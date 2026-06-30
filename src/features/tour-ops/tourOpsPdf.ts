@@ -3,33 +3,22 @@ import { formatInTimeZone } from "date-fns-tz";
 import type jsPDF from "jspdf";
 import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
 import { buildReadableFilename } from "@/utils/fileName";
+import { blobToDataUrl, getLastAutoTableY, SECTOR_PRO_RED } from "@/utils/pdf/exportHelpers";
 import { fetchTourLogo, getCompanyLogo } from "@/utils/pdf/logoUtils";
 import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import type { TourOpsDate, TourOpsModel, TourOpsProjection } from "@/features/tour-ops/types";
 
-const RED: [number, number, number] = [125, 1, 1];
+const RED: [number, number, number] = SECTOR_PRO_RED;
 const INK: [number, number, number] = [32, 36, 42];
 const MUTED: [number, number, number] = [104, 112, 124];
-
-interface AutoTableDoc extends jsPDF {
-  lastAutoTable?: { finalY?: number };
-}
 
 interface PdfBranding {
   tourLogo?: { dataUrl: string; format: "PNG" | "JPEG" };
   companyLogo?: HTMLImageElement | null;
 }
 
-const lastY = (pdf: jsPDF, fallback: number) => (pdf as AutoTableDoc).lastAutoTable?.finalY ?? fallback;
+const lastY = (pdf: jsPDF, fallback: number) => getLastAutoTableY(pdf, fallback);
 const dateOnlyAsMadridNoon = (value: string) => (value.includes("T") ? value : `${value}T12:00:00`);
-
-const blobToDataUrl = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
-    reader.readAsDataURL(blob);
-  });
 
 const loadDataUrl = async (url: string | undefined): Promise<string | null> => {
   if (!url || typeof fetch === "undefined") return null;

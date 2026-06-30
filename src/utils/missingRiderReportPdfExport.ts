@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
+import { SECTOR_PRO_LOGO_PATH, FALLBACK_BRAND_LOGO_PATH } from '@/utils/pdf/shared/pdfExportShared';
 import { generateQRCode } from '@/utils/qrcode';
 
 export interface MissingRiderArtist {
@@ -36,10 +38,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
   const markCurrentPageAsContent = () => {
     contentPageNumbers.add(doc.getCurrentPageInfo().pageNumber);
   };
-  const getLastAutoTableFinalY = (fallback: number) => {
-    const docWithTable = doc as unknown as { lastAutoTable?: { finalY?: number } };
-    return docWithTable.lastAutoTable?.finalY ?? fallback;
-  };
+  const getLastAutoTableFinalY = (fallback: number) => getLastAutoTableY(doc, fallback);
   interface LoadedImage {
     dataUrl: string;
     width: number;
@@ -94,8 +93,8 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
 
   const festivalLogo = await toLoadedImage(data.logoUrl);
   const sectorLogo =
-    (await toLoadedImage('/sector pro logo.png')) ||
-    (await toLoadedImage('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png'));
+    (await toLoadedImage(SECTOR_PRO_LOGO_PATH)) ||
+    (await toLoadedImage(FALLBACK_BRAND_LOGO_PATH));
 
   const drawRunningHeader = (pageNumber: number) => {
     doc.setFillColor(125, 1, 1);

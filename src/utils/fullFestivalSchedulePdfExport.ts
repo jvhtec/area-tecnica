@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
 import {
   loadImageWithTimeout as loadImageSafely,
   SECTOR_PRO_LOGO_PATH,
@@ -160,7 +161,7 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
   const totalArtists = sortedArtists.length;
   const uniqueStages = [...new Set(sortedArtists.map(a => a.stage))];
 
-  let currentY = (doc as any).lastAutoTable.finalY + 20;
+  let currentY = getLastAutoTableY(doc, 0) + 20;
 
   // Check if we need a new page for the summary
   if (currentY > pageHeight - 80) {

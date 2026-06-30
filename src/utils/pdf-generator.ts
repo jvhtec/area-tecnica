@@ -2,8 +2,12 @@ import { supabase } from "@/lib/supabase";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { Formatters } from "@/utils/hoja-de-ruta/pdf/utils/formatters";
 import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
-
-type AutoTableJsPDF = any & { lastAutoTable: { finalY: number } };
+import {
+  drawCorporateHeader,
+  getLastAutoTableY,
+  inferPdfImageFormat,
+  loadSectorProFooterLogo,
+} from "@/utils/pdf";
 
 // Helper function to format datetime for PDF display
 // Uses empty string instead of 'N/A' for cleaner table output
@@ -90,7 +94,7 @@ export const generatePDF = async (
   const titleForFileName = selectedJob?.title?.trim() || eventData.eventName?.trim();
   const fileName = buildRouteSheetFileName(titleForFileName);
 
-  const doc = new jsPDF() as AutoTableJsPDF;
+  const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const bottomMargin = 60;
@@ -104,16 +108,8 @@ export const generatePDF = async (
     return currentY;
   };
 
-  // Header background
-  doc.setFillColor(125, 1, 1);
-  doc.rect(0, 0, pageWidth, 40, "F");
-
-  // Title and event name
-  doc.setFontSize(24);
-  doc.setTextColor(255, 255, 255);
-  doc.text("Hoja de Ruta", pageWidth / 2, 20, { align: "center" });
-  doc.setFontSize(16);
-  doc.text(eventData.eventName, pageWidth / 2, 30, { align: "center" });
+  // Shared corporate header band (title + event name)
+  drawCorporateHeader(doc, { title: "Hoja de Ruta", subtitle: eventData.eventName });
 
   let yPosition = 50;
   doc.setFontSize(12);
@@ -173,7 +169,7 @@ export const generatePDF = async (
       theme: "grid",
       styles: { fontSize: 10 },
     });
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    yPosition = getLastAutoTableY(doc, yPosition) + 15;
   }
 
   // Logistics section
@@ -233,7 +229,7 @@ export const generatePDF = async (
       theme: "grid",
       styles: { fontSize: 10 },
     });
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    yPosition = getLastAutoTableY(doc, yPosition) + 15;
   }
 
   // Travel arrangements section
@@ -263,7 +259,7 @@ export const generatePDF = async (
       theme: "grid",
       styles: { fontSize: 10 },
     });
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    yPosition = getLastAutoTableY(doc, yPosition) + 15;
   }
 
   // Room assignments section
@@ -291,7 +287,7 @@ export const generatePDF = async (
       theme: "grid",
       styles: { fontSize: 10 },
     });
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    yPosition = getLastAutoTableY(doc, yPosition) + 15;
   }
 
   // Schedule section
@@ -368,12 +364,9 @@ export const generatePDF = async (
     }
   }
 
-  // Load and add logo
-  const logo = new Image();
-  logo.crossOrigin = "anonymous";
-  logo.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
-  
-  logo.onload = () => {
+  // Centered footer logo on every page (shared loader, aspect preserved)
+  const logo = await loadSectorProFooterLogo();
+  if (logo && logo.width > 0 && logo.height > 0) {
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
@@ -381,26 +374,16 @@ export const generatePDF = async (
       const logoHeight = logoWidth * (logo.height / logo.width);
       const xPositionLogo = (pageWidth - logoWidth) / 2;
       const yPositionLogo = pageHeight - logoHeight - 10;
-      doc.addImage(logo, "PNG", xPositionLogo, yPositionLogo, logoWidth, logoHeight);
+      doc.addImage(logo, inferPdfImageFormat(logo), xPositionLogo, yPositionLogo, logoWidth, logoHeight);
     }
-    const blob = doc.output("blob");
-    uploadPdfToJob(selectedJobId, blob, fileName);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-  
-  logo.onerror = () => {
-    console.error("No se pudo cargar el logo");
-    const blob = doc.output("blob");
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  }
+
+  const blob = doc.output("blob");
+  void uploadPdfToJob(selectedJobId, blob, fileName);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 };

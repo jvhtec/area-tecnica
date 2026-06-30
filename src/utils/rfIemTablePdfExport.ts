@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { inferPdfImageFormat, loadImageSilently, loadSectorProFooterLogo } from '@/utils/pdf';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 
 export interface RfIemSystemData {
@@ -579,41 +580,23 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   const tableStartY = 30;
   const footerBandHeight = 22;
 
-  let headerLogoObjectUrl: string | undefined;
-  let headerLogoFormat: 'PNG' | 'JPEG' = 'PNG';
-  let headerLogoDimensions: { width: number; height: number } | undefined;
-  if (data.logoUrl) {
-    try {
-      const response = await fetch(data.logoUrl);
-      const logoBlob = await response.blob();
-      headerLogoObjectUrl = URL.createObjectURL(logoBlob);
-      headerLogoFormat = logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG';
-
-      headerLogoDimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
-        const image = new Image();
-        image.onload = () => {
-          resolve({ width: image.width, height: image.height });
-        };
-        image.onerror = () => resolve(undefined);
-        image.src = headerLogoObjectUrl as string;
-      });
-    } catch (err) {
-      console.error('Error loading logo:', err);
-    }
-  }
+  const headerLogo = data.logoUrl
+    ? await loadImageSilently(data.logoUrl, 'rf/iem header logo')
+    : null;
+  const headerLogoFormat = inferPdfImageFormat(data.logoUrl, 'PNG');
 
   const drawPageHeader = (festivalDayLabel: string): void => {
-    if (headerLogoObjectUrl && headerLogoDimensions && headerLogoDimensions.width > 0 && headerLogoDimensions.height > 0) {
+    if (headerLogo && headerLogo.width > 0 && headerLogo.height > 0) {
       const maxLogoWidth = 40;
       const maxLogoHeight = 15;
       const scale = Math.min(
-        maxLogoWidth / headerLogoDimensions.width,
-        maxLogoHeight / headerLogoDimensions.height,
+        maxLogoWidth / headerLogo.width,
+        maxLogoHeight / headerLogo.height,
       );
-      const drawWidth = headerLogoDimensions.width * scale;
-      const drawHeight = headerLogoDimensions.height * scale;
+      const drawWidth = headerLogo.width * scale;
+      const drawHeight = headerLogo.height * scale;
       pdf.addImage(
-        headerLogoObjectUrl,
+        headerLogo,
         headerLogoFormat,
         pageWidth - drawWidth - rightMargin,
         10,
@@ -872,53 +855,39 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   }
 
   const addFooter = async () => {
-    return new Promise<void>((resolve) => {
-      const totalPages = pdf.getNumberOfPages();
+    const totalPages = pdf.getNumberOfPages();
+
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+
+      pdf.setFontSize(8);
+      pdf.setTextColor(100);
+
+      const date = new Date().toLocaleDateString('es-ES');
+      pdf.text(`Generado: ${date}`, leftMargin, pageHeight - 8);
+      pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
+    }
+
+    const logo = await loadSectorProFooterLogo();
+    if (logo && logo.width > 0 && logo.height > 0) {
+      const logoWidth = 50;
+      const logoHeight = logoWidth * (logo.height / logo.width);
 
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
+        const xPosition = (pageWidth - logoWidth) / 2;
+        const yPosition = pageHeight - 5 - logoHeight;
 
-        pdf.setFontSize(8);
-        pdf.setTextColor(100);
-
-        const date = new Date().toLocaleDateString('es-ES');
-        pdf.text(`Generado: ${date}`, leftMargin, pageHeight - 8);
-        pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
-      }
-
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-
-      logo.onload = () => {
-        const logoWidth = 50;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-
-        for (let i = 1; i <= totalPages; i++) {
-          pdf.setPage(i);
-          const xPosition = (pageWidth - logoWidth) / 2;
-          const yPosition = pageHeight - 5 - logoHeight;
-
-          try {
-            pdf.addImage(logo, 'PNG', xPosition, yPosition, logoWidth, logoHeight);
-          } catch (error) {
-            console.error(`Error adding logo on page ${i}:`, error);
-          }
+        try {
+          pdf.addImage(logo, inferPdfImageFormat(logo), xPosition, yPosition, logoWidth, logoHeight);
+        } catch (error) {
+          console.error(`Error adding logo on page ${i}:`, error);
         }
-
-        resolve();
-      };
-
-      logo.onerror = () => {
-        resolve();
-      };
-    });
+      }
+    }
   };
 
   await addFooter();
-  if (headerLogoObjectUrl) {
-    URL.revokeObjectURL(headerLogoObjectUrl);
-  }
 
   return pdf.output('blob');
 };

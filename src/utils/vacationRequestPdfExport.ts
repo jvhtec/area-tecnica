@@ -3,7 +3,7 @@ import { VacationRequest } from '@/lib/vacation-requests';
 import { supabase } from '@/integrations/supabase/client';
 import { buildVacationRequestPdfFilename } from '@/utils/pdfFileNames';
 import { loadJsPDF } from '@/utils/pdf/lazyPdf';
-import { loadImageWithTimeout as loadImageSafely } from '@/utils/pdf/shared/pdfExportShared';
+import { loadSectorProFooterLogo } from '@/utils/pdf/shared/pdfExportShared';
 
 interface VacationRequestPDFOptions {
   request: VacationRequest;
@@ -64,20 +64,9 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   const primaryColor: [number, number, number] = [125, 1, 1]; // Dark blue
   const accentColor: [number, number, number] = [125, 1, 25]; // Darker blue-gray
   
-  // Load Sector Pro logo (try multiple paths like other PDFs)
-  let logoImg: HTMLImageElement | null = null;
-  const logoPaths = [
-    '/sector pro logo.png',
-    '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png',
-    './sector pro logo.png',
-    'sector pro logo.png'
-  ];
-  
-  for (const logoPath of logoPaths) {
-    logoImg = await loadImageSafely(logoPath, 'Sector Pro logo');
-    if (logoImg) break;
-  }
-  
+  // Load Sector Pro logo (shared loader with corporate fallback paths)
+  const logoImg = await loadSectorProFooterLogo();
+
   // Header
   pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   pdf.rect(0, 0, pageWidth, 25, 'F');

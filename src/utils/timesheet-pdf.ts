@@ -3,6 +3,7 @@ import { Job } from '@/types/job';
 import { format, parseISO } from 'date-fns';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { loadImageWithTimeout, loadSectorProFooterLogo } from '@/utils/pdf';
 import { isPrepDayTimesheet } from '@/utils/timesheetPrepDays';
 
 interface GenerateTimesheetPDFOptions {
@@ -44,33 +45,6 @@ const formatOvertime = (overtimeHours: number | null | undefined): string => {
   return `${overtimeHours}h`;
 };
 
-// Helper function to safely load images with timeout
-const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    const timeout = setTimeout(() => {
-      console.warn(`Timeout loading ${description}`);
-      resolve(null);
-    }, 5000);
-
-    img.onload = () => {
-      clearTimeout(timeout);
-      console.log(`Successfully loaded ${description}`);
-      resolve(img);
-    };
-
-    img.onerror = (error) => {
-      clearTimeout(timeout);
-      console.error(`Error loading ${description}:`, error);
-      resolve(null);
-    };
-
-    img.src = src;
-  });
-};
-
 export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTimesheetPDFOptions) => {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
@@ -85,8 +59,8 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
 
   // Load images
   const [jobLogo, companyLogo] = await Promise.all([
-    jobLogoUrl ? loadImageSafely(jobLogoUrl, 'job logo') : Promise.resolve(null),
-    loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'company logo')
+    jobLogoUrl ? loadImageWithTimeout(jobLogoUrl, 'job logo') : Promise.resolve(null),
+    loadSectorProFooterLogo()
   ]);
 
   // Create signature map

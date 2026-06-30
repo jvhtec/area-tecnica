@@ -1,4 +1,5 @@
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
+import { loadSectorProFooterLogo } from "@/utils/pdf";
 import { loadExceljs } from "@/utils/lazyExceljs";
 import { applyStyle, saveWorkbook, toArgb, tintColor, thinBorder, hexToRgb, getContrastHexColor } from "@/utils/excelExport";
 import {
@@ -164,14 +165,8 @@ export const generatePersonalCalendarPDF = async (
 
   let startDate: Date, endDate: Date;
 
-  // Load logo
-  const logo = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
-    img.onload = () => resolve(img);
-    img.onerror = (err) => reject(err);
-  }).catch((): null => null);
+  // Load logo (shared Sector Pro loader)
+  const logo = await loadSectorProFooterLogo();
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { inferPdfImageFormat, loadSectorProFooterLogo } from "@/utils/pdf";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FolderOpen, Check, X, Upload } from "lucide-react";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
@@ -321,48 +322,34 @@ export const ReportGenerator = () => {
       }
     }
 
-    // Add footer logo (Sector Pro)
-    const footerLogo = new Image();
-    footerLogo.crossOrigin = 'anonymous';
-    footerLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-    
-    footerLogo.onload = () => {
+    // Add footer logo (Sector Pro, shared loader)
+    const footerLogo = await loadSectorProFooterLogo();
+    const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+    let logoAdded = true;
+    if (footerLogo && footerLogo.width > 0 && footerLogo.height > 0) {
       pdf.setPage(pdf.getNumberOfPages());
       const logoWidth = 50;
       const logoHeight = logoWidth * (footerLogo.height / footerLogo.width);
       const xPosition = (pageWidth - logoWidth) / 2;
       const yPosition = pageHeight - 20;
-      
+
       try {
-        pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        const blob = pdf.output('blob');
-        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-        pdf.save(filename);
-        toast({
-          title: "Success",
-          description: "Report generated successfully",
-        });
+        pdf.addImage(footerLogo, inferPdfImageFormat(footerLogo), xPosition, yPosition - logoHeight, logoWidth, logoHeight);
       } catch (error) {
         console.error('Error adding footer logo:', error);
-        const blob = pdf.output('blob');
-        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-        pdf.save(filename);
-        toast({
-          title: "Success",
-          description: "Report generated successfully (without logo)",
-        });
+        logoAdded = false;
       }
-    };
+    } else {
+      logoAdded = false;
+    }
 
-    footerLogo.onerror = () => {
-      console.error('Failed to load footer logo');
-      const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-      pdf.save(filename);
-      toast({
-        title: "Success",
-        description: "Report generated successfully (without logo)",
-      });
-    };
+    pdf.save(filename);
+    toast({
+      title: "Success",
+      description: logoAdded
+        ? "Report generated successfully"
+        : "Report generated successfully (without logo)",
+    });
   };
 
   const addImageToPDF = async (pdf: jsPDF, file: File, viewType: string, x: number, y: number, width: number) => {

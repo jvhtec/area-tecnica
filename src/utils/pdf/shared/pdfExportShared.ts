@@ -1,9 +1,25 @@
 import type jsPDF from 'jspdf';
 import { SECTOR_PRO_RED, type PdfRgb } from '@/utils/pdf/exportHelpers';
 import { fetchJobLogo, fetchTourLogo } from '@/utils/pdf/logoUtils';
+import { buildReadableFilename, sanitizeFilenamePart as sanitizeFileNamePart } from '@/utils/fileName';
 
 export type { PdfRgb };
 export type PdfImageFormat = 'PNG' | 'JPEG';
+
+/**
+ * A logo accepted by the shared header/footer builders. jsPDF's `addImage`
+ * handles both an `HTMLImageElement` (intrinsic dimensions available for
+ * aspect-ratio sizing) and a data-URL/`string` source, so both flavours are
+ * supported through a single API.
+ */
+export type PdfLogo = HTMLImageElement | string | null | undefined;
+
+const logoAspectRatio = (logo: PdfLogo): number => {
+  if (logo && typeof logo !== 'string' && logo.width > 0 && logo.height > 0) {
+    return logo.width / logo.height;
+  }
+  return 1.25; // default ratio used when intrinsic dimensions are unavailable
+};
 
 // ---------------------------------------------------------------------------
 // Shared corporate palette
@@ -41,25 +57,15 @@ export const FALLBACK_BRAND_LOGO_PATH = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5b
 // Filename helpers
 // ---------------------------------------------------------------------------
 
-const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*]/g;
-
-export const sanitizeFilenamePart = (value: string): string => {
-  return value
-    .replace(INVALID_FILENAME_CHARS_REGEX, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[. ]+$/g, '');
-};
+export const sanitizeFilenamePart = (value: string | null | undefined): string =>
+  sanitizeFileNamePart(value, '');
 
 export const buildPdfFilename = (
   parts: Array<string | null | undefined>,
   fallback = 'Documento',
 ): string => {
-  const safeParts = parts
-    .map((part) => sanitizeFilenamePart(part ?? ''))
-    .filter(Boolean);
-  const baseName = safeParts.join(' - ') || fallback;
-  return `${baseName}.pdf`;
+  const safeParts = parts.map((part) => sanitizeFilenamePart(part)).filter(Boolean);
+  return buildReadableFilename(safeParts.length ? safeParts : [fallback], 'pdf');
 };
 
 // ---------------------------------------------------------------------------
@@ -182,15 +188,16 @@ export const resolveHeaderLogo = async ({
  */
 export const addLogoConstrainedToHeight = (
   doc: jsPDF,
-  image: HTMLImageElement,
+  image: PdfLogo,
   format: 'PNG' | 'JPEG',
   x: number,
   y: number,
   maxHeight: number,
 ): void => {
-  const ratio = image.width / image.height;
-  const logoHeight = Math.min(maxHeight, image.height);
-  const logoWidth = logoHeight * ratio;
+  if (!image) return;
+  const intrinsicHeight = typeof image === 'string' ? maxHeight : image.height || maxHeight;
+  const logoHeight = Math.min(maxHeight, intrinsicHeight);
+  const logoWidth = logoHeight * logoAspectRatio(image);
   doc.addImage(image, format, x, y, logoWidth, logoHeight);
 };
 
@@ -202,7 +209,7 @@ export interface CorporateHeaderOptions {
   title: string;
   subtitle?: string;
   metadata?: string;
-  logo?: HTMLImageElement | null;
+  logo?: PdfLogo;
 }
 
 /**
@@ -220,9 +227,8 @@ export const drawCorporateHeader = (
 
   if (logo) {
     try {
-      const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
       const logoHeight = 26;
-      const logoWidth = logoHeight * ratio;
+      const logoWidth = logoHeight * logoAspectRatio(logo);
       doc.addImage(logo, inferPdfImageFormat(logo), 16, 9, logoWidth, logoHeight);
     } catch (error) {
       console.error('Error adding logo to PDF header:', error);
@@ -255,7 +261,7 @@ export const drawCorporateHeader = (
  * Draws the corporate footer (centered logo, "Sector-Pro" label and
  * "Página X de Y" page numbers) on every page of the document.
  */
-export const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null): void => {
+export const drawCorporateFooter = (doc: jsPDF, logo: PdfLogo): void => {
   const pageCount = doc.getNumberOfPages();
 
   for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
@@ -267,9 +273,8 @@ export const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null): 
 
     if (logo) {
       try {
-        const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
         const logoHeight = 12;
-        const logoWidth = logoHeight * ratio;
+        const logoWidth = logoHeight * logoAspectRatio(logo);
         const logoX = (pageWidth - logoWidth) / 2;
         doc.addImage(
           logo,
@@ -349,20 +354,21 @@ export const drawFestivalHeaderText = (
  */
 export const drawCenteredFooterLogo = (
   doc: jsPDF,
-  logo: HTMLImageElement | null,
+  logo: PdfLogo,
   pageWidth: number,
   pageHeight: number,
   bottomOffset: number,
   errorMessage = 'Error adding footer logo to PDF:',
 ): void => {
-  if (!logo || !(logo.width > 0) || !(logo.height > 0)) return;
+  if (!logo) return;
+  if (typeof logo !== 'string' && (!(logo.width > 0) || !(logo.height > 0))) return;
 
   try {
     const logoWidth = 20;
-    const logoHeight = logoWidth * (logo.height / logo.width);
+    const logoHeight = logoWidth / logoAspectRatio(logo);
     doc.addImage(
       logo,
-      'PNG',
+      inferPdfImageFormat(logo),
       pageWidth / 2 - logoWidth / 2,
       pageHeight - logoHeight - bottomOffset,
       logoWidth,

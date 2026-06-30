@@ -1,4 +1,5 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { inferPdfImageFormat, loadImageSilently, loadSectorProFooterLogo } from '@/utils/pdf';
 
 export interface InfrastructureItemData {
   type: 'cat6' | 'hma' | 'coax' | 'opticalcon_duo' | 'analog';
@@ -123,52 +124,21 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
   const headerStartY = 30;
   const bottomMargin = 24;
 
-  type HeaderLogo = {
-    objectUrl: string;
-    format: 'PNG' | 'JPEG';
-    width: number;
-    height: number;
-  };
-  let headerLogo: HeaderLogo | undefined;
-
-  if (data.logoUrl) {
-    try {
-      const response = await fetch(data.logoUrl);
-      if (response.ok) {
-        const logoBlob = await response.blob();
-        const objectUrl = URL.createObjectURL(logoBlob);
-        const dimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
-          const image = new Image();
-          image.onload = () => resolve({ width: image.width, height: image.height });
-          image.onerror = () => resolve(undefined);
-          image.src = objectUrl;
-        });
-        if (dimensions && dimensions.width > 0 && dimensions.height > 0) {
-          headerLogo = {
-            objectUrl,
-            format: logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG',
-            width: dimensions.width,
-            height: dimensions.height,
-          };
-        } else {
-          URL.revokeObjectURL(objectUrl);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading logo:', err);
-    }
-  }
+  const headerLogo = data.logoUrl
+    ? await loadImageSilently(data.logoUrl, 'infrastructure header logo')
+    : null;
+  const headerLogoFormat = inferPdfImageFormat(data.logoUrl, 'JPEG');
 
   const drawStageHeader = (stageNum: number): void => {
-    if (headerLogo) {
+    if (headerLogo && headerLogo.width > 0 && headerLogo.height > 0) {
       const maxLogoWidth = 40;
       const maxLogoHeight = 15;
       const scale = Math.min(maxLogoWidth / headerLogo.width, maxLogoHeight / headerLogo.height);
       const drawWidth = headerLogo.width * scale;
       const drawHeight = headerLogo.height * scale;
       pdf.addImage(
-        headerLogo.objectUrl,
-        headerLogo.format,
+        headerLogo,
+        headerLogoFormat,
         pageWidth - drawWidth - rightMargin,
         10,
         drawWidth,
@@ -256,13 +226,7 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     });
   }
 
-  const sectorLogo = new Image();
-  sectorLogo.crossOrigin = 'anonymous';
-  sectorLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-  await new Promise<void>((resolve) => {
-    sectorLogo.onload = () => resolve();
-    sectorLogo.onerror = () => resolve();
-  });
+  const sectorLogo = await loadSectorProFooterLogo();
 
   const totalPages = pdf.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
@@ -273,21 +237,17 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     pdf.text(`Generado: ${date}`, leftMargin, pageHeight - 8);
     pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
 
-    if (sectorLogo.width > 0 && sectorLogo.height > 0) {
+    if (sectorLogo && sectorLogo.width > 0 && sectorLogo.height > 0) {
       const logoWidth = 50;
       const logoHeight = logoWidth * (sectorLogo.height / sectorLogo.width);
       const xPosition = (pageWidth - logoWidth) / 2;
       const yLogo = pageHeight - 5 - logoHeight;
       try {
-        pdf.addImage(sectorLogo, 'PNG', xPosition, yLogo, logoWidth, logoHeight);
+        pdf.addImage(sectorLogo, inferPdfImageFormat(sectorLogo), xPosition, yLogo, logoWidth, logoHeight);
       } catch (error) {
         console.error(`Error adding footer logo on page ${i}:`, error);
       }
     }
-  }
-
-  if (headerLogo) {
-    URL.revokeObjectURL(headerLogo.objectUrl);
   }
 
   return pdf.output('blob');

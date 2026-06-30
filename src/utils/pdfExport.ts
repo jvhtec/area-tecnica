@@ -1,4 +1,10 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  getLastAutoTableY,
+  inferPdfImageFormat,
+  loadImageSilently,
+  loadSectorProFooterLogo,
+} from '@/utils/pdf';
 import { getResolvedPowerPosition } from '@/utils/powerPositions';
 import { buildPowerStagePlot } from '@/utils/powerStagePlot';
 import { drawPowerStagePlot } from '@/utils/pdf/powerStagePlotPdf';
@@ -70,6 +76,8 @@ export const exportToPDF = async (
   fohSchukoRequired?: boolean
 ): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
+  const headerLogo = customLogoUrl ? await loadImageSilently(customLogoUrl, 'pdf export header logo') : null;
+  const footerLogo = await loadSectorProFooterLogo();
   return new Promise<Blob>((resolve) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -161,7 +169,7 @@ export const exportToPDF = async (
               styles: { fontSize: 10, cellPadding: 5 },
               headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] }
             });
-            yPosition = (doc as any).lastAutoTable.finalY + 10;
+            yPosition = getLastAutoTableY(doc, yPosition) + 10;
           }
 
           const supportRows = table.rows
@@ -176,7 +184,7 @@ export const exportToPDF = async (
               styles: { fontSize: 10, cellPadding: 5 },
               headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] }
             });
-            yPosition = (doc as any).lastAutoTable.finalY + 10;
+            yPosition = getLastAutoTableY(doc, yPosition) + 10;
           }
 
           if (table.maxMomentNm !== undefined || table.maxDeflectionMm !== undefined) {
@@ -273,7 +281,7 @@ export const exportToPDF = async (
           didDrawPage: (data) => { yPosition = data.cursor.y + 10; }
         });
 
-        yPosition = (doc as any).lastAutoTable.finalY + 10;
+        yPosition = getLastAutoTableY(doc, yPosition) + 10;
 
         if (type === 'power') {
           const positionLabel = getResolvedPowerPosition(table.position, table.customPosition);
@@ -488,45 +496,25 @@ export const exportToPDF = async (
         }
       }
 
-      // Footer logo & created date
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-      logo.onload = () => {
+      // Footer logo & created date (shared Sector Pro logo, loaded up front)
+      const totalPages = doc.internal.pages.length - 1;
+      if (footerLogo && footerLogo.width > 0 && footerLogo.height > 0) {
         const logoWidth = 50;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-        const totalPages = doc.internal.pages.length - 1;
+        const logoHeight = logoWidth * (footerLogo.height / footerLogo.width);
         for (let i = 1; i <= totalPages; i++) {
           doc.setPage(i);
           const xPosition = (pageWidth - logoWidth) / 2;
           const yLogo = pageHeight - 20;
-          try { doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight); } catch { /* logo is optional; render without it */ }
+          try { doc.addImage(footerLogo, inferPdfImageFormat(footerLogo), xPosition, yLogo - logoHeight, logoWidth, logoHeight); } catch { /* logo is optional; render without it */ }
         }
-        doc.setPage(totalPages);
-        doc.setFontSize(10); doc.setTextColor(51, 51, 51);
-        doc.text(`Creado: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-        const blob = doc.output('blob'); resolve(blob);
-      };
-
-      logo.onerror = () => {
-        const totalPages = doc.internal.pages.length - 1;
-        doc.setPage(totalPages);
-        doc.setFontSize(10); doc.setTextColor(51, 51, 51);
-        doc.text(`Creado: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-        const blob = doc.output('blob'); resolve(blob);
-      };
+      }
+      doc.setPage(totalPages);
+      doc.setFontSize(10); doc.setTextColor(51, 51, 51);
+      doc.text(`Creado: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+      resolve(doc.output('blob'));
     };
 
-    // Header logo (optional)
-    let headerLogo: HTMLImageElement | undefined;
-    if (customLogoUrl) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = customLogoUrl;
-      img.onload = () => { headerLogo = img; loadHeaderContent(img); };
-      img.onerror = () => { loadHeaderContent(); };
-    } else {
-      loadHeaderContent();
-    }
+    // Draw header (with optional custom logo loaded up front) then process tables.
+    loadHeaderContent(headerLogo ?? undefined);
   });
 };

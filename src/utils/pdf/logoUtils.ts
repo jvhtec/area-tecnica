@@ -1,6 +1,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { logoUrlCache } from '@/lib/logo-url-cache';
+import { blobToDataUrl } from '@/utils/pdf/exportHelpers';
 
 const COMPANY_LOGO_BUCKET = 'company-assets';
 const COMPANY_LOGO_PATH = 'sector-pro-logo.png';
@@ -304,15 +305,6 @@ const loadImageElement = (src: string): Promise<HTMLImageElement | null> => {
       resolve(null);
     };
     img.src = src;
-  });
-};
-
-const blobToDataUrl = (blob: Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
-    reader.readAsDataURL(blob);
   });
 };
 

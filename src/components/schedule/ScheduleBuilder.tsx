@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ProgramRow } from '@/types/hoja-de-ruta';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { Plus, Trash2, Copy, ArrowUp, ArrowDown, FileDown } from 'lucide-react';
 
 type TimeFormat = '24h' | '12h';
@@ -153,8 +154,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
   };
 
   const exportPdf = async () => {
-    const { jsPDF } = await import('jspdf');
-    const { autoTable } = await import('jspdf-autotable');
+    const { jsPDF, autoTable } = await loadPdfLibs();
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text(title, 20, 20);

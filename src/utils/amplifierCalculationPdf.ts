@@ -1,6 +1,12 @@
 import { format } from 'date-fns';
 import type { SpeakerSection, AmplifierResults } from '@/components/sound/amplifier-tool/types';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  drawCorporatePdfHeader,
+  drawGeneratedPdfFooter,
+  getLastAutoTableY,
+  loadCompanyLogoDataUrl,
+} from '@/utils/pdf';
 
 export const generateAmplifierPdf = async (
   config: Record<string, SpeakerSection>,
@@ -8,19 +14,15 @@ export const generateAmplifierPdf = async (
   soundComponentDatabase: Array<{ id: number; name: string; weight: number }>,
 ): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
+  const companyLogo = await loadCompanyLogoDataUrl();
   return new Promise((resolve, reject) => {
     try {
       const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const createdDate = format(new Date(), 'PPP');
 
-      // Header
-      doc.setFillColor(125, 1, 1);
-      doc.rect(0, 0, pageWidth, 30, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
-      doc.text("Amplifier Requirements Report", pageWidth / 2, 20, { align: 'center' });
+      // Header (shared corporate chrome)
+      drawCorporatePdfHeader(doc, { title: 'Amplifier Requirements Report' });
 
       // Date
       doc.setTextColor(0, 0, 0);
@@ -54,7 +56,7 @@ export const generateAmplifierPdf = async (
             margin: { left: 14, right: 14 },
           });
 
-          yPosition = (doc as any).lastAutoTable.finalY + 10;
+          yPosition = getLastAutoTableY(doc, yPosition) + 10;
 
           // Total for section
           doc.setFontSize(12);
@@ -95,40 +97,14 @@ export const generateAmplifierPdf = async (
         margin: { left: 14, right: 14 }
       });
 
-      // Add logo
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+      // Shared corporate footer (centered logo + generated date + page number)
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        drawGeneratedPdfFooter(doc, { pageNumber: i, logo: companyLogo });
+      }
 
-      logo.onload = () => {
-        try {
-          const logoWidth = 40;
-          const logoHeight = logoWidth * (logo.height / logo.width);
-          const totalPages = (doc.internal as any).pages.length;
-
-          // Add logo and page numbers to each page
-          for (let i = 1; i <= totalPages; i++) {
-            doc.setPage(i);
-            doc.addImage(logo, 'PNG', pageWidth - 50, pageHeight - 25, logoWidth, logoHeight);
-            doc.setFontSize(10);
-            doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-          }
-
-          const blob = doc.output('blob');
-          resolve(blob);
-        } catch (error) {
-          console.error('Error adding logo:', error);
-          const blob = doc.output('blob');
-          resolve(blob);
-        }
-      };
-
-      logo.onerror = () => {
-        console.error('Failed to load logo');
-        const blob = doc.output('blob');
-        resolve(blob);
-      };
-
+      resolve(doc.output('blob'));
     } catch (error) {
       console.error("Error generating PDF:", error);
       reject(error);

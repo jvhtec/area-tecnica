@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { categoryLabels } from '@/types/equipment';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY, inferPdfImageFormat, loadSectorProFooterLogo } from '@/utils/pdf';
 
 interface DailyUsage {
   used: number;
@@ -29,6 +30,7 @@ export const exportWeeklySummaryPDF = async (
   shortagesOnly: boolean = false
 ): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
+  const footerLogo = await loadSectorProFooterLogo();
   return new Promise((resolve, reject) => {
     try {
       const doc = new jsPDF({ orientation: 'landscape' });
@@ -127,7 +129,8 @@ export const exportWeeklySummaryPDF = async (
       const TOP = 60;
       const FOOTER_RESERVE = 42; // keep clear space for footer/logo & page number
       const safeBottom = doc.internal.pageSize.getHeight() - FOOTER_RESERVE;
-      let y = (doc as any).lastAutoTable?.finalY ? Math.min((doc as any).lastAutoTable.finalY + 12, safeBottom) : TOP;
+      const lastTableY = getLastAutoTableY(doc, 0);
+      let y = lastTableY ? Math.min(lastTableY + 12, safeBottom) : TOP;
 
       const ensureSpace = (needed: number) => {
         if (y + needed > safeBottom) {
@@ -177,48 +180,36 @@ export const exportWeeklySummaryPDF = async (
           },
           margin: { left: LEFT, right: 14, bottom: FOOTER_RESERVE },
         });
-        y = ((doc as any).lastAutoTable?.finalY || y) + 8;
+        y = getLastAutoTableY(doc, y) + 8;
       });
 
-      // Add logo and page numbers
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+      // Add logo and page numbers (shared Sector Pro logo, loaded up front)
+      const totalPages = (doc.internal as any).pages.length - 1;
+      const logoWidth = 50;
+      const logoHeight = footerLogo && footerLogo.width > 0 ? logoWidth * (footerLogo.height / footerLogo.width) : 0;
 
-      logo.onload = () => {
-        const logoWidth = 50;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-        const totalPages = (doc.internal as any).pages.length - 1;
-
-        for (let i = 1; i <= totalPages; i++) {
-          doc.setPage(i);
-          const xPosition = (pageWidth - logoWidth) / 2;
-          const yLogo = pageHeight - 20;
-          try {
-            doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight);
-            doc.setFontSize(10);
-            doc.setTextColor(51, 51, 51);
-            doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-          } catch (error) {
-            console.error(`Error adding logo on page ${i}:`, error);
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        const xPosition = (pageWidth - logoWidth) / 2;
+        const yLogo = pageHeight - 20;
+        try {
+          if (footerLogo && footerLogo.width > 0 && footerLogo.height > 0) {
+            doc.addImage(footerLogo, inferPdfImageFormat(footerLogo), xPosition, yLogo - logoHeight, logoWidth, logoHeight);
           }
+          doc.setFontSize(10);
+          doc.setTextColor(51, 51, 51);
+          doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        } catch (error) {
+          console.error(`Error adding logo on page ${i}:`, error);
         }
+      }
 
-        doc.setPage(totalPages);
-        doc.setFontSize(10);
-        doc.setTextColor(51, 51, 51);
-        doc.text(`Creado: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-        
-        const blob = doc.output('blob');
-        resolve(blob);
-      };
+      doc.setPage(totalPages);
+      doc.setFontSize(10);
+      doc.setTextColor(51, 51, 51);
+      doc.text(`Creado: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
 
-      logo.onerror = () => {
-        console.error('Failed to load logo');
-        const blob = doc.output('blob');
-        resolve(blob);
-      };
-
+      resolve(doc.output('blob'));
     } catch (error) {
       console.error("Error in PDF generation:", error);
       reject(error);

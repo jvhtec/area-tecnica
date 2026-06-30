@@ -1,6 +1,12 @@
 import { format } from 'date-fns';
 import { ShiftWithAssignments } from '@/types/festival-scheduling';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  getLastAutoTableY,
+  inferPdfImageFormat,
+  loadImageSilently,
+  loadSectorProFooterLogo,
+} from '@/utils/pdf';
 
 export interface ShiftsTablePdfData {
   jobTitle: string;
@@ -12,6 +18,14 @@ export interface ShiftsTablePdfData {
 
 export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
+
+  // Load the header (festival/job) logo and the Sector Pro footer logo up front.
+  const headerLogoImg = data.logoUrl
+    ? await loadImageSilently(data.logoUrl, 'shifts header logo')
+    : null;
+  const headerLogoFormat = inferPdfImageFormat(data.logoUrl, 'JPEG');
+  const sectorImg = await loadSectorProFooterLogo();
+
   return new Promise((resolve, reject) => {
     try {
       // Create PDF in landscape
@@ -24,35 +38,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       const tableTopMargin = 25;
       const footerReserve = 24;
 
-      let headerLogoImg: HTMLImageElement | null = null;
-      let headerLogoFormat: 'PNG' | 'JPEG' = 'JPEG';
-
-      // Logo loading promise
-      const loadLogoPromise = data.logoUrl 
-        ? new Promise<void>((resolveLogoLoad, rejectLogoLoad) => {
-            console.log("Attempting to load logo from URL:", data.logoUrl);
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
-              try {
-                console.log("Logo loaded successfully, dimensions:", img.width, "x", img.height);
-                headerLogoImg = img;
-                headerLogoFormat = (data.logoUrl || '').toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-                resolveLogoLoad();
-              } catch (err) {
-                console.error('Error adding logo to PDF:', err);
-                resolveLogoLoad(); // Resolve anyway to continue PDF generation
-              }
-            };
-            img.onerror = (e) => {
-              console.error('Error loading logo image:', e);
-              resolveLogoLoad(); // Resolve anyway to continue PDF generation
-            };
-            img.src = data.logoUrl;
-          })
-        : Promise.resolve();
-
-      loadLogoPromise.then(() => {
+      {
         const drawRunningHeader = () => {
           doc.setFillColor(125, 1, 1);  // Corporate red
           doc.rect(0, 0, pageWidth, 20, 'F');
@@ -174,7 +160,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
             }
           });
 
-          yPosition = (doc as any).lastAutoTable.finalY + 15;
+          yPosition = getLastAutoTableY(doc, yPosition) + 15;
 
           // Add page break if needed
           if (yPosition > pageHeight - 40 && Object.entries(departmentShifts).indexOf([department, shifts]) < Object.entries(departmentShifts).length - 1) {
@@ -215,14 +201,8 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
           resolve(blob);
         };
 
-        const sectorImg = new Image();
-        sectorImg.onload = () => applyFooterAndResolve(sectorImg);
-        sectorImg.onerror = () => applyFooterAndResolve();
-        sectorImg.src = '/sector pro logo.png';
-      }).catch(err => {
-        console.error("Error in PDF generation:", err);
-        reject(err);
-      });
+        applyFooterAndResolve(sectorImg ?? undefined);
+      }
     } catch (error) {
       console.error("Exception in PDF export:", error);
       reject(error);

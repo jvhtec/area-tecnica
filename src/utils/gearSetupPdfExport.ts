@@ -1,6 +1,12 @@
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  getLastAutoTableY,
+  inferPdfImageFormat,
+  loadImageSilently,
+  loadSectorProFooterLogo,
+} from '@/utils/pdf';
 import { formatFrequencyBand } from '@/lib/frequencyBands';
 
 export const generateStageGearPDF = async (
@@ -118,55 +124,25 @@ export const generateStageGearPDF = async (
       addPageHeader();
 
       // Load logo from provided URL first, then fall back to legacy path.
-      const loadLogoPromise = new Promise<void>((resolveLogoLoad) => {
-        const logoCandidates = [logoUrl, `/logos/${jobId}.jpg`].filter(
-          (candidate): candidate is string => Boolean(candidate),
-        );
-
-        if (logoCandidates.length === 0) {
-          resolveLogoLoad();
-          return;
+      const logoCandidates = [logoUrl, `/logos/${jobId}.jpg`].filter(
+        (candidate): candidate is string => Boolean(candidate),
+      );
+      let headerLogo: HTMLImageElement | null = null;
+      for (const candidate of logoCandidates) {
+        headerLogo = await loadImageSilently(candidate, 'gear setup logo');
+        if (headerLogo) break;
+      }
+      if (headerLogo && headerLogo.width > 0 && headerLogo.height > 0) {
+        try {
+          const maxHeight = 18;
+          const ratio = headerLogo.width / headerLogo.height;
+          const logoHeight = Math.min(maxHeight, headerLogo.height);
+          const logoWidth = logoHeight * ratio;
+          doc.addImage(headerLogo, inferPdfImageFormat(headerLogo, 'JPEG'), 5, 1, logoWidth, logoHeight);
+        } catch (err) {
+          console.warn('Error adding logo to PDF:', err);
         }
-
-        const tryLoadAt = (index: number) => {
-          if (index >= logoCandidates.length) {
-            resolveLogoLoad();
-            return;
-          }
-
-          const currentLogo = logoCandidates[index];
-          const img = new Image();
-          img.crossOrigin = 'Anonymous';
-          img.onload = () => {
-            try {
-              const maxHeight = 18;
-              const ratio = img.width / img.height;
-              const logoHeight = Math.min(maxHeight, img.height);
-              const logoWidth = logoHeight * ratio;
-
-              doc.addImage(
-                img,
-                'JPEG',
-                5,
-                1,
-                logoWidth,
-                logoHeight
-              );
-            } catch (err) {
-              console.warn('Error adding logo to PDF:', err);
-            }
-            resolveLogoLoad();
-          };
-          img.onerror = () => {
-            tryLoadAt(index + 1);
-          };
-          img.src = currentLogo;
-        };
-
-        tryLoadAt(0);
-      });
-
-      await loadLogoPromise;
+      }
 
       let yPosition = 30;
 
@@ -214,7 +190,7 @@ export const generateStageGearPDF = async (
           }
         });
 
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+        yPosition = getLastAutoTableY(doc, yPosition) + 15;
       }
 
       if (setupToUse.foh_waves_outboard && String(setupToUse.foh_waves_outboard).trim().length > 0) {
@@ -256,7 +232,7 @@ export const generateStageGearPDF = async (
           }
         });
 
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+        yPosition = getLastAutoTableY(doc, yPosition) + 15;
       }
 
       if (setupToUse.mon_waves_outboard && String(setupToUse.mon_waves_outboard).trim().length > 0) {
@@ -315,7 +291,7 @@ export const generateStageGearPDF = async (
           }
         });
 
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+        yPosition = getLastAutoTableY(doc, yPosition) + 15;
       }
 
       // IEM
@@ -351,7 +327,7 @@ export const generateStageGearPDF = async (
           }
         });
 
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+        yPosition = getLastAutoTableY(doc, yPosition) + 15;
       }
 
       // Wired Microphones
@@ -386,7 +362,7 @@ export const generateStageGearPDF = async (
           }
         });
 
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+        yPosition = getLastAutoTableY(doc, yPosition) + 15;
       }
 
       // Infrastructure
@@ -474,50 +450,32 @@ export const generateStageGearPDF = async (
         doc.text(`${actualStageName} - Equipamiento`, 14, pageHeight - 10);
       }
 
-      // Add Sector Pro logo at bottom center of last page
-      try {
-        const sectorLogoPath = '/sector pro logo.png';
-        const sectorImg = new Image();
-        sectorImg.onload = () => {
-          try {
-            const logoWidth = 30;
-            const ratio = sectorImg.width / sectorImg.height;
-            const logoHeight = logoWidth / ratio;
-            
-            // Add logo to all pages
-            for (let i = 1; i <= totalPages; i++) {
-              doc.setPage(i);
-              doc.addImage(
-                sectorImg, 
-                'PNG', 
-                pageWidth/2 - logoWidth/2,
-                pageHeight - logoHeight - 15,
-                logoWidth,
-                logoHeight
-              );
-            }
-            
-            const blob = doc.output('blob');
-            console.log(`PDF generated successfully for ${actualStageName}`);
-            resolve(blob);
-          } catch (err) {
-            console.error('Error adding Sector Pro logo:', err);
-            const blob = doc.output('blob');
-            resolve(blob);
+      // Add Sector Pro logo at bottom center of all pages
+      const sectorImg = await loadSectorProFooterLogo();
+      if (sectorImg && sectorImg.width > 0 && sectorImg.height > 0) {
+        try {
+          const logoWidth = 30;
+          const ratio = sectorImg.width / sectorImg.height;
+          const logoHeight = logoWidth / ratio;
+          for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.addImage(
+              sectorImg,
+              inferPdfImageFormat(sectorImg),
+              pageWidth / 2 - logoWidth / 2,
+              pageHeight - logoHeight - 15,
+              logoWidth,
+              logoHeight,
+            );
           }
-        };
-        
-        sectorImg.onerror = () => {
-          const blob = doc.output('blob');
-          resolve(blob);
-        };
-        
-        sectorImg.src = sectorLogoPath;
-      } catch (logoErr) {
-        console.error('Error loading Sector Pro logo:', logoErr);
-        const blob = doc.output('blob');
-        resolve(blob);
+        } catch (err) {
+          console.error('Error adding Sector Pro logo:', err);
+        }
       }
+
+      const blob = doc.output('blob');
+      console.log(`PDF generated successfully for ${actualStageName}`);
+      resolve(blob);
     } catch (error) {
       console.error('Error generating stage gear PDF:', error);
       reject(error);

@@ -1,5 +1,6 @@
 import { PDFDocument } from '../hoja-de-ruta/pdf/core/pdf-document';
 import { LogoService } from '../hoja-de-ruta/pdf/services/logo-service';
+import { loadImageSilently } from '@/utils/pdf';
 import { uploadJobPdfWithCleanup } from '../jobDocumentsUpload';
 
 interface StagePlotItem {
@@ -110,26 +111,21 @@ export const generateStagePlotPDF = async (
   // Logo in header
   if (logoData) {
     try {
-      const logoImg = new Image();
-      logoImg.src = logoData;
-      await new Promise((resolve, reject) => {
-	      logoImg.onload = resolve;
-	      logoImg.onerror = reject;
-	    });
-	      const logoHeight = 30;
-	      let logoWidth = 60;
-	      if (logoImg.width > 0 && logoImg.height > 0) {
-	        const ratio = logoImg.width / logoImg.height;
-	        const computedWidth = logoHeight * ratio;
-	        if (Number.isFinite(computedWidth) && computedWidth > 0) {
-	          logoWidth = computedWidth;
-	        }
-	      }
-	      pdfDoc.addImage(logoData, 'PNG', 15, 10, logoWidth, logoHeight);
-	    } catch (error) {
-	      console.error("Error adding logo to stage plot:", error);
-	    }
-	  }
+      const logoImg = await loadImageSilently(logoData, 'stage plot logo');
+      const logoHeight = 30;
+      let logoWidth = 60;
+      if (logoImg && logoImg.width > 0 && logoImg.height > 0) {
+        const ratio = logoImg.width / logoImg.height;
+        const computedWidth = logoHeight * ratio;
+        if (Number.isFinite(computedWidth) && computedWidth > 0) {
+          logoWidth = computedWidth;
+        }
+      }
+      pdfDoc.addImage(logoData, 'PNG', 15, 10, logoWidth, logoHeight);
+    } catch (error) {
+      console.error("Error adding logo to stage plot:", error);
+    }
+  }
 
   // Header title - White text
   pdfDoc.setText(18, [255, 255, 255]);

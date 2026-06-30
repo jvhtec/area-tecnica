@@ -1,3 +1,5 @@
+import { blobToDataUrl } from '@/utils/pdf/exportHelpers';
+
 export class StampService {
   private static cachedExactSectorProStamp: StampImage | null | undefined = undefined;
   private static cachedFallbackSectorProStamp: StampImage | null = null;
@@ -95,12 +97,7 @@ export class StampService {
   }
 
   private static blobToDataURL(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    return blobToDataUrl(blob);
   }
 
   private static getImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {

@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { blobToDataUrl } from '@/utils/pdf/exportHelpers';
 
 export class FooterService {
   private static readonly FOOTER_HEIGHT = 30;
@@ -131,12 +132,7 @@ export class FooterService {
   }
 
   private static blobToDataURL(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    return blobToDataUrl(blob);
   }
 
   private static getImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
