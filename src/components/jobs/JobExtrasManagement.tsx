@@ -40,6 +40,7 @@ const cardBase = "bg-card border-border text-card-foreground";
 const surface = "bg-muted/30 border-border";
 const subtle = "text-muted-foreground";
 const pill = "bg-primary/5 border-primary/10 text-primary dark:text-primary-foreground";
+const EMPTY_TECHNICIAN_ID = '00000000-0000-0000-0000-000000000000';
 
 export const JobExtrasManagement = ({
   jobId,
@@ -54,7 +55,9 @@ export const JobExtrasManagement = ({
   const { userRole, user } = useOptimizedAuth();
   const viewerIsManager = isManagementRole(userRole);
   const isManager = isManagerProp && viewerIsManager;
-  const technicianId = viewerIsManager ? technicianIdProp : (user?.id ?? technicianIdProp);
+  const technicianId = viewerIsManager ? technicianIdProp : user?.id;
+  const scopedTechnicianId = technicianId ?? EMPTY_TECHNICIAN_ID;
+  const assignmentScopeKey = isManager ? (technicianId ?? 'all') : scopedTechnicianId;
 
   const visibleTechnicianIdSet = useMemo(
     () => new Set(visibleTechnicianIds ?? []),
@@ -62,7 +65,7 @@ export const JobExtrasManagement = ({
   );
 
   const { data: assignments, isLoading: assignmentsLoading } = useQuery({
-    queryKey: queryKeys.scope('job-assignments', jobId, technicianId, visibleTechnicianIds?.join(',') ?? 'all'),
+    queryKey: queryKeys.scope('job-assignments', jobId, assignmentScopeKey, visibleTechnicianIds?.join(',') ?? 'all'),
     queryFn: async () => {
       let query = dataLayerClient.from('job_assignments')
         .select(`
@@ -78,7 +81,7 @@ export const JobExtrasManagement = ({
       if (!isManager) {
         // Non-managers are strictly limited to their own assignment. If their id
         // is somehow unknown, match nothing rather than leaking every technician.
-        query = query.eq('technician_id', technicianId ?? '00000000-0000-0000-0000-000000000000');
+        query = query.eq('technician_id', scopedTechnicianId);
       } else if (visibleTechnicianIds && visibleTechnicianIds.length > 0) {
         query = query.in('technician_id', visibleTechnicianIds);
       }
@@ -93,12 +96,12 @@ export const JobExtrasManagement = ({
   // Fetch custom travel rates for all assigned technicians
   const visibleAssignments = useMemo(
     () => (assignments ?? []).filter((assignment) => {
-      if (!isManager) return Boolean(technicianId) && assignment.technician_id === technicianId;
+      if (!isManager) return assignment.technician_id === scopedTechnicianId;
       if (technicianId) return assignment.technician_id === technicianId;
       if (!visibleTechnicianIds) return true;
       return visibleTechnicianIdSet.has(assignment.technician_id);
     }),
-    [assignments, isManager, technicianId, visibleTechnicianIds, visibleTechnicianIdSet]
+    [assignments, isManager, scopedTechnicianId, technicianId, visibleTechnicianIds, visibleTechnicianIdSet]
   );
 
   const techIds = useMemo(
@@ -120,7 +123,10 @@ export const JobExtrasManagement = ({
   });
 
   // If technicianId is provided (non-manager), restrict payouts to that technician
-  const { data: payoutTotals, isLoading: payoutLoading } = useJobPayoutTotals(jobId, technicianId);
+  const { data: payoutTotals, isLoading: payoutLoading } = useJobPayoutTotals(
+    jobId,
+    isManager ? technicianId : scopedTechnicianId,
+  );
 
   if (assignmentsLoading || payoutLoading || customTravelRatesLoading) {
     return (

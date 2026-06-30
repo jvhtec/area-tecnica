@@ -12,7 +12,7 @@ async function recalcTechnicianDraftTimesheets(profileId: string): Promise<Times
     .select('id')
     .eq('technician_id', profileId)
     .eq('is_active', true)
-    .neq('status', 'approved');
+    .in('status', ['draft', 'rejected']);
 
   if (error) {
     console.warn('Could not load timesheets to recalc after rate change:', error);
