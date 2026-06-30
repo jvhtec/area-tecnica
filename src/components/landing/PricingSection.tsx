@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { GRADIENT_BTN, GRADIENT_TEXT } from "./_shared";
 import { SectionHeading } from "./SectionHeading";
 
-const ADMIN_BASE = 120; // € / mes — base de cuenta, incluye 1 admin
+const ADMIN_BASE = 250; // € / mes — base de cuenta (incluye 1 admin + 8 GB)
 const MANAGER_PRICE = 25; // € / coordinador · mes
 const INTEGRATION_PRICE = 9; // € / integración · mes (tarifa plana)
 const WHATSAPP_PER_USER = 4; // € / usuario · mes (WhatsApp se factura por usuario)
@@ -21,13 +21,12 @@ const integrationOptions = [
 
 export function PricingSection() {
   const navigate = useNavigate();
-  // Default reflects a typical mid-size production company (~12 coordinators +
-  // common integrations) — lands around the ~500 €/mes target ARPA.
-  const [managers, setManagers] = useState(12);
+  // Default reflects a typical production company (~8 coordinators + common
+  // integrations) — lands around the ~500 €/mes target ARPA.
+  const [managers, setManagers] = useState(8);
   const [active, setActive] = useState<Record<string, boolean>>({
     flex: true,
     gmaps: true,
-    mapbox: true,
     whatsapp: true,
   });
 
@@ -77,7 +76,7 @@ export function PricingSection() {
                 <p className="mt-2 text-3xl font-bold text-white">
                   {ADMIN_BASE} €<span className="text-base font-normal text-slate-500"> /mes</span>
                 </p>
-                <p className="mt-1 text-[12px] text-slate-500">incluye 1 admin</p>
+                <p className="mt-1 text-[12px] text-slate-500">1 admin · 8 GB incluidos</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
                 <p className="text-sm font-medium text-slate-300">Coordinador</p>
@@ -110,13 +109,14 @@ export function PricingSection() {
               <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-[13px]">
                 <span className="text-slate-500">Ellos</span>
                 <span className="text-slate-400">
-                  Por usuario (mín. 40) <span className="text-slate-600">+</span> add-ons por módulo:
-                  payroll, travel, subcontratas…
+                  Por usuario (mín. 40) <span className="text-slate-600">+</span> add-ons por módulo
+                  (payroll, travel, subcontratas…) <span className="text-slate-600">·</span> 0,5–5 GB.
                 </span>
                 <span className="font-medium text-sky-300">Sector Pro</span>
                 <span className="text-slate-200">
                   Técnicos <span className="font-medium text-white">ilimitados y gratis</span> ·{" "}
-                  <span className="font-medium text-white">todos los módulos incluidos</span>, sin add-ons.
+                  <span className="font-medium text-white">todos los módulos incluidos</span> ·{" "}
+                  <span className="font-medium text-white">8 GB</span>, sin add-ons.
                 </span>
               </div>
             </div>
