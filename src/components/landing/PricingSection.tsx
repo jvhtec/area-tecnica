@@ -21,8 +21,15 @@ const integrationOptions = [
 
 export function PricingSection() {
   const navigate = useNavigate();
-  const [managers, setManagers] = useState(3);
-  const [active, setActive] = useState<Record<string, boolean>>({ flex: true, whatsapp: true });
+  // Default reflects a typical mid-size production company (~12 coordinators +
+  // common integrations) — lands around the ~500 €/mes target ARPA.
+  const [managers, setManagers] = useState(12);
+  const [active, setActive] = useState<Record<string, boolean>>({
+    flex: true,
+    gmaps: true,
+    mapbox: true,
+    whatsapp: true,
+  });
 
   const billableUsers = managers + 1; // admin + coordinadores (WhatsApp se factura por usuario)
   const managersCost = managers * MANAGER_PRICE;
@@ -96,6 +103,22 @@ export function PricingSection() {
                 Integración con <span className="font-semibold text-white">Rentman</span> —{" "}
                 <span className="text-violet-200">incluida sin coste extra</span>.
               </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <p className="text-sm font-semibold text-white">Frente a la competencia</p>
+              <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-[13px]">
+                <span className="text-slate-500">Ellos</span>
+                <span className="text-slate-400">
+                  Por usuario (mín. 40) <span className="text-slate-600">+</span> add-ons por módulo:
+                  payroll, travel, subcontratas…
+                </span>
+                <span className="font-medium text-sky-300">Sector Pro</span>
+                <span className="text-slate-200">
+                  Técnicos <span className="font-medium text-white">ilimitados y gratis</span> ·{" "}
+                  <span className="font-medium text-white">todos los módulos incluidos</span>, sin add-ons.
+                </span>
+              </div>
             </div>
           </div>
 
