@@ -104,6 +104,7 @@ export const FestivalGearSetupForm = ({
   const [hasStageSpecificSetup, setHasStageSpecificSetup] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
   const isPrimaryStage = stageNumber === 1;
+  const readOnlyField = () => readOnly;
 
   useEffect(() => {
     const fetchExistingSetup = async () => {
@@ -511,11 +512,13 @@ export const FestivalGearSetupForm = ({
         <FestivalConsoleSetupSection
           formData={setup}
           onChange={(changes) => handleChange(changes)}
+          readOnly={readOnly}
         />
 
         <WirelessSetupSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
+          readOnly={readOnly}
         />
 
         <FestivalMicKitConfig
@@ -526,24 +529,28 @@ export const FestivalGearSetupForm = ({
             console.log('FestivalMicKitConfig onChange called with:', wiredMics);
             handleChange({ wired_mics: wiredMics });
           }}
+          readOnly={readOnly}
         />
 
         <MonitorSetupSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
           gearSetup={globalSetup}
+          isFieldLocked={readOnlyField}
         />
 
         <ExtraRequirementsSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
           gearSetup={globalSetup}
+          isFieldLocked={readOnlyField}
         />
 
         <InfrastructureSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
           gearSetup={globalSetup}
+          isFieldLocked={readOnlyField}
         />
 
         <div className="space-y-4">
@@ -557,6 +564,7 @@ export const FestivalGearSetupForm = ({
         <NotesSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
+          isFieldLocked={readOnlyField}
         />
       </div>
 
@@ -571,6 +579,7 @@ export const FestivalGearSetupForm = ({
               <FestivalConsoleSetupSection
                 formData={setup}
                 onChange={(changes) => handleChange(changes)}
+                readOnly={readOnly}
               />
             </AccordionContent>
           </AccordionItem>
@@ -583,6 +592,7 @@ export const FestivalGearSetupForm = ({
               <WirelessSetupSection
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
+                readOnly={readOnly}
               />
             </AccordionContent>
           </AccordionItem>
@@ -600,6 +610,7 @@ export const FestivalGearSetupForm = ({
                   console.log('FestivalMicKitConfig onChange called with:', wiredMics);
                   handleChange({ wired_mics: wiredMics });
                 }}
+                readOnly={readOnly}
               />
             </AccordionContent>
           </AccordionItem>
@@ -613,6 +624,7 @@ export const FestivalGearSetupForm = ({
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
                 gearSetup={globalSetup}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>
@@ -626,6 +638,7 @@ export const FestivalGearSetupForm = ({
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
                 gearSetup={globalSetup}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>
@@ -639,6 +652,7 @@ export const FestivalGearSetupForm = ({
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
                 gearSetup={globalSetup}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>
@@ -665,6 +679,7 @@ export const FestivalGearSetupForm = ({
               <NotesSection
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>

@@ -14,9 +14,10 @@ interface FestivalMicKitConfigProps {
   stageNumber: number;
   wiredMics: WiredMic[];
   onChange: (mics: WiredMic[]) => void;
+  readOnly?: boolean;
 }
 
-export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }: FestivalMicKitConfigProps) => {
+export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange, readOnly = false }: FestivalMicKitConfigProps) => {
   const [analysisPreviewOpen, setAnalysisPreviewOpen] = useState(false);
   const [isLoadingRequirements, setIsLoadingRequirements] = useState(false);
 
@@ -35,6 +36,8 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
   console.log('FestivalMicKitConfig render - wiredMics serialized:', JSON.stringify(wiredMics, null, 2));
 
   const handleLoadFromAnalysis = async () => {
+    if (readOnly) return;
+
     if (!analysisData) {
       toast.error("No hay datos de análisis disponibles");
       return;
@@ -49,7 +52,7 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
   };
 
   const handleConfirmLoadRequirements = async () => {
-    if (!analysisData) return;
+    if (!analysisData || readOnly) return;
 
     setIsLoadingRequirements(true);
     
@@ -134,7 +137,7 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
               variant="outline"
               size="sm"
               onClick={handleLoadFromAnalysis}
-              disabled={isAnalyzing}
+              disabled={readOnly || isAnalyzing}
             >
               <Calculator className="h-4 w-4 mr-2" />
               {isAnalyzing ? "Analizando..." : "Cargar desde Requisitos de Artistas"}
@@ -155,6 +158,7 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
             value={safeWiredMics}
             onChange={handleMicsChange}
             availableMics={availableMics}
+            readOnly={readOnly}
             showExclusiveUse={true}
             showNotes={true}
           />

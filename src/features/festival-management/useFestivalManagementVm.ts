@@ -6,7 +6,13 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Department } from "@/types/department";
-import { isManagementRole } from "@/utils/permissions";
+import {
+  canEditJobs,
+  canUploadFestivalDocuments,
+  isHouseTechRole,
+  isManagementRole,
+  isTechnicianRole,
+} from "@/utils/permissions";
 import { useFestivalAdminActions } from "@/features/festival-management/hooks/useFestivalAdminActions";
 import { useFestivalDocuments } from "@/features/festival-management/hooks/useFestivalDocuments";
 import { useFestivalFlexControls } from "@/features/festival-management/hooks/useFestivalFlexControls";
@@ -83,12 +89,11 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const isSchedulingRoute = location.pathname.includes("/scheduling");
   const isArtistRoute = location.pathname.includes("/artists");
   const isGearRoute = location.pathname.includes("/gear");
-  const canEdit = ["admin", "management", "logistics"].includes(userRole || "");
-  const isHouseTech = userRole === "house_tech";
-  const isViewOnly = userRole === "technician";
-  // House techs get a read-only view of planning + gear setup, but may still upload documents.
+  const canEdit = canEditJobs(userRole);
+  const isHouseTech = isHouseTechRole(userRole);
+  const isViewOnly = isTechnicianRole(userRole) && !isHouseTech;
   const isPlanningViewOnly = isViewOnly || isHouseTech;
-  const canUploadDocuments = canEdit || isHouseTech;
+  const canUploadDocuments = canUploadFestivalDocuments(userRole);
 
   useEffect(() => {
     if (!jobId) {

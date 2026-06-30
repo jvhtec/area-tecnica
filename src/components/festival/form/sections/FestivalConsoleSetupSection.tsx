@@ -17,9 +17,10 @@ interface FestivalConsoleSetupSectionProps {
     foh_waves_outboard?: string;
     mon_waves_outboard?: string;
   }) => void;
+  readOnly?: boolean;
 }
 
-export const FestivalConsoleSetupSection = ({ formData, onChange }: FestivalConsoleSetupSectionProps) => {
+export const FestivalConsoleSetupSection = ({ formData, onChange, readOnly = false }: FestivalConsoleSetupSectionProps) => {
   return (
     <div className="space-y-4 md:space-y-6 border rounded-lg p-3 md:p-4">
       <h3 className="text-base md:text-lg font-semibold">Configuración de Consoles</h3>
@@ -28,6 +29,7 @@ export const FestivalConsoleSetupSection = ({ formData, onChange }: FestivalCons
         consoles={formData.foh_consoles}
         onChange={(consoles) => onChange({ foh_consoles: consoles })}
         label="Consoles FOH"
+        readOnly={readOnly}
       />
       <div className="space-y-2">
         <Label htmlFor="festival-foh-waves-outboard">Waves / Outboard FOH</Label>
@@ -36,6 +38,7 @@ export const FestivalConsoleSetupSection = ({ formData, onChange }: FestivalCons
           value={formData.foh_waves_outboard || ""}
           onChange={(event) => onChange({ foh_waves_outboard: event.target.value })}
           placeholder="Ej: Waves + outboard analógico"
+          disabled={readOnly}
         />
       </div>
 
@@ -43,6 +46,7 @@ export const FestivalConsoleSetupSection = ({ formData, onChange }: FestivalCons
         consoles={formData.mon_consoles}
         onChange={(consoles) => onChange({ mon_consoles: consoles })}
         label="Consoles de Monitor"
+        readOnly={readOnly}
       />
       <div className="space-y-2">
         <Label htmlFor="festival-mon-waves-outboard">Waves / Outboard MON</Label>
@@ -51,6 +55,7 @@ export const FestivalConsoleSetupSection = ({ formData, onChange }: FestivalCons
           value={formData.mon_waves_outboard || ""}
           onChange={(event) => onChange({ mon_waves_outboard: event.target.value })}
           placeholder="Ej: Plugins/FX para monitores"
+          disabled={readOnly}
         />
       </div>
     </div>

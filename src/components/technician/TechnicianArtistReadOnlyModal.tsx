@@ -514,6 +514,8 @@ export function TechnicianArtistReadOnlyModal({
                     mode="readonly"
                     riderFilesByArtistId={riderFilesByArtistId}
                     onDownloadRiderFile={handleDownloadRiderFile}
+                    canDelete={false}
+                    canCreateExtras={false}
                   />
                 </section>
               ))}

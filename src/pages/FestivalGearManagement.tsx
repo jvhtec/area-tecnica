@@ -312,16 +312,19 @@ const FestivalGearManagement = () => {
   };
 
   const handleAddStage = () => {
+    if (!canManageGear) return;
     handleUpdateMaxStages(maxStages + 1);
   };
 
   const handleStartEditStage = (stageNumber: number) => {
+    if (!canManageGear) return;
     const stage = stages.find(s => s.number === stageNumber);
     setEditingStage(stageNumber);
     setEditingStageName(stage?.name || `Stage ${stageNumber}`);
   };
 
   const handleSaveStageEdit = async () => {
+    if (!canManageGear) return;
     if (!editingStage || !editingStageName.trim()) {
       console.log("Save cancelled: missing stage number or name");
       setEditingStage(null);

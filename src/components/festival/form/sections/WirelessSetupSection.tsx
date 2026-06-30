@@ -4,7 +4,7 @@ import { ProviderSelector } from "../shared/ProviderSelector";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { useEffect } from "react";
 
-export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps) => {
+export const WirelessSetupSection = ({ formData, onChange, readOnly = false }: ArtistSectionProps) => {
   // Auto-detect mixed providers for wireless systems
   const detectWirelessProvider = (systems: any[]) => {
     if (!systems || systems.length === 0) return "festival";
@@ -35,6 +35,8 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
 
   // Auto-update provider when systems change
   useEffect(() => {
+    if (readOnly) return;
+
     const detectedWirelessProvider = detectWirelessProvider(formData.wireless_systems || []);
     const detectedIEMProvider = detectIEMProvider(formData.iem_systems || []);
     
@@ -45,7 +47,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
     if (detectedIEMProvider !== formData.iem_provided_by) {
       onChange({ iem_provided_by: detectedIEMProvider });
     }
-  }, [formData.wireless_systems, formData.iem_systems]);
+  }, [formData.wireless_systems, formData.iem_systems, readOnly]);
 
   const handleWirelessChange = (systems: any[]) => {
     console.log('WirelessSetupSection: Wireless systems changed:', systems);
@@ -82,6 +84,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
             onChange={handleWirelessChange}
             label="Sistemas Wireless"
             includeQuantityTypes={true}
+            readOnly={readOnly}
           />
           <ProviderSelector
             value={formData.wireless_provided_by || "festival"}
@@ -89,6 +92,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
             label="Sistemas Wireless Proporcionados Por"
             id="wireless-provider"
             showMixed={true}
+            disabled={readOnly}
           />
         </div>
 
@@ -99,6 +103,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
             label="Sistemas IEM"
             includeQuantityTypes={true}
             isIEM={true}
+            readOnly={readOnly}
           />
           <ProviderSelector
             value={formData.iem_provided_by || "festival"}
@@ -106,6 +111,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
             label="Sistemas IEM Proporcionados Por"
             id="iem-provider"
             showMixed={true}
+            disabled={readOnly}
           />
         </div>
       </div>

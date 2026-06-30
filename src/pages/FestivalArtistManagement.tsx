@@ -24,8 +24,6 @@ import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { canCreateFestivalArtistExtras, canDeleteFestivalArtists } from "@/utils/permissions";
-
-
 import { queryKeys } from "@/lib/react-query";
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
@@ -35,8 +33,7 @@ const FestivalArtistManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { userRole } = useOptimizedAuth();
-  const canDeleteArtists = canDeleteFestivalArtists(userRole);
-  const canCreateArtistExtras = canCreateFestivalArtistExtras(userRole);
+  const artistActionPermissions = { canDelete: canDeleteFestivalArtists(userRole), canCreateExtras: canCreateFestivalArtistExtras(userRole) };
   const routeDate = searchParams.get("date") || "";
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -60,14 +57,7 @@ const FestivalArtistManagement = () => {
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isFullSchedulePrinting, setIsFullSchedulePrinting] = useState(false);
 
-  // Use React Query for artists data
-  const {
-    artists,
-    isLoading: artistsLoading,
-    deleteArtist,
-    isDeletingArtist,
-    invalidateArtists
-  } = useArtistsQuery(jobId, selectedDate, dayStartTime);
+  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists } = useArtistsQuery(jobId, selectedDate, dayStartTime);
   const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
   const {
     data: festivalSettings
@@ -335,8 +325,8 @@ const FestivalArtistManagement = () => {
     setIsDialogOpen(true);
   };
   
-  const handleDeleteArtist = async (artist: any) => {
-    if (!canDeleteArtists) return;
+  const handleDeleteArtist = (artist: any) => {
+    if (!artistActionPermissions.canDelete) return;
     deleteArtist(artist.id);
   };
   
@@ -764,8 +754,7 @@ const FestivalArtistManagement = () => {
                     jobId={jobId}
                     selectedDate={selectedDate}
                     onArtistStagePlotUpdated={invalidateArtists}
-                    canDelete={canDeleteArtists}
-                    canCreateExtras={canCreateArtistExtras}
+                    {...artistActionPermissions}
                   />
                 </div>
               ) : (

@@ -672,15 +672,13 @@ export function JobCardNewView({
 
           {isProjectManagementPage && (
             <>
-              {!isHouseTech && (
-                <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-                  <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
-                    <div className="h-full overflow-auto">
-                      <ModernHojaDeRuta jobId={job.id} />
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
+              <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
+                <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
+                  <div className="h-full overflow-auto">
+                    <ModernHojaDeRuta jobId={job.id} />
+                  </div>
+                </DialogContent>
+              </Dialog>
               <ProjectNotesDialog
                 open={projectNotesOpen}
                 onOpenChange={setProjectNotesOpen}

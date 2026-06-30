@@ -91,8 +91,8 @@ interface MobileArtistListProps {
   mode?: 'edit' | 'readonly';
   riderFilesByArtistId?: Record<string, MobileArtistRiderFile[]>;
   onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
-  canDelete?: boolean;
-  canCreateExtras?: boolean;
+  canDelete: boolean;
+  canCreateExtras: boolean;
 }
 
 export const MobileArtistList = ({
@@ -119,8 +119,8 @@ export const MobileArtistList = ({
   mode = 'edit',
   riderFilesByArtistId = {},
   onDownloadRiderFile,
-  canDelete = true,
-  canCreateExtras = true,
+  canDelete,
+  canCreateExtras,
 }: MobileArtistListProps) => {
   const [editingCategory, setEditingCategory] = useState<{
     artistId: string;

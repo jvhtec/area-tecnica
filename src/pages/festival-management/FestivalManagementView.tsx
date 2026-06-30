@@ -44,13 +44,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
   const {
     job,
     jobId,
-    canEdit,
-    canUploadDocuments,
-    isViewOnly,
-    isPlanningViewOnly,
-    isHouseTech,
-    navigate,
-
+    canEdit, canUploadDocuments, isPlanningViewOnly, isViewOnly, navigate,
     isSingleJobMode,
     isSchedulingRoute,
     isArtistRoute,
@@ -393,9 +387,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4">
-                {/* House techs may only upload documents — all other quick actions are hidden */}
-                {!isHouseTech && (
-                  <>
+                {!isPlanningViewOnly && <>
                 <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
@@ -530,10 +522,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                   </Button>
                 </div>
 
-                  </>
-                )}
-
-                {/* Upload Documents */}
+                </>}
                 {canUploadDocuments && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-blue-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
