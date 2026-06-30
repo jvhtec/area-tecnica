@@ -11,9 +11,15 @@ import {
   type PackageDepartment,
 } from "@/utils/tourPackages";
 import { buildNormalizedTourPowerTables } from "@/utils/tourPowerTables";
+import {
+  buildTourDefaultDocumentVersionKey,
+  getTourDefaultDocumentObjectPath,
+  getTourDefaultDocumentSlotPrefix,
+} from "@/utils/tourDefaultDocumentVersioning";
+
+export { getTourDefaultDocumentObjectPath } from "@/utils/tourDefaultDocumentVersioning";
 
 const TOUR_DOCUMENTS_BUCKET = "tour-documents";
-const AUTO_DEFAULT_DOCUMENT_ROOT = "auto-generated/default-pdfs";
 const TOUR_DEFAULT_DOCUMENT_TYPES = ["power", "weight"] as const;
 const UNKNOWN_LOCATION_LABEL = "Ubicación desconocida";
 
@@ -137,19 +143,6 @@ const getPdfTypeLabel = (type: TourDefaultDocumentType) =>
 
 const cleanDisplayFilePart = (value: string): string =>
   value.replace(/[\\/\r\n]+/g, " ").replace(/\s+/g, " ").trim();
-
-export const getTourDefaultDocumentObjectPath = ({
-  tourId,
-  tourDateId,
-  department,
-  type,
-}: {
-  tourId: string;
-  tourDateId: string;
-  department: PackageDepartment;
-  type: TourDefaultDocumentType;
-}) =>
-  `tours/${tourId}/${AUTO_DEFAULT_DOCUMENT_ROOT}/${tourDateId}/${department}-${type}.pdf`;
 
 export const getTourDefaultDocumentFileName = ({
   tourName,
@@ -288,6 +281,18 @@ const buildUploadPlanItem = ({
 }): Extract<TourDefaultDocumentPlanItem, { action: "upload" }> => {
   const locationName = getTourDateLocationName(tourDate);
   const jobDate = tourDate.date || tourDate.start_date;
+  const versionKey = buildTourDefaultDocumentVersionKey({
+    tour,
+    tourDate,
+    locationName,
+    department,
+    type,
+    defaultSet,
+    defaultTables,
+    powerOverrides,
+    weightOverrides,
+    packageLabel,
+  });
 
   return {
     action: "upload",
@@ -305,6 +310,7 @@ const buildUploadPlanItem = ({
       tourDateId: tourDate.id,
       department,
       type,
+      versionKey,
     }),
     fileName: getTourDefaultDocumentFileName({
       tourName: tour.name,
@@ -520,26 +526,55 @@ const loadTourDefaultDocumentSyncData = async ({
   };
 };
 
-const cleanupTourDefaultDocument = async ({
+const cleanupTourDefaultDocumentSlot = async ({
   client,
   tourId,
-  objectPath,
+  tourDateId,
+  department,
+  type,
 }: {
   client: SupabaseClientLike;
   tourId: string;
-  objectPath: string;
+  tourDateId: string;
+  department: PackageDepartment;
+  type: TourDefaultDocumentType;
 }) => {
-  const { error: storageError } = await client.storage
-    .from(TOUR_DOCUMENTS_BUCKET)
-    .remove([objectPath]);
+  const slotPrefix = getTourDefaultDocumentSlotPrefix({
+    tourId,
+    tourDateId,
+    department,
+    type,
+  });
 
-  if (storageError) throw storageError;
+  const { data: existingDocuments, error: loadError } = await client
+    .from("tour_documents")
+    .select("file_path")
+    .eq("tour_id", tourId)
+    .like("file_path", `${slotPrefix}%`);
+
+  if (loadError) throw loadError;
+
+  const paths = Array.from(
+    new Set(
+      (existingDocuments || [])
+        .map((document) => document.file_path)
+        .filter((path): path is string => typeof path === "string" && path.length > 0)
+    )
+  );
+
+  if (paths.length > 0) {
+    const { error: storageError } = await client.storage
+      .from(TOUR_DOCUMENTS_BUCKET)
+      .remove(paths);
+
+    if (storageError) throw storageError;
+  }
 
   const { error } = await client
     .from("tour_documents")
     .delete()
     .eq("tour_id", tourId)
-    .eq("file_path", objectPath);
+    .like("file_path", `${slotPrefix}%`);
 
   if (error) throw error;
 };
@@ -555,15 +590,12 @@ export const cleanupTourDefaultDocumentsForDate = async ({
 }) => {
   for (const department of PACKAGE_DEPARTMENTS) {
     for (const type of TOUR_DEFAULT_DOCUMENT_TYPES) {
-      await cleanupTourDefaultDocument({
+      await cleanupTourDefaultDocumentSlot({
         client,
         tourId,
-        objectPath: getTourDefaultDocumentObjectPath({
-          tourId,
-          tourDateId,
-          department,
-          type,
-        }),
+        tourDateId,
+        department,
+        type,
       });
     }
   }
@@ -572,22 +604,34 @@ export const cleanupTourDefaultDocumentsForDate = async ({
 const uploadTourDefaultDocument = async ({
   client,
   tourId,
+  tourDateId,
+  department,
+  type,
   objectPath,
   fileName,
   pdfBlob,
 }: {
   client: SupabaseClientLike;
   tourId: string;
+  tourDateId: string;
+  department: PackageDepartment;
+  type: TourDefaultDocumentType;
   objectPath: string;
   fileName: string;
   pdfBlob: Blob;
 }) => {
-  await cleanupTourDefaultDocument({ client, tourId, objectPath });
+  await cleanupTourDefaultDocumentSlot({
+    client,
+    tourId,
+    tourDateId,
+    department,
+    type,
+  });
 
   const { error: uploadError } = await client.storage
     .from(TOUR_DOCUMENTS_BUCKET)
     .upload(objectPath, pdfBlob, {
-      cacheControl: "3600",
+      cacheControl: "0",
       upsert: false,
       contentType: "application/pdf",
     });
@@ -687,7 +731,13 @@ export const syncTourDefaultDocuments = async ({
   for (const item of plan) {
     try {
       if (item.action === "cleanup") {
-        await cleanupTourDefaultDocument({ client, tourId, objectPath: item.objectPath });
+        await cleanupTourDefaultDocumentSlot({
+          client,
+          tourId,
+          tourDateId: item.tourDate.id,
+          department: item.department,
+          type: item.type,
+        });
         result.removed += 1;
         if (item.reason !== "no_tables") result.skipped += 1;
         continue;
@@ -701,6 +751,9 @@ export const syncTourDefaultDocuments = async ({
       await uploadTourDefaultDocument({
         client,
         tourId,
+        tourDateId: item.tourDate.id,
+        department: item.department,
+        type: item.type,
         objectPath: item.objectPath,
         fileName: item.fileName,
         pdfBlob,
