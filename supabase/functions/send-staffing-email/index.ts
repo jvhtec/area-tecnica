@@ -142,7 +142,7 @@ type StaffingRequestDateScope = {
 
 type StaffingEventRoleRow = {
   staffing_request_id?: string | null;
-  meta?: { role?: unknown } | null;
+  meta?: { phase?: unknown; role?: unknown } | null;
 };
 
 function staffingRolePrefix(roleCode?: string | null): string | null {
@@ -793,6 +793,11 @@ serve(createHttpHandler(async (req) => {
           .map((request) => String(request.id || ''))
           .filter(Boolean);
         const crossJobDeclineEventRoles = new Map<string, string>();
+        const crossJobDeclinePhaseById = new Map(
+          crossJobDeclineRows
+            .map((request): [string, string | null] => [String(request.id || ''), request.phase || null])
+            .filter(([requestId]) => Boolean(requestId))
+        );
         if (crossJobDeclineIds.length > 0) {
           const { data: declineEvents, error: declineEventsError } = await supabase
             .from('staffing_events')
@@ -815,6 +820,11 @@ serve(createHttpHandler(async (req) => {
           for (const event of (declineEvents || []) as StaffingEventRoleRow[]) {
             const requestId = String(event.staffing_request_id || '');
             if (!requestId || crossJobDeclineEventRoles.has(requestId)) continue;
+            const expectedPhase = crossJobDeclinePhaseById.get(requestId);
+            const eventPhase = typeof event.meta?.phase === 'string'
+              ? event.meta.phase.trim()
+              : '';
+            if (!expectedPhase || eventPhase !== expectedPhase) continue;
             const eventRole = typeof event.meta?.role === 'string'
               ? event.meta.role.trim()
               : '';

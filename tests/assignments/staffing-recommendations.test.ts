@@ -140,9 +140,11 @@ describe("smarter staffing recommendation migration", () => {
     expect(sameDateDeclineBlockingMigration).toContain("idx_staffing_requests_declined_profile_job_date");
     expect(sameDateDeclineBlockingMigration).toContain("sr.job_id IS DISTINCT FROM p_job_id");
     expect(sameDateDeclineBlockingMigration).toContain("sr.status = 'declined'");
+    expect(sameDateDeclineBlockingMigration).toContain("sr.phase IN ('availability', 'offer')");
     expect(sameDateDeclineBlockingMigration).toContain("sr.phase = 'availability'");
     expect(sameDateDeclineBlockingMigration).toContain("td.target_date BETWEEN declined_job.start_time::date AND declined_job.end_time::date");
     expect(sameDateDeclineBlockingMigration).toContain("public.staffing_role_prefix");
+    expect(sameDateDeclineBlockingMigration).toContain("latest_role.event_role_code");
   });
 
   it("applies profile cost/rate scoring without changing the candidate RPC shape", () => {
@@ -215,6 +217,9 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("cross_job_declines");
     expect(sendStaffingEmailFunction).toContain("staffingRequestOverlapsTargetDates");
     expect(sendStaffingEmailFunction).toContain("staffingRolePrefix");
+    expect(sendStaffingEmailFunction).toContain("|| crossJobDeclines.length > 0");
+    expect(sendStaffingEmailFunction).toContain("cross_job_declines: crossJobDeclines.map");
+    expect(sendStaffingEmailFunction).toContain("filter((request) => staffingRequestOverlapsTargetDates(request, targetDates))");
     expect(sendStaffingEmailFunction).toContain("adjacent_assignments");
     expect(sendStaffingEmailFunction).toContain("adjacent_job_policy");
     expect(sendStaffingEmailFunction).toContain("urgentAdjacentMode");
