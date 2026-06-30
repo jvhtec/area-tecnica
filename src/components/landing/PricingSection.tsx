@@ -10,6 +10,7 @@ const ADMIN_BASE = 250; // € / mes — base de cuenta (incluye 1 admin + 8 GB)
 const MANAGER_PRICE = 25; // € / coordinador · mes
 const INTEGRATION_PRICE = 9; // € / integración · mes (tarifa plana)
 const WHATSAPP_PER_USER = 4; // € / usuario · mes (WhatsApp se factura por usuario)
+const WALLBOARD_PER_DISPLAY = 15; // € / pantalla · mes (feed de wallboard / señalización)
 
 const integrationOptions = [
   { id: "flex", name: "Flex Rental Solutions", price: INTEGRATION_PRICE, perUser: false },
@@ -19,14 +20,21 @@ const integrationOptions = [
   { id: "ics", name: "Calendar (ICS)", price: INTEGRATION_PRICE, perUser: false },
 ];
 
+// Premium modules — billed as add-ons (the rest of the platform is included).
+const moduleOptions = [
+  { id: "fichajes", name: "Fichajes, gastos y nóminas", price: 49 },
+  { id: "logistica", name: "Logística y almacén", price: 29 },
+];
+
 export function PricingSection() {
   const navigate = useNavigate();
-  // Default reflects a typical production company (~8 coordinators + common
-  // integrations) — lands around the ~500 €/mes target ARPA.
-  const [managers, setManagers] = useState(8);
+  // Default reflects a typical production company (coordinators + premium
+  // modules + common integrations + a wallboard) — lands around ~500 €/mes ARPA.
+  const [managers, setManagers] = useState(5);
+  const [displays, setDisplays] = useState(1);
+  const [modules, setModules] = useState<Record<string, boolean>>({ fichajes: true, logistica: true });
   const [active, setActive] = useState<Record<string, boolean>>({
     flex: true,
-    gmaps: true,
     whatsapp: true,
   });
 
@@ -36,10 +44,14 @@ export function PricingSection() {
     (sum, opt) => (active[opt.id] ? sum + (opt.perUser ? opt.price * billableUsers : opt.price) : sum),
     0,
   );
-  const monthly = ADMIN_BASE + managersCost + integrationsCost;
+  const wallboardCost = displays * WALLBOARD_PER_DISPLAY;
+  const modulesCost = moduleOptions.reduce((sum, m) => (modules[m.id] ? sum + m.price : sum), 0);
+  const monthly = ADMIN_BASE + managersCost + modulesCost + integrationsCost + wallboardCost;
 
   const toggle = (id: string) => setActive((s) => ({ ...s, [id]: !s[id] }));
+  const toggleModule = (id: string) => setModules((s) => ({ ...s, [id]: !s[id] }));
   const clampManagers = (n: number) => Math.max(1, Math.min(50, n));
+  const clampDisplays = (n: number) => Math.max(0, Math.min(50, n));
 
   return (
     <section id="precios" className="relative px-6 py-24 scroll-mt-20">
@@ -70,7 +82,7 @@ export function PricingSection() {
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
                 <p className="text-sm font-medium text-slate-300">Base de cuenta</p>
                 <p className="mt-2 text-3xl font-bold text-white">
@@ -92,6 +104,13 @@ export function PricingSection() {
                 </p>
                 <p className="mt-1 text-[12px] text-slate-500">WhatsApp: +{WHATSAPP_PER_USER} € /usuario</p>
               </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                <p className="text-sm font-medium text-slate-300">Pantalla wallboard</p>
+                <p className="mt-2 text-3xl font-bold text-white">
+                  +{WALLBOARD_PER_DISPLAY} €<span className="text-base font-normal text-slate-500"> /mes</span>
+                </p>
+                <p className="mt-1 text-[12px] text-slate-500">por pantalla / feed</p>
+              </div>
             </div>
 
             <div className="flex items-center gap-3 rounded-2xl border border-violet-500/25 bg-violet-500/[0.06] p-5">
@@ -109,14 +128,14 @@ export function PricingSection() {
               <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-[13px]">
                 <span className="text-slate-500">Ellos</span>
                 <span className="text-slate-400">
-                  Por usuario (mín. 40) <span className="text-slate-600">+</span> add-ons por módulo
-                  (payroll, travel, subcontratas…) <span className="text-slate-600">·</span> 0,5–5 GB.
+                  Por usuario (mín. 40) <span className="text-slate-600">+</span> casi todo en add-ons
+                  (payroll, travel, vehículos, subcontratas…) <span className="text-slate-600">·</span> 0,5–5 GB.
                 </span>
                 <span className="font-medium text-sky-300">Sector Pro</span>
                 <span className="text-slate-200">
                   Técnicos <span className="font-medium text-white">ilimitados y gratis</span> ·{" "}
-                  <span className="font-medium text-white">todos los módulos incluidos</span> ·{" "}
-                  <span className="font-medium text-white">8 GB</span>, sin add-ons.
+                  <span className="font-medium text-white">8 GB</span> · solo{" "}
+                  <span className="font-medium text-white">fichajes y logística</span> son módulos aparte.
                 </span>
               </div>
             </div>
@@ -158,6 +177,37 @@ export function PricingSection() {
               />
             </div>
 
+            {/* premium modules */}
+            <div className="mt-6">
+              <p className="text-sm text-slate-300">Módulos premium</p>
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                {moduleOptions.map((m) => {
+                  const on = !!modules[m.id];
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => toggleModule(m.id)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[13px] transition-colors ${
+                        on
+                          ? "border-emerald-400/40 bg-emerald-500/10 text-white"
+                          : "border-white/10 bg-white/[0.02] text-slate-400 hover:border-white/20"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          on ? "border-emerald-400 bg-emerald-400 text-slate-900" : "border-white/20"
+                        }`}
+                      >
+                        {on && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className="flex-1 truncate">{m.name}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-slate-500">+{m.price} €</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* integrations */}
             <div className="mt-6">
               <p className="text-sm text-slate-300">Integraciones</p>
@@ -191,6 +241,31 @@ export function PricingSection() {
               </div>
             </div>
 
+            {/* wallboard displays */}
+            <div className="mt-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-300">Pantallas wallboard</p>
+                <p className="text-[12px] text-slate-500">feed de señalización · {WALLBOARD_PER_DISPLAY} € c/u</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setDisplays((d) => clampDisplays(d - 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10"
+                  aria-label="Quitar pantalla"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="w-8 text-center font-mono text-lg text-white">{displays}</span>
+                <button
+                  onClick={() => setDisplays((d) => clampDisplays(d + 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10"
+                  aria-label="Añadir pantalla"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
             {/* total */}
             <div className="mt-8 border-t border-white/10 pt-6">
               <div className="flex items-end justify-between">
@@ -210,7 +285,9 @@ export function PricingSection() {
               </div>
               <p className="mt-2 text-right text-[12px] text-slate-500">
                 {ADMIN_BASE} € base + {managers} × {MANAGER_PRICE} € coordinadores
-                {integrationsCost > 0 ? ` + ${integrationsCost} € integraciones` : ""} · facturación anual: 2 meses gratis
+                {modulesCost > 0 ? ` + ${modulesCost} € módulos` : ""}
+                {integrationsCost > 0 ? ` + ${integrationsCost} € integraciones` : ""}
+                {wallboardCost > 0 ? ` + ${wallboardCost} € pantallas` : ""} · facturación anual: 2 meses gratis
               </p>
               <Button
                 onClick={() => navigate("/auth")}
