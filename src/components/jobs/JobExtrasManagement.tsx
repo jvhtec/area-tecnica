@@ -8,6 +8,7 @@ import { DollarSign, Users } from 'lucide-react';
 import { JobExtrasEditor } from './JobExtrasEditor';
 import { formatCurrency } from '@/lib/utils';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { isManagementRole } from '@/utils/permissions';
 
 
@@ -42,10 +43,19 @@ const pill = "bg-primary/5 border-primary/10 text-primary dark:text-primary-fore
 
 export const JobExtrasManagement = ({
   jobId,
-  isManager = false,
-  technicianId,
+  isManager: isManagerProp = false,
+  technicianId: technicianIdProp,
   visibleTechnicianIds,
 }: JobExtrasManagementProps) => {
+  // Defense-in-depth: derive the viewer from auth so this component is safe no
+  // matter how a caller wires its props. A non-management viewer (e.g. a house
+  // tech) may only ever SEE and never EDIT their own extras — they can never see
+  // another technician's financial info even if a caller forgets to scope it.
+  const { userRole, user } = useOptimizedAuth();
+  const viewerIsManager = isManagementRole(userRole);
+  const isManager = isManagerProp && viewerIsManager;
+  const technicianId = viewerIsManager ? technicianIdProp : (user?.id ?? technicianIdProp);
+
   const visibleTechnicianIdSet = useMemo(
     () => new Set(visibleTechnicianIds ?? []),
     [visibleTechnicianIds]
@@ -65,9 +75,11 @@ export const JobExtrasManagement = ({
           )
         `)
         .eq('job_id', jobId);
-      if (technicianId && !isManager) {
-        query = query.eq('technician_id', technicianId);
-      } else if (isManager && visibleTechnicianIds && visibleTechnicianIds.length > 0) {
+      if (!isManager) {
+        // Non-managers are strictly limited to their own assignment. If their id
+        // is somehow unknown, match nothing rather than leaking every technician.
+        query = query.eq('technician_id', technicianId ?? '00000000-0000-0000-0000-000000000000');
+      } else if (visibleTechnicianIds && visibleTechnicianIds.length > 0) {
         query = query.in('technician_id', visibleTechnicianIds);
       }
       const { data, error } = await query;
@@ -81,11 +93,12 @@ export const JobExtrasManagement = ({
   // Fetch custom travel rates for all assigned technicians
   const visibleAssignments = useMemo(
     () => (assignments ?? []).filter((assignment) => {
+      if (!isManager) return Boolean(technicianId) && assignment.technician_id === technicianId;
       if (technicianId) return assignment.technician_id === technicianId;
       if (!visibleTechnicianIds) return true;
       return visibleTechnicianIdSet.has(assignment.technician_id);
     }),
-    [assignments, technicianId, visibleTechnicianIds, visibleTechnicianIdSet]
+    [assignments, isManager, technicianId, visibleTechnicianIds, visibleTechnicianIdSet]
   );
 
   const techIds = useMemo(
