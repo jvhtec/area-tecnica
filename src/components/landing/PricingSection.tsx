@@ -6,15 +6,17 @@ import { Button } from "@/components/ui/button";
 import { GRADIENT_BTN, GRADIENT_TEXT } from "./_shared";
 import { SectionHeading } from "./SectionHeading";
 
-const MANAGER_PRICE = 18; // € / coordinador · mes
-const INTEGRATION_PRICE = 9; // € / integración · mes
+const ADMIN_BASE = 120; // € / mes — base de cuenta, incluye 1 admin
+const MANAGER_PRICE = 25; // € / coordinador · mes
+const INTEGRATION_PRICE = 9; // € / integración · mes (tarifa plana)
+const WHATSAPP_PER_USER = 4; // € / usuario · mes (WhatsApp se factura por usuario)
 
 const integrationOptions = [
-  { id: "flex", name: "Flex Rental Solutions" },
-  { id: "gmaps", name: "Google Maps / Places" },
-  { id: "mapbox", name: "Mapbox" },
-  { id: "whatsapp", name: "WhatsApp" },
-  { id: "ics", name: "Calendar (ICS)" },
+  { id: "flex", name: "Flex Rental Solutions", price: INTEGRATION_PRICE, perUser: false },
+  { id: "gmaps", name: "Google Maps / Places", price: INTEGRATION_PRICE, perUser: false },
+  { id: "mapbox", name: "Mapbox", price: INTEGRATION_PRICE, perUser: false },
+  { id: "whatsapp", name: "WhatsApp", price: WHATSAPP_PER_USER, perUser: true },
+  { id: "ics", name: "Calendar (ICS)", price: INTEGRATION_PRICE, perUser: false },
 ];
 
 export function PricingSection() {
@@ -22,8 +24,13 @@ export function PricingSection() {
   const [managers, setManagers] = useState(3);
   const [active, setActive] = useState<Record<string, boolean>>({ flex: true, whatsapp: true });
 
-  const activeCount = Object.values(active).filter(Boolean).length;
-  const monthly = managers * MANAGER_PRICE + activeCount * INTEGRATION_PRICE;
+  const billableUsers = managers + 1; // admin + coordinadores (WhatsApp se factura por usuario)
+  const managersCost = managers * MANAGER_PRICE;
+  const integrationsCost = integrationOptions.reduce(
+    (sum, opt) => (active[opt.id] ? sum + (opt.perUser ? opt.price * billableUsers : opt.price) : sum),
+    0,
+  );
+  const monthly = ADMIN_BASE + managersCost + integrationsCost;
 
   const toggle = (id: string) => setActive((s) => ({ ...s, [id]: !s[id] }));
   const clampManagers = (n: number) => Math.max(1, Math.min(50, n));
@@ -35,7 +42,7 @@ export function PricingSection() {
           eyebrow="Precios"
           title="Paga por quien coordina,"
           highlight="no por quien curra"
-          lead="La competencia te cobra por cada técnico. Aquí los técnicos son ilimitados y gratis — pagas solo por los coordinadores y por las integraciones que enciendes."
+          lead="La competencia te cobra por cada técnico. Aquí los técnicos son ilimitados y gratis — pagas una base de cuenta, los coordinadores y las integraciones que enciendes."
         />
 
         <div className="mt-14 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -57,20 +64,27 @@ export function PricingSection() {
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-                <p className="text-sm font-medium text-slate-300">Coordinador / manager</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                <p className="text-sm font-medium text-slate-300">Base de cuenta</p>
+                <p className="mt-2 text-3xl font-bold text-white">
+                  {ADMIN_BASE} €<span className="text-base font-normal text-slate-500"> /mes</span>
+                </p>
+                <p className="mt-1 text-[12px] text-slate-500">incluye 1 admin</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                <p className="text-sm font-medium text-slate-300">Coordinador</p>
                 <p className="mt-2 text-3xl font-bold text-white">
                   {MANAGER_PRICE} €<span className="text-base font-normal text-slate-500"> /mes</span>
                 </p>
                 <p className="mt-1 text-[12px] text-slate-500">por usuario que gestiona</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
                 <p className="text-sm font-medium text-slate-300">Integración</p>
                 <p className="mt-2 text-3xl font-bold text-white">
                   +{INTEGRATION_PRICE} €<span className="text-base font-normal text-slate-500"> /mes</span>
                 </p>
-                <p className="mt-1 text-[12px] text-slate-500">por integración activada</p>
+                <p className="mt-1 text-[12px] text-slate-500">WhatsApp: +{WHATSAPP_PER_USER} € /usuario</p>
               </div>
             </div>
 
@@ -138,13 +152,16 @@ export function PricingSection() {
                       }`}
                     >
                       <span
-                        className={`flex h-4 w-4 items-center justify-center rounded border ${
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                           on ? "border-sky-400 bg-sky-400 text-slate-900" : "border-white/20"
                         }`}
                       >
                         {on && <Check className="h-3 w-3" />}
                       </span>
-                      {opt.name}
+                      <span className="flex-1 truncate">{opt.name}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                        +{opt.price} €{opt.perUser ? "/u" : ""}
+                      </span>
                     </button>
                   );
                 })}
@@ -169,7 +186,8 @@ export function PricingSection() {
                 </motion.p>
               </div>
               <p className="mt-2 text-right text-[12px] text-slate-500">
-                {managers} × {MANAGER_PRICE} € + {activeCount} × {INTEGRATION_PRICE} € · facturación anual: 2 meses gratis
+                {ADMIN_BASE} € base + {managers} × {MANAGER_PRICE} € coordinadores
+                {integrationsCost > 0 ? ` + ${integrationsCost} € integraciones` : ""} · facturación anual: 2 meses gratis
               </p>
               <Button
                 onClick={() => navigate("/auth")}
