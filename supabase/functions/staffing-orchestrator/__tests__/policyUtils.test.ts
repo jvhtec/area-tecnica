@@ -52,6 +52,10 @@ describe("staffing orchestrator policy utilities", () => {
     expect(policy.offer_ttl_hours).toBe(2);
     expect(policy.soft_conflict_policy).toBe("block");
     expect(policy.escalation).toMatchObject({ minimum_auto_book_score: 75 });
+    expect(policy.surrounding_jobs).toEqual({
+      enabled: true,
+      max_location_distance_km: 25,
+    });
     expect(policy.role_profiles?.["SND-PA-LEAD"]).toMatchObject({
       inferred_profile: "high_risk_critical",
       selected_profile: "high_risk_critical",
@@ -77,6 +81,9 @@ describe("staffing orchestrator policy utilities", () => {
         cost_scoring: {
           penalty_strength: "high",
           max_rate_penalty: 20,
+        },
+        surrounding_jobs: {
+          max_location_distance_km: 15,
         },
         channel: "whatsapp",
       },
@@ -105,6 +112,10 @@ describe("staffing orchestrator policy utilities", () => {
       enabled: true,
       penalty_strength: "high",
       max_rate_penalty: 20,
+    });
+    expect(policy.surrounding_jobs).toEqual({
+      enabled: true,
+      max_location_distance_km: 15,
     });
   });
 

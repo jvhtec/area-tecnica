@@ -27,6 +27,11 @@ const profileRateScoringMigration = readFileSync(
   "utf-8",
 );
 
+const surroundingJobAwarenessMigration = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260630100000_staffing_surrounding_job_awareness.sql"),
+  "utf-8",
+);
+
 const staffingSweeperScheduleMigration = readFileSync(
   join(process.cwd(), "supabase/migrations/20260520130000_schedule_staffing_sweeper.sql"),
   "utf-8",
@@ -71,6 +76,11 @@ const staffingOrchestratorFunction = readFileSync(
 
 const staffingOrchestratorPolicyUtils = readFileSync(
   join(process.cwd(), "supabase/functions/staffing-orchestrator/policyUtils.ts"),
+  "utf-8",
+);
+
+const staffingCandidateList = readFileSync(
+  join(process.cwd(), "src/components/matrix/StaffingCandidateList.tsx"),
   "utf-8",
 );
 
@@ -131,6 +141,23 @@ describe("smarter staffing recommendation migration", () => {
     expect(profileRateScoringMigration).toContain("Rate adjustment:");
   });
 
+  it("blocks adjacent separate-job candidates unless close or urgent", () => {
+    expect(surroundingJobAwarenessMigration).toContain("rank_staffing_candidates(uuid,text,text,text,jsonb)");
+    expect(surroundingJobAwarenessMigration).not.toContain("RETURNS TABLE");
+    expect(surroundingJobAwarenessMigration).toContain("v_surrounding_jobs_max_distance_km");
+    expect(surroundingJobAwarenessMigration).toContain("max_location_distance_km')::double precision, 25");
+    expect(surroundingJobAwarenessMigration).toContain("v_target_tour_id");
+    expect(surroundingJobAwarenessMigration).toContain("selected_job_profile");
+    expect(surroundingJobAwarenessMigration).toContain("emergency_fill");
+    expect(surroundingJobAwarenessMigration).toContain("has_previous_day_job");
+    expect(surroundingJobAwarenessMigration).toContain("has_next_day_job");
+    expect(surroundingJobAwarenessMigration).toContain("wr.has_previous_day_job OR wr.has_next_day_job");
+    expect(surroundingJobAwarenessMigration).toMatch(/v_target_tour_id IS NULL\s+OR j3\.tour_id IS NULL\s+OR j3\.tour_id <> v_target_tour_id/);
+    expect(surroundingJobAwarenessMigration).toContain("max_surrounding_job_distance_km");
+    expect(surroundingJobAwarenessMigration).toContain("v_surrounding_jobs_enabled");
+    expect(surroundingJobAwarenessMigration).toContain("Adjacent jobs allowed by Cobertura urgente");
+  });
+
   it("filters hard collisions and unavailability before candidates are returned", () => {
     expect(smarterMigration).toMatch(/FROM technician_availability ta/);
     expect(smarterMigration).toMatch(/JOIN target_dates td ON td\.target_date = ta\.date/);
@@ -169,6 +196,14 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("same_role_requests");
     expect(sendStaffingEmailFunction).toContain("job_availability_requests");
     expect(sendStaffingEmailFunction).toContain("roleless_declines");
+    expect(sendStaffingEmailFunction).toContain("adjacent_assignments");
+    expect(sendStaffingEmailFunction).toContain("adjacent_job_policy");
+    expect(sendStaffingEmailFunction).toContain("urgentAdjacentMode");
+    expect(sendStaffingEmailFunction).toContain("targetTourId");
+    expect(sendStaffingEmailFunction).toContain("distanceKm(");
+    expect(sendStaffingEmailFunction).toContain("value.trim() === ''");
+    expect(sendStaffingEmailFunction).toContain(".eq('job_id', job_id)");
+    expect(staffingCandidateList).toContain("campaign_id: campaignId");
     expect(sendStaffingEmailFunction).toContain("status: 409");
   });
 

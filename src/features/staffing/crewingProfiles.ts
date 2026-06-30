@@ -79,6 +79,10 @@ export type BuildCampaignPolicyInput = {
   };
   tickIntervalSeconds: number;
   weightOverrides?: Partial<ScoringWeights>;
+  surroundingJobs?: {
+    enabled?: boolean;
+    maxLocationDistanceKm?: number;
+  };
 };
 
 export const JOB_PROFILE_LABELS: Record<JobProfileName, string> = {
@@ -468,6 +472,10 @@ export function buildCampaignPolicy(input: BuildCampaignPolicyInput) {
       escalate_soft_conflicts: true,
       escalate_weak_critical_pool: true,
       require_manager_approval_for_low_confidence: true,
+    },
+    surrounding_jobs: {
+      enabled: input.surroundingJobs?.enabled ?? true,
+      max_location_distance_km: input.surroundingJobs?.maxLocationDistanceKm ?? 25,
     },
     audit: {
       log_inferred_profile: true,

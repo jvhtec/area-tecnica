@@ -95,6 +95,57 @@ function rangesOverlapInclusive(
   return aStart <= bEnd && aEnd >= bStart;
 }
 
+function addDaysToDateKey(dateKey: string | null | undefined, days: number): string | null {
+  if (!dateKey) return null;
+  const parsed = new Date(`${dateKey}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().split('T')[0];
+}
+
+function dateKeyInRange(dateKey: string | null, start?: string | null, end?: string | null): boolean {
+  if (!dateKey) return false;
+  const startKey = dateOnly(start);
+  const endKey = dateOnly(end);
+  if (!startKey || !endKey) return false;
+  const first = startKey <= endKey ? startKey : endKey;
+  const last = startKey <= endKey ? endKey : startKey;
+  return dateKey >= first && dateKey <= last;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function distanceKm(
+  lat1: number | null,
+  lon1: number | null,
+  lat2: number | null,
+  lon2: number | null
+): number | null {
+  if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return null;
+  const toRad = (value: number) => value * Math.PI / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function jobLocation(job: any): { latitude: number | null; longitude: number | null } {
+  const location = joinedSingle(job?.locations);
+  return {
+    latitude: toFiniteNumber(location?.latitude),
+    longitude: toFiniteNumber(location?.longitude),
+  };
+}
+
 function joinedSingle<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
@@ -430,7 +481,8 @@ serve(createHttpHandler(async (req) => {
             title,
             start_time,
             end_time,
-            locations(formatted_address)
+            tour_id,
+            locations(formatted_address, latitude, longitude)
           `)
           .eq("id", job_id)
           .maybeSingle(),
@@ -565,6 +617,7 @@ serve(createHttpHandler(async (req) => {
           sameRoleRequestResult,
           jobAvailabilityRequestResult,
           rolelessDeclineResult,
+          campaignPolicyResult,
         ] = await Promise.all([
           supabase
             .from('job_assignments')
@@ -573,7 +626,7 @@ serve(createHttpHandler(async (req) => {
             .eq('technician_id', profile_id),
           supabase
             .from('job_assignments')
-            .select('id, job_id, status, jobs(id, title, start_time, end_time)')
+            .select('id, job_id, status, jobs(id, title, start_time, end_time, tour_id, locations(id, latitude, longitude))')
             .eq('technician_id', profile_id)
             .neq('job_id', job_id),
           roleCode
@@ -603,6 +656,14 @@ serve(createHttpHandler(async (req) => {
             .in('phase', ['availability', 'offer'])
             .eq('status', 'declined')
             .or('role_code.is.null,role_code.eq.'),
+          typeof campaign_id === 'string' && campaign_id
+            ? supabase
+              .from('staffing_campaigns')
+              .select('policy, job_id')
+              .eq('id', campaign_id)
+              .eq('job_id', job_id)
+              .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
         ]);
 
         const guardErrors = [
@@ -611,6 +672,7 @@ serve(createHttpHandler(async (req) => {
           sameRoleRequestResult.error,
           jobAvailabilityRequestResult.error,
           rolelessDeclineResult.error,
+          campaignPolicyResult.error,
         ].filter(Boolean);
 
         if (guardErrors.length > 0) {
@@ -654,10 +716,62 @@ serve(createHttpHandler(async (req) => {
             || !request.target_date
             || targetDates.includes(request.target_date)
           ));
+        const campaignPolicy = (campaignPolicyResult.data?.policy || {}) as any;
+        const rolePolicy = roleCode && campaignPolicy?.role_profiles
+          ? campaignPolicy.role_profiles[roleCode]
+          : null;
+        const adjacentGuardEnabled = campaignPolicy?.surrounding_jobs?.enabled !== false;
+        const adjacentMaxDistanceKm = toFiniteNumber(campaignPolicy?.surrounding_jobs?.max_location_distance_km) ?? 25;
+        const urgentAdjacentMode =
+          campaignPolicy?.profile?.selected_job_profile === 'emergency_fill'
+          || campaignPolicy?.profile?.inferred_job_profile === 'emergency_fill'
+          || rolePolicy?.selected_profile === 'emergency_fill'
+          || rolePolicy?.inferred_profile === 'emergency_fill';
+        const sortedTargetDates = [...targetDates].sort();
+        const previousTargetDate = addDaysToDateKey(sortedTargetDates[0], -1);
+        const nextTargetDate = addDaysToDateKey(sortedTargetDates[sortedTargetDates.length - 1], 1);
+        const targetLocation = jobLocation(job);
+        const targetTourId = typeof job.tour_id === 'string' ? job.tour_id : null;
+        const adjacentAssignments = (activeAssignmentResult.data || [])
+          .filter((assignment: any) => assignment.status !== 'declined')
+          .map((assignment: any) => ({
+            ...assignment,
+            job: joinedSingle(assignment.jobs),
+          }))
+          .filter((assignment: any) => {
+            const assignmentTourId = typeof assignment.job?.tour_id === 'string' ? assignment.job.tour_id : null;
+            if (targetTourId && assignmentTourId && targetTourId === assignmentTourId) return false;
+            return dateKeyInRange(previousTargetDate, assignment.job?.start_time, assignment.job?.end_time)
+              || dateKeyInRange(nextTargetDate, assignment.job?.start_time, assignment.job?.end_time);
+          })
+          .map((assignment: any) => {
+            const otherLocation = jobLocation(assignment.job);
+            return {
+              id: assignment.id,
+              status: assignment.status,
+              job_id: assignment.job_id,
+              title: assignment.job?.title,
+              start_time: assignment.job?.start_time,
+              end_time: assignment.job?.end_time,
+              tour_id: assignment.job?.tour_id || null,
+              distance_km: distanceKm(
+                targetLocation.latitude,
+                targetLocation.longitude,
+                otherLocation.latitude,
+                otherLocation.longitude,
+              ),
+            };
+          });
+        const blockingAdjacentAssignments = adjacentGuardEnabled && !urgentAdjacentMode
+          ? adjacentAssignments.filter((assignment: any) =>
+            assignment.distance_km === null || assignment.distance_km > adjacentMaxDistanceKm
+          )
+          : [];
 
         if (
           activeTargetAssignments.length > 0
           || overlappingAssignments.length > 0
+          || blockingAdjacentAssignments.length > 0
           || sameRoleRequests.length > 0
           || jobAvailabilityRequests.length > 0
           || rolelessDeclines.length > 0
@@ -673,6 +787,14 @@ serve(createHttpHandler(async (req) => {
               start_time: assignment.job?.start_time,
               end_time: assignment.job?.end_time,
             })),
+            adjacent_assignments: blockingAdjacentAssignments,
+            adjacent_job_policy: {
+              enabled: adjacentGuardEnabled,
+              urgent: urgentAdjacentMode,
+              max_location_distance_km: adjacentMaxDistanceKm,
+              previous_target_date: previousTargetDate,
+              next_target_date: nextTargetDate,
+            },
             same_role_requests: sameRoleRequests,
             job_availability_requests: jobAvailabilityRequests,
             roleless_declines: rolelessDeclines,

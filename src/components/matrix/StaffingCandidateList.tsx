@@ -364,6 +364,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
               department,
               channel,
               require_no_conflicts: true,
+              campaign_id: campaignId,
               idempotency_key: `campaign:${campaignId}:${roleCode}:${profileId}:availability:${channel}`
             })
           }
