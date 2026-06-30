@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { ShowControlBar } from "@/components/landing/ShowControlBar";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { StatsSection } from "@/components/landing/StatsSection";
+import { ShowDayTimeline } from "@/components/landing/ShowDayTimeline";
 import { ProductShowcase } from "@/components/landing/ProductShowcase";
+import { DocTicker } from "@/components/landing/DocTicker";
 import { PlatformMap } from "@/components/landing/PlatformMap";
 import { FeatureHighlights } from "@/components/landing/FeatureHighlights";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
+import { PricingSection } from "@/components/landing/PricingSection";
 import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
-import { TechnicalSpecs } from "@/components/landing/TechnicalSpecs";
 import { CallToAction } from "@/components/landing/CallToAction";
 import { BRAND, GRADIENT_BTN } from "@/components/landing/_shared";
 
@@ -46,6 +49,7 @@ const navLinks = [
   { label: "Producto", href: "producto" },
   { label: "Plataforma", href: "modulos" },
   { label: "Integraciones", href: "integraciones" },
+  { label: "Precios", href: "precios" },
 ];
 
 function Navbar() {
@@ -61,7 +65,7 @@ function Navbar() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+      className={`sticky top-8 z-50 transition-all duration-300 ${
         scrolled ? "border-b border-white/10 bg-[#070910]/80 backdrop-blur-xl" : "border-b border-transparent"
       }`}
     >
@@ -135,16 +139,19 @@ export default function Landing() {
   return (
     <div className="dark min-h-screen scroll-smooth bg-[#070910] text-slate-100 antialiased">
       <TechBackground />
+      <ShowControlBar />
       <Navbar />
       <main>
         <HeroSection />
         <StatsSection />
+        <ShowDayTimeline />
         <ProductShowcase />
+        <DocTicker />
         <PlatformMap />
         <IntegrationsSection />
+        <PricingSection />
         <FeatureHighlights />
         <TestimonialsSection />
-        <TechnicalSpecs />
         <CallToAction />
       </main>
       <Footer />

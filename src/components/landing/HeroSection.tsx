@@ -16,7 +16,7 @@ export const HeroSection = () => {
   const reduce = useReducedMotion();
 
   return (
-    <section className="relative overflow-hidden px-6 pb-24 pt-28 sm:pt-36">
+    <section className="relative overflow-hidden px-6 pb-24 pt-12 sm:pt-20">
       <div className="mx-auto grid max-w-6xl items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
         {/* Copy */}
         <motion.div
