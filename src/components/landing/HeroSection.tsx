@@ -1,232 +1,114 @@
-import { useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, PlayCircle, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Play, Star } from "lucide-react";
-import dashboardHero from "@/assets/landing/dashboard-hero.jpg";
+import { GRADIENT_BTN, GRADIENT_TEXT } from "./_shared";
+import { MatrixMock } from "./visuals/MatrixMock";
 
-const heroImages = [
-  {
-    src: dashboardHero,
-    alt: "Dashboard Overview",
-    title: "Complete Dashboard Control"
-  }
+const trustBadges = [
+  { icon: Zap, label: "Tiempo real" },
+  { icon: ShieldCheck, label: "RLS + roles" },
+  { icon: Sparkles, label: "PWA móvil" },
 ];
 
 export const HeroSection = () => {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const prefersReducedMotion = useReducedMotion();
-  const imageCount = heroImages.length;
-
-  useEffect(() => {
-    if (imageCount <= 1) {
-      return;
-    }
-
-    let intervalId: number | null = null;
-
-    const start = () => {
-      if (intervalId) return;
-      intervalId = window.setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % imageCount);
-      }, 4000);
-    };
-
-    const stop = () => {
-      if (!intervalId) return;
-      clearInterval(intervalId);
-      intervalId = null;
-    };
-
-    const handleVisibility = () => {
-      if (document.hidden) {
-        stop();
-      } else {
-        start();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility, { passive: true });
-    handleVisibility();
-
-    return () => {
-      stop();
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [imageCount]);
+  const navigate = useNavigate();
+  const reduce = useReducedMotion();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-secondary/20" />
-      
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
+    <section className="relative overflow-hidden px-6 pb-24 pt-12 sm:pt-20">
+      <div className="mx-auto grid max-w-6xl items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
+        {/* Copy */}
         <motion.div
-          className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/10 to-transparent rounded-full"
-          initial={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.95 }}
-          animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          style={{ willChange: "transform" }}
-        />
-        <motion.div
-          className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-secondary/10 to-transparent rounded-full"
-          initial={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.95 }}
-          animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
-          style={{ willChange: "transform" }}
-        />
-      </div>
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="text-center lg:text-left"
+        >
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-400" />
+            </span>
+            La plataforma técnica para producción de directo
+          </span>
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Content Section */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            className="space-y-8"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Badge variant="secondary" className="mb-4">
-                <Star className="w-4 h-4 mr-2" />
-                Professional Technical Management
-              </Badge>
-            </motion.div>
+          <h1 className="mt-6 text-balance text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            Toda tu operación{" "}
+            <span className={GRADIENT_TEXT}>técnica</span>, en un solo lugar.
+          </h1>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="text-4xl lg:text-6xl font-bold leading-tight"
+          <p className="mx-auto mt-6 max-w-xl text-pretty text-lg leading-relaxed text-slate-400 lg:mx-0">
+            Festivales, giras, staffing, logística y documentación técnica unificados en
+            una PWA móvil. Menos hojas de cálculo y correos sueltos. Más show.
+          </p>
+
+          <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
+            <Button
+              size="lg"
+              onClick={() => navigate("/auth")}
+              className={`group h-12 px-7 text-base font-semibold text-white shadow-lg shadow-violet-600/25 ${GRADIENT_BTN}`}
             >
-              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Sector Pro
+              Entrar a la plataforma
+              <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                document.getElementById("modulos")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="h-12 border-white/15 bg-white/5 px-7 text-base font-semibold text-white hover:bg-white/10 hover:text-white"
+            >
+              <PlayCircle className="mr-1 h-4 w-4" />
+              Ver módulos
+            </Button>
+          </div>
+
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 lg:justify-start">
+            {trustBadges.map(({ icon: Icon, label }) => (
+              <span key={label} className="inline-flex items-center gap-2 text-sm text-slate-400">
+                <Icon className="h-4 w-4 text-sky-400" />
+                {label}
               </span>
-              <br />
-              Complete Technical Platform
-            </motion.h1>
+            ))}
+          </div>
+        </motion.div>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="text-xl text-muted-foreground leading-relaxed"
-            >
-              Streamline your sound, lighting, video, and logistics operations with the most comprehensive technical management platform built for professionals.
-            </motion.p>
+        {/* Visual */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 24 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+          className="relative mx-auto w-full max-w-xl"
+        >
+          {/* glow */}
+          <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-sky-500/30 via-violet-500/20 to-cyan-400/20 blur-3xl" />
+          <div style={reduce ? undefined : { transform: "perspective(1600px) rotateY(-6deg) rotateX(2deg)" }}>
+            <MatrixMock live />
+          </div>
 
+          {/* floating chip */}
+          {!reduce && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="flex flex-col sm:flex-row gap-4"
-            >
-              <Button size="lg" className="group">
-                <Play className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform" />
-                See Live Demo
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-              <Button size="lg" variant="outline">
-                Get Started Free
-              </Button>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
-              className="flex items-center gap-6 text-sm text-muted-foreground"
+              className="absolute -bottom-5 -left-5 hidden items-center gap-3 rounded-xl border border-white/10 bg-slate-900/90 px-4 py-3 shadow-xl backdrop-blur sm:flex"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                Real-time Collaboration
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                10+ Specialized Modules
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                PDF Report Generation
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                <Zap className="h-5 w-5" />
+              </span>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-white">Sincronización en vivo</p>
+                <p className="text-xs text-slate-400">multi-pestaña · multi-dispositivo</p>
               </div>
             </motion.div>
-          </motion.div>
-
-          {/* Hero Image Section */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="relative"
-          >
-            <div className="relative">
-              {/* Glow Effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl blur-3xl scale-105" />
-              
-              {/* Main Image Container */}
-              <motion.div
-                className="relative bg-card rounded-2xl overflow-hidden shadow-2xl"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3 }}
-              >
-                <motion.img
-                  key={currentImageIndex}
-                  src={heroImages[currentImageIndex].src}
-                  alt={heroImages[currentImageIndex].alt}
-                  className="w-full h-auto"
-                  initial={{ opacity: 0, scale: 1.1 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.8 }}
-                />
-                
-                {/* Image Overlay Info */}
-                <div className="absolute bottom-4 left-4 right-4">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-background/80 backdrop-blur-sm rounded-lg p-4"
-                  >
-                    <h3 className="font-semibold text-foreground">
-                      {heroImages[currentImageIndex].title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Manage all your technical operations from one powerful interface
-                    </p>
-                  </motion.div>
-                </div>
-              </motion.div>
-
-              {/* Floating Elements */}
-              <motion.div
-                className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-br from-primary to-secondary rounded-full opacity-20"
-                initial={prefersReducedMotion ? undefined : { opacity: 0, y: 8 }}
-                animate={prefersReducedMotion ? undefined : { opacity: 0.2, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut", delay: 0.35 }}
-                style={{ willChange: "transform" }}
-              />
-              <motion.div
-                className="absolute -bottom-4 -left-4 w-16 h-16 bg-gradient-to-br from-secondary to-primary rounded-full opacity-20"
-                initial={prefersReducedMotion ? undefined : { opacity: 0, y: -8 }}
-                animate={prefersReducedMotion ? undefined : { opacity: 0.2, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut", delay: 0.45 }}
-                style={{ willChange: "transform" }}
-              />
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Scroll Indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-        <div className="w-6 h-10 border-2 border-primary rounded-full flex justify-center">
-          <div className="w-1 h-3 bg-primary rounded-full mt-2" />
-        </div>
+          )}
+        </motion.div>
       </div>
     </section>
   );
 };
+
+export default HeroSection;

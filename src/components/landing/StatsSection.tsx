@@ -1,126 +1,92 @@
-import { motion } from "framer-motion";
-import { useInView } from "framer-motion";
-import { useRef, useEffect, useState } from "react";
-import { Users, Calendar, FileText, Zap } from "lucide-react";
+import { motion, useInView, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { CalendarRange, FileText, LayoutGrid, Radio } from "lucide-react";
+import { GRADIENT_TEXT } from "./_shared";
 
 const stats = [
   {
-    icon: Users,
-    value: 10,
+    icon: LayoutGrid,
+    value: 12,
     suffix: "+",
-    label: "Specialized Modules",
-    description: "From festivals to tours, lighting to sound"
+    label: "Módulos especializados",
+    description: "De festivales a giras, de sonido a logística",
   },
   {
-    icon: Calendar,
+    icon: Radio,
     value: 24,
     suffix: "/7",
-    label: "Real-time Sync",
-    description: "Live collaboration across all departments"
+    label: "Sincronización en tiempo real",
+    description: "Colaboración en vivo entre departamentos",
   },
   {
     icon: FileText,
     value: 50,
     suffix: "+",
-    label: "Report Types",
-    description: "Professional PDF generation for every need"
+    label: "Informes PDF profesionales",
+    description: "Memorias técnicas, riders, hojas de ruta y más",
   },
   {
-    icon: Zap,
-    value: 99,
-    suffix: ".9%",
-    label: "Uptime",
-    description: "Enterprise-grade reliability you can trust"
-  }
+    icon: CalendarRange,
+    value: 6,
+    suffix: "",
+    label: "Departamentos integrados",
+    description: "Sonido, luces, vídeo, logística, producción y admin",
+  },
 ];
 
-const AnimatedCounter = ({ value, suffix, duration = 2 }: { value: number; suffix: string; duration?: number }) => {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
+function Counter({ to, suffix }: { to: number; suffix: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-80px" });
+  const reduce = useReducedMotion();
+  const [value, setValue] = useState(0);
 
   useEffect(() => {
-    if (isInView) {
-      const increment = value / (duration * 60); // 60 FPS
-      const timer = setInterval(() => {
-        setCount(prev => {
-          const next = prev + increment;
-          if (next >= value) {
-            clearInterval(timer);
-            return value;
-          }
-          return next;
-        });
-      }, 1000 / 60);
-
-      return () => clearInterval(timer);
+    if (!inView) return;
+    if (reduce) {
+      setValue(to);
+      return;
     }
-  }, [isInView, value, duration]);
+    const duration = 1200;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setValue(Math.round(eased * to));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [inView, to, reduce]);
 
   return (
-    <span ref={ref}>
-      {Math.floor(count)}{suffix}
+    <span ref={ref} className={`text-4xl font-extrabold tracking-tight sm:text-5xl ${GRADIENT_TEXT}`}>
+      {value}
+      {suffix}
     </span>
   );
-};
+}
 
 export const StatsSection = () => {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
   return (
-    <section ref={ref} className="py-20 bg-muted/50">
-      <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-            Trusted by Technical Professionals
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Join thousands of professionals who rely on Sector Pro for their most critical technical operations
-          </p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {stats.map((stat, index) => (
+    <section className="relative px-6 py-20">
+      <div className="mx-auto max-w-6xl">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {stats.map(({ icon: Icon, value, suffix, label, description }, i) => (
             <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 50 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.8, delay: index * 0.2 }}
-              className="text-center"
+              key={label}
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, delay: i * 0.08 }}
+              className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center backdrop-blur-sm transition-colors hover:border-white/20"
             >
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                className="bg-card rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300"
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={isInView ? { scale: 1 } : {}}
-                  transition={{ duration: 0.5, delay: index * 0.2 + 0.3 }}
-                  className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-6"
-                >
-                  <stat.icon className="w-8 h-8 text-primary" />
-                </motion.div>
-
-                <motion.div
-                  className="text-4xl lg:text-5xl font-bold text-primary mb-2"
-                  initial={{ opacity: 0 }}
-                  animate={isInView ? { opacity: 1 } : {}}
-                  transition={{ delay: index * 0.2 + 0.5 }}
-                >
-                  <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-                </motion.div>
-
-                <h3 className="text-xl font-semibold mb-2">{stat.label}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {stat.description}
-                </p>
-              </motion.div>
+              <span className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 to-violet-500/20 text-sky-300">
+                <Icon className="h-5 w-5" />
+              </span>
+              <Counter to={value} suffix={suffix} />
+              <p className="mt-2 text-sm font-semibold text-white">{label}</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">{description}</p>
             </motion.div>
           ))}
         </div>
@@ -128,3 +94,5 @@ export const StatsSection = () => {
     </section>
   );
 };
+
+export default StatsSection;
