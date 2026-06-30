@@ -108,7 +108,8 @@ const sortDefaultTables = <TTable extends VersionDefaultTableRow>(tables: TTable
     if (leftOrder !== rightOrder) return leftOrder - rightOrder;
     const leftTime = left.created_at ? toJobTimezone(left.created_at).getTime() : 0;
     const rightTime = right.created_at ? toJobTimezone(right.created_at).getTime() : 0;
-    return leftTime - rightTime;
+    if (leftTime !== rightTime) return leftTime - rightTime;
+    return left.id.localeCompare(right.id);
   });
 
 const sortOverrides = <
