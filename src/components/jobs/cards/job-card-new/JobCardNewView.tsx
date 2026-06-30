@@ -355,7 +355,7 @@ export function JobCardNewView({
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-6">
           <div className="flex flex-wrap items-center gap-2">
-            {isProjectManagementPage && job.job_type !== "dryhire" && (
+            {isProjectManagementPage && !isHouseTech && job.job_type !== "dryhire" && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -672,13 +672,15 @@ export function JobCardNewView({
 
           {isProjectManagementPage && (
             <>
-              <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-                <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
-                  <div className="h-full overflow-auto">
-                    <ModernHojaDeRuta jobId={job.id} />
-                  </div>
-                </DialogContent>
-              </Dialog>
+              {!isHouseTech && (
+                <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
+                  <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
+                    <div className="h-full overflow-auto">
+                      <ModernHojaDeRuta jobId={job.id} />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
               <ProjectNotesDialog
                 open={projectNotesOpen}
                 onOpenChange={setProjectNotesOpen}

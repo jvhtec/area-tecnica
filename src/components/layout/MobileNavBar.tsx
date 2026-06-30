@@ -58,13 +58,15 @@ function useVisualViewportBottomOffset() {
     window.addEventListener("resize", updateBottomOffset)
     window.addEventListener("orientationchange", updateBottomOffset)
     visualViewport?.addEventListener("resize", updateBottomOffset)
-    visualViewport?.addEventListener("scroll", updateBottomOffset)
+    // NOTE: we intentionally do NOT listen to visualViewport "scroll". That event
+    // fires continuously during momentum/rubber-band scrolling with transient
+    // offsets, which made the fixed bottom bar chase the viewport and visibly
+    // "unstick". Keyboard and browser-chrome changes still arrive via "resize".
 
     return () => {
       window.removeEventListener("resize", updateBottomOffset)
       window.removeEventListener("orientationchange", updateBottomOffset)
       visualViewport?.removeEventListener("resize", updateBottomOffset)
-      visualViewport?.removeEventListener("scroll", updateBottomOffset)
     }
   }, [])
 
