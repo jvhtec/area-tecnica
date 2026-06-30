@@ -120,6 +120,64 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+type StaffingJoinedJob = {
+  id?: string | null;
+  title?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+
+type StaffingRequestDateScope = {
+  id?: string | null;
+  job_id?: string | null;
+  phase?: string | null;
+  status?: string | null;
+  role_code?: string | null;
+  target_date?: string | null;
+  single_day?: boolean | null;
+  updated_at?: string | null;
+  jobs?: StaffingJoinedJob | StaffingJoinedJob[] | null;
+  job?: StaffingJoinedJob | null;
+};
+
+type StaffingEventRoleRow = {
+  staffing_request_id?: string | null;
+  meta?: { role?: unknown } | null;
+};
+
+function staffingRolePrefix(roleCode?: string | null): string | null {
+  const normalized = typeof roleCode === 'string' ? roleCode.trim() : '';
+  if (!normalized) return null;
+  return normalized.replace(/-[RET]$/i, '') || null;
+}
+
+function staffingRequestOverlapsTargetDates(request: StaffingRequestDateScope, targetDates: string[]): boolean {
+  const normalizedTargetDates = targetDates
+    .map((date) => dateOnly(date))
+    .filter((date): date is string => Boolean(date));
+  if (normalizedTargetDates.length === 0) return true;
+
+  const requestTargetDate = dateOnly(request?.target_date);
+  if (request?.single_day === true && requestTargetDate) {
+    return normalizedTargetDates.includes(requestTargetDate);
+  }
+
+  const job = joinedSingle(request?.jobs ?? request?.job);
+  const jobStart = dateOnly(job?.start_time);
+  const jobEnd = dateOnly(job?.end_time);
+  if (jobStart && jobEnd) {
+    const first = jobStart <= jobEnd ? jobStart : jobEnd;
+    const last = jobStart <= jobEnd ? jobEnd : jobStart;
+    return normalizedTargetDates.some((date) => date >= first && date <= last);
+  }
+
+  if (requestTargetDate) {
+    return normalizedTargetDates.includes(requestTargetDate);
+  }
+
+  return true;
+}
+
 function distanceKm(
   lat1: number | null,
   lon1: number | null,
@@ -617,6 +675,7 @@ serve(createHttpHandler(async (req) => {
           sameRoleRequestResult,
           jobAvailabilityRequestResult,
           rolelessDeclineResult,
+          crossJobDeclineResult,
           campaignPolicyResult,
         ] = await Promise.all([
           supabase
@@ -656,6 +715,13 @@ serve(createHttpHandler(async (req) => {
             .in('phase', ['availability', 'offer'])
             .eq('status', 'declined')
             .or('role_code.is.null,role_code.eq.'),
+          supabase
+            .from('staffing_requests')
+            .select('id, job_id, phase, status, role_code, target_date, single_day, updated_at, jobs(id, title, start_time, end_time)')
+            .eq('profile_id', profile_id)
+            .neq('job_id', job_id)
+            .eq('status', 'declined')
+            .in('phase', ['availability', 'offer']),
           typeof campaign_id === 'string' && campaign_id
             ? supabase
               .from('staffing_campaigns')
@@ -672,6 +738,7 @@ serve(createHttpHandler(async (req) => {
           sameRoleRequestResult.error,
           jobAvailabilityRequestResult.error,
           rolelessDeclineResult.error,
+          crossJobDeclineResult.error,
           campaignPolicyResult.error,
         ].filter(Boolean);
 
@@ -716,6 +783,53 @@ serve(createHttpHandler(async (req) => {
             || !request.target_date
             || targetDates.includes(request.target_date)
           ));
+        const crossJobDeclineRows = ((crossJobDeclineResult.data || []) as StaffingRequestDateScope[])
+          .map((request) => ({
+            ...request,
+            job: joinedSingle(request.jobs),
+          }))
+          .filter((request) => staffingRequestOverlapsTargetDates(request, targetDates));
+        const crossJobDeclineIds = crossJobDeclineRows
+          .map((request) => String(request.id || ''))
+          .filter(Boolean);
+        const crossJobDeclineEventRoles = new Map<string, string>();
+        if (crossJobDeclineIds.length > 0) {
+          const { data: declineEvents, error: declineEventsError } = await supabase
+            .from('staffing_events')
+            .select('staffing_request_id, event, meta, created_at')
+            .in('staffing_request_id', crossJobDeclineIds)
+            .in('event', ['email_sent', 'whatsapp_sent'])
+            .order('created_at', { ascending: false });
+
+          if (declineEventsError) {
+            console.error('❌ RECOMMENDATION GUARD FAILED: cross-job decline role lookup', declineEventsError);
+            return new Response(JSON.stringify({
+              error: 'Unable to verify technician availability',
+              details: { errors: [declineEventsError] },
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          for (const event of (declineEvents || []) as StaffingEventRoleRow[]) {
+            const requestId = String(event.staffing_request_id || '');
+            if (!requestId || crossJobDeclineEventRoles.has(requestId)) continue;
+            const eventRole = typeof event.meta?.role === 'string'
+              ? event.meta.role.trim()
+              : '';
+            if (eventRole) crossJobDeclineEventRoles.set(requestId, eventRole);
+          }
+        }
+        const targetRolePrefix = staffingRolePrefix(roleCode);
+        const crossJobDeclines = crossJobDeclineRows.filter((request) => {
+          if (request.phase === 'availability') return true;
+          const requestRole = typeof request.role_code === 'string' && request.role_code.trim()
+            ? request.role_code
+            : crossJobDeclineEventRoles.get(String(request.id || '')) || null;
+          const requestRolePrefix = staffingRolePrefix(requestRole);
+          return !targetRolePrefix || !requestRolePrefix || requestRolePrefix === targetRolePrefix;
+        });
         const campaignPolicy = (campaignPolicyResult.data?.policy || {}) as any;
         const rolePolicy = roleCode && campaignPolicy?.role_profiles
           ? campaignPolicy.role_profiles[roleCode]
@@ -775,6 +889,7 @@ serve(createHttpHandler(async (req) => {
           || sameRoleRequests.length > 0
           || jobAvailabilityRequests.length > 0
           || rolelessDeclines.length > 0
+          || crossJobDeclines.length > 0
         ) {
           const blockDetails = {
             conflict_type: 'stale_recommendation',
@@ -798,6 +913,19 @@ serve(createHttpHandler(async (req) => {
             same_role_requests: sameRoleRequests,
             job_availability_requests: jobAvailabilityRequests,
             roleless_declines: rolelessDeclines,
+            cross_job_declines: crossJobDeclines.map((request) => ({
+              id: request.id,
+              job_id: request.job_id,
+              phase: request.phase,
+              status: request.status,
+              role_code: request.role_code || crossJobDeclineEventRoles.get(String(request.id || '')) || null,
+              target_date: request.target_date,
+              single_day: request.single_day,
+              updated_at: request.updated_at,
+              title: request.job?.title,
+              start_time: request.job?.start_time,
+              end_time: request.job?.end_time,
+            })),
             target_dates: targetDates,
             target_job: {
               id: job.id,

@@ -32,6 +32,11 @@ const surroundingJobAwarenessMigration = readFileSync(
   "utf-8",
 );
 
+const sameDateDeclineBlockingMigration = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260630120000_block_same_date_declined_staffing_requests.sql"),
+  "utf-8",
+);
+
 const staffingSweeperScheduleMigration = readFileSync(
   join(process.cwd(), "supabase/migrations/20260520130000_schedule_staffing_sweeper.sql"),
   "utf-8",
@@ -129,6 +134,17 @@ describe("smarter staffing recommendation migration", () => {
     expect(declinedPenaltyMigration).toContain("Declined role requests:");
   });
 
+  it("blocks same-date declined staffing requests from other jobs", () => {
+    expect(sameDateDeclineBlockingMigration).toContain("rank_staffing_candidates(uuid,text,text,text,jsonb)");
+    expect(sameDateDeclineBlockingMigration).not.toContain("RETURNS TABLE");
+    expect(sameDateDeclineBlockingMigration).toContain("idx_staffing_requests_declined_profile_job_date");
+    expect(sameDateDeclineBlockingMigration).toContain("sr.job_id IS DISTINCT FROM p_job_id");
+    expect(sameDateDeclineBlockingMigration).toContain("sr.status = 'declined'");
+    expect(sameDateDeclineBlockingMigration).toContain("sr.phase = 'availability'");
+    expect(sameDateDeclineBlockingMigration).toContain("td.target_date BETWEEN declined_job.start_time::date AND declined_job.end_time::date");
+    expect(sameDateDeclineBlockingMigration).toContain("public.staffing_role_prefix");
+  });
+
   it("applies profile cost/rate scoring without changing the candidate RPC shape", () => {
     expect(profileRateScoringMigration).toContain("rank_staffing_candidates(uuid,text,text,text,jsonb)");
     expect(profileRateScoringMigration).not.toContain("RETURNS TABLE");
@@ -196,6 +212,9 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("same_role_requests");
     expect(sendStaffingEmailFunction).toContain("job_availability_requests");
     expect(sendStaffingEmailFunction).toContain("roleless_declines");
+    expect(sendStaffingEmailFunction).toContain("cross_job_declines");
+    expect(sendStaffingEmailFunction).toContain("staffingRequestOverlapsTargetDates");
+    expect(sendStaffingEmailFunction).toContain("staffingRolePrefix");
     expect(sendStaffingEmailFunction).toContain("adjacent_assignments");
     expect(sendStaffingEmailFunction).toContain("adjacent_job_policy");
     expect(sendStaffingEmailFunction).toContain("urgentAdjacentMode");
