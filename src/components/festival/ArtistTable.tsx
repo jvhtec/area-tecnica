@@ -96,6 +96,8 @@ interface ArtistTableProps {
   jobId?: string;
   selectedDate?: string;
   onArtistStagePlotUpdated?: () => void;
+  canDelete?: boolean;
+  canCreateExtras?: boolean;
 }
 
 type EquipmentSystem = {
@@ -144,7 +146,9 @@ export const ArtistTable = ({
   dayStartTime,
   jobId,
   selectedDate,
-  onArtistStagePlotUpdated
+  onArtistStagePlotUpdated,
+  canDelete = true,
+  canCreateExtras = true
 }: ArtistTableProps) => {
   const confirm = useConfirm();
   const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
@@ -1084,7 +1088,7 @@ export const ArtistTable = ({
                               {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
                             </Button>
                           )}
-                          {gearComparison?.mismatches.some(m => m.severity === 'error') && (
+                          {canCreateExtras && gearComparison?.mismatches.some(m => m.severity === 'error') && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1101,9 +1105,11 @@ export const ArtistTable = ({
                           <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
-                            {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                          </Button>
+                          {canDelete && (
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
+                              {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1136,6 +1142,8 @@ export const ArtistTable = ({
               deletingStagePlotArtistId={deletingStagePlotArtistId}
               onCreateFlexExtras={createExtrasPresupuesto}
               isCreatingExtrasFor={isCreatingExtrasFor}
+              canDelete={canDelete}
+              canCreateExtras={canCreateExtras}
             />
           </div>
 

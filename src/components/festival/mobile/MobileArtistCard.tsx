@@ -187,6 +187,8 @@ interface MobileArtistCardProps {
   isCreatingExtrasFor: (id: string) => boolean;
   onCreateFlexExtras: (artistId: string, artistName: string, artistDate: string, showStart: string, showEnd: string, isAfterMidnight: boolean) => void;
   riderFiles?: MobileArtistRiderFile[];
+  canDelete?: boolean;
+  canCreateExtras?: boolean;
 }
 
 export const MobileArtistCard = ({
@@ -210,6 +212,8 @@ export const MobileArtistCard = ({
   isCreatingExtrasFor,
   onCreateFlexExtras,
   riderFiles = [],
+  canDelete = true,
+  canCreateExtras = true,
 }: MobileArtistCardProps) => {
   return (
     <div className="border rounded-xl bg-card overflow-hidden max-w-full">
@@ -391,7 +395,7 @@ export const MobileArtistCard = ({
               {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
             </Button>
           )}
-          {gearComparison?.mismatches.some(m => m.severity === 'error') && (
+          {canCreateExtras && gearComparison?.mismatches.some(m => m.severity === 'error') && (
             <Button
               variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
               onClick={() => {
@@ -407,13 +411,15 @@ export const MobileArtistCard = ({
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditArtist(artist)}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost" size="icon" className="h-8 w-8 text-destructive"
-            onClick={() => onDeleteArtist(artist)}
-            disabled={deletingArtistId === artist.id}
-          >
-            {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-          </Button>
+          {canDelete && (
+            <Button
+              variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+              onClick={() => onDeleteArtist(artist)}
+              disabled={deletingArtistId === artist.id}
+            >
+              {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            </Button>
+          )}
         </div>
       )}
     </div>

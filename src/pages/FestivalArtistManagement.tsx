@@ -22,6 +22,8 @@ import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/ut
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { canCreateFestivalArtistExtras, canDeleteFestivalArtists } from "@/utils/permissions";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -32,6 +34,9 @@ const FestivalArtistManagement = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { userRole } = useOptimizedAuth();
+  const canDeleteArtists = canDeleteFestivalArtists(userRole);
+  const canCreateArtistExtras = canCreateFestivalArtistExtras(userRole);
   const routeDate = searchParams.get("date") || "";
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -331,6 +336,7 @@ const FestivalArtistManagement = () => {
   };
   
   const handleDeleteArtist = async (artist: any) => {
+    if (!canDeleteArtists) return;
     deleteArtist(artist.id);
   };
   
@@ -758,6 +764,8 @@ const FestivalArtistManagement = () => {
                     jobId={jobId}
                     selectedDate={selectedDate}
                     onArtistStagePlotUpdated={invalidateArtists}
+                    canDelete={canDeleteArtists}
+                    canCreateExtras={canCreateArtistExtras}
                   />
                 </div>
               ) : (

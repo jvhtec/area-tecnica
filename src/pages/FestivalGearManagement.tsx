@@ -17,6 +17,8 @@ import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { Badge } from "@/components/ui/badge";
 import { buildReadableFilename } from "@/utils/fileName";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { canManageFestivalGear } from "@/utils/permissions";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -30,6 +32,8 @@ const FestivalGearManagement = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { userRole } = useOptimizedAuth();
+  const canManageGear = canManageFestivalGear(userRole);
   const [jobTitle, setJobTitle] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [stages, setStages] = useState<StageInfo[]>([{ number: 1, name: "Stage 1" }]);
@@ -502,10 +506,12 @@ const FestivalGearManagement = () => {
                 Configura los escenarios para tu festival. Haz clic en el nombre de un escenario para editarlo.
               </CardDescription>
             </div>
-            <Button onClick={handleAddStage} size="sm" className="self-start sm:self-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              Añadir Escenario
-            </Button>
+            {canManageGear && (
+              <Button onClick={handleAddStage} size="sm" className="self-start sm:self-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Añadir Escenario
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -549,7 +555,7 @@ const FestivalGearManagement = () => {
                       </Button>
                     </div>
                   </div>
-                ) : (
+                ) : canManageGear ? (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -558,7 +564,7 @@ const FestivalGearManagement = () => {
                   >
                     <Edit2 className="h-3 w-3" />
                   </Button>
-                )}
+                ) : null}
               </div>
             ))}
           </div>
@@ -602,6 +608,7 @@ const FestivalGearManagement = () => {
               jobId={jobId || ''}
               stageNumber={selectedStage}
               onSave={handleSave}
+              readOnly={!canManageGear}
             />
           </CardContent>
         </Card>

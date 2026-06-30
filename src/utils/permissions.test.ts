@@ -8,8 +8,14 @@ import {
   canDeleteDocuments,
   canDeleteSoundVisionFiles,
   canDeleteTourDocuments,
+  canCreateFestivalArtistExtras,
+  canDeleteFestivalArtists,
+  canManageFestivalGear,
+  canManageFestivalScheduling,
   canManageJobAssignments,
   canManagePayouts,
+  canUploadFestivalDocuments,
+  isHouseTechRole,
   canPrintFestivalDocuments,
   canReceiveMorningSummary,
   canSubmitTechnicianIncidentReports,
@@ -140,6 +146,32 @@ describe('management role helpers', () => {
     expect(canManageJobAssignments('house_tech')).toBe(true);
     expect(canManageJobAssignments('logistics')).toBe(false);
     expect(canManageJobAssignments('technician')).toBe(false);
+  });
+
+  it('restricts festival planning and gear editing to management, read-only for house techs', () => {
+    expect(isHouseTechRole('house_tech')).toBe(true);
+    expect(isHouseTechRole('management')).toBe(false);
+
+    expect(canManageFestivalScheduling('admin')).toBe(true);
+    expect(canManageFestivalScheduling('management')).toBe(true);
+    expect(canManageFestivalScheduling('house_tech')).toBe(false);
+
+    expect(canManageFestivalGear('management')).toBe(true);
+    expect(canManageFestivalGear('house_tech')).toBe(false);
+  });
+
+  it('lets house techs upload festival documents but not delete artists or create extras', () => {
+    expect(canUploadFestivalDocuments('management')).toBe(true);
+    expect(canUploadFestivalDocuments('logistics')).toBe(true);
+    expect(canUploadFestivalDocuments('house_tech')).toBe(true);
+    expect(canUploadFestivalDocuments('technician')).toBe(false);
+
+    expect(canDeleteFestivalArtists('admin')).toBe(true);
+    expect(canDeleteFestivalArtists('management')).toBe(true);
+    expect(canDeleteFestivalArtists('house_tech')).toBe(false);
+
+    expect(canCreateFestivalArtistExtras('management')).toBe(true);
+    expect(canCreateFestivalArtistExtras('house_tech')).toBe(false);
   });
 
   it('centralizes document and festival print permissions', () => {

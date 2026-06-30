@@ -124,6 +124,7 @@ type FestivalManagementLocalVm = {
   assignmentDepartment: Department;
   artistCount: number;
   canEdit: boolean;
+  canUploadDocuments: boolean;
   departmentOptions: Department[];
   festivalStageOptions: FestivalStageOption[];
   flexError: string | null;
@@ -140,10 +141,12 @@ type FestivalManagementLocalVm = {
   isAssignmentDialogOpen: boolean;
   isFlexLoading: boolean;
   isGearRoute: boolean;
+  isHouseTech: boolean;
   isJobDetailsOpen: boolean;
   isJobPresetsOpen: boolean;
   isLoading: boolean;
   isManagementUser?: boolean;
+  isPlanningViewOnly: boolean;
   isRouteSheetOpen: boolean;
   isSchedulingRoute: boolean;
   isSingleJobMode: boolean;

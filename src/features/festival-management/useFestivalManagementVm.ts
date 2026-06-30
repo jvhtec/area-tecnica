@@ -84,7 +84,11 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const isArtistRoute = location.pathname.includes("/artists");
   const isGearRoute = location.pathname.includes("/gear");
   const canEdit = ["admin", "management", "logistics"].includes(userRole || "");
+  const isHouseTech = userRole === "house_tech";
   const isViewOnly = userRole === "technician";
+  // House techs get a read-only view of planning + gear setup, but may still upload documents.
+  const isPlanningViewOnly = isViewOnly || isHouseTech;
+  const canUploadDocuments = canEdit || isHouseTech;
 
   useEffect(() => {
     if (!jobId) {
@@ -172,10 +176,13 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       humanizeDepartment: humanizeFestivalDepartment,
 
       canEdit,
+      canUploadDocuments,
       isArtistRoute,
       isGearRoute,
+      isHouseTech,
       isLoading: jobData.isLoading,
       isManagementUser,
+      isPlanningViewOnly,
       isSchedulingRoute,
       isSingleJobMode,
       isViewOnly,
