@@ -4,8 +4,9 @@
 // .xmlp - Archivo de proyecto (proyecto SoundVision completo)
 // .xmls - Archivo de escena (contexto de recinto/geometría)
 // .xmlc - Archivo de configuración (exportaciones como posiciones de altavoces)
+// .nwm - Archivo de modelo NWM usado como referencia técnica
 // .dwg/.dxf/.dfx - Planos CAD usados como referencia técnica
-export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc', '.dwg', '.dxf', '.dfx'];
+export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc', '.nwm', '.dwg', '.dxf', '.dfx'];
 export const ALLOWED_MIME_TYPES = [
   'application/xml',
   'text/xml',

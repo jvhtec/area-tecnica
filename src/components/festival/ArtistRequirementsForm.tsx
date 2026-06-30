@@ -1012,7 +1012,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
                     <div className="space-y-2">
                       <label htmlFor="public-rider-upload" className="text-sm font-medium">
-                        {tx("Subir rider(s) (PDF, Word, imagen, SoundVision o CAD)", "Upload rider file(s) (PDF, Word, image, SoundVision, or CAD)")}
+                        {tx("Subir rider(s) (PDF, Word, imagen, SoundVision, NWM o CAD)", "Upload rider file(s) (PDF, Word, image, SoundVision, NWM, or CAD)")}
                       </label>
                       <Input
                         id="public-rider-upload"

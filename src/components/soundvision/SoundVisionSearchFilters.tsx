@@ -70,6 +70,7 @@ export const SoundVisionSearchFilters = ({
             <SelectItem value=".xmlp">.xmlp (Proyecto)</SelectItem>
             <SelectItem value=".xmls">.xmls (Escena)</SelectItem>
             <SelectItem value=".xmlc">.xmlc (Configuración)</SelectItem>
+            <SelectItem value=".nwm">.nwm (Modelo NWM)</SelectItem>
           </SelectContent>
         </Select>
 

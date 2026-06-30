@@ -84,6 +84,7 @@ const DOCUMENT_UPLOAD_ALLOWED_EXTENSIONS = new Set([
   'xmlp',
   'xmlc',
   'xmls',
+  'nwm',
   'dwg',
   'dfx',
   'dxf',
