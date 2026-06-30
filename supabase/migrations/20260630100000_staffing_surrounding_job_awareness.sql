@@ -13,6 +13,15 @@ BEGIN
   SELECT pg_get_functiondef('public.rank_staffing_candidates(uuid,text,text,text,jsonb)'::regprocedure)
   INTO v_sql;
 
+  IF POSITION(
+$old$
+  v_base_lat double precision := 40.4168;
+  v_base_lng double precision := -3.7038;
+$old$ IN v_sql) = 0
+  THEN
+    RAISE EXCEPTION 'Failed to find rank_staffing_candidates coordinate declaration block';
+  END IF;
+
   v_sql := replace(
     v_sql,
 $old$
@@ -33,6 +42,17 @@ $new$
     OR COALESCE(p_policy->'role_profiles'->NULLIF(BTRIM(COALESCE(p_role_code, '')), '')->>'inferred_profile', '') = 'emergency_fill';
 $new$
   );
+
+  IF POSITION(
+$old$
+  SELECT j.start_time, j.end_time
+  INTO v_job_start, v_job_end
+  FROM jobs j
+  WHERE j.id = p_job_id;
+$old$ IN v_sql) = 0
+  THEN
+    RAISE EXCEPTION 'Failed to find rank_staffing_candidates target job metadata block';
+  END IF;
 
   v_sql := replace(
     v_sql,
@@ -55,6 +75,16 @@ $new$
   WHERE j.id = p_job_id;
 $new$
   );
+
+  IF POSITION(
+$old$
+          AND NOT (j2.time_range && tstzrange(v_job_start, v_job_end, '[]'))
+      ) AS has_same_day_job
+    FROM profiles p
+$old$ IN v_sql) = 0
+  THEN
+    RAISE EXCEPTION 'Failed to find rank_staffing_candidates adjacent assignment projection block';
+  END IF;
 
   v_sql := replace(
     v_sql,
@@ -151,6 +181,16 @@ $new$
 $new$
   );
 
+  IF POSITION(
+$old$
+      wr.rate_penalty,
+      GREATEST(0, 100 - ROUND(wr.rate_penalty * 10)::int) AS cost_efficiency_score,
+      wr.jobs_worked,
+$old$ IN v_sql) = 0
+  THEN
+    RAISE EXCEPTION 'Failed to find rank_staffing_candidates candidate field forwarding block';
+  END IF;
+
   v_sql := replace(
     v_sql,
 $old$
@@ -168,6 +208,15 @@ $new$
       wr.jobs_worked,
 $new$
   );
+
+  IF POSITION(
+$old$
+      wr.has_same_day_job AS soft_conflict,
+      false AS hard_conflict
+$old$ IN v_sql) = 0
+  THEN
+    RAISE EXCEPTION 'Failed to find rank_staffing_candidates hard conflict block';
+  END IF;
 
   v_sql := replace(
     v_sql,
@@ -189,6 +238,22 @@ $new$
       ) AS hard_conflict
 $new$
   );
+
+  IF POSITION(
+$old$
+    (CASE
+      WHEN f.rate_penalty > 0
+      THEN jsonb_build_array(
+        'Rate adjustment: -' || ROUND(f.rate_penalty::numeric, 1) ||
+        ' (' || ROUND(((f.rate_ratio - 1) * 100)::numeric, 0) || '% above standard)'
+      )
+      ELSE '[]'::jsonb
+    END) ||
+    (CASE WHEN f.soft_conflict THEN jsonb_build_array('Same-day job (different time)') ELSE '[]'::jsonb END) AS reasons
+$old$ IN v_sql) = 0
+  THEN
+    RAISE EXCEPTION 'Failed to find rank_staffing_candidates reasons block';
+  END IF;
 
   v_sql := replace(
     v_sql,
@@ -213,12 +278,15 @@ $new$
       ELSE '[]'::jsonb
     END) ||
     (CASE
-      WHEN (f.has_previous_day_job OR f.has_next_day_job) AND v_surrounding_jobs_is_urgent
-      THEN jsonb_build_array('Adjacent jobs allowed by Cobertura urgente')
-      WHEN (f.has_previous_day_job OR f.has_next_day_job) AND f.max_surrounding_job_distance_km IS NOT NULL
-      THEN jsonb_build_array('Adjacent jobs within ' || ROUND(f.max_surrounding_job_distance_km::numeric, 1) || 'km')
       WHEN (f.has_previous_day_job OR f.has_next_day_job) AND NOT v_surrounding_jobs_enabled
       THEN jsonb_build_array('Adjacent job guard disabled')
+      WHEN (f.has_previous_day_job OR f.has_next_day_job) AND v_surrounding_jobs_enabled AND v_surrounding_jobs_is_urgent
+      THEN jsonb_build_array('Adjacent jobs allowed by Cobertura urgente')
+      WHEN (f.has_previous_day_job OR f.has_next_day_job)
+        AND v_surrounding_jobs_enabled
+        AND f.max_surrounding_job_distance_km IS NOT NULL
+        AND f.max_surrounding_job_distance_km <= v_surrounding_jobs_max_distance_km
+      THEN jsonb_build_array('Adjacent jobs within ' || ROUND(f.max_surrounding_job_distance_km::numeric, 1) || 'km')
       ELSE '[]'::jsonb
     END) ||
     (CASE WHEN f.soft_conflict THEN jsonb_build_array('Same-day job (different time)') ELSE '[]'::jsonb END) AS reasons

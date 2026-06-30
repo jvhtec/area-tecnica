@@ -104,6 +104,42 @@ describe('crewing profile inference', () => {
     expect(policy.channel).toBe('whatsapp');
   });
 
+  it('passes surrounding-job policy overrides into campaign policy', () => {
+    const policy = buildCampaignPolicy({
+      mode: 'assisted',
+      selectedJobProfile: 'standard',
+      inferProfileFromJobType: false,
+      roleProfiles: {},
+      availabilityTtlHours: 24,
+      offerTtlHours: 2,
+      softConflictPolicy: 'warn',
+      excludeFridge: false,
+      sendChannel: 'email',
+      costScoring: {
+        enabled: false,
+        penaltyStrength: 'disabled',
+        maxRatePenalty: 0,
+      },
+      waves: {
+        mode: 'manual_selection',
+        buffer: 0,
+        waitMinutes: 15,
+        maxWaves: 1,
+        autoSendNextWave: false,
+      },
+      tickIntervalSeconds: 300,
+      surroundingJobs: {
+        enabled: false,
+        maxLocationDistanceKm: 12,
+      },
+    });
+
+    expect(policy.surrounding_jobs).toEqual({
+      enabled: false,
+      max_location_distance_km: 12,
+    });
+  });
+
   it('groups ranked candidates into recommended waves from required count plus buffer', () => {
     expect(recommendedWaveNumber(0, 2, 1)).toBe(1);
     expect(recommendedWaveNumber(2, 2, 1)).toBe(1);

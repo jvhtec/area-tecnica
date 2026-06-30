@@ -152,7 +152,7 @@ describe("smarter staffing recommendation migration", () => {
     expect(surroundingJobAwarenessMigration).toContain("has_previous_day_job");
     expect(surroundingJobAwarenessMigration).toContain("has_next_day_job");
     expect(surroundingJobAwarenessMigration).toContain("wr.has_previous_day_job OR wr.has_next_day_job");
-    expect(surroundingJobAwarenessMigration).toContain("j3.tour_id <> v_target_tour_id");
+    expect(surroundingJobAwarenessMigration).toMatch(/v_target_tour_id IS NULL\s+OR j3\.tour_id IS NULL\s+OR j3\.tour_id <> v_target_tour_id/);
     expect(surroundingJobAwarenessMigration).toContain("max_surrounding_job_distance_km");
     expect(surroundingJobAwarenessMigration).toContain("v_surrounding_jobs_enabled");
     expect(surroundingJobAwarenessMigration).toContain("Adjacent jobs allowed by Cobertura urgente");
@@ -201,6 +201,8 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("urgentAdjacentMode");
     expect(sendStaffingEmailFunction).toContain("targetTourId");
     expect(sendStaffingEmailFunction).toContain("distanceKm(");
+    expect(sendStaffingEmailFunction).toContain("value.trim() === ''");
+    expect(sendStaffingEmailFunction).toContain(".eq('job_id', job_id)");
     expect(staffingCandidateList).toContain("campaign_id: campaignId");
     expect(sendStaffingEmailFunction).toContain("status: 409");
   });

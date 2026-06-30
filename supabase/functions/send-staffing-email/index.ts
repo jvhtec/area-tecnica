@@ -114,6 +114,8 @@ function dateKeyInRange(dateKey: string | null, start?: string | null, end?: str
 }
 
 function toFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 }
@@ -657,8 +659,9 @@ serve(createHttpHandler(async (req) => {
           typeof campaign_id === 'string' && campaign_id
             ? supabase
               .from('staffing_campaigns')
-              .select('policy')
+              .select('policy, job_id')
               .eq('id', campaign_id)
+              .eq('job_id', job_id)
               .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
         ]);
