@@ -143,7 +143,7 @@ describe('management role helpers', () => {
   it('centralizes mobile assignment permissions', () => {
     expect(canManageJobAssignments('admin')).toBe(true);
     expect(canManageJobAssignments('management')).toBe(true);
-    expect(canManageJobAssignments('house_tech')).toBe(true);
+    expect(canManageJobAssignments('house_tech')).toBe(false);
     expect(canManageJobAssignments('logistics')).toBe(false);
     expect(canManageJobAssignments('technician')).toBe(false);
   });

@@ -105,8 +105,9 @@ export const canPrintFestivalDocuments = (role: UserRole) => canUploadDocuments(
 
 export const canCreateFolders = (role: UserRole) => PROJECT_MANAGEMENT_ALLOWED_ROLES.includes(role as AppUserRole);
 
+// House techs may view assignments but must not add or remove them.
 export const canManageJobAssignments = (role: UserRole): boolean =>
-  isManagementRole(role) || role === 'house_tech';
+  isManagementRole(role);
 
 export const canViewAchievements = (role: UserRole): boolean =>
   isTechnicianRole(role) || isManagementRole(role);
