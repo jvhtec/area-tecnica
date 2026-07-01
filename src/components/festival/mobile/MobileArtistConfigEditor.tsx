@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } from "@/lib/frequencyBands";
 import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtistCard";
 import type { Database, Json } from "@/integrations/supabase/types";
+import { combineWavesDisplay } from "@/constants/wavesModels";
 
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
 type ProviderType = Database["public"]["Enums"]["provider_type"];
@@ -34,8 +35,10 @@ interface Artist {
   mon_console: string;
   mon_console_provided_by?: ProviderType | null;
   monitors_from_foh?: boolean;
-  foh_waves_outboard?: string;
-  mon_waves_outboard?: string;
+  foh_waves_models?: string[];
+  foh_outboard?: string;
+  mon_waves_models?: string[];
+  mon_outboard?: string;
   wireless_systems: any[];
   wireless_provided_by?: ProviderType | null;
   iem_systems: any[];
@@ -208,8 +211,8 @@ export const ReadOnlyArtistCategoryContent = ({
           <div className="text-xs uppercase text-muted-foreground font-semibold">FOH</div>
           <div className="font-medium">{artist.foh_console || "Sin especificar"}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.foh_console_provided_by)}</div>
-          {artist.foh_waves_outboard && (
-            <div className="text-muted-foreground">Waves/Outboard: {artist.foh_waves_outboard}</div>
+          {(artist.foh_waves_models?.length || artist.foh_outboard) && (
+            <div className="text-muted-foreground">Waves/Outboard: {combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</div>
           )}
         </div>
         <div>
@@ -220,8 +223,8 @@ export const ReadOnlyArtistCategoryContent = ({
             <>
               <div className="font-medium">{artist.mon_console || "Sin especificar"}</div>
               <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.mon_console_provided_by)}</div>
-              {artist.mon_waves_outboard && (
-                <div className="text-muted-foreground">Waves/Outboard: {artist.mon_waves_outboard}</div>
+              {(artist.mon_waves_models?.length || artist.mon_outboard) && (
+                <div className="text-muted-foreground">Waves/Outboard: {combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</div>
               )}
             </>
           )}
@@ -380,8 +383,10 @@ function buildFormData(artist: Artist) {
     mon_console: artist.mon_console || "",
     mon_console_provided_by: artist.mon_console_provided_by || "festival",
     monitors_from_foh: artist.monitors_from_foh || false,
-    foh_waves_outboard: artist.foh_waves_outboard || "",
-    mon_waves_outboard: artist.mon_waves_outboard || "",
+    foh_waves_models: artist.foh_waves_models || [],
+    foh_outboard: artist.foh_outboard || "",
+    mon_waves_models: artist.mon_waves_models || [],
+    mon_outboard: artist.mon_outboard || "",
     wireless_systems: artist.wireless_systems || [],
     iem_systems: artist.iem_systems || [],
     wireless_provided_by: artist.wireless_provided_by || "festival",
@@ -470,8 +475,10 @@ export const MobileArtistConfigEditor = ({
             mon_console: formData.mon_console,
             mon_console_provided_by: formData.mon_console_provided_by,
             monitors_from_foh: formData.monitors_from_foh,
-            foh_waves_outboard: formData.foh_waves_outboard || null,
-            mon_waves_outboard: formData.mon_waves_outboard || null,
+            foh_waves_models: formData.foh_waves_models,
+            foh_outboard: formData.foh_outboard || null,
+            mon_waves_models: formData.mon_waves_models,
+            mon_outboard: formData.mon_outboard || null,
             foh_tech: formData.foh_tech,
             mon_tech: formData.mon_tech,
           };

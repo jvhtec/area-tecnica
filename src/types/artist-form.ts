@@ -24,8 +24,12 @@ export interface ArtistSectionProps {
     mon_consoles: ConsoleSetup[];
     mon_console_provided_by: string;
     monitors_from_foh: boolean;
-    foh_waves_outboard: string;
-    mon_waves_outboard: string;
+    foh_waves_models: string[];
+    foh_outboard: string;
+    foh_waves_provided_by: string;
+    mon_waves_models: string[];
+    mon_outboard: string;
+    mon_waves_provided_by: string;
     wireless_systems: any[];
     iem_systems: any[];
     wireless_provided_by: string;

@@ -41,8 +41,12 @@ interface ArtistManagementFormData {
   mon_console: string;
   mon_console_provided_by: string;
   monitors_from_foh: boolean;
-  foh_waves_outboard: string;
-  mon_waves_outboard: string;
+  foh_waves_models: string[];
+  foh_outboard: string;
+  foh_waves_provided_by: string;
+  mon_waves_models: string[];
+  mon_outboard: string;
+  mon_waves_provided_by: string;
   wireless_systems: any[];
   iem_systems: any[];
   wireless_provided_by: string;
@@ -112,8 +116,12 @@ export const ArtistManagementForm = ({
       mon_console: artistData?.mon_console || "",
       mon_console_provided_by: artistData?.mon_console_provided_by || "festival",
       monitors_from_foh: artistData?.monitors_from_foh || false,
-      foh_waves_outboard: artistData?.foh_waves_outboard || "",
-      mon_waves_outboard: artistData?.mon_waves_outboard || "",
+      foh_waves_models: artistData?.foh_waves_models || [],
+      foh_outboard: artistData?.foh_outboard || "",
+      foh_waves_provided_by: artistData?.foh_waves_provided_by || "festival",
+      mon_waves_models: artistData?.mon_waves_models || [],
+      mon_outboard: artistData?.mon_outboard || "",
+      mon_waves_provided_by: artistData?.mon_waves_provided_by || "festival",
       wireless_systems: artistData?.wireless_systems || [],
       iem_systems: artistData?.iem_systems || [],
       wireless_provided_by: artistData?.wireless_provided_by || "festival",

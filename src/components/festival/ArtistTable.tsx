@@ -11,6 +11,7 @@ import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically, sortArtistsByField, type ArtistSortField } from "@/utils/artistSorting";
+import { combineWavesDisplay } from "@/constants/wavesModels";
 import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -45,8 +46,12 @@ interface Artist {
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_from_foh?: boolean;
-  foh_waves_outboard?: string;
-  mon_waves_outboard?: string;
+  foh_waves_models?: string[];
+  foh_outboard?: string;
+  foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_waves_models?: string[];
+  mon_outboard?: string;
+  mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: any[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
@@ -262,8 +267,12 @@ export const ArtistTable = ({
         mon_console: artist.mon_console,
         mon_console_provided_by: artist.mon_console_provided_by,
         monitors_from_foh: artist.monitors_from_foh || false,
-        foh_waves_outboard: artist.foh_waves_outboard || "",
-        mon_waves_outboard: artist.mon_waves_outboard || "",
+        foh_waves_models: artist.foh_waves_models || [],
+        foh_outboard: artist.foh_outboard || "",
+        foh_waves_provided_by: artist.foh_waves_provided_by,
+        mon_waves_models: artist.mon_waves_models || [],
+        mon_outboard: artist.mon_outboard || "",
+        mon_waves_provided_by: artist.mon_waves_provided_by,
         wireless_systems: artist.wireless_systems || [],
         wireless_provided_by: artist.wireless_provided_by,
         iem_systems: artist.iem_systems || [],
@@ -691,8 +700,8 @@ export const ArtistTable = ({
           providedBy: artist.mon_console_provided_by || 'festival'
         },
         monitorsFromFoh: artist.monitors_from_foh || false,
-        fohWavesOutboard: artist.foh_waves_outboard || "",
-        monWavesOutboard: artist.mon_waves_outboard || "",
+        fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
+        monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
         wireless: {
           systems: artist.wireless_systems || [],
           providedBy: artist.wireless_provided_by || 'festival'
@@ -940,9 +949,14 @@ export const ArtistTable = ({
                             )}
                             {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                           </div>
-                          {artist.foh_waves_outboard && (
-                            <div className="text-xs text-muted-foreground">
-                              FOH Waves/Outboard: {artist.foh_waves_outboard}
+                          {(artist.foh_waves_models?.length || artist.foh_outboard) && (
+                            <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
+                              <span>FOH Waves/Outboard: {combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
+                              {artist.foh_waves_provided_by && (
+                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_waves_provided_by)}`}>
+                                  {artist.foh_waves_provided_by}
+                                </Badge>
+                              )}
                             </div>
                           )}
                           {artist.monitors_from_foh ? (
@@ -958,9 +972,14 @@ export const ArtistTable = ({
                                 )}
                                 {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                               </div>
-                              {artist.mon_waves_outboard && (
-                                <div className="text-xs text-muted-foreground">
-                                  MON Waves/Outboard: {artist.mon_waves_outboard}
+                              {(artist.mon_waves_models?.length || artist.mon_outboard) && (
+                                <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
+                                  <span>MON Waves/Outboard: {combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
+                                  {artist.mon_waves_provided_by && (
+                                    <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_waves_provided_by)}`}>
+                                      {artist.mon_waves_provided_by}
+                                    </Badge>
+                                  )}
                                 </div>
                               )}
                             </>

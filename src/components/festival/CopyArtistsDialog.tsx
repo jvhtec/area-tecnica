@@ -189,8 +189,10 @@ export const CopyArtistsDialog = ({
           foh_console: copyOptions.copyTechnicalSpecs ? artistData.foh_console : null,
           mon_console: copyOptions.copyTechnicalSpecs ? artistData.mon_console : null,
           monitors_from_foh: copyOptions.copyTechnicalSpecs ? artistData.monitors_from_foh : false,
-          foh_waves_outboard: copyOptions.copyTechnicalSpecs ? artistData.foh_waves_outboard : null,
-          mon_waves_outboard: copyOptions.copyTechnicalSpecs ? artistData.mon_waves_outboard : null,
+          foh_waves_models: copyOptions.copyTechnicalSpecs ? artistData.foh_waves_models : [],
+          foh_outboard: copyOptions.copyTechnicalSpecs ? artistData.foh_outboard : null,
+          mon_waves_models: copyOptions.copyTechnicalSpecs ? artistData.mon_waves_models : [],
+          mon_outboard: copyOptions.copyTechnicalSpecs ? artistData.mon_outboard : null,
           wireless_systems: copyOptions.copyTechnicalSpecs ? artistData.wireless_systems : [],
           iem_systems: copyOptions.copyTechnicalSpecs ? artistData.iem_systems : [],
           wired_mics: copyOptions.copyTechnicalSpecs ? artistData.wired_mics : []

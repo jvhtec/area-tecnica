@@ -2,6 +2,7 @@ import type { ArtistTablePdfData } from '@/utils/artistTablePdfExport';
 import type { ArtistRfIemData, RfIemSystemData } from '@/utils/rfIemTablePdfExport';
 import type { ArtistInfrastructureData } from '@/utils/infrastructureTablePdfExport';
 import type { ShiftAssignment, ShiftWithAssignments } from '@/types/festival-scheduling';
+import { combineWavesDisplay } from '@/constants/wavesModels';
 
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value);
@@ -167,8 +168,8 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
           providedBy: normalizeProvider(artist.mon_console_provided_by, 'festival'),
         },
         monitorsFromFoh: Boolean(artist.monitors_from_foh),
-        fohWavesOutboard: toStringValue(artist.foh_waves_outboard),
-        monWavesOutboard: toStringValue(artist.mon_waves_outboard),
+        fohWavesOutboard: combineWavesDisplay(asArray(artist.foh_waves_models) as string[], toStringValue(artist.foh_outboard)),
+        monWavesOutboard: combineWavesDisplay(asArray(artist.mon_waves_models) as string[], toStringValue(artist.mon_outboard)),
         wireless: {
           systems: normalizeRfIemSystems(artist.wireless_systems, wirelessProvidedBy),
           providedBy: wirelessProvidedBy,

@@ -24,8 +24,10 @@ export interface GearSetupFormData {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_outboard: string;
-  mon_waves_outboard: string;
+  foh_waves_models: string[];
+  foh_outboard: string;
+  mon_waves_models: string[];
+  mon_outboard: string;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];

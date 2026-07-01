@@ -2,11 +2,11 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { useEffect } from "react";
 import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
+import { WavesModelPicker } from "../shared/WavesModelPicker";
 
 export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: ArtistSectionProps) => {
   const { models } = useEquipmentModels();
@@ -30,17 +30,27 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
   useEffect(() => {
     if (!formData.monitors_from_foh) return;
 
-    if (formData.mon_console || formData.mon_waves_outboard || formData.mon_console_provided_by !== "festival") {
+    if (
+      formData.mon_console ||
+      (formData.mon_waves_models && formData.mon_waves_models.length > 0) ||
+      formData.mon_outboard ||
+      formData.mon_console_provided_by !== "festival" ||
+      formData.mon_waves_provided_by !== "festival"
+    ) {
       onChange({
         mon_console: "",
         mon_console_provided_by: "festival",
-        mon_waves_outboard: "",
+        mon_waves_models: [],
+        mon_outboard: "",
+        mon_waves_provided_by: "festival",
       });
     }
   }, [
     formData.mon_console,
     formData.mon_console_provided_by,
-    formData.mon_waves_outboard,
+    formData.mon_waves_models,
+    formData.mon_outboard,
+    formData.mon_waves_provided_by,
     formData.monitors_from_foh,
     onChange,
   ]);
@@ -112,16 +122,20 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
           />
           <Label htmlFor="foh-tech">{tx("Requiere Técnico FOH", "Requires FOH engineer")}</Label>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="foh-waves-outboard">{tx("Waves / Outboard FOH", "FOH Waves / Outboard")}</Label>
-          <Input
-            id="foh-waves-outboard"
-            value={formData.foh_waves_outboard || ""}
-            onChange={(event) => onChange({ foh_waves_outboard: event.target.value })}
-            placeholder={tx("Ej: Waves + outboard analógico", "Ex: Waves + analog outboard")}
-            disabled={locked("foh_waves_outboard")}
-          />
-        </div>
+        <WavesModelPicker
+          idPrefix="foh-waves"
+          waveModelsLabel={tx("Servidor Waves FOH", "FOH Waves Server")}
+          outboardLabel={tx("Outboard FOH", "FOH Outboard")}
+          outboardPlaceholder={tx("Ej: outboard analógico adicional", "Ex: additional analog outboard")}
+          selectedModels={formData.foh_waves_models || []}
+          outboard={formData.foh_outboard || ""}
+          onModelsChange={(models) => onChange({ foh_waves_models: models })}
+          onOutboardChange={(outboard) => onChange({ foh_outboard: outboard })}
+          providedBy={formData.foh_waves_provided_by || "festival"}
+          onProvidedByChange={(providedBy) => onChange({ foh_waves_provided_by: providedBy })}
+          providedByLabel={tx("Waves/Outboard FOH proporcionado por", "FOH Waves/Outboard provided by")}
+          disabled={locked("foh_waves_models")}
+        />
       </div>
 
       {/* Monitor Console */}
@@ -189,16 +203,20 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="mon-waves-outboard">{tx("Waves / Outboard MON", "MON Waves / Outboard")}</Label>
-              <Input
-                id="mon-waves-outboard"
-                value={formData.mon_waves_outboard || ""}
-                onChange={(event) => onChange({ mon_waves_outboard: event.target.value })}
-                placeholder={tx("Ej: Plugins/FX para monitores", "Ex: Monitor plugins/FX")}
-                disabled={locked("mon_waves_outboard")}
-              />
-            </div>
+            <WavesModelPicker
+              idPrefix="mon-waves"
+              waveModelsLabel={tx("Servidor Waves MON", "MON Waves Server")}
+              outboardLabel={tx("Outboard MON", "MON Outboard")}
+              outboardPlaceholder={tx("Ej: outboard adicional para monitores", "Ex: additional outboard for monitors")}
+              selectedModels={formData.mon_waves_models || []}
+              outboard={formData.mon_outboard || ""}
+              onModelsChange={(models) => onChange({ mon_waves_models: models })}
+              onOutboardChange={(outboard) => onChange({ mon_outboard: outboard })}
+              providedBy={formData.mon_waves_provided_by || "festival"}
+              onProvidedByChange={(providedBy) => onChange({ mon_waves_provided_by: providedBy })}
+              providedByLabel={tx("Waves/Outboard MON proporcionado por", "MON Waves/Outboard provided by")}
+              disabled={locked("mon_waves_models")}
+            />
           </>
         ) : (
           <p className="text-xs text-muted-foreground">

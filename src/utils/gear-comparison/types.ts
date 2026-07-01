@@ -45,8 +45,12 @@ export interface ArtistRequirements {
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_from_foh?: boolean;
-  foh_waves_outboard?: string;
-  mon_waves_outboard?: string;
+  foh_waves_models?: string[];
+  foh_outboard?: string;
+  foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_waves_models?: string[];
+  mon_outboard?: string;
+  mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: WirelessSetup[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: WirelessSetup[];
@@ -73,8 +77,10 @@ export interface ArtistRequirements {
 export interface AvailableGear {
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_outboard?: string | null;
-  mon_waves_outboard?: string | null;
+  foh_waves_models?: string[];
+  foh_outboard?: string | null;
+  mon_waves_models?: string[];
+  mon_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];

@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
 import type { ArtistSortField } from "@/utils/artistSorting";
+import { combineWavesDisplay } from "@/constants/wavesModels";
 import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -403,8 +404,8 @@ const FestivalArtistManagement = () => {
               providedBy: artist.mon_console_provided_by
             },
             monitorsFromFoh: artist.monitors_from_foh || false,
-            fohWavesOutboard: artist.foh_waves_outboard || "",
-            monWavesOutboard: artist.mon_waves_outboard || "",
+            fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
+            monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
             wireless: {
               systems: Array.isArray(wirelessSystems) ? wirelessSystems : [],
               providedBy: artist.wireless_provided_by

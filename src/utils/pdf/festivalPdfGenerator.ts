@@ -16,6 +16,7 @@ import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArti
 import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
 import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
 import { buildReadableFilename } from '@/utils/fileName';
+import { combineWavesDisplay } from '@/constants/wavesModels';
 import {
   normalizeVenueCoordinates,
   resolveHojaVenue,
@@ -551,8 +552,8 @@ export const generateAndMergeFestivalPDFs = async (
                 providedBy: String(artist.mon_console_provided_by || 'festival') 
               },
               monitorsFromFoh: Boolean(artist.monitors_from_foh || false),
-              fohWavesOutboard: String(artist.foh_waves_outboard || ""),
-              monWavesOutboard: String(artist.mon_waves_outboard || ""),
+              fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
+              monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
               wireless: {
                 systems: artist.wireless_systems || [],
                 providedBy: String(artist.wireless_provided_by || 'festival'),

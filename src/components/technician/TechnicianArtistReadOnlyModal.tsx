@@ -41,8 +41,10 @@ type ReadOnlyArtist = {
   mon_console: string | null;
   mon_console_provided_by?: "festival" | "band" | "mixed" | null;
   monitors_from_foh?: boolean | null;
-  foh_waves_outboard?: string | null;
-  mon_waves_outboard?: string | null;
+  foh_waves_models?: string[] | null;
+  foh_outboard?: string | null;
+  mon_waves_models?: string[] | null;
+  mon_outboard?: string | null;
   wireless_systems: any[];
   wireless_provided_by?: "festival" | "band" | "mixed" | null;
   iem_systems: any[];
