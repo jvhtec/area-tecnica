@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
+import { uploadStorageObject } from "@/utils/storageUpload";
 
 interface PDFFile {
   file: File;
@@ -127,10 +128,13 @@ export const MemoriaTecnica = () => {
     let lastErr: Error | null = null;
     for (const bucket of STORAGE_BUCKET_CANDIDATES) {
       try {
-        const { error: uploadError } = await dataLayerClient.storage
-          .from(bucket)
-          .upload(safePath, file, { upsert: true });
-        if (uploadError) throw uploadError;
+        await uploadStorageObject(dataLayerClient, {
+          bucket,
+          path: safePath,
+          file,
+          contentType: file.type || "application/octet-stream",
+          upsert: true,
+        });
 
         const { data: signedUrlData, error: signUrlError } = await dataLayerClient.storage
           .from(bucket)

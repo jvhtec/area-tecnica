@@ -9,6 +9,7 @@ import {
   canUploadTourDocuments,
   isManagementRole,
 } from "@/utils/permissions";
+import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -75,14 +76,17 @@ export const useTourDocuments = (tourId: string) => {
 
       console.log('Uploading file:', finalFileName, 'to path:', filePath);
 
-      // Upload file to storage
-      const { error: uploadError } = await supabase.storage
-        .from('tour-documents')
-        .upload(filePath, file);
-
-      if (uploadError) {
+      // Upload file to storage. Large CAD documents use resumable chunks.
+      try {
+        await uploadStorageObject(supabase, {
+          bucket: 'tour-documents',
+          path: filePath,
+          file,
+          contentType: file.type || 'application/octet-stream',
+        });
+      } catch (uploadError) {
         console.error('Storage upload error:', uploadError);
-        throw uploadError;
+        throw new Error(getStorageUploadErrorMessage(uploadError, file));
       }
 
       // Save document record

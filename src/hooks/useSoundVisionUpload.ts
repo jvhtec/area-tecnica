@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { validateFile, generateStoragePath } from '@/utils/soundvisionFileValidation';
+import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/storageUpload';
 import { VenueMetadata, useUpsertVenue } from './useVenues';
 
 
@@ -40,15 +41,22 @@ export const useSoundVisionUpload = () => {
       const storagePath = generateStoragePath(venueId, file.name);
       setProgress(40);
 
-      // Upload file to storage
-      const { error: uploadError } = await supabase.storage
-        .from('soundvision-files')
-        .upload(storagePath, file, {
+      // Upload file to storage. Large CAD/SoundVision files use resumable chunks.
+      try {
+        await uploadStorageObject(supabase, {
+          bucket: 'soundvision-files',
+          path: storagePath,
+          file,
           cacheControl: '3600',
+          contentType: file.type || 'application/octet-stream',
           upsert: false,
+          onProgress: ({ percentage }) => {
+            setProgress(40 + Math.round((percentage / 100) * 30));
+          },
         });
-
-      if (uploadError) throw uploadError;
+      } catch (uploadError) {
+        throw new Error(getStorageUploadErrorMessage(uploadError, file));
+      }
       setProgress(70);
 
       // Get current user

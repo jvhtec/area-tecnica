@@ -20,6 +20,10 @@ import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react"
 import { normalizeWirelessSystem, normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 import { mapFestivalGearSetup } from "@/utils/festivalGearMappers";
 import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
+import {
+  type PublicRiderFileRecord,
+  uploadPublicArtistRiderFiles,
+} from "@/utils/publicArtistRiderUpload";
 
 interface ArtistRequirementsFormProps {
   isBlank?: boolean;
@@ -42,16 +46,7 @@ interface PublicSubmitResponse {
 }
 
 type ArtistFormState = ArtistSectionProps["formData"];
-type RiderFileRecord = {
-  id: string;
-  file_name: string;
-  file_path: string;
-  file_type: string | null;
-  file_size: number | null;
-  uploaded_at: string | null;
-  uploaded_by: string | null;
-  uploaded_by_name: string | null;
-};
+type RiderFileRecord = PublicRiderFileRecord;
 
 const makeBlankWirelessSystem = () =>
   normalizeWirelessSystem(
@@ -749,51 +744,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       setIsUploadingRider(true);
 
       try {
-        const payload = new FormData();
-        payload.append("token", token);
-        selectedFiles.forEach((file) => payload.append("files", file));
-
-        const { data, error } = await dataLayerClient.functions.invoke("upload-public-artist-rider", {
-          body: payload,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        const response = data as {
-          ok?: boolean;
-          error?: string;
-          file?: Record<string, unknown> | null;
-          files?: Array<Record<string, unknown>>;
-        } | null;
-        if (!response?.ok) {
-          throw new Error(response?.error || "upload_failed");
-        }
-
-        const uploadedRaw =
-          Array.isArray(response.files) && response.files.length > 0
-            ? response.files
-            : response.file
-              ? [response.file]
-              : [];
-
-        const uploaded = uploadedRaw
-          .map((file) => ({
-            id: asString(file.id),
-            file_name: asString(file.file_name),
-            file_path: asString(file.file_path),
-            file_type: asString(file.file_type) || null,
-            file_size: typeof file.file_size === "number" ? file.file_size : null,
-            uploaded_at: asString(file.uploaded_at) || null,
-            uploaded_by: asString(file.uploaded_by) || null,
-            uploaded_by_name: asString(file.uploaded_by_name) || null,
-          }))
-          .filter((file) => file.id && file.file_path);
-
-        if (uploaded.length === 0) {
-          throw new Error("invalid_upload_response");
-        }
+        const uploaded = await uploadPublicArtistRiderFiles(token, selectedFiles);
 
         setRiderFiles((prev) => {
           const deduped = prev.filter((existing) => !uploaded.some((nextFile) => nextFile.id === existing.id));

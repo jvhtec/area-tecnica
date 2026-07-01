@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
+import { uploadStorageObject } from "@/utils/storageUpload";
 
 interface PDFFile {
   file: File;
@@ -119,11 +120,12 @@ export const VideoMemoriaTecnica = () => {
   };
 
   const uploadToStorage = async (file: File, path: string) => {
-    const { error: uploadError, data } = await dataLayerClient.storage
-      .from('video-memoria-tecnica')
-      .upload(path, file);
-
-    if (uploadError) throw uploadError;
+    await uploadStorageObject(dataLayerClient, {
+      bucket: 'video-memoria-tecnica',
+      path,
+      file,
+      contentType: file.type || 'application/octet-stream',
+    });
 
     const { data: { publicUrl } } = dataLayerClient.storage
       .from('video-memoria-tecnica')

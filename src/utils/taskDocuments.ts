@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { uploadStorageObject } from "@/utils/storageUpload";
 
 export type SignedUrlResult = { signedUrl: string | null };
 
@@ -24,6 +25,16 @@ export async function remove(bucket: string, filePath: string): Promise<boolean>
 }
 
 export async function upload(bucket: string, filePath: string, file: File | Blob): Promise<boolean> {
-  const { error } = await supabase.storage.from(bucket).upload(filePath, file, { upsert: true });
-  return !error;
+  try {
+    await uploadStorageObject(supabase, {
+      bucket,
+      path: filePath,
+      file,
+      contentType: file.type || "application/octet-stream",
+      upsert: true,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
