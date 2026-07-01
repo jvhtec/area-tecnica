@@ -13,6 +13,7 @@ import {
   getDocumentUploadValidationError,
 } from "@/utils/documentUploadValidation";
 import { optimizeImageForUpload } from "@/utils/imageOptimization";
+import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 
 interface ArtistFileDialogProps {
   open: boolean;
@@ -92,16 +93,17 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
         const fileExt = uploadFile.name.split('.').pop();
         const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
 
-        // First upload the file to storage
-        const { error: uploadError } = await dataLayerClient.storage
-          .from('festival_artist_files')
-          .upload(filePath, uploadFile, {
-            contentType: uploadFile.type || file.type,
+        // First upload the file to storage. Large CAD/rider files use resumable chunks.
+        try {
+          await uploadStorageObject(dataLayerClient, {
+            bucket: 'festival_artist_files',
+            path: filePath,
+            file: uploadFile,
+            contentType: uploadFile.type || file.type || 'application/octet-stream',
           });
-
-        if (uploadError) {
+        } catch (uploadError) {
           console.error("Storage upload error:", uploadError);
-          throw uploadError;
+          throw new Error(getStorageUploadErrorMessage(uploadError, uploadFile));
         }
         uploadedPaths.push(filePath);
 
@@ -138,6 +140,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       fetchFiles();
     } catch (error: any) {
       console.error("Error uploading file:", error);
+      const uploadErrorMessage = error instanceof Error ? error.message : "";
       try {
         if (insertedIds.length > 0) {
           await dataLayerClient.from('festival_artist_files').delete().in('id', insertedIds);
@@ -150,7 +153,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       }
       toast({
         title: "Error",
-        description: "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
+        description: uploadErrorMessage || "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
         variant: "destructive",
       });
     } finally {

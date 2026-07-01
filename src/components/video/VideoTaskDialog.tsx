@@ -22,6 +22,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { TASK_TYPES } from "@/constants/taskTypes";
+import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import {
   Table as UITable,
   TableBody,
@@ -157,11 +158,16 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       for (const file of files) {
         const filePath = `${taskId}/${crypto.randomUUID()}-${file.name}`;
         
-        const { error: uploadError } = await dataLayerClient.storage
-          .from('task_documents')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
+        try {
+          await uploadStorageObject(dataLayerClient, {
+            bucket: 'task_documents',
+            path: filePath,
+            file,
+            contentType: file.type || 'application/octet-stream',
+          });
+        } catch (uploadError) {
+          throw new Error(getStorageUploadErrorMessage(uploadError, file));
+        }
         uploadedPaths.push(filePath);
 
         const taskDocument: TaskDocumentInsert = {

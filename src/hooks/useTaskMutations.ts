@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
+import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/storageUpload';
 
 type Dept = 'sound'|'lights'|'video';
 type TaskUpdateFields = Record<string, unknown>;
@@ -350,8 +351,17 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
 
     const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const key = `${taskId}/${Date.now()}_${sanitized}`;
-    const { error: upErr } = await supabase.storage.from('task_documents').upload(key, file, { upsert: false });
-    if (upErr) throw upErr;
+    try {
+      await uploadStorageObject(supabase, {
+        bucket: 'task_documents',
+        path: key,
+        file,
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      });
+    } catch (upErr) {
+      throw new Error(getStorageUploadErrorMessage(upErr, file));
+    }
     const { error: insErr } = await supabase.from('task_documents').insert({ [docFk]: taskId, file_name: file.name, file_path: key });
     if (insErr) {
       const { error: cleanupError } = await supabase.storage.from('task_documents').remove([key]);

@@ -23,6 +23,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { TASK_TYPES } from "@/constants/taskTypes";
+import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import {
   Table as UITable,
   TableBody,
@@ -238,13 +239,18 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const filePath = `${taskId}/${Date.now()}-${crypto.randomUUID()}_${sanitizedFileName}`;
 
-        const { error: uploadError } = await dataLayerClient.storage
-          .from('task_documents')
-          .upload(filePath, file, {
+        try {
+          await uploadStorageObject(dataLayerClient, {
+            bucket: 'task_documents',
+            path: filePath,
+            file,
             cacheControl: '3600',
-            upsert: false
+            contentType: file.type || 'application/octet-stream',
+            upsert: false,
           });
-        if (uploadError) throw uploadError;
+        } catch (uploadError) {
+          throw new Error(getStorageUploadErrorMessage(uploadError, file));
+        }
         uploadedPaths.push(filePath);
 
         const { data: insertedDocument, error: dbError } = await dataLayerClient.from('task_documents')

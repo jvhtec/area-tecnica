@@ -4,6 +4,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { type Dept } from '@/utils/tasks';
 import { isTaskAssigneeUniqueConflict } from '@/utils/taskAssignment';
 import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
+import { uploadTaskStorageObject } from '@/utils/taskStorageUpload';
 
 type SoundTaskUpdate = Database['public']['Tables']['sound_job_tasks']['Update'];
 type LightsTaskUpdate = Database['public']['Tables']['lights_job_tasks']['Update'];
@@ -691,7 +692,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     if (jobId) {
       const destPath = `${department}/${jobId}/task-${taskId}/${safeName}`;
-      await supabase.storage.from('job_documents').upload(destPath, blob, { upsert: true });
+      await uploadTaskStorageObject(supabase, { bucket: 'job_documents', path: destPath, file: blob, upsert: true });
       // Idempotent: delete any existing row first, then insert
       await supabase.from('job_documents').delete().eq('file_path', destPath);
       await supabase.from('job_documents').insert({
@@ -704,7 +705,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     if (tourId) {
       const destPath = `schedules/${tourId}/task-${taskId}/${safeName}`;
-      await supabase.storage.from('tour-documents').upload(destPath, blob, { upsert: true });
+      await uploadTaskStorageObject(supabase, { bucket: 'tour-documents', path: destPath, file: blob, upsert: true });
       await supabase.from('tour_documents').delete().eq('file_path', destPath);
       await supabase.from('tour_documents').insert({
         tour_id: tourId,
@@ -738,10 +739,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     // 1. Always store in task_documents bucket + table
     const taskKey = `${taskId}/${Date.now()}_${safeName}`;
-    const { error: upErr } = await supabase.storage
-      .from('task_documents')
-      .upload(taskKey, file, { upsert: false });
-    if (upErr) throw upErr;
+    await uploadTaskStorageObject(supabase, { bucket: 'task_documents', path: taskKey, file, upsert: false });
 
     const taskDocumentInsert: TaskDocumentInsert = {
       file_name: file.name,
@@ -762,7 +760,7 @@ export function useGlobalTaskMutations(department: Dept) {
     // 2. Mirror to job bucket if linked (idempotent: delete-before-insert)
     if (jobId) {
       const jobPath = `${department}/${jobId}/task-${taskId}/${safeName}`;
-      await supabase.storage.from('job_documents').upload(jobPath, file, { upsert: true });
+      await uploadTaskStorageObject(supabase, { bucket: 'job_documents', path: jobPath, file, upsert: true });
       // Remove any existing row to avoid duplicates
       await supabase.from('job_documents').delete().eq('file_path', jobPath);
       await supabase.from('job_documents').insert({
@@ -776,7 +774,7 @@ export function useGlobalTaskMutations(department: Dept) {
     // 3. Mirror to tour bucket if linked (idempotent: delete-before-insert)
     if (tourId) {
       const tourPath = `schedules/${tourId}/task-${taskId}/${safeName}`;
-      await supabase.storage.from('tour-documents').upload(tourPath, file, { upsert: true });
+      await uploadTaskStorageObject(supabase, { bucket: 'tour-documents', path: tourPath, file, upsert: true });
       // Remove any existing row to avoid duplicates
       await supabase.from('tour_documents').delete().eq('file_path', tourPath);
       await supabase.from('tour_documents').insert({

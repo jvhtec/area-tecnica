@@ -18,6 +18,7 @@ import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { generateAndMergeFestivalPDFs, type FestivalPdfProgress } from "@/utils/pdf/festivalPdfGenerator";
 import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
 import { optimizeImageForUpload } from "@/utils/imageOptimization";
+import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
@@ -69,11 +70,17 @@ export const uploadJobDocument = async ({ file, jobId }: { file: File; jobId: st
     outputFormat: "image/webp",
   });
   const filePath = `${jobId}/${uploadFile.name}`;
-  const { error: uploadError } = await supabase.storage.from("job_documents").upload(filePath, uploadFile, {
-    contentType: uploadFile.type || file.type,
-  });
 
-  if (uploadError) throw uploadError;
+  try {
+    await uploadStorageObject(supabase, {
+      bucket: "job_documents",
+      path: filePath,
+      file: uploadFile,
+      contentType: uploadFile.type || file.type || "application/octet-stream",
+    });
+  } catch (uploadError) {
+    throw new Error(getStorageUploadErrorMessage(uploadError, uploadFile));
+  }
 
   const { error: dbError } = await supabase.from("job_documents").insert({
     job_id: jobId,

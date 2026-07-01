@@ -16,6 +16,7 @@ import {
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
 import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
+import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/storageUpload';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -430,10 +431,16 @@ export const useOptimizedJobCard = (
         const fileExt = file.name.split('.').pop();
         const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('job_documents')
-          .upload(filePath, file);
-        if (uploadError) throw uploadError;
+        try {
+          await uploadStorageObject(supabase, {
+            bucket: 'job_documents',
+            path: filePath,
+            file,
+            contentType: file.type || 'application/octet-stream',
+          });
+        } catch (uploadError) {
+          throw new Error(getStorageUploadErrorMessage(uploadError, file));
+        }
 
         const { data: inserted, error: dbError } = await supabase
           .from('job_documents')
