@@ -29,6 +29,27 @@ vi.mock("@/hooks/use-toast", () => ({
 
 import { WahaEndpointSettings } from "@/components/settings/WahaEndpointSettings";
 
+type FunctionInvokeOptions = {
+  body?: Record<string, unknown>;
+};
+
+type MockFunctionResult = {
+  data: unknown;
+  error: Error | null;
+};
+
+function mockInvokeByAction(
+  handlers: Record<string, (options: FunctionInvokeOptions) => MockFunctionResult>,
+  fallback: (options: FunctionInvokeOptions) => MockFunctionResult,
+) {
+  mockSupabase.functions.invoke.mockImplementation(async (_name, options: FunctionInvokeOptions = {}) => {
+    const action = typeof options.body?.action === "string" ? options.body.action : "get";
+    const handler = handlers[action];
+
+    return handler ? handler(options) : fallback(options);
+  });
+}
+
 describe("WahaEndpointSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,31 +63,25 @@ describe("WahaEndpointSettings", () => {
   it("refreshes WAHA status for the saved endpoint", async () => {
     const user = userEvent.setup();
 
-    mockSupabase.functions.invoke.mockImplementation(async (_name, options) => {
-      const action = options?.body?.action;
-
-      if (action === "status") {
-        return {
-          data: {
-            endpoint: "https://waha2.sector-pro.work",
-            session: "default",
-            status: "WORKING",
-            me: { pushName: "Sector Pro" },
-          },
-          error: null,
-        };
-      }
-
-      return {
+    mockInvokeByAction({
+      status: () => ({
         data: {
           endpoint: "https://waha2.sector-pro.work",
           session: "default",
-          status: "UNKNOWN",
-          me: null,
+          status: "WORKING",
+          me: { pushName: "Sector Pro" },
         },
         error: null,
-      };
-    });
+      }),
+    }, () => ({
+      data: {
+        endpoint: "https://waha2.sector-pro.work",
+        session: "default",
+        status: "UNKNOWN",
+        me: null,
+      },
+      error: null,
+    }));
 
     renderWithProviders(<WahaEndpointSettings />);
 
@@ -84,48 +99,42 @@ describe("WahaEndpointSettings", () => {
     expect(screen.getByText((_, element) => element?.textContent === "Cuenta vinculada: Sector Pro")).toBeInTheDocument();
   });
 
-  it("saves a selected WAHA endpoint", async () => {
+  it("saves a generated WAHA 6 endpoint", async () => {
     const user = userEvent.setup();
 
-    mockSupabase.functions.invoke.mockImplementation(async (_name, options) => {
-      const action = options?.body?.action;
-
-      if (action === "save") {
-        return {
-          data: {
-            endpoint: options.body.endpoint,
-            session: "default",
-            status: "UNKNOWN",
-            me: null,
-          },
-          error: null,
-        };
-      }
-
-      return {
+    mockInvokeByAction({
+      save: (options) => ({
         data: {
-          endpoint: null,
+          endpoint: options.body?.endpoint ?? null,
           session: "default",
-          status: "NOT_CONFIGURED",
+          status: "UNKNOWN",
           me: null,
         },
         error: null,
-      };
-    });
+      }),
+    }, () => ({
+      data: {
+        endpoint: null,
+        session: "default",
+        status: "NOT_CONFIGURED",
+        me: null,
+      },
+      error: null,
+    }));
 
     renderWithProviders(<WahaEndpointSettings />);
 
     await screen.findByText(/No hay un endpoint WAHA asignado/i);
 
     await user.click(screen.getByRole("combobox", { name: /endpoint waha/i }));
-    await user.click(await screen.findByRole("option", { name: /WAHA 3 - waha3\.sector-pro\.work/i }));
+    await user.click(await screen.findByRole("option", { name: /WAHA 6 - waha6\.sector-pro\.work/i }));
     await user.click(screen.getByRole("button", { name: /guardar/i }));
 
     await waitFor(() => {
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("waha-session", {
         body: {
           action: "save",
-          endpoint: "https://waha3.sector-pro.work",
+          endpoint: "https://waha6.sector-pro.work",
         },
       });
     });
@@ -137,39 +146,157 @@ describe("WahaEndpointSettings", () => {
     );
   });
 
+  it("shows endpoint directory statuses in the config menu", async () => {
+    const user = userEvent.setup();
+
+    mockInvokeByAction({
+      endpoints: () => ({
+        data: {
+          endpoint: "https://waha2.sector-pro.work",
+          session: "default",
+          status: "UNKNOWN",
+          me: null,
+          endpoints: [
+            {
+              label: "WAHA 2",
+              value: "https://waha2.sector-pro.work",
+              session: "default",
+              status: "WORKING",
+              me: { pushName: "Sector Pro" },
+            },
+            {
+              label: "WAHA 6",
+              value: "https://waha6.sector-pro.work",
+              session: "default",
+              status: "STOPPED",
+              me: null,
+            },
+          ],
+        },
+        error: null,
+      }),
+    }, () => ({
+      data: {
+        endpoint: "https://waha2.sector-pro.work",
+        session: "default",
+        status: "UNKNOWN",
+        me: null,
+      },
+      error: null,
+    }));
+
+    renderWithProviders(<WahaEndpointSettings />);
+
+    expect(await screen.findByText("Estado de endpoints")).toBeInTheDocument();
+    expect(await screen.findByText("waha6.sector-pro.work")).toBeInTheDocument();
+    expect(screen.getByText("Detenida")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: /endpoint waha/i }));
+    expect(await screen.findByRole("option", { name: /WAHA 6 - waha6\.sector-pro\.work/i })).toBeInTheDocument();
+  });
+
+  it("restarts the saved WAHA session", async () => {
+    const user = userEvent.setup();
+
+    mockInvokeByAction({
+      restart: () => ({
+        data: {
+          endpoint: "https://waha.sector-pro.work",
+          session: "default",
+          status: "WORKING",
+          me: { pushName: "Sector Pro" },
+        },
+        error: null,
+      }),
+    }, () => ({
+      data: {
+        endpoint: "https://waha.sector-pro.work",
+        session: "default",
+        status: "FAILED",
+        me: null,
+      },
+      error: null,
+    }));
+
+    renderWithProviders(<WahaEndpointSettings />);
+
+    await screen.findByText(/WAHA 1 - waha\.sector-pro\.work/i);
+    await user.click(screen.getByRole("button", { name: /reiniciar/i }));
+
+    await waitFor(() => {
+      expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("waha-session", {
+        body: { action: "restart" },
+      });
+    });
+
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Sesion WAHA reiniciada",
+      }),
+    );
+  });
+
+  it("shows an error toast when WAHA restart fails", async () => {
+    const user = userEvent.setup();
+
+    mockInvokeByAction({
+      restart: () => ({
+        data: null,
+        error: new Error("restart failed"),
+      }),
+    }, () => ({
+      data: {
+        endpoint: "https://waha.sector-pro.work",
+        session: "default",
+        status: "FAILED",
+        me: null,
+      },
+      error: null,
+    }));
+
+    renderWithProviders(<WahaEndpointSettings />);
+
+    await screen.findByText(/WAHA 1 - waha\.sector-pro\.work/i);
+    await user.click(screen.getByRole("button", { name: /reiniciar/i }));
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "No se pudo reiniciar la sesion WAHA",
+          description: "restart failed",
+          variant: "destructive",
+        }),
+      );
+    });
+  });
+
   it("renders the pairing QR returned by the proxy", async () => {
     const user = userEvent.setup();
     const dataUrl = "data:image/png;base64,abc123";
 
-    mockSupabase.functions.invoke.mockImplementation(async (_name, options) => {
-      const action = options?.body?.action;
-
-      if (action === "qr") {
-        return {
-          data: {
-            endpoint: "https://waha.sector-pro.work",
-            session: "default",
-            status: "SCAN_QR_CODE",
-            me: null,
-            qr: {
-              dataUrl,
-              mimetype: "image/png",
-            },
-          },
-          error: null,
-        };
-      }
-
-      return {
+    mockInvokeByAction({
+      qr: () => ({
         data: {
           endpoint: "https://waha.sector-pro.work",
           session: "default",
           status: "SCAN_QR_CODE",
           me: null,
+          qr: {
+            dataUrl,
+            mimetype: "image/png",
+          },
         },
         error: null,
-      };
-    });
+      }),
+    }, () => ({
+      data: {
+        endpoint: "https://waha.sector-pro.work",
+        session: "default",
+        status: "SCAN_QR_CODE",
+        me: null,
+      },
+      error: null,
+    }));
 
     renderWithProviders(<WahaEndpointSettings />);
 
