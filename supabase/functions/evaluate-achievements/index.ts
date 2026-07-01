@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireServiceRoleRequest } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -24,6 +25,8 @@ serve(async (req) => {
         headers: corsHeaders,
       });
     }
+
+    requireServiceRoleRequest(req, SERVICE_ROLE);
 
     const body = await req.json().catch(() => ({}));
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
@@ -76,8 +79,10 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in evaluate-achievements function:", error);
-    return new Response("Server error", {
-      status: 500,
+    const status = typeof error?.status === "number" ? error.status : 500;
+    const message = status >= 500 ? "Server error" : error.message;
+    return new Response(message, {
+      status,
       headers: corsHeaders,
     });
   }

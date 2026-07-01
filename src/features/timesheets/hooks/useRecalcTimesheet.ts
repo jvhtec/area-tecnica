@@ -1,21 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-
+import { supabase } from '@/integrations/supabase/client'
 
 import { queryKeys } from "@/lib/react-query";
 export function useRecalcTimesheet() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (timesheetId: string) => {
-      const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
-      if (!base) throw new Error('VITE_SUPABASE_FUNCTIONS_URL is not set')
-      const url = `${base}/recalc-timesheet-amount`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timesheet_id: timesheetId })
+      const { data, error } = await supabase.rpc('compute_timesheet_amount_2025', {
+        _timesheet_id: timesheetId,
+        _persist: true
       })
-      if (!res.ok) throw new Error(await res.text())
-      return res.json()
+
+      if (error) throw error
+      return data
     },
     onSuccess: (_data, timesheetId) => {
       qc.invalidateQueries({ queryKey: queryKeys.scope('timesheet', timesheetId) })
@@ -23,4 +20,3 @@ export function useRecalcTimesheet() {
     }
   })
 }
-

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { businessRoleLookupFor, inferTierFromRoleCode } from "./flexBusinessRoles.ts";
 
 type Dept = "sound" | "lights" | "video";
@@ -20,15 +21,19 @@ serve(async (req: Request) => {
   }
 
   try {
-    const body = await req.json() as { job_id: string; departments?: Dept[] };
-    const job_id = body.job_id;
-    const departments = body.departments;
-    if (!job_id) throw new Error("Missing job_id");
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    await requireAdminOrManagement(supabase, req, {
+      logContext: "sync-flex-crew-for-job",
+    });
+
+    const body = await req.json() as { job_id: string; departments?: Dept[] };
+    const job_id = body.job_id;
+    const departments = body.departments;
+    if (!job_id) throw new Error("Missing job_id");
 
     const flexAuthToken =
       Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
@@ -430,9 +435,11 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (e) {
-    const msg = (e && (e as any).message) ? (e as any).message : String(e);
+    const errorLike = e as { status?: unknown; message?: unknown };
+    const msg = typeof errorLike.message === "string" ? errorLike.message : String(e);
+    const status = typeof errorLike.status === "number" ? errorLike.status : 400;
     return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 400,
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }

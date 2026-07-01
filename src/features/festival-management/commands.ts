@@ -82,10 +82,17 @@ export const uploadJobDocument = async ({ file, jobId }: { file: File; jobId: st
     throw new Error(getStorageUploadErrorMessage(uploadError, uploadFile));
   }
 
+  // uploaded_by must be self-attributed for the insert to pass RLS for
+  // non-management roles (house techs): p_job_documents_public_insert only
+  // accepts rows where uploaded_by = auth.uid() or the caller is
+  // admin/management/logistics.
+  const { data: userRes } = await supabase.auth.getUser();
+
   const { error: dbError } = await supabase.from("job_documents").insert({
     job_id: jobId,
     file_name: file.name,
     file_path: filePath,
+    uploaded_by: userRes?.user?.id ?? null,
   });
 
   if (dbError) {
