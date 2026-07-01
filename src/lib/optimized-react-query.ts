@@ -150,7 +150,10 @@ export const createQueryKey = {
    * department-facing (`EnhancedJobDetailsModal`) and technician-facing
    * (`useDetailsModalData`) views of the same job. Both must use these
    * exact keys so the two components share one cache entry instead of
-   * fetching/duplicating the same job row under different keys.
+   * fetching/duplicating the same job row under different keys. Because the
+   * key is shared, both consumers' `select()` projections for `staff` must
+   * request the same superset of columns — whichever query populates the
+   * cache first determines what's available to the other within staleTime.
    */
   jobDetailsModal: {
     details: (jobId?: string | null) => ['job-details-modal', jobId ?? null] as const,

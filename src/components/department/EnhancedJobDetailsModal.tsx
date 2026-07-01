@@ -58,6 +58,7 @@ interface StaffAssignment {
         last_name: string;
         email?: string;
         department?: string | null;
+        profile_picture_url?: string | null;
     } | null;
 }
 
@@ -111,7 +112,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
           sound_role,
           lights_role,
           video_role,
-          technician:profiles(id, first_name, last_name, email, department)
+          technician:profiles(id, first_name, last_name, email, department, profile_picture_url)
         `)
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');

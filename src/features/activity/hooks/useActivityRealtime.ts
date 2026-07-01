@@ -149,6 +149,7 @@ export function useActivityRealtime(options: UseActivityRealtimeOptions = {}): v
           }
 
           const prefs = await ensurePreferencesCached(prefsRef, fetchPrefs);
+          if (cancelled) return;
           if (prefs?.mute_toasts) return;
           if (prefs?.muted_codes && prefs.muted_codes.includes(row.code)) return;
 

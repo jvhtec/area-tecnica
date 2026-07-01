@@ -93,7 +93,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
           sound_role,
           lights_role,
           video_role,
-          technician:profiles(id, first_name, last_name, email, profile_picture_url)
+          technician:profiles(id, first_name, last_name, email, profile_picture_url, department)
         `)
         .eq("job_id", job.id)
         .eq("status", "confirmed");

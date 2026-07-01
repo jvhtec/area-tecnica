@@ -30,7 +30,8 @@ export const useMessagesSubscription = (
         ownerRoute,
         invalidateOnPayload: false,
         onPayload: (payload: RealtimeChangePayload) => {
-          const record = payload.new as { sender_id?: string; recipient_id?: string } | null;
+          // DELETE events only populate `old`; fall back to it so removals still trigger onUpdate.
+          const record = (payload.new ?? payload.old) as { sender_id?: string; recipient_id?: string } | null;
           if (record && (record.sender_id === currentUserId || record.recipient_id === currentUserId)) {
             onUpdateRef.current();
           }

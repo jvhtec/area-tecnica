@@ -28,8 +28,11 @@ export function useStaffingCampaignRealtime(jobId: string, department: string) {
         ownerRoute,
         invalidateOnPayload: false,
         onPayload: (payload: RealtimeChangePayload) => {
-          const row = (payload.new ?? payload.old) as { department?: string } | null
-          if (row?.department !== department) return
+          // Check both sides so an UPDATE that moves a campaign into or out of
+          // this department still invalidates the cache for this department.
+          const newRow = payload.new as { department?: string } | null
+          const oldRow = payload.old as { department?: string } | null
+          if (newRow?.department !== department && oldRow?.department !== department) return
           queryClient.invalidateQueries({
             queryKey: queryKeys.scope('staffing_campaign', jobId, department)
           })

@@ -304,8 +304,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
     const ownerRoute = `job-assignments-${jobId}:${ownerIdRef.current}`;
     const handlePayload = () => {
-      // Force immediate refresh
-      manualRefresh();
+      // Force immediate refresh. manualRefresh already logs and toasts on
+      // failure internally before re-throwing; catch here only to avoid an
+      // unhandled promise rejection.
+      manualRefresh().catch(() => {});
     };
 
     subscriptionManager.subscribeToTable(
