@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, ImageOff, ImagePlus, Loader2, Mic } from "lucide-react";
+import { ArrowDown, ExternalLink, ImageOff, ImagePlus, Loader2, Mic } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
@@ -101,50 +101,14 @@ interface ArtistTableProps {
   onDeleteArtist: (artist: Artist) => void;
   searchTerm: string;
   stageFilter: string;
-  equipmentFilter: string;
   riderFilter: string;
   dayStartTime: string;
-  sortBy?: ArtistSortField;
   jobId?: string;
   selectedDate?: string;
   onArtistStagePlotUpdated?: () => void;
   canDelete: boolean;
   canCreateExtras: boolean;
 }
-
-type EquipmentSystem = {
-  quantity?: number | string | null;
-  quantity_hh?: number | string | null;
-  quantity_bp?: number | string | null;
-};
-
-const hasSystemsWithPositiveQuantities = (systems: EquipmentSystem[] = []) => {
-  return Array.isArray(systems) &&
-    systems.length > 0 &&
-    systems.some(system =>
-      Number(system?.quantity || 0) > 0 ||
-      Number(system?.quantity_hh || 0) > 0 ||
-      Number(system?.quantity_bp || 0) > 0
-    );
-};
-
-const matchesEquipmentFilter = (artist: Artist, equipmentFilter: string) => {
-  const filterKey = (equipmentFilter || "").trim().toLowerCase();
-
-  switch (filterKey) {
-    case "":
-    case "all":
-      return true;
-    case "wireless":
-      return hasSystemsWithPositiveQuantities(artist.wireless_systems);
-    case "iem":
-      return hasSystemsWithPositiveQuantities(artist.iem_systems);
-    case "monitors":
-      return Boolean(artist.monitors_enabled) || Number(artist.monitors_quantity || 0) > 0;
-    default:
-      return true;
-  }
-};
 
 export const ArtistTable = ({
   artists,
@@ -153,16 +117,19 @@ export const ArtistTable = ({
   onDeleteArtist,
   searchTerm,
   stageFilter,
-  equipmentFilter,
   riderFilter,
   dayStartTime,
-  sortBy = 'chronological',
   jobId,
   selectedDate,
   onArtistStagePlotUpdated,
   canDelete,
   canCreateExtras
 }: ArtistTableProps) => {
+  const [sortBy, setSortBy] = useState<ArtistSortField>('chronological');
+
+  const toggleSort = (field: Exclude<ArtistSortField, 'chronological'>) => {
+    setSortBy((current) => (current === field ? 'chronological' : field));
+  };
   const confirm = useConfirm();
   const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
@@ -575,9 +542,8 @@ export const ArtistTable = ({
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = stageFilter === "all" || artist.stage?.toString() === stageFilter;
-    const matchesEquipment = matchesEquipmentFilter(artist, equipmentFilter);
     const matchesRider = riderFilter === "all" || riderFilter === "missing" && artist.rider_missing || riderFilter === "complete" && !artist.rider_missing;
-    return matchesSearch && matchesStage && matchesEquipment && matchesRider;
+    return matchesSearch && matchesStage && matchesRider;
   });
 
   // Apply sorting to filtered artists using imported utility
@@ -832,9 +798,39 @@ export const ArtistTable = ({
                   <TableHead className="min-w-[120px]">Stage Plot</TableHead>
                   <TableHead className="min-w-[80px]">Stage</TableHead>
                   <TableHead className="min-w-[90px]">Load In</TableHead>
-                  <TableHead className="min-w-[100px]">Hora del show</TableHead>
-                  <TableHead className="min-w-[100px]">Soundcheck</TableHead>
-                  <TableHead className="min-w-[100px]">Line Check</TableHead>
+                  <TableHead className="min-w-[100px]">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort('show_start')}
+                      title="Ordenar por hora del show"
+                    >
+                      Hora del show
+                      {sortBy === 'show_start' && <ArrowDown className="h-3 w-3" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="min-w-[100px]">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort('soundcheck_start')}
+                      title="Ordenar por hora de soundcheck"
+                    >
+                      Soundcheck
+                      {sortBy === 'soundcheck_start' && <ArrowDown className="h-3 w-3" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="min-w-[100px]">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort('line_check_start')}
+                      title="Ordenar por hora de line check"
+                    >
+                      Line Check
+                      {sortBy === 'line_check_start' && <ArrowDown className="h-3 w-3" />}
+                    </button>
+                  </TableHead>
                   <TableHead className="min-w-[200px]">Consolas</TableHead>
                   <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
                   <TableHead className="min-w-[140px]">

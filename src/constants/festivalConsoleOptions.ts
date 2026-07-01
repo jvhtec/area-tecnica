@@ -1,6 +1,9 @@
 export const FESTIVAL_CONSOLE_OPTIONS = [
   "Yamaha CL5",
-  "Yamaha PMx",
+  "Yamaha PM3",
+  "Yamaha PM5",
+  "Yamaha PM7",
+  "Yamaha PM10",
   "Yamaha DM7",
   "Yamaha DM3",
   "DiGiCo SD5",
@@ -21,6 +24,7 @@ export const FESTIVAL_CONSOLE_OPTIONS = [
   "Behringer X32",
   "Behringer Wing",
   "Avid S6L",
+  "A&H Avantis",
   "A&H C1500",
   "A&H C2500",
   "A&H S3000",

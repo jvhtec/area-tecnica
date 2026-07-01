@@ -17,7 +17,6 @@ import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
-import type { ArtistSortField } from "@/utils/artistSorting";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
@@ -45,9 +44,7 @@ const FestivalArtistManagement = () => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
-  const [equipmentFilter, setEquipmentFilter] = useState("");
   const [riderFilter, setRiderFilter] = useState("all");
-  const [sortBy, setSortBy] = useState<ArtistSortField>("chronological");
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printDate, setPrintDate] = useState("");
@@ -718,12 +715,8 @@ const FestivalArtistManagement = () => {
                 stageFilter={stageFilter}
                 onStageFilterChange={setStageFilter}
                 hideStageFilter
-                equipmentFilter={equipmentFilter}
-                onEquipmentFilterChange={setEquipmentFilter}
                 riderFilter={riderFilter}
                 onRiderFilterChange={setRiderFilter}
-                sortBy={sortBy}
-                onSortByChange={setSortBy}
               />
             )}
             
@@ -751,12 +744,10 @@ const FestivalArtistManagement = () => {
                     isLoading={artistsLoading} 
                     onEditArtist={handleEditArtist} 
                     onDeleteArtist={handleDeleteArtist} 
-                    searchTerm={searchTerm} 
-                    stageFilter={stageFilter} 
-                    equipmentFilter={equipmentFilter} 
+                    searchTerm={searchTerm}
+                    stageFilter={stageFilter}
                     riderFilter={riderFilter}
                     dayStartTime={dayStartTime}
-                    sortBy={sortBy}
                     jobId={jobId}
                     selectedDate={selectedDate}
                     onArtistStagePlotUpdated={invalidateArtists}
