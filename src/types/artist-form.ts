@@ -21,9 +21,12 @@ export interface ArtistSectionProps {
     foh_console: string;
     foh_consoles: ConsoleSetup[];
     foh_console_provided_by: string;
+    foh_drive?: string;
+    foh_drive_position?: string;
     mon_console: string;
     mon_consoles: ConsoleSetup[];
     mon_console_provided_by: string;
+    mon_position?: string;
     monitors_from_foh: boolean;
     foh_waves_models: WavesModelSelection[];
     foh_outboard: string;

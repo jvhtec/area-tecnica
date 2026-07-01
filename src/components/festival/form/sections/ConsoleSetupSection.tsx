@@ -7,6 +7,7 @@ import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { useEffect } from "react";
 import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
 import { WavesModelPicker } from "../shared/WavesModelPicker";
+import { FOH_DRIVE_OPTIONS, CONSOLE_POSITION_OPTIONS, MON_CONSOLE_POSITION_OPTIONS } from "@/constants/consoleDrive";
 
 export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: ArtistSectionProps) => {
   const { models } = useEquipmentModels();
@@ -35,7 +36,8 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
       (formData.mon_waves_models && formData.mon_waves_models.length > 0) ||
       formData.mon_outboard ||
       formData.mon_console_provided_by !== "festival" ||
-      formData.mon_waves_provided_by !== "festival"
+      formData.mon_waves_provided_by !== "festival" ||
+      formData.mon_position
     ) {
       onChange({
         mon_console: "",
@@ -43,6 +45,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
         mon_waves_models: [],
         mon_outboard: "",
         mon_waves_provided_by: "festival",
+        mon_position: "",
       });
     }
   }, [
@@ -51,6 +54,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
     formData.mon_waves_models,
     formData.mon_outboard,
     formData.mon_waves_provided_by,
+    formData.mon_position,
     formData.monitors_from_foh,
     onChange,
   ]);
@@ -109,6 +113,46 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
               <SelectContent>
                 <SelectItem value="festival">Festival</SelectItem>
                 <SelectItem value="band">{tx("Banda", "Band")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label>{tx("Drive", "Drive")}</Label>
+            <Select
+              value={formData.foh_drive || ""}
+              onValueChange={(value) => onChange({ foh_drive: value })}
+              disabled={locked("foh_drive")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={tx("Seleccionar drive", "Select drive")} />
+              </SelectTrigger>
+              <SelectContent>
+                {FOH_DRIVE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>{tx("Posición", "Position")}</Label>
+            <Select
+              value={formData.foh_drive_position || ""}
+              onValueChange={(value) => onChange({ foh_drive_position: value })}
+              disabled={locked("foh_drive_position")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={tx("Seleccionar posición", "Select position")} />
+              </SelectTrigger>
+              <SelectContent>
+                {CONSOLE_POSITION_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -199,6 +243,25 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
                   <SelectContent>
                     <SelectItem value="festival">Festival</SelectItem>
                     <SelectItem value="band">{tx("Banda", "Band")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{tx("Posición", "Position")}</Label>
+                <Select
+                  value={formData.mon_position || ""}
+                  onValueChange={(value) => onChange({ mon_position: value })}
+                  disabled={locked("mon_position")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={tx("Seleccionar posición", "Select position")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MON_CONSOLE_POSITION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

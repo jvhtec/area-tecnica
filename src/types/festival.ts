@@ -1,6 +1,7 @@
 
 import type { FrequencyBandSelection } from "@/lib/frequencyBands";
 import type { WavesModelSelection } from "@/constants/wavesModels";
+import type { FohDrive, ConsolePosition, MonConsolePosition } from "@/constants/consoleDrive";
 
 export interface ConsoleSetup {
   model: string;
@@ -73,9 +74,12 @@ export interface ArtistFormData {
   foh_console: string;
   foh_consoles: ConsoleSetup[];
   foh_console_provided_by: ProviderType;
+  foh_drive?: FohDrive | '';
+  foh_drive_position?: ConsolePosition | '';
   mon_console: string;
   mon_consoles: ConsoleSetup[];
   mon_console_provided_by: ProviderType;
+  mon_position?: MonConsolePosition | '';
   monitors_from_foh: boolean;
   foh_waves_models: WavesModelSelection[];
   foh_outboard: string;

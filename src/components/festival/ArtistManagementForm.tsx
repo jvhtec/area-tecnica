@@ -39,8 +39,11 @@ interface ArtistManagementFormData {
   load_in_time?: string;
   foh_console: string;
   foh_console_provided_by: string;
+  foh_drive: string;
+  foh_drive_position: string;
   mon_console: string;
   mon_console_provided_by: string;
+  mon_position: string;
   monitors_from_foh: boolean;
   foh_waves_models: WavesModelSelection[];
   foh_outboard: string;
@@ -114,8 +117,11 @@ export const ArtistManagementForm = ({
       load_in_time: artistData?.load_in_time || "",
       foh_console: artistData?.foh_console || "",
       foh_console_provided_by: artistData?.foh_console_provided_by || "festival",
+      foh_drive: artistData?.foh_drive || "",
+      foh_drive_position: artistData?.foh_drive_position || "",
       mon_console: artistData?.mon_console || "",
       mon_console_provided_by: artistData?.mon_console_provided_by || "festival",
+      mon_position: artistData?.mon_position || "",
       monitors_from_foh: artistData?.monitors_from_foh || false,
       foh_waves_models: artistData?.foh_waves_models || [],
       foh_outboard: artistData?.foh_outboard || "",

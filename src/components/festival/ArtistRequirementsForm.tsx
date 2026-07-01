@@ -136,10 +136,13 @@ const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormStat
   foh_console: "",
   foh_consoles: [],
   foh_console_provided_by: "festival",
+  foh_drive: "",
+  foh_drive_position: "",
   foh_tech: false,
   mon_console: "",
   mon_consoles: [],
   mon_console_provided_by: "festival",
+  mon_position: "",
   monitors_from_foh: false,
   foh_waves_models: [],
   foh_outboard: "",
@@ -374,6 +377,8 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         nextLockedFields.add("foh_console");
         nextLockedFields.add("foh_console_provided_by");
       }
+      if (hasText(artistData.foh_drive)) nextLockedFields.add("foh_drive");
+      if (hasText(artistData.foh_drive_position)) nextLockedFields.add("foh_drive_position");
       if (hasConsoleSetups(artistData.foh_consoles)) nextLockedFields.add("foh_consoles");
       if (asArray(artistData.foh_waves_models).length > 0 || hasText(artistData.foh_outboard)) {
         nextLockedFields.add("foh_waves_models");
@@ -384,6 +389,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         nextLockedFields.add("mon_console");
         nextLockedFields.add("mon_console_provided_by");
       }
+      if (hasText(artistData.mon_position)) nextLockedFields.add("mon_position");
       if (hasConsoleSetups(artistData.mon_consoles)) nextLockedFields.add("mon_consoles");
       if (asBoolean(artistData.monitors_from_foh)) nextLockedFields.add("monitors_from_foh");
       if (asArray(artistData.mon_waves_models).length > 0 || hasText(artistData.mon_outboard)) {
@@ -461,6 +467,8 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         foh_console: asString(artistData.foh_console),
         foh_consoles: fohConsoles.length > 0 ? fohConsoles : prev.foh_consoles,
         foh_console_provided_by: asString(artistData.foh_console_provided_by) || "festival",
+        foh_drive: asString(artistData.foh_drive),
+        foh_drive_position: asString(artistData.foh_drive_position),
         foh_tech: asBoolean(artistData.foh_tech),
         foh_waves_models: normalizeWavesModelSelections(artistData.foh_waves_models),
         foh_outboard: asString(artistData.foh_outboard),
@@ -468,6 +476,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         mon_console: asString(artistData.mon_console),
         mon_consoles: monConsoles.length > 0 ? monConsoles : prev.mon_consoles,
         mon_console_provided_by: asString(artistData.mon_console_provided_by) || "festival",
+        mon_position: asString(artistData.mon_position),
         monitors_from_foh: asBoolean(artistData.monitors_from_foh),
         mon_waves_models: normalizeWavesModelSelections(artistData.mon_waves_models),
         mon_outboard: asString(artistData.mon_outboard),

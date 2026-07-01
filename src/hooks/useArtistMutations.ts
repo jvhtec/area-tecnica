@@ -15,10 +15,16 @@ type ArtistTimeField =
   | "soundcheck_end"
   | "line_check_start"
   | "line_check_end"
-  | "load_in_time";
+  | "load_in_time"
+  | "foh_drive"
+  | "foh_drive_position"
+  | "mon_position";
 type ArtistTimePayload = (FestivalArtistInsert | FestivalArtistUpdate) &
   Partial<Record<ArtistTimeField, string | null>>;
 
+// Time fields and nullable-enum fields (foh_drive, foh_drive_position,
+// mon_position) both need '' converted to null: the DB check constraints on
+// the enum fields reject an empty string as an invalid value.
 const artistTimeFields: ArtistTimeField[] = [
   "show_start",
   "show_end",
@@ -27,6 +33,9 @@ const artistTimeFields: ArtistTimeField[] = [
   "line_check_start",
   "line_check_end",
   "load_in_time",
+  "foh_drive",
+  "foh_drive_position",
+  "mon_position",
 ];
 
 // Helper function to format artist time data

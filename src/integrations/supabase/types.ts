@@ -1627,6 +1627,8 @@ export type Database = {
           foh_console_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          foh_drive: string | null
+          foh_drive_position: string | null
           foh_tech: boolean | null
           foh_waves_models: Json
           foh_waves_provided_by: Database["public"]["Enums"]["provider_type"]
@@ -1659,6 +1661,7 @@ export type Database = {
           mon_console_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          mon_position: string | null
           mon_tech: boolean | null
           mon_waves_models: Json
           mon_waves_provided_by: Database["public"]["Enums"]["provider_type"]
@@ -1704,6 +1707,8 @@ export type Database = {
           foh_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          foh_drive?: string | null
+          foh_drive_position?: string | null
           foh_tech?: boolean | null
           foh_waves_models?: Json
           foh_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
@@ -1736,6 +1741,7 @@ export type Database = {
           mon_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          mon_position?: string | null
           mon_tech?: boolean | null
           mon_waves_models?: Json
           mon_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
@@ -1781,6 +1787,8 @@ export type Database = {
           foh_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          foh_drive?: string | null
+          foh_drive_position?: string | null
           foh_tech?: boolean | null
           foh_waves_models?: Json
           foh_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
@@ -1813,6 +1821,7 @@ export type Database = {
           mon_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          mon_position?: string | null
           mon_tech?: boolean | null
           mon_waves_models?: Json
           mon_waves_provided_by?: Database["public"]["Enums"]["provider_type"]

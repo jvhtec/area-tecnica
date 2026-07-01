@@ -12,6 +12,7 @@ import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically, sortArtistsByField, type ArtistSortField } from "@/utils/artistSorting";
 import { combineWavesDisplay } from "@/constants/wavesModels";
+import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
 import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -43,8 +44,11 @@ interface Artist {
   load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
+  foh_drive?: string;
+  foh_drive_position?: string;
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_position?: string;
   monitors_from_foh?: boolean;
   foh_waves_models?: any[];
   foh_outboard?: string;
@@ -945,6 +949,12 @@ export const ArtistTable = ({
                             )}
                             {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                           </div>
+                          {(artist.foh_drive || artist.foh_drive_position) && (
+                            <div className="text-xs text-muted-foreground">
+                              Drive: {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
+                              {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
+                            </div>
+                          )}
                           {(artist.foh_waves_models?.length || artist.foh_outboard) && (
                             <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
                               <span>FOH Waves/Outboard: {combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
@@ -968,6 +978,11 @@ export const ArtistTable = ({
                                 )}
                                 {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                               </div>
+                              {artist.mon_position && (
+                                <div className="text-xs text-muted-foreground">
+                                  Posición: {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
+                                </div>
+                              )}
                               {(artist.mon_waves_models?.length || artist.mon_outboard) && (
                                 <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
                                   <span>MON Waves/Outboard: {combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
