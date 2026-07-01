@@ -130,7 +130,16 @@ function getWirelessSummary(artist: Artist): string {
     const model = iems[0]?.model || "IEM";
     parts.push(`${totalCh} Ch ${model}`);
   }
-  return parts.length > 0 ? parts.join(", ") : "Ninguno";
+  if (parts.length > 0) return parts.join(", ");
+  // No systems detailed yet, but the provider choice is still meaningful:
+  // "band" often means we know they bring their own without model/unit detail.
+  if (artist.wireless_provided_by === "band" || artist.iem_provided_by === "band") {
+    return "Aporta banda (sin detalle)";
+  }
+  if (artist.wireless_provided_by === "mixed" || artist.iem_provided_by === "mixed") {
+    return "Mixto (sin detalle)";
+  }
+  return "Ninguno";
 }
 
 function getMicSummary(artist: Artist): string {
@@ -171,7 +180,14 @@ function hasMonitorWarning(artist: Artist): boolean {
 }
 
 function hasWirelessData(artist: Artist): boolean {
-  return (artist.wireless_systems?.length > 0) || (artist.iem_systems?.length > 0);
+  return (
+    (artist.wireless_systems?.length > 0) ||
+    (artist.iem_systems?.length > 0) ||
+    artist.wireless_provided_by === "band" ||
+    artist.iem_provided_by === "band" ||
+    artist.wireless_provided_by === "mixed" ||
+    artist.iem_provided_by === "mixed"
+  );
 }
 
 function hasInfraData(artist: Artist): boolean {

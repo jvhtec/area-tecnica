@@ -187,14 +187,23 @@ export const CopyArtistsDialog = ({
           notes: copyOptions.copyNotes ? artistData.notes : null,
           // Keep or remove technical specs based on option
           foh_console: copyOptions.copyTechnicalSpecs ? artistData.foh_console : null,
+          foh_console_provided_by: copyOptions.copyTechnicalSpecs ? artistData.foh_console_provided_by : 'festival',
           mon_console: copyOptions.copyTechnicalSpecs ? artistData.mon_console : null,
+          mon_console_provided_by: copyOptions.copyTechnicalSpecs ? artistData.mon_console_provided_by : 'festival',
           monitors_from_foh: copyOptions.copyTechnicalSpecs ? artistData.monitors_from_foh : false,
+          foh_drive: copyOptions.copyTechnicalSpecs ? artistData.foh_drive : null,
+          foh_drive_position: copyOptions.copyTechnicalSpecs ? artistData.foh_drive_position : null,
+          mon_position: copyOptions.copyTechnicalSpecs ? artistData.mon_position : null,
           foh_waves_models: copyOptions.copyTechnicalSpecs ? artistData.foh_waves_models : [],
           foh_outboard: copyOptions.copyTechnicalSpecs ? artistData.foh_outboard : null,
+          foh_waves_provided_by: copyOptions.copyTechnicalSpecs ? artistData.foh_waves_provided_by : 'festival',
           mon_waves_models: copyOptions.copyTechnicalSpecs ? artistData.mon_waves_models : [],
           mon_outboard: copyOptions.copyTechnicalSpecs ? artistData.mon_outboard : null,
+          mon_waves_provided_by: copyOptions.copyTechnicalSpecs ? artistData.mon_waves_provided_by : 'festival',
           wireless_systems: copyOptions.copyTechnicalSpecs ? artistData.wireless_systems : [],
+          wireless_provided_by: copyOptions.copyTechnicalSpecs ? artistData.wireless_provided_by : 'festival',
           iem_systems: copyOptions.copyTechnicalSpecs ? artistData.iem_systems : [],
+          iem_provided_by: copyOptions.copyTechnicalSpecs ? artistData.iem_provided_by : 'festival',
           wired_mics: copyOptions.copyTechnicalSpecs ? artistData.wired_mics : []
         };
       }) || [];

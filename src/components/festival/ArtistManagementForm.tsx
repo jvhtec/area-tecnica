@@ -162,47 +162,49 @@ export const ArtistManagementForm = ({
 
   const [formData, setFormData] = useState<ArtistManagementFormData>(createFormData(artist));
 
+  // Reset/refetch only when the edited artist actually changes. Keying these
+  // effects on the `artist` object or `combinedSetup` identity resets the form
+  // mid-edit (e.g. right after the gear setup query resolves or the artist
+  // list refetches), silently reverting quick changes like a provided-by
+  // selection made with no systems added yet.
   useEffect(() => {
-    if (artist) {
-      setFormData(createFormData(artist));
-    }
-  }, [artist, selectedDate, combinedSetup]);
+    if (!artist?.id) return;
 
-  useEffect(() => {
-    if (artist) {
-      setIsLoading(true);
-      const fetchArtist = async () => {
-        try {
-          const { data, error } = await dataLayerClient.from("festival_artists")
-            .select("*")
-            .eq("id", artist.id)
-            .single();
-          
-          if (error) {
-            console.error("Error fetching artist:", error);
-            toast({
-              title: "Error",
-              description: "No se pudieron cargar los detalles del artista",
-              variant: "destructive",
-            });
-          } else if (data) {
-            setFormData(createFormData(data));
-          }
-        } catch (error) {
+    setFormData(createFormData(artist));
+    setIsLoading(true);
+
+    const fetchArtist = async () => {
+      try {
+        const { data, error } = await dataLayerClient.from("festival_artists")
+          .select("*")
+          .eq("id", artist.id)
+          .single();
+
+        if (error) {
           console.error("Error fetching artist:", error);
           toast({
             title: "Error",
             description: "No se pudieron cargar los detalles del artista",
             variant: "destructive",
           });
-        } finally {
-          setIsLoading(false);
+        } else if (data) {
+          setFormData(createFormData(data));
         }
-      };
+      } catch (error) {
+        console.error("Error fetching artist:", error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los detalles del artista",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      fetchArtist();
-    }
-  }, [artist, selectedDate, toast, combinedSetup]);
+    fetchArtist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artist?.id, selectedDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

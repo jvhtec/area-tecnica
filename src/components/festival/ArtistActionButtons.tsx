@@ -1,5 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { FileText, ImageOff, ImagePlus, Link, Loader2, Pencil, Printer, Receipt, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { FileText, ImageOff, ImagePlus, Link, Loader2, MoreVertical, Pencil, Printer, Receipt, Trash2 } from "lucide-react";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
 
 type ArtistActionArtist = {
@@ -56,38 +63,73 @@ export function ArtistActionButtons<TArtist extends ArtistActionArtist>({
     onCreateFlexExtras(artist.id, artist.name, artist.date, artist.show_start, artist.show_end, artist.isaftermidnight || false);
   };
 
+  const isBusy =
+    printingArtistId === artist.id ||
+    uploadingStagePlotArtistId === artist.id ||
+    deletingStagePlotArtistId === artist.id ||
+    deletingArtistId === artist.id ||
+    isCreatingExtrasFor(artist.id);
+
   return (
-    <div className="flex items-center gap-1 flex-wrap">
-      <Button variant="ghost" size="icon" onClick={() => onGenerateLink(artist)} title="Generate form link">
-        <Link className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={() => onManageFiles(artist)} title="Manage files/riders">
-        <FileText className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={() => onPrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
-        {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-      </Button>
-      <Button variant="ghost" size="icon" onClick={() => onOpenStagePlotCapture(artist)} disabled={uploadingStagePlotArtistId === artist.id} title="Capture/upload stage plot">
-        {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-      </Button>
-      {artist.stage_plot_file_path && (
-        <Button variant="ghost" size="icon" onClick={() => onDeleteStagePlot(artist)} disabled={deletingStagePlotArtistId === artist.id} title="Delete stage plot">
-          {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
-        </Button>
-      )}
-      {canCreateExtras && gearComparison?.mismatches.some((m) => m.severity === "error") && (
-        <Button variant="ghost" size="icon" onClick={handleCreateExtras} disabled={isCreatingExtrasFor(artist.id) || !artist.date} title="Crear presupuesto extras en Flex" className="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
-          {isCreatingExtrasFor(artist.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
-        </Button>
-      )}
-      <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
+    <div className="flex items-center gap-0.5">
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditArtist(artist)} title="Editar artista">
         <Pencil className="h-4 w-4" />
       </Button>
-      {canDelete && (
-        <Button variant="ghost" size="icon" onClick={() => onDeleteArtist(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
-          {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        </Button>
-      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="Más acciones">
+            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onGenerateLink(artist)}>
+            <Link className="h-4 w-4 mr-2" />
+            Generar enlace de formulario
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onManageFiles(artist)}>
+            <FileText className="h-4 w-4 mr-2" />
+            Gestionar archivos/riders
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onPrintArtist(artist)} disabled={printingArtistId === artist.id}>
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir PDF del artista
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onOpenStagePlotCapture(artist)} disabled={uploadingStagePlotArtistId === artist.id}>
+            <ImagePlus className="h-4 w-4 mr-2" />
+            Pegar/cargar stage plot
+          </DropdownMenuItem>
+          {artist.stage_plot_file_path && (
+            <DropdownMenuItem onClick={() => onDeleteStagePlot(artist)} disabled={deletingStagePlotArtistId === artist.id}>
+              <ImageOff className="h-4 w-4 mr-2" />
+              Eliminar stage plot
+            </DropdownMenuItem>
+          )}
+          {canCreateExtras && gearComparison?.mismatches.some((m) => m.severity === "error") && (
+            <DropdownMenuItem
+              onClick={handleCreateExtras}
+              disabled={isCreatingExtrasFor(artist.id) || !artist.date}
+              className="text-amber-600 focus:text-amber-700"
+            >
+              <Receipt className="h-4 w-4 mr-2" />
+              Crear presupuesto extras en Flex
+            </DropdownMenuItem>
+          )}
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onDeleteArtist(artist)}
+                disabled={deletingArtistId === artist.id}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar artista
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

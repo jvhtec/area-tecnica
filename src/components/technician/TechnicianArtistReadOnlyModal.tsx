@@ -36,6 +36,10 @@ type ReadOnlyArtist = {
   soundcheck: boolean;
   soundcheck_start?: string | null;
   soundcheck_end?: string | null;
+  line_check?: boolean | null;
+  line_check_start?: string | null;
+  line_check_end?: string | null;
+  load_in_time?: string | null;
   foh_console: string | null;
   foh_console_provided_by?: "festival" | "band" | "mixed" | null;
   foh_drive?: string | null;
