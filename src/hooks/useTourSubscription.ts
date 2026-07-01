@@ -1,7 +1,7 @@
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -10,31 +10,25 @@ import { queryKeys } from "@/lib/react-query";
  */
 export const useTourSubscription = () => {
   const queryClient = useQueryClient();
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  );
+  const ownerIdRef = useRef(`tour-subscription-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
-    console.log('Setting up tours realtime subscription');
-    
-    const channel = supabase
-      .channel('tours-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tours'
-        },
-        (payload) => {
-          console.log('Tours table change detected:', payload);
-          
-          // Invalidate tours query to refresh the data
-          queryClient.invalidateQueries({ queryKey: queryKeys.scope('tours') });
-        }
-      )
-      .subscribe();
+    const ownerRoute = ownerIdRef.current;
+
+    subscriptionManager.subscribeToTable(
+      'tours',
+      queryKeys.scope('tours'),
+      { event: '*', schema: 'public' },
+      'medium',
+      { ownerRoute }
+    );
 
     return () => {
-      console.log('Cleaning up tours subscription');
-      supabase.removeChannel(channel);
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute);
     };
-  }, [queryClient]);
+  }, [subscriptionManager]);
 };

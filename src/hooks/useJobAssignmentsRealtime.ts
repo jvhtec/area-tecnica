@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { getAssignmentNotificationDepartments } from "@/utils/assignmentNotificationDepartments";
+import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import type { Database } from "@/integrations/supabase/types";
 
 import { queryKeys } from "@/lib/react-query";
@@ -289,50 +290,44 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     }
   );
 
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  );
+  const ownerIdRef = useRef(`job-assignments-realtime-${Math.random().toString(36).slice(2)}`);
+
   // Additional real-time subscription specifically for this job
   // Listen to both timesheets (source of truth) and job_assignments (for role/status updates)
+  // via the unified subscription manager so this doesn't open its own untracked channel.
   useEffect(() => {
     if (!jobId) return;
 
-    console.log(`Setting up job-specific timesheet/assignment subscription for job ${jobId}`);
+    const ownerRoute = `job-assignments-${jobId}:${ownerIdRef.current}`;
+    const handlePayload = () => {
+      // Force immediate refresh
+      manualRefresh();
+    };
 
-    const channel = supabase
-      .channel(`assignments-${jobId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'timesheets',
-          filter: `job_id=eq.${jobId}`
-        },
-        (payload) => {
-          console.log(`Timesheet change detected for job ${jobId}:`, payload);
-          // Force immediate refresh
-          manualRefresh();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_assignments',
-          filter: `job_id=eq.${jobId}`
-        },
-        (payload) => {
-          console.log(`Assignment metadata change detected for job ${jobId}:`, payload);
-          // Force immediate refresh (for role/status updates)
-          manualRefresh();
-        }
-      )
-      .subscribe();
+    subscriptionManager.subscribeToTable(
+      'timesheets',
+      ['job-assignments', jobId],
+      { event: '*', schema: 'public', filter: `job_id=eq.${jobId}` },
+      'high',
+      { ownerRoute, invalidateOnPayload: false, onPayload: handlePayload }
+    );
+
+    subscriptionManager.subscribeToTable(
+      'job_assignments',
+      ['job-assignments', jobId],
+      { event: '*', schema: 'public', filter: `job_id=eq.${jobId}` },
+      'high',
+      { ownerRoute, invalidateOnPayload: false, onPayload: handlePayload }
+    );
 
     return () => {
-      console.log(`Cleaning up job timesheet/assignment subscription for job ${jobId}`);
-      supabase.removeChannel(channel);
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute);
     };
-  }, [jobId, manualRefresh, queryClient]);
+  }, [jobId, manualRefresh, subscriptionManager]);
 
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 

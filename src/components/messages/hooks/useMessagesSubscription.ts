@@ -1,40 +1,45 @@
 
-import { useEffect } from 'react';
-import { dataLayerClient } from '@/services/dataLayerClient';
+import { useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { UnifiedSubscriptionManager, type RealtimeChangePayload } from '@/lib/unified-subscription-manager';
+
 export const useMessagesSubscription = (
   currentUserId: string | undefined,
   onUpdate: () => void
 ) => {
+  const queryClient = useQueryClient();
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  );
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const ownerIdRef = useRef(`direct-messages-${Math.random().toString(36).slice(2)}`);
+
   useEffect(() => {
     if (!currentUserId) return;
 
-    console.log('Setting up direct messages subscription for user:', currentUserId);
+    const ownerRoute = ownerIdRef.current;
 
-    const channel = dataLayerClient.channel('direct-messages-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'direct_messages',
-        },
-        async (payload: { new: any; eventType: string; old: any }) => {
-          console.log('Received direct message change:', payload);
-          
-          if (payload.new && 
-              (payload.new.sender_id === currentUserId || 
-               payload.new.recipient_id === currentUserId)) {
-            onUpdate();
+    subscriptionManager.subscribeToTable(
+      'direct_messages',
+      ['direct-messages', currentUserId],
+      { event: '*', schema: 'public' },
+      'medium',
+      {
+        ownerRoute,
+        invalidateOnPayload: false,
+        onPayload: (payload: RealtimeChangePayload) => {
+          const record = payload.new as { sender_id?: string; recipient_id?: string } | null;
+          if (record && (record.sender_id === currentUserId || record.recipient_id === currentUserId)) {
+            onUpdateRef.current();
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Direct messages subscription status:', status);
-      });
+        },
+      }
+    );
 
     return () => {
-      console.log('Cleaning up direct messages subscription');
-      dataLayerClient.removeChannel(channel);
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute);
     };
-  }, [currentUserId, onUpdate]);
+  }, [currentUserId, subscriptionManager]);
 };

@@ -32,7 +32,7 @@ import type {
 import type { TourDocument } from "@/hooks/useTourDocuments";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useWeatherData } from "@/hooks/useWeatherData";
-import { queryKeys } from "@/lib/react-query";
+import { createQueryKey } from "@/lib/react-query";
 import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from "@/types/job";
@@ -64,7 +64,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   const [isMapLoading, setIsMapLoading] = useState(false);
 
   const { data: jobDetails, isLoading: jobDetailsLoading } = useQuery({
-    queryKey: queryKeys.scope("job-details-modal", job?.id),
+    queryKey: createQueryKey.jobDetailsModal.details(job?.id),
     queryFn: async () => {
       if (!job?.id) return null;
       const { data, error } = await dataLayerClient.from("jobs")
@@ -85,7 +85,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
     (job as { tour_id?: string })?.tour_id;
 
   const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
-    queryKey: queryKeys.scope("job-staff", job?.id),
+    queryKey: createQueryKey.jobDetailsModal.staff(job?.id),
     queryFn: async () => {
       if (!job?.id) return [];
       const { data, error } = await dataLayerClient.from("job_assignments")
@@ -109,7 +109,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: assignedDates = [], isLoading: assignedDatesLoading } = useQuery({
-    queryKey: queryKeys.scope("tech-assigned-dates", job?.id, user?.id),
+    queryKey: createQueryKey.technicianJobModal.assignedDates(job?.id, user?.id),
     queryFn: async () => {
       if (!job?.id || !user?.id) return [];
       const { data, error } = await dataLayerClient.from("timesheets")
@@ -125,7 +125,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: festivalStages = [] } = useQuery({
-    queryKey: queryKeys.scope("technician-job-festival-stages", job?.id),
+    queryKey: createQueryKey.technicianJobModal.festivalStages(job?.id),
     queryFn: async () => {
       if (!job?.id) return [];
       const { data, error } = await dataLayerClient.from("festival_stages")
@@ -138,7 +138,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: techShiftAssignments = [], isLoading: techShiftAssignmentsLoading } = useQuery({
-    queryKey: queryKeys.scope("technician-job-shift-assignments", job?.id, user?.id),
+    queryKey: createQueryKey.technicianJobModal.shiftAssignments(job?.id, user?.id),
     queryFn: async () => {
       if (!job?.id || !user?.id) return [];
 
@@ -177,7 +177,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: jobDateTypes = [], isLoading: jobDateTypesLoading } = useQuery({
-    queryKey: queryKeys.scope("job-date-types", job?.id),
+    queryKey: createQueryKey.technicianJobModal.dateTypes(job?.id),
     queryFn: async () => {
       if (!job?.id) return [];
       const { data, error } = await dataLayerClient.from("job_date_types")
@@ -190,7 +190,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: tourDocuments = [], isLoading: tourDocumentsLoading } = useQuery({
-    queryKey: queryKeys.scope("tour-documents-for-job", tourId),
+    queryKey: createQueryKey.technicianJobModal.tourDocuments(tourId),
     queryFn: async () => {
       if (!tourId) return [];
       const { data, error } = await dataLayerClient.from("tour_documents")
@@ -205,7 +205,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: jobArtists = [], isLoading: isArtistsLoading, error: jobArtistsError } = useQuery({
-    queryKey: queryKeys.scope("technician-job-artists", job?.id),
+    queryKey: createQueryKey.technicianJobModal.artists(job?.id),
     queryFn: async () => {
       if (!job?.id) return [];
       const { data, error } = await dataLayerClient.from("festival_artists")
@@ -222,7 +222,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   const artistStageMap = useMemo(() => new Map(jobArtists.map((artist) => [artist.id, artist.stage])), [jobArtists]);
 
   const { data: riderFiles = [], isLoading: isRidersLoading, error: riderFilesError } = useQuery({
-    queryKey: queryKeys.scope("technician-job-rider-files", job?.id, artistIdList),
+    queryKey: createQueryKey.technicianJobModal.riderFiles(job?.id, artistIdList),
     queryFn: async () => {
       if (artistIdList.length === 0) return [];
       const { data, error } = await dataLayerClient.from("festival_artist_files")
@@ -236,7 +236,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: hojaDeRutaMeta, isLoading: hojaDeRutaLoading } = useQuery({
-    queryKey: queryKeys.scope("technician-hoja-de-ruta-meta", job?.id),
+    queryKey: createQueryKey.technicianJobModal.hojaDeRutaMeta(job?.id),
     queryFn: async () => {
       if (!job?.id) return null;
       const { data, error } = await dataLayerClient.from("hoja_de_ruta")
@@ -257,7 +257,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   const hojaDeRutaId = hojaDeRutaMeta?.id || null;
 
   const { data: hojaAccommodations = [], isLoading: hojaAccommodationsLoading } = useQuery({
-    queryKey: queryKeys.scope("technician-hoja-accommodations", hojaDeRutaId),
+    queryKey: createQueryKey.technicianJobModal.hojaAccommodations(hojaDeRutaId),
     queryFn: async () => {
       if (!hojaDeRutaId) return [];
       const { data, error } = await dataLayerClient.from("hoja_de_ruta_accommodations")
@@ -289,7 +289,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: hojaTravelArrangements = [], isLoading: hojaTravelLoading } = useQuery({
-    queryKey: queryKeys.scope("technician-hoja-travel-arrangements", hojaDeRutaId),
+    queryKey: createQueryKey.technicianJobModal.hojaTravelArrangements(hojaDeRutaId),
     queryFn: async () => {
       if (!hojaDeRutaId) return [];
       const { data, error } = await dataLayerClient.from("hoja_de_ruta_travel_arrangements")
@@ -320,7 +320,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: hojaTransportEntries = [], isLoading: hojaTransportLoading } = useQuery({
-    queryKey: queryKeys.scope("technician-hoja-logistics-transport", hojaDeRutaId),
+    queryKey: createQueryKey.technicianJobModal.hojaTransport(hojaDeRutaId),
     queryFn: async () => {
       if (!hojaDeRutaId) return [];
       const { data, error } = await dataLayerClient.from("hoja_de_ruta_transport")
@@ -351,7 +351,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   });
 
   const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
-    queryKey: queryKeys.scope("job-restaurants-modal", job?.id, jobDetails?.locations?.formatted_address),
+    queryKey: createQueryKey.jobDetailsModal.restaurants(job?.id, jobDetails?.locations?.formatted_address),
     queryFn: async () => {
       const locationData = jobDetails?.locations;
       const address = locationData?.formatted_address || locationData?.name;
@@ -583,7 +583,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   );
 
   const { data: roomOccupantProfiles = [], isLoading: roomOccupantsLoading } = useQuery({
-    queryKey: queryKeys.scope("technician-hoja-room-occupants", roomStaffProfileIds),
+    queryKey: createQueryKey.technicianJobModal.roomOccupants(roomStaffProfileIds),
     queryFn: async () => {
       if (roomStaffProfileIds.length === 0) return [];
       const { data, error } = await dataLayerClient.from("profiles")
@@ -684,7 +684,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
 
   const handleTourDocumentUploadSuccess = useCallback(() => {
     setIsUploadingTourDocument(false);
-    queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job", tourId) });
+    queryClient.invalidateQueries({ queryKey: createQueryKey.technicianJobModal.tourDocuments(tourId) });
   }, [queryClient, tourId]);
 
   return {

@@ -1,6 +1,6 @@
-import { MutableRefObject, useCallback, useEffect, useRef } from 'react';
+import { MutableRefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { useToast } from '@/hooks/use-toast';
 import type { ActivityCatalogEntry, ActivityLogEntry, ActivityPreferences, ActivitySeverity } from '../types';
 import { getActivityMeta } from '../catalog';
@@ -96,6 +96,11 @@ export function useActivityRealtime(options: UseActivityRealtimeOptions = {}): v
   const queryClient = useQueryClient();
   const seen = useRef<Set<string>>(new Set());
   const prefsRef = useRef<ActivityPreferences | null>(null);
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  );
+  const ownerIdRef = useRef(`activity-realtime-${Math.random().toString(36).slice(2)}`);
 
   const fetchPrefs = useCallback(async () => {
     if (!userId) return null;
@@ -108,53 +113,61 @@ export function useActivityRealtime(options: UseActivityRealtimeOptions = {}): v
     if (!userId) return;
 
     let cancelled = false;
+    const ownerRoute = ownerIdRef.current;
 
     fetchPrefs().catch((error) => {
       console.warn('[activity] Failed to load activity preferences', error);
     });
 
     const filter = jobId
-      ? { event: 'INSERT', schema: 'public', table: 'activity_log', filter: `job_id=eq.${jobId}` }
-      : { event: 'INSERT', schema: 'public', table: 'activity_log' };
+      ? { event: 'INSERT' as const, schema: 'public', filter: `job_id=eq.${jobId}` }
+      : { event: 'INSERT' as const, schema: 'public' };
 
-    const channel = supabase
-      .channel(`activity${jobId ? `-${jobId}` : ''}`)
-      .on('postgres_changes' as any, filter, async (payload) => {
-        if (cancelled) return;
+    subscriptionManager.subscribeToTable(
+      'activity_log',
+      queryKeys.scope('activity', jobId ?? 'all'),
+      filter,
+      'medium',
+      {
+        ownerRoute,
+        invalidateOnPayload: false,
+        onPayload: async (payload) => {
+          if (cancelled) return;
 
-        const row = payload.new as ActivityLogEntry | null;
-        if (!row || !row.id) return;
-        if (seen.current.has(row.id)) return;
-        seen.current.add(row.id);
+          const row = payload.new as unknown as ActivityLogEntry | null;
+          if (!row || !row.id) return;
+          if (seen.current.has(row.id)) return;
+          seen.current.add(row.id);
 
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('activity', jobId ?? 'all') });
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope('activity', jobId ?? 'all') });
 
-        if (!autoToasts) return;
+          if (!autoToasts) return;
 
-        const meta = getActivityMeta(row.code);
-        if (meta && meta.toast_enabled === false) {
-          return;
-        }
+          const meta = getActivityMeta(row.code);
+          if (meta && meta.toast_enabled === false) {
+            return;
+          }
 
-        const prefs = await ensurePreferencesCached(prefsRef, fetchPrefs);
-        if (prefs?.mute_toasts) return;
-        if (prefs?.muted_codes && prefs.muted_codes.includes(row.code)) return;
+          const prefs = await ensurePreferencesCached(prefsRef, fetchPrefs);
+          if (prefs?.mute_toasts) return;
+          if (prefs?.muted_codes && prefs.muted_codes.includes(row.code)) return;
 
-        const content = mapToast(row, meta);
-        if (!content) return;
+          const content = mapToast(row, meta);
+          if (!content) return;
 
-        const variant = severityToVariant[meta?.severity ?? 'info'];
-        toast({
-          title: content.title,
-          description: content.description,
-          variant,
-        });
-      })
-      .subscribe();
+          const variant = severityToVariant[meta?.severity ?? 'info'];
+          toast({
+            title: content.title,
+            description: content.description,
+            variant,
+          });
+        },
+      }
+    );
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute);
     };
-  }, [autoToasts, fetchPrefs, jobId, queryClient, toast, userId]);
+  }, [autoToasts, fetchPrefs, jobId, queryClient, toast, userId, subscriptionManager]);
 }
