@@ -838,7 +838,11 @@ export const ArtistTable = ({
                       {sortBy === 'line_check_start' && <ArrowDown className="h-3 w-3" />}
                     </button>
                   </TableHead>
-                  <TableHead className="min-w-[200px]">Consolas</TableHead>
+                  <TableHead className="min-w-[180px]">Consolas</TableHead>
+                  <TableHead className="min-w-[120px]">Drive FOH</TableHead>
+                  <TableHead className="min-w-[160px]">Waves/Outboard FOH</TableHead>
+                  <TableHead className="min-w-[100px]">Posición MON</TableHead>
+                  <TableHead className="min-w-[160px]">Waves/Outboard MON</TableHead>
                   <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
                   <TableHead className="min-w-[140px]">
                     <div className="flex items-center gap-1">
@@ -941,7 +945,7 @@ export const ArtistTable = ({
                         )}
                       </TableCell>
 
-                      <TableCell className="min-w-[200px]">
+                      <TableCell className="min-w-[180px]">
                         <div className="text-sm space-y-1">
                           <div className="flex items-center gap-1 flex-wrap">
                             <span>FOH: {artist.foh_console || "No especificado"}</span>
@@ -952,55 +956,73 @@ export const ArtistTable = ({
                             )}
                             {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                           </div>
-                          {(artist.foh_drive || artist.foh_drive_position) && (
-                            <div className="text-xs text-muted-foreground">
-                              Drive: {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
-                              {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
-                            </div>
-                          )}
-                          {(artist.foh_waves_models?.length || artist.foh_outboard) && (
-                            <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
-                              <span>FOH Waves/Outboard: {combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
-                              {artist.foh_waves_provided_by && (
-                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_waves_provided_by)}`}>
-                                  {artist.foh_waves_provided_by}
-                                </Badge>
-                              )}
-                            </div>
-                          )}
                           {artist.monitors_from_foh ? (
                             <div className="text-xs text-muted-foreground">Monitores desde FOH</div>
                           ) : (
-                            <>
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span>MON: {artist.mon_console || "No especificado"}</span>
-                                {artist.mon_console_provided_by && (
-                                  <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                                    {artist.mon_console_provided_by}
-                                  </Badge>
-                                )}
-                                {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
-                              </div>
-                              {artist.mon_position && (
-                                <div className="text-xs text-muted-foreground">
-                                  Posición: {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
-                                </div>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span>MON: {artist.mon_console || "No especificado"}</span>
+                              {artist.mon_console_provided_by && (
+                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                                  {artist.mon_console_provided_by}
+                                </Badge>
                               )}
-                              {(artist.mon_waves_models?.length || artist.mon_outboard) && (
-                                <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
-                                  <span>MON Waves/Outboard: {combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
-                                  {artist.mon_waves_provided_by && (
-                                    <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_waves_provided_by)}`}>
-                                      {artist.mon_waves_provided_by}
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
-                            </>
+                              {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
+                            </div>
                           )}
                         </div>
                       </TableCell>
-                      
+
+                      <TableCell className="min-w-[120px]">
+                        {(artist.foh_drive || artist.foh_drive_position) ? (
+                          <div className="text-xs text-muted-foreground">
+                            {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
+                            {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="min-w-[160px]">
+                        {(artist.foh_waves_models?.length || artist.foh_outboard) ? (
+                          <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
+                            <span>{combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
+                            {artist.foh_waves_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_waves_provided_by)}`}>
+                                {artist.foh_waves_provided_by}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="min-w-[100px]">
+                        {!artist.monitors_from_foh && artist.mon_position ? (
+                          <div className="text-xs text-muted-foreground">
+                            {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="min-w-[160px]">
+                        {!artist.monitors_from_foh && (artist.mon_waves_models?.length || artist.mon_outboard) ? (
+                          <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
+                            <span>{combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
+                            {artist.mon_waves_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_waves_provided_by)}`}>
+                                {artist.mon_waves_provided_by}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
                       <TableCell className="min-w-[180px]">
                         <div className="text-sm space-y-1">
                           {(artist.wireless_provided_by || (artist.wireless_systems && artist.wireless_systems.length > 0)) && (
