@@ -162,7 +162,10 @@ export function WahaEndpointSettings() {
     : selectedEndpointStatus || data?.status;
 
   const updateSessionCaches = (result: WahaSessionResponse) => {
-    queryClient.setQueryData(queryKey, result);
+    queryClient.setQueryData<WahaSessionResponse | undefined>(queryKey, (current) => ({
+      ...result,
+      endpoints: result.endpoints ?? current?.endpoints,
+    }));
 
     if (!result.endpoint) return;
 

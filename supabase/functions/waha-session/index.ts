@@ -169,7 +169,7 @@ function assertAllowedEndpoint(endpoint: string) {
   const host = new URL(endpoint).host.toLowerCase();
   const allowedHosts = getAllowedEndpointHosts();
 
-  if (allowedHosts.has(host) || /^waha\d*\.sector-pro\.work$/i.test(host)) {
+  if (allowedHosts.has(host)) {
     return;
   }
 
