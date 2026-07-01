@@ -1,5 +1,6 @@
 
 import type { FrequencyBandSelection } from "@/lib/frequencyBands";
+import type { WavesModelSelection } from "@/constants/wavesModels";
 
 export interface ConsoleSetup {
   model: string;
@@ -32,9 +33,9 @@ export interface FestivalGearSetup {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_models?: string[];
+  foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string | null;
-  mon_waves_models?: string[];
+  mon_waves_models?: WavesModelSelection[];
   mon_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
@@ -76,10 +77,10 @@ export interface ArtistFormData {
   mon_consoles: ConsoleSetup[];
   mon_console_provided_by: ProviderType;
   monitors_from_foh: boolean;
-  foh_waves_models: string[];
+  foh_waves_models: WavesModelSelection[];
   foh_outboard: string;
   foh_waves_provided_by: ProviderType;
-  mon_waves_models: string[];
+  mon_waves_models: WavesModelSelection[];
   mon_outboard: string;
   mon_waves_provided_by: ProviderType;
   wireless_systems: WirelessSetup[];
@@ -124,9 +125,9 @@ export interface StageGearSetup {
   stage_number: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_models?: string[];
+  foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string | null;
-  mon_waves_models?: string[];
+  mon_waves_models?: WavesModelSelection[];
   mon_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];

@@ -19,7 +19,7 @@ import { ArtistSectionProps } from "@/types/artist-form";
 import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
 import { normalizeWirelessSystem, normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 import { mapFestivalGearSetup } from "@/utils/festivalGearMappers";
-import { isWavesModel } from "@/constants/wavesModels";
+import { normalizeWavesModelSelections } from "@/constants/wavesModels";
 import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
 import {
   type PublicRiderFileRecord,
@@ -462,14 +462,14 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         foh_consoles: fohConsoles.length > 0 ? fohConsoles : prev.foh_consoles,
         foh_console_provided_by: asString(artistData.foh_console_provided_by) || "festival",
         foh_tech: asBoolean(artistData.foh_tech),
-        foh_waves_models: asArray<string>(artistData.foh_waves_models).filter(isWavesModel),
+        foh_waves_models: normalizeWavesModelSelections(artistData.foh_waves_models),
         foh_outboard: asString(artistData.foh_outboard),
         foh_waves_provided_by: asString(artistData.foh_waves_provided_by) || "festival",
         mon_console: asString(artistData.mon_console),
         mon_consoles: monConsoles.length > 0 ? monConsoles : prev.mon_consoles,
         mon_console_provided_by: asString(artistData.mon_console_provided_by) || "festival",
         monitors_from_foh: asBoolean(artistData.monitors_from_foh),
-        mon_waves_models: asArray<string>(artistData.mon_waves_models).filter(isWavesModel),
+        mon_waves_models: normalizeWavesModelSelections(artistData.mon_waves_models),
         mon_outboard: asString(artistData.mon_outboard),
         mon_waves_provided_by: asString(artistData.mon_waves_provided_by) || "festival",
         mon_tech: asBoolean(artistData.mon_tech),

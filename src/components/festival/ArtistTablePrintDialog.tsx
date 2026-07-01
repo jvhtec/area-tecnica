@@ -37,10 +37,10 @@ interface Artist {
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_from_foh?: boolean;
-  foh_waves_models?: string[];
+  foh_waves_models?: any[];
   foh_outboard?: string;
   foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_waves_models?: string[];
+  mon_waves_models?: any[];
   mon_outboard?: string;
   mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: any[];

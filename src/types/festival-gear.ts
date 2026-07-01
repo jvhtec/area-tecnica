@@ -1,5 +1,6 @@
 
 import { WirelessSetup, ConsoleSetup, WiredMicSetup } from "./festival";
+import type { WavesModelSelection } from "@/constants/wavesModels";
 
 export interface WirelessConfigProps {
   systems: WirelessSetup[];
@@ -24,9 +25,9 @@ export interface GearSetupFormData {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_models: string[];
+  foh_waves_models: WavesModelSelection[];
   foh_outboard: string;
-  mon_waves_models: string[];
+  mon_waves_models: WavesModelSelection[];
   mon_outboard: string;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];

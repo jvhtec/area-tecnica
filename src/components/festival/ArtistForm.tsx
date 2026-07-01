@@ -29,10 +29,6 @@ export const ArtistForm = () => {
     foh_tech: boolean;
     mon_tech: boolean;
     monitors_from_foh: boolean;
-    foh_waves_models: string[];
-    foh_outboard: string;
-    mon_waves_models: string[];
-    mon_outboard: string;
     isaftermidnight: boolean;
     rider_missing: boolean;
   }>({
@@ -176,13 +172,13 @@ export const ArtistForm = () => {
           foh_console: formData.foh_console,
           foh_console_provided_by: formData.foh_console_provided_by,
           foh_tech: formData.foh_tech,
-          foh_waves_models: formData.foh_waves_models,
+          foh_waves_models: formData.foh_waves_models as unknown as Json,
           foh_outboard: formData.foh_outboard,
           foh_waves_provided_by: formData.foh_waves_provided_by,
           mon_console: formData.mon_console,
           mon_console_provided_by: formData.mon_console_provided_by,
           monitors_from_foh: formData.monitors_from_foh,
-          mon_waves_models: formData.mon_waves_models,
+          mon_waves_models: formData.mon_waves_models as unknown as Json,
           mon_outboard: formData.mon_outboard,
           mon_waves_provided_by: formData.mon_waves_provided_by,
           mon_tech: formData.mon_tech,

@@ -41,9 +41,9 @@ type ReadOnlyArtist = {
   mon_console: string | null;
   mon_console_provided_by?: "festival" | "band" | "mixed" | null;
   monitors_from_foh?: boolean | null;
-  foh_waves_models?: string[] | null;
+  foh_waves_models?: any[] | null;
   foh_outboard?: string | null;
-  mon_waves_models?: string[] | null;
+  mon_waves_models?: any[] | null;
   mon_outboard?: string | null;
   wireless_systems: any[];
   wireless_provided_by?: "festival" | "band" | "mixed" | null;
@@ -120,6 +120,8 @@ const mapRawToReadOnlyArtist = (artist: FestivalArtistRow): ReadOnlyArtist => ({
   soundcheck: Boolean(artist.soundcheck),
   foh_console: artist.foh_console || null,
   mon_console: artist.mon_console || null,
+  foh_waves_models: asArray(artist.foh_waves_models),
+  mon_waves_models: asArray(artist.mon_waves_models),
   wireless_systems: asArray(artist.wireless_systems),
   iem_systems: asArray(artist.iem_systems),
   monitors_enabled: Boolean(artist.monitors_enabled),

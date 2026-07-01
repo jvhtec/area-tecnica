@@ -1,6 +1,7 @@
 import type { Tables } from "@/integrations/supabase/types";
 import { normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 import type { ConsoleSetup, FestivalGearSetup, StageGearSetup, WiredMicSetup } from "@/types/festival";
+import { normalizeWavesModelSelections } from "@/constants/wavesModels";
 
 type FestivalGearSetupRow = Tables<"festival_gear_setups">;
 type StageGearSetupRow = Tables<"festival_stage_gear_setups">;
@@ -49,9 +50,9 @@ export function mapFestivalGearSetup(row: FestivalGearSetupRow | null | undefine
     max_stages: row.max_stages ?? 3,
     foh_consoles: mapConsoleSetups(row.foh_consoles),
     mon_consoles: mapConsoleSetups(row.mon_consoles),
-    foh_waves_models: row.foh_waves_models ?? [],
+    foh_waves_models: normalizeWavesModelSelections(row.foh_waves_models),
     foh_outboard: row.foh_outboard,
-    mon_waves_models: row.mon_waves_models ?? [],
+    mon_waves_models: normalizeWavesModelSelections(row.mon_waves_models),
     mon_outboard: row.mon_outboard,
     wireless_systems: normalizeWirelessSystems(row.wireless_systems, "wireless"),
     iem_systems: normalizeWirelessSystems(row.iem_systems, "iem"),
@@ -80,9 +81,9 @@ export function mapStageGearSetup(row: StageGearSetupRow | null | undefined): St
     stage_number: row.stage_number,
     foh_consoles: mapConsoleSetups(row.foh_consoles),
     mon_consoles: mapConsoleSetups(row.mon_consoles),
-    foh_waves_models: row.foh_waves_models ?? [],
+    foh_waves_models: normalizeWavesModelSelections(row.foh_waves_models),
     foh_outboard: row.foh_outboard,
-    mon_waves_models: row.mon_waves_models ?? [],
+    mon_waves_models: normalizeWavesModelSelections(row.mon_waves_models),
     mon_outboard: row.mon_outboard,
     wireless_systems: normalizeWirelessSystems(row.wireless_systems, "wireless"),
     iem_systems: normalizeWirelessSystems(row.iem_systems, "iem"),

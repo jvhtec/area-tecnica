@@ -2,22 +2,23 @@
 import { ConsoleConfig } from "../../gear-setup/ConsoleConfig";
 import { ConsoleSetup } from "@/types/festival";
 import { WavesModelPicker } from "../shared/WavesModelPicker";
+import type { WavesModelSelection } from "@/constants/wavesModels";
 
 interface FestivalConsoleSetupSectionProps {
   formData: {
     foh_consoles: ConsoleSetup[];
     mon_consoles: ConsoleSetup[];
-    foh_waves_models: string[];
+    foh_waves_models: WavesModelSelection[];
     foh_outboard: string;
-    mon_waves_models: string[];
+    mon_waves_models: WavesModelSelection[];
     mon_outboard: string;
   };
   onChange: (changes: {
     foh_consoles?: ConsoleSetup[];
     mon_consoles?: ConsoleSetup[];
-    foh_waves_models?: string[];
+    foh_waves_models?: WavesModelSelection[];
     foh_outboard?: string;
-    mon_waves_models?: string[];
+    mon_waves_models?: WavesModelSelection[];
     mon_outboard?: string;
   }) => void;
   readOnly?: boolean;

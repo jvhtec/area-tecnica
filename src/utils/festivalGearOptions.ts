@@ -102,9 +102,9 @@ export const fetchFestivalGearOptionsForTemplate = async (
   type SetupShape = {
     foh_consoles: unknown;
     mon_consoles: unknown;
-    foh_waves_models?: string[] | null;
+    foh_waves_models?: unknown;
     foh_outboard?: string | null;
-    mon_waves_models?: string[] | null;
+    mon_waves_models?: unknown;
     mon_outboard?: string | null;
     wireless_systems: unknown;
     iem_systems: unknown;

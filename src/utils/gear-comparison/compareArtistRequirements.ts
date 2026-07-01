@@ -2,47 +2,106 @@ import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { getAvailableWirelessChannels, getRequiredWirelessChannels } from "@/lib/frequencyBands";
 import type { GearMismatch, ArtistGearComparison, ArtistRequirements, AvailableGear } from "@/utils/gear-comparison/types";
 import { EMPTY_AVAILABLE_GEAR, mapStageSetupToAvailableGear, mapGlobalSetupToAvailableGear } from "@/utils/gear-comparison/availableGear";
-import { areWavesModelsCompatible, formatWavesModels, isWavesModel, type WavesModel } from "@/constants/wavesModels";
+import {
+  canSubstituteWavesModel,
+  formatWavesModelSelections,
+  normalizeWavesModelSelections,
+  WAVES_POWER_RANK,
+  type WavesModelSelection,
+} from "@/constants/wavesModels";
 
 type WavesCheckArgs = {
   label: string;
-  artistModels: string[] | undefined;
-  availableModels: string[] | undefined;
+  artistModels: WavesModelSelection[] | undefined;
+  availableModels: WavesModelSelection[] | undefined;
 };
 
 // Shared FOH/MON waves model comparison: no model configured on the festival
-// side is an error, a different-but-compatible model is a warning, and a
-// model from an incompatible family (e.g. Livebox/Fourier vs the SoundGrid
-// family) is an error since they can't be substituted for one another.
+// side is an error; insufficient quantity of an otherwise-matching (or
+// substitutable) model is an error; covering a requirement with a
+// substitutable-but-different model (e.g. a Titan covering a Server One
+// requirement) is a warning; a model from an incompatible family (e.g.
+// Livebox/Fourier vs the SoundGrid family, or a Server One trying to cover a
+// Titan requirement) is an error since it can't be substituted.
 const checkWavesModels = ({ label, artistModels, availableModels }: WavesCheckArgs): GearMismatch | null => {
-  const requiredModels = (artistModels || []).filter(isWavesModel);
-  if (requiredModels.length === 0) return null;
+  const required = normalizeWavesModelSelections(artistModels);
+  if (required.length === 0) return null;
 
-  const configuredModels = (availableModels || []).filter(isWavesModel);
-  if (configuredModels.length === 0) {
+  const available = normalizeWavesModelSelections(availableModels);
+  if (available.length === 0) {
     return {
       type: 'console',
       severity: 'error',
       message: `Se solicita servidor Waves ${label} pero no está configurado en el setup de equipo`,
-      details: `Solicitado: ${formatWavesModels(requiredModels)}`,
+      details: `Solicitado: ${formatWavesModelSelections(required)}`,
     };
   }
 
-  if (requiredModels.some((required) => configuredModels.includes(required))) {
-    return null;
+  // Greedy allocation from a shared pool: satisfy the most demanding (highest
+  // power tier) requirements first, taking an exact-model match before
+  // reaching for a more powerful substitute, and preferring the smallest
+  // sufficient substitute to leave bigger units free for other needs.
+  const pool = new Map(available.map((selection) => [selection.model, selection.quantity]));
+  const orderedRequired = [...required].sort(
+    (a, b) => (WAVES_POWER_RANK[b.model] || 0) - (WAVES_POWER_RANK[a.model] || 0)
+  );
+
+  const insufficient: WavesModelSelection[] = [];
+  const incompatibleModels = new Set<string>();
+  let usedSubstitute = false;
+
+  orderedRequired.forEach((requiredSelection) => {
+    let remaining = requiredSelection.quantity;
+
+    const exact = pool.get(requiredSelection.model) || 0;
+    const takeExact = Math.min(exact, remaining);
+    if (takeExact > 0) {
+      pool.set(requiredSelection.model, exact - takeExact);
+      remaining -= takeExact;
+    }
+
+    if (remaining > 0) {
+      const substitutes = Array.from(pool.entries())
+        .filter(([model, quantity]) => quantity > 0 && model !== requiredSelection.model && canSubstituteWavesModel(requiredSelection.model, model))
+        .sort((a, b) => (WAVES_POWER_RANK[a[0]] || 0) - (WAVES_POWER_RANK[b[0]] || 0));
+
+      substitutes.forEach(([model, quantity]) => {
+        if (remaining <= 0) return;
+        const take = Math.min(quantity, remaining);
+        pool.set(model, quantity - take);
+        remaining -= take;
+        usedSubstitute = true;
+      });
+    }
+
+    if (remaining > 0) {
+      insufficient.push({ model: requiredSelection.model, quantity: remaining });
+      const hasAnyCompatible = available.some(
+        (availableSelection) => canSubstituteWavesModel(requiredSelection.model, availableSelection.model)
+      );
+      if (!hasAnyCompatible) incompatibleModels.add(requiredSelection.model);
+    }
+  });
+
+  if (insufficient.length > 0) {
+    const allIncompatible = insufficient.every((selection) => incompatibleModels.has(selection.model));
+    return {
+      type: 'console',
+      severity: 'error',
+      message: allIncompatible
+        ? `El servidor Waves ${label} solicitado no es compatible con el configurado`
+        : `Servidores Waves ${label} insuficientes`,
+      details: `Faltan: ${formatWavesModelSelections(insufficient)}. Configurado: ${formatWavesModelSelections(available)}`,
+    };
   }
 
-  const isCompatible = requiredModels.some((required) =>
-    configuredModels.some((configured) => areWavesModelsCompatible(required as WavesModel, configured as WavesModel))
-  );
+  if (!usedSubstitute) return null;
 
   return {
     type: 'console',
-    severity: isCompatible ? 'warning' : 'error',
-    message: isCompatible
-      ? `El servidor Waves ${label} solicitado difiere del configurado`
-      : `El servidor Waves ${label} solicitado no es compatible con el configurado`,
-    details: `Solicitado: ${formatWavesModels(requiredModels)}. Configurado: ${formatWavesModels(configuredModels)}`,
+    severity: 'warning',
+    message: `El servidor Waves ${label} solicitado difiere del configurado`,
+    details: `Solicitado: ${formatWavesModelSelections(required)}. Configurado: ${formatWavesModelSelections(available)}`,
   };
 };
 
@@ -101,7 +160,7 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'console',
         severity: 'info',
-        message: `La banda aporta Waves/Outboard FOH${artist.foh_waves_models?.length ? ` (${formatWavesModels(artist.foh_waves_models)})` : ''}`
+        message: `La banda aporta Waves/Outboard FOH${artist.foh_waves_models?.length ? ` (${formatWavesModelSelections(artist.foh_waves_models)})` : ''}`
       });
     } else {
       const wavesMismatch = checkWavesModels({
@@ -152,7 +211,7 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'console',
         severity: 'info',
-        message: `La banda aporta Waves/Outboard MON${artist.mon_waves_models?.length ? ` (${formatWavesModels(artist.mon_waves_models)})` : ''}`
+        message: `La banda aporta Waves/Outboard MON${artist.mon_waves_models?.length ? ` (${formatWavesModelSelections(artist.mon_waves_models)})` : ''}`
       });
     } else {
       const wavesMismatch = checkWavesModels({

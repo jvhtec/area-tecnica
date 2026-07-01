@@ -12,6 +12,7 @@ import { MicKitSection } from "./form/sections/MicKitSection";
 import { WiredMic } from "./gear-setup/WiredMicConfig";
 import { ArtistFormData, WirelessSetup } from "@/types/festival";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
+import type { WavesModelSelection } from "@/constants/wavesModels";
 
 interface ArtistManagementFormProps {
   artist?: any;
@@ -41,10 +42,10 @@ interface ArtistManagementFormData {
   mon_console: string;
   mon_console_provided_by: string;
   monitors_from_foh: boolean;
-  foh_waves_models: string[];
+  foh_waves_models: WavesModelSelection[];
   foh_outboard: string;
   foh_waves_provided_by: string;
-  mon_waves_models: string[];
+  mon_waves_models: WavesModelSelection[];
   mon_outboard: string;
   mon_waves_provided_by: string;
   wireless_systems: any[];

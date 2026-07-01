@@ -1,8 +1,9 @@
 
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { WAVES_MODEL_OPTIONS } from "@/constants/wavesModels";
+import { Button } from "@/components/ui/button";
+import { Minus, Plus } from "lucide-react";
+import { WAVES_MODEL_OPTIONS, getWavesModelQuantity, type WavesModel, type WavesModelSelection } from "@/constants/wavesModels";
 import { ProviderSelector } from "./ProviderSelector";
 
 interface WavesModelPickerProps {
@@ -10,9 +11,9 @@ interface WavesModelPickerProps {
   waveModelsLabel: string;
   outboardLabel: string;
   outboardPlaceholder: string;
-  selectedModels: string[];
+  selectedModels: WavesModelSelection[];
   outboard: string;
-  onModelsChange: (models: string[]) => void;
+  onModelsChange: (models: WavesModelSelection[]) => void;
   onOutboardChange: (outboard: string) => void;
   providedBy?: string;
   onProvidedByChange?: (providedBy: string) => void;
@@ -34,32 +35,61 @@ export const WavesModelPicker = ({
   providedByLabel = "Waves/Outboard proporcionado por",
   disabled = false,
 }: WavesModelPickerProps) => {
-  const toggleModel = (value: string, checked: boolean) => {
-    if (checked) {
-      onModelsChange([...selectedModels, value]);
-    } else {
-      onModelsChange(selectedModels.filter((model) => model !== value));
+  const setQuantity = (model: WavesModel, quantity: number) => {
+    if (quantity <= 0) {
+      onModelsChange(selectedModels.filter((selection) => selection.model !== model));
+      return;
     }
+
+    const exists = selectedModels.some((selection) => selection.model === model);
+    onModelsChange(
+      exists
+        ? selectedModels.map((selection) => (selection.model === model ? { ...selection, quantity } : selection))
+        : [...selectedModels, { model, quantity }]
+    );
   };
 
   return (
     <div className="space-y-3">
       <div className="space-y-2">
         <Label>{waveModelsLabel}</Label>
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {WAVES_MODEL_OPTIONS.map((option) => (
-            <div key={option.value} className="flex items-center space-x-2">
-              <Checkbox
-                id={`${idPrefix}-${option.value}`}
-                checked={selectedModels.includes(option.value)}
-                onCheckedChange={(checked) => toggleModel(option.value, checked === true)}
-                disabled={disabled}
-              />
-              <Label htmlFor={`${idPrefix}-${option.value}`} className="font-normal">
-                {option.label}
-              </Label>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {WAVES_MODEL_OPTIONS.map((option) => {
+            const quantity = getWavesModelQuantity(selectedModels, option.value);
+            return (
+              <div
+                key={option.value}
+                className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+              >
+                <span className="text-sm">{option.label}</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setQuantity(option.value, quantity - 1)}
+                    disabled={disabled || quantity === 0}
+                    aria-label={`Quitar ${option.label}`}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="w-5 text-center text-sm font-medium tabular-nums">{quantity}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setQuantity(option.value, quantity + 1)}
+                    disabled={disabled}
+                    aria-label={`Añadir ${option.label}`}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="space-y-2">
