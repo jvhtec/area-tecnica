@@ -6,7 +6,8 @@
 // .xmlc - Archivo de configuración (exportaciones como posiciones de altavoces)
 // .nwm - Archivo de modelo NWM usado como referencia técnica
 // .dwg/.dxf/.dfx - Planos CAD usados como referencia técnica
-export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc', '.nwm', '.dwg', '.dxf', '.dfx'];
+// .mvr - My Virtual Rig (formato GDTF, contenedor ZIP con datos 3D de escenario)
+export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc', '.nwm', '.dwg', '.dxf', '.dfx', '.mvr'];
 export const ALLOWED_MIME_TYPES = [
   'application/xml',
   'text/xml',
@@ -22,6 +23,9 @@ export const ALLOWED_MIME_TYPES = [
   'application/vnd.dxf',
   'image/vnd.dxf',
   'drawing/x-dxf',
+  'application/zip', // MVR files are ZIP containers
+  'application/x-zip-compressed',
+  'application/x-mvr',
 ];
 export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
 
