@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RichTextEditor } from "../RichTextEditor";
+import { RichTextEditor } from "@/components/emails/RichTextEditor";
 
 type PasteCall = {
   html: string;
@@ -113,5 +113,43 @@ describe("RichTextEditor", () => {
     });
 
     expect(onChange).toHaveBeenLastCalledWith("");
+  });
+
+  it("emits formatted Quill HTML without rewriting it", () => {
+    const onChange = vi.fn();
+    render(<RichTextEditor value="" onChange={onChange} />);
+    const editor = mockQuillInstances[0];
+    const formattedHtml =
+      '<ol><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>Patch notes</li></ol><p><a href="https://example.com" target="_blank">Details</a></p>';
+
+    act(() => {
+      editor.root.innerHTML = formattedHtml;
+      editor.handlers.get("text-change")?.();
+    });
+
+    expect(onChange).toHaveBeenLastCalledWith(formattedHtml);
+  });
+
+  it("cleans up listeners, toolbar DOM, and editor children on unmount", () => {
+    const onChange = vi.fn();
+    const { container, unmount } = render(
+      <RichTextEditor value="<p>Hello</p>" onChange={onChange} />,
+    );
+    const editor = mockQuillInstances[0];
+    const wrapper = container.querySelector(".rich-text-editor-wrapper");
+    const child = document.createElement("p");
+    child.textContent = "temporary content";
+    editor.element.appendChild(child);
+
+    expect(editor.handlers.has("text-change")).toBe(true);
+    expect(wrapper?.querySelectorAll(".ql-toolbar")).toHaveLength(1);
+    expect(editor.element.childNodes).toHaveLength(1);
+
+    unmount();
+
+    expect(editor.handlers.has("text-change")).toBe(false);
+    expect(wrapper?.querySelectorAll(".ql-toolbar")).toHaveLength(0);
+    expect(editor.element.className).toBe("rich-text-editor");
+    expect(editor.element.childNodes).toHaveLength(0);
   });
 });

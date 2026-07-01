@@ -23,9 +23,6 @@ const EDITOR_MODULES = {
     ["link"],
     ["clean"],
   ],
-  clipboard: {
-    matchVisual: false,
-  },
 };
 
 const EDITOR_FORMATS = [
