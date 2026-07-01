@@ -136,4 +136,34 @@ describe("MobileNavBar", () => {
 
     await waitFor(() => expect(nav.style.bottom).toBe(""))
   })
+
+  it("recomputes the offset on visibilitychange when iOS resumes a backgrounded PWA without firing resize", async () => {
+    mockVisualViewport({
+      height: 700,
+      innerHeight: 760,
+      offsetTop: 0,
+    })
+
+    renderMobileNav()
+
+    const nav = screen.getByRole("navigation", { name: /navegación principal/i })
+
+    await waitFor(() => expect(nav.style.bottom).toBe("60px"))
+
+    // Simulate the viewport settling back to full height while backgrounded,
+    // without any "resize" event firing on resume (the iOS PWA behavior this
+    // guards against).
+    ;(window.visualViewport as unknown as { height: number }).height = 760
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    })
+
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"))
+    })
+
+    await waitFor(() => expect(nav.style.bottom).toBe(""))
+  })
 })

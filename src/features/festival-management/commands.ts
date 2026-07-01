@@ -73,7 +73,7 @@ export const uploadJobDocument = async ({ file, jobId }: { file: File; jobId: st
 
   try {
     await uploadStorageObject(supabase, {
-      bucket: "job_documents",
+      bucket: "job-documents",
       path: filePath,
       file: uploadFile,
       contentType: uploadFile.type || file.type || "application/octet-stream",
@@ -89,7 +89,7 @@ export const uploadJobDocument = async ({ file, jobId }: { file: File; jobId: st
   });
 
   if (dbError) {
-    const { error: cleanupError } = await supabase.storage.from("job_documents").remove([filePath]);
+    const { error: cleanupError } = await supabase.storage.from("job-documents").remove([filePath]);
     if (cleanupError) {
       console.error("Failed to remove uploaded job document after database insert error:", cleanupError);
     }
