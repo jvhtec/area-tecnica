@@ -3,9 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { Download, Mail } from "lucide-react";
+import { Download, Loader2, Mail } from "lucide-react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { exportMissingRiderReportPDF, MissingRiderReportData } from "@/utils/missingRiderReportPdfExport";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
@@ -28,6 +29,7 @@ import {
   sortArtistsChronologically,
 } from "@/utils/pdf/festivalPdfSectionBuilders";
 import { toast } from "sonner";
+import type { FestivalPdfProgress } from "@/utils/pdf/festivalPdfGenerator";
 
 export interface PrintOptions {
   includeGearSetup: boolean;
@@ -56,6 +58,9 @@ interface PrintOptionsDialogProps {
   maxStages: number;
   jobTitle: string;
   jobId?: string;
+  closeOnConfirm?: boolean;
+  isGenerating?: boolean;
+  progress?: FestivalPdfProgress | null;
 }
 
 export const PrintOptionsDialog = ({ 
@@ -64,7 +69,10 @@ export const PrintOptionsDialog = ({
   onConfirm,
   maxStages,
   jobTitle,
-  jobId
+  jobId,
+  closeOnConfirm = true,
+  isGenerating = false,
+  progress = null,
 }: PrintOptionsDialogProps) => {
   const [options, setOptions] = useState<PrintOptions>({
     includeGearSetup: true,
@@ -240,8 +248,14 @@ export const PrintOptionsDialog = ({
   const handleConfirm = () => {
     const filename = generateFilename();
     onConfirm(options, filename);
-    onOpenChange(false);
+    if (closeOnConfirm) {
+      onOpenChange(false);
+    }
   };
+
+  const progressValue = progress && progress.total > 0
+    ? Math.round((progress.completed / progress.total) * 100)
+    : undefined;
 
   const buildMissingRiderReport = async () => {
     if (!jobId) {
@@ -800,7 +814,13 @@ export const PrintOptionsDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (isGenerating && !nextOpen) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] sm:max-h-[90vh] w-[95vw] sm:w-auto overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">Seleccionar Documentos para Imprimir</DialogTitle>
@@ -1171,14 +1191,31 @@ export const PrintOptionsDialog = ({
               <p className="text-xs sm:text-sm text-muted-foreground font-mono dark:text-gray-300 break-all">{generateFilename()}</p>
             </div>
           </div>
+
+          {isGenerating && (
+            <div className="border rounded-md p-3 space-y-2 bg-muted/40 dark:bg-muted/20">
+              <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                <span className="font-medium text-foreground">{progress?.label || "Preparando documentacion"}</span>
+                {typeof progressValue === "number" && (
+                  <span className="shrink-0 text-muted-foreground">
+                    {progress.completed}/{progress.total}
+                  </span>
+                )}
+              </div>
+              <Progress value={progressValue ?? 8} className="h-2" />
+            </div>
+          )}
         </div>
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isGenerating} className="w-full sm:w-auto">
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} className="w-full sm:w-auto">
-            <span className="hidden sm:inline">Generar {options.generateIndividualStagePDFs ? 'PDFs Individuales por Stage' : 'PDF'}</span>
-            <span className="sm:hidden">Generar</span>
+          <Button onClick={handleConfirm} disabled={isGenerating} className="w-full sm:w-auto">
+            {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            <span className="hidden sm:inline">
+              {isGenerating ? "Generando..." : `Generar ${options.generateIndividualStagePDFs ? 'PDFs Individuales por Stage' : 'PDF'}`}
+            </span>
+            <span className="sm:hidden">{isGenerating ? "Generando..." : "Generar"}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

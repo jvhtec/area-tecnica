@@ -12,6 +12,7 @@ import {
   DOCUMENT_UPLOAD_ACCEPT,
   getDocumentUploadValidationError,
 } from "@/utils/documentUploadValidation";
+import { optimizeImageForUpload } from "@/utils/imageOptimization";
 
 interface ArtistFileDialogProps {
   open: boolean;
@@ -82,13 +83,21 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
     setIsUploading(true);
     try {
       for (const file of selectedFiles) {
-        const fileExt = file.name.split('.').pop();
+        const uploadFile = await optimizeImageForUpload(file, {
+          maxWidth: 1800,
+          maxHeight: 1800,
+          quality: 0.82,
+          outputFormat: 'image/webp',
+        });
+        const fileExt = uploadFile.name.split('.').pop();
         const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
 
         // First upload the file to storage
         const { error: uploadError } = await dataLayerClient.storage
           .from('festival_artist_files')
-          .upload(filePath, file);
+          .upload(filePath, uploadFile, {
+            contentType: uploadFile.type || file.type,
+          });
 
         if (uploadError) {
           console.error("Storage upload error:", uploadError);
@@ -102,8 +111,8 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
             artist_id: artistId,
             file_name: file.name,
             file_path: filePath,
-            file_type: file.type,
-            file_size: file.size,
+            file_type: uploadFile.type || file.type,
+            file_size: uploadFile.size,
           })
           .select("id")
           .single();

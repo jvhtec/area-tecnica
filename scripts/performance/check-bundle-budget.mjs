@@ -21,8 +21,22 @@ const kindBudgets = {
   image: { percent: 0.12, slackBytes: 500_000 },
 };
 
+const absoluteKindBudgets = {
+  js: 3_150_000,
+  css: 80_000,
+  font: 2_950_000,
+  image: 8_500_000,
+};
+
 const largeJsBudget = { percent: 0.12, slackBytes: 60_000 };
 const entryScriptBudget = { percent: 0.12, slackBytes: 30_000 };
+const absoluteLargestEntryScriptBytes = 230_000;
+const absoluteLargeJsFamilyBudgets = {
+  "maps-lib.js": 575_000,
+  "pdf-libs.js": 430_000,
+  "spreadsheet-libs.js": 340_000,
+  "index.js": 230_000,
+};
 const largeJsRawThresholdBytes = 500_000;
 const newLargeJsGzipThresholdBytes = 180_000;
 
@@ -163,6 +177,24 @@ function compareBundles(current, baselineBundle) {
         maxBytes: max,
       });
     }
+
+    const absoluteMax = absoluteKindBudgets[kind];
+    if (absoluteMax) {
+      rows.push({
+        label: `${kind} gzip total absolute`,
+        baselineBytes: baselineTotal,
+        currentBytes: currentTotal,
+        maxBytes: absoluteMax,
+      });
+
+      if (currentTotal > absoluteMax) {
+        failures.push({
+          label: `${kind} gzip total absolute`,
+          currentBytes: currentTotal,
+          maxBytes: absoluteMax,
+        });
+      }
+    }
   }
 
   const baselineFiles = baselineFilesFromBundle(baselineBundle);
@@ -186,6 +218,21 @@ function compareBundles(current, baselineBundle) {
         label: `largest entry script (${currentEntry.file})`,
         currentBytes: currentEntry.gzipBytes,
         maxBytes: max,
+      });
+    }
+
+    rows.push({
+      label: "largest entry script gzip absolute",
+      baselineBytes: baselineEntry.gzipBytes,
+      currentBytes: currentEntry.gzipBytes,
+      maxBytes: absoluteLargestEntryScriptBytes,
+    });
+
+    if (currentEntry.gzipBytes > absoluteLargestEntryScriptBytes) {
+      failures.push({
+        label: `largest entry script absolute (${currentEntry.file})`,
+        currentBytes: currentEntry.gzipBytes,
+        maxBytes: absoluteLargestEntryScriptBytes,
       });
     }
   }
@@ -214,18 +261,20 @@ function compareBundles(current, baselineBundle) {
     }
 
     const max = maxAllowedBytes(baselineAsset.gzipBytes, largeJsBudget);
+    const absoluteFamilyMax = absoluteLargeJsFamilyBudgets[asset.family];
+    const effectiveMax = absoluteFamilyMax ? Math.min(max, absoluteFamilyMax) : max;
     rows.push({
       label: `${asset.family} gzip`,
       baselineBytes: baselineAsset.gzipBytes,
       currentBytes: asset.gzipBytes,
-      maxBytes: max,
+      maxBytes: effectiveMax,
     });
 
-    if (asset.gzipBytes > max) {
+    if (asset.gzipBytes > effectiveMax) {
       failures.push({
         label: `${asset.file}`,
         currentBytes: asset.gzipBytes,
-        maxBytes: max,
+        maxBytes: effectiveMax,
       });
     }
   }

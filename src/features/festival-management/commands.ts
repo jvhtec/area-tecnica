@@ -15,8 +15,9 @@ import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
-import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
+import { generateAndMergeFestivalPDFs, type FestivalPdfProgress } from "@/utils/pdf/festivalPdfGenerator";
 import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
+import { optimizeImageForUpload } from "@/utils/imageOptimization";
 import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
@@ -61,8 +62,16 @@ export const downloadBlobInBrowser = (blob: Blob, fileName: string) => {
 };
 
 export const uploadJobDocument = async ({ file, jobId }: { file: File; jobId: string }) => {
-  const filePath = `${jobId}/${file.name}`;
-  const { error: uploadError } = await supabase.storage.from("job_documents").upload(filePath, file);
+  const uploadFile = await optimizeImageForUpload(file, {
+    maxWidth: 1800,
+    maxHeight: 1800,
+    quality: 0.82,
+    outputFormat: "image/webp",
+  });
+  const filePath = `${jobId}/${uploadFile.name}`;
+  const { error: uploadError } = await supabase.storage.from("job_documents").upload(filePath, uploadFile, {
+    contentType: uploadFile.type || file.type,
+  });
 
   if (uploadError) throw uploadError;
 
@@ -152,19 +161,21 @@ export const generateFestivalDocumentation = async ({
   jobId,
   jobTitle,
   maxStages,
+  onProgress,
   options,
 }: {
   filename: string;
   jobId: string;
   jobTitle: string;
   maxStages: number;
+  onProgress?: (progress: FestivalPdfProgress) => void;
   options: PrintOptions;
 }) => {
   if (options.generateIndividualStagePDFs) {
     return generateIndividualStagePDFs(jobId, jobTitle, options, maxStages);
   }
 
-  return generateAndMergeFestivalPDFs(jobId, jobTitle, options, filename);
+  return generateAndMergeFestivalPDFs(jobId, jobTitle, options, filename, { onProgress });
 };
 
 export const createLocalFolders = async (jobId: string) => {

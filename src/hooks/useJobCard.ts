@@ -59,7 +59,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       async function fetchDateTypes() {
         const { data, error } = await supabase
           .from("job_date_types")
-          .select("*")
+          .select("id, job_id, date, type")
           .eq("job_id", job.id);
         if (!error && data && data.length > 0) {
           const key = `${job.id}-${new Date(job.start_time).toISOString().split('T')[0]}`;
@@ -113,7 +113,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     queryFn: async () => {
       const { data: existingData, error: fetchError } = await supabase
         .from("sound_job_personnel")
-        .select("*")
+        .select("id, job_id, foh_engineers, mon_engineers, pa_techs, rf_techs")
         .eq("job_id", job.id)
         .maybeSingle();
       if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
@@ -127,7 +127,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
             pa_techs: 0,
             rf_techs: 0
           })
-          .select()
+          .select("id, job_id, foh_engineers, mon_engineers, pa_techs, rf_techs")
           .single();
         if (insertError) throw insertError;
         return newData;

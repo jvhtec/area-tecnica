@@ -24,6 +24,7 @@ const isDevHost =
   hostname.endsWith('.github.dev')
 
 const HTML_TIMEOUT_MS = 3000
+const RUNTIME_CACHE_MAX_ENTRIES = 180
 
 self.fetchWithTimeout = async (request, timeoutMs) => {
   const controller = new AbortController()
@@ -32,6 +33,18 @@ self.fetchWithTimeout = async (request, timeoutMs) => {
     return await fetch(request, { signal: controller.signal })
   } finally {
     clearTimeout(timeoutId)
+  }
+}
+
+self.trimRuntimeCache = async (cache) => {
+  try {
+    const keys = await cache.keys()
+    if (keys.length <= RUNTIME_CACHE_MAX_ENTRIES) return
+
+    const staleKeys = keys.slice(0, keys.length - RUNTIME_CACHE_MAX_ENTRIES)
+    await Promise.all(staleKeys.map((key) => cache.delete(key)))
+  } catch (e) {
+    console.warn('[sw] Failed to trim runtime cache:', e)
   }
 }
 
@@ -186,7 +199,9 @@ self.addEventListener('fetch', (event) => {
           // Clone the response to cache it
           const responseToCache = response.clone()
           caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseToCache).catch((e) => {
+            cache.put(request, responseToCache).then(() => {
+              self.trimRuntimeCache(cache)
+            }).catch((e) => {
               console.warn('[sw] Failed to cache asset response:', e)
             })
           }).catch((e) => {

@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase";
-
+import { ChannelRetryManager } from "./subscription-retry";
 
 import { queryKeys } from "@/lib/react-query";
 export type SubscriptionDebugEntry = {
@@ -100,6 +100,7 @@ export class UnifiedSubscriptionManager {
   private pingChannel: any | null;
   private tableLastActivity: Map<string, number>;
   private invalidationTimers: Map<string, number>;
+  private channelRetryManager: ChannelRetryManager;
   private listeners: Set<() => void>;
   private snapshot: SubscriptionSnapshot;
 
@@ -113,6 +114,7 @@ export class UnifiedSubscriptionManager {
     this.connectionStatus = 'connecting';
     this.pingChannel = null;
     this.invalidationTimers = new Map();
+    this.channelRetryManager = new ChannelRetryManager();
     this.listeners = new Set();
     this.snapshot = {
       connectionStatus: 'connecting',
@@ -354,6 +356,9 @@ export class UnifiedSubscriptionManager {
           if (status === 'SUBSCRIBED') {
             this.connectionStatus = 'connected';
             this.updateSnapshot({ connectionStatus: 'connected' });
+            void pingChannel.track({ online_at: new Date().toISOString() }).catch((error) => {
+              console.warn('Ping channel presence track failed:', error);
+            });
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             this.connectionStatus = 'disconnected';
             this.updateSnapshot({ connectionStatus: 'disconnected' });
@@ -611,31 +616,26 @@ export class UnifiedSubscriptionManager {
         })
         .subscribe((status) => {
           console.log(`Channel ${channelName} status:`, status);
+
+          if (status === 'SUBSCRIBED') {
+            this.channelRetryManager.clear(subscriptionKey);
+          }
           
-          // If channel subscription fails, retry with backoff
           if (status === 'CHANNEL_ERROR') {
-            // Suppress noisy errors for job_departments which can be transient
+            const retryResult = this.channelRetryManager.schedule(
+              subscriptionKey,
+              () => this.retrySubscription(subscriptionKey, table),
+              () => this.markSubscriptionRetryExhausted(table),
+            );
+
+            if (retryResult.state !== "scheduled") return;
+
+            const retryDelay = retryResult.delayMs;
             if (table !== 'job_departments') {
-              console.error(`Error subscribing to ${table}, will retry...`);
+              console.error(`Error subscribing to ${table}, retrying in ${retryDelay}ms...`);
             } else {
-              console.warn(`Transient subscription error for ${table}, retrying silently...`);
+              console.warn(`Transient subscription error for ${table}, retrying in ${retryDelay}ms...`);
             }
-            setTimeout(() => {
-              if (this.subscriptions.has(subscriptionKey)) {
-                console.log(`Retrying subscription to ${table}`);
-                const sub = this.subscriptions.get(subscriptionKey);
-                if (sub) {
-                  const pendingSubscription = this.snapshotManagedSubscription(sub);
-                  try {
-                    sub.unsubscribe();
-                  } catch (e) {
-                    console.error('Error unsubscribing during retry:', e);
-                  }
-                  this.subscriptions.delete(subscriptionKey);
-                  this.replayPendingSubscription(pendingSubscription);
-                }
-              }
-            }, 5000); // Try again in 5 seconds
           }
         });
       
@@ -652,9 +652,8 @@ export class UnifiedSubscriptionManager {
 
           this.subscriptions.delete(subscriptionKey);
           this.tableLastActivity.delete(subscriptionKey);
-          this.routeSubscriptions.forEach((keys) => {
-            keys.delete(subscriptionKey);
-          });
+          this.channelRetryManager.clear(subscriptionKey);
+          this.routeSubscriptions.forEach((keys) => keys.delete(subscriptionKey));
           this.refreshSnapshotFromState();
         },
         options: { table, queryKey, filter, priority },
@@ -684,13 +683,9 @@ export class UnifiedSubscriptionManager {
       const handlerId = options.onPayload
         ? this.addPayloadHandler(subscription, options.onPayload, options.ownerRoute)
         : null;
-      
-      // Store the subscription for later cleanup
-      this.subscriptions.set(subscriptionKey, subscription);
-      
-      // Initialize last activity timestamp
-      this.tableLastActivity.set(subscriptionKey, Date.now());
 
+      this.subscriptions.set(subscriptionKey, subscription);
+      this.tableLastActivity.set(subscriptionKey, Date.now());
       this.refreshSnapshotFromState();
       
       if (handlerId) {
@@ -707,7 +702,11 @@ export class UnifiedSubscriptionManager {
 
       return subscription;
     } catch (error) {
-      console.error(`Error subscribing to ${table}:`, error);
+      console.error(`Error creating subscription for ${table}:`, error);
+      this.snapshot.failedConnections += 1;
+      this.refreshSnapshotFromState();
+
+      // Return dummy subscription
       const fallbackSubscription: ManagedSubscription = {
         key: subscriptionKey,
         unsubscribe: () => {},
@@ -723,6 +722,26 @@ export class UnifiedSubscriptionManager {
 
       return fallbackSubscription;
     }
+  }
+
+  private retrySubscription(subscriptionKey: string, table: string) {
+    const sub = this.subscriptions.get(subscriptionKey);
+    if (!sub) return;
+    console.log(`Retrying subscription to ${table}`);
+    const pendingSubscription = this.snapshotManagedSubscription(sub);
+    try {
+      sub.unsubscribe();
+    } catch (e) {
+      console.error('Error unsubscribing during retry:', e);
+    }
+    this.subscriptions.delete(subscriptionKey);
+    this.replayPendingSubscription(pendingSubscription);
+  }
+
+  private markSubscriptionRetryExhausted(table: string) {
+    console.error(`Subscription to ${table} failed after repeated retry attempts.`);
+    this.snapshot.failedConnections += 1;
+    this.refreshSnapshotFromState();
   }
 
   /**

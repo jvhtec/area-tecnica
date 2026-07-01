@@ -5,6 +5,7 @@ import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { optimizeImageForUpload, validateImageFile } from "@/utils/imageOptimization";
 
 interface FestivalLogoManagerProps {
   jobId: string;
@@ -77,10 +78,11 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    const validation = validateImageFile(file, 5);
+    if (!validation.valid) {
       toast({
         title: "Tipo de archivo inválido",
-        description: "Por favor sube un archivo de imagen",
+        description: validation.error || "Por favor sube un archivo de imagen",
         variant: "destructive",
       });
       return;
@@ -108,7 +110,13 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         throw new Error("Authentication error: " + (sessionError?.message || "Session not found"));
       }
       
-      const fileExt = file.name.split('.').pop();
+      const uploadFile = await optimizeImageForUpload(file, {
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.86,
+        outputFormat: 'image/webp',
+      });
+      const fileExt = uploadFile.name.split('.').pop();
       const filePath = `${jobId}.${fileExt}`;
 
       // First, delete any existing logo
@@ -138,9 +146,10 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       console.log("Uploading new logo to storage:", filePath);
       const { error: uploadError } = await dataLayerClient.storage
         .from('festival-logos')
-        .upload(filePath, file, {
+        .upload(filePath, uploadFile, {
           upsert: true,
           cacheControl: '3600',
+          contentType: uploadFile.type || file.type,
         });
 
       if (uploadError) {
@@ -154,8 +163,8 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
           job_id: jobId,
           file_path: filePath,
           file_name: file.name,
-          content_type: file.type,
-          file_size: file.size,
+          content_type: uploadFile.type || file.type,
+          file_size: uploadFile.size,
           uploaded_by: userId,
         });
 

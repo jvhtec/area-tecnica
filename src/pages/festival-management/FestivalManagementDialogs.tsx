@@ -50,6 +50,8 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
     setIsRouteSheetOpen,
 
     isPrintDialogOpen,
+    isPrinting,
+    printProgress,
     setIsPrintDialogOpen,
     handlePrintAllDocumentation,
     maxStages,
@@ -189,6 +191,9 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
           maxStages={maxStages}
           jobTitle={job?.title || ""}
           jobId={jobId}
+          closeOnConfirm={false}
+          isGenerating={isPrinting}
+          progress={printProgress}
         />
       )}
 

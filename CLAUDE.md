@@ -385,7 +385,7 @@ Client-side security config in `src/lib/enhanced-security-config.ts`:
 2. **Query Optimization**: Materialized views (`v_job_staffing_summary`), indexed foreign keys
 3. **Realtime Throttling**: Connection pooling, subscription deduplication, route-aware subscriptions
 4. **Multi-Tab Dedup**: Leader election prevents duplicate subscriptions across tabs
-5. **Virtual Scrolling**: `useVirtualizedMatrix` and `useVirtualizedDateRange` for large datasets
+5. **Virtual Scrolling**: assignment matrix inline row/column windowing plus `useVirtualizedDateRange` for large datasets
 6. **Optimistic Updates**: `useOptimisticJobManagement` for immediate UI feedback with rollback
 7. **Image Optimization**: `src/utils/imageOptimization.ts`
 8. **Bundle Optimization**: Separate chunks for pdf-libs, maps-lib, spreadsheet-libs, editor-lib

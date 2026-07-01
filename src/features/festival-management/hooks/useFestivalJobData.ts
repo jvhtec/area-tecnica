@@ -13,7 +13,7 @@ export const useFestivalJobData = ({ jobId, toast }: { jobId?: string; toast: To
   const { data, error, errorUpdatedAt, isLoading, refetch } = useQuery({
     queryKey: jobDetailsQueryKey,
     enabled: Boolean(jobId),
-    staleTime: 0,
+    staleTime: 1000 * 60 * 2,
     queryFn: () => {
       if (!jobId) {
         throw new Error("Missing festival job id");

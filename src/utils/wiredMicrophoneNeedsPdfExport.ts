@@ -386,27 +386,11 @@ const generateSimplifiedMatrixData = (artists: any[]): SimplifiedMatrixData => {
 // Helper function to organize artists by date and stage - fixed date handling
 export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<number, any[]>> => {
   const organized = new Map<string, Map<number, any[]>>();
-  
-  console.log('\n🗂️ ORGANIZING ARTISTS BY DATE/STAGE - FIXED VERSION');
-  console.log(`📋 Input: ${artists.length} artists`);
-  
-  // Log all unique dates first
-  const allDates = [];
-  for (let i = 0; i < artists.length; i++) {
-    const date = artists[i].date;
-    if (date) {
-      allDates.push(date);
-    }
-  }
-  const uniqueDates = Array.from(new Set(allDates));
-  console.log('📅 ALL DATES IN INPUT:', uniqueDates);
 
   for (let i = 0; i < artists.length; i++) {
     const artist = artists[i];
     const date = artist.date;
     const stage = artist.stage || 1;
-
-    console.log(`📌 Artist ${i}: "${artist.name}" -> Date: "${date}", Stage: ${stage}`);
 
     if (!date) {
       console.warn(`⚠️ Skipping "${artist.name}" - no date field`);
@@ -422,23 +406,6 @@ export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<n
     }
 
     organized.get(date)!.get(stage)!.push(artist);
-  }
-
-  console.log('\n📊 ORGANIZATION COMPLETE:');
-  const organizedEntries = Array.from(organized.entries());
-  for (let i = 0; i < organizedEntries.length; i++) {
-    const [date, stages] = organizedEntries[i];
-    console.log(`📅 Date "${date}": ${stages.size} stages`);
-    const stageEntries = Array.from(stages.entries());
-    for (let j = 0; j < stageEntries.length; j++) {
-      const [stage, stageArtists] = stageEntries[j];
-      console.log(`  🎪 Stage ${stage}: ${stageArtists.length} artists`);
-      for (let k = 0; k < stageArtists.length; k++) {
-        const artist = stageArtists[k];
-        const wiredMicCount = artist.wired_mics?.length || 0;
-        console.log(`    👤 ${artist.name}: ${wiredMicCount} wired mics`);
-      }
-    }
   }
   
   return organized;

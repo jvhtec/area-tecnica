@@ -52,13 +52,24 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       );
       const isTourDateJob = String(jobMeta?.job_type || "").toLowerCase() === "tourdate";
 
-      const { data: timesheetRows, error } = await supabase
+      let timesheetQuery = supabase
         .from("timesheets")
         .select("*")
         .eq("job_id", jobId)
         .eq("is_active", true)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
+
+      if (isTourDateJob) {
+        if (prepDayDates.size === 0) {
+          setTimesheets([]);
+          return;
+        }
+
+        timesheetQuery = timesheetQuery.in("date", Array.from(prepDayDates));
+      }
+
+      const { data: timesheetRows, error } = await timesheetQuery;
 
       if (error) {
         console.error("Error fetching timesheets:", error);
@@ -67,9 +78,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         return;
       }
 
-      const data = isTourDateJob
-        ? (timesheetRows || []).filter((timesheet) => prepDayDates.has(timesheet.date))
-        : (timesheetRows || []);
+      const data = timesheetRows || [];
 
       if (!data || data.length === 0) {
         setTimesheets([]);

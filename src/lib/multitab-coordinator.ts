@@ -37,6 +37,8 @@ interface TabState {
   queryClient: QueryClient;
 }
 
+const FALLBACK_HEARTBEAT_INTERVAL_MS = 5_000;
+
 /**
  * Multi-tab coordinator that manages leader election and cross-tab communication
  * to optimize performance when multiple tabs are open with the same user
@@ -272,7 +274,7 @@ export class MultiTabCoordinator {
         };
         localStorage.setItem('sector-pro-leader', JSON.stringify(leaderInfo));
       }
-    }, 3000);
+    }, FALLBACK_HEARTBEAT_INTERVAL_MS);
   }
 
   private claimLeadership() {
