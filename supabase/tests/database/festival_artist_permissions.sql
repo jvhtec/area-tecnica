@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(6);
+SELECT plan(16);
 
 SELECT is(
   (
@@ -82,6 +82,171 @@ SELECT ok(
       AND qual ILIKE '%house_tech%'
   ),
   'house techs retain festival artist read access'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'festival_artist_files'
+      AND cmd = 'INSERT'
+      AND with_check ILIKE '%house_tech%'
+  ),
+  'house techs may insert festival artist file metadata'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'festival_logos'
+      AND cmd = 'INSERT'
+      AND with_check ILIKE '%house_tech%'
+  ),
+  'house techs may insert festival logo metadata'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'festival_logos'
+      AND cmd = 'UPDATE'
+      AND qual ILIKE '%house_tech%'
+      AND with_check ILIKE '%house_tech%'
+  ),
+  'house techs may update festival logo metadata'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_artist_files_authorized_select'
+      AND cmd = 'SELECT'
+      AND qual ILIKE '%festival_artist_files%'
+      AND qual ILIKE '%admin%'
+      AND qual ILIKE '%management%'
+      AND qual ILIKE '%logistics%'
+      AND qual ILIKE '%house_tech%'
+      AND qual ILIKE '%festival_artists%'
+  ),
+  'house techs may view festival artist file storage objects'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_artist_files_authorized_insert'
+      AND cmd = 'INSERT'
+      AND with_check ILIKE '%festival_artist_files%'
+      AND with_check ILIKE '%admin%'
+      AND with_check ILIKE '%management%'
+      AND with_check ILIKE '%logistics%'
+      AND with_check ILIKE '%house_tech%'
+      AND with_check ILIKE '%festival_artists%'
+  ),
+  'house techs may upload festival artist file storage objects'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_artist_files_authorized_update'
+      AND cmd = 'UPDATE'
+      AND qual ILIKE '%festival_artist_files%'
+      AND qual ILIKE '%admin%'
+      AND qual ILIKE '%management%'
+      AND qual ILIKE '%logistics%'
+      AND qual ILIKE '%house_tech%'
+      AND with_check ILIKE '%festival_artist_files%'
+      AND with_check ILIKE '%admin%'
+      AND with_check ILIKE '%management%'
+      AND with_check ILIKE '%logistics%'
+      AND with_check ILIKE '%house_tech%'
+  ),
+  'house techs may upsert festival artist file storage objects'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_logos_authorized_select'
+      AND cmd = 'SELECT'
+      AND qual ILIKE '%festival-logos%'
+      AND qual ILIKE '%admin%'
+      AND qual ILIKE '%management%'
+      AND qual ILIKE '%logistics%'
+      AND qual ILIKE '%house_tech%'
+      AND qual ILIKE '%festival%'
+      AND qual ILIKE '%ciclo%'
+  ),
+  'house techs may view festival logo storage objects'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_logos_authorized_insert'
+      AND cmd = 'INSERT'
+      AND with_check ILIKE '%festival-logos%'
+      AND with_check ILIKE '%admin%'
+      AND with_check ILIKE '%management%'
+      AND with_check ILIKE '%logistics%'
+      AND with_check ILIKE '%house_tech%'
+      AND with_check ILIKE '%festival%'
+      AND with_check ILIKE '%ciclo%'
+  ),
+  'house techs may upload festival logo storage objects'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_logos_authorized_update'
+      AND cmd = 'UPDATE'
+      AND qual ILIKE '%festival-logos%'
+      AND qual ILIKE '%admin%'
+      AND qual ILIKE '%management%'
+      AND qual ILIKE '%logistics%'
+      AND qual ILIKE '%house_tech%'
+      AND with_check ILIKE '%festival-logos%'
+      AND with_check ILIKE '%admin%'
+      AND with_check ILIKE '%management%'
+      AND with_check ILIKE '%logistics%'
+      AND with_check ILIKE '%house_tech%'
+  ),
+  'house techs may upsert festival logo storage objects'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM storage.buckets
+    WHERE id IN ('festival_artist_files', 'festival-logos')
+    HAVING count(*) = 2
+  ),
+  'festival upload buckets are declared by migrations'
 );
 
 SELECT * FROM finish();
