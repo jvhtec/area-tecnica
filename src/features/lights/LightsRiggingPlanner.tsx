@@ -11,7 +11,7 @@ import { AlertTriangle, FileText, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF } from "@/utils/pdfExport";
 import { supabase } from "@/lib/supabase";
-import { uploadStorageObject } from "@/utils/storageUpload";
+import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useJobSelection } from "@/hooks/useJobSelection";
 
@@ -265,12 +265,16 @@ const LightsRiggingPlanner: React.FC = () => {
       if (!isTourDefaults && selectedJobId) {
         const file = new File([pdfBlob], fileName, { type: "application/pdf" });
         const filePath = `lights/${selectedJobId}/${crypto.randomUUID()}.pdf`;
-        await uploadStorageObject(supabase, {
-          bucket: "task_documents",
-          path: filePath,
-          file,
-          contentType: "application/pdf",
-        });
+        try {
+          await uploadStorageObject(supabase, {
+            bucket: "task_documents",
+            path: filePath,
+            file,
+            contentType: "application/pdf",
+          });
+        } catch (uploadError) {
+          throw new Error(getStorageUploadErrorMessage(uploadError, file));
+        }
       }
 
       toast({ title: "Success", description: "PDF generated." });

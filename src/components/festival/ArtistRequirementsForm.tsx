@@ -760,9 +760,10 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         });
       } catch (error) {
         console.error("Error uploading rider file:", error);
+        const uploadErrorMessage = error instanceof Error ? error.message : "";
         toast({
           title: tx("Error", "Error"),
-          description: tx(
+          description: uploadErrorMessage || tx(
             "No se pudo cargar el rider. Inténtalo de nuevo.",
             "Could not upload rider file. Please try again."
           ),

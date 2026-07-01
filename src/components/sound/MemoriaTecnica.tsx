@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
-import { uploadStorageObject } from "@/utils/storageUpload";
+import { isStorageNotFoundError, uploadStorageObject } from "@/utils/storageUpload";
 
 interface PDFFile {
   file: File;
@@ -144,8 +144,7 @@ export const MemoriaTecnica = () => {
       } catch (err) {
         lastErr = err as Error;
         // Try next candidate on 404 bucket not found; otherwise rethrow
-        const msg = (err && ((err as Error).message || (err as { error?: string }).error || '')) + '';
-        if (!msg.toLowerCase().includes('bucket not found') && !((err as { statusCode?: string })?.statusCode === '404')) {
+        if (!isStorageNotFoundError(err)) {
           throw err;
         }
       }

@@ -24,6 +24,20 @@ type StorageUploadOptions = {
 };
 
 type SupabaseStorageClient = Pick<SupabaseClient, "auth" | "storage">;
+type UploadErrorWithStatus = {
+  status?: unknown;
+  statusCode?: unknown;
+  originalResponse?: {
+    getStatus?: () => unknown;
+    status?: unknown;
+    statusCode?: unknown;
+  };
+};
+
+function normalizeStatusCode(value: unknown) {
+  const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(numeric) ? numeric : null;
+}
 
 function getResumableUploadEndpoint() {
   const url = new URL(SUPABASE_URL);
@@ -147,4 +161,28 @@ export function getStorageUploadErrorMessage(error: unknown, file?: UploadableFi
   }
 
   return message || "No se pudo subir el archivo";
+}
+
+export function getStorageUploadStatusCode(error: unknown) {
+  const errorWithStatus = error as UploadErrorWithStatus;
+  const response = errorWithStatus.originalResponse;
+  const candidates = [
+    errorWithStatus.status,
+    errorWithStatus.statusCode,
+    response?.status,
+    response?.statusCode,
+    response?.getStatus?.(),
+  ];
+
+  for (const candidate of candidates) {
+    const statusCode = normalizeStatusCode(candidate);
+    if (statusCode !== null) return statusCode;
+  }
+
+  return null;
+}
+
+export function isStorageNotFoundError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return getStorageUploadStatusCode(error) === 404 || /bucket not found/i.test(message);
 }

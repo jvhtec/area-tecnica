@@ -94,6 +94,11 @@ type UploadContext = {
   artistContext: ArtistLookupRow | null;
 };
 
+type StorageListFile = {
+  name: string;
+  metadata?: Record<string, unknown> | null;
+};
+
 const sanitizeFileName = (value: string) => {
   const trimmed = value.trim();
   const cleaned = trimmed
@@ -186,6 +191,33 @@ const validateFileDescriptor = (descriptor: FileDescriptor) => {
     sanitizedName,
     fileType: fileType || null,
     fileSize,
+  };
+};
+
+const readMetadataNumber = (metadata: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = metadata[key];
+    const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return null;
+};
+
+const readMetadataString = (metadata: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+};
+
+const normalizeMimeType = (value: string | null) => value?.trim().toLowerCase() || null;
+
+const readStoredFileMetadata = (storedFile: StorageListFile) => {
+  const metadata = storedFile.metadata && typeof storedFile.metadata === "object" ? storedFile.metadata : {};
+  return {
+    size: readMetadataNumber(metadata, ["size", "content_length", "contentLength"]),
+    mimeType: readMetadataString(metadata, ["mimetype", "mime_type", "contentType", "content-type"]),
   };
 };
 
@@ -352,8 +384,21 @@ async function insertUploadedRiderFiles(
         throw new Error("storage_lookup_failed");
       }
 
-      if (!storedFiles?.some((storedFile) => storedFile.name === objectName)) {
+      const storedFile = (storedFiles as StorageListFile[] | null | undefined)
+        ?.find((candidate) => candidate.name === objectName);
+      if (!storedFile) {
         throw new Error("uploaded_file_missing");
+      }
+
+      const storedMetadata = readStoredFileMetadata(storedFile);
+      if (storedMetadata.size !== null && storedMetadata.size !== file.file_size) {
+        throw new Error("uploaded_file_size_mismatch");
+      }
+
+      const storedMimeType = normalizeMimeType(storedMetadata.mimeType);
+      const submittedMimeType = normalizeMimeType(file.file_type);
+      if (storedMimeType && submittedMimeType && storedMimeType !== submittedMimeType) {
+        throw new Error("uploaded_file_type_mismatch");
       }
 
       const { data: insertedFile, error: insertError } = await supabaseAdmin
@@ -362,8 +407,8 @@ async function insertUploadedRiderFiles(
           artist_id: context.formRow.artist_id,
           file_name: file.file_name,
           file_path: file.file_path,
-          file_type: file.file_type,
-          file_size: file.file_size,
+          file_type: storedMetadata.mimeType || file.file_type,
+          file_size: storedMetadata.size ?? file.file_size,
         })
         .select("id, file_name, file_path, file_type, file_size, uploaded_at, uploaded_by")
         .single();
@@ -524,9 +569,13 @@ serve(createHttpHandler(async (req) => {
           return jsonResponse(result, { status: 201 });
         } catch (error) {
           const errorCode = error instanceof Error ? error.message : "internal_error";
-          const status = errorCode === "invalid_file_path" || errorCode === "uploaded_file_missing"
-            ? 400
-            : getFileValidationStatus(errorCode);
+          const status =
+            errorCode === "invalid_file_path" ||
+            errorCode === "uploaded_file_missing" ||
+            errorCode === "uploaded_file_size_mismatch" ||
+            errorCode === "uploaded_file_type_mismatch"
+              ? 400
+              : getFileValidationStatus(errorCode);
           return jsonResponse({ ok: false, error: errorCode }, { status });
         }
       }

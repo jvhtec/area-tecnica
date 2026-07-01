@@ -140,6 +140,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       fetchFiles();
     } catch (error: any) {
       console.error("Error uploading file:", error);
+      const uploadErrorMessage = error instanceof Error ? error.message : "";
       try {
         if (insertedIds.length > 0) {
           await dataLayerClient.from('festival_artist_files').delete().in('id', insertedIds);
@@ -152,7 +153,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       }
       toast({
         title: "Error",
-        description: "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
+        description: uploadErrorMessage || "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
         variant: "destructive",
       });
     } finally {

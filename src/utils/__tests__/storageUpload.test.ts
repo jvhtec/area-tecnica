@@ -15,6 +15,7 @@ type MockTusOptions = {
 };
 
 const mocks = vi.hoisted(() => {
+  let tusStartError: Error | null = null;
   const uploadInstances: Array<{
     file: Blob;
     options: MockTusOptions;
@@ -29,6 +30,10 @@ const mocks = vi.hoisted(() => {
     findPreviousUploads = vi.fn(() => Promise.resolve([]));
     resumeFromPreviousUpload = vi.fn();
     start = vi.fn(() => {
+      if (tusStartError) {
+        this.options.onError?.(tusStartError);
+        return;
+      }
       this.options.onProgress?.(this.file.size, this.file.size);
       this.options.onSuccess?.();
     });
@@ -45,6 +50,9 @@ const mocks = vi.hoisted(() => {
     storageFrom: vi.fn(),
     storageUpload: vi.fn(),
     uploadInstances,
+    setTusStartError: (error: Error | null) => {
+      tusStartError = error;
+    },
     MockUpload,
   };
 });
@@ -82,6 +90,7 @@ describe("storageUpload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.uploadInstances.length = 0;
+    mocks.setTusStartError(null);
     mocks.authGetSession.mockResolvedValue({
       data: { session: { access_token: "session-token" } },
       error: null,
@@ -177,5 +186,47 @@ describe("storageUpload", () => {
       "x-signature": "signed-token",
     });
     await expect(options.fingerprint?.(file)).resolves.toContain("artist-1/public-rider.dwg");
+  });
+
+  it("surfaces errors from the normal Supabase upload API", async () => {
+    const file = makeNamedBlob(1024, "small.dwg", "application/acad");
+    mocks.storageUpload.mockResolvedValue({ error: new Error("standard upload failed") });
+
+    await expect(
+      uploadStorageObject(makeSupabase(), {
+        bucket: "plans",
+        path: "jobs/job-1/small.dwg",
+        file,
+      }),
+    ).rejects.toThrow("standard upload failed");
+  });
+
+  it("requires an authenticated session for large non-signed resumable uploads", async () => {
+    const file = makeNamedBlob(RESUMABLE_UPLOAD_THRESHOLD_BYTES, "large.dwg", "application/acad");
+    mocks.authGetSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    await expect(
+      uploadStorageObject(makeSupabase(), {
+        bucket: "plans",
+        path: "jobs/job-1/large.dwg",
+        file,
+      }),
+    ).rejects.toThrow("Usuario no autenticado");
+  });
+
+  it("rejects when the resumable tus upload reports an error", async () => {
+    const file = makeNamedBlob(RESUMABLE_UPLOAD_THRESHOLD_BYTES, "large.dwg", "application/acad");
+    mocks.setTusStartError(new Error("tus upload failed"));
+
+    await expect(
+      uploadStorageObject(makeSupabase(), {
+        bucket: "plans",
+        path: "jobs/job-1/large.dwg",
+        file,
+      }),
+    ).rejects.toThrow("tus upload failed");
   });
 });
