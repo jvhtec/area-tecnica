@@ -104,6 +104,44 @@ function mockVisualViewport({
   }
 }
 
+/**
+ * Replaces requestAnimationFrame with a manually-flushed queue so tests can
+ * assert on the rAF-deferred follow-up recomputes without relying on real
+ * frame timing.
+ */
+function mockRequestAnimationFrame() {
+  const originalRaf = window.requestAnimationFrame
+  const originalCaf = window.cancelAnimationFrame
+  let nextId = 1
+  const callbacks = new Map<number, FrameRequestCallback>()
+
+  window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+    const id = nextId++
+    callbacks.set(id, callback)
+    return id
+  }) as typeof window.requestAnimationFrame
+
+  window.cancelAnimationFrame = vi.fn((id: number) => {
+    callbacks.delete(id)
+  }) as typeof window.cancelAnimationFrame
+
+  return {
+    // Drains every queued frame, including ones scheduled by callbacks that
+    // run during the flush (e.g. the nested second rAF).
+    flush() {
+      while (callbacks.size > 0) {
+        const [id, callback] = callbacks.entries().next().value as [number, FrameRequestCallback]
+        callbacks.delete(id)
+        callback(0)
+      }
+    },
+    restore() {
+      window.requestAnimationFrame = originalRaf
+      window.cancelAnimationFrame = originalCaf
+    },
+  }
+}
+
 describe("MobileNavBar", () => {
   it("renders the fixed nav in a body portal", () => {
     const { container } = renderMobileNav()
@@ -143,27 +181,40 @@ describe("MobileNavBar", () => {
       innerHeight: 760,
       offsetTop: 0,
     })
+    const raf = mockRequestAnimationFrame()
 
-    renderMobileNav()
+    try {
+      renderMobileNav()
 
-    const nav = screen.getByRole("navigation", { name: /navegación principal/i })
+      const nav = screen.getByRole("navigation", { name: /navegación principal/i })
 
-    await waitFor(() => expect(nav.style.bottom).toBe("60px"))
+      await waitFor(() => expect(nav.style.bottom).toBe("60px"))
 
-    // Simulate the viewport settling back to full height while backgrounded,
-    // without any "resize" event firing on resume (the iOS PWA behavior this
-    // guards against).
-    ;(window.visualViewport as unknown as { height: number }).height = 760
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "visible",
+      })
 
-    Object.defineProperty(document, "visibilityState", {
-      configurable: true,
-      value: "visible",
-    })
+      // Dispatch while the viewport is still reporting the stale (backgrounded)
+      // height, mirroring WebKit reporting old values for a frame or two after
+      // resume. The immediate recompute should see no change yet.
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"))
+      })
+      expect(nav.style.bottom).toBe("60px")
 
-    act(() => {
-      document.dispatchEvent(new Event("visibilitychange"))
-    })
+      // The corrected height only becomes available a frame later, without any
+      // "resize" event firing on resume (the iOS PWA behavior this guards
+      // against).
+      ;(window.visualViewport as unknown as { height: number }).height = 760
 
-    await waitFor(() => expect(nav.style.bottom).toBe(""))
+      act(() => {
+        raf.flush()
+      })
+
+      expect(nav.style.bottom).toBe("")
+    } finally {
+      raf.restore()
+    }
   })
 })

@@ -62,12 +62,22 @@ function useVisualViewportBottomOffset() {
     // the visibility/pageshow signals below, with a couple of rAF-deferred
     // follow-ups since WebKit can report the old viewport values for a frame
     // or two right after resume.
+    let pendingFrames: number[] = []
+
+    const cancelPendingFrames = () => {
+      pendingFrames.forEach((frameId) => cancelAnimationFrame(frameId))
+      pendingFrames = []
+    }
+
     const recomputeOnResume = () => {
+      cancelPendingFrames()
       updateBottomOffset()
-      requestAnimationFrame(() => {
+      const firstFrame = requestAnimationFrame(() => {
         updateBottomOffset()
-        requestAnimationFrame(updateBottomOffset)
+        const secondFrame = requestAnimationFrame(updateBottomOffset)
+        pendingFrames.push(secondFrame)
       })
+      pendingFrames.push(firstFrame)
     }
 
     const handleVisibilityChange = () => {
@@ -93,6 +103,7 @@ function useVisualViewportBottomOffset() {
       visualViewport?.removeEventListener("resize", updateBottomOffset)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("pageshow", recomputeOnResume)
+      cancelPendingFrames()
     }
   }, [])
 
