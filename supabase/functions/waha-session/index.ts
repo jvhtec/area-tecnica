@@ -11,7 +11,7 @@ import {
 } from "../_shared/http.ts";
 import { normalizeBaseUrl } from "../_shared/waha.ts";
 
-type Action = "get" | "save" | "status" | "start" | "qr";
+type Action = "get" | "save" | "status" | "start" | "restart" | "qr" | "endpoints";
 
 type RequestBody = Record<string, unknown> & {
   action?: unknown;
@@ -38,38 +38,96 @@ type WahaSessionInfo = {
   } | null;
 };
 
-// Keep in sync with src/constants/wahaEndpoints.ts. Edge Functions cannot import
-// the frontend module directly, so the server keeps its own allow-list copy.
-const DEFAULT_ENDPOINTS = [
-  "https://waha.sector-pro.work",
-  "https://waha2.sector-pro.work",
-  "https://waha3.sector-pro.work",
-  "https://waha4.sector-pro.work",
-  "https://waha5.sector-pro.work",
-];
+type WahaEndpointOption = {
+  label: string;
+  value: string;
+};
 
-const ACTIONS = ["get", "save", "status", "start", "qr"] as const;
+type WahaEndpointStatus = WahaEndpointOption & {
+  session: string;
+  status: string;
+  me: WahaSessionInfo["me"];
+  error?: string | null;
+};
+
+const DEFAULT_ENDPOINT_FAMILY_MAX = 6;
+const MAX_ENDPOINT_FAMILY_MAX = 100;
+const WAHA_ENDPOINT_ROOT_DOMAIN = "sector-pro.work";
+
+const ACTIONS = ["get", "save", "status", "start", "restart", "qr", "endpoints"] as const;
 
 function isAction(value: string): value is Action {
   return (ACTIONS as readonly string[]).includes(value);
 }
 
-function getAllowedEndpointHosts() {
-  const configured = (Deno.env.get("WAHA_ALLOWED_ENDPOINTS") || "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+function parsePositiveInt(value: string | undefined, fallback: number, max: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
 
+  return Math.min(max, Math.max(1, Math.floor(parsed)));
+}
+
+function wahaEndpointForIndex(index: number) {
+  return index === 1
+    ? `https://waha.${WAHA_ENDPOINT_ROOT_DOMAIN}`
+    : `https://waha${index}.${WAHA_ENDPOINT_ROOT_DOMAIN}`;
+}
+
+function getWahaEndpointLabel(endpoint: string) {
+  try {
+    const host = new URL(normalizeBaseUrl(endpoint)).hostname.toLowerCase();
+    const match = host.match(/^waha(\d*)\.sector-pro\.work$/);
+    if (match) {
+      return `WAHA ${match[1] ? Number(match[1]) : 1}`;
+    }
+
+    return host;
+  } catch {
+    return endpoint;
+  }
+}
+
+function pushEndpointOption(options: Map<string, WahaEndpointOption>, endpoint: string) {
+  try {
+    const normalized = normalizeEndpointForStorage(endpoint);
+    if (!normalized) return;
+
+    const host = new URL(normalized).host.toLowerCase();
+    options.set(host, {
+      label: getWahaEndpointLabel(normalized),
+      value: normalized,
+    });
+  } catch (error) {
+    console.warn("Ignoring invalid WAHA endpoint option", { endpoint, error });
+  }
+}
+
+function getConfiguredEndpointOptions(extraEndpoints: Array<string | null | undefined> = []) {
+  const familyMax = parsePositiveInt(
+    Deno.env.get("WAHA_ENDPOINT_FAMILY_MAX"),
+    DEFAULT_ENDPOINT_FAMILY_MAX,
+    MAX_ENDPOINT_FAMILY_MAX,
+  );
+  const options = new Map<string, WahaEndpointOption>();
+
+  for (let index = 1; index <= familyMax; index += 1) {
+    pushEndpointOption(options, wahaEndpointForIndex(index));
+  }
+
+  for (const endpoint of (Deno.env.get("WAHA_ALLOWED_ENDPOINTS") || "").split(",")) {
+    pushEndpointOption(options, endpoint);
+  }
+
+  for (const endpoint of extraEndpoints) {
+    if (endpoint) pushEndpointOption(options, endpoint);
+  }
+
+  return [...options.values()].sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true }));
+}
+
+function getAllowedEndpointHosts() {
   return new Set(
-    [...DEFAULT_ENDPOINTS, ...configured]
-      .map((endpoint) => {
-        try {
-          return new URL(normalizeBaseUrl(endpoint)).host.toLowerCase();
-        } catch {
-          return null;
-        }
-      })
-      .filter((host): host is string => Boolean(host)),
+    getConfiguredEndpointOptions().map((endpoint) => new URL(endpoint.value).host.toLowerCase()),
   );
 }
 
@@ -205,12 +263,17 @@ async function getWahaConfig(supabaseAdmin: ReturnType<typeof createClient>, end
   };
 }
 
-async function getSessionStatus(endpoint: string, session: string, apiKey: string) {
+async function getSessionStatus(
+  endpoint: string,
+  session: string,
+  apiKey: string,
+  timeoutMs = Number(Deno.env.get("WAHA_FETCH_TIMEOUT_MS") || 9000),
+) {
   const url = `${endpoint}/api/sessions/${encodeURIComponent(session)}`;
   const res = await fetchWithTimeout(url, {
     method: "GET",
     headers: headersFor(apiKey),
-  }, Number(Deno.env.get("WAHA_FETCH_TIMEOUT_MS") || 9000));
+  }, timeoutMs);
 
   if (res.status === 404) {
     return {
@@ -274,6 +337,67 @@ async function ensureSessionStarted(endpoint: string, session: string, apiKey: s
   }
 
   return getSessionStatus(endpoint, session, apiKey);
+}
+
+async function restartSession(endpoint: string, session: string, apiKey: string) {
+  const current = await getSessionStatus(endpoint, session, apiKey);
+  if (current.status === "NOT_CREATED") {
+    return ensureSessionStarted(endpoint, session, apiKey);
+  }
+
+  const res = await fetchWithTimeout(`${endpoint}/api/sessions/${encodeURIComponent(session)}/restart`, {
+    method: "POST",
+    headers: headersFor(apiKey),
+    body: JSON.stringify({}),
+  }, Number(Deno.env.get("WAHA_FETCH_TIMEOUT_MS") || 9000));
+
+  if (!res.ok) {
+    throw new HttpError(502, "WAHA session restart request failed", {
+      code: "waha_session_restart_failed",
+      details: { status: res.status, body: await readWahaError(res) },
+      exposeDetails: true,
+    });
+  }
+
+  return getSessionStatus(endpoint, session, apiKey);
+}
+
+function wahaEndpointErrorMessage(error: unknown) {
+  if (error instanceof HttpError) return error.message;
+  if (error instanceof Error) return error.message;
+  return "WAHA status request failed";
+}
+
+async function getEndpointStatuses(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  extraEndpoints: Array<string | null | undefined> = [],
+) {
+  const timeoutMs = Number(Deno.env.get("WAHA_ENDPOINT_STATUS_TIMEOUT_MS") || 2500);
+  const options = getConfiguredEndpointOptions(extraEndpoints);
+
+  return await Promise.all(options.map(async (option): Promise<WahaEndpointStatus> => {
+    const { apiKey, session } = await getWahaConfig(supabaseAdmin, option.value);
+
+    try {
+      const status = await getSessionStatus(option.value, session, apiKey, timeoutMs);
+
+      return {
+        ...option,
+        session: status.session,
+        status: status.status,
+        me: status.me,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        ...option,
+        session,
+        status: "UNREACHABLE",
+        me: null,
+        error: wahaEndpointErrorMessage(error),
+      };
+    }
+  }));
 }
 
 async function getQr(endpoint: string, session: string, apiKey: string) {
@@ -381,6 +505,7 @@ async function handler(req: Request) {
       session: endpoint ? (await getWahaConfig(supabaseAdmin, endpoint)).session : "default",
       status: endpoint ? "UNKNOWN" : "NOT_CONFIGURED",
       me: null,
+      endpoints: getConfiguredEndpointOptions([endpoint]),
     });
   }
 
@@ -392,6 +517,7 @@ async function handler(req: Request) {
       session: context.session,
       status: "NOT_CONFIGURED",
       me: null,
+      endpoints: action === "endpoints" ? await getEndpointStatuses(supabaseAdmin) : getConfiguredEndpointOptions(),
     });
   }
 
@@ -401,6 +527,17 @@ async function handler(req: Request) {
       session: context.session,
       status: "UNKNOWN",
       me: null,
+      endpoints: getConfiguredEndpointOptions([context.endpoint]),
+    });
+  }
+
+  if (action === "endpoints") {
+    return jsonResponse({
+      endpoint: context.endpoint,
+      session: context.session,
+      status: "UNKNOWN",
+      me: null,
+      endpoints: await getEndpointStatuses(supabaseAdmin, [context.endpoint]),
     });
   }
 
@@ -410,6 +547,10 @@ async function handler(req: Request) {
 
   if (action === "start") {
     return jsonResponse(await ensureSessionStarted(context.endpoint, context.session, context.apiKey));
+  }
+
+  if (action === "restart") {
+    return jsonResponse(await restartSession(context.endpoint, context.session, context.apiKey));
   }
 
   const status = await ensureSessionStarted(context.endpoint, context.session, context.apiKey);

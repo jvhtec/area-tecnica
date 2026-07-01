@@ -84,7 +84,7 @@ describe("WahaEndpointSettings", () => {
     expect(screen.getByText((_, element) => element?.textContent === "Cuenta vinculada: Sector Pro")).toBeInTheDocument();
   });
 
-  it("saves a selected WAHA endpoint", async () => {
+  it("saves a generated WAHA 6 endpoint", async () => {
     const user = userEvent.setup();
 
     mockSupabase.functions.invoke.mockImplementation(async (_name, options) => {
@@ -118,14 +118,14 @@ describe("WahaEndpointSettings", () => {
     await screen.findByText(/No hay un endpoint WAHA asignado/i);
 
     await user.click(screen.getByRole("combobox", { name: /endpoint waha/i }));
-    await user.click(await screen.findByRole("option", { name: /WAHA 3 - waha3\.sector-pro\.work/i }));
+    await user.click(await screen.findByRole("option", { name: /WAHA 6 - waha6\.sector-pro\.work/i }));
     await user.click(screen.getByRole("button", { name: /guardar/i }));
 
     await waitFor(() => {
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("waha-session", {
         body: {
           action: "save",
-          endpoint: "https://waha3.sector-pro.work",
+          endpoint: "https://waha6.sector-pro.work",
         },
       });
     });
@@ -133,6 +133,108 @@ describe("WahaEndpointSettings", () => {
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Endpoint WAHA guardado",
+      }),
+    );
+  });
+
+  it("shows endpoint directory statuses in the config menu", async () => {
+    const user = userEvent.setup();
+
+    mockSupabase.functions.invoke.mockImplementation(async (_name, options) => {
+      const action = options?.body?.action;
+
+      if (action === "endpoints") {
+        return {
+          data: {
+            endpoint: "https://waha2.sector-pro.work",
+            session: "default",
+            status: "UNKNOWN",
+            me: null,
+            endpoints: [
+              {
+                label: "WAHA 2",
+                value: "https://waha2.sector-pro.work",
+                session: "default",
+                status: "WORKING",
+                me: { pushName: "Sector Pro" },
+              },
+              {
+                label: "WAHA 6",
+                value: "https://waha6.sector-pro.work",
+                session: "default",
+                status: "STOPPED",
+                me: null,
+              },
+            ],
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: {
+          endpoint: "https://waha2.sector-pro.work",
+          session: "default",
+          status: "UNKNOWN",
+          me: null,
+        },
+        error: null,
+      };
+    });
+
+    renderWithProviders(<WahaEndpointSettings />);
+
+    expect(await screen.findByText("Estado de endpoints")).toBeInTheDocument();
+    expect(await screen.findByText("waha6.sector-pro.work")).toBeInTheDocument();
+    expect(screen.getByText("Detenida")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: /endpoint waha/i }));
+    expect(await screen.findByRole("option", { name: /WAHA 6 - waha6\.sector-pro\.work/i })).toBeInTheDocument();
+  });
+
+  it("restarts the saved WAHA session", async () => {
+    const user = userEvent.setup();
+
+    mockSupabase.functions.invoke.mockImplementation(async (_name, options) => {
+      const action = options?.body?.action;
+
+      if (action === "restart") {
+        return {
+          data: {
+            endpoint: "https://waha.sector-pro.work",
+            session: "default",
+            status: "WORKING",
+            me: { pushName: "Sector Pro" },
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: {
+          endpoint: "https://waha.sector-pro.work",
+          session: "default",
+          status: "FAILED",
+          me: null,
+        },
+        error: null,
+      };
+    });
+
+    renderWithProviders(<WahaEndpointSettings />);
+
+    await screen.findByText(/WAHA 1 - waha\.sector-pro\.work/i);
+    await user.click(screen.getByRole("button", { name: /reiniciar/i }));
+
+    await waitFor(() => {
+      expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("waha-session", {
+        body: { action: "restart" },
+      });
+    });
+
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Sesion WAHA reiniciada",
       }),
     );
   });
