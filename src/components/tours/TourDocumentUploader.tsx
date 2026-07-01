@@ -83,14 +83,14 @@ export const TourDocumentUploader = ({
           <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
           <p className="text-lg font-medium mb-2">Drop files here or click to browse</p>
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, JPG, PNG
+            Supported formats: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, JPG, PNG, MVR
           </p>
           <input
             ref={fileInputRef}
             type="file"
             onChange={handleFileSelect}
             className="hidden"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt,.mvr"
           />
         </div>
       ) : (

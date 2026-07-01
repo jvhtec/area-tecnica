@@ -7,7 +7,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 10;
-const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "webp"]);
+const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "webp", "mvr"]);
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
   "application/msword",
@@ -16,6 +16,8 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",
+  "application/octet-stream",
+  "application/x-mvr",
 ]);
 
 type UploadFormRow = {

@@ -987,12 +987,12 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
                     <div className="space-y-2">
                       <label htmlFor="public-rider-upload" className="text-sm font-medium">
-                        {tx("Subir rider(s) (PDF, Word o imagen)", "Upload rider file(s) (PDF, Word, or image)")}
+                        {tx("Subir rider(s) (PDF, Word, imagen o MVR)", "Upload rider file(s) (PDF, Word, image or MVR)")}
                       </label>
                       <Input
                         id="public-rider-upload"
                         type="file"
-                        accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp"
+                        accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp,.mvr"
                         multiple
                         onChange={handleRiderUpload}
                         disabled={isUploadingRider}

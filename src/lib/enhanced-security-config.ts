@@ -188,6 +188,8 @@ export function validateFileUpload(file: File): {
     'text/plain',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/octet-stream',
+    'application/x-mvr',
   ];
   
   if (!allowedTypes.includes(file.type)) {
