@@ -179,6 +179,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
           onProvidedByChange={(providedBy) => onChange({ foh_waves_provided_by: providedBy })}
           providedByLabel={tx("Waves/Outboard FOH proporcionado por", "FOH Waves/Outboard provided by")}
           disabled={locked("foh_waves_models")}
+          language={language}
         />
       </div>
 
@@ -279,6 +280,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
               onProvidedByChange={(providedBy) => onChange({ mon_waves_provided_by: providedBy })}
               providedByLabel={tx("Waves/Outboard MON proporcionado por", "MON Waves/Outboard provided by")}
               disabled={locked("mon_waves_models")}
+              language={language}
             />
           </>
         ) : (

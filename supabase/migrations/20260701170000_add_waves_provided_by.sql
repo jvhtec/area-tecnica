@@ -92,6 +92,10 @@ begin
       soundcheck = coalesce((p_form_data->>'soundcheck')::boolean, festival_artists.soundcheck, false),
       soundcheck_start = coalesce(nullif(p_form_data->>'soundcheck_start', '')::time, festival_artists.soundcheck_start),
       soundcheck_end = coalesce(nullif(p_form_data->>'soundcheck_end', '')::time, festival_artists.soundcheck_end),
+      line_check = coalesce((p_form_data->>'line_check')::boolean, festival_artists.line_check, false),
+      line_check_start = coalesce(nullif(p_form_data->>'line_check_start', '')::time, festival_artists.line_check_start),
+      line_check_end = coalesce(nullif(p_form_data->>'line_check_end', '')::time, festival_artists.line_check_end),
+      load_in_time = coalesce(nullif(p_form_data->>'load_in_time', '')::time, festival_artists.load_in_time),
       foh_console = coalesce(nullif(trim(p_form_data->>'foh_console'), ''), festival_artists.foh_console),
       foh_console_provided_by = coalesce(
         nullif(p_form_data->>'foh_console_provided_by', '')::public.provider_type,

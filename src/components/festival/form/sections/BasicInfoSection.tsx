@@ -9,6 +9,7 @@ import { computeLineCheckDefaults } from "@/utils/artistTimeDefaults";
 interface BasicInfoSectionProps extends ArtistSectionProps {
   stageNames?: Record<number, string>;
   showInternalFlags?: boolean;
+  showLoadInAndLineCheck?: boolean;
   showSoundcheckTimes?: boolean;
 }
 
@@ -20,12 +21,14 @@ export const BasicInfoSection = ({
   language = "es",
   stageNames,
   showInternalFlags = true,
+  showLoadInAndLineCheck,
   showSoundcheckTimes = true,
 }: BasicInfoSectionProps) => {
   // Get max stages from gearSetup or default to 3
   const maxStages = gearSetup?.max_stages || 3;
   const locked = (field: string) => isFieldLocked?.(field) ?? false;
   const tx = (es: string, en: string) => (language === "en" ? en : es);
+  const showLoadAndLineCheck = showLoadInAndLineCheck ?? showInternalFlags;
 
   return (
     <div className="space-y-4 border rounded-lg p-4">
@@ -72,7 +75,7 @@ export const BasicInfoSection = ({
         />
       </div>
 
-      {showInternalFlags && (
+      {showLoadAndLineCheck && (
         <div>
           <Label>{tx("Hora de Load In", "Load In Time")}</Label>
           <Input
@@ -140,7 +143,7 @@ export const BasicInfoSection = ({
         )}
       </div>
 
-      {showInternalFlags && (
+      {showLoadAndLineCheck && (
         <div className="space-y-4">
           <div className="flex items-center space-x-2">
             <Checkbox

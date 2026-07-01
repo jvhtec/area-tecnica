@@ -281,7 +281,12 @@ export const ArtistFormLinksDialog = ({
         stage: templateStage,
         date: dateFilter,
         schedule: {
+          loadIn: "",
           show: {
+            start: "",
+            end: "",
+          },
+          lineCheck: {
             start: "",
             end: "",
           },

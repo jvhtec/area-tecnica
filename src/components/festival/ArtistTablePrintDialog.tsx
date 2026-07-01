@@ -32,6 +32,10 @@ interface Artist {
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  line_check?: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
+  load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
@@ -154,7 +158,7 @@ export const ArtistTablePrintDialog = ({
       });
 
       // Sort artists chronologically using the shared utility
-      const sortedArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
+      const sortedArtists = sortArtistsChronologically(filteredArtists) as Artist[];
 
       console.log('Filtered artists count:', filteredArtists.length);
       
@@ -260,6 +264,7 @@ export const ArtistTablePrintDialog = ({
         return {
           name: artist.name,
           stage: artist.stage,
+          loadInTime: artist.load_in_time || undefined,
           showTime: {
             start: artist.show_start,
             end: artist.show_end
@@ -267,6 +272,10 @@ export const ArtistTablePrintDialog = ({
           soundcheck: artist.soundcheck ? {
             start: artist.soundcheck_start || '',
             end: artist.soundcheck_end || ''
+          } : undefined,
+          lineCheck: artist.line_check ? {
+            start: artist.line_check_start || '',
+            end: artist.line_check_end || ''
           } : undefined,
           technical: {
             fohTech: artist.foh_tech || false,

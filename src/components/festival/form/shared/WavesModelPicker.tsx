@@ -19,6 +19,7 @@ interface WavesModelPickerProps {
   onProvidedByChange?: (providedBy: string) => void;
   providedByLabel?: string;
   disabled?: boolean;
+  language?: "es" | "en";
 }
 
 export const WavesModelPicker = ({
@@ -34,6 +35,7 @@ export const WavesModelPicker = ({
   onProvidedByChange,
   providedByLabel = "Waves/Outboard proporcionado por",
   disabled = false,
+  language = "es",
 }: WavesModelPickerProps) => {
   const setQuantity = (model: WavesModel, quantity: number) => {
     if (quantity <= 0) {
@@ -109,6 +111,7 @@ export const WavesModelPicker = ({
           value={providedBy || "festival"}
           onChange={onProvidedByChange}
           disabled={disabled}
+          language={language}
         />
       )}
     </div>

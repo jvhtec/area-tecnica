@@ -15,53 +15,49 @@ alter table public.festival_stage_gear_setups
   drop constraint if exists festival_stage_gear_setups_foh_waves_models_check,
   drop constraint if exists festival_stage_gear_setups_mon_waves_models_check;
 
+create or replace function public._waves_models_text_array_to_jsonb(p_models text[])
+returns jsonb
+language sql
+immutable
+as $$
+  select coalesce(
+    jsonb_agg(jsonb_build_object('model', model_key, 'quantity', 1)),
+    '[]'::jsonb
+  )
+  from unnest(coalesce(p_models, '{}'::text[])) as model_key;
+$$;
+
 alter table public.festival_artists
-  alter column foh_waves_models type jsonb using (
-    coalesce(
-      (select jsonb_agg(jsonb_build_object('model', m, 'quantity', 1)) from unnest(foh_waves_models) as m),
-      '[]'::jsonb
-    )
-  ),
+  alter column foh_waves_models drop default,
+  alter column mon_waves_models drop default;
+
+alter table public.festival_gear_setups
+  alter column foh_waves_models drop default,
+  alter column mon_waves_models drop default;
+
+alter table public.festival_stage_gear_setups
+  alter column foh_waves_models drop default,
+  alter column mon_waves_models drop default;
+
+alter table public.festival_artists
+  alter column foh_waves_models type jsonb using public._waves_models_text_array_to_jsonb(foh_waves_models),
   alter column foh_waves_models set default '[]'::jsonb,
-  alter column mon_waves_models type jsonb using (
-    coalesce(
-      (select jsonb_agg(jsonb_build_object('model', m, 'quantity', 1)) from unnest(mon_waves_models) as m),
-      '[]'::jsonb
-    )
-  ),
+  alter column mon_waves_models type jsonb using public._waves_models_text_array_to_jsonb(mon_waves_models),
   alter column mon_waves_models set default '[]'::jsonb;
 
 alter table public.festival_gear_setups
-  alter column foh_waves_models type jsonb using (
-    coalesce(
-      (select jsonb_agg(jsonb_build_object('model', m, 'quantity', 1)) from unnest(foh_waves_models) as m),
-      '[]'::jsonb
-    )
-  ),
+  alter column foh_waves_models type jsonb using public._waves_models_text_array_to_jsonb(foh_waves_models),
   alter column foh_waves_models set default '[]'::jsonb,
-  alter column mon_waves_models type jsonb using (
-    coalesce(
-      (select jsonb_agg(jsonb_build_object('model', m, 'quantity', 1)) from unnest(mon_waves_models) as m),
-      '[]'::jsonb
-    )
-  ),
+  alter column mon_waves_models type jsonb using public._waves_models_text_array_to_jsonb(mon_waves_models),
   alter column mon_waves_models set default '[]'::jsonb;
 
 alter table public.festival_stage_gear_setups
-  alter column foh_waves_models type jsonb using (
-    coalesce(
-      (select jsonb_agg(jsonb_build_object('model', m, 'quantity', 1)) from unnest(foh_waves_models) as m),
-      '[]'::jsonb
-    )
-  ),
+  alter column foh_waves_models type jsonb using public._waves_models_text_array_to_jsonb(foh_waves_models),
   alter column foh_waves_models set default '[]'::jsonb,
-  alter column mon_waves_models type jsonb using (
-    coalesce(
-      (select jsonb_agg(jsonb_build_object('model', m, 'quantity', 1)) from unnest(mon_waves_models) as m),
-      '[]'::jsonb
-    )
-  ),
+  alter column mon_waves_models type jsonb using public._waves_models_text_array_to_jsonb(mon_waves_models),
   alter column mon_waves_models set default '[]'::jsonb;
+
+drop function public._waves_models_text_array_to_jsonb(text[]);
 
 comment on column public.festival_artists.foh_waves_models is
   'Selected FOH Waves server model(s) with quantity: array of {model, quantity} objects. model is one of server_one, extreme, titan, livebox, fourier, axis_one, axis_scope.';
@@ -153,6 +149,10 @@ begin
       soundcheck = coalesce((p_form_data->>'soundcheck')::boolean, festival_artists.soundcheck, false),
       soundcheck_start = coalesce(nullif(p_form_data->>'soundcheck_start', '')::time, festival_artists.soundcheck_start),
       soundcheck_end = coalesce(nullif(p_form_data->>'soundcheck_end', '')::time, festival_artists.soundcheck_end),
+      line_check = coalesce((p_form_data->>'line_check')::boolean, festival_artists.line_check, false),
+      line_check_start = coalesce(nullif(p_form_data->>'line_check_start', '')::time, festival_artists.line_check_start),
+      line_check_end = coalesce(nullif(p_form_data->>'line_check_end', '')::time, festival_artists.line_check_end),
+      load_in_time = coalesce(nullif(p_form_data->>'load_in_time', '')::time, festival_artists.load_in_time),
       foh_console = coalesce(nullif(trim(p_form_data->>'foh_console'), ''), festival_artists.foh_console),
       foh_console_provided_by = coalesce(
         nullif(p_form_data->>'foh_console_provided_by', '')::public.provider_type,

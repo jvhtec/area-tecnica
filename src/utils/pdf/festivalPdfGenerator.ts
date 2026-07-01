@@ -531,14 +531,10 @@ export const generateAndMergeFestivalPDFs = async (
             stage: artist.stage || 1,
             date: artist.date || '',
             schedule: {
-              show: { 
-                start: artist.show_start || '', 
-                end: artist.show_end || '' 
-              },
-              soundcheck: artist.soundcheck_start ? {
-                start: artist.soundcheck_start || '',
-                end: artist.soundcheck_end || ''
-              } : undefined
+              loadIn: artist.load_in_time || undefined,
+              show: { start: artist.show_start || '', end: artist.show_end || '' },
+              soundcheck: artist.soundcheck_start ? { start: artist.soundcheck_start || '', end: artist.soundcheck_end || '' } : undefined,
+              lineCheck: artist.line_check ? { start: artist.line_check_start || '', end: artist.line_check_end || '' } : undefined,
             },
             technical: {
               fohTech: Boolean(artist.foh_tech || false),

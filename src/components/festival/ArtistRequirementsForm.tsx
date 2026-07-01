@@ -464,6 +464,10 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         soundcheck: asBoolean(artistData.soundcheck),
         soundcheck_start: normalizeTime(asString(artistData.soundcheck_start)),
         soundcheck_end: normalizeTime(asString(artistData.soundcheck_end)),
+        line_check: asBoolean(artistData.line_check),
+        line_check_start: normalizeTime(asString(artistData.line_check_start)),
+        line_check_end: normalizeTime(asString(artistData.line_check_end)),
+        load_in_time: normalizeTime(asString(artistData.load_in_time)),
         foh_console: asString(artistData.foh_console),
         foh_consoles: fohConsoles.length > 0 ? fohConsoles : prev.foh_consoles,
         foh_console_provided_by: asString(artistData.foh_console_provided_by) || "festival",
@@ -1022,6 +1026,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                       language={formLanguage}
                       stageNames={stageNames}
                       showInternalFlags={false}
+                      showLoadInAndLineCheck
                       showSoundcheckTimes={false}
                     />
                     <ConsoleSetupSection

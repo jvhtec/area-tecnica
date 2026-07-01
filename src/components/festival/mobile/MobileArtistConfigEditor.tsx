@@ -41,8 +41,10 @@ interface Artist {
   monitors_from_foh?: boolean;
   foh_waves_models?: any[];
   foh_outboard?: string;
+  foh_waves_provided_by?: ProviderType | null;
   mon_waves_models?: any[];
   mon_outboard?: string;
+  mon_waves_provided_by?: ProviderType | null;
   wireless_systems: any[];
   wireless_provided_by?: ProviderType | null;
   iem_systems: any[];
@@ -403,8 +405,10 @@ function buildFormData(artist: Artist) {
     monitors_from_foh: artist.monitors_from_foh || false,
     foh_waves_models: artist.foh_waves_models || [],
     foh_outboard: artist.foh_outboard || "",
+    foh_waves_provided_by: artist.foh_waves_provided_by || "festival",
     mon_waves_models: artist.mon_waves_models || [],
     mon_outboard: artist.mon_outboard || "",
+    mon_waves_provided_by: artist.mon_waves_provided_by || "festival",
     wireless_systems: artist.wireless_systems || [],
     iem_systems: artist.iem_systems || [],
     wireless_provided_by: artist.wireless_provided_by || "festival",
@@ -498,8 +502,10 @@ export const MobileArtistConfigEditor = ({
             monitors_from_foh: formData.monitors_from_foh,
             foh_waves_models: formData.foh_waves_models,
             foh_outboard: formData.foh_outboard || null,
+            foh_waves_provided_by: formData.foh_waves_provided_by,
             mon_waves_models: formData.mon_waves_models,
             mon_outboard: formData.mon_outboard || null,
+            mon_waves_provided_by: formData.mon_waves_provided_by,
             foh_tech: formData.foh_tech,
             mon_tech: formData.mon_tech,
           };

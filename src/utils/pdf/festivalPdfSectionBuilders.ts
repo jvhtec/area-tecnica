@@ -146,6 +146,7 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
     return {
       name: toStringValue(artist.name, 'Unnamed Artist'),
       stage: toNumber(artist.stage, 1),
+      loadInTime: toStringValue(artist.load_in_time),
       showTime: {
         start: toStringValue(artist.show_start),
         end: toStringValue(artist.show_end),
@@ -154,6 +155,12 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
         ? {
             start: toStringValue(artist.soundcheck_start),
             end: toStringValue(artist.soundcheck_end),
+          }
+        : undefined,
+      lineCheck: artist.line_check
+        ? {
+            start: toStringValue(artist.line_check_start),
+            end: toStringValue(artist.line_check_end),
           }
         : undefined,
       technical: {
@@ -236,10 +243,13 @@ export const buildRfIemArtists = (artists: Record<string, unknown>[] = []): Arti
       iemSystems: normalizeRfIemSystems(artist.iemSystems ?? artist.iem_systems, iemProvidedBy),
       date: toStringValue(artist.date),
       isAfterMidnight: explicitAfterMidnight === true || computedAfterMidnight,
+      loadInTime: toStringValue(artist.load_in_time || artist.loadInTime),
       showStart,
       showEnd: toStringValue(artist.show_end || artist.showEnd),
       soundcheckStart: toStringValue(artist.soundcheck_start || artist.soundcheckStart),
       soundcheckEnd: toStringValue(artist.soundcheck_end || artist.soundcheckEnd),
+      lineCheckStart: toStringValue(artist.line_check_start || artist.lineCheckStart),
+      lineCheckEnd: toStringValue(artist.line_check_end || artist.lineCheckEnd),
     };
   });
 };

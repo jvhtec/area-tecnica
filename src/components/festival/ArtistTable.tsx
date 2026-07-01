@@ -9,7 +9,7 @@ import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
-import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
+import { exportArtistPDF } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically, sortArtistsByField, type ArtistSortField } from "@/utils/artistSorting";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition, type MonConsolePosition } from "@/constants/consoleDrive";
@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
@@ -27,6 +26,7 @@ import { optimizeImageForUpload, validateImageFile } from "@/utils/imageOptimiza
 import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 import { ArtistActionButtons } from "./ArtistActionButtons";
+import { buildArtistPdfData } from "@/utils/artistPdfDataMapper";
 
 interface Artist {
   id: string;
@@ -556,8 +556,8 @@ export const ArtistTable = ({
   // Apply sorting to filtered artists using imported utility
   const sortedFilteredArtists = (
     sortBy === 'chronological'
-      ? sortArtistsChronologically(filteredArtists as any)
-      : sortArtistsByField(filteredArtists as any, sortBy)
+      ? sortArtistsChronologically(filteredArtists)
+      : sortArtistsByField(filteredArtists, sortBy)
   ) as Artist[];
   const hasArtistSubmittedData = sortedFilteredArtists.some((artist) => artist.artist_submitted);
   const handleDeleteClick = async (artist: Artist) => {
@@ -617,118 +617,10 @@ export const ArtistTable = ({
     return colors[provider] || "bg-gray-100 text-gray-800";
   };
 
-  // Helper function to transform artist data for PDF with logo URL
-  const transformArtistDataForPdf = async (artist: Artist): Promise<ArtistPdfData> => {
-    let logoUrl: string | undefined;
-    let stagePlotUrl: string | undefined;
-    
-    if (jobId) {
-      try {
-        logoUrl = await fetchJobLogo(jobId);
-        console.log('Fetched logo URL for PDF:', logoUrl);
-      } catch (error) {
-        console.error('Error fetching logo for PDF:', error);
-      }
-    }
-
-    if (artist.stage_plot_file_path) {
-      try {
-        const { data: stagePlotData, error: stagePlotError } = await dataLayerClient.storage
-          .from("festival_artist_files")
-          .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
-
-        if (stagePlotError) {
-          console.error("Error creating signed URL for stage plot:", stagePlotError);
-        } else if (stagePlotData?.signedUrl) {
-          stagePlotUrl = stagePlotData.signedUrl;
-        }
-      } catch (error) {
-        console.error("Error loading stage plot for PDF:", error);
-      }
-    }
-
-    return {
-      name: artist.name,
-      stage: artist.stage,
-      date: artist.date,
-      schedule: {
-        show: {
-          start: artist.show_start,
-          end: artist.show_end
-        },
-        soundcheck: artist.soundcheck ? {
-          start: artist.soundcheck_start || '',
-          end: artist.soundcheck_end || ''
-        } : undefined
-      },
-      technical: {
-        fohTech: artist.foh_tech || false,
-        monTech: artist.mon_tech || false,
-        fohConsole: {
-          model: artist.foh_console,
-          providedBy: artist.foh_console_provided_by || 'festival'
-        },
-        monConsole: {
-          model: artist.mon_console,
-          providedBy: artist.mon_console_provided_by || 'festival'
-        },
-        monitorsFromFoh: artist.monitors_from_foh || false,
-        fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
-        monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
-        wireless: {
-          systems: artist.wireless_systems || [],
-          providedBy: artist.wireless_provided_by || 'festival'
-        },
-        iem: {
-          systems: artist.iem_systems || [],
-          providedBy: artist.iem_provided_by || 'festival'
-        },
-        monitors: {
-          enabled: artist.monitors_enabled,
-          quantity: artist.monitors_quantity
-        }
-      },
-      infrastructure: {
-        providedBy: artist.infrastructure_provided_by || 'festival',
-        cat6: {
-          enabled: artist.infra_cat6 || false,
-          quantity: artist.infra_cat6_quantity || 0
-        },
-        hma: {
-          enabled: artist.infra_hma || false,
-          quantity: artist.infra_hma_quantity || 0
-        },
-        coax: {
-          enabled: artist.infra_coax || false,
-          quantity: artist.infra_coax_quantity || 0
-        },
-        opticalconDuo: {
-          enabled: artist.infra_opticalcon_duo || false,
-          quantity: artist.infra_opticalcon_duo_quantity || 0
-        },
-        analog: artist.infra_analog || 0,
-        other: artist.other_infrastructure || ''
-      },
-      extras: {
-        sideFill: artist.extras_sf,
-        drumFill: artist.extras_df,
-        djBooth: artist.extras_djbooth,
-        wired: ''
-      },
-      notes: artist.notes || '',
-      wiredMics: artist.wired_mics || [],
-      logoUrl: logoUrl,
-      micKit: artist.mic_kit || 'band',
-      riderMissing: artist.rider_missing || false,
-      stagePlotUrl,
-      stagePlotFileType: artist.stage_plot_file_type || undefined,
-    };
-  };
-
   const handlePrintArtist = async (artist: Artist) => {
     setPrintingArtistId(artist.id);
     try {
-      const pdfData = await transformArtistDataForPdf(artist);
+      const pdfData = await buildArtistPdfData(artist, jobId);
       
       // Remove the gearComparison assignment as it doesn't exist in ArtistPdfData
       const blob = await exportArtistPDF(pdfData, {

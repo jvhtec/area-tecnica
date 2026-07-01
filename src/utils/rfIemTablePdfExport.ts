@@ -3,6 +3,9 @@ import { es } from 'date-fns/locale';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
+import { extractRfIemScheduleFields, formatRfIemScheduleCell, type RawRfIemScheduleFields, type RfIemScheduleFields } from '@/utils/rfIemScheduleFields';
+
+export { formatTimeRange } from '@/utils/rfIemScheduleFields';
 
 export interface RfIemSystemData {
   model: string;
@@ -14,7 +17,7 @@ export interface RfIemSystemData {
   provided_by?: 'festival' | 'band' | 'mixed';
 }
 
-export interface ArtistRfIemData {
+export interface ArtistRfIemData extends RfIemScheduleFields {
   id?: string;
   name: string;
   stage: number;
@@ -22,10 +25,6 @@ export interface ArtistRfIemData {
   iemSystems: RfIemSystemData[];
   date?: string;
   isAfterMidnight?: boolean;
-  showStart?: string;
-  showEnd?: string;
-  soundcheckStart?: string;
-  soundcheckEnd?: string;
 }
 
 export interface RfIemTablePdfData {
@@ -34,7 +33,7 @@ export interface RfIemTablePdfData {
   artists: ArtistRfIemData[];
 }
 
-export type RawArtistLike = {
+export type RawArtistLike = RawRfIemScheduleFields & {
   id?: string;
   name: string;
   stage: number;
@@ -47,14 +46,6 @@ export type RawArtistLike = {
   date?: unknown;
   isaftermidnight?: unknown;
   isAfterMidnight?: unknown;
-  showStart?: unknown;
-  show_start?: unknown;
-  showEnd?: unknown;
-  show_end?: unknown;
-  soundcheckStart?: unknown;
-  soundcheck_start?: unknown;
-  soundcheckEnd?: unknown;
-  soundcheck_end?: unknown;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -214,18 +205,7 @@ export const normalizeRfIemArtistInput = (artist: RawArtistLike): ArtistRfIemDat
     iemSystems: normalizedIem,
     date: typeof artist.date === 'string' ? artist.date : undefined,
     isAfterMidnight: artist.isAfterMidnight === true || artist.isaftermidnight === true,
-    showStart: typeof (artist.showStart ?? artist.show_start) === 'string'
-      ? String(artist.showStart ?? artist.show_start)
-      : undefined,
-    showEnd: typeof (artist.showEnd ?? artist.show_end) === 'string'
-      ? String(artist.showEnd ?? artist.show_end)
-      : undefined,
-    soundcheckStart: typeof (artist.soundcheckStart ?? artist.soundcheck_start) === 'string'
-      ? String(artist.soundcheckStart ?? artist.soundcheck_start)
-      : undefined,
-    soundcheckEnd: typeof (artist.soundcheckEnd ?? artist.soundcheck_end) === 'string'
-      ? String(artist.soundcheckEnd ?? artist.soundcheck_end)
-      : undefined,
+    ...extractRfIemScheduleFields(artist),
   };
 };
 
@@ -523,15 +503,6 @@ const getStageCellColor = (stageLabel: string): [number, number, number] => {
   return palette[(stageNumber - 1) % palette.length];
 };
 
-export const formatTimeRange = (start?: string, end?: string): string => {
-  const safeStart = (start || '').trim();
-  const safeEnd = (end || '').trim();
-  if (!safeStart && !safeEnd) return '-';
-  if (!safeStart) return `- ${safeEnd}`;
-  if (!safeEnd) return `${safeStart} - -`;
-  return `${safeStart} - ${safeEnd}`;
-};
-
 export const buildRfIemTableRow = (artist: ArtistRfIemData): Array<string | number> => {
   const totalRfChannels = formatMetricBreakdownByProvider(artist.wirelessSystems, getRfSystemChannels);
   const totalRfHH = formatMetricBreakdownByProvider(artist.wirelessSystems, (sys) => sys.quantity_hh || 0);
@@ -544,12 +515,10 @@ export const buildRfIemTableRow = (artist: ArtistRfIemData): Array<string | numb
   const iemBands = getUniqueFormattedBands(artist.iemSystems);
   const rfProvidedBy = getProviderSummary(artist.wirelessSystems);
   const iemProvidedBy = getProviderSummary(artist.iemSystems);
-  const scheduleCell = `Show: ${formatTimeRange(artist.showStart, artist.showEnd)}\nSC: ${formatTimeRange(artist.soundcheckStart, artist.soundcheckEnd)}`;
-
   return [
     artist.name,
     `Escenario ${artist.stage}`,
-    scheduleCell,
+    formatRfIemScheduleCell(artist),
     rfProvidedBy,
     rfModels,
     rfBands,

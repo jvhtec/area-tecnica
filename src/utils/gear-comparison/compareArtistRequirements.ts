@@ -17,6 +17,10 @@ type WavesCheckArgs = {
   availableModels: WavesModelSelection[] | undefined;
 };
 
+type WavesProviderCheckArgs = WavesCheckArgs & {
+  providedBy: 'festival' | 'band' | 'mixed';
+};
+
 type EnumMembershipCheckArgs = {
   label: string;
   required: string | undefined;
@@ -142,6 +146,23 @@ const checkWavesModels = ({ label, artistModels, availableModels }: WavesCheckAr
   };
 };
 
+const evaluateWavesProvider = ({
+  label,
+  providedBy,
+  artistModels,
+  availableModels,
+}: WavesProviderCheckArgs): GearMismatch | null => {
+  if (providedBy === 'band') {
+    return {
+      type: 'console',
+      severity: 'info',
+      message: `La banda aporta Waves/Outboard ${label}${artistModels?.length ? ` (${formatWavesModelSelections(artistModels)})` : ''}`,
+    };
+  }
+
+  return checkWavesModels({ label, artistModels, availableModels });
+};
+
 export const compareArtistRequirements = (
   artist: ArtistRequirements,
   globalSetup: FestivalGearSetup | null,
@@ -209,20 +230,13 @@ export const compareArtistRequirements = (
 
   const fohWavesProvidedBy = artist.foh_waves_provided_by || 'festival';
   if ((artist.foh_waves_models || []).length > 0 || (artist.foh_outboard || "").trim().length > 0) {
-    if (fohWavesProvidedBy === 'band') {
-      mismatches.push({
-        type: 'console',
-        severity: 'info',
-        message: `La banda aporta Waves/Outboard FOH${artist.foh_waves_models?.length ? ` (${formatWavesModelSelections(artist.foh_waves_models)})` : ''}`
-      });
-    } else {
-      const wavesMismatch = checkWavesModels({
-        label: 'FOH',
-        artistModels: artist.foh_waves_models,
-        availableModels: availableGear.foh_waves_models,
-      });
-      if (wavesMismatch) mismatches.push(wavesMismatch);
-    }
+    const wavesMismatch = evaluateWavesProvider({
+      label: 'FOH',
+      providedBy: fohWavesProvidedBy,
+      artistModels: artist.foh_waves_models,
+      availableModels: availableGear.foh_waves_models,
+    });
+    if (wavesMismatch) mismatches.push(wavesMismatch);
   }
 
   // Check Monitor Console availability
@@ -270,20 +284,13 @@ export const compareArtistRequirements = (
 
   const monWavesProvidedBy = artist.mon_waves_provided_by || 'festival';
   if (!artist.monitors_from_foh && ((artist.mon_waves_models || []).length > 0 || (artist.mon_outboard || "").trim().length > 0)) {
-    if (monWavesProvidedBy === 'band') {
-      mismatches.push({
-        type: 'console',
-        severity: 'info',
-        message: `La banda aporta Waves/Outboard MON${artist.mon_waves_models?.length ? ` (${formatWavesModelSelections(artist.mon_waves_models)})` : ''}`
-      });
-    } else {
-      const wavesMismatch = checkWavesModels({
-        label: 'MON',
-        artistModels: artist.mon_waves_models,
-        availableModels: availableGear.mon_waves_models,
-      });
-      if (wavesMismatch) mismatches.push(wavesMismatch);
-    }
+    const wavesMismatch = evaluateWavesProvider({
+      label: 'MON',
+      providedBy: monWavesProvidedBy,
+      artistModels: artist.mon_waves_models,
+      availableModels: availableGear.mon_waves_models,
+    });
+    if (wavesMismatch) mismatches.push(wavesMismatch);
   }
 
   // Check Wireless Systems

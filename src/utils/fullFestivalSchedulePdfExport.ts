@@ -11,11 +11,15 @@ export interface FullScheduleArtist {
   name: string;
   date: string;
   stage: number;
+  load_in_time?: string;
   show_start: string;
   show_end: string;
   soundcheck_start?: string;
   soundcheck_end?: string;
   soundcheck: boolean;
+  line_check?: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
 }
 
 export interface FullFestivalSchedulePdfData {
@@ -29,7 +33,7 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
   console.log('exportFullFestivalSchedulePDF called with data:', data);
   
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const doc = new jsPDF('portrait');
+  const doc = new jsPDF('landscape');
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
 
@@ -105,9 +109,13 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
   // === FESTIVAL SCHEDULE TABLE ===
   const tableData = sortedArtists.map(artist => {
     const stageName = data.stageNames?.[artist.stage] || `Stage ${artist.stage}`;
+    const loadInTime = artist.load_in_time || '-';
     const showTime = `${artist.show_start} - ${artist.show_end}`;
     const soundcheckTime = artist.soundcheck && artist.soundcheck_start && artist.soundcheck_end 
       ? `${artist.soundcheck_start} - ${artist.soundcheck_end}`
+      : '-';
+    const lineCheckTime = artist.line_check && artist.line_check_start && artist.line_check_end
+      ? `${artist.line_check_start} - ${artist.line_check_end}`
       : '-';
     
     return [
@@ -115,20 +123,22 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
       format(new Date(artist.date), 'EEEE'),
       artist.name,
       stageName,
+      loadInTime,
       showTime,
-      soundcheckTime
+      soundcheckTime,
+      lineCheckTime
     ];
   });
 
   console.log('Schedule table data prepared:', tableData.length, 'rows');
 
   autoTable(doc, {
-    head: [['FECHA', 'DÍA', 'ARTISTA', 'ESCENARIO', 'HORA DE SHOW', 'SOUNDCHECK']],
+    head: [['FECHA', 'DÍA', 'ARTISTA', 'ESCENARIO', 'LOAD IN', 'SHOW', 'SOUNDCHECK', 'LINE CHECK']],
     body: tableData,
     startY: 45,
     theme: 'grid',
     styles: {
-      fontSize: 9,
+      fontSize: 8,
       cellPadding: 2,
       valign: 'middle',
       lineColor: [200, 200, 200],
@@ -137,7 +147,7 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
     headStyles: {
       fillColor: [125, 1, 1],
       textColor: [255, 255, 255],
-      fontSize: 10,
+      fontSize: 8.5,
       fontStyle: 'bold',
       cellPadding: 3,
     },
@@ -146,8 +156,10 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
       1: { cellWidth: 22, halign: 'center' }, // Day
       2: { cellWidth: 60, halign: 'left' }, // Artist
       3: { cellWidth: 25, halign: 'center' }, // Stage
-      4: { cellWidth: 30, halign: 'center' }, // Show Time
-      5: { cellWidth: 25, halign: 'center' }, // Soundcheck
+      4: { cellWidth: 20, halign: 'center' }, // Load In
+      5: { cellWidth: 30, halign: 'center' }, // Show Time
+      6: { cellWidth: 25, halign: 'center' }, // Soundcheck
+      7: { cellWidth: 25, halign: 'center' }, // Line Check
     },
     alternateRowStyles: {
       fillColor: [248, 249, 250],

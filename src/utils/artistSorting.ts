@@ -75,7 +75,7 @@ const normalizeTimeForSort = (time: string | undefined, isAfterMidnight?: boolea
   const hour = parseInt(time.split(':')[0], 10);
   if (Number.isNaN(hour)) return null;
   const adjustedHour = isAfterMidnight ? hour + 24 : hour;
-  return `${adjustedHour}${time.substring(time.indexOf(':'))}`;
+  return `${adjustedHour.toString().padStart(2, '0')}${time.substring(time.indexOf(':'))}`;
 };
 
 export const sortArtistsByField = (artists: Artist[], field: Exclude<ArtistSortField, 'chronological'>) => {

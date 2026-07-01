@@ -536,7 +536,10 @@ const FestivalArtistManagement = () => {
           show_end: artist.show_end,
           soundcheck_start: artist.soundcheck_start,
           soundcheck_end: artist.soundcheck_end,
-          soundcheck: artist.soundcheck
+          soundcheck: artist.soundcheck, line_check: artist.line_check,
+          line_check_start: artist.line_check_start,
+          line_check_end: artist.line_check_end,
+          load_in_time: artist.load_in_time,
         })),
         stageNames: stageNames,
         logoUrl: logoUrl || undefined
