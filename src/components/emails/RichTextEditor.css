@@ -5,9 +5,6 @@
   border-radius: 0.5rem;
   overflow: hidden;
   background: hsl(var(--background));
-}
-
-.rich-text-editor-wrapper .quill {
   display: flex;
   flex-direction: column;
 }

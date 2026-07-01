@@ -1,9 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-12T21:28:10.080Z",
+  "generatedAt": "2026-07-01T21:13:42Z",
   "note": "Current npm audit advisories are grandfathered. CI fails on new advisory IDs or increased severity counts.",
   "advisoryIds": [
-    "1098574",
     "1112659",
     "1113300",
     "1113375",
@@ -15,27 +14,36 @@
     "1114680",
     "1116451",
     "1119441",
-    "1120679",
     "1120782"
   ],
   "exceptions": [
     {
-      "advisoryId": "1120679",
-      "package": "esbuild",
-      "rationale": "The vulnerable Deno module path is not used; this repository consumes esbuild through Node and Vite 6. The patched esbuild 0.28 line breaks Vite 6 target transforms, so remove this exception during the planned Vite major migration."
+      "advisoryId": "1116451",
+      "package": "quill",
+      "rationale": "The direct editor dependency is quill@2.0.3. ReactQuill and its nested quill@1.3.7 copy have been removed. Corporate email sanitizes editor HTML with DOMPurify before send; remove this exception when Quill publishes a patched 2.x release or a tested downgrade to 2.0.2 is approved."
+    },
+    {
+      "advisoryId": "1119441",
+      "package": "uuid",
+      "rationale": "This is pulled through exceljs@4.4.0 and the @capacitor/assets toolchain. The app does not pass caller-controlled buffers to uuid v3/v5/v6 through these libraries, and npm audit's ExcelJS fix path downgrades to 3.4.0; remove this exception when ExcelJS or Capacitor assets publish compatible dependency updates."
     },
     {
       "advisoryId": "1120782",
       "package": "tar",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x. @capacitor/assets is already at its latest release and npm audit reports no fixAvailable path for that nested CLI; remove this exception when @capacitor/assets publishes a compatible release that no longer depends on the vulnerable tar range."
+    },
+    {
+      "advisoryId": "1113459",
+      "package": "minimatch",
+      "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @trapezedev/project -> replace. It is used only by local/build tooling on controlled project inputs; remove this exception when @capacitor/assets or @trapezedev/project publishes a compatible release without the vulnerable minimatch range."
     }
   ],
   "vulnerabilityCounts": {
     "info": 0,
-    "low": 0,
-    "moderate": 5,
-    "high": 12,
+    "low": 1,
+    "moderate": 3,
+    "high": 6,
     "critical": 0
   },
-  "total": 17
+  "total": 10
 }

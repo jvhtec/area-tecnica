@@ -20,29 +20,36 @@
 
 ## Known Vulnerabilities (Cannot Fix)
 
-### react-quill/quill - Cross-site Scripting (MODERATE)
+### Quill HTML export - Cross-site Scripting (LOW)
 - **Status**: ⚠️ ACCEPTED RISK
-- **CVE**: GHSA-4943-9vgg-gr5r
-- **Severity**: Moderate (CVSS 4.2)
-- **Affected**: react-quill@2.0.0 bundles quill@1.3.7
+- **CVE**: GHSA-v3m3-f69x-jf25
+- **Severity**: Low
+- **Affected**: quill@2.0.3
 - **Mitigation**:
-  - Application directly uses quill@2.0.3 (not vulnerable)
-  - react-quill has not been updated since Aug 2022
-  - XSS requires authenticated user with low privileges (AC:H - High Attack Complexity)
-  - Consider replacing react-quill with alternative editor in future
-- **Why not fixed**: No updated version of react-quill available that uses quill 2.x
+  - ReactQuill and its nested quill@1.3.7 copy have been removed.
+  - Corporate email sanitizes editor HTML with DOMPurify before sending.
+  - Do not render Quill HTML output outside a DOMPurify-sanitized flow.
+- **Why not fixed**: No patched Quill 2.x release is available. `npm audit fix` suggests downgrading to quill@2.0.2, which should be treated as a planned dependency change with editor regression testing.
 
-### esbuild - Development Server Request Vulnerability (MODERATE)
-- **Status**: ⚠️ ACCEPTED RISK (DEV ONLY)
-- **CVE**: GHSA-67mh-4wv8-2f99
-- **Severity**: Moderate (CVSS 5.3)
-- **Affected**: esbuild@0.24.2 (via vitest@2.1.9)
+### ExcelJS/uuid - Buffer Bounds Check (MODERATE)
+- **Status**: ⚠️ ACCEPTED RISK
+- **CVE**: GHSA-w5hq-g745-h8pq
+- **Severity**: Moderate
+- **Affected**: exceljs@4.4.0 -> uuid@8.3.2
 - **Mitigation**:
-  - Only affects development environment
-  - Not present in production builds
-  - Requires high attack complexity (AC:H)
-  - Upgrading vitest to 4.x would require major changes and testing
-- **Why not fixed**: Would require vitest major version upgrade (2.x → 4.x) which needs extensive testing
+  - ExcelJS is used for generated spreadsheet exports.
+  - The application does not pass caller-controlled buffers to uuid v3/v5/v6 through ExcelJS.
+- **Why not fixed**: `npm audit fix` requires downgrading ExcelJS to 3.4.0, which would undo the SheetJS replacement and requires a dedicated export regression pass. Revisit when ExcelJS publishes a compatible uuid update.
+
+### Capacitor assets toolchain - tar/minimatch/uuid (HIGH)
+- **Status**: ⚠️ ACCEPTED RISK (BUILD TOOLING)
+- **CVE**: GHSA-34x7-hfp2-rc4v, GHSA-8qq5-rm4j-mr97, GHSA-83g3-92jg-28cx, GHSA-qffp-2rhf-9h96, GHSA-9ppj-qmqm-q256, GHSA-r6q2-hw4h-h46w, GHSA-vmf3-w455-68vh, GHSA-3ppc-4f35-3m26, GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74, GHSA-w5hq-g745-h8pq
+- **Severity**: High
+- **Affected**: @capacitor/assets@3.0.5 -> @capacitor/cli/tar and @trapezedev/project/replace/minimatch/xcode/uuid
+- **Mitigation**:
+  - Build-time only; these packages are not part of the production browser bundle.
+  - Capacitor asset generation runs on controlled repository assets, not on untrusted archives or glob patterns.
+- **Why not fixed**: `npm audit` reports no compatible fix for @capacitor/assets. Revisit when @capacitor/assets or @trapezedev/project publishes a patched dependency chain.
 
 ## Security Best Practices
 
@@ -125,7 +132,7 @@
 ### Medium Priority (Next Month)
 - [ ] Implement automated security scanning in CI/CD (npm audit, Snyk, or OWASP)
 - [ ] Set up Dependabot or Renovate for automated dependency PRs
-- [ ] Consider replacing react-quill with maintained alternative (TipTap, Lexical, Slate)
+- [ ] Track a patched Quill 2.x release or schedule a tested downgrade from quill@2.0.3 to quill@2.0.2
 - [ ] Document security testing procedures in test suite
 
 ### Long-term (Next Quarter)
