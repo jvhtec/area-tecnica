@@ -1,21 +1,40 @@
 
 import { ConsoleConfig } from "../../gear-setup/ConsoleConfig";
 import { ConsoleSetup } from "@/types/festival";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { WavesModelPicker } from "../shared/WavesModelPicker";
+import { EnumCheckboxGroup } from "../shared/EnumCheckboxGroup";
+import type { WavesModelSelection } from "@/constants/wavesModels";
+import {
+  FOH_DRIVE_OPTIONS,
+  CONSOLE_POSITION_OPTIONS,
+  MON_CONSOLE_POSITION_OPTIONS,
+  type FohDrive,
+  type ConsolePosition,
+  type MonConsolePosition,
+} from "@/constants/consoleDrive";
 
 interface FestivalConsoleSetupSectionProps {
   formData: {
     foh_consoles: ConsoleSetup[];
     mon_consoles: ConsoleSetup[];
-    foh_waves_outboard: string;
-    mon_waves_outboard: string;
+    foh_drive_options?: FohDrive[];
+    foh_drive_positions?: ConsolePosition[];
+    mon_positions?: MonConsolePosition[];
+    foh_waves_models: WavesModelSelection[];
+    foh_outboard: string;
+    mon_waves_models: WavesModelSelection[];
+    mon_outboard: string;
   };
   onChange: (changes: {
     foh_consoles?: ConsoleSetup[];
     mon_consoles?: ConsoleSetup[];
-    foh_waves_outboard?: string;
-    mon_waves_outboard?: string;
+    foh_drive_options?: FohDrive[];
+    foh_drive_positions?: ConsolePosition[];
+    mon_positions?: MonConsolePosition[];
+    foh_waves_models?: WavesModelSelection[];
+    foh_outboard?: string;
+    mon_waves_models?: WavesModelSelection[];
+    mon_outboard?: string;
   }) => void;
   readOnly?: boolean;
 }
@@ -31,16 +50,33 @@ export const FestivalConsoleSetupSection = ({ formData, onChange, readOnly = fal
         label="Consoles FOH"
         readOnly={readOnly}
       />
-      <div className="space-y-2">
-        <Label htmlFor="festival-foh-waves-outboard">Waves / Outboard FOH</Label>
-        <Input
-          id="festival-foh-waves-outboard"
-          value={formData.foh_waves_outboard || ""}
-          onChange={(event) => onChange({ foh_waves_outboard: event.target.value })}
-          placeholder="Ej: Waves + outboard analógico"
-          disabled={readOnly}
-        />
-      </div>
+      <EnumCheckboxGroup
+        idPrefix="festival-foh-drive"
+        label="Drive FOH soportado"
+        options={FOH_DRIVE_OPTIONS}
+        selected={formData.foh_drive_options || []}
+        onChange={(selected) => onChange({ foh_drive_options: selected })}
+        disabled={readOnly}
+      />
+      <EnumCheckboxGroup
+        idPrefix="festival-foh-drive-position"
+        label="Posiciones de drive FOH soportadas"
+        options={CONSOLE_POSITION_OPTIONS}
+        selected={formData.foh_drive_positions || []}
+        onChange={(selected) => onChange({ foh_drive_positions: selected })}
+        disabled={readOnly}
+      />
+      <WavesModelPicker
+        idPrefix="festival-foh-waves"
+        waveModelsLabel="Servidor Waves FOH"
+        outboardLabel="Outboard FOH"
+        outboardPlaceholder="Ej: outboard analógico adicional"
+        selectedModels={formData.foh_waves_models || []}
+        outboard={formData.foh_outboard || ""}
+        onModelsChange={(models) => onChange({ foh_waves_models: models })}
+        onOutboardChange={(outboard) => onChange({ foh_outboard: outboard })}
+        disabled={readOnly}
+      />
 
       <ConsoleConfig
         consoles={formData.mon_consoles}
@@ -48,16 +84,25 @@ export const FestivalConsoleSetupSection = ({ formData, onChange, readOnly = fal
         label="Consoles de Monitor"
         readOnly={readOnly}
       />
-      <div className="space-y-2">
-        <Label htmlFor="festival-mon-waves-outboard">Waves / Outboard MON</Label>
-        <Input
-          id="festival-mon-waves-outboard"
-          value={formData.mon_waves_outboard || ""}
-          onChange={(event) => onChange({ mon_waves_outboard: event.target.value })}
-          placeholder="Ej: Plugins/FX para monitores"
-          disabled={readOnly}
-        />
-      </div>
+      <EnumCheckboxGroup
+        idPrefix="festival-mon-position"
+        label="Posiciones de monitores soportadas"
+        options={MON_CONSOLE_POSITION_OPTIONS}
+        selected={formData.mon_positions || []}
+        onChange={(selected) => onChange({ mon_positions: selected })}
+        disabled={readOnly}
+      />
+      <WavesModelPicker
+        idPrefix="festival-mon-waves"
+        waveModelsLabel="Servidor Waves MON"
+        outboardLabel="Outboard MON"
+        outboardPlaceholder="Ej: outboard adicional para monitores"
+        selectedModels={formData.mon_waves_models || []}
+        outboard={formData.mon_outboard || ""}
+        onModelsChange={(models) => onChange({ mon_waves_models: models })}
+        onOutboardChange={(outboard) => onChange({ mon_outboard: outboard })}
+        disabled={readOnly}
+      />
     </div>
   );
 };

@@ -8,6 +8,12 @@ import {
 import { ConfigSummaryRow } from "./ConfigSummaryRow";
 import { GearMismatchIndicator } from "../GearMismatchIndicator";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
+import {
+  FOH_DRIVE_LABELS,
+  CONSOLE_POSITION_LABELS,
+  type FohDrive,
+  type ConsolePosition,
+} from "@/constants/consoleDrive";
 
 interface Artist {
   id: string;
@@ -19,13 +25,22 @@ interface Artist {
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  line_check?: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
+  load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
+  foh_drive?: string | null;
+  foh_drive_position?: string | null;
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_position?: string | null;
   monitors_from_foh?: boolean;
-  foh_waves_outboard?: string;
-  mon_waves_outboard?: string;
+  foh_waves_models?: any[];
+  foh_outboard?: string;
+  mon_waves_models?: any[];
+  mon_outboard?: string;
   wireless_systems: any[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
@@ -60,19 +75,40 @@ interface Artist {
 
 // --- Summary Formatters ---
 
+function getDriveSummary(artist: Artist): string {
+  const driveLabel = artist.foh_drive
+    ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive
+    : "";
+  const positionLabel = artist.foh_drive_position
+    ? CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position
+    : "";
+  if (!driveLabel && !positionLabel) return "";
+  if (driveLabel && positionLabel) return `Drive: ${driveLabel} (${positionLabel})`;
+  return `Drive: ${driveLabel || positionLabel}`;
+}
+
 function getConsoleSummary(artist: Artist): string {
   if (artist.monitors_from_foh) {
     const foh = artist.foh_console || "Sin especificar";
-    return `FOH: ${foh} (Mon desde FOH)`;
+    const parts = [`FOH: ${foh} (Mon desde FOH)`];
+    const drive = getDriveSummary(artist);
+    if (drive) parts.push(drive);
+    return parts.join(", ");
   }
   const parts: string[] = [];
   if (artist.foh_console) {
     const prov = artist.foh_console_provided_by ? ` (${artist.foh_console_provided_by})` : "";
     parts.push(`FOH: ${artist.foh_console}${prov}`);
   }
+  const drive = getDriveSummary(artist);
+  if (drive) parts.push(drive);
   if (artist.mon_console) {
     const prov = artist.mon_console_provided_by ? ` (${artist.mon_console_provided_by})` : "";
     parts.push(`MON: ${artist.mon_console}${prov}`);
+  }
+  if (artist.mon_position) {
+    const posLabel = CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position;
+    parts.push(`Posición MON: ${posLabel}`);
   }
   return parts.length > 0 ? parts.join(", ") : "Sin configurar";
 }
@@ -253,7 +289,13 @@ export const MobileArtistCard = ({
         </div>
 
         {/* Time Row */}
-        <div className={`grid gap-2 mt-3 ${artist.soundcheck ? 'grid-cols-1 min-[380px]:grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 mt-3">
+          {artist.load_in_time && (
+            <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Load In</div>
+              <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeCompact(artist.load_in_time)}</div>
+            </div>
+          )}
           <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
             <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Hora del Show</div>
             <div className="text-xs font-bold font-mono truncate">{formatTimeRange(artist.show_start, artist.show_end)}</div>
@@ -262,6 +304,12 @@ export const MobileArtistCard = ({
             <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
               <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Soundcheck</div>
               <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)}</div>
+            </div>
+          )}
+          {artist.line_check && (
+            <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Line Check</div>
+              <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeRange(artist.line_check_start, artist.line_check_end)}</div>
             </div>
           )}
         </div>

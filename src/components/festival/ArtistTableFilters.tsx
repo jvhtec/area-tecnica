@@ -8,8 +8,6 @@ interface ArtistTableFiltersProps {
   onSearchChange: (value: string) => void;
   stageFilter: string;
   onStageFilterChange: (value: string) => void;
-  equipmentFilter: string;
-  onEquipmentFilterChange: (value: string) => void;
   riderFilter?: string;
   onRiderFilterChange?: (value: string) => void;
   hideStageFilter?: boolean;
@@ -20,14 +18,12 @@ export const ArtistTableFilters = ({
   onSearchChange,
   stageFilter,
   onStageFilterChange,
-  equipmentFilter,
-  onEquipmentFilterChange,
   riderFilter = "all",
   onRiderFilterChange,
   hideStageFilter = false,
 }: ArtistTableFiltersProps) => {
-  const gridCols = hideStageFilter ? "lg:grid-cols-3" : "lg:grid-cols-4";
-  
+  const gridCols = hideStageFilter ? "lg:grid-cols-2" : "lg:grid-cols-3";
+
   return (
     <div className="space-y-4 mb-4">
       <div className={`grid grid-cols-1 md:grid-cols-2 ${gridCols} gap-4`}>
@@ -58,21 +54,6 @@ export const ArtistTableFilters = ({
             </Select>
           </div>
         )}
-
-        <div>
-          <Label htmlFor="equipment" className="text-sm">Filtrar por equipo</Label>
-          <Select value={equipmentFilter} onValueChange={onEquipmentFilterChange}>
-            <SelectTrigger id="equipment" className="h-10">
-              <SelectValue placeholder="Todo el equipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todo el equipo</SelectItem>
-              <SelectItem value="wireless">Wireless</SelectItem>
-              <SelectItem value="iem">IEM</SelectItem>
-              <SelectItem value="monitors">Monitores</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
         <div>
           <Label htmlFor="rider" className="text-sm">Filtrar por estado del rider</Label>

@@ -7,45 +7,49 @@ import { useEffect } from "react";
 export const WirelessSetupSection = ({ formData, onChange, readOnly = false }: ArtistSectionProps) => {
   // Auto-detect mixed providers for wireless systems
   const detectWirelessProvider = (systems: any[]) => {
-    if (!systems || systems.length === 0) return "festival";
-    
     const providers = systems.map(system => system.provided_by || "festival");
     const uniqueProviders = [...new Set(providers)];
-    
+
     if (uniqueProviders.length > 1) {
       return "mixed";
     }
-    
+
     return uniqueProviders[0] || "festival";
   };
 
   // Auto-detect mixed providers for IEM systems
   const detectIEMProvider = (systems: any[]) => {
-    if (!systems || systems.length === 0) return "festival";
-    
     const providers = systems.map(system => system.provided_by || "festival");
     const uniqueProviders = [...new Set(providers)];
-    
+
     if (uniqueProviders.length > 1) {
       return "mixed";
     }
-    
+
     return uniqueProviders[0] || "festival";
   };
 
-  // Auto-update provider when systems change
+  // Auto-update provider when systems change. Only runs when systems exist -
+  // otherwise a manually selected provider (e.g. "band" with no systems added
+  // yet) would get overwritten back to "festival" and never get persisted.
   useEffect(() => {
     if (readOnly) return;
 
-    const detectedWirelessProvider = detectWirelessProvider(formData.wireless_systems || []);
-    const detectedIEMProvider = detectIEMProvider(formData.iem_systems || []);
-    
-    if (detectedWirelessProvider !== formData.wireless_provided_by) {
-      onChange({ wireless_provided_by: detectedWirelessProvider });
+    const wirelessSystems = formData.wireless_systems || [];
+    const iemSystems = formData.iem_systems || [];
+
+    if (wirelessSystems.length > 0) {
+      const detectedWirelessProvider = detectWirelessProvider(wirelessSystems);
+      if (detectedWirelessProvider !== formData.wireless_provided_by) {
+        onChange({ wireless_provided_by: detectedWirelessProvider });
+      }
     }
-    
-    if (detectedIEMProvider !== formData.iem_provided_by) {
-      onChange({ iem_provided_by: detectedIEMProvider });
+
+    if (iemSystems.length > 0) {
+      const detectedIEMProvider = detectIEMProvider(iemSystems);
+      if (detectedIEMProvider !== formData.iem_provided_by) {
+        onChange({ iem_provided_by: detectedIEMProvider });
+      }
     }
   }, [formData.wireless_systems, formData.iem_systems, readOnly]);
 

@@ -14,6 +14,7 @@ import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { WiredMic } from "./gear-setup/WiredMicConfig";
 import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
 import type { Json } from "@/integrations/supabase/types";
+import { WavesModelPicker } from "./form/shared/WavesModelPicker";
 
 export const ArtistForm = () => {
   const { token } = useParams();
@@ -28,8 +29,6 @@ export const ArtistForm = () => {
     foh_tech: boolean;
     mon_tech: boolean;
     monitors_from_foh: boolean;
-    foh_waves_outboard: string;
-    mon_waves_outboard: string;
     isaftermidnight: boolean;
     rider_missing: boolean;
   }>({
@@ -42,16 +41,24 @@ export const ArtistForm = () => {
     soundcheck: false,
     soundcheck_start: "18:00",
     soundcheck_end: "19:00",
+    line_check: false,
+    line_check_start: "",
+    line_check_end: "",
+    load_in_time: "",
     foh_console: "",
     foh_consoles: [],
     foh_console_provided_by: "festival",
     foh_tech: false,
-    foh_waves_outboard: "",
+    foh_waves_models: [],
+    foh_outboard: "",
+    foh_waves_provided_by: "festival",
     mon_console: "",
     mon_consoles: [],
     mon_console_provided_by: "festival",
     monitors_from_foh: false,
-    mon_waves_outboard: "",
+    mon_waves_models: [],
+    mon_outboard: "",
+    mon_waves_provided_by: "festival",
     mon_tech: false,
     wireless_systems: [],
     iem_systems: [],
@@ -165,11 +172,15 @@ export const ArtistForm = () => {
           foh_console: formData.foh_console,
           foh_console_provided_by: formData.foh_console_provided_by,
           foh_tech: formData.foh_tech,
-          foh_waves_outboard: formData.foh_waves_outboard,
+          foh_waves_models: formData.foh_waves_models as unknown as Json,
+          foh_outboard: formData.foh_outboard,
+          foh_waves_provided_by: formData.foh_waves_provided_by,
           mon_console: formData.mon_console,
           mon_console_provided_by: formData.mon_console_provided_by,
           monitors_from_foh: formData.monitors_from_foh,
-          mon_waves_outboard: formData.mon_waves_outboard,
+          mon_waves_models: formData.mon_waves_models as unknown as Json,
+          mon_outboard: formData.mon_outboard,
+          mon_waves_provided_by: formData.mon_waves_provided_by,
           mon_tech: formData.mon_tech,
           wireless_systems: formData.wireless_systems as unknown as Json,
           wireless_provided_by: formData.wireless_provided_by,
@@ -367,15 +378,19 @@ export const ArtistForm = () => {
                 />
                 <Label htmlFor="foh-tech">Requiere Técnico FOH</Label>
               </div>
-              <div className="space-y-2">
-                <Label>Waves / Outboard FOH</Label>
-                <Input
-                  type="text"
-                  value={formData.foh_waves_outboard || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, foh_waves_outboard: e.target.value }))}
-                  placeholder="Ej: Waves + outboard analógico"
-                />
-              </div>
+              <WavesModelPicker
+                idPrefix="artist-form-foh-waves"
+                waveModelsLabel="Servidor Waves FOH"
+                outboardLabel="Outboard FOH"
+                outboardPlaceholder="Ej: outboard analógico adicional"
+                selectedModels={formData.foh_waves_models || []}
+                outboard={formData.foh_outboard || ""}
+                onModelsChange={(models) => setFormData(prev => ({ ...prev, foh_waves_models: models }))}
+                onOutboardChange={(outboard) => setFormData(prev => ({ ...prev, foh_outboard: outboard }))}
+                providedBy={formData.foh_waves_provided_by || "festival"}
+                onProvidedByChange={(providedBy) => setFormData(prev => ({ ...prev, foh_waves_provided_by: providedBy as 'festival' | 'band' | 'mixed' }))}
+                providedByLabel="Waves/Outboard FOH proporcionado por"
+              />
             </div>
 
             {/* Monitor Console Section */}
@@ -391,7 +406,9 @@ export const ArtistForm = () => {
                       monitors_from_foh: !!checked,
                       mon_console: checked ? "" : prev.mon_console,
                       mon_console_provided_by: checked ? "festival" : prev.mon_console_provided_by,
-                      mon_waves_outboard: checked ? "" : prev.mon_waves_outboard,
+                      mon_waves_models: checked ? [] : prev.mon_waves_models,
+                      mon_outboard: checked ? "" : prev.mon_outboard,
+                      mon_waves_provided_by: checked ? "festival" : prev.mon_waves_provided_by,
                     }))
                   }
                 />
@@ -434,15 +451,19 @@ export const ArtistForm = () => {
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Waves / Outboard MON</Label>
-                    <Input
-                      type="text"
-                      value={formData.mon_waves_outboard || ""}
-                      onChange={(e) => setFormData(prev => ({ ...prev, mon_waves_outboard: e.target.value }))}
-                      placeholder="Ej: Plugins/FX para monitores"
-                    />
-                  </div>
+                  <WavesModelPicker
+                    idPrefix="artist-form-mon-waves"
+                    waveModelsLabel="Servidor Waves MON"
+                    outboardLabel="Outboard MON"
+                    outboardPlaceholder="Ej: outboard adicional para monitores"
+                    selectedModels={formData.mon_waves_models || []}
+                    outboard={formData.mon_outboard || ""}
+                    onModelsChange={(models) => setFormData(prev => ({ ...prev, mon_waves_models: models }))}
+                    onOutboardChange={(outboard) => setFormData(prev => ({ ...prev, mon_outboard: outboard }))}
+                    providedBy={formData.mon_waves_provided_by || "festival"}
+                    onProvidedByChange={(providedBy) => setFormData(prev => ({ ...prev, mon_waves_provided_by: providedBy as 'festival' | 'band' | 'mixed' }))}
+                    providedByLabel="Waves/Outboard MON proporcionado por"
+                  />
                 </>
               )}
               <div className="flex items-center space-x-2">

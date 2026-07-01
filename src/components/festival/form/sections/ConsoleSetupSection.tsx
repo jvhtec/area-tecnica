@@ -2,11 +2,12 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { useEffect } from "react";
 import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
+import { WavesModelPicker } from "../shared/WavesModelPicker";
+import { FOH_DRIVE_OPTIONS, CONSOLE_POSITION_OPTIONS, MON_CONSOLE_POSITION_OPTIONS } from "@/constants/consoleDrive";
 
 export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: ArtistSectionProps) => {
   const { models } = useEquipmentModels();
@@ -30,17 +31,30 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
   useEffect(() => {
     if (!formData.monitors_from_foh) return;
 
-    if (formData.mon_console || formData.mon_waves_outboard || formData.mon_console_provided_by !== "festival") {
+    if (
+      formData.mon_console ||
+      (formData.mon_waves_models && formData.mon_waves_models.length > 0) ||
+      formData.mon_outboard ||
+      formData.mon_console_provided_by !== "festival" ||
+      formData.mon_waves_provided_by !== "festival" ||
+      formData.mon_position
+    ) {
       onChange({
         mon_console: "",
         mon_console_provided_by: "festival",
-        mon_waves_outboard: "",
+        mon_waves_models: [],
+        mon_outboard: "",
+        mon_waves_provided_by: "festival",
+        mon_position: "",
       });
     }
   }, [
     formData.mon_console,
     formData.mon_console_provided_by,
-    formData.mon_waves_outboard,
+    formData.mon_waves_models,
+    formData.mon_outboard,
+    formData.mon_waves_provided_by,
+    formData.mon_position,
     formData.monitors_from_foh,
     onChange,
   ]);
@@ -103,6 +117,46 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
             </Select>
           </div>
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label>{tx("Drive", "Drive")}</Label>
+            <Select
+              value={formData.foh_drive || ""}
+              onValueChange={(value) => onChange({ foh_drive: value })}
+              disabled={locked("foh_drive")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={tx("Seleccionar drive", "Select drive")} />
+              </SelectTrigger>
+              <SelectContent>
+                {FOH_DRIVE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>{tx("Posición", "Position")}</Label>
+            <Select
+              value={formData.foh_drive_position || ""}
+              onValueChange={(value) => onChange({ foh_drive_position: value })}
+              disabled={locked("foh_drive_position")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={tx("Seleccionar posición", "Select position")} />
+              </SelectTrigger>
+              <SelectContent>
+                {CONSOLE_POSITION_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <div className="flex items-center space-x-2">
           <Checkbox
             id="foh-tech"
@@ -112,16 +166,21 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
           />
           <Label htmlFor="foh-tech">{tx("Requiere Técnico FOH", "Requires FOH engineer")}</Label>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="foh-waves-outboard">{tx("Waves / Outboard FOH", "FOH Waves / Outboard")}</Label>
-          <Input
-            id="foh-waves-outboard"
-            value={formData.foh_waves_outboard || ""}
-            onChange={(event) => onChange({ foh_waves_outboard: event.target.value })}
-            placeholder={tx("Ej: Waves + outboard analógico", "Ex: Waves + analog outboard")}
-            disabled={locked("foh_waves_outboard")}
-          />
-        </div>
+        <WavesModelPicker
+          idPrefix="foh-waves"
+          waveModelsLabel={tx("Servidor Waves FOH", "FOH Waves Server")}
+          outboardLabel={tx("Outboard FOH", "FOH Outboard")}
+          outboardPlaceholder={tx("Ej: outboard analógico adicional", "Ex: additional analog outboard")}
+          selectedModels={formData.foh_waves_models || []}
+          outboard={formData.foh_outboard || ""}
+          onModelsChange={(models) => onChange({ foh_waves_models: models })}
+          onOutboardChange={(outboard) => onChange({ foh_outboard: outboard })}
+          providedBy={formData.foh_waves_provided_by || "festival"}
+          onProvidedByChange={(providedBy) => onChange({ foh_waves_provided_by: providedBy })}
+          providedByLabel={tx("Waves/Outboard FOH proporcionado por", "FOH Waves/Outboard provided by")}
+          disabled={locked("foh_waves_models")}
+          language={language}
+        />
       </div>
 
       {/* Monitor Console */}
@@ -188,17 +247,41 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>{tx("Posición", "Position")}</Label>
+                <Select
+                  value={formData.mon_position || ""}
+                  onValueChange={(value) => onChange({ mon_position: value })}
+                  disabled={locked("mon_position")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={tx("Seleccionar posición", "Select position")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MON_CONSOLE_POSITION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="mon-waves-outboard">{tx("Waves / Outboard MON", "MON Waves / Outboard")}</Label>
-              <Input
-                id="mon-waves-outboard"
-                value={formData.mon_waves_outboard || ""}
-                onChange={(event) => onChange({ mon_waves_outboard: event.target.value })}
-                placeholder={tx("Ej: Plugins/FX para monitores", "Ex: Monitor plugins/FX")}
-                disabled={locked("mon_waves_outboard")}
-              />
-            </div>
+            <WavesModelPicker
+              idPrefix="mon-waves"
+              waveModelsLabel={tx("Servidor Waves MON", "MON Waves Server")}
+              outboardLabel={tx("Outboard MON", "MON Outboard")}
+              outboardPlaceholder={tx("Ej: outboard adicional para monitores", "Ex: additional outboard for monitors")}
+              selectedModels={formData.mon_waves_models || []}
+              outboard={formData.mon_outboard || ""}
+              onModelsChange={(models) => onChange({ mon_waves_models: models })}
+              onOutboardChange={(outboard) => onChange({ mon_outboard: outboard })}
+              providedBy={formData.mon_waves_provided_by || "festival"}
+              onProvidedByChange={(providedBy) => onChange({ mon_waves_provided_by: providedBy })}
+              providedByLabel={tx("Waves/Outboard MON proporcionado por", "MON Waves/Outboard provided by")}
+              disabled={locked("mon_waves_models")}
+              language={language}
+            />
           </>
         ) : (
           <p className="text-xs text-muted-foreground">

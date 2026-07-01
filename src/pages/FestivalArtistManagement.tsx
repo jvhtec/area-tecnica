@@ -17,6 +17,7 @@ import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
+import { combineWavesDisplay } from "@/constants/wavesModels";
 import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -43,7 +44,6 @@ const FestivalArtistManagement = () => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
-  const [equipmentFilter, setEquipmentFilter] = useState("");
   const [riderFilter, setRiderFilter] = useState("all");
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -401,8 +401,8 @@ const FestivalArtistManagement = () => {
               providedBy: artist.mon_console_provided_by
             },
             monitorsFromFoh: artist.monitors_from_foh || false,
-            fohWavesOutboard: artist.foh_waves_outboard || "",
-            monWavesOutboard: artist.mon_waves_outboard || "",
+            fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
+            monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
             wireless: {
               systems: Array.isArray(wirelessSystems) ? wirelessSystems : [],
               providedBy: artist.wireless_provided_by
@@ -536,7 +536,10 @@ const FestivalArtistManagement = () => {
           show_end: artist.show_end,
           soundcheck_start: artist.soundcheck_start,
           soundcheck_end: artist.soundcheck_end,
-          soundcheck: artist.soundcheck
+          soundcheck: artist.soundcheck, line_check: artist.line_check,
+          line_check_start: artist.line_check_start,
+          line_check_end: artist.line_check_end,
+          load_in_time: artist.load_in_time,
         })),
         stageNames: stageNames,
         logoUrl: logoUrl || undefined
@@ -715,8 +718,6 @@ const FestivalArtistManagement = () => {
                 stageFilter={stageFilter}
                 onStageFilterChange={setStageFilter}
                 hideStageFilter
-                equipmentFilter={equipmentFilter}
-                onEquipmentFilterChange={setEquipmentFilter}
                 riderFilter={riderFilter}
                 onRiderFilterChange={setRiderFilter}
               />
@@ -746,11 +747,10 @@ const FestivalArtistManagement = () => {
                     isLoading={artistsLoading} 
                     onEditArtist={handleEditArtist} 
                     onDeleteArtist={handleDeleteArtist} 
-                    searchTerm={searchTerm} 
-                    stageFilter={stageFilter} 
-                    equipmentFilter={equipmentFilter} 
-                    riderFilter={riderFilter} 
-                    dayStartTime={dayStartTime} 
+                    searchTerm={searchTerm}
+                    stageFilter={stageFilter}
+                    riderFilter={riderFilter}
+                    dayStartTime={dayStartTime}
                     jobId={jobId}
                     selectedDate={selectedDate}
                     onArtistStagePlotUpdated={invalidateArtists}

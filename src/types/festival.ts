@@ -1,5 +1,7 @@
 
 import type { FrequencyBandSelection } from "@/lib/frequencyBands";
+import type { WavesModelSelection } from "@/constants/wavesModels";
+import type { FohDrive, ConsolePosition, MonConsolePosition } from "@/constants/consoleDrive";
 
 export interface ConsoleSetup {
   model: string;
@@ -32,8 +34,13 @@ export interface FestivalGearSetup {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_outboard?: string | null;
-  mon_waves_outboard?: string | null;
+  foh_drive_options?: FohDrive[];
+  foh_drive_positions?: ConsolePosition[];
+  mon_positions?: MonConsolePosition[];
+  foh_waves_models?: WavesModelSelection[];
+  foh_outboard?: string | null;
+  mon_waves_models?: WavesModelSelection[];
+  mon_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];
@@ -63,15 +70,26 @@ export interface ArtistFormData {
   readonly soundcheck: boolean;
   readonly soundcheck_start?: string;
   readonly soundcheck_end?: string;
+  readonly line_check: boolean;
+  readonly line_check_start?: string;
+  readonly line_check_end?: string;
+  readonly load_in_time?: string;
   foh_console: string;
   foh_consoles: ConsoleSetup[];
   foh_console_provided_by: ProviderType;
+  foh_drive?: FohDrive | '';
+  foh_drive_position?: ConsolePosition | '';
   mon_console: string;
   mon_consoles: ConsoleSetup[];
   mon_console_provided_by: ProviderType;
+  mon_position?: MonConsolePosition | '';
   monitors_from_foh: boolean;
-  foh_waves_outboard: string;
-  mon_waves_outboard: string;
+  foh_waves_models: WavesModelSelection[];
+  foh_outboard: string;
+  foh_waves_provided_by: ProviderType;
+  mon_waves_models: WavesModelSelection[];
+  mon_outboard: string;
+  mon_waves_provided_by: ProviderType;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wireless_provided_by: ProviderType;
@@ -114,8 +132,13 @@ export interface StageGearSetup {
   stage_number: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_outboard?: string | null;
-  mon_waves_outboard?: string | null;
+  foh_drive_options?: FohDrive[];
+  foh_drive_positions?: ConsolePosition[];
+  mon_positions?: MonConsolePosition[];
+  foh_waves_models?: WavesModelSelection[];
+  foh_outboard?: string | null;
+  mon_waves_models?: WavesModelSelection[];
+  mon_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];

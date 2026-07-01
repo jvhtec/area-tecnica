@@ -20,6 +20,7 @@ import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { Checkbox } from "@/components/ui/checkbox";
 import { buildReadableFilename } from "@/utils/fileName";
+import { combineWavesDisplay } from "@/constants/wavesModels";
 
 interface Artist {
   id: string;
@@ -31,13 +32,21 @@ interface Artist {
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  line_check?: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
+  load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_from_foh?: boolean;
-  foh_waves_outboard?: string;
-  mon_waves_outboard?: string;
+  foh_waves_models?: any[];
+  foh_outboard?: string;
+  foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_waves_models?: any[];
+  mon_outboard?: string;
+  mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: any[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
@@ -149,7 +158,7 @@ export const ArtistTablePrintDialog = ({
       });
 
       // Sort artists chronologically using the shared utility
-      const sortedArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
+      const sortedArtists = sortArtistsChronologically(filteredArtists) as Artist[];
 
       console.log('Filtered artists count:', filteredArtists.length);
       
@@ -221,8 +230,12 @@ export const ArtistTablePrintDialog = ({
           mon_console: artist.mon_console,
           mon_console_provided_by: (artist.mon_console_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           monitors_from_foh: artist.monitors_from_foh || false,
-          foh_waves_outboard: artist.foh_waves_outboard || "",
-          mon_waves_outboard: artist.mon_waves_outboard || "",
+          foh_waves_models: artist.foh_waves_models || [],
+          foh_outboard: artist.foh_outboard || "",
+          foh_waves_provided_by: artist.foh_waves_provided_by || 'festival',
+          mon_waves_models: artist.mon_waves_models || [],
+          mon_outboard: artist.mon_outboard || "",
+          mon_waves_provided_by: artist.mon_waves_provided_by || 'festival',
           wireless_systems: artist.wireless_systems || [],
           wireless_provided_by: (artist.wireless_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           iem_systems: artist.iem_systems || [],
@@ -251,6 +264,7 @@ export const ArtistTablePrintDialog = ({
         return {
           name: artist.name,
           stage: artist.stage,
+          loadInTime: artist.load_in_time || undefined,
           showTime: {
             start: artist.show_start,
             end: artist.show_end
@@ -258,6 +272,10 @@ export const ArtistTablePrintDialog = ({
           soundcheck: artist.soundcheck ? {
             start: artist.soundcheck_start || '',
             end: artist.soundcheck_end || ''
+          } : undefined,
+          lineCheck: artist.line_check ? {
+            start: artist.line_check_start || '',
+            end: artist.line_check_end || ''
           } : undefined,
           technical: {
             fohTech: artist.foh_tech || false,
@@ -271,8 +289,8 @@ export const ArtistTablePrintDialog = ({
               providedBy: artist.mon_console_provided_by || 'festival'
             },
             monitorsFromFoh: artist.monitors_from_foh || false,
-            fohWavesOutboard: artist.foh_waves_outboard || "",
-            monWavesOutboard: artist.mon_waves_outboard || "",
+            fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
+            monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
             wireless: {
               systems: artist.wireless_systems || [],
               providedBy: artist.wireless_provided_by || 'festival'

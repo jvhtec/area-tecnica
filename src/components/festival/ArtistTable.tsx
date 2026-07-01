@@ -4,18 +4,19 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, ImageOff, ImagePlus, Loader2, Mic } from "lucide-react";
+import { ArrowDown, ExternalLink, ImageOff, ImagePlus, Loader2, Mic } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
-import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
-import { sortArtistsChronologically } from "@/utils/artistSorting";
+import { exportArtistPDF } from "@/utils/artistPdfExport";
+import { sortArtistsChronologically, sortArtistsByField, type ArtistSortField } from "@/utils/artistSorting";
+import { combineWavesDisplay } from "@/constants/wavesModels";
+import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition, type MonConsolePosition } from "@/constants/consoleDrive";
 import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
@@ -25,6 +26,7 @@ import { optimizeImageForUpload, validateImageFile } from "@/utils/imageOptimiza
 import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 import { ArtistActionButtons } from "./ArtistActionButtons";
+import { buildArtistPdfData } from "@/utils/artistPdfDataMapper";
 
 interface Artist {
   id: string;
@@ -36,13 +38,24 @@ interface Artist {
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  line_check?: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
+  load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
+  foh_drive?: string;
+  foh_drive_position?: string;
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_position?: string;
   monitors_from_foh?: boolean;
-  foh_waves_outboard?: string;
-  mon_waves_outboard?: string;
+  foh_waves_models?: any[];
+  foh_outboard?: string;
+  foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_waves_models?: any[];
+  mon_outboard?: string;
+  mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: any[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
@@ -92,7 +105,6 @@ interface ArtistTableProps {
   onDeleteArtist: (artist: Artist) => void;
   searchTerm: string;
   stageFilter: string;
-  equipmentFilter: string;
   riderFilter: string;
   dayStartTime: string;
   jobId?: string;
@@ -102,40 +114,6 @@ interface ArtistTableProps {
   canCreateExtras: boolean;
 }
 
-type EquipmentSystem = {
-  quantity?: number | string | null;
-  quantity_hh?: number | string | null;
-  quantity_bp?: number | string | null;
-};
-
-const hasSystemsWithPositiveQuantities = (systems: EquipmentSystem[] = []) => {
-  return Array.isArray(systems) &&
-    systems.length > 0 &&
-    systems.some(system =>
-      Number(system?.quantity || 0) > 0 ||
-      Number(system?.quantity_hh || 0) > 0 ||
-      Number(system?.quantity_bp || 0) > 0
-    );
-};
-
-const matchesEquipmentFilter = (artist: Artist, equipmentFilter: string) => {
-  const filterKey = (equipmentFilter || "").trim().toLowerCase();
-
-  switch (filterKey) {
-    case "":
-    case "all":
-      return true;
-    case "wireless":
-      return hasSystemsWithPositiveQuantities(artist.wireless_systems);
-    case "iem":
-      return hasSystemsWithPositiveQuantities(artist.iem_systems);
-    case "monitors":
-      return Boolean(artist.monitors_enabled) || Number(artist.monitors_quantity || 0) > 0;
-    default:
-      return true;
-  }
-};
-
 export const ArtistTable = ({
   artists,
   isLoading,
@@ -143,7 +121,6 @@ export const ArtistTable = ({
   onDeleteArtist,
   searchTerm,
   stageFilter,
-  equipmentFilter,
   riderFilter,
   dayStartTime,
   jobId,
@@ -152,6 +129,11 @@ export const ArtistTable = ({
   canDelete,
   canCreateExtras
 }: ArtistTableProps) => {
+  const [sortBy, setSortBy] = useState<ArtistSortField>('chronological');
+
+  const toggleSort = (field: Exclude<ArtistSortField, 'chronological'>) => {
+    setSortBy((current) => (current === field ? 'chronological' : field));
+  };
   const confirm = useConfirm();
   const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
@@ -253,11 +235,18 @@ export const ArtistTable = ({
         stage: artist.stage,
         foh_console: artist.foh_console,
         foh_console_provided_by: artist.foh_console_provided_by,
+        foh_drive: artist.foh_drive as FohDrive | '' | undefined,
+        foh_drive_position: artist.foh_drive_position as ConsolePosition | '' | undefined,
         mon_console: artist.mon_console,
         mon_console_provided_by: artist.mon_console_provided_by,
+        mon_position: artist.mon_position as MonConsolePosition | '' | undefined,
         monitors_from_foh: artist.monitors_from_foh || false,
-        foh_waves_outboard: artist.foh_waves_outboard || "",
-        mon_waves_outboard: artist.mon_waves_outboard || "",
+        foh_waves_models: artist.foh_waves_models || [],
+        foh_outboard: artist.foh_outboard || "",
+        foh_waves_provided_by: artist.foh_waves_provided_by,
+        mon_waves_models: artist.mon_waves_models || [],
+        mon_outboard: artist.mon_outboard || "",
+        mon_waves_provided_by: artist.mon_waves_provided_by,
         wireless_systems: artist.wireless_systems || [],
         wireless_provided_by: artist.wireless_provided_by,
         iem_systems: artist.iem_systems || [],
@@ -560,13 +549,16 @@ export const ArtistTable = ({
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = stageFilter === "all" || artist.stage?.toString() === stageFilter;
-    const matchesEquipment = matchesEquipmentFilter(artist, equipmentFilter);
     const matchesRider = riderFilter === "all" || riderFilter === "missing" && artist.rider_missing || riderFilter === "complete" && !artist.rider_missing;
-    return matchesSearch && matchesStage && matchesEquipment && matchesRider;
+    return matchesSearch && matchesStage && matchesRider;
   });
 
-  // Apply chronological sorting to filtered artists using imported utility
-  const sortedFilteredArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
+  // Apply sorting to filtered artists using imported utility
+  const sortedFilteredArtists = (
+    sortBy === 'chronological'
+      ? sortArtistsChronologically(filteredArtists)
+      : sortArtistsByField(filteredArtists, sortBy)
+  ) as Artist[];
   const hasArtistSubmittedData = sortedFilteredArtists.some((artist) => artist.artist_submitted);
   const handleDeleteClick = async (artist: Artist) => {
     if (!canDelete) return;
@@ -625,118 +617,10 @@ export const ArtistTable = ({
     return colors[provider] || "bg-gray-100 text-gray-800";
   };
 
-  // Helper function to transform artist data for PDF with logo URL
-  const transformArtistDataForPdf = async (artist: Artist): Promise<ArtistPdfData> => {
-    let logoUrl: string | undefined;
-    let stagePlotUrl: string | undefined;
-    
-    if (jobId) {
-      try {
-        logoUrl = await fetchJobLogo(jobId);
-        console.log('Fetched logo URL for PDF:', logoUrl);
-      } catch (error) {
-        console.error('Error fetching logo for PDF:', error);
-      }
-    }
-
-    if (artist.stage_plot_file_path) {
-      try {
-        const { data: stagePlotData, error: stagePlotError } = await dataLayerClient.storage
-          .from("festival_artist_files")
-          .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
-
-        if (stagePlotError) {
-          console.error("Error creating signed URL for stage plot:", stagePlotError);
-        } else if (stagePlotData?.signedUrl) {
-          stagePlotUrl = stagePlotData.signedUrl;
-        }
-      } catch (error) {
-        console.error("Error loading stage plot for PDF:", error);
-      }
-    }
-
-    return {
-      name: artist.name,
-      stage: artist.stage,
-      date: artist.date,
-      schedule: {
-        show: {
-          start: artist.show_start,
-          end: artist.show_end
-        },
-        soundcheck: artist.soundcheck ? {
-          start: artist.soundcheck_start || '',
-          end: artist.soundcheck_end || ''
-        } : undefined
-      },
-      technical: {
-        fohTech: artist.foh_tech || false,
-        monTech: artist.mon_tech || false,
-        fohConsole: {
-          model: artist.foh_console,
-          providedBy: artist.foh_console_provided_by || 'festival'
-        },
-        monConsole: {
-          model: artist.mon_console,
-          providedBy: artist.mon_console_provided_by || 'festival'
-        },
-        monitorsFromFoh: artist.monitors_from_foh || false,
-        fohWavesOutboard: artist.foh_waves_outboard || "",
-        monWavesOutboard: artist.mon_waves_outboard || "",
-        wireless: {
-          systems: artist.wireless_systems || [],
-          providedBy: artist.wireless_provided_by || 'festival'
-        },
-        iem: {
-          systems: artist.iem_systems || [],
-          providedBy: artist.iem_provided_by || 'festival'
-        },
-        monitors: {
-          enabled: artist.monitors_enabled,
-          quantity: artist.monitors_quantity
-        }
-      },
-      infrastructure: {
-        providedBy: artist.infrastructure_provided_by || 'festival',
-        cat6: {
-          enabled: artist.infra_cat6 || false,
-          quantity: artist.infra_cat6_quantity || 0
-        },
-        hma: {
-          enabled: artist.infra_hma || false,
-          quantity: artist.infra_hma_quantity || 0
-        },
-        coax: {
-          enabled: artist.infra_coax || false,
-          quantity: artist.infra_coax_quantity || 0
-        },
-        opticalconDuo: {
-          enabled: artist.infra_opticalcon_duo || false,
-          quantity: artist.infra_opticalcon_duo_quantity || 0
-        },
-        analog: artist.infra_analog || 0,
-        other: artist.other_infrastructure || ''
-      },
-      extras: {
-        sideFill: artist.extras_sf,
-        drumFill: artist.extras_df,
-        djBooth: artist.extras_djbooth,
-        wired: ''
-      },
-      notes: artist.notes || '',
-      wiredMics: artist.wired_mics || [],
-      logoUrl: logoUrl,
-      micKit: artist.mic_kit || 'band',
-      riderMissing: artist.rider_missing || false,
-      stagePlotUrl,
-      stagePlotFileType: artist.stage_plot_file_type || undefined,
-    };
-  };
-
   const handlePrintArtist = async (artist: Artist) => {
     setPrintingArtistId(artist.id);
     try {
-      const pdfData = await transformArtistDataForPdf(artist);
+      const pdfData = await buildArtistPdfData(artist, jobId);
       
       // Remove the gearComparison assignment as it doesn't exist in ArtistPdfData
       const blob = await exportArtistPDF(pdfData, {
@@ -812,9 +696,45 @@ export const ArtistTable = ({
                   <TableHead className="min-w-[140px]">Artista</TableHead>
                   <TableHead className="min-w-[120px]">Stage Plot</TableHead>
                   <TableHead className="min-w-[80px]">Stage</TableHead>
-                  <TableHead className="min-w-[100px]">Hora del show</TableHead>
-                  <TableHead className="min-w-[100px]">Soundcheck</TableHead>
-                  <TableHead className="min-w-[200px]">Consolas</TableHead>
+                  <TableHead className="min-w-[90px]">Load In</TableHead>
+                  <TableHead className="min-w-[100px]">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort('show_start')}
+                      title="Ordenar por hora del show"
+                    >
+                      Hora del show
+                      {sortBy === 'show_start' && <ArrowDown className="h-3 w-3" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="min-w-[100px]">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort('soundcheck_start')}
+                      title="Ordenar por hora de soundcheck"
+                    >
+                      Soundcheck
+                      {sortBy === 'soundcheck_start' && <ArrowDown className="h-3 w-3" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="min-w-[100px]">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-foreground"
+                      onClick={() => toggleSort('line_check_start')}
+                      title="Ordenar por hora de line check"
+                    >
+                      Line Check
+                      {sortBy === 'line_check_start' && <ArrowDown className="h-3 w-3" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="min-w-[180px]">Consolas</TableHead>
+                  <TableHead className="min-w-[120px]">Drive FOH</TableHead>
+                  <TableHead className="min-w-[160px]">Waves/Outboard FOH</TableHead>
+                  <TableHead className="min-w-[100px]">Posición MON</TableHead>
+                  <TableHead className="min-w-[160px]">Waves/Outboard MON</TableHead>
                   <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
                   <TableHead className="min-w-[140px]">
                     <div className="flex items-center gap-1">
@@ -882,6 +802,11 @@ export const ArtistTable = ({
                       <TableCell className="min-w-[80px]">
                         <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
                       </TableCell>
+                      <TableCell className="min-w-[90px]">
+                        <div className="text-sm">
+                          {artist.load_in_time || <span className="text-muted-foreground">-</span>}
+                        </div>
+                      </TableCell>
                       <TableCell className="min-w-[100px]">
                         <div className="text-sm">
                           {artist.show_start} - {artist.show_end}
@@ -899,8 +824,20 @@ export const ArtistTable = ({
                           <Badge variant="outline">No</Badge>
                         )}
                       </TableCell>
-                      
-                      <TableCell className="min-w-[200px]">
+                      <TableCell className="min-w-[100px]">
+                        {artist.line_check ? (
+                          <div className="text-sm">
+                            <Badge variant="secondary">Sí</Badge>
+                            <div className="text-xs text-muted-foreground">
+                              {artist.line_check_start} - {artist.line_check_end}
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge variant="outline">No</Badge>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="min-w-[180px]">
                         <div className="text-sm space-y-1">
                           <div className="flex items-center gap-1 flex-wrap">
                             <span>FOH: {artist.foh_console || "No especificado"}</span>
@@ -911,37 +848,76 @@ export const ArtistTable = ({
                             )}
                             {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                           </div>
-                          {artist.foh_waves_outboard && (
-                            <div className="text-xs text-muted-foreground">
-                              FOH Waves/Outboard: {artist.foh_waves_outboard}
-                            </div>
-                          )}
                           {artist.monitors_from_foh ? (
                             <div className="text-xs text-muted-foreground">Monitores desde FOH</div>
                           ) : (
-                            <>
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span>MON: {artist.mon_console || "No especificado"}</span>
-                                {artist.mon_console_provided_by && (
-                                  <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                                    {artist.mon_console_provided_by}
-                                  </Badge>
-                                )}
-                                {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
-                              </div>
-                              {artist.mon_waves_outboard && (
-                                <div className="text-xs text-muted-foreground">
-                                  MON Waves/Outboard: {artist.mon_waves_outboard}
-                                </div>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span>MON: {artist.mon_console || "No especificado"}</span>
+                              {artist.mon_console_provided_by && (
+                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                                  {artist.mon_console_provided_by}
+                                </Badge>
                               )}
-                            </>
+                              {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
+                            </div>
                           )}
                         </div>
                       </TableCell>
-                      
+
+                      <TableCell className="min-w-[120px]">
+                        {(artist.foh_drive || artist.foh_drive_position) ? (
+                          <div className="text-xs text-muted-foreground">
+                            {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
+                            {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="min-w-[160px]">
+                        {(artist.foh_waves_models?.length || artist.foh_outboard) ? (
+                          <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
+                            <span>{combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
+                            {artist.foh_waves_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_waves_provided_by)}`}>
+                                {artist.foh_waves_provided_by}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="min-w-[100px]">
+                        {!artist.monitors_from_foh && artist.mon_position ? (
+                          <div className="text-xs text-muted-foreground">
+                            {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="min-w-[160px]">
+                        {!artist.monitors_from_foh && (artist.mon_waves_models?.length || artist.mon_outboard) ? (
+                          <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
+                            <span>{combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
+                            {artist.mon_waves_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_waves_provided_by)}`}>
+                                {artist.mon_waves_provided_by}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
                       <TableCell className="min-w-[180px]">
                         <div className="text-sm space-y-1">
-                          {artist.wireless_systems && artist.wireless_systems.length > 0 && (
+                          {(artist.wireless_provided_by || (artist.wireless_systems && artist.wireless_systems.length > 0)) && (
                             <div className="flex items-center gap-1 flex-wrap">
                               <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
                                 Wireless: {formatWirelessSystems(artist.wireless_systems)}
@@ -953,7 +929,7 @@ export const ArtistTable = ({
                               )}
                             </div>
                           )}
-                          {artist.iem_systems && artist.iem_systems.length > 0 && (
+                          {(artist.iem_provided_by || (artist.iem_systems && artist.iem_systems.length > 0)) && (
                             <div className="flex items-center gap-1 flex-wrap">
                               <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
                                 IEM: {formatWirelessSystems(artist.iem_systems, true)}

@@ -188,7 +188,7 @@ export const ArtistFormLinkDialog = ({
     }
 
     const { data: artistData, error: artistError } = await dataLayerClient.from("festival_artists")
-      .select("name, stage, date, show_start, show_end, soundcheck, soundcheck_start, soundcheck_end")
+      .select("name, stage, date, load_in_time, show_start, show_end, soundcheck, soundcheck_start, soundcheck_end, line_check, line_check_start, line_check_end")
       .eq("id", artistId)
       .maybeSingle();
 
@@ -234,6 +234,7 @@ export const ArtistFormLinkDialog = ({
       stage: templateStage,
       date: templateDate,
       schedule: {
+        loadIn: artistData?.load_in_time || "",
         show: {
           start: artistData?.show_start || "",
           end: artistData?.show_end || "",
@@ -242,6 +243,12 @@ export const ArtistFormLinkDialog = ({
           ? {
               start: artistData?.soundcheck_start || "",
               end: artistData?.soundcheck_end || "",
+            }
+          : undefined,
+        lineCheck: artistData?.line_check
+          ? {
+              start: artistData?.line_check_start || "",
+              end: artistData?.line_check_end || "",
             }
           : undefined,
       },

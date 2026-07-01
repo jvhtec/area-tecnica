@@ -2,6 +2,7 @@ import type { ArtistTablePdfData } from '@/utils/artistTablePdfExport';
 import type { ArtistRfIemData, RfIemSystemData } from '@/utils/rfIemTablePdfExport';
 import type { ArtistInfrastructureData } from '@/utils/infrastructureTablePdfExport';
 import type { ShiftAssignment, ShiftWithAssignments } from '@/types/festival-scheduling';
+import { combineWavesDisplay } from '@/constants/wavesModels';
 
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value);
@@ -145,6 +146,7 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
     return {
       name: toStringValue(artist.name, 'Unnamed Artist'),
       stage: toNumber(artist.stage, 1),
+      loadInTime: toStringValue(artist.load_in_time),
       showTime: {
         start: toStringValue(artist.show_start),
         end: toStringValue(artist.show_end),
@@ -153,6 +155,12 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
         ? {
             start: toStringValue(artist.soundcheck_start),
             end: toStringValue(artist.soundcheck_end),
+          }
+        : undefined,
+      lineCheck: artist.line_check
+        ? {
+            start: toStringValue(artist.line_check_start),
+            end: toStringValue(artist.line_check_end),
           }
         : undefined,
       technical: {
@@ -167,8 +175,8 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
           providedBy: normalizeProvider(artist.mon_console_provided_by, 'festival'),
         },
         monitorsFromFoh: Boolean(artist.monitors_from_foh),
-        fohWavesOutboard: toStringValue(artist.foh_waves_outboard),
-        monWavesOutboard: toStringValue(artist.mon_waves_outboard),
+        fohWavesOutboard: combineWavesDisplay(asArray(artist.foh_waves_models) as string[], toStringValue(artist.foh_outboard)),
+        monWavesOutboard: combineWavesDisplay(asArray(artist.mon_waves_models) as string[], toStringValue(artist.mon_outboard)),
         wireless: {
           systems: normalizeRfIemSystems(artist.wireless_systems, wirelessProvidedBy),
           providedBy: wirelessProvidedBy,
@@ -235,10 +243,13 @@ export const buildRfIemArtists = (artists: Record<string, unknown>[] = []): Arti
       iemSystems: normalizeRfIemSystems(artist.iemSystems ?? artist.iem_systems, iemProvidedBy),
       date: toStringValue(artist.date),
       isAfterMidnight: explicitAfterMidnight === true || computedAfterMidnight,
+      loadInTime: toStringValue(artist.load_in_time || artist.loadInTime),
       showStart,
       showEnd: toStringValue(artist.show_end || artist.showEnd),
       soundcheckStart: toStringValue(artist.soundcheck_start || artist.soundcheckStart),
       soundcheckEnd: toStringValue(artist.soundcheck_end || artist.soundcheckEnd),
+      lineCheckStart: toStringValue(artist.line_check_start || artist.lineCheckStart),
+      lineCheckEnd: toStringValue(artist.line_check_end || artist.lineCheckEnd),
     };
   });
 };

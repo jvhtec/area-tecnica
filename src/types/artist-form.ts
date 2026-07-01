@@ -1,6 +1,7 @@
 
 import { ConsoleSetup, FestivalGearSetup } from "./festival";
 import { WiredMic } from "@/components/festival/gear-setup/WiredMicConfig";
+import type { WavesModelSelection } from "@/constants/wavesModels";
 
 export interface ArtistSectionProps {
   formData: {
@@ -13,15 +14,26 @@ export interface ArtistSectionProps {
     soundcheck: boolean;
     soundcheck_start?: string;
     soundcheck_end?: string;
+    line_check: boolean;
+    line_check_start?: string;
+    line_check_end?: string;
+    load_in_time?: string;
     foh_console: string;
     foh_consoles: ConsoleSetup[];
     foh_console_provided_by: string;
+    foh_drive?: string;
+    foh_drive_position?: string;
     mon_console: string;
     mon_consoles: ConsoleSetup[];
     mon_console_provided_by: string;
+    mon_position?: string;
     monitors_from_foh: boolean;
-    foh_waves_outboard: string;
-    mon_waves_outboard: string;
+    foh_waves_models: WavesModelSelection[];
+    foh_outboard: string;
+    foh_waves_provided_by: string;
+    mon_waves_models: WavesModelSelection[];
+    mon_outboard: string;
+    mon_waves_provided_by: string;
     wireless_systems: any[];
     iem_systems: any[];
     wireless_provided_by: string;

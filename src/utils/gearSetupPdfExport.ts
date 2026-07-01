@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { formatFrequencyBand } from '@/lib/frequencyBands';
+import { combineWavesDisplay } from '@/constants/wavesModels';
 
 export const generateStageGearPDF = async (
   jobId: string,
@@ -217,11 +218,12 @@ export const generateStageGearPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
-      if (setupToUse.foh_waves_outboard && String(setupToUse.foh_waves_outboard).trim().length > 0) {
+      const fohWavesDisplay = combineWavesDisplay(setupToUse.foh_waves_models, setupToUse.foh_outboard);
+      if (fohWavesDisplay.length > 0) {
         yPosition = checkPageBreak(14, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
-        doc.text(`FOH Waves/Outboard: ${String(setupToUse.foh_waves_outboard).trim()}`, 14, yPosition);
+        doc.text(`FOH Waves/Outboard: ${fohWavesDisplay}`, 14, yPosition);
         yPosition += 10;
       }
 
@@ -259,11 +261,12 @@ export const generateStageGearPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
-      if (setupToUse.mon_waves_outboard && String(setupToUse.mon_waves_outboard).trim().length > 0) {
+      const monWavesDisplay = combineWavesDisplay(setupToUse.mon_waves_models, setupToUse.mon_outboard);
+      if (monWavesDisplay.length > 0) {
         yPosition = checkPageBreak(14, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
-        doc.text(`MON Waves/Outboard: ${String(setupToUse.mon_waves_outboard).trim()}`, 14, yPosition);
+        doc.text(`MON Waves/Outboard: ${monWavesDisplay}`, 14, yPosition);
         yPosition += 10;
       }
 

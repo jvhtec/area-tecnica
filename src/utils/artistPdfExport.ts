@@ -17,6 +17,7 @@ import {
   loadImageWithTimeout,
   loadSectorProFooterLogo,
 } from '@/utils/pdf/shared/pdfExportShared';
+import { drawArtistScheduleSection } from '@/utils/pdf/artistScheduleSection';
 
 export interface ArtistTechnicalInfo {
   fohTech: boolean;
@@ -99,8 +100,10 @@ export interface ArtistPdfData {
   stage: number;
   date: string;
   schedule: {
+    loadIn?: string;
     show: { start: string; end: string };
     soundcheck?: { start: string; end: string };
+    lineCheck?: { start: string; end: string };
   };
   technical: ArtistTechnicalInfo;
   infrastructure: ArtistInfrastructure;
@@ -229,25 +232,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
   let yPosition = 40;
 
-  // === SCHEDULE SECTION ===
-  doc.setFontSize(12);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text(tx("Horario", "Schedule"), 14, yPosition);
-  yPosition += 8;
-
-  doc.setFontSize(9);
-  doc.setTextColor(...TEXT_DARK);
-  const showStart = data.schedule.show.start || (templateMode ? "________" : "");
-  const showEnd = data.schedule.show.end || (templateMode ? "________" : "");
-  doc.text(`${tx("Horario Show", "Show Time")}: ${showStart} - ${showEnd}`, 14, yPosition);
-  yPosition += 6;
-  if (templateMode || data.schedule.soundcheck) {
-    const soundcheckStart = data.schedule.soundcheck?.start || (templateMode ? "________" : "");
-    const soundcheckEnd = data.schedule.soundcheck?.end || (templateMode ? "________" : "");
-    doc.text(`${tx("Prueba de Sonido", "Soundcheck")}: ${soundcheckStart} - ${soundcheckEnd}`, 14, yPosition);
-    yPosition += 6;
-  }
-  yPosition += 4;
+  yPosition = drawArtistScheduleSection(doc, data.schedule, yPosition, language, templateMode);
 
   if (templateMode && data.festivalOptions) {
     const checklistRows: string[][] = [];

@@ -2,6 +2,166 @@ import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { getAvailableWirelessChannels, getRequiredWirelessChannels } from "@/lib/frequencyBands";
 import type { GearMismatch, ArtistGearComparison, ArtistRequirements, AvailableGear } from "@/utils/gear-comparison/types";
 import { EMPTY_AVAILABLE_GEAR, mapStageSetupToAvailableGear, mapGlobalSetupToAvailableGear } from "@/utils/gear-comparison/availableGear";
+import {
+  canSubstituteWavesModel,
+  formatWavesModelSelections,
+  normalizeWavesModelSelections,
+  WAVES_POWER_RANK,
+  type WavesModelSelection,
+} from "@/constants/wavesModels";
+import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS } from "@/constants/consoleDrive";
+
+type WavesCheckArgs = {
+  label: string;
+  artistModels: WavesModelSelection[] | undefined;
+  availableModels: WavesModelSelection[] | undefined;
+};
+
+type WavesProviderCheckArgs = WavesCheckArgs & {
+  providedBy: 'festival' | 'band' | 'mixed';
+};
+
+type EnumMembershipCheckArgs = {
+  label: string;
+  required: string | undefined;
+  available: string[] | undefined;
+  labels: Record<string, string>;
+};
+
+// Generic "is the required option among what the festival supports" check,
+// used for FOH drive, FOH drive position, and MON position: no options
+// configured at all is an error, and a required option outside the
+// configured set is also an error (no substitutability concept for these).
+const checkEnumMembership = ({ label, required, available, labels }: EnumMembershipCheckArgs): GearMismatch | null => {
+  if (!required) return null;
+
+  const configured = available || [];
+  if (configured.length === 0) {
+    return {
+      type: 'console',
+      severity: 'error',
+      message: `Se solicita ${label} pero no está configurado en el setup de equipo`,
+      details: `Solicitado: ${labels[required] || required}`,
+    };
+  }
+
+  if (!configured.includes(required)) {
+    return {
+      type: 'console',
+      severity: 'error',
+      message: `${label} solicitado no coincide con el configurado`,
+      details: `Solicitado: ${labels[required] || required}. Configurado: ${configured.map((value) => labels[value] || value).join(', ')}`,
+    };
+  }
+
+  return null;
+};
+
+// Shared FOH/MON waves model comparison: no model configured on the festival
+// side is an error; insufficient quantity of an otherwise-matching (or
+// substitutable) model is an error; covering a requirement with a
+// substitutable-but-different model (e.g. a Titan covering a Server One
+// requirement) is a warning; a model from an incompatible family (e.g.
+// Livebox/Fourier vs the SoundGrid family, or a Server One trying to cover a
+// Titan requirement) is an error since it can't be substituted.
+const checkWavesModels = ({ label, artistModels, availableModels }: WavesCheckArgs): GearMismatch | null => {
+  const required = normalizeWavesModelSelections(artistModels);
+  if (required.length === 0) return null;
+
+  const available = normalizeWavesModelSelections(availableModels);
+  if (available.length === 0) {
+    return {
+      type: 'console',
+      severity: 'error',
+      message: `Se solicita servidor Waves ${label} pero no está configurado en el setup de equipo`,
+      details: `Solicitado: ${formatWavesModelSelections(required)}`,
+    };
+  }
+
+  // Greedy allocation from a shared pool: satisfy the most demanding (highest
+  // power tier) requirements first, taking an exact-model match before
+  // reaching for a more powerful substitute, and preferring the smallest
+  // sufficient substitute to leave bigger units free for other needs.
+  const pool = new Map(available.map((selection) => [selection.model, selection.quantity]));
+  const orderedRequired = [...required].sort(
+    (a, b) => (WAVES_POWER_RANK[b.model] || 0) - (WAVES_POWER_RANK[a.model] || 0)
+  );
+
+  const insufficient: WavesModelSelection[] = [];
+  const incompatibleModels = new Set<string>();
+  let usedSubstitute = false;
+
+  orderedRequired.forEach((requiredSelection) => {
+    let remaining = requiredSelection.quantity;
+
+    const exact = pool.get(requiredSelection.model) || 0;
+    const takeExact = Math.min(exact, remaining);
+    if (takeExact > 0) {
+      pool.set(requiredSelection.model, exact - takeExact);
+      remaining -= takeExact;
+    }
+
+    if (remaining > 0) {
+      const substitutes = Array.from(pool.entries())
+        .filter(([model, quantity]) => quantity > 0 && model !== requiredSelection.model && canSubstituteWavesModel(requiredSelection.model, model))
+        .sort((a, b) => (WAVES_POWER_RANK[a[0]] || 0) - (WAVES_POWER_RANK[b[0]] || 0));
+
+      substitutes.forEach(([model, quantity]) => {
+        if (remaining <= 0) return;
+        const take = Math.min(quantity, remaining);
+        pool.set(model, quantity - take);
+        remaining -= take;
+        usedSubstitute = true;
+      });
+    }
+
+    if (remaining > 0) {
+      insufficient.push({ model: requiredSelection.model, quantity: remaining });
+      const hasAnyCompatible = available.some(
+        (availableSelection) => canSubstituteWavesModel(requiredSelection.model, availableSelection.model)
+      );
+      if (!hasAnyCompatible) incompatibleModels.add(requiredSelection.model);
+    }
+  });
+
+  if (insufficient.length > 0) {
+    const allIncompatible = insufficient.every((selection) => incompatibleModels.has(selection.model));
+    return {
+      type: 'console',
+      severity: 'error',
+      message: allIncompatible
+        ? `El servidor Waves ${label} solicitado no es compatible con el configurado`
+        : `Servidores Waves ${label} insuficientes`,
+      details: `Faltan: ${formatWavesModelSelections(insufficient)}. Configurado: ${formatWavesModelSelections(available)}`,
+    };
+  }
+
+  if (!usedSubstitute) return null;
+
+  return {
+    type: 'console',
+    severity: 'warning',
+    message: `El servidor Waves ${label} solicitado difiere del configurado`,
+    details: `Solicitado: ${formatWavesModelSelections(required)}. Configurado: ${formatWavesModelSelections(available)}`,
+  };
+};
+
+const evaluateWavesProvider = ({
+  label,
+  providedBy,
+  artistModels,
+  availableModels,
+}: WavesProviderCheckArgs): GearMismatch | null => {
+  if (providedBy === 'band') {
+    return {
+      type: 'console',
+      severity: 'info',
+      message: `La banda aporta Waves/Outboard ${label}${artistModels?.length ? ` (${formatWavesModelSelections(artistModels)})` : ''}`,
+    };
+  }
+
+  return checkWavesModels({ label, artistModels, availableModels });
+};
 
 export const compareArtistRequirements = (
   artist: ArtistRequirements,
@@ -52,40 +212,31 @@ export const compareArtistRequirements = (
     }
   }
 
-  const normalizeText = (value: string | null | undefined) => (value || "").trim().toLowerCase();
-  const artistFohWavesOutboard = (artist.foh_waves_outboard || "").trim();
-  const availableFohWavesOutboard = (availableGear.foh_waves_outboard || "").trim();
-  if (artistFohWavesOutboard.length > 0) {
-    const fohProvidedBy = artist.foh_console_provided_by || 'festival';
-    if (fohProvidedBy === 'band') {
-      mismatches.push({
-        type: 'console',
-        severity: 'info',
-        message: `La banda aporta Waves/Outboard FOH (${artistFohWavesOutboard})`
-      });
-    } else if (!availableFohWavesOutboard) {
-      mismatches.push({
-        type: 'console',
-        severity: 'error',
-        message: `Se solicita Waves/Outboard FOH pero no está configurado en el setup de equipo`,
-      });
-    } else {
-      const normalizedNeed = normalizeText(artistFohWavesOutboard);
-      const normalizedAvailable = normalizeText(availableFohWavesOutboard);
-      if (
-        normalizedNeed &&
-        normalizedAvailable &&
-        !normalizedAvailable.includes(normalizedNeed) &&
-        !normalizedNeed.includes(normalizedAvailable)
-      ) {
-        mismatches.push({
-          type: 'console',
-          severity: 'warning',
-          message: `La solicitud de Waves/Outboard FOH difiere del setup configurado`,
-          details: `Solicitado: ${artistFohWavesOutboard}. Configurado: ${availableFohWavesOutboard}`
-        });
-      }
-    }
+  const fohDriveMismatch = checkEnumMembership({
+    label: 'Drive FOH',
+    required: artist.foh_drive || undefined,
+    available: availableGear.foh_drive_options,
+    labels: FOH_DRIVE_LABELS,
+  });
+  if (fohDriveMismatch) mismatches.push(fohDriveMismatch);
+
+  const fohDrivePositionMismatch = checkEnumMembership({
+    label: 'posición del drive FOH',
+    required: artist.foh_drive_position || undefined,
+    available: availableGear.foh_drive_positions,
+    labels: CONSOLE_POSITION_LABELS,
+  });
+  if (fohDrivePositionMismatch) mismatches.push(fohDrivePositionMismatch);
+
+  const fohWavesProvidedBy = artist.foh_waves_provided_by || 'festival';
+  if ((artist.foh_waves_models || []).length > 0 || (artist.foh_outboard || "").trim().length > 0) {
+    const wavesMismatch = evaluateWavesProvider({
+      label: 'FOH',
+      providedBy: fohWavesProvidedBy,
+      artistModels: artist.foh_waves_models,
+      availableModels: availableGear.foh_waves_models,
+    });
+    if (wavesMismatch) mismatches.push(wavesMismatch);
   }
 
   // Check Monitor Console availability
@@ -121,39 +272,25 @@ export const compareArtistRequirements = (
     }
   }
 
-  const artistMonWavesOutboard = (artist.mon_waves_outboard || "").trim();
-  const availableMonWavesOutboard = (availableGear.mon_waves_outboard || "").trim();
-  if (!artist.monitors_from_foh && artistMonWavesOutboard.length > 0) {
-    const monProvidedBy = artist.mon_console_provided_by || 'festival';
-    if (monProvidedBy === 'band') {
-      mismatches.push({
-        type: 'console',
-        severity: 'info',
-        message: `La banda aporta Waves/Outboard MON (${artistMonWavesOutboard})`
-      });
-    } else if (!availableMonWavesOutboard) {
-      mismatches.push({
-        type: 'console',
-        severity: 'error',
-        message: `Se solicita Waves/Outboard MON pero no está configurado en el setup de equipo`,
-      });
-    } else {
-      const normalizedNeed = normalizeText(artistMonWavesOutboard);
-      const normalizedAvailable = normalizeText(availableMonWavesOutboard);
-      if (
-        normalizedNeed &&
-        normalizedAvailable &&
-        !normalizedAvailable.includes(normalizedNeed) &&
-        !normalizedNeed.includes(normalizedAvailable)
-      ) {
-        mismatches.push({
-          type: 'console',
-          severity: 'warning',
-          message: `La solicitud de Waves/Outboard MON difiere del setup configurado`,
-          details: `Solicitado: ${artistMonWavesOutboard}. Configurado: ${availableMonWavesOutboard}`
-        });
-      }
-    }
+  if (!artist.monitors_from_foh) {
+    const monPositionMismatch = checkEnumMembership({
+      label: 'posición de monitores',
+      required: artist.mon_position || undefined,
+      available: availableGear.mon_positions,
+      labels: CONSOLE_POSITION_LABELS,
+    });
+    if (monPositionMismatch) mismatches.push(monPositionMismatch);
+  }
+
+  const monWavesProvidedBy = artist.mon_waves_provided_by || 'festival';
+  if (!artist.monitors_from_foh && ((artist.mon_waves_models || []).length > 0 || (artist.mon_outboard || "").trim().length > 0)) {
+    const wavesMismatch = evaluateWavesProvider({
+      label: 'MON',
+      providedBy: monWavesProvidedBy,
+      artistModels: artist.mon_waves_models,
+      availableModels: availableGear.mon_waves_models,
+    });
+    if (wavesMismatch) mismatches.push(wavesMismatch);
   }
 
   // Check Wireless Systems

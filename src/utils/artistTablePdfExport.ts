@@ -35,6 +35,7 @@ export interface ArtistTablePdfData {
   artists: Array<{
     name: string;
     stage: number;
+    loadInTime?: string;
     showTime: {
       start: string;
       end: string;
@@ -43,6 +44,7 @@ export interface ArtistTablePdfData {
       start: string;
       end: string;
     };
+    lineCheck?: { start: string; end: string };
     technical: {
       fohTech: boolean;
       monTech: boolean;
@@ -235,6 +237,9 @@ const formatConsoleSectionForPdf = (technical: ArtistTablePdfData["artists"][num
 
   return lines.join("\n");
 };
+
+const formatTimeRangeForPdf = (range?: { start: string; end: string }) =>
+  range ? `${range.start || '-'} - ${range.end || '-'}` : '-';
 
 // Simplified gear mismatch formatting without emoji icons
 const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
@@ -622,8 +627,10 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
 
     return [
       artist.name,
+      artist.loadInTime || '-',
       `${artist.showTime.start} - ${artist.showTime.end}`,
-      artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
+      formatTimeRangeForPdf(artist.soundcheck),
+      formatTimeRangeForPdf(artist.lineCheck),
       formatConsoleSectionForPdf(artist.technical),
       `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
       microphonesDisplay,
@@ -643,7 +650,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   console.log('Table data prepared:', tableData.length, 'rows');
 
   const availableTableWidth = pageWidth - leftMargin - rightMargin;
-  const baseColumnWidths = [25, 18, 18, 35, 35, 30, 12, 20, 12, 25, 15, 20];
+  const baseColumnWidths = [24, 14, 18, 16, 16, 32, 32, 28, 11, 18, 11, 22, 13, 18];
   const totalBaseWidth = baseColumnWidths.reduce((sum, width) => sum + width, 0) || 1;
   const normalizedColumnStyles = baseColumnWidths.reduce((acc, width, index) => {
     acc[index] = { cellWidth: availableTableWidth * (width / totalBaseWidth) };
@@ -652,20 +659,12 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   const tokenizedCellText = new Map<string, string>();
 
   autoTable(doc, {
-    head: [['Artista', 'Show', 'Check', 'Consolas', 'RF/IEM', 'Microfonos', 'Mons', 'Infra', 'Extras', 'Notas', 'Rider', 'Material']],
+    head: [['Artista', 'Load', 'Show', 'SC', 'Line', 'Consolas', 'RF/IEM', 'Microfonos', 'Mons', 'Infra', 'Extras', 'Notas', 'Rider', 'Material']],
     body: tableData,
     startY: 40,
     theme: 'grid',
-    styles: {
-      fontSize: 8,
-      cellPadding: 2,
-      valign: 'top',
-    },
-    headStyles: {
-      ...FESTIVAL_TABLE_HEAD_STYLES,
-      fontSize: 9,
-      fontStyle: 'bold',
-    },
+    styles: { fontSize: 7, cellPadding: 1.4, valign: 'top', overflow: 'linebreak' },
+    headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES, fontSize: 7.5, fontStyle: 'bold', cellPadding: 1.6 },
     columnStyles: normalizedColumnStyles,
     didParseCell: (cellData) => {
       if (cellData.section === 'body') {
@@ -676,26 +675,26 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
           const rfIemColor = getProviderCellColor(rowMeta.rfIemProvider);
           const micColor = getProviderCellColor(rowMeta.micProvider);
 
-          if (cellData.column.index >= 0 && cellData.column.index <= 2) {
+          if (cellData.column.index >= 0 && cellData.column.index <= 4) {
             cellData.cell.styles.fillColor = stageColor;
             cellData.cell.styles.textColor = [30, 30, 30];
           }
-          if (cellData.column.index === 3) {
+          if (cellData.column.index === 5) {
             cellData.cell.styles.fillColor = consoleColor;
             cellData.cell.styles.textColor = [35, 35, 35];
           }
-          if (cellData.column.index === 4) {
+          if (cellData.column.index === 6) {
             cellData.cell.styles.fillColor = rfIemColor;
             cellData.cell.styles.textColor = [35, 35, 35];
           }
-          if (cellData.column.index === 5) {
+          if (cellData.column.index === 7) {
             cellData.cell.styles.fillColor = micColor;
             cellData.cell.styles.textColor = [35, 35, 35];
           }
         }
       }
 
-      const mixedDetailColumns = cellData.column.index === 4 || cellData.column.index === 5;
+      const mixedDetailColumns = cellData.column.index === 6 || cellData.column.index === 7;
       if (mixedDetailColumns) {
         const cellText = Array.isArray(cellData.cell.text)
           ? cellData.cell.text.join('\n')
@@ -711,13 +710,13 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
         }
       }
 
-      // Make "Missing" text red in the Rider Status column (column 10)
-      if (cellData.column.index === 10 && cellData.cell.text[0] === 'Falta') {
+      // Make "Missing" text red in the Rider Status column (column 12)
+      if (cellData.column.index === 12 && cellData.cell.text[0] === 'Falta') {
         cellData.cell.styles.textColor = [255, 0, 0]; // Red color
       }
       
-      // Color code gear status column (column 11) - now looking for text instead of icons
-      if (cellData.column.index === 11) {
+      // Color code gear status column (column 13) - now looking for text instead of icons
+      if (cellData.column.index === 13) {
         const cellText = cellData.cell.text[0];
         if (cellText.includes('Error')) {
           cellData.cell.styles.textColor = [255, 0, 0]; // Red for errors

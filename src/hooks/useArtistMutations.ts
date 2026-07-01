@@ -8,11 +8,35 @@ import { queryKeys } from "@/lib/react-query";
 type FestivalArtistInsert = Database["public"]["Tables"]["festival_artists"]["Insert"];
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
 type FestivalArtistUpdatePayload = FestivalArtistUpdate & { id: string };
-type ArtistTimeField = "show_start" | "show_end" | "soundcheck_start" | "soundcheck_end";
+type ArtistTimeField =
+  | "show_start"
+  | "show_end"
+  | "soundcheck_start"
+  | "soundcheck_end"
+  | "line_check_start"
+  | "line_check_end"
+  | "load_in_time"
+  | "foh_drive"
+  | "foh_drive_position"
+  | "mon_position";
 type ArtistTimePayload = (FestivalArtistInsert | FestivalArtistUpdate) &
   Partial<Record<ArtistTimeField, string | null>>;
 
-const artistTimeFields: ArtistTimeField[] = ["show_start", "show_end", "soundcheck_start", "soundcheck_end"];
+// Time fields and nullable-enum fields (foh_drive, foh_drive_position,
+// mon_position) both need '' converted to null: the DB check constraints on
+// the enum fields reject an empty string as an invalid value.
+const artistTimeFields: ArtistTimeField[] = [
+  "show_start",
+  "show_end",
+  "soundcheck_start",
+  "soundcheck_end",
+  "line_check_start",
+  "line_check_end",
+  "load_in_time",
+  "foh_drive",
+  "foh_drive_position",
+  "mon_position",
+];
 
 // Helper function to format artist time data
 const formatArtistTimeData = <T extends ArtistTimePayload>(artistData: T): T => {

@@ -1,4 +1,6 @@
 import { ConsoleSetup, WirelessSetup, WiredMicSetup } from "@/types/festival";
+import type { WavesModelSelection } from "@/constants/wavesModels";
+import type { FohDrive, ConsolePosition, MonConsolePosition } from "@/constants/consoleDrive";
 
 export interface GearMismatch {
   type: 'console' | 'wireless' | 'iem' | 'infrastructure' | 'extras' | 'monitors' | 'microphones';
@@ -45,8 +47,15 @@ export interface ArtistRequirements {
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_from_foh?: boolean;
-  foh_waves_outboard?: string;
-  mon_waves_outboard?: string;
+  foh_drive?: FohDrive | '';
+  foh_drive_position?: ConsolePosition | '';
+  mon_position?: MonConsolePosition | '';
+  foh_waves_models?: WavesModelSelection[];
+  foh_outboard?: string;
+  foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_waves_models?: WavesModelSelection[];
+  mon_outboard?: string;
+  mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: WirelessSetup[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: WirelessSetup[];
@@ -73,8 +82,13 @@ export interface ArtistRequirements {
 export interface AvailableGear {
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  foh_waves_outboard?: string | null;
-  mon_waves_outboard?: string | null;
+  foh_drive_options?: FohDrive[];
+  foh_drive_positions?: ConsolePosition[];
+  mon_positions?: MonConsolePosition[];
+  foh_waves_models?: WavesModelSelection[];
+  foh_outboard?: string | null;
+  mon_waves_models?: WavesModelSelection[];
+  mon_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];

@@ -12,6 +12,7 @@ import { MicKitSection } from "./form/sections/MicKitSection";
 import { WiredMic } from "./gear-setup/WiredMicConfig";
 import { ArtistFormData, WirelessSetup } from "@/types/festival";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
+import type { WavesModelSelection } from "@/constants/wavesModels";
 
 interface ArtistManagementFormProps {
   artist?: any;
@@ -32,13 +33,24 @@ interface ArtistManagementFormData {
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  line_check: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
+  load_in_time?: string;
   foh_console: string;
   foh_console_provided_by: string;
+  foh_drive: string;
+  foh_drive_position: string;
   mon_console: string;
   mon_console_provided_by: string;
+  mon_position: string;
   monitors_from_foh: boolean;
-  foh_waves_outboard: string;
-  mon_waves_outboard: string;
+  foh_waves_models: WavesModelSelection[];
+  foh_outboard: string;
+  foh_waves_provided_by: string;
+  mon_waves_models: WavesModelSelection[];
+  mon_outboard: string;
+  mon_waves_provided_by: string;
   wireless_systems: any[];
   iem_systems: any[];
   wireless_provided_by: string;
@@ -99,13 +111,24 @@ export const ArtistManagementForm = ({
       soundcheck: artistData?.soundcheck || false,
       soundcheck_start: artistData?.soundcheck_start || "18:00",
       soundcheck_end: artistData?.soundcheck_end || "19:00",
+      line_check: artistData?.line_check || false,
+      line_check_start: artistData?.line_check_start || "",
+      line_check_end: artistData?.line_check_end || "",
+      load_in_time: artistData?.load_in_time || "",
       foh_console: artistData?.foh_console || "",
       foh_console_provided_by: artistData?.foh_console_provided_by || "festival",
+      foh_drive: artistData?.foh_drive || "",
+      foh_drive_position: artistData?.foh_drive_position || "",
       mon_console: artistData?.mon_console || "",
       mon_console_provided_by: artistData?.mon_console_provided_by || "festival",
+      mon_position: artistData?.mon_position || "",
       monitors_from_foh: artistData?.monitors_from_foh || false,
-      foh_waves_outboard: artistData?.foh_waves_outboard || "",
-      mon_waves_outboard: artistData?.mon_waves_outboard || "",
+      foh_waves_models: artistData?.foh_waves_models || [],
+      foh_outboard: artistData?.foh_outboard || "",
+      foh_waves_provided_by: artistData?.foh_waves_provided_by || "festival",
+      mon_waves_models: artistData?.mon_waves_models || [],
+      mon_outboard: artistData?.mon_outboard || "",
+      mon_waves_provided_by: artistData?.mon_waves_provided_by || "festival",
       wireless_systems: artistData?.wireless_systems || [],
       iem_systems: artistData?.iem_systems || [],
       wireless_provided_by: artistData?.wireless_provided_by || "festival",

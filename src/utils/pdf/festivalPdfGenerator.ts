@@ -16,6 +16,7 @@ import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArti
 import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
 import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
 import { buildReadableFilename } from '@/utils/fileName';
+import { combineWavesDisplay } from '@/constants/wavesModels';
 import {
   normalizeVenueCoordinates,
   resolveHojaVenue,
@@ -530,14 +531,10 @@ export const generateAndMergeFestivalPDFs = async (
             stage: artist.stage || 1,
             date: artist.date || '',
             schedule: {
-              show: { 
-                start: artist.show_start || '', 
-                end: artist.show_end || '' 
-              },
-              soundcheck: artist.soundcheck_start ? {
-                start: artist.soundcheck_start || '',
-                end: artist.soundcheck_end || ''
-              } : undefined
+              loadIn: artist.load_in_time || undefined,
+              show: { start: artist.show_start || '', end: artist.show_end || '' },
+              soundcheck: artist.soundcheck_start ? { start: artist.soundcheck_start || '', end: artist.soundcheck_end || '' } : undefined,
+              lineCheck: artist.line_check ? { start: artist.line_check_start || '', end: artist.line_check_end || '' } : undefined,
             },
             technical: {
               fohTech: Boolean(artist.foh_tech || false),
@@ -551,8 +548,8 @@ export const generateAndMergeFestivalPDFs = async (
                 providedBy: String(artist.mon_console_provided_by || 'festival') 
               },
               monitorsFromFoh: Boolean(artist.monitors_from_foh || false),
-              fohWavesOutboard: String(artist.foh_waves_outboard || ""),
-              monWavesOutboard: String(artist.mon_waves_outboard || ""),
+              fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
+              monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
               wireless: {
                 systems: artist.wireless_systems || [],
                 providedBy: String(artist.wireless_provided_by || 'festival'),

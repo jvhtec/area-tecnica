@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { PdfFestivalGearOptions } from "@/utils/artistPdfExport";
 import { formatFrequencyBand, type FrequencyBandSelection } from "@/lib/frequencyBands";
+import { combineWavesDisplay } from "@/constants/wavesModels";
 
 interface ConsoleOption {
   model: string;
@@ -85,7 +86,7 @@ export const fetchFestivalGearOptionsForTemplate = async (
   const { data: mainSetup, error: mainError } = await supabase
     .from("festival_gear_setups")
     .select(
-      "id, foh_consoles, mon_consoles, foh_waves_outboard, mon_waves_outboard, wireless_systems, iem_systems, wired_mics, available_monitors, has_side_fills, has_drum_fills, has_dj_booths, available_cat6_runs, available_hma_runs, available_coax_runs, available_opticalcon_duo_runs, available_analog_runs",
+      "id, foh_consoles, mon_consoles, foh_waves_models, foh_outboard, mon_waves_models, mon_outboard, wireless_systems, iem_systems, wired_mics, available_monitors, has_side_fills, has_drum_fills, has_dj_booths, available_cat6_runs, available_hma_runs, available_coax_runs, available_opticalcon_duo_runs, available_analog_runs",
     )
     .eq("job_id", jobId)
     .maybeSingle();
@@ -101,8 +102,10 @@ export const fetchFestivalGearOptionsForTemplate = async (
   type SetupShape = {
     foh_consoles: unknown;
     mon_consoles: unknown;
-    foh_waves_outboard?: string | null;
-    mon_waves_outboard?: string | null;
+    foh_waves_models?: unknown;
+    foh_outboard?: string | null;
+    mon_waves_models?: unknown;
+    mon_outboard?: string | null;
     wireless_systems: unknown;
     iem_systems: unknown;
     wired_mics: unknown;
@@ -120,8 +123,10 @@ export const fetchFestivalGearOptionsForTemplate = async (
   let setupToUse: SetupShape = {
     foh_consoles: mainSetup.foh_consoles,
     mon_consoles: mainSetup.mon_consoles,
-    foh_waves_outboard: mainSetup.foh_waves_outboard,
-    mon_waves_outboard: mainSetup.mon_waves_outboard,
+    foh_waves_models: mainSetup.foh_waves_models,
+    foh_outboard: mainSetup.foh_outboard,
+    mon_waves_models: mainSetup.mon_waves_models,
+    mon_outboard: mainSetup.mon_outboard,
     wireless_systems: mainSetup.wireless_systems,
     iem_systems: mainSetup.iem_systems,
     wired_mics: mainSetup.wired_mics,
@@ -140,7 +145,7 @@ export const fetchFestivalGearOptionsForTemplate = async (
     const { data: stageSetup, error: stageError } = await supabase
       .from("festival_stage_gear_setups")
       .select(
-        "foh_consoles, mon_consoles, foh_waves_outboard, mon_waves_outboard, wireless_systems, iem_systems, wired_mics, monitors_quantity, extras_sf, extras_df, extras_djbooth, infra_cat6_quantity, infra_hma_quantity, infra_coax_quantity, infra_opticalcon_duo_quantity, infra_analog",
+        "foh_consoles, mon_consoles, foh_waves_models, foh_outboard, mon_waves_models, mon_outboard, wireless_systems, iem_systems, wired_mics, monitors_quantity, extras_sf, extras_df, extras_djbooth, infra_cat6_quantity, infra_hma_quantity, infra_coax_quantity, infra_opticalcon_duo_quantity, infra_analog",
       )
       .eq("gear_setup_id", mainSetup.id)
       .eq("stage_number", stageNumber)
@@ -154,8 +159,10 @@ export const fetchFestivalGearOptionsForTemplate = async (
       setupToUse = {
         foh_consoles: stageSetup.foh_consoles,
         mon_consoles: stageSetup.mon_consoles,
-        foh_waves_outboard: stageSetup.foh_waves_outboard,
-        mon_waves_outboard: stageSetup.mon_waves_outboard,
+        foh_waves_models: stageSetup.foh_waves_models,
+        foh_outboard: stageSetup.foh_outboard,
+        mon_waves_models: stageSetup.mon_waves_models,
+        mon_outboard: stageSetup.mon_outboard,
         wireless_systems: stageSetup.wireless_systems,
         iem_systems: stageSetup.iem_systems,
         wired_mics: stageSetup.wired_mics,
@@ -175,8 +182,8 @@ export const fetchFestivalGearOptionsForTemplate = async (
   return {
     fohConsoles: toConsoleOptions(setupToUse.foh_consoles),
     monConsoles: toConsoleOptions(setupToUse.mon_consoles),
-    fohWavesOutboard: setupToUse.foh_waves_outboard || "",
-    monWavesOutboard: setupToUse.mon_waves_outboard || "",
+    fohWavesOutboard: combineWavesDisplay(setupToUse.foh_waves_models, setupToUse.foh_outboard),
+    monWavesOutboard: combineWavesDisplay(setupToUse.mon_waves_models, setupToUse.mon_outboard),
     wirelessSystems: toWirelessOptions(setupToUse.wireless_systems),
     iemSystems: toWirelessOptions(setupToUse.iem_systems),
     wiredMics: toWiredMicOptions(setupToUse.wired_mics),
