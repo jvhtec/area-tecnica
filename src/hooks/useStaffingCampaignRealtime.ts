@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { UnifiedSubscriptionManager, type RealtimeChangePayload } from '@/lib/unified-subscription-manager'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -9,29 +9,41 @@ import { queryKeys } from "@/lib/react-query";
  */
 export function useStaffingCampaignRealtime(jobId: string, department: string) {
   const queryClient = useQueryClient()
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  )
+  const ownerIdRef = useRef(`staffing-campaign-${Math.random().toString(36).slice(2)}`)
 
   useEffect(() => {
     if (!jobId || !department) return
+    const ownerRoute = ownerIdRef.current
 
-    const channel = supabase
-      .channel(`staffing-campaign-${jobId}-${department}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'staffing_campaigns', filter: `job_id=eq.${jobId}` },
-        (payload: any) => {
-          const row = payload.new ?? payload.old
-          if (row?.department !== department) return
+    subscriptionManager.subscribeToTable(
+      'staffing_campaigns',
+      queryKeys.scope('staffing_campaign', jobId, department),
+      { event: '*', schema: 'public', filter: `job_id=eq.${jobId}` },
+      'medium',
+      {
+        ownerRoute,
+        invalidateOnPayload: false,
+        onPayload: (payload: RealtimeChangePayload) => {
+          // Check both sides so an UPDATE that moves a campaign into or out of
+          // this department still invalidates the cache for this department.
+          const newRow = payload.new as { department?: string } | null
+          const oldRow = payload.old as { department?: string } | null
+          if (newRow?.department !== department && oldRow?.department !== department) return
           queryClient.invalidateQueries({
             queryKey: queryKeys.scope('staffing_campaign', jobId, department)
           })
-        }
-      )
-      .subscribe()
+        },
+      }
+    )
 
     return () => {
-      supabase.removeChannel(channel)
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute)
     }
-  }, [jobId, department, queryClient])
+  }, [jobId, department, queryClient, subscriptionManager])
 }
 
 /**
@@ -39,27 +51,28 @@ export function useStaffingCampaignRealtime(jobId: string, department: string) {
  */
 export function useStaffingCampaignRolesRealtime(campaignId?: string) {
   const queryClient = useQueryClient()
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  )
+  const ownerIdRef = useRef(`staffing-campaign-roles-${Math.random().toString(36).slice(2)}`)
 
   useEffect(() => {
     if (!campaignId) return
+    const ownerRoute = ownerIdRef.current
 
-    const channel = supabase
-      .channel(`staffing-campaign-roles-${campaignId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'staffing_campaign_roles', filter: `campaign_id=eq.${campaignId}` },
-        () => {
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.scope('staffing_campaign_roles', campaignId)
-          })
-        }
-      )
-      .subscribe()
+    subscriptionManager.subscribeToTable(
+      'staffing_campaign_roles',
+      queryKeys.scope('staffing_campaign_roles', campaignId),
+      { event: '*', schema: 'public', filter: `campaign_id=eq.${campaignId}` },
+      'medium',
+      { ownerRoute }
+    )
 
     return () => {
-      supabase.removeChannel(channel)
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute)
     }
-  }, [campaignId, queryClient])
+  }, [campaignId, subscriptionManager])
 }
 
 /**
@@ -67,16 +80,25 @@ export function useStaffingCampaignRolesRealtime(campaignId?: string) {
  */
 export function useStaffingRequestsRealtime(jobId: string) {
   const queryClient = useQueryClient()
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  )
+  const ownerIdRef = useRef(`staffing-requests-${Math.random().toString(36).slice(2)}`)
 
   useEffect(() => {
     if (!jobId) return
+    const ownerRoute = ownerIdRef.current
 
-    const channel = supabase
-      .channel(`staffing-requests-${jobId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'staffing_requests', filter: `job_id=eq.${jobId}` },
-        () => {
+    subscriptionManager.subscribeToTable(
+      'staffing_requests',
+      queryKeys.scope('staffing_requests', jobId),
+      { event: '*', schema: 'public', filter: `job_id=eq.${jobId}` },
+      'medium',
+      {
+        ownerRoute,
+        invalidateOnPayload: false,
+        onPayload: () => {
           queryClient.invalidateQueries({
             queryKey: queryKeys.scope('staffing_availability_responses', jobId)
           })
@@ -89,14 +111,14 @@ export function useStaffingRequestsRealtime(jobId: string) {
           queryClient.invalidateQueries({
             queryKey: queryKeys.scope('staffing_roleless_consultations', jobId)
           })
-        }
-      )
-      .subscribe()
+        },
+      }
+    )
 
     return () => {
-      supabase.removeChannel(channel)
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute)
     }
-  }, [jobId, queryClient])
+  }, [jobId, queryClient, subscriptionManager])
 }
 
 /**
@@ -104,25 +126,26 @@ export function useStaffingRequestsRealtime(jobId: string) {
  */
 export function useStaffingEventsRealtime(campaignId?: string) {
   const queryClient = useQueryClient()
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(queryClient),
+    [queryClient]
+  )
+  const ownerIdRef = useRef(`staffing-campaign-events-${Math.random().toString(36).slice(2)}`)
 
   useEffect(() => {
     if (!campaignId) return
+    const ownerRoute = ownerIdRef.current
 
-    const channel = supabase
-      .channel(`staffing-campaign-events-${campaignId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'staffing_campaign_events', filter: `campaign_id=eq.${campaignId}` },
-        () => {
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.scope('staffing_campaign_events', campaignId)
-          })
-        }
-      )
-      .subscribe()
+    subscriptionManager.subscribeToTable(
+      'staffing_campaign_events',
+      queryKeys.scope('staffing_campaign_events', campaignId),
+      { event: 'INSERT', schema: 'public', filter: `campaign_id=eq.${campaignId}` },
+      'low',
+      { ownerRoute }
+    )
 
     return () => {
-      supabase.removeChannel(channel)
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute)
     }
-  }, [campaignId, queryClient])
+  }, [campaignId, subscriptionManager])
 }

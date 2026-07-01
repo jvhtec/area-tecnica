@@ -25,8 +25,7 @@ import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 
-
-import { queryKeys } from "@/lib/react-query";
+import { queryKeys, createQueryKey } from "@/lib/react-query";
 interface EnhancedJobDetailsModalProps {
     theme: {
         bg: string;
@@ -58,6 +57,7 @@ interface StaffAssignment {
         last_name: string;
         email?: string;
         department?: string | null;
+        profile_picture_url?: string | null;
     } | null;
 }
 
@@ -76,7 +76,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     // Fetch full job details with location
     const { data: jobDetails, isLoading: jobDetailsLoading } = useQuery({
-        queryKey: queryKeys.scope('job-details-modal', job?.id),
+        queryKey: createQueryKey.jobDetailsModal.details(job?.id),
         queryFn: async () => {
             if (!job?.id) return null;
             const { data, error } = await dataLayerClient.from('jobs')
@@ -103,7 +103,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     // Fetch staff assignments
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
-        queryKey: queryKeys.scope('job-staff', job?.id),
+        queryKey: createQueryKey.jobDetailsModal.staff(job?.id),
         queryFn: async () => {
             if (!job?.id) return [];
             const { data, error } = await dataLayerClient.from('job_assignments')
@@ -111,7 +111,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
           sound_role,
           lights_role,
           video_role,
-          technician:profiles(id, first_name, last_name, email, department)
+          technician:profiles(id, first_name, last_name, email, department, profile_picture_url)
         `)
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');
@@ -128,7 +128,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     // Fetch restaurants
     const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
-        queryKey: queryKeys.scope('job-restaurants-modal', job?.id, jobDetails?.locations?.formatted_address),
+        queryKey: createQueryKey.jobDetailsModal.restaurants(job?.id, jobDetails?.locations?.formatted_address),
         queryFn: async () => {
             const locationData = jobDetails?.locations;
             const address = locationData?.formatted_address || locationData?.name;
@@ -198,7 +198,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     const invalidateJobQueries = () => {
         if (!resolvedJobId) return;
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details-modal', resolvedJobId) });
+        queryClient.invalidateQueries({ queryKey: createQueryKey.jobDetailsModal.details(resolvedJobId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-approval-status', resolvedJobId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-rates-approval', resolvedJobId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-rates-approval-map') });

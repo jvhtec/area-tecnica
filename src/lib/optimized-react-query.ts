@@ -145,6 +145,41 @@ export const createQueryKey = {
     technicianReadonlyArtists: (jobId?: string) => ['technician', 'readonly-artists', jobId ?? null] as const,
     technicianReadonlyFestivalStages: (jobId?: string) => ['technician', 'readonly-festival-stages', jobId ?? null] as const,
   },
+  /**
+   * Shared cache bucket for the job-details modal, used by both the
+   * department-facing (`EnhancedJobDetailsModal`) and technician-facing
+   * (`useDetailsModalData`) views of the same job. Both must use these
+   * exact keys so the two components share one cache entry instead of
+   * fetching/duplicating the same job row under different keys. Because the
+   * key is shared, both consumers' `select()` projections for `staff` must
+   * request the same superset of columns — whichever query populates the
+   * cache first determines what's available to the other within staleTime.
+   */
+  jobDetailsModal: {
+    details: (jobId?: string | null) => ['job-details-modal', jobId ?? null] as const,
+    staff: (jobId?: string | null) => ['job-staff', jobId ?? null] as const,
+    restaurants: (jobId?: string | null, address?: string | null) =>
+      ['job-restaurants-modal', jobId ?? null, address ?? null] as const,
+  },
+  /** Query keys unique to the technician-facing job details modal (`useDetailsModalData`). */
+  technicianJobModal: {
+    assignedDates: (jobId?: string | null, technicianId?: string | null) =>
+      ['tech-assigned-dates', jobId ?? null, technicianId ?? null] as const,
+    festivalStages: (jobId?: string | null) => ['technician-job-festival-stages', jobId ?? null] as const,
+    shiftAssignments: (jobId?: string | null, technicianId?: string | null) =>
+      ['technician-job-shift-assignments', jobId ?? null, technicianId ?? null] as const,
+    dateTypes: (jobId?: string | null) => ['job-date-types', jobId ?? null] as const,
+    tourDocuments: (tourId?: string | null) => ['tour-documents-for-job', tourId ?? null] as const,
+    artists: (jobId?: string | null) => ['technician-job-artists', jobId ?? null] as const,
+    riderFiles: (jobId?: string | null, artistIds?: string[]) =>
+      ['technician-job-rider-files', jobId ?? null, artistIds ?? []] as const,
+    hojaDeRutaMeta: (jobId?: string | null) => ['technician-hoja-de-ruta-meta', jobId ?? null] as const,
+    hojaAccommodations: (hojaId?: string | null) => ['technician-hoja-accommodations', hojaId ?? null] as const,
+    hojaTravelArrangements: (hojaId?: string | null) =>
+      ['technician-hoja-travel-arrangements', hojaId ?? null] as const,
+    hojaTransport: (hojaId?: string | null) => ['technician-hoja-logistics-transport', hojaId ?? null] as const,
+    roomOccupants: (profileIds?: string[]) => ['technician-hoja-room-occupants', profileIds ?? []] as const,
+  },
 };
 
 // Optimized invalidation strategies

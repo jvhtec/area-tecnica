@@ -27,6 +27,7 @@ export interface TechnicianProfile {
   last_name?: string;
   email?: string;
   profile_picture_url?: string | null;
+  department?: string | null;
 }
 
 export interface StaffAssignment {
