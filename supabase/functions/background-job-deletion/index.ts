@@ -1,6 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireServiceRoleRequest } from "../_shared/auth.ts";
+
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +26,8 @@ serve(async (req) => {
   }
 
   try {
+    requireServiceRoleRequest(req, SERVICE_ROLE_KEY);
+
     const { jobId } = await req.json();
     
     if (!jobId) {
@@ -37,7 +42,7 @@ serve(async (req) => {
     // Initialize Supabase client with service role key for full access
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -58,13 +63,17 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in background-job-deletion function:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message 
+    const errorLike = error as { status?: unknown; message?: unknown };
+    const status = typeof errorLike.status === 'number' ? errorLike.status : 500;
+    const details = typeof errorLike.message === 'string' ? errorLike.message : String(error);
+    const message = status >= 500 ? details : 'Forbidden';
+    return new Response(JSON.stringify({
+      success: false,
+      error: message
     }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

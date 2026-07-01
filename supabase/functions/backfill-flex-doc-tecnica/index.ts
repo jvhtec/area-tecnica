@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
 
@@ -18,11 +19,6 @@ const corsHeaders = {
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...corsHeaders } });
-}
-
-function ensureAuth(req: Request) {
-  const h = req.headers.get('Authorization');
-  if (!h) throw new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } });
 }
 
 function normalize(str: string): string {
@@ -152,12 +148,22 @@ function findDocTecByDeptInTree(nodes: any[], dept: Dept): string[] {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Not found' }, 404);
-  try { ensureAuth(req); } catch (e) { return e as Response; }
+
+  const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  try {
+    await requireAdminOrManagement(sb, req, {
+      logContext: 'backfill-flex-doc-tecnica',
+    });
+  } catch (error) {
+    const errorLike = error as { status?: unknown; message?: unknown };
+    const status = typeof errorLike.status === 'number' ? errorLike.status : 403;
+    const message = typeof errorLike.message === 'string' ? errorLike.message : 'Forbidden';
+    return json({ error: message }, status);
+  }
 
   const { job_id, departments, manual } = await req.json().catch(() => ({}));
   if (!job_id) return json({ error: 'Missing job_id' }, 400);
-
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   // 1) Candidate roots: department folders, tour-level folders per dept, and main job element
   const { data: deptRows } = await sb

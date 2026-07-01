@@ -28,6 +28,21 @@ const VALID_CLASSES = new Set([
   "service-only",
 ]);
 
+const PRIVILEGED_ROLE_GUARD_PATTERNS = [
+  /\brequireAdminOrManagement\b/,
+  /\brequireAuthenticatedRole\b/,
+  /\bALLOWED_ROLES\b/,
+  /\bGOOGLE_MAPS_ALLOWED_ROLES\b/,
+  /\.select\([^)]*\brole\b[^)]*\)/s,
+];
+
+const SERVICE_ONLY_GUARD_PATTERNS = [
+  /\brequireServiceRoleRequest\b/,
+  /\bisServiceRoleRequest\b/,
+  /\btimingSafeEqual\b/,
+  /\bWALLBOARD_SHARED_TOKEN\b/,
+];
+
 function toPosix(path) {
   return path.split("\\").join("/");
 }
@@ -100,6 +115,52 @@ function effectiveVerifyJwt(configVerifyJwt, name) {
   return configVerifyJwt.has(name) ? configVerifyJwt.get(name) : true;
 }
 
+function listSourceFiles(directory) {
+  const files = [];
+
+  if (!existsSync(directory)) {
+    return files;
+  }
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      if (entry.name === "__tests__") {
+        continue;
+      }
+
+      files.push(...listSourceFiles(entryPath));
+      continue;
+    }
+
+    if (
+      entry.isFile() &&
+      /\.(?:ts|js)$/.test(entry.name) &&
+      !entry.name.endsWith(".test.ts") &&
+      !entry.name.endsWith(".test.js")
+    ) {
+      files.push(entryPath);
+    }
+  }
+
+  return files;
+}
+
+function readFunctionSource(name) {
+  return listSourceFiles(join(functionsRoot, name))
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n");
+}
+
+function hasPattern(source, patterns) {
+  return patterns.some((pattern) => pattern.test(source));
+}
+
+function normalizedGuard(entry) {
+  return typeof entry.internalGuard === "string" ? entry.internalGuard.trim() : "";
+}
+
 function validate() {
   const directories = listFunctionDirectories();
   const manifest = readManifest();
@@ -141,11 +202,49 @@ function validate() {
     }
 
     if (entry.verifyJwt === false) {
-      const guard = typeof entry.internalGuard === "string" ? entry.internalGuard.trim() : "";
+      const guard = normalizedGuard(entry);
       if (!guard) {
         errors.push(
           `Function \`${name}\` has verifyJwt=false but no internalGuard. ` +
             `Document how it is protected without gateway JWT verification.`,
+        );
+      }
+    }
+
+    if (entry.class === "public-token") {
+      const guard = normalizedGuard(entry);
+      if (!guard) {
+        errors.push(
+          `Function \`${name}\` is public-token but has no internalGuard. ` +
+            `Document the token, rate limit, safe public behavior, or other runtime guard.`,
+        );
+      }
+    }
+
+    if (entry.class === "service-only") {
+      const guard = normalizedGuard(entry);
+      if (!guard) {
+        errors.push(
+          `Function \`${name}\` is service-only but has no internalGuard. ` +
+            `Document the service-role/shared-secret/runtime guard.`,
+        );
+      }
+
+      const source = readFunctionSource(name);
+      if (!hasPattern(source, SERVICE_ONLY_GUARD_PATTERNS)) {
+        errors.push(
+          `Function \`${name}\` is service-only but its source does not reference a recognizable service-only guard. ` +
+            `Use requireServiceRoleRequest/isServiceRoleRequest or document and implement an equivalent guard.`,
+        );
+      }
+    }
+
+    if (entry.class === "privileged-role") {
+      const source = readFunctionSource(name);
+      if (!hasPattern(source, PRIVILEGED_ROLE_GUARD_PATTERNS)) {
+        errors.push(
+          `Function \`${name}\` is privileged-role but its source does not reference a recognizable role guard. ` +
+            `Use requireAdminOrManagement/requireAuthenticatedRole or an explicit role allowlist.`,
         );
       }
     }

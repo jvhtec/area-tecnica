@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,28 +23,6 @@ interface FlexFolderResponse {
   id: string;
   name: string;
   parent_id?: string;
-}
-
-async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.replace('Bearer ', '').trim();
-  if (!token) return null;
-
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error) {
-      console.warn('[create-flex-folders] Unable to resolve actor id:', error);
-      return null;
-    }
-    return data.user?.id ?? null;
-  } catch (err) {
-    console.warn('[create-flex-folders] Error resolving actor id', err);
-    return null;
-  }
 }
 
 async function resolveActorName(supabase: ReturnType<typeof createClient>, actorId: string | null): Promise<string | null> {
@@ -157,7 +136,10 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
-    const actorId = await resolveActorId(supabase, req)
+    const caller = await requireAdminOrManagement(supabase, req, {
+      logContext: 'create-flex-folders',
+    })
+    const actorId = caller.userId
     const actorName = await resolveActorName(supabase, actorId)
     const activityEvents: Array<{ payload: Record<string, unknown>; visibility?: 'management' | 'job_participants' | 'house_plus_job' | 'actor_only' }> = []
 
@@ -395,11 +377,13 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Error in create-flex-folders:", error)
+    const status = typeof error?.status === 'number' ? error.status : 400
+    const message = status >= 500 ? 'Internal server error' : error.message
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status,
       },
     )
   }

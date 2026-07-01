@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { requireAdminOrManagement } from "../_shared/auth.ts"
 import { businessRoleLookupFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
 
 const corsHeaders = {
@@ -51,28 +52,6 @@ function buildFlexRowDataParams(includeTimestamp = true): URLSearchParams {
   }
   qs.set('node', 'root');
   return qs;
-}
-
-async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.replace('Bearer ', '').trim();
-  if (!token) return null;
-
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error) {
-      console.warn('[manage-flex-crew-assignments] Unable to resolve actor id:', error);
-      return null;
-    }
-    return data.user?.id ?? null;
-  } catch (err) {
-    console.warn('[manage-flex-crew-assignments] Error resolving actor id', err);
-    return null;
-  }
 }
 
 /**
@@ -199,8 +178,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const caller = await requireAdminOrManagement(supabase, req, {
+      logContext: 'manage-flex-crew-assignments',
+    });
+
     const { job_id, technician_id, department, action } = await req.json() as RequestBody;
-    const actorId = await resolveActorId(supabase, req);
+    const actorId = caller.userId;
 
     console.log(`Managing Flex crew assignment: ${action} technician ${technician_id} for job ${job_id} in department ${department}`);
 
@@ -702,9 +685,11 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in manage-flex-crew-assignments:', error);
+    const status = typeof error?.status === 'number' ? error.status : 500;
+    const message = status >= 500 ? 'Internal server error' : error.message;
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: message }),
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

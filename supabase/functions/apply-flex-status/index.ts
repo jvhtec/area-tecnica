@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { requireAdminOrManagement } from "../_shared/auth.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,6 +52,16 @@ function annotateFlexResponse(payload: unknown, meta: Record<string, unknown>, f
   if (fallbackMessage) res.message = fallbackMessage;
   if (payload !== undefined) res.payload = payload as any;
   return res;
+}
+
+function publicCatchMessage(status: number): string {
+  if (status === 401) return 'Unauthorized';
+  if (status === 403) return 'Forbidden';
+  if (status === 404) return 'Not found';
+  if (status === 405) return 'Method not allowed';
+  if (status === 503) return 'Service unavailable';
+  if (status >= 400 && status < 500) return 'Request rejected';
+  return 'Internal server error';
 }
 
 async function callFlexWorkflowAction(args: {
@@ -146,6 +157,10 @@ serve(async (req) => {
   );
 
   try {
+    const caller = await requireAdminOrManagement(supabase, req, {
+      logContext: 'apply-flex-status',
+    });
+
     const body = await req.json() as RequestBody;
     const { folder_id, element_id, status, cascade = false } = body;
     let cascadeResult: null | {
@@ -166,15 +181,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid or missing status' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
     }
 
-    // Try to read user info (optional)
-    let processedBy: string | null = null;
-    const authHeader = req.headers.get('authorization') || undefined;
-    try {
-      if (authHeader) {
-        const { data: { user } } = await supabase.auth.getUser((authHeader || '').replace('Bearer ', ''));
-        processedBy = user?.id ?? null;
-      }
-    } catch {}
+    const processedBy: string | null = caller.userId;
 
     // Load folder row if folder_id provided
     let folderRow: any = null;
@@ -348,8 +355,10 @@ serve(async (req) => {
     const httpStatus = success ? ((cascadeResult?.failed ?? 0) > 0 ? 207 : 200) : 502;
     return new Response(JSON.stringify({ success, response: responseJson, error: success ? null : errorMessage, cascade: cascadeResult }), { status: httpStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('apply-flex-status error:', error);
-    return new Response(JSON.stringify({ success: false, error: 'Internal server error', details: error?.message || String(error) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    const errorLike = error as { status?: unknown; message?: unknown };
+    const status = typeof errorLike.status === 'number' ? errorLike.status : 500;
+    return new Response(JSON.stringify({ success: false, error: publicCatchMessage(status) }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 });
