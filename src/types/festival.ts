@@ -63,6 +63,10 @@ export interface ArtistFormData {
   readonly soundcheck: boolean;
   readonly soundcheck_start?: string;
   readonly soundcheck_end?: string;
+  readonly line_check: boolean;
+  readonly line_check_start?: string;
+  readonly line_check_end?: string;
+  readonly load_in_time?: string;
   foh_console: string;
   foh_consoles: ConsoleSetup[];
   foh_console_provided_by: ProviderType;

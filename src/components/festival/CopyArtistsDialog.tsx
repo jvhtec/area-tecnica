@@ -178,6 +178,9 @@ export const CopyArtistsDialog = ({
           show_end: copyOptions.resetTimes ? null : artistData.show_end,
           soundcheck_start: copyOptions.resetTimes ? null : artistData.soundcheck_start,
           soundcheck_end: copyOptions.resetTimes ? null : artistData.soundcheck_end,
+          line_check_start: copyOptions.resetTimes ? null : artistData.line_check_start,
+          line_check_end: copyOptions.resetTimes ? null : artistData.line_check_end,
+          load_in_time: copyOptions.resetTimes ? null : artistData.load_in_time,
           // Reset stages if option is selected
           stage: copyOptions.resetStages ? 1 : artistData.stage,
           // Remove notes if option is not selected

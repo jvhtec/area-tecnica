@@ -2,6 +2,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ARTIST_SORT_FIELD_LABELS, type ArtistSortField } from "@/utils/artistSorting";
 
 interface ArtistTableFiltersProps {
   searchTerm: string;
@@ -12,6 +13,8 @@ interface ArtistTableFiltersProps {
   onEquipmentFilterChange: (value: string) => void;
   riderFilter?: string;
   onRiderFilterChange?: (value: string) => void;
+  sortBy?: ArtistSortField;
+  onSortByChange?: (value: ArtistSortField) => void;
   hideStageFilter?: boolean;
 }
 
@@ -24,10 +27,12 @@ export const ArtistTableFilters = ({
   onEquipmentFilterChange,
   riderFilter = "all",
   onRiderFilterChange,
+  sortBy = "chronological",
+  onSortByChange,
   hideStageFilter = false,
 }: ArtistTableFiltersProps) => {
-  const gridCols = hideStageFilter ? "lg:grid-cols-3" : "lg:grid-cols-4";
-  
+  const gridCols = hideStageFilter ? "lg:grid-cols-4" : "lg:grid-cols-5";
+
   return (
     <div className="space-y-4 mb-4">
       <div className={`grid grid-cols-1 md:grid-cols-2 ${gridCols} gap-4`}>
@@ -84,6 +89,22 @@ export const ArtistTableFilters = ({
               <SelectItem value="all">Todos los riders</SelectItem>
               <SelectItem value="complete">Rider completo</SelectItem>
               <SelectItem value="missing">Rider faltante</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="sort" className="text-sm">Ordenar por</Label>
+          <Select value={sortBy} onValueChange={onSortByChange}>
+            <SelectTrigger id="sort" className="h-10">
+              <SelectValue placeholder={ARTIST_SORT_FIELD_LABELS.chronological} />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(ARTIST_SORT_FIELD_LABELS) as ArtistSortField[]).map((field) => (
+                <SelectItem key={field} value={field}>
+                  {ARTIST_SORT_FIELD_LABELS[field]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

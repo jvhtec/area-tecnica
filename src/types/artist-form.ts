@@ -13,6 +13,10 @@ export interface ArtistSectionProps {
     soundcheck: boolean;
     soundcheck_start?: string;
     soundcheck_end?: string;
+    line_check: boolean;
+    line_check_start?: string;
+    line_check_end?: string;
+    load_in_time?: string;
     foh_console: string;
     foh_consoles: ConsoleSetup[];
     foh_console_provided_by: string;

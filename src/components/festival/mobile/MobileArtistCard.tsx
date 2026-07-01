@@ -19,6 +19,10 @@ interface Artist {
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  line_check?: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
+  load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
@@ -253,7 +257,13 @@ export const MobileArtistCard = ({
         </div>
 
         {/* Time Row */}
-        <div className={`grid gap-2 mt-3 ${artist.soundcheck ? 'grid-cols-1 min-[380px]:grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 mt-3">
+          {artist.load_in_time && (
+            <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Load In</div>
+              <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeCompact(artist.load_in_time)}</div>
+            </div>
+          )}
           <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
             <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Hora del Show</div>
             <div className="text-xs font-bold font-mono truncate">{formatTimeRange(artist.show_start, artist.show_end)}</div>
@@ -262,6 +272,12 @@ export const MobileArtistCard = ({
             <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
               <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Soundcheck</div>
               <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)}</div>
+            </div>
+          )}
+          {artist.line_check && (
+            <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Line Check</div>
+              <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeRange(artist.line_check_start, artist.line_check_end)}</div>
             </div>
           )}
         </div>

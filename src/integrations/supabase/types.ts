@@ -1647,6 +1647,10 @@ export type Database = {
             | null
           isaftermidnight: boolean | null
           job_id: string | null
+          line_check: boolean
+          line_check_end: string | null
+          line_check_start: string | null
+          load_in_time: string | null
           mic_kit: string | null
           mic_pack: string | null
           mon_console: string | null
@@ -1716,6 +1720,10 @@ export type Database = {
             | null
           isaftermidnight?: boolean | null
           job_id?: string | null
+          line_check?: boolean
+          line_check_end?: string | null
+          line_check_start?: string | null
+          load_in_time?: string | null
           mic_kit?: string | null
           mic_pack?: string | null
           mon_console?: string | null
@@ -1785,6 +1793,10 @@ export type Database = {
             | null
           isaftermidnight?: boolean | null
           job_id?: string | null
+          line_check?: boolean
+          line_check_end?: string | null
+          line_check_start?: string | null
+          load_in_time?: string | null
           mic_kit?: string | null
           mic_pack?: string | null
           mon_console?: string | null

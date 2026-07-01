@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArtistSectionProps } from "@/types/artist-form";
+import { computeLineCheckDefaults } from "@/utils/artistTimeDefaults";
 
 interface BasicInfoSectionProps extends ArtistSectionProps {
   stageNames?: Record<number, string>;
@@ -71,6 +72,18 @@ export const BasicInfoSection = ({
         />
       </div>
 
+      {showInternalFlags && (
+        <div>
+          <Label>{tx("Hora de Load In", "Load In Time")}</Label>
+          <Input
+            type="time"
+            value={formData.load_in_time || ""}
+            onChange={(e) => onChange({ load_in_time: e.target.value })}
+            disabled={locked("load_in_time")}
+          />
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label>{tx("Inicio del Show", "Show Start")}</Label>
@@ -126,6 +139,54 @@ export const BasicInfoSection = ({
           </div>
         )}
       </div>
+
+      {showInternalFlags && (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="line-check"
+              checked={formData.line_check}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  const defaults = computeLineCheckDefaults(formData.show_start);
+                  onChange({
+                    line_check: true,
+                    line_check_start: formData.line_check_start || defaults.start,
+                    line_check_end: formData.line_check_end || defaults.end,
+                  });
+                } else {
+                  onChange({ line_check: false });
+                }
+              }}
+              disabled={locked("line_check")}
+            />
+            <Label htmlFor="line-check">{tx("Requiere Line Check", "Requires Line Check")}</Label>
+          </div>
+
+          {formData.line_check && (
+            <div className="grid grid-cols-2 gap-4 ml-6">
+              <div>
+                <Label>{tx("Inicio del Line Check", "Line Check Start")}</Label>
+                <Input
+                  type="time"
+                  value={formData.line_check_start || ""}
+                  onChange={(e) => onChange({ line_check_start: e.target.value })}
+                  disabled={locked("line_check_start")}
+                />
+              </div>
+              <div>
+                <Label>{tx("Fin del Line Check", "Line Check End")}</Label>
+                <Input
+                  type="time"
+                  value={formData.line_check_end || ""}
+                  onChange={(e) => onChange({ line_check_end: e.target.value })}
+                  disabled={locked("line_check_end")}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {showInternalFlags && (
         <div className="space-y-4">

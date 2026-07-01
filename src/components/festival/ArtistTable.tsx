@@ -10,7 +10,7 @@ import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
-import { sortArtistsChronologically } from "@/utils/artistSorting";
+import { sortArtistsChronologically, sortArtistsByField, type ArtistSortField } from "@/utils/artistSorting";
 import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -36,6 +36,10 @@ interface Artist {
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  line_check?: boolean;
+  line_check_start?: string;
+  line_check_end?: string;
+  load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
@@ -95,6 +99,7 @@ interface ArtistTableProps {
   equipmentFilter: string;
   riderFilter: string;
   dayStartTime: string;
+  sortBy?: ArtistSortField;
   jobId?: string;
   selectedDate?: string;
   onArtistStagePlotUpdated?: () => void;
@@ -146,6 +151,7 @@ export const ArtistTable = ({
   equipmentFilter,
   riderFilter,
   dayStartTime,
+  sortBy = 'chronological',
   jobId,
   selectedDate,
   onArtistStagePlotUpdated,
@@ -565,8 +571,12 @@ export const ArtistTable = ({
     return matchesSearch && matchesStage && matchesEquipment && matchesRider;
   });
 
-  // Apply chronological sorting to filtered artists using imported utility
-  const sortedFilteredArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
+  // Apply sorting to filtered artists using imported utility
+  const sortedFilteredArtists = (
+    sortBy === 'chronological'
+      ? sortArtistsChronologically(filteredArtists as any)
+      : sortArtistsByField(filteredArtists as any, sortBy)
+  ) as Artist[];
   const hasArtistSubmittedData = sortedFilteredArtists.some((artist) => artist.artist_submitted);
   const handleDeleteClick = async (artist: Artist) => {
     if (!canDelete) return;
@@ -812,8 +822,10 @@ export const ArtistTable = ({
                   <TableHead className="min-w-[140px]">Artista</TableHead>
                   <TableHead className="min-w-[120px]">Stage Plot</TableHead>
                   <TableHead className="min-w-[80px]">Stage</TableHead>
+                  <TableHead className="min-w-[90px]">Load In</TableHead>
                   <TableHead className="min-w-[100px]">Hora del show</TableHead>
                   <TableHead className="min-w-[100px]">Soundcheck</TableHead>
+                  <TableHead className="min-w-[100px]">Line Check</TableHead>
                   <TableHead className="min-w-[200px]">Consolas</TableHead>
                   <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
                   <TableHead className="min-w-[140px]">
@@ -882,6 +894,11 @@ export const ArtistTable = ({
                       <TableCell className="min-w-[80px]">
                         <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
                       </TableCell>
+                      <TableCell className="min-w-[90px]">
+                        <div className="text-sm">
+                          {artist.load_in_time || <span className="text-muted-foreground">-</span>}
+                        </div>
+                      </TableCell>
                       <TableCell className="min-w-[100px]">
                         <div className="text-sm">
                           {artist.show_start} - {artist.show_end}
@@ -899,7 +916,19 @@ export const ArtistTable = ({
                           <Badge variant="outline">No</Badge>
                         )}
                       </TableCell>
-                      
+                      <TableCell className="min-w-[100px]">
+                        {artist.line_check ? (
+                          <div className="text-sm">
+                            <Badge variant="secondary">Sí</Badge>
+                            <div className="text-xs text-muted-foreground">
+                              {artist.line_check_start} - {artist.line_check_end}
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge variant="outline">No</Badge>
+                        )}
+                      </TableCell>
+
                       <TableCell className="min-w-[200px]">
                         <div className="text-sm space-y-1">
                           <div className="flex items-center gap-1 flex-wrap">
@@ -941,7 +970,7 @@ export const ArtistTable = ({
                       
                       <TableCell className="min-w-[180px]">
                         <div className="text-sm space-y-1">
-                          {artist.wireless_systems && artist.wireless_systems.length > 0 && (
+                          {(artist.wireless_provided_by || (artist.wireless_systems && artist.wireless_systems.length > 0)) && (
                             <div className="flex items-center gap-1 flex-wrap">
                               <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
                                 Wireless: {formatWirelessSystems(artist.wireless_systems)}
@@ -953,7 +982,7 @@ export const ArtistTable = ({
                               )}
                             </div>
                           )}
-                          {artist.iem_systems && artist.iem_systems.length > 0 && (
+                          {(artist.iem_provided_by || (artist.iem_systems && artist.iem_systems.length > 0)) && (
                             <div className="flex items-center gap-1 flex-wrap">
                               <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
                                 IEM: {formatWirelessSystems(artist.iem_systems, true)}

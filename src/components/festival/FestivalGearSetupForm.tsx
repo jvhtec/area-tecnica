@@ -481,6 +481,7 @@ export const FestivalGearSetupForm = ({
     show_start: "",
     show_end: "",
     soundcheck: false,
+    line_check: false,
     foh_console: "",
     foh_console_provided_by: "",
     mon_console: "",

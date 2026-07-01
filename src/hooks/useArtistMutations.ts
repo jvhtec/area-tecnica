@@ -8,11 +8,26 @@ import { queryKeys } from "@/lib/react-query";
 type FestivalArtistInsert = Database["public"]["Tables"]["festival_artists"]["Insert"];
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
 type FestivalArtistUpdatePayload = FestivalArtistUpdate & { id: string };
-type ArtistTimeField = "show_start" | "show_end" | "soundcheck_start" | "soundcheck_end";
+type ArtistTimeField =
+  | "show_start"
+  | "show_end"
+  | "soundcheck_start"
+  | "soundcheck_end"
+  | "line_check_start"
+  | "line_check_end"
+  | "load_in_time";
 type ArtistTimePayload = (FestivalArtistInsert | FestivalArtistUpdate) &
   Partial<Record<ArtistTimeField, string | null>>;
 
-const artistTimeFields: ArtistTimeField[] = ["show_start", "show_end", "soundcheck_start", "soundcheck_end"];
+const artistTimeFields: ArtistTimeField[] = [
+  "show_start",
+  "show_end",
+  "soundcheck_start",
+  "soundcheck_end",
+  "line_check_start",
+  "line_check_end",
+  "load_in_time",
+];
 
 // Helper function to format artist time data
 const formatArtistTimeData = <T extends ArtistTimePayload>(artistData: T): T => {
