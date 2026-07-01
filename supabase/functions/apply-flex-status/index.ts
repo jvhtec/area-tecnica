@@ -54,6 +54,16 @@ function annotateFlexResponse(payload: unknown, meta: Record<string, unknown>, f
   return res;
 }
 
+function publicCatchMessage(status: number): string {
+  if (status === 401) return 'Unauthorized';
+  if (status === 403) return 'Forbidden';
+  if (status === 404) return 'Not found';
+  if (status === 405) return 'Method not allowed';
+  if (status === 503) return 'Service unavailable';
+  if (status >= 400 && status < 500) return 'Request rejected';
+  return 'Internal server error';
+}
+
 async function callFlexWorkflowAction(args: {
   elementId: string;
   workflowActionId: string;
@@ -349,8 +359,6 @@ serve(async (req) => {
     console.error('apply-flex-status error:', error);
     const errorLike = error as { status?: unknown; message?: unknown };
     const status = typeof errorLike.status === 'number' ? errorLike.status : 500;
-    const details = typeof errorLike.message === 'string' ? errorLike.message : String(error);
-    const message = status >= 500 ? 'Internal server error' : (details || 'Request rejected');
-    return new Response(JSON.stringify({ success: false, error: message }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    return new Response(JSON.stringify({ success: false, error: publicCatchMessage(status) }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 });
