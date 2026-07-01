@@ -9,11 +9,48 @@ import {
   WAVES_POWER_RANK,
   type WavesModelSelection,
 } from "@/constants/wavesModels";
+import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS } from "@/constants/consoleDrive";
 
 type WavesCheckArgs = {
   label: string;
   artistModels: WavesModelSelection[] | undefined;
   availableModels: WavesModelSelection[] | undefined;
+};
+
+type EnumMembershipCheckArgs = {
+  label: string;
+  required: string | undefined;
+  available: string[] | undefined;
+  labels: Record<string, string>;
+};
+
+// Generic "is the required option among what the festival supports" check,
+// used for FOH drive, FOH drive position, and MON position: no options
+// configured at all is an error, and a required option outside the
+// configured set is also an error (no substitutability concept for these).
+const checkEnumMembership = ({ label, required, available, labels }: EnumMembershipCheckArgs): GearMismatch | null => {
+  if (!required) return null;
+
+  const configured = available || [];
+  if (configured.length === 0) {
+    return {
+      type: 'console',
+      severity: 'error',
+      message: `Se solicita ${label} pero no está configurado en el setup de equipo`,
+      details: `Solicitado: ${labels[required] || required}`,
+    };
+  }
+
+  if (!configured.includes(required)) {
+    return {
+      type: 'console',
+      severity: 'error',
+      message: `${label} solicitado no coincide con el configurado`,
+      details: `Solicitado: ${labels[required] || required}. Configurado: ${configured.map((value) => labels[value] || value).join(', ')}`,
+    };
+  }
+
+  return null;
 };
 
 // Shared FOH/MON waves model comparison: no model configured on the festival
@@ -154,6 +191,22 @@ export const compareArtistRequirements = (
     }
   }
 
+  const fohDriveMismatch = checkEnumMembership({
+    label: 'Drive FOH',
+    required: artist.foh_drive || undefined,
+    available: availableGear.foh_drive_options,
+    labels: FOH_DRIVE_LABELS,
+  });
+  if (fohDriveMismatch) mismatches.push(fohDriveMismatch);
+
+  const fohDrivePositionMismatch = checkEnumMembership({
+    label: 'posición del drive FOH',
+    required: artist.foh_drive_position || undefined,
+    available: availableGear.foh_drive_positions,
+    labels: CONSOLE_POSITION_LABELS,
+  });
+  if (fohDrivePositionMismatch) mismatches.push(fohDrivePositionMismatch);
+
   const fohWavesProvidedBy = artist.foh_waves_provided_by || 'festival';
   if ((artist.foh_waves_models || []).length > 0 || (artist.foh_outboard || "").trim().length > 0) {
     if (fohWavesProvidedBy === 'band') {
@@ -203,6 +256,16 @@ export const compareArtistRequirements = (
         });
       }
     }
+  }
+
+  if (!artist.monitors_from_foh) {
+    const monPositionMismatch = checkEnumMembership({
+      label: 'posición de monitores',
+      required: artist.mon_position || undefined,
+      available: availableGear.mon_positions,
+      labels: CONSOLE_POSITION_LABELS,
+    });
+    if (monPositionMismatch) mismatches.push(monPositionMismatch);
   }
 
   const monWavesProvidedBy = artist.mon_waves_provided_by || 'festival';

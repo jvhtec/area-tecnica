@@ -16,6 +16,7 @@ import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } fro
 import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtistCard";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { combineWavesDisplay } from "@/constants/wavesModels";
+import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
 
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
 type ProviderType = Database["public"]["Enums"]["provider_type"];
@@ -32,8 +33,11 @@ interface Artist {
   soundcheck_end?: string;
   foh_console: string;
   foh_console_provided_by?: ProviderType | null;
+  foh_drive?: string | null;
+  foh_drive_position?: string | null;
   mon_console: string;
   mon_console_provided_by?: ProviderType | null;
+  mon_position?: string | null;
   monitors_from_foh?: boolean;
   foh_waves_models?: any[];
   foh_outboard?: string;
@@ -211,6 +215,12 @@ export const ReadOnlyArtistCategoryContent = ({
           <div className="text-xs uppercase text-muted-foreground font-semibold">FOH</div>
           <div className="font-medium">{artist.foh_console || "Sin especificar"}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.foh_console_provided_by)}</div>
+          {(artist.foh_drive || artist.foh_drive_position) && (
+            <div className="text-muted-foreground">
+              Drive: {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
+              {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
+            </div>
+          )}
           {(artist.foh_waves_models?.length || artist.foh_outboard) && (
             <div className="text-muted-foreground">Waves/Outboard: {combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</div>
           )}
@@ -223,6 +233,11 @@ export const ReadOnlyArtistCategoryContent = ({
             <>
               <div className="font-medium">{artist.mon_console || "Sin especificar"}</div>
               <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.mon_console_provided_by)}</div>
+              {artist.mon_position && (
+                <div className="text-muted-foreground">
+                  Posición: {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
+                </div>
+              )}
               {(artist.mon_waves_models?.length || artist.mon_outboard) && (
                 <div className="text-muted-foreground">Waves/Outboard: {combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</div>
               )}
@@ -380,8 +395,11 @@ function buildFormData(artist: Artist) {
     soundcheck_end: artist.soundcheck_end || "",
     foh_console: artist.foh_console || "",
     foh_console_provided_by: artist.foh_console_provided_by || "festival",
+    foh_drive: artist.foh_drive || "",
+    foh_drive_position: artist.foh_drive_position || "",
     mon_console: artist.mon_console || "",
     mon_console_provided_by: artist.mon_console_provided_by || "festival",
+    mon_position: artist.mon_position || "",
     monitors_from_foh: artist.monitors_from_foh || false,
     foh_waves_models: artist.foh_waves_models || [],
     foh_outboard: artist.foh_outboard || "",
@@ -472,8 +490,11 @@ export const MobileArtistConfigEditor = ({
           updatePayload = {
             foh_console: formData.foh_console,
             foh_console_provided_by: formData.foh_console_provided_by,
+            foh_drive: formData.foh_drive || null,
+            foh_drive_position: formData.foh_drive_position || null,
             mon_console: formData.mon_console,
             mon_console_provided_by: formData.mon_console_provided_by,
+            mon_position: formData.mon_position || null,
             monitors_from_foh: formData.monitors_from_foh,
             foh_waves_models: formData.foh_waves_models,
             foh_outboard: formData.foh_outboard || null,

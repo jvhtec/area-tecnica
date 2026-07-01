@@ -1,6 +1,7 @@
 
 import { WirelessSetup, ConsoleSetup, WiredMicSetup } from "./festival";
 import type { WavesModelSelection } from "@/constants/wavesModels";
+import type { FohDrive, ConsolePosition, MonConsolePosition } from "@/constants/consoleDrive";
 
 export interface WirelessConfigProps {
   systems: WirelessSetup[];
@@ -25,6 +26,9 @@ export interface GearSetupFormData {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
+  foh_drive_options?: FohDrive[];
+  foh_drive_positions?: ConsolePosition[];
+  mon_positions?: MonConsolePosition[];
   foh_waves_models: WavesModelSelection[];
   foh_outboard: string;
   mon_waves_models: WavesModelSelection[];

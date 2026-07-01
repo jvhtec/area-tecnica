@@ -34,6 +34,9 @@ export interface FestivalGearSetup {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
+  foh_drive_options?: FohDrive[];
+  foh_drive_positions?: ConsolePosition[];
+  mon_positions?: MonConsolePosition[];
   foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string | null;
   mon_waves_models?: WavesModelSelection[];
@@ -129,6 +132,9 @@ export interface StageGearSetup {
   stage_number: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
+  foh_drive_options?: FohDrive[];
+  foh_drive_positions?: ConsolePosition[];
+  mon_positions?: MonConsolePosition[];
   foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string | null;
   mon_waves_models?: WavesModelSelection[];

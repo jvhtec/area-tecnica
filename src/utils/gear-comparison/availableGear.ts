@@ -4,6 +4,9 @@ import type { AvailableGear } from "@/utils/gear-comparison/types";
 export const EMPTY_AVAILABLE_GEAR: AvailableGear = {
   foh_consoles: [],
   mon_consoles: [],
+  foh_drive_options: [],
+  foh_drive_positions: [],
+  mon_positions: [],
   foh_waves_models: [],
   foh_outboard: "",
   mon_waves_models: [],
@@ -25,6 +28,9 @@ export const EMPTY_AVAILABLE_GEAR: AvailableGear = {
 export const mapStageSetupToAvailableGear = (stageSetup: StageGearSetup): AvailableGear => ({
   foh_consoles: stageSetup.foh_consoles || [],
   mon_consoles: stageSetup.mon_consoles || [],
+  foh_drive_options: stageSetup.foh_drive_options || [],
+  foh_drive_positions: stageSetup.foh_drive_positions || [],
+  mon_positions: stageSetup.mon_positions || [],
   foh_waves_models: stageSetup.foh_waves_models || [],
   foh_outboard: stageSetup.foh_outboard || "",
   mon_waves_models: stageSetup.mon_waves_models || [],
@@ -46,6 +52,9 @@ export const mapStageSetupToAvailableGear = (stageSetup: StageGearSetup): Availa
 export const mapGlobalSetupToAvailableGear = (globalSetup: FestivalGearSetup): AvailableGear => ({
   foh_consoles: globalSetup.foh_consoles || [],
   mon_consoles: globalSetup.mon_consoles || [],
+  foh_drive_options: globalSetup.foh_drive_options || [],
+  foh_drive_positions: globalSetup.foh_drive_positions || [],
+  mon_positions: globalSetup.mon_positions || [],
   foh_waves_models: globalSetup.foh_waves_models || [],
   foh_outboard: globalSetup.foh_outboard || "",
   mon_waves_models: globalSetup.mon_waves_models || [],

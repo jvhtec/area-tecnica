@@ -21,6 +21,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { PushToFlexPullsheetDialog } from "./PushToFlexPullsheetDialog";
 import { normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 import { normalizeWavesModelSelections, type WavesModelSelection } from "@/constants/wavesModels";
+import { asFohDriveArray, asConsolePositionArray, asMonConsolePositionArray } from "@/constants/consoleDrive";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -33,6 +34,9 @@ const buildEmptyStageSetup = (maxStages = 1): GearSetupFormData => ({
   max_stages: maxStages,
   foh_consoles: [],
   mon_consoles: [],
+  foh_drive_options: [],
+  foh_drive_positions: [],
+  mon_positions: [],
   foh_waves_models: [],
   foh_outboard: "",
   mon_waves_models: [],
@@ -73,6 +77,9 @@ const mapGearSetupRow = (row: FestivalGearSetupRow): FestivalGearSetup => ({
   max_stages: row.max_stages || 1,
   foh_consoles: jsonArrayOrEmpty<GearSetupFormData["foh_consoles"][number]>(row.foh_consoles),
   mon_consoles: jsonArrayOrEmpty<GearSetupFormData["mon_consoles"][number]>(row.mon_consoles),
+  foh_drive_options: asFohDriveArray(row.foh_drive_options),
+  foh_drive_positions: asConsolePositionArray(row.foh_drive_positions),
+  mon_positions: asMonConsolePositionArray(row.mon_positions),
   foh_waves_models: normalizeWavesModelSelections(row.foh_waves_models),
   foh_outboard: row.foh_outboard,
   mon_waves_models: normalizeWavesModelSelections(row.mon_waves_models),
@@ -168,6 +175,9 @@ export const FestivalGearSetupForm = ({
                 max_stages: setupData.max_stages || 1,
                 foh_consoles: jsonArrayOrEmpty<GearSetupFormData["foh_consoles"][number]>(stageSetupData.foh_consoles),
                 mon_consoles: jsonArrayOrEmpty<GearSetupFormData["mon_consoles"][number]>(stageSetupData.mon_consoles),
+                foh_drive_options: asFohDriveArray(stageSetupData.foh_drive_options),
+                foh_drive_positions: asConsolePositionArray(stageSetupData.foh_drive_positions),
+                mon_positions: asMonConsolePositionArray(stageSetupData.mon_positions),
                 foh_waves_models: normalizeWavesModelSelections(stageSetupData.foh_waves_models),
                 foh_outboard: stageSetupData.foh_outboard || "",
                 mon_waves_models: normalizeWavesModelSelections(stageSetupData.mon_waves_models),
@@ -209,6 +219,9 @@ export const FestivalGearSetupForm = ({
               max_stages: setupData.max_stages || 1,
               foh_consoles: jsonArrayOrEmpty<GearSetupFormData["foh_consoles"][number]>(setupData.foh_consoles),
               mon_consoles: jsonArrayOrEmpty<GearSetupFormData["mon_consoles"][number]>(setupData.mon_consoles),
+              foh_drive_options: asFohDriveArray(setupData.foh_drive_options),
+              foh_drive_positions: asConsolePositionArray(setupData.foh_drive_positions),
+              mon_positions: asMonConsolePositionArray(setupData.mon_positions),
               foh_waves_models: normalizeWavesModelSelections(setupData.foh_waves_models),
               foh_outboard: setupData.foh_outboard || "",
               mon_waves_models: normalizeWavesModelSelections(setupData.mon_waves_models),
@@ -307,6 +320,9 @@ export const FestivalGearSetupForm = ({
           max_stages: setup.max_stages,
           foh_consoles: toJson(setup.foh_consoles),
           mon_consoles: toJson(setup.mon_consoles),
+          foh_drive_options: setup.foh_drive_options,
+          foh_drive_positions: setup.foh_drive_positions,
+          mon_positions: setup.mon_positions,
           foh_waves_models: toJson(setup.foh_waves_models),
           foh_outboard: setup.foh_outboard,
           mon_waves_models: toJson(setup.mon_waves_models),
@@ -406,6 +422,9 @@ export const FestivalGearSetupForm = ({
           stage_number: stageNumber,
           foh_consoles: toJson(setup.foh_consoles),
           mon_consoles: toJson(setup.mon_consoles),
+          foh_drive_options: setup.foh_drive_options,
+          foh_drive_positions: setup.foh_drive_positions,
+          mon_positions: setup.mon_positions,
           foh_waves_models: toJson(setup.foh_waves_models),
           foh_outboard: setup.foh_outboard,
           mon_waves_models: toJson(setup.mon_waves_models),

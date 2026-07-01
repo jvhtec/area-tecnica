@@ -8,6 +8,12 @@ import {
 import { ConfigSummaryRow } from "./ConfigSummaryRow";
 import { GearMismatchIndicator } from "../GearMismatchIndicator";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
+import {
+  FOH_DRIVE_LABELS,
+  CONSOLE_POSITION_LABELS,
+  type FohDrive,
+  type ConsolePosition,
+} from "@/constants/consoleDrive";
 
 interface Artist {
   id: string;
@@ -25,8 +31,11 @@ interface Artist {
   load_in_time?: string;
   foh_console: string;
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
+  foh_drive?: string | null;
+  foh_drive_position?: string | null;
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
+  mon_position?: string | null;
   monitors_from_foh?: boolean;
   foh_waves_models?: any[];
   foh_outboard?: string;
@@ -66,19 +75,40 @@ interface Artist {
 
 // --- Summary Formatters ---
 
+function getDriveSummary(artist: Artist): string {
+  const driveLabel = artist.foh_drive
+    ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive
+    : "";
+  const positionLabel = artist.foh_drive_position
+    ? CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position
+    : "";
+  if (!driveLabel && !positionLabel) return "";
+  if (driveLabel && positionLabel) return `Drive: ${driveLabel} (${positionLabel})`;
+  return `Drive: ${driveLabel || positionLabel}`;
+}
+
 function getConsoleSummary(artist: Artist): string {
   if (artist.monitors_from_foh) {
     const foh = artist.foh_console || "Sin especificar";
-    return `FOH: ${foh} (Mon desde FOH)`;
+    const parts = [`FOH: ${foh} (Mon desde FOH)`];
+    const drive = getDriveSummary(artist);
+    if (drive) parts.push(drive);
+    return parts.join(", ");
   }
   const parts: string[] = [];
   if (artist.foh_console) {
     const prov = artist.foh_console_provided_by ? ` (${artist.foh_console_provided_by})` : "";
     parts.push(`FOH: ${artist.foh_console}${prov}`);
   }
+  const drive = getDriveSummary(artist);
+  if (drive) parts.push(drive);
   if (artist.mon_console) {
     const prov = artist.mon_console_provided_by ? ` (${artist.mon_console_provided_by})` : "";
     parts.push(`MON: ${artist.mon_console}${prov}`);
+  }
+  if (artist.mon_position) {
+    const posLabel = CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position;
+    parts.push(`Posición MON: ${posLabel}`);
   }
   return parts.length > 0 ? parts.join(", ") : "Sin configurar";
 }

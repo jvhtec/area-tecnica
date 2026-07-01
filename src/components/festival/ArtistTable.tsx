@@ -12,7 +12,7 @@ import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically, sortArtistsByField, type ArtistSortField } from "@/utils/artistSorting";
 import { combineWavesDisplay } from "@/constants/wavesModels";
-import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
+import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition, type MonConsolePosition } from "@/constants/consoleDrive";
 import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -235,8 +235,11 @@ export const ArtistTable = ({
         stage: artist.stage,
         foh_console: artist.foh_console,
         foh_console_provided_by: artist.foh_console_provided_by,
+        foh_drive: artist.foh_drive as FohDrive | '' | undefined,
+        foh_drive_position: artist.foh_drive_position as ConsolePosition | '' | undefined,
         mon_console: artist.mon_console,
         mon_console_provided_by: artist.mon_console_provided_by,
+        mon_position: artist.mon_position as MonConsolePosition | '' | undefined,
         monitors_from_foh: artist.monitors_from_foh || false,
         foh_waves_models: artist.foh_waves_models || [],
         foh_outboard: artist.foh_outboard || "",

@@ -38,8 +38,11 @@ type ReadOnlyArtist = {
   soundcheck_end?: string | null;
   foh_console: string | null;
   foh_console_provided_by?: "festival" | "band" | "mixed" | null;
+  foh_drive?: string | null;
+  foh_drive_position?: string | null;
   mon_console: string | null;
   mon_console_provided_by?: "festival" | "band" | "mixed" | null;
+  mon_position?: string | null;
   monitors_from_foh?: boolean | null;
   foh_waves_models?: any[] | null;
   foh_outboard?: string | null;

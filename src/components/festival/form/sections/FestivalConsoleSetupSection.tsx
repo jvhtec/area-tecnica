@@ -2,12 +2,24 @@
 import { ConsoleConfig } from "../../gear-setup/ConsoleConfig";
 import { ConsoleSetup } from "@/types/festival";
 import { WavesModelPicker } from "../shared/WavesModelPicker";
+import { EnumCheckboxGroup } from "../shared/EnumCheckboxGroup";
 import type { WavesModelSelection } from "@/constants/wavesModels";
+import {
+  FOH_DRIVE_OPTIONS,
+  CONSOLE_POSITION_OPTIONS,
+  MON_CONSOLE_POSITION_OPTIONS,
+  type FohDrive,
+  type ConsolePosition,
+  type MonConsolePosition,
+} from "@/constants/consoleDrive";
 
 interface FestivalConsoleSetupSectionProps {
   formData: {
     foh_consoles: ConsoleSetup[];
     mon_consoles: ConsoleSetup[];
+    foh_drive_options?: FohDrive[];
+    foh_drive_positions?: ConsolePosition[];
+    mon_positions?: MonConsolePosition[];
     foh_waves_models: WavesModelSelection[];
     foh_outboard: string;
     mon_waves_models: WavesModelSelection[];
@@ -16,6 +28,9 @@ interface FestivalConsoleSetupSectionProps {
   onChange: (changes: {
     foh_consoles?: ConsoleSetup[];
     mon_consoles?: ConsoleSetup[];
+    foh_drive_options?: FohDrive[];
+    foh_drive_positions?: ConsolePosition[];
+    mon_positions?: MonConsolePosition[];
     foh_waves_models?: WavesModelSelection[];
     foh_outboard?: string;
     mon_waves_models?: WavesModelSelection[];
@@ -35,6 +50,22 @@ export const FestivalConsoleSetupSection = ({ formData, onChange, readOnly = fal
         label="Consoles FOH"
         readOnly={readOnly}
       />
+      <EnumCheckboxGroup
+        idPrefix="festival-foh-drive"
+        label="Drive FOH soportado"
+        options={FOH_DRIVE_OPTIONS}
+        selected={formData.foh_drive_options || []}
+        onChange={(selected) => onChange({ foh_drive_options: selected })}
+        disabled={readOnly}
+      />
+      <EnumCheckboxGroup
+        idPrefix="festival-foh-drive-position"
+        label="Posiciones de drive FOH soportadas"
+        options={CONSOLE_POSITION_OPTIONS}
+        selected={formData.foh_drive_positions || []}
+        onChange={(selected) => onChange({ foh_drive_positions: selected })}
+        disabled={readOnly}
+      />
       <WavesModelPicker
         idPrefix="festival-foh-waves"
         waveModelsLabel="Servidor Waves FOH"
@@ -52,6 +83,14 @@ export const FestivalConsoleSetupSection = ({ formData, onChange, readOnly = fal
         onChange={(consoles) => onChange({ mon_consoles: consoles })}
         label="Consoles de Monitor"
         readOnly={readOnly}
+      />
+      <EnumCheckboxGroup
+        idPrefix="festival-mon-position"
+        label="Posiciones de monitores soportadas"
+        options={MON_CONSOLE_POSITION_OPTIONS}
+        selected={formData.mon_positions || []}
+        onChange={(selected) => onChange({ mon_positions: selected })}
+        disabled={readOnly}
       />
       <WavesModelPicker
         idPrefix="festival-mon-waves"

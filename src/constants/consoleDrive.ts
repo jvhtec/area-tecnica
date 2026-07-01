@@ -28,3 +28,21 @@ export const CONSOLE_POSITION_LABELS: Record<ConsolePosition, string> = CONSOLE_
   (acc, option) => ({ ...acc, [option.value]: option.label }),
   {} as Record<ConsolePosition, string>
 );
+
+export const isFohDrive = (value: unknown): value is FohDrive =>
+  typeof value === "string" && FOH_DRIVE_OPTIONS.some((option) => option.value === value);
+
+export const isConsolePosition = (value: unknown): value is ConsolePosition =>
+  typeof value === "string" && CONSOLE_POSITION_OPTIONS.some((option) => option.value === value);
+
+export const isMonConsolePosition = (value: unknown): value is MonConsolePosition =>
+  typeof value === "string" && MON_CONSOLE_POSITION_OPTIONS.some((option) => option.value === value);
+
+export const asFohDriveArray = (value: unknown): FohDrive[] =>
+  Array.isArray(value) ? value.filter(isFohDrive) : [];
+
+export const asConsolePositionArray = (value: unknown): ConsolePosition[] =>
+  Array.isArray(value) ? value.filter(isConsolePosition) : [];
+
+export const asMonConsolePositionArray = (value: unknown): MonConsolePosition[] =>
+  Array.isArray(value) ? value.filter(isMonConsolePosition) : [];
