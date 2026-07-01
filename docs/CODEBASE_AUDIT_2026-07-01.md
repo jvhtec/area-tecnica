@@ -54,6 +54,31 @@ carried over from the June audits. None block release.
 | Type safety | C | Compiles clean, but ~939 `: any` annotations + broad `any` warnings |
 | Module size | C+ | ~14 files >1,200 lines; a few 1,800–2,100-line god files |
 
+## Remediation status in this PR
+
+Follow-up commits on this PR address the actionable authorization findings from this
+audit:
+
+- `apply-flex-status`, `archive-to-flex`, `backfill-flex-doc-tecnica`,
+  `create-flex-folders`, `manage-flex-crew-assignments`, `sync-flex-crew-for-job`,
+  and the admin CSV import function now call `requireAdminOrManagement()` before any
+  service-role mutation or Flex side effect.
+- `evaluate-achievements`, `recalc-timesheet-amount`, and `background-job-deletion`
+  now require a service-role bearer/apikey via `requireServiceRoleRequest()`.
+- `staffing-sweeper` now uses the shared service-role guard.
+- `governance:exposure` now scans source files so `privileged-role` functions must
+  reference a recognizable role guard, `service-only` functions must document and
+  implement a recognizable service/shared-token guard, and `public-token` functions
+  must document their runtime guard.
+- Exposure classes were corrected where the prior labels did not match behavior:
+  password reset remains intentionally callable for account recovery, `security-audit`
+  remains an app audit logging endpoint, `get-secret` is classified as authenticated
+  but still always returns HTTP 410, and mixed service/user staffing reminder paths are
+  documented as privileged-role.
+
+The accepted dependency risks and broad code-quality items remain follow-up tracks; no
+forced dependency migration was performed in this PR.
+
 ## Findings
 
 ### 1. Edge-function role enforcement relies on gateway auth alone (defense-in-depth)
@@ -166,11 +191,11 @@ credential-theft path here, so this is acceptable. Flagged only for awareness.
 
 ## Recommended next actions (priority order)
 
-1. **Add `requireAdminOrManagement()` to the six `privileged-role` Flex functions**
-   (Finding 1) and extend `check-edge-function-exposure.mjs` to assert role-check
-   presence for that class. *(Medium — the one finding with real authz impact.)*
-2. **Verify the three `service-only` functions** in Finding 2 are unreachable by
-   ordinary users; add an explicit service-secret check if not.
+1. **Done in this PR:** Add `requireAdminOrManagement()` to the six
+   `privileged-role` Flex functions (Finding 1) and extend
+   `check-edge-function-exposure.mjs` to assert role-check presence for that class.
+2. **Done in this PR:** Harden the three `service-only` functions from Finding 2 with
+   explicit service-role checks.
 3. **Schedule the `react-quill`/`quill` migration** and re-confirm the accepted
    dependency risks at the next review (Finding 3).
 4. Continue chipping at `any` and the largest god-files opportunistically; the

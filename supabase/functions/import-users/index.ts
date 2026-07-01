@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { parse } from "https://deno.land/std@0.224.0/csv/parse.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +29,15 @@ serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    await requireAdminOrManagement(supabase, req, {
+      logContext: 'import-users',
+    });
+
     const formData = await req.formData();
     const file = formData.get('file');
 
@@ -37,11 +47,6 @@ serve(async (req) => {
 
     const text = await file.text();
     const records = parse(text, { skipFirstRow: true, columns: true }) as CSVUserData[];
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
 
     const results = {
       successful: [] as CSVUserData[],
@@ -92,8 +97,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    const status = typeof error?.status === 'number' ? error.status : 500;
+    const message = status >= 500 ? 'Internal server error' : error.message;
+    return new Response(JSON.stringify({ error: message }), {
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

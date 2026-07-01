@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
 
@@ -42,17 +43,6 @@ function json(body: unknown, status = 200) {
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders },
   });
-}
-
-function ensureAuthHeader(req: Request) {
-  const header = req.headers.get("Authorization");
-  if (!header) {
-    throw new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
-  }
-  return header.replace("Bearer ", "").trim();
 }
 
 // Minimal bucket resolver mirroring src/utils/jobDocuments.ts
@@ -329,8 +319,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Not found" }, 404);
 
-  // Auth presence check
-  try { ensureAuthHeader(req); } catch (e) { return e as Response; }
+  const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  try {
+    await requireAdminOrManagement(sb, req, {
+      logContext: "archive-to-flex",
+    });
+  } catch (error) {
+    const errorLike = error as { status?: unknown; message?: unknown };
+    const status = typeof errorLike.status === "number" ? errorLike.status : 403;
+    const message = typeof errorLike.message === "string" ? errorLike.message : "Forbidden";
+    return json({ error: message }, status);
+  }
 
   let body: Body;
   try {
@@ -347,8 +347,6 @@ serve(async (req) => {
   const includeTemplates = Boolean(body.include_templates);
   const onMissing = body.on_missing_doc_tecnica || "skip";
   const explicitDepts = (body.departments || []) as Dept[];
-
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   // Load selected departments for the job (used for better defaults)
   async function getJobSelectedDepartments(): Promise<Dept[]> {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Phase 2 trust-boundary control. Every Supabase Edge Function directory must be classified by exposure class. `verifyJwt` records the reviewed gateway JWT requirement; `scripts/governance/check-edge-function-exposure.mjs` fails CI when supabase/config.toml drifts from this manifest. Any function with verifyJwt=false MUST document an internalGuard explaining how it is protected without gateway JWT verification.",
+  "note": "Phase 2 trust-boundary control. Every Supabase Edge Function directory must be classified by exposure class. `verifyJwt` records the reviewed gateway JWT requirement; `scripts/governance/check-edge-function-exposure.mjs` fails CI when supabase/config.toml drifts from this manifest. Public-token functions MUST document an internalGuard. Service-only functions MUST document and implement a recognizable service/shared-token guard. Privileged-role functions MUST reference a recognizable role guard.",
   "classes": {
     "public-token": "Reachable without a user session. Protected by a per-resource token, signed link, shared secret, or is intentionally public. MUST document an internalGuard.",
     "authenticated-user": "Requires a valid Supabase user JWT. No additional role is required beyond authentication.",
@@ -8,20 +8,20 @@
     "service-only": "Invoked by pg_cron, database triggers, or trusted server code with the service role. Not intended for browser callers. When verifyJwt=false it MUST verify the service-role secret or an equivalent internal guard."
   },
   "functions": {
-    "apply-flex-status": { "class": "privileged-role", "verifyJwt": true },
-    "archive-to-flex": { "class": "privileged-role", "verifyJwt": true },
-    "auto-send-timesheet-reminders": { "class": "service-only", "verifyJwt": true, "internalGuard": "Distinguishes service_role (pg_cron) from user callers and enforces a profile role check before sending." },
-    "backfill-flex-doc-tecnica": { "class": "privileged-role", "verifyJwt": true },
-    "background-job-deletion": { "class": "service-only", "verifyJwt": true },
+    "apply-flex-status": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before processing workflow status changes or writing flex_status_log rows." },
+    "archive-to-flex": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before reading job documents, creating signed URLs, uploading to Flex, or deleting archived documents." },
+    "auto-send-timesheet-reminders": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Distinguishes service_role (pg_cron) from user callers and enforces a profile role check before sending." },
+    "backfill-flex-doc-tecnica": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before scanning Flex trees or inserting doc_tecnica flex_folders rows." },
+    "background-job-deletion": { "class": "service-only", "verifyJwt": true, "internalGuard": "Requires a service-role bearer/apikey via requireServiceRoleRequest before starting background deletion." },
     "cleanup-corporate-email-images": { "class": "service-only", "verifyJwt": false, "internalGuard": "timingSafeEqual comparison of the bearer/apikey against SUPABASE_SERVICE_ROLE_KEY; returns 403 otherwise." },
-    "create-flex-folders": { "class": "privileged-role", "verifyJwt": true },
+    "create-flex-folders": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before creating Flex folder trees, writing tour/flex_folders rows, or broadcasting activity." },
     "create-transport-request": { "class": "authenticated-user", "verifyJwt": true },
     "create-user": { "class": "privileged-role", "verifyJwt": true },
     "create-whatsapp-group": { "class": "privileged-role", "verifyJwt": true },
     "csp-report": { "class": "public-token", "verifyJwt": false, "internalGuard": "Browser report endpoint with no credentials. Applies a durable service-role rate limit, reads a size-bounded body, normalizes reports, strips query strings, and writes only normalized records via the service role. Returns 204 with no data." },
     "delete-public-artist-rider": { "class": "public-token", "verifyJwt": false, "internalGuard": "Festival artist form access token validated against the submission before any storage delete; guarded by durable ingress and token/document scoped rate limits." },
     "delete-user": { "class": "privileged-role", "verifyJwt": true },
-    "evaluate-achievements": { "class": "service-only", "verifyJwt": true },
+    "evaluate-achievements": { "class": "service-only", "verifyJwt": true, "internalGuard": "Requires a service-role bearer/apikey via requireServiceRoleRequest before running achievement evaluation RPCs." },
     "fetch-flex-contact-info": {
       "class": "privileged-role",
       "verifyJwt": true,
@@ -43,15 +43,15 @@
     "generate-video-memoria-tecnica": { "class": "authenticated-user", "verifyJwt": true },
     "get-google-maps-key": { "class": "privileged-role", "verifyJwt": false, "internalGuard": "Verifies the caller JWT with auth.getUser, enforces GOOGLE_MAPS_ALLOWED_ROLES, and consumes a per-user/global daily quota before returning a restricted key." },
     "get-mapbox-token": { "class": "public-token", "verifyJwt": false, "internalGuard": "Applies a durable client-bucket rate limit and returns only the publishable MAPBOX_PUBLIC_TOKEN, which is URL-restricted at Mapbox; no secret material is exposed." },
-    "get-secret": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Management role check; only client-safe allowlisted keys are returned (see ENT-SEC-02 remediation)." },
+    "get-secret": { "class": "authenticated-user", "verifyJwt": true, "internalGuard": "Direct secret delivery is disabled: valid authenticated callers are audited and receive HTTP 410, while missing/invalid auth receives 401." },
     "image-proxy": { "class": "authenticated-user", "verifyJwt": true },
-    "import-users": { "class": "privileged-role", "verifyJwt": true },
+    "import-users": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before accepting the CSV upload or creating/updating users with the auth admin API." },
     "job-hoja-de-ruta-link": {
       "class": "public-token",
       "verifyJwt": false,
       "internalGuard": "HMAC-signed job-scoped links expire, pass durable ingress and token-scoped rate limits, then resolve the latest Hoja de Ruta and redirect only to a short-lived storage signed URL."
     },
-    "manage-flex-crew-assignments": { "class": "privileged-role", "verifyJwt": true },
+    "manage-flex-crew-assignments": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before adding/removing Flex crew resources or mutating flex_crew_assignments." },
     "notify-staffing-cancellation": {
       "class": "privileged-role",
       "verifyJwt": true,
@@ -65,13 +65,13 @@
     "place-photos": { "class": "authenticated-user", "verifyJwt": true },
     "place-restaurants": { "class": "authenticated-user", "verifyJwt": true },
     "push": { "class": "authenticated-user", "verifyJwt": true },
-    "recalc-timesheet-amount": { "class": "service-only", "verifyJwt": true },
+    "recalc-timesheet-amount": { "class": "service-only", "verifyJwt": true, "internalGuard": "Requires a service-role bearer/apikey via requireServiceRoleRequest before persisting recalculated timesheet amounts." },
     "secure-flex-api": {
       "class": "privileged-role",
       "verifyJwt": true,
       "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT, requires admin/management, and preserves the Flex endpoint/method/header allowlists before proxying."
     },
-    "security-audit": { "class": "privileged-role", "verifyJwt": true },
+    "security-audit": { "class": "public-token", "verifyJwt": true, "internalGuard": "Intentionally accepts app audit events via gateway JWT, validates bounded action/resource/severity payloads, sanitizes metadata, prefers the authenticated JWT user, and returns no stored data." },
     "send-bug-resolution-email": { "class": "privileged-role", "verifyJwt": true },
     "send-corporate-email": { "class": "privileged-role", "verifyJwt": true },
     "send-expense-notification": {
@@ -90,7 +90,7 @@
       "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT with auth.getUser and requires admin or production department plus a WAHA endpoint before sending."
     },
     "send-onboarding-email": { "class": "privileged-role", "verifyJwt": true },
-    "send-password-reset": { "class": "privileged-role", "verifyJwt": true },
+    "send-password-reset": { "class": "public-token", "verifyJwt": true, "internalGuard": "Password recovery endpoint intentionally accepts anon/session gateway JWTs, normalizes all responses to avoid user enumeration, and only sends Supabase recovery links." },
     "send-payout-override-notification": {
       "class": "privileged-role",
       "verifyJwt": true,
@@ -115,13 +115,13 @@
     },
     "set-job-preventive-resource": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "ALLOWED_ROLES set restricts callers to admin/management/logistics." },
     "staffing-click": { "class": "public-token", "verifyJwt": false, "internalGuard": "Opaque per-invitation action token has durable ingress and per-link rate limits, then is validated against the campaign before any state transition." },
-    "staffing-orchestrator": { "class": "service-only", "verifyJwt": false, "internalGuard": "Service-role/internal campaign execution; validates caller secret/service role before mutating campaign state." },
-    "staffing-sweeper": { "class": "service-only", "verifyJwt": false, "internalGuard": "pg_cron/service-role cleanup of expired campaigns; no user-facing data is returned." },
+    "staffing-orchestrator": { "class": "privileged-role", "verifyJwt": false, "internalGuard": "Gateway JWT is disabled for browser CORS and service tick calls. Tick requires service-role; user actions resolve the JWT, load profiles.role/department, and enforce campaign department authorization before mutating campaign state." },
+    "staffing-sweeper": { "class": "service-only", "verifyJwt": false, "internalGuard": "pg_cron/service-role campaign sweep; requireServiceRoleRequest validates bearer/apikey before ticking campaigns." },
     "static-map": { "class": "authenticated-user", "verifyJwt": true },
     "submit-bug-report": { "class": "authenticated-user", "verifyJwt": true },
     "submit-feature-request": { "class": "authenticated-user", "verifyJwt": true },
     "submit-public-artist-form": { "class": "public-token", "verifyJwt": false, "internalGuard": "Festival artist form submissions have durable ingress and token-scoped rate limits before persisting the submission." },
-    "sync-flex-crew-for-job": { "class": "privileged-role", "verifyJwt": true },
+    "sync-flex-crew-for-job": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before reconciling desired assignments with Flex crew line items." },
     "system-health": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Requires an authenticated admin/management caller; redacts internal errors and records a security audit entry. Liveness moved to the unauthenticated `health` function." },
     "tech-calendar-ics": { "class": "public-token", "verifyJwt": false, "internalGuard": "Per-technician calendar feed token embedded in the subscription URL; guarded by durable ingress and token/client scoped hourly rate limits." },
     "tour-guest-document-url": { "class": "public-token", "verifyJwt": false, "internalGuard": "Tour guest document signing has durable ingress and token/document scoped rate limits before issuing a scoped, time-limited document URL." },
