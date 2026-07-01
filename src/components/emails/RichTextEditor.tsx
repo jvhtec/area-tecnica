@@ -40,8 +40,64 @@ const EDITOR_FORMATS = [
   "link",
 ];
 
+function normalizeQuillListHtml(html: string): string {
+  if (!html.includes("data-list") && !html.includes("ql-ui")) {
+    return html;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  template.content.querySelectorAll(".ql-ui").forEach((node) => node.remove());
+
+  template.content.querySelectorAll("ol").forEach((list) => {
+    const childNodes = Array.from(list.childNodes);
+    const hasQuillListItems = childNodes.some((node) => {
+      return node.nodeType === 1
+        && (node as Element).tagName === "LI"
+        && (node as Element).hasAttribute("data-list");
+    });
+
+    if (!hasQuillListItems) {
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    let currentList: HTMLOListElement | HTMLUListElement | null = null;
+    let currentListTagName: "ol" | "ul" | null = null;
+
+    childNodes.forEach((node) => {
+      if (node.nodeType === 3 && !node.textContent?.trim()) {
+        return;
+      }
+
+      if (node.nodeType !== 1 || (node as Element).tagName !== "LI") {
+        currentList = null;
+        currentListTagName = null;
+        fragment.appendChild(node);
+        return;
+      }
+
+      const item = node as HTMLLIElement;
+      const listTagName = item.getAttribute("data-list") === "bullet" ? "ul" : "ol";
+      item.removeAttribute("data-list");
+
+      if (!currentList || currentListTagName !== listTagName) {
+        currentList = document.createElement(listTagName);
+        currentListTagName = listTagName;
+        fragment.appendChild(currentList);
+      }
+
+      currentList.appendChild(item);
+    });
+
+    list.replaceWith(fragment);
+  });
+
+  return template.innerHTML;
+}
+
 function normalizeEditorHtml(html: string): string {
-  return html === EMPTY_EDITOR_HTML ? "" : html;
+  return html === EMPTY_EDITOR_HTML ? "" : normalizeQuillListHtml(html);
 }
 
 export function RichTextEditor({

@@ -115,19 +115,21 @@ describe("RichTextEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("");
   });
 
-  it("emits formatted Quill HTML without rewriting it", () => {
+  it("emits semantic formatted HTML from Quill list markup", () => {
     const onChange = vi.fn();
     render(<RichTextEditor value="" onChange={onChange} />);
     const editor = mockQuillInstances[0];
     const formattedHtml =
       '<ol><li data-list="bullet"><span class="ql-ui" contenteditable="false"></span>Patch notes</li></ol><p><a href="https://example.com" target="_blank">Details</a></p>';
+    const expectedHtml =
+      '<ul><li>Patch notes</li></ul><p><a href="https://example.com" target="_blank">Details</a></p>';
 
     act(() => {
       editor.root.innerHTML = formattedHtml;
       editor.handlers.get("text-change")?.();
     });
 
-    expect(onChange).toHaveBeenLastCalledWith(formattedHtml);
+    expect(onChange).toHaveBeenLastCalledWith(expectedHtml);
   });
 
   it("cleans up listeners, toolbar DOM, and editor children on unmount", () => {
