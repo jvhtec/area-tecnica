@@ -88,6 +88,7 @@ const DOCUMENT_UPLOAD_ALLOWED_EXTENSIONS = new Set([
   'dwg',
   'dfx',
   'dxf',
+  'mvr',
 ]);
 
 const DOCUMENT_UPLOAD_ALLOWED_MIME_TYPES = new Set([
@@ -113,6 +114,9 @@ const DOCUMENT_UPLOAD_ALLOWED_MIME_TYPES = new Set([
   'application/vnd.dxf',
   'image/vnd.dxf',
   'drawing/x-dxf',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-mvr',
 ]);
 
 /**

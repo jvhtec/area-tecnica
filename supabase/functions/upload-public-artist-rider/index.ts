@@ -31,6 +31,7 @@ const ALLOWED_EXTENSIONS = new Set([
   "dwg",
   "dfx",
   "dxf",
+  "mvr",
 ]);
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -54,6 +55,9 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.dxf",
   "image/vnd.dxf",
   "drawing/x-dxf",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-mvr",
 ]);
 
 type UploadFormRow = {
