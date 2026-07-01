@@ -139,7 +139,12 @@ function consoleSummary(fd: any): string {
 function wirelessSummary(fd: any): string {
   const ws = fd.wireless_systems || [];
   const iems = fd.iem_systems || [];
-  if (ws.length === 0 && iems.length === 0) return "Sin configurar";
+  if (ws.length === 0 && iems.length === 0) {
+    if (fd.wireless_provided_by === "band" || fd.iem_provided_by === "band") {
+      return "Aporta banda (sin detalle)";
+    }
+    return "Sin configurar";
+  }
   const parts: string[] = [];
   if (ws.length > 0) parts.push(`${ws.length} sist. wireless`);
   if (iems.length > 0) parts.push(`${iems.length} sist. IEM`);

@@ -8,13 +8,15 @@ interface Artist {
   show_end: string;
   soundcheck_start?: string;
   line_check_start?: string;
+  load_in_time?: string;
   isaftermidnight?: boolean;
 }
 
-export type ArtistSortField = 'chronological' | 'show_start' | 'soundcheck_start' | 'line_check_start';
+export type ArtistSortField = 'chronological' | 'load_in_time' | 'show_start' | 'soundcheck_start' | 'line_check_start';
 
 export const ARTIST_SORT_FIELD_LABELS: Record<ArtistSortField, string> = {
   chronological: 'Cronológico',
+  load_in_time: 'Load in',
   show_start: 'Hora del show',
   soundcheck_start: 'Soundcheck',
   line_check_start: 'Line check',

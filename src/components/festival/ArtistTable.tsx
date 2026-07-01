@@ -4,13 +4,21 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
-import { ArrowDown, ExternalLink, ImageOff, ImagePlus, Loader2, Mic } from "lucide-react";
+import { ArrowUpDown, ExternalLink, ImageOff, ImagePlus, Loader2 } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF } from "@/utils/artistPdfExport";
-import { sortArtistsChronologically, sortArtistsByField, type ArtistSortField } from "@/utils/artistSorting";
+import { sortArtistsChronologically, sortArtistsByField, ARTIST_SORT_FIELD_LABELS, type ArtistSortField } from "@/utils/artistSorting";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition, type MonConsolePosition } from "@/constants/consoleDrive";
 import { toast } from "sonner";
@@ -130,10 +138,6 @@ export const ArtistTable = ({
   canCreateExtras
 }: ArtistTableProps) => {
   const [sortBy, setSortBy] = useState<ArtistSortField>('chronological');
-
-  const toggleSort = (field: Exclude<ArtistSortField, 'chronological'>) => {
-    setSortBy((current) => (current === field ? 'chronological' : field));
-  };
   const confirm = useConfirm();
   const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
@@ -594,14 +598,18 @@ export const ArtistTable = ({
         const beltpacks = system.quantity_bp || 0;
         return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
       } else {
-        // For wireless: show HH and BP
+        // For wireless: show channels plus HH and BP
+        const channels = system.quantity_ch || 0;
         const hh = system.quantity_hh || 0;
         const bp = system.quantity_bp || 0;
         const total = hh + bp;
+        const channelPart = channels > 0 ? `${channels} ch` : '';
         if (hh > 0 && bp > 0) {
-          return `${system.model}: ${hh}x HH, ${bp}x BP`;
+          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${hh}x HH, ${bp}x BP`;
         } else if (total > 0) {
-          return `${system.model}: ${total}x`;
+          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x`;
+        } else if (channels > 0) {
+          return `${system.model}: ${channels} ch`;
         }
         return system.model;
       }
@@ -616,6 +624,31 @@ export const ArtistTable = ({
     };
     return colors[provider] || "bg-gray-100 text-gray-800";
   };
+
+  const PROVIDER_LABELS: Record<'festival' | 'band' | 'mixed', string> = {
+    festival: "Festival",
+    band: "Banda",
+    mixed: "Mixto",
+  };
+
+  const renderProviderBadge = (provider?: 'festival' | 'band' | 'mixed') => {
+    if (!provider) return null;
+    return (
+      <Badge variant="outline" className={`text-[10px] px-1 py-0 ${getProviderBadge(provider)}`}>
+        {PROVIDER_LABELS[provider] || provider}
+      </Badge>
+    );
+  };
+
+  // DB time columns come back as HH:MM:SS; the table only shows HH:MM
+  const formatTime = (value?: string | null) => {
+    if (!value) return "";
+    const trimmed = String(value).trim();
+    return trimmed.length >= 5 && trimmed.includes(":") ? trimmed.slice(0, 5) : trimmed;
+  };
+
+  const formatTimeRange = (start?: string | null, end?: string | null) =>
+    `${formatTime(start) || "--:--"} - ${formatTime(end) || "--:--"}`;
 
   const handlePrintArtist = async (artist: Artist) => {
     setPrintingArtistId(artist.id);
@@ -688,67 +721,48 @@ export const ArtistTable = ({
             </div>
           )}
 
-          {/* Desktop Table */}
-          <div className="hidden md:block w-full overflow-x-auto">
-            <Table className="w-full min-w-full">
+          {/* Desktop Table — fixed layout so all columns fit the viewport without horizontal scroll */}
+          <div className="hidden md:block w-full">
+            <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[140px]">Artista</TableHead>
-                  <TableHead className="min-w-[120px]">Stage Plot</TableHead>
-                  <TableHead className="min-w-[80px]">Stage</TableHead>
-                  <TableHead className="min-w-[90px]">Load In</TableHead>
-                  <TableHead className="min-w-[100px]">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 hover:text-foreground"
-                      onClick={() => toggleSort('show_start')}
-                      title="Ordenar por hora del show"
-                    >
-                      Hora del show
-                      {sortBy === 'show_start' && <ArrowDown className="h-3 w-3" />}
-                    </button>
+                  <TableHead className="w-[12%] px-2">Artista</TableHead>
+                  <TableHead className="w-[11%] px-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground"
+                          title="Ordenar horarios"
+                        >
+                          Horarios
+                          <ArrowUpDown className="h-3 w-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {(Object.keys(ARTIST_SORT_FIELD_LABELS) as ArtistSortField[]).map((field) => (
+                          <DropdownMenuCheckboxItem
+                            key={field}
+                            checked={sortBy === field}
+                            onCheckedChange={() => setSortBy(field)}
+                          >
+                            {ARTIST_SORT_FIELD_LABELS[field]}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableHead>
-                  <TableHead className="min-w-[100px]">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 hover:text-foreground"
-                      onClick={() => toggleSort('soundcheck_start')}
-                      title="Ordenar por hora de soundcheck"
-                    >
-                      Soundcheck
-                      {sortBy === 'soundcheck_start' && <ArrowDown className="h-3 w-3" />}
-                    </button>
-                  </TableHead>
-                  <TableHead className="min-w-[100px]">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 hover:text-foreground"
-                      onClick={() => toggleSort('line_check_start')}
-                      title="Ordenar por hora de line check"
-                    >
-                      Line Check
-                      {sortBy === 'line_check_start' && <ArrowDown className="h-3 w-3" />}
-                    </button>
-                  </TableHead>
-                  <TableHead className="min-w-[180px]">Consolas</TableHead>
-                  <TableHead className="min-w-[120px]">Drive FOH</TableHead>
-                  <TableHead className="min-w-[160px]">Waves/Outboard FOH</TableHead>
-                  <TableHead className="min-w-[100px]">Posición MON</TableHead>
-                  <TableHead className="min-w-[160px]">Waves/Outboard MON</TableHead>
-                  <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
-                  <TableHead className="min-w-[140px]">
-                    <div className="flex items-center gap-1">
-                      <Mic className="h-4 w-4" />
-                      Micrófonos
-                    </div>
-                  </TableHead>
-                  <TableHead className="min-w-[80px]">Monitores</TableHead>
-                  <TableHead className="min-w-[160px]">Infraestructura</TableHead>
-                  <TableHead className="min-w-[80px]">Extras</TableHead>
-                  <TableHead className="min-w-[120px]">Notas</TableHead>
-                  <TableHead className="min-w-[80px]">Estado</TableHead>
-                  <TableHead className="min-w-[100px]">Estado del equipo</TableHead>
-                  <TableHead className="min-w-[200px]">Acciones</TableHead>
+                  <TableHead className="w-[13%] px-2">Consolas</TableHead>
+                  <TableHead className="w-[10%] px-2">Waves/Outboard</TableHead>
+                  <TableHead className="w-[12%] px-2">RF/IEM</TableHead>
+                  <TableHead className="w-[9%] px-2">Micrófonos</TableHead>
+                  <TableHead className="w-[7%] px-2">Mon/Extras</TableHead>
+                  <TableHead className="w-[8%] px-2">Infra</TableHead>
+                  <TableHead className="w-[7%] px-2">Notas</TableHead>
+                  <TableHead className="w-[5%] px-2">Estado</TableHead>
+                  <TableHead className="w-[6%] px-2">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -757,23 +771,27 @@ export const ArtistTable = ({
                   
                   return (
                     <TableRow key={artist.id}>
-                      <TableCell className="min-w-[140px]">
+                      {/* Artista: name, badges, stage, plot thumbnail */}
+                      <TableCell className="px-2 py-2 align-top">
                         <div className="space-y-1">
-                          <div className="font-medium">{artist.name}</div>
-                          {artist.artist_submitted && (
-                            <Badge variant="outline" className="text-xs bg-amber-100 text-amber-900 border-amber-300">
-                              Enviado por artista
-                            </Badge>
-                          )}
-                          {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">Después de medianoche</Badge>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="min-w-[120px]">
-                        <div className="space-y-2">
-                          {stagePlotUrls[artist.id] ? (
+                          <div className="font-medium text-sm break-words">{artist.name}</div>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">{getStageDisplayName(artist.stage)}</Badge>
+                            {artist.artist_submitted && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-100 text-amber-900 border-amber-300" title="Enviado por artista mediante formulario público">
+                                Enviado
+                              </Badge>
+                            )}
+                            {artist.isaftermidnight && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-700 text-white" title="Show después de medianoche">
+                                +24h
+                              </Badge>
+                            )}
+                          </div>
+                          {stagePlotUrls[artist.id] && (
                             <button
                               type="button"
-                              className="group relative h-16 w-24 overflow-hidden rounded border"
+                              className="group relative h-10 w-16 overflow-hidden rounded border"
                               onClick={() => window.open(stagePlotUrls[artist.id], "_blank", "noopener,noreferrer")}
                               title="Ver stage plot"
                             >
@@ -783,106 +801,75 @@ export const ArtistTable = ({
                                 className="h-full w-full object-cover transition-transform group-hover:scale-105"
                               />
                             </button>
-                          ) : (
-                            <div className="flex h-16 w-24 items-center justify-center rounded border border-dashed text-xs text-muted-foreground">
-                              Sin plot
-                            </div>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => handleOpenStagePlotCapture(artist)}
-                            disabled={uploadingStagePlotArtistId === artist.id}
-                          >
-                            {uploadingStagePlotArtistId === artist.id ? "Cargando..." : "Pegar/Cargar"}
-                          </Button>
                         </div>
-                      </TableCell>
-                      <TableCell className="min-w-[80px]">
-                        <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
-                      </TableCell>
-                      <TableCell className="min-w-[90px]">
-                        <div className="text-sm">
-                          {artist.load_in_time || <span className="text-muted-foreground">-</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="min-w-[100px]">
-                        <div className="text-sm">
-                          {artist.show_start} - {artist.show_end}
-                        </div>
-                      </TableCell>
-                      <TableCell className="min-w-[100px]">
-                        {artist.soundcheck ? (
-                          <div className="text-sm">
-                            <Badge variant="secondary">Sí</Badge>
-                            <div className="text-xs text-muted-foreground">
-                              {artist.soundcheck_start} - {artist.soundcheck_end}
-                            </div>
-                          </div>
-                        ) : (
-                          <Badge variant="outline">No</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="min-w-[100px]">
-                        {artist.line_check ? (
-                          <div className="text-sm">
-                            <Badge variant="secondary">Sí</Badge>
-                            <div className="text-xs text-muted-foreground">
-                              {artist.line_check_start} - {artist.line_check_end}
-                            </div>
-                          </div>
-                        ) : (
-                          <Badge variant="outline">No</Badge>
-                        )}
                       </TableCell>
 
-                      <TableCell className="min-w-[180px]">
-                        <div className="text-sm space-y-1">
+                      {/* Horarios: load in, show, soundcheck, line check */}
+                      <TableCell className="px-2 py-2 align-top">
+                        <div className="text-xs space-y-0.5">
+                          {artist.load_in_time && (
+                            <div className="text-muted-foreground">Load in: {formatTime(artist.load_in_time)}</div>
+                          )}
+                          <div className="font-medium">Show: {formatTimeRange(artist.show_start, artist.show_end)}</div>
+                          {artist.soundcheck && (
+                            <div className="text-muted-foreground">SC: {formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)}</div>
+                          )}
+                          {artist.line_check && (
+                            <div className="text-muted-foreground">LC: {formatTimeRange(artist.line_check_start, artist.line_check_end)}</div>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Consolas: FOH/MON with provider, tech, drive and position */}
+                      <TableCell className="px-2 py-2 align-top">
+                        <div className="text-xs space-y-1">
                           <div className="flex items-center gap-1 flex-wrap">
-                            <span>FOH: {artist.foh_console || "No especificado"}</span>
-                            {artist.foh_console_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
-                                {artist.foh_console_provided_by}
-                              </Badge>
-                            )}
-                            {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
+                            <span className="break-words">FOH: {artist.foh_console || "Sin especificar"}</span>
+                            {renderProviderBadge(artist.foh_console_provided_by)}
+                            {artist.foh_tech && <Badge variant="outline" className="text-[10px] px-1 py-0">Téc</Badge>}
                           </div>
-                          {artist.monitors_from_foh ? (
-                            <div className="text-xs text-muted-foreground">Monitores desde FOH</div>
-                          ) : (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span>MON: {artist.mon_console || "No especificado"}</span>
-                              {artist.mon_console_provided_by && (
-                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                                  {artist.mon_console_provided_by}
-                                </Badge>
-                              )}
-                              {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
+                          {(artist.foh_drive || artist.foh_drive_position) && (
+                            <div className="text-muted-foreground">
+                              Drive: {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
+                              {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
                             </div>
+                          )}
+                          {artist.monitors_from_foh ? (
+                            <div className="text-muted-foreground">MON desde FOH</div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="break-words">MON: {artist.mon_console || "Sin especificar"}</span>
+                                {renderProviderBadge(artist.mon_console_provided_by)}
+                                {artist.mon_tech && <Badge variant="outline" className="text-[10px] px-1 py-0">Téc</Badge>}
+                              </div>
+                              {artist.mon_position && (
+                                <div className="text-muted-foreground">
+                                  Pos: {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-[120px]">
-                        {(artist.foh_drive || artist.foh_drive_position) ? (
-                          <div className="text-xs text-muted-foreground">
-                            {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
-                            {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-
-                      <TableCell className="min-w-[160px]">
-                        {(artist.foh_waves_models?.length || artist.foh_outboard) ? (
-                          <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
-                            <span>{combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
-                            {artist.foh_waves_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_waves_provided_by)}`}>
-                                {artist.foh_waves_provided_by}
-                              </Badge>
+                      {/* Waves/Outboard: FOH + MON */}
+                      <TableCell className="px-2 py-2 align-top">
+                        {(artist.foh_waves_models?.length || artist.foh_outboard ||
+                          (!artist.monitors_from_foh && (artist.mon_waves_models?.length || artist.mon_outboard))) ? (
+                          <div className="text-xs space-y-1 text-muted-foreground">
+                            {(artist.foh_waves_models?.length || artist.foh_outboard) && (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="break-words">FOH: {combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
+                                {renderProviderBadge(artist.foh_waves_provided_by)}
+                              </div>
+                            )}
+                            {!artist.monitors_from_foh && (artist.mon_waves_models?.length || artist.mon_outboard) && (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="break-words">MON: {combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
+                                {renderProviderBadge(artist.mon_waves_provided_by)}
+                              </div>
                             )}
                           </div>
                         ) : (
@@ -890,97 +877,81 @@ export const ArtistTable = ({
                         )}
                       </TableCell>
 
-                      <TableCell className="min-w-[100px]">
-                        {!artist.monitors_from_foh && artist.mon_position ? (
-                          <div className="text-xs text-muted-foreground">
-                            {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-
-                      <TableCell className="min-w-[160px]">
-                        {!artist.monitors_from_foh && (artist.mon_waves_models?.length || artist.mon_outboard) ? (
-                          <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
-                            <span>{combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
-                            {artist.mon_waves_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_waves_provided_by)}`}>
-                                {artist.mon_waves_provided_by}
-                              </Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-
-                      <TableCell className="min-w-[180px]">
-                        <div className="text-sm space-y-1">
+                      {/* RF/IEM */}
+                      <TableCell className="px-2 py-2 align-top">
+                        <div className="text-xs space-y-1">
                           {(artist.wireless_provided_by || (artist.wireless_systems && artist.wireless_systems.length > 0)) && (
                             <div className="flex items-center gap-1 flex-wrap">
-                              <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
-                                Wireless: {formatWirelessSystems(artist.wireless_systems)}
-                              </div>
-                              {artist.wireless_provided_by && (
-                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
-                                  {artist.wireless_provided_by === 'mixed' ? 'Mixed' : artist.wireless_provided_by}
-                                </Badge>
-                              )}
+                              <span className="break-words" title={formatWirelessSystems(artist.wireless_systems)}>
+                                RF: {formatWirelessSystems(artist.wireless_systems)}
+                              </span>
+                              {renderProviderBadge(artist.wireless_provided_by)}
                             </div>
                           )}
                           {(artist.iem_provided_by || (artist.iem_systems && artist.iem_systems.length > 0)) && (
                             <div className="flex items-center gap-1 flex-wrap">
-                              <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
+                              <span className="break-words" title={formatWirelessSystems(artist.iem_systems, true)}>
                                 IEM: {formatWirelessSystems(artist.iem_systems, true)}
-                              </div>
-                              {artist.iem_provided_by && (
-                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
-                                  {artist.iem_provided_by === 'mixed' ? 'Mixed' : artist.iem_provided_by}
-                                </Badge>
-                              )}
+                              </span>
+                              {renderProviderBadge(artist.iem_provided_by)}
                             </div>
+                          )}
+                          {!artist.wireless_provided_by && !artist.iem_provided_by &&
+                            !(artist.wireless_systems?.length) && !(artist.iem_systems?.length) && (
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-[140px]">
-                        <div className="text-sm space-y-1">
+                      {/* Micrófonos */}
+                      <TableCell className="px-2 py-2 align-top">
+                        <div className="text-xs space-y-1">
                           <Badge variant={
-                            artist.mic_kit === 'festival' ? 'default' : 
-                            artist.mic_kit === 'mixed' ? 'secondary' : 
+                            artist.mic_kit === 'festival' ? 'default' :
+                            artist.mic_kit === 'mixed' ? 'secondary' :
                             'outline'
-                          } className={
-                            artist.mic_kit === 'mixed' ? 'bg-purple-100 text-purple-800' : ''
-                          }>
-                            {artist.mic_kit === 'festival' ? 'Festival' : 
-                             artist.mic_kit === 'mixed' ? 'Mixed' : 
-                             'Band'}
+                          } className={`text-[10px] px-1 py-0 ${artist.mic_kit === 'mixed' ? 'bg-purple-100 text-purple-800' : ''}`}>
+                            {artist.mic_kit === 'festival' ? 'Festival' :
+                             artist.mic_kit === 'mixed' ? 'Mixto' :
+                             'Banda'}
                           </Badge>
                           {(artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') && artist.wired_mics && artist.wired_mics.length > 0 && (
-                            <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
-                              {formatWiredMics(artist.wired_mics)}
-                            </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="text-muted-foreground line-clamp-3 cursor-help break-words">
+                                  {formatWiredMics(artist.wired_mics)}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-sm">{formatWiredMics(artist.wired_mics)}</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-[80px]">
-                        {artist.monitors_enabled ? (
-                          <div className="text-sm">
-                            <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
-                          </div>
-                        ) : (
-                          <Badge variant="outline">Ninguno</Badge>
-                        )}
+                      {/* Monitores y extras */}
+                      <TableCell className="px-2 py-2 align-top">
+                        <div className="flex flex-wrap gap-1">
+                          {artist.monitors_enabled ? (
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0" title="Cuñas de monitor">
+                              {artist.monitors_quantity}x
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">0x</Badge>
+                          )}
+                          {artist.extras_sf && <Badge variant="outline" className="text-[10px] px-1 py-0" title="Side fill">SF</Badge>}
+                          {artist.extras_df && <Badge variant="outline" className="text-[10px] px-1 py-0" title="Drum fill">DF</Badge>}
+                          {artist.extras_djbooth && <Badge variant="outline" className="text-[10px] px-1 py-0" title="DJ booth">DJ</Badge>}
+                        </div>
                       </TableCell>
 
-                      {/* Infrastructure Column */}
-                      <TableCell className="min-w-[160px]">
-                        <div className="text-sm space-y-1">
+                      {/* Infraestructura */}
+                      <TableCell className="px-2 py-2 align-top">
+                        <div className="text-xs space-y-1">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div className="text-xs text-muted-foreground max-w-36 truncate cursor-help">
+                              <div className="text-muted-foreground line-clamp-3 cursor-help break-words">
                                 {formatInfrastructure(artist)}
                               </div>
                             </TooltipTrigger>
@@ -994,28 +965,16 @@ export const ArtistTable = ({
                               </div>
                             </TooltipContent>
                           </Tooltip>
-                          {artist.infrastructure_provided_by && (
-                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.infrastructure_provided_by)}`}>
-                              {artist.infrastructure_provided_by}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      
-                      <TableCell className="min-w-[80px]">
-                        <div className="text-xs space-y-1 flex flex-wrap gap-1">
-                          {artist.extras_sf && <Badge variant="outline" className="text-xs">SF</Badge>}
-                          {artist.extras_df && <Badge variant="outline" className="text-xs">DF</Badge>}
-                          {artist.extras_djbooth && <Badge variant="outline" className="text-xs">DJ</Badge>}
+                          {renderProviderBadge(artist.infrastructure_provided_by)}
                         </div>
                       </TableCell>
 
-                      {/* Notes Column */}
-                      <TableCell className="min-w-[120px]">
+                      {/* Notas */}
+                      <TableCell className="px-2 py-2 align-top">
                         {artist.notes && artist.notes.trim() !== '' ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div className="text-xs text-muted-foreground max-w-28 truncate cursor-help">
+                              <div className="text-xs text-muted-foreground line-clamp-3 cursor-help break-words">
                                 {formatNotes(artist.notes)}
                               </div>
                             </TooltipTrigger>
@@ -1027,28 +986,28 @@ export const ArtistTable = ({
                             </TooltipContent>
                           </Tooltip>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Sin notas</span>
+                          <span className="text-xs text-muted-foreground">-</span>
                         )}
                       </TableCell>
 
-                      <TableCell className="min-w-[80px]">
-                        <Badge variant={artist.rider_missing ? "destructive" : "default"}>
-                          {artist.rider_missing ? "Faltante" : "Completo"}
-                        </Badge>
-                      </TableCell>
-
-                      {/* New Gear Status Column */}
-                      <TableCell className="min-w-[100px]">
-                        {gearComparison ? (
-                          <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
-                        ) : (
-                          <Badge variant="outline" className="text-xs">
-                            Sin configuración
+                      {/* Estado: rider + material */}
+                      <TableCell className="px-2 py-2 align-top">
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge variant={artist.rider_missing ? "destructive" : "default"} className="text-[10px] px-1 py-0">
+                            {artist.rider_missing ? "Faltante" : "Completo"}
                           </Badge>
-                        )}
+                          {gearComparison ? (
+                            <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0" title="Sin configuración de material del festival">
+                              Sin conf.
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
-                      
-                      <TableCell className="min-w-[200px]">
+
+                      {/* Acciones */}
+                      <TableCell className="px-2 py-2 align-top">
                         <ArtistActionButtons
                           artist={artist}
                           gearComparison={gearComparison}
