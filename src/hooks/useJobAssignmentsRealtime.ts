@@ -294,7 +294,12 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     () => UnifiedSubscriptionManager.getInstance(queryClient),
     [queryClient]
   );
+  const manualRefreshRef = useRef(manualRefresh);
   const ownerIdRef = useRef(`job-assignments-realtime-${Math.random().toString(36).slice(2)}`);
+
+  useEffect(() => {
+    manualRefreshRef.current = manualRefresh;
+  }, [manualRefresh]);
 
   // Additional real-time subscription specifically for this job
   // Listen to both timesheets (source of truth) and job_assignments (for role/status updates)
@@ -307,7 +312,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       // Force immediate refresh. manualRefresh already logs and toasts on
       // failure internally before re-throwing; catch here only to avoid an
       // unhandled promise rejection.
-      manualRefresh().catch(() => {});
+      manualRefreshRef.current().catch(() => {});
     };
 
     subscriptionManager.subscribeToTable(
@@ -329,7 +334,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     return () => {
       subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute);
     };
-  }, [jobId, manualRefresh, subscriptionManager]);
+  }, [jobId, subscriptionManager]);
 
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 

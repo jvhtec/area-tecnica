@@ -25,7 +25,6 @@ import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 
-
 import { queryKeys, createQueryKey } from "@/lib/react-query";
 interface EnhancedJobDetailsModalProps {
     theme: {
