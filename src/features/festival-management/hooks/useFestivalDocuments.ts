@@ -39,7 +39,7 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
   } = useQuery({
     queryKey: documentsQueryKey,
     enabled: Boolean(jobId),
-    staleTime: 0,
+    staleTime: 1000 * 60 * 2,
     queryFn: () => {
       if (!jobId) {
         return Promise.resolve({ artistRiderFiles: [], jobDocuments: [] });

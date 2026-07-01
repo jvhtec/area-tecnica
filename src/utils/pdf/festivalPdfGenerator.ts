@@ -11,7 +11,7 @@ import { fetchJobLogo, fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents, TocLinkRegion, TocSection } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
-import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
 import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
 import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
@@ -100,13 +100,75 @@ const getPdfPageCount = async (pdf: Blob): Promise<number> => {
 const getTotalPages = (pageCounts: number[]): number =>
   pageCounts.reduce((total, count) => total + count, 0);
 
+export type FestivalPdfProgressPhase =
+  | "gear-setup"
+  | "shift-schedules"
+  | "artist-tables"
+  | "artist-requirements"
+  | "merge";
+
+export interface FestivalPdfProgress {
+  phase: FestivalPdfProgressPhase;
+  completed: number;
+  total: number;
+  label: string;
+}
+
+export interface FestivalPdfGenerationOptions {
+  concurrency?: number;
+  onProgress?: (progress: FestivalPdfProgress) => void;
+}
+
+const DEFAULT_PDF_GENERATION_CONCURRENCY = 4;
+const MAX_PDF_GENERATION_CONCURRENCY = 6;
+
+const clampPdfConcurrency = (value?: number) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_PDF_GENERATION_CONCURRENCY;
+  }
+  return Math.max(1, Math.min(MAX_PDF_GENERATION_CONCURRENCY, Math.floor(value)));
+};
+
+const runWithConcurrency = async <T, R>(
+  items: readonly T[],
+  worker: (item: T, index: number) => Promise<R>,
+  concurrency: number,
+): Promise<R[]> => {
+  if (items.length === 0) return [];
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await worker(items[currentIndex], currentIndex);
+      }
+    },
+  );
+
+  await Promise.all(workers);
+  return results;
+};
+
+const isNonEmptyBlob = (value: Blob | null | undefined): value is Blob =>
+  Boolean(value && value.size > 0);
+
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
   jobTitle: string,
   options: PrintOptions,
-  customFilename?: string
+  customFilename?: string,
+  generationOptions: FestivalPdfGenerationOptions = {},
 ): Promise<{ blob: Blob; filename: string }> => {
   console.log("Starting comprehensive PDF generation with options:", options);
+  const pdfConcurrency = clampPdfConcurrency(generationOptions.concurrency);
+  const reportProgress = (progress: FestivalPdfProgress) => {
+    generationOptions.onProgress?.(progress);
+  };
 
   const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
   console.log("Logo URL for PDFs:", logoUrl);
@@ -173,8 +235,15 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (options.includeGearSetup && options.gearSetupStages.length > 0) {
       console.log("Starting gear setup PDF generation for stages:", options.gearSetupStages);
+      let completedGearPdfs = 0;
+      reportProgress({
+        phase: "gear-setup",
+        completed: completedGearPdfs,
+        total: options.gearSetupStages.length,
+        label: "Preparando dotacion tecnica",
+      });
       
-      for (const stageNum of options.gearSetupStages) {
+      const generatedGearPdfs = await runWithConcurrency(options.gearSetupStages, async (stageNum) => {
         try {
           const stageName = getStageNameByNumber(stageNum);
           
@@ -182,14 +251,25 @@ export const generateAndMergeFestivalPDFs = async (
           
           if (pdf && pdf.size > 0) {
             console.log(`Generated gear setup PDF for ${stageName}, size: ${pdf.size} bytes`);
-            gearPdfs.push(pdf);
+            return pdf;
           } else {
             console.log(`No gear setup found for ${stageName}, skipping`);
           }
         } catch (err) {
           console.error(`Error generating gear setup PDF for stage ${stageNum}:`, err);
+        } finally {
+          completedGearPdfs += 1;
+          reportProgress({
+            phase: "gear-setup",
+            completed: completedGearPdfs,
+            total: options.gearSetupStages.length,
+            label: "Generando dotacion tecnica",
+          });
         }
-      }
+        return null;
+      }, pdfConcurrency);
+
+      gearPdfs.push(...generatedGearPdfs.filter(isNonEmptyBlob));
     }
     
     if (options.includeShiftSchedules) {
@@ -207,10 +287,17 @@ export const generateAndMergeFestivalPDFs = async (
       } else {
         const allJobDates = [...new Set(jobDates?.map(d => d.date) || [])];
         console.log("Processing shift schedules for all job dates:", allJobDates);
+        const selectedJobDates = allJobDates.filter((date): date is string => Boolean(date));
+        let completedShiftPdfs = 0;
+        reportProgress({
+          phase: "shift-schedules",
+          completed: completedShiftPdfs,
+          total: selectedJobDates.length,
+          label: "Preparando horarios de turnos",
+        });
         
-        for (const date of allJobDates) {
-          if (!date) continue;
-          
+        const generatedShiftPdfs = await runWithConcurrency(selectedJobDates, async (date) => {
+          try {
           const { data: shiftsData, error: shiftsError } = await supabase
             .from("festival_shifts")
             .select(`
@@ -219,7 +306,9 @@ export const generateAndMergeFestivalPDFs = async (
             .eq("job_id", jobId)
             .eq("date", date);
           
-          if (shiftsError) continue;
+          if (shiftsError) {
+            return null;
+          }
           
           const filteredShifts = shiftsData?.filter(shift => 
             !shift.stage || options.shiftScheduleStages.includes(Number(shift.stage))
@@ -236,7 +325,7 @@ export const generateAndMergeFestivalPDFs = async (
 
               if (assignmentsError) {
                 console.error(`Error fetching assignments for date ${date}:`, assignmentsError);
-                continue;
+                return null;
               }
 
               const technicianIds = Array.from(
@@ -288,8 +377,7 @@ export const generateAndMergeFestivalPDFs = async (
             
               console.log(`Generated shifts PDF for date ${date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
               if (shiftPdf && shiftPdf.size > 0) {
-                shiftPdfs.push(shiftPdf);
-                console.log(`Added shift PDF to array. Current count: ${shiftPdfs.length}`);
+                return shiftPdf;
               } else {
                 console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
               }
@@ -299,7 +387,19 @@ export const generateAndMergeFestivalPDFs = async (
           } else {
             console.log(`No shifts found for date ${date}, skipping shifts PDF generation`);
           }
-        }
+          return null;
+          } finally {
+          completedShiftPdfs += 1;
+          reportProgress({
+            phase: "shift-schedules",
+            completed: completedShiftPdfs,
+            total: selectedJobDates.length,
+            label: "Generando horarios de turnos",
+          });
+          }
+        }, pdfConcurrency);
+
+        shiftPdfs.push(...generatedShiftPdfs.filter(isNonEmptyBlob));
       }
     }
     
@@ -323,7 +423,14 @@ export const generateAndMergeFestivalPDFs = async (
           dateGroups.get(artist.date)?.push(artist);
         });
         
-        // Process dates in chronological order
+        const artistTableJobs: Array<{
+          date: string;
+          stageNum: number;
+          stageArtists: typeof sortedArtists;
+          stageName: string;
+        }> = [];
+
+        // Build date/stage jobs in chronological order, then generate them concurrently.
         for (const [date, dateArtists] of dateGroups.entries()) {
           if (!dateArtists || dateArtists.length === 0) continue;
           
@@ -341,7 +448,25 @@ export const generateAndMergeFestivalPDFs = async (
             if (stageArtists.length === 0) continue;
             
             const stageName = getStageNameByNumber(stageNum);
-            
+            artistTableJobs.push({ date, stageNum, stageArtists, stageName });
+          }
+        }
+
+        let completedArtistTablePdfs = 0;
+        reportProgress({
+          phase: "artist-tables",
+          completed: completedArtistTablePdfs,
+          total: artistTableJobs.length,
+          label: "Preparando tablas de artistas",
+        });
+
+        const generatedArtistTablePdfs = await runWithConcurrency(artistTableJobs, async ({
+          date,
+          stageNum,
+          stageArtists,
+          stageName,
+        }) => {
+          try {
             const tableData: ArtistTablePdfData = {
               jobTitle: jobTitle,
               date: date,
@@ -356,15 +481,26 @@ export const generateAndMergeFestivalPDFs = async (
               const pdf = await exportArtistTablePDF(tableData);
               console.log(`Generated table PDF, size: ${pdf.size} bytes`);
               if (pdf && pdf.size > 0) {
-                artistTablePdfs.push(pdf);
+                return pdf;
               } else {
                 console.warn(`Generated empty table PDF for ${date} ${stageName}, skipping`);
               }
             } catch (err) {
               console.error(`Error generating table PDF for ${date} ${stageName}:`, err);
             }
+          } finally {
+            completedArtistTablePdfs += 1;
+            reportProgress({
+              phase: "artist-tables",
+              completed: completedArtistTablePdfs,
+              total: artistTableJobs.length,
+              label: "Generando tablas de artistas",
+            });
           }
-        }
+          return null;
+        }, pdfConcurrency);
+
+        artistTablePdfs.push(...generatedArtistTablePdfs.filter(isNonEmptyBlob));
       }
     }
     
@@ -377,8 +513,15 @@ export const generateAndMergeFestivalPDFs = async (
       const sortedArtists = sortArtistsChronologically(filteredArtists);
       
       console.log(`Sorted ${sortedArtists.length} artists for PDF generation`);
+      let completedArtistRequirementPdfs = 0;
+      reportProgress({
+        phase: "artist-requirements",
+        completed: completedArtistRequirementPdfs,
+        total: sortedArtists.length,
+        label: "Preparando fichas de artistas",
+      });
       
-      for (const artist of sortedArtists) {
+      const generatedArtistPdfs = await runWithConcurrency(sortedArtists, async (artist) => {
         try {
           console.log(`Generating PDF for artist: ${artist.name}, Stage: ${artist.stage}, Time: ${artist.show_start}`);
           
@@ -468,14 +611,31 @@ export const generateAndMergeFestivalPDFs = async (
           const pdf = await exportArtistPDF(artistData);
           console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
           if (pdf && pdf.size > 0) {
-            individualArtistPdfs.push(pdf);
-            individualArtistIndexTitles.push(artist.name || 'Unnamed Artist');
+            return {
+              pdf,
+              title: artist.name || 'Unnamed Artist',
+            };
           } else {
             console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
           }
         } catch (err) {
           console.error(`Error generating PDF for artist ${artist.name}:`, err);
+        } finally {
+          completedArtistRequirementPdfs += 1;
+          reportProgress({
+            phase: "artist-requirements",
+            completed: completedArtistRequirementPdfs,
+            total: sortedArtists.length,
+            label: "Generando fichas de artistas",
+          });
         }
+        return null;
+      }, pdfConcurrency);
+
+      for (const result of generatedArtistPdfs) {
+        if (!result) continue;
+        individualArtistPdfs.push(result.pdf);
+        individualArtistIndexTitles.push(result.title);
       }
     }
     
@@ -740,6 +900,13 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    reportProgress({
+      phase: "merge",
+      completed: 0,
+      total: 3,
+      label: "Calculando paginas",
+    });
+
     const [
       shiftPageCounts,
       gearPageCounts,
@@ -810,6 +977,12 @@ export const generateAndMergeFestivalPDFs = async (
     }
     
     console.log(`Table of contents sections:`, tocSections);
+    reportProgress({
+      phase: "merge",
+      completed: 1,
+      total: 3,
+      label: "Creando indice",
+    });
     
     const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
     const { blob: tableOfContents, links: tocLinks } = await generateTableOfContents(tocSections, logoUrl);
@@ -878,8 +1051,21 @@ export const generateAndMergeFestivalPDFs = async (
       throw new Error('No content documents were generated. Please ensure at least one document type has data to include in the PDF.');
     }
     
+    reportProgress({
+      phase: "merge",
+      completed: 2,
+      total: 3,
+      label: "Combinando PDFs",
+    });
+
     const mergedBlob = await mergePDFs(selectedPdfs);
     const mergedBlobWithTocLinks = await addTableOfContentsLinks(mergedBlob, tocLinks);
+    reportProgress({
+      phase: "merge",
+      completed: 3,
+      total: 3,
+      label: "PDF listo",
+    });
     
     // Generate filename if not provided
     const filename = customFilename || buildReadableFilename([jobTitle || "Festival", "Documentación completa"]);

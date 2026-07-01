@@ -17,7 +17,15 @@ opportunistically.
 - ✅ **Fixed 2026-07-01** — items 1, 2, and 3 below (realtime bypass hooks +
   `useDetailsModalData.ts` query-key fragmentation). See commit
   `0f7cdf1` on `claude/codebase-performance-audit-kcda0t`.
-- Everything else in this document is still open.
+- ✅ **Fixed in follow-up branch** — items 4, 5, 6, 7, 8, 9, 10, 14, 15,
+  16, 17, 19, 20, 21, 22, 24, 25, 26, and 27.
+- ✅ **Verified/corrected** — item 12 is covered by existing left-prefix
+  sender indexes; item 13's `useTimesheets` client-side date filtering is
+  fixed server-side.
+- ⚠️ **Deferred for larger migrations/production confirmation** — item 11's
+  varchar-to-uuid FK conversion, item 13's SQL aggregation/RPC work,
+  item 18's broad query-key migration, and item 23's non-matrix list
+  virtualization decision.
 
 ## High severity
 
@@ -88,6 +96,8 @@ opportunistically.
    cascading updates/deletes from `profiles`/`auth.users` will seq-scan it.
    Fix: `CREATE INDEX CONCURRENTLY idx_stock_movements_user_id ON stock_movements(user_id);`
 
+   **RESOLVED:** added `idx_stock_movements_user_id`.
+
 5. **`v_job_staffing_summary` materialized view has no auto-refresh
    trigger.** A `refresh_v_job_staffing_summary()` function exists (uses
    `CONCURRENTLY`) but nothing calls it when `timesheets`/`job_assignments`
@@ -95,11 +105,19 @@ opportunistically.
    indefinitely. Fix: add a trigger on the source tables or a scheduled
    `pg_cron` job.
 
+   **RESOLVED:** added a guarded `pg_cron` schedule to refresh
+   `v_job_staffing_summary` every 5 minutes when the linked database has
+   `pg_cron` installed.
+
 6. **`festivalPdfGenerator.ts:381-479`** generates one PDF per artist in a
    sequential `for...await` loop with zero progress feedback. For a
    150-300 artist festival this blocks the main thread for 20-30+ seconds
    with no UI indication anything is happening. Fix: chunk the work with
    progress reporting, and/or batch independent exports with `Promise.all`.
+
+   **RESOLVED:** individual artist PDFs now generate with bounded
+   concurrency while preserving output order, and the festival-management
+   print dialog shows live generation progress.
 
 ## Medium severity
 
@@ -113,6 +131,9 @@ opportunistically.
    chunk rules for the heavy libs above and a stable long-cache vendor
    chunk for react/react-dom/react-router-dom.
 
+   **RESOLVED:** added stable chunks for React core, Radix, charts, motion,
+   markdown, QR, and ZIP dependencies.
+
 8. **Bundle budget is a ratchet with no absolute ceiling**
    (`scripts/performance/check-bundle-budget.mjs`). It only fails a PR if
    growth exceeds ~10-12% of `docs/performance/phase-4-baseline/baseline.json`
@@ -121,11 +142,17 @@ opportunistically.
    would catch, since there's no absolute cap (e.g., "fail if total JS gzip
    > 2MB"). Consider adding one alongside the existing ratchet.
 
+   **RESOLVED:** added absolute kind-level caps, an absolute largest entry
+   script cap, and fixed caps for the known large JS families.
+
 9. **`index.html`** preconnects to `sectorpro.flexrentalsolutions.com` but
    not to the Supabase URL, which is the primary data dependency hit on
    every page load. Add `<link rel="preconnect" href="https://<project>.supabase.co" crossorigin>`
    (inject at build time next to the existing SW-version injection, since
    the URL is env-dependent).
+
+   **RESOLVED:** added Supabase `preconnect` and `dns-prefetch` tags using
+   the existing post-build injector and `VITE_SUPABASE_URL`.
 
 10. **Redundant polling stacked on top of realtime**:
     `src/hooks/useTourDateRealtime.ts:39-59` runs a 15s `setInterval`
@@ -134,15 +161,29 @@ opportunistically.
     tour detail page this becomes N×(poll + realtime). Remove the interval
     or gate it to the leader tab with a much longer period.
 
+    **RESOLVED:** removed the 15s fallback invalidation interval; the hook
+    now relies on its scoped realtime subscriptions.
+
 11. **`technician_availability.technician_id`** is a plain `varchar` with
     no FK to `profiles` and no index beyond the `(technician_id, date)`
     unique constraint — no referential integrity, and lookups by
     technician alone can't use an index efficiently. Needs a migration to
     convert to `uuid REFERENCES profiles(id)`.
 
+    **PARTIAL/DEFERRED:** added a standalone
+    `idx_technician_availability_technician_id` index. The varchar-to-uuid
+    FK conversion is intentionally deferred because it affects existing SQL
+    functions/RPCs and should be handled as a dedicated compatibility
+    migration.
+
 12. **`messages.sender_id`** has no standalone index, only a composite
     `(sender_id, created_at)` — confirm this covers all sender-only query
     shapes before assuming it's fine.
+
+    **CORRECTED:** confirmed the existing `(sender_id, created_at)`
+    btree index covers sender-only predicates via the leftmost prefix, with
+    additional unread-message partial indexes already present for inbox
+    shapes.
 
 13. Client-side aggregation instead of SQL: `useJobsRealtime.ts:82-123`
     fetches per-job timesheet rows and aggregates via `reduce()` in JS
@@ -151,9 +192,17 @@ opportunistically.
     filters client-side with `.filter(t => prepDayDates.has(t.date))`
     instead of `.in('date', [...])` server-side.
 
+    **PARTIAL/DEFERRED:** `useTimesheets` now pushes tour prep-day date
+    filtering into Supabase with `.in("date", ...)`. Replacing
+    `useJobsRealtime`'s JS aggregation with an RPC is deferred because it
+    changes the data contract and needs focused SQL coverage.
+
 14. **`useAvailableTechnicians.ts:78-110`** invalidates/refetches the
     entire technician set on any `job_assignments` realtime event instead
     of a scoped subscription — refetch storms on busy matrix pages.
+
+    **RESOLVED:** replaced the broad channel with scoped manager-backed
+    subscriptions filtered to the active job and exact query key.
 
 15. Several `useQuery` hooks override the global 2min/5min stale/gc
     defaults (`src/lib/optimized-react-query.ts:7-21`) with `staleTime: 0`,
@@ -162,6 +211,9 @@ opportunistically.
     `useFestivalJobData.ts:16`, `src/hooks/festival/useFestivalShifts.ts:137`.
     Worth confirming these truly need always-fresh data rather than relying
     on the existing realtime invalidation.
+
+    **RESOLVED:** changed those hooks to a 2-minute stale window and disabled
+    unnecessary focus refetch for festival shifts.
 
 16. Festival artist file uploads bypass image optimization: `optimizeProfilePicture`
     (`src/utils/imageOptimization.ts`) is only wired into
@@ -173,10 +225,17 @@ opportunistically.
     client-side file-size validation before upload (unlike
     `ProfilePictureUpload.tsx`'s `validateImageFile(file, 5)`).
 
+    **RESOLVED:** added a shared image-upload optimizer and wired it into
+    artist file uploads, stage plots, festival logos, job documents, and
+    festival-management upload paths.
+
 17. `festivalPdfGenerator.ts:174-193,211-304` also generates stage
     gear-setup and per-date shift PDFs in sequential `for...await` loops
     (no `Promise.all`) — 4-8 stages × 3-5 days adds several seconds of
     avoidable blocking on top of finding #6.
+
+    **RESOLVED:** gear setup, shift schedules, artist tables, and individual
+    artist PDFs now use bounded concurrent generation with ordered results.
 
 18. The generic `queryKeys.scope`/`queryKeys.custom` escape hatch
     (`src/lib/react-query.ts:21-25`) is used in 769 call sites across 207
@@ -187,6 +246,9 @@ opportunistically.
     get subtly wrong. The migration described in the code's own comments
     appears stalled.
 
+    **DEFERRED:** this is a broad architecture migration across hundreds of
+    call sites and should be split by domain-specific query-key ownership.
+
 ## Low severity
 
 19. Service worker (`public/sw.js:157-224`) caches static assets
@@ -194,37 +256,66 @@ opportunistically.
     PWA/Capacitor sessions the runtime cache can grow unbounded until the
     next deploy clears it. Low risk, but worth an LRU cap for mobile.
 
+    **RESOLVED:** runtime cache entries are trimmed to a fixed LRU-style cap.
+
 20. `unified-subscription-manager.ts:332-364` infers connection health from
     a presence `sync` event on a channel that never calls `channel.track()`
     — the sync event may not fire reliably, making connection-status
     reporting to `useSubscriptionContext` unreliable in edge cases.
 
+    **RESOLVED:** the ping channel now tracks presence after subscription.
+
 21. `unified-subscription-manager.ts:616-639` retries `CHANNEL_ERROR`
     every 5s indefinitely with no retry cap — during a sustained outage
     this spins forever instead of backing off or giving up.
+
+    **RESOLVED:** channel retries now use bounded exponential backoff with a
+    maximum retry count.
 
 22. `useVirtualizedMatrix.ts` is dead code (zero call sites beyond its own
     definition) — CLAUDE.md references it as the matrix's virtualization
     mechanism, but the actual matrix (`OptimizedAssignmentMatrix.tsx:439-443`)
     does its own inline row/column windowing plus `useVirtualizedDateRange`.
     Either wire the hook in or delete it and correct the docs.
+
+    **RESOLVED:** deleted the unused hook and corrected the CLAUDE.md
+    virtualization note.
+
 23. No `react-window`/`react-virtual` anywhere in the codebase — large
     non-matrix lists (equipment, technician pickers, messages) render fully
     via `.map()`. Likely fine at current list sizes; worth confirming
     production festivals don't have artist/technician rosters in the low
     hundreds before deprioritizing.
+
+    **DEFERRED:** requires production list-size confirmation before adding a
+    virtualization dependency or rewriting specific list components.
+
 24. `wiredMicrophoneNeedsPdfExport.ts:404-441` — triple-nested
     date→stage→artist loop with per-iteration `console.log` calls; the
     logging overhead alone adds ~500ms on large festivals.
+
+    **RESOLVED:** removed the per-date/stage/artist console logging from the
+    organizer.
+
 25. `getMismatchSummary.ts:6-7` — repeated `.filter()` inside a `reduce()`
     (O(n·m)) over gear mismatches instead of a single pass; only
     noticeable above ~200 artists.
+
+    **RESOLVED:** replaced repeated filtering with a single-pass aggregation.
+
 26. `useJobCard.ts:62,116` uses `.select("*")` scoped by `job_id` — not a
     table scan, but pulls unused columns per card render; project only the
     fields `JobCard` actually uses.
+
+    **RESOLVED:** narrowed fallback `job_date_types` and
+    `sound_job_personnel` projections.
+
 27. Multi-tab heartbeat (`multitab-coordinator.ts:258-276`) writes to
     `localStorage` every 3s per tab, but only in the Web Locks API fallback
     path (older browsers/some WebViews) — low impact on modern targets.
+
+    **RESOLVED:** moved the fallback heartbeat to a named 5s interval while
+    keeping it below the existing 10s stale-leader timeout.
 
 ## Verified non-issues (checked, found solid)
 
@@ -254,14 +345,16 @@ opportunistically.
 
 ## Suggested priority order
 
-1. Fix the two DB items with a migration (#4 index, #5 trigger) — cheap,
-   isolated, no app-code risk. **Still open.**
+1. ~~Fix the two DB items with a migration (#4 index, #5 trigger) — cheap,
+   isolated, no app-code risk.~~ **Done in follow-up branch.**
 2. ~~Consolidate the realtime bypass hooks (#1, #2) — highest blast radius
    for duplicate-fetch bugs and unnecessary connections at scale.~~ **Done
    2026-07-01.**
 3. ~~Migrate `useDetailsModalData.ts` onto query-key factories (#3) — fixes
    real stale-cache bugs, not just a "nice to have."~~ **Done 2026-07-01.**
-4. Chunk/parallelize the festival PDF export (#6, #17) with progress
-   feedback — directly user-visible on large festivals. **Still open.**
-5. Everything else (bundle chunking, upload image optimization, dead-code
-   cleanup) can be picked up opportunistically. **Still open.**
+4. ~~Chunk/parallelize the festival PDF export (#6, #17) with progress
+   feedback — directly user-visible on large festivals.~~ **Done in
+   follow-up branch.**
+5. ~~Everything else (bundle chunking, upload image optimization, dead-code
+   cleanup) can be picked up opportunistically.~~ **Most follow-ups done;
+   broad query-key/RPC/list-virtualization migrations are deferred above.**

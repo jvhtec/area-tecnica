@@ -21,6 +21,7 @@ import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { buildReadableFilename } from "@/utils/fileName";
+import { optimizeImageForUpload, validateImageFile } from "@/utils/imageOptimization";
 import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 import { ArtistActionButtons } from "./ArtistActionButtons";
@@ -343,16 +344,28 @@ export const ArtistTable = ({
       return;
     }
 
+    const validation = validateImageFile(file, 10);
+    if (!validation.valid) {
+      toast.error(validation.error || "El stage plot no es válido.");
+      return;
+    }
+
     setUploadingStagePlotArtistId(artist.id);
 
     try {
-      const fileExtension = file.name.split(".").pop() || "jpg";
+      const uploadFile = await optimizeImageForUpload(file, {
+        maxWidth: 1800,
+        maxHeight: 1800,
+        quality: 0.82,
+        outputFormat: "image/webp",
+      });
+      const fileExtension = uploadFile.name.split(".").pop() || "webp";
       const nextFilePath = `${artist.id}/stage-plots/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
       const { error: uploadError } = await dataLayerClient.storage
         .from("festival_artist_files")
-        .upload(nextFilePath, file, {
-          contentType: file.type,
+        .upload(nextFilePath, uploadFile, {
+          contentType: uploadFile.type || file.type,
           upsert: true,
         });
 
@@ -364,7 +377,7 @@ export const ArtistTable = ({
         .update({
           stage_plot_file_path: nextFilePath,
           stage_plot_file_name: file.name,
-          stage_plot_file_type: file.type,
+          stage_plot_file_type: uploadFile.type || file.type,
           stage_plot_uploaded_at: new Date().toISOString(),
         })
         .eq("id", artist.id);

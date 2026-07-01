@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { downloadBlobInBrowser, generateFestivalDocumentation } from "@/features/festival-management/commands";
+import type { FestivalPdfProgress } from "@/utils/pdf/festivalPdfGenerator";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 
@@ -18,12 +19,14 @@ export const useFestivalPrintActions = ({
 }) => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [printProgress, setPrintProgress] = useState<FestivalPdfProgress | null>(null);
 
   const handlePrintAllDocumentation = useCallback(
     async (options: PrintOptions, filename: string) => {
       if (!jobId) return;
 
       setIsPrinting(true);
+      setPrintProgress(null);
       try {
         console.log("Starting documentation print process with options:", options);
         const result = await generateFestivalDocumentation({
@@ -31,6 +34,7 @@ export const useFestivalPrintActions = ({
           jobId,
           jobTitle: jobTitle || "Festival",
           maxStages,
+          onProgress: setPrintProgress,
           options,
         });
 
@@ -47,6 +51,7 @@ export const useFestivalPrintActions = ({
             ? "PDFs individuales de escenarios generados exitosamente"
             : "Documentación generada exitosamente",
         });
+        setIsPrintDialogOpen(false);
       } catch (error: any) {
         console.error("Error generating documentation:", error);
         toast({
@@ -56,6 +61,7 @@ export const useFestivalPrintActions = ({
         });
       } finally {
         setIsPrinting(false);
+        setPrintProgress(null);
       }
     },
     [jobId, jobTitle, maxStages, toast],
@@ -70,6 +76,7 @@ export const useFestivalPrintActions = ({
     handlePrintButtonClick,
     isPrintDialogOpen,
     isPrinting,
+    printProgress,
     setIsPrintDialogOpen,
   };
 };

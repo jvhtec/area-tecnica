@@ -1,7 +1,7 @@
 
-import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { getAvailableTechnicians } from "@/utils/technicianAvailability";
 import { toast } from "sonner";
 
@@ -34,10 +34,17 @@ export function useAvailableTechnicians({
   enabled = true
 }: UseAvailableTechniciansOptions) {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const queryClient = useQueryClient();
+  const availableTechniciansQueryKey = queryKeys.scope(
+    "available-technicians",
+    department,
+    jobId,
+    jobStartTime,
+    jobEndTime,
+    assignmentDate ?? null,
+  );
 
   const query = useQuery({
-    queryKey: queryKeys.scope("available-technicians", department, jobId, jobStartTime, jobEndTime, assignmentDate ?? null),
+    queryKey: availableTechniciansQueryKey,
     queryFn: async () => {
       if (!department || !jobId || !jobStartTime || !jobEndTime) {
         return [];
@@ -67,53 +74,24 @@ export function useAvailableTechnicians({
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Set up real-time subscription for job assignments
-  useEffect(() => {
-    if (!enabled || !department || !jobId) {
-      return;
-    }
-
-    console.log(`Setting up real-time subscription for available technicians (${department}, job: ${jobId})`);
-
-    const channel = supabase
-      .channel('technician-availability-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_assignments'
-        },
-        (payload) => {
-          console.log('Job assignment changed, refreshing available technicians:', payload);
-          // Invalidate and refetch the available technicians query
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.scope("available-technicians", department, jobId, jobStartTime, jobEndTime)
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'jobs'
-        },
-        (payload) => {
-          console.log('Job changed, refreshing available technicians:', payload);
-          // Invalidate and refetch when job dates might have changed
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.scope("available-technicians")
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log('Cleaning up technician availability subscription');
-      supabase.removeChannel(channel);
-    };
-  }, [enabled, department, jobId, jobStartTime, jobEndTime, assignmentDate, queryClient]);
+  useRealtimeSubscription(
+    enabled && department && jobId
+      ? [
+          {
+            table: 'job_assignments',
+            queryKey: availableTechniciansQueryKey,
+            event: '*',
+            filter: `job_id=eq.${jobId}`,
+          },
+          {
+            table: 'jobs',
+            queryKey: availableTechniciansQueryKey,
+            event: '*',
+            filter: `id=eq.${jobId}`,
+          },
+        ]
+      : [],
+  );
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);

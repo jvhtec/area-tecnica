@@ -1,7 +1,6 @@
 
 import React from "react";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { useQueryClient } from "@tanstack/react-query";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -10,7 +9,6 @@ import { queryKeys } from "@/lib/react-query";
  * Subscribes to changes in tour_dates, flex_folders, and locations tables
  */
 export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]) => {
-  const queryClient = useQueryClient();
   const tourDateIdsKey = React.useMemo(() => [...tourDateIds].sort().join(','), [tourDateIds]);
 
   // Subscribe to tour dates changes - matches parent component query key
@@ -35,26 +33,9 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
     event: '*',
   });
 
-  // Force refresh queries when tour dates change
   React.useEffect(() => {
     if (tourId) {
-      console.log('Setting up additional query invalidation for tour:', tourId);
-
-      // Force invalidate queries periodically as a fallback to the realtime
-      // subscription. We keep the interval modest to avoid unnecessary churn
-      // when the subscription is delivering timely updates.
-      const fallbackIntervalMs = 15000;
-      const interval = setInterval(() => {
-        const state = queryClient.getQueryState(queryKeys.scope('tour', tourId));
-        const dataUpdatedAt = state?.dataUpdatedAt ?? 0;
-        const isFresh = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt < fallbackIntervalMs;
-
-        if (!isFresh) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour', tourId) });
-        }
-      }, fallbackIntervalMs);
-
-      return () => clearInterval(interval);
+      console.log('Tour date realtime subscriptions active for tour:', tourId);
     }
-  }, [tourId, queryClient]);
+  }, [tourId]);
 };

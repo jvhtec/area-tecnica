@@ -2,17 +2,33 @@ import type { ArtistGearComparison } from "@/utils/gear-comparison/types";
 
 export const getMismatchSummary = (comparisons: ArtistGearComparison[]) => {
   const totalArtists = comparisons.length;
-  const artistsWithConflicts = comparisons.filter(c => c.hasConflicts).length;
-  const totalErrors = comparisons.reduce((sum, c) => sum + c.mismatches.filter(m => m.severity === 'error').length, 0);
-  const totalWarnings = comparisons.reduce((sum, c) => sum + c.mismatches.filter(m => m.severity === 'warning').length, 0);
-  
-  const conflicts = comparisons
-    .filter(c => c.hasConflicts)
-    .map(c => ({
-      artist: c.artistName,
-      stage: c.stage,
-      mismatches: c.mismatches
-    }));
+  let artistsWithConflicts = 0;
+  let totalErrors = 0;
+  let totalWarnings = 0;
+  const conflicts: Array<{
+    artist: string;
+    stage: number;
+    mismatches: ArtistGearComparison["mismatches"];
+  }> = [];
+
+  for (const comparison of comparisons) {
+    if (comparison.hasConflicts) {
+      artistsWithConflicts += 1;
+      conflicts.push({
+        artist: comparison.artistName,
+        stage: comparison.stage,
+        mismatches: comparison.mismatches
+      });
+    }
+
+    for (const mismatch of comparison.mismatches) {
+      if (mismatch.severity === "error") {
+        totalErrors += 1;
+      } else if (mismatch.severity === "warning") {
+        totalWarnings += 1;
+      }
+    }
+  }
 
   return {
     totalArtists,

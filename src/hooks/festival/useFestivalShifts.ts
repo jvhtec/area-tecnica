@@ -134,8 +134,8 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
     queryKey: queryKeys.scope('festival_shifts', jobId, selectedDate),
     queryFn: fetchShifts,
     enabled: !!jobId && !!selectedDate,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
     retry: 2
   });
 

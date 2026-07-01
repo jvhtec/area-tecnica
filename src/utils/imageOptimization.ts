@@ -143,6 +143,22 @@ export function validateImageFile(
   return { valid: true };
 }
 
+export function isOptimizableImageFile(file: File): boolean {
+  return ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type);
+}
+
+export async function optimizeImageForUpload(
+  file: File,
+  options: ImageOptimizationOptions = {}
+): Promise<File> {
+  if (!isOptimizableImageFile(file)) {
+    return file;
+  }
+
+  const optimizedFile = await optimizeProfilePicture(file, options);
+  return optimizedFile.size < file.size ? optimizedFile : file;
+}
+
 /**
  * Validates and sanitizes a userId to prevent path traversal attacks
  * @param userId - The user's ID to validate

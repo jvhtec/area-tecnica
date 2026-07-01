@@ -39,6 +39,17 @@ export default defineConfig(({ mode }) => ({
               return 'commonjs-helpers';
             }
 
+            if (
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/react-router') ||
+              id.includes('node_modules/@tanstack/react-query')
+            ) {
+              return 'vendor-react';
+            }
+            if (id.includes('node_modules/@radix-ui/')) {
+              return 'vendor-radix';
+            }
             if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
               return 'pdf-libs';
             }
@@ -50,6 +61,29 @@ export default defineConfig(({ mode }) => ({
             }
             if (id.includes('node_modules/quill')) {
               return 'editor-lib';
+            }
+            if (id.includes('node_modules/recharts')) {
+              return 'charts-lib';
+            }
+            if (id.includes('node_modules/framer-motion')) {
+              return 'motion-lib';
+            }
+            if (
+              id.includes('node_modules/react-markdown') ||
+              id.includes('node_modules/remark-') ||
+              id.includes('node_modules/rehype-') ||
+              id.includes('node_modules/mdast-') ||
+              id.includes('node_modules/hast-') ||
+              id.includes('node_modules/micromark') ||
+              id.includes('node_modules/unified')
+            ) {
+              return 'markdown-lib';
+            }
+            if (id.includes('node_modules/qrcode')) {
+              return 'qr-lib';
+            }
+            if (id.includes('node_modules/jszip')) {
+              return 'zip-lib';
             }
           },
         },
