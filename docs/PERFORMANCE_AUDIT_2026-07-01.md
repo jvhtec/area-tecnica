@@ -12,9 +12,16 @@ Severity legend: **High** = user-visible slowdown or scales badly with data
 growth; **Medium** = real but bounded impact today; **Low** = worth fixing
 opportunistically.
 
+## Status
+
+- ✅ **Fixed 2026-07-01** — items 1, 2, and 3 below (realtime bypass hooks +
+  `useDetailsModalData.ts` query-key fragmentation). See commit
+  `0f7cdf1` on `claude/codebase-performance-audit-kcda0t`.
+- Everything else in this document is still open.
+
 ## High severity
 
-1. **Several hooks open their own realtime channels instead of going
+1. ~~**Several hooks open their own realtime channels instead of going
    through `UnifiedSubscriptionManager`**, breaking dedup and leader-election
    gating. Every tab (not just the leader) independently opens a websocket
    subscription:
@@ -26,16 +33,31 @@ opportunistically.
 
    Fix: migrate these to `UnifiedSubscriptionManager.subscribeToTable()`
    (the API already supports per-owner payload callbacks), or at minimum
-   gate channel creation behind `MultiTabCoordinator.getIsLeader()`.
+   gate channel creation behind `MultiTabCoordinator.getIsLeader()`.~~
 
-2. **`useJobAssignmentsRealtime.ts:169-290` double-subscribes** — it uses
+   **RESOLVED (2026-07-01):** all five hooks now go through
+   `UnifiedSubscriptionManager.subscribeToTable()` with owner-route
+   registration/cleanup, preserving their original filters and
+   invalidation behavior (including JS-side filtering where a payload
+   couldn't be expressed as a single Postgres filter, e.g. staffing
+   campaign department matching). `useMessagesSubscription` additionally
+   now stabilizes its `onUpdate` callback via a ref to stop resubscribing
+   on every parent render.
+
+2. ~~**`useJobAssignmentsRealtime.ts:169-290` double-subscribes** — it uses
    `useRealtimeQuery` (subscribed to `timesheets`) *and* a second manual
    channel (lines 299-329) subscribed to both `timesheets` and
    `job_assignments`. Two independent paths react to the same table
    changes and can both trigger a refresh, risking duplicate fetches/races.
-   Consolidate into a single subscription path.
+   Consolidate into a single subscription path.~~
 
-3. **`useDetailsModalData.ts:66-590`** — all 16 `useQuery` calls use
+   **RESOLVED (2026-07-01):** the manual channel was replaced by two
+   manager-routed, `job_id`-filtered subscriptions (`timesheets` and
+   `job_assignments`) sharing one owner route and `invalidateOnPayload:
+   false` + a shared `onPayload` handler that calls `manualRefresh()` once
+   — no more duplicate refresh paths for the same job.
+
+3. ~~**`useDetailsModalData.ts:66-590`** — all 16 `useQuery` calls use
    free-form `queryKeys.scope(...)` strings instead of the domain factories
    in `src/lib/optimized-react-query.ts:83-148`. Job/assignment data fetched
    here lives under different cache keys than the same data fetched by the
@@ -43,7 +65,23 @@ opportunistically.
    these entries — stale data after mutations, plus duplicate fetches for
    data that's already cached elsewhere. Fix: extend `createQueryKey` with
    the missing accessors (`.staff`, `.dateTypes`, `.artists`, etc.) and
-   migrate these 16 call sites.
+   migrate these 16 call sites.~~
+
+   **RESOLVED (2026-07-01), with a correction:** before migrating, found
+   that `EnhancedJobDetailsModal.tsx` (department view) intentionally
+   shares three of these cache entries (`job-details-modal`, `job-staff`,
+   `job-restaurants-modal`) with this hook via matching string literals —
+   migrating only this file to different factory keys would have silently
+   *broken* that existing sharing rather than fixed fragmentation. Instead,
+   added `createQueryKey.jobDetailsModal` (the 3 shared keys, generating
+   byte-identical key arrays to what was there before) and
+   `createQueryKey.technicianJobModal` (the 12 technician-only keys) to
+   `src/lib/optimized-react-query.ts`, and migrated both
+   `useDetailsModalData.ts` and `EnhancedJobDetailsModal.tsx` onto the same
+   canonical factories so the coupling is explicit and drift-proof instead
+   of relying on two files independently typing matching strings. No
+   `optimizedInvalidation.invalidateJobRelated()` wiring was added for
+   these keys — that's a separate, riskier change left out of scope.
 
 4. **`stock_movements.user_id` has a foreign key but no index**
    (`00000000000000_production_schema.sql`). This is a high-write table;
@@ -217,12 +255,13 @@ opportunistically.
 ## Suggested priority order
 
 1. Fix the two DB items with a migration (#4 index, #5 trigger) — cheap,
-   isolated, no app-code risk.
-2. Consolidate the realtime bypass hooks (#1, #2) — highest blast radius
-   for duplicate-fetch bugs and unnecessary connections at scale.
-3. Migrate `useDetailsModalData.ts` onto query-key factories (#3) — fixes
-   real stale-cache bugs, not just a "nice to have."
+   isolated, no app-code risk. **Still open.**
+2. ~~Consolidate the realtime bypass hooks (#1, #2) — highest blast radius
+   for duplicate-fetch bugs and unnecessary connections at scale.~~ **Done
+   2026-07-01.**
+3. ~~Migrate `useDetailsModalData.ts` onto query-key factories (#3) — fixes
+   real stale-cache bugs, not just a "nice to have."~~ **Done 2026-07-01.**
 4. Chunk/parallelize the festival PDF export (#6, #17) with progress
-   feedback — directly user-visible on large festivals.
+   feedback — directly user-visible on large festivals. **Still open.**
 5. Everything else (bundle chunking, upload image optimization, dead-code
-   cleanup) can be picked up opportunistically.
+   cleanup) can be picked up opportunistically. **Still open.**
