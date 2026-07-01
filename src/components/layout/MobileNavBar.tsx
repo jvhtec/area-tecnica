@@ -54,6 +54,38 @@ function useVisualViewportBottomOffset() {
 
     updateBottomOffset()
 
+    // iOS often resumes a backgrounded/minimized PWA without firing a "resize"
+    // event even though the WebKit-reported viewport offsets were stale at the
+    // moment it was backgrounded (e.g. mid-keyboard-dismiss or mid-chrome
+    // animation). Without a recompute on resume, the fixed nav stays pinned to
+    // that stale offset and visibly "unsticks" from the bottom. Recompute on
+    // the visibility/pageshow signals below, with a couple of rAF-deferred
+    // follow-ups since WebKit can report the old viewport values for a frame
+    // or two right after resume.
+    let pendingFrames: number[] = []
+
+    const cancelPendingFrames = () => {
+      pendingFrames.forEach((frameId) => cancelAnimationFrame(frameId))
+      pendingFrames = []
+    }
+
+    const recomputeOnResume = () => {
+      cancelPendingFrames()
+      updateBottomOffset()
+      const firstFrame = requestAnimationFrame(() => {
+        updateBottomOffset()
+        const secondFrame = requestAnimationFrame(updateBottomOffset)
+        pendingFrames.push(secondFrame)
+      })
+      pendingFrames.push(firstFrame)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        recomputeOnResume()
+      }
+    }
+
     const visualViewport = window.visualViewport
     window.addEventListener("resize", updateBottomOffset)
     window.addEventListener("orientationchange", updateBottomOffset)
@@ -62,11 +94,16 @@ function useVisualViewportBottomOffset() {
     // fires continuously during momentum/rubber-band scrolling with transient
     // offsets, which made the fixed bottom bar chase the viewport and visibly
     // "unstick". Keyboard and browser-chrome changes still arrive via "resize".
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("pageshow", recomputeOnResume)
 
     return () => {
       window.removeEventListener("resize", updateBottomOffset)
       window.removeEventListener("orientationchange", updateBottomOffset)
       visualViewport?.removeEventListener("resize", updateBottomOffset)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("pageshow", recomputeOnResume)
+      cancelPendingFrames()
     }
   }, [])
 
