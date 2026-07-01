@@ -351,6 +351,6 @@ serve(async (req) => {
     const status = typeof errorLike.status === 'number' ? errorLike.status : 500;
     const details = typeof errorLike.message === 'string' ? errorLike.message : String(error);
     const message = status >= 500 ? 'Internal server error' : (details || 'Request rejected');
-    return new Response(JSON.stringify({ success: false, error: message, details: status >= 500 ? details : undefined }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    return new Response(JSON.stringify({ success: false, error: message }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 });
