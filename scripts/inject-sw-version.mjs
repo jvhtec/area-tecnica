@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 
 const buildTimestamp = `${Math.floor(Date.now() / 1000)}`;
@@ -6,6 +5,9 @@ const swFile = "dist/sw.js";
 const indexFile = "dist/index.html";
 const placeholder = "__BUILD_TIMESTAMP__";
 const supabasePreconnectPlaceholder = "<!-- __SUPABASE_PRECONNECT__ -->";
+
+const isMissingFileError = (error) =>
+  error && typeof error === "object" && "code" in error && error.code === "ENOENT";
 
 const getSupabasePreconnectTags = () => {
   const rawUrl = process.env.VITE_SUPABASE_URL?.trim().replace(/^["']|["']$/g, "");
@@ -26,12 +28,16 @@ const getSupabasePreconnectTags = () => {
   }
 };
 
-if (!existsSync(swFile)) {
-  console.error(`Warning: service worker file not found at ${swFile}`);
-  process.exit(1);
+let currentContents;
+try {
+  currentContents = await readFile(swFile, "utf8");
+} catch (error) {
+  if (isMissingFileError(error)) {
+    console.error(`Warning: service worker file not found at ${swFile}`);
+    process.exit(1);
+  }
+  throw error;
 }
-
-const currentContents = await readFile(swFile, "utf8");
 
 if (!currentContents.includes(placeholder)) {
   console.error(`Warning: placeholder ${placeholder} not found in ${swFile}`);
@@ -44,7 +50,7 @@ await writeFile(swFile, nextContents, "utf8");
 
 console.log(`Injected build timestamp into service worker: ${buildTimestamp}`);
 
-if (existsSync(indexFile)) {
+try {
   const indexContents = await readFile(indexFile, "utf8");
   if (indexContents.includes(supabasePreconnectPlaceholder)) {
     const supabasePreconnectTags = getSupabasePreconnectTags();
@@ -58,5 +64,9 @@ if (existsSync(indexFile)) {
     } else {
       console.log("Removed Supabase preconnect placeholder from index.html");
     }
+  }
+} catch (error) {
+  if (!isMissingFileError(error)) {
+    throw error;
   }
 }
