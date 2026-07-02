@@ -2,7 +2,7 @@ import { useEffect, useState, type ComponentProps } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Printer, Info, Copy, Menu } from "lucide-react";
+import { ArrowLeft, Info } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
@@ -20,12 +20,15 @@ import { useArtistsQuery } from "@/hooks/useArtistsQuery";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { canCreateFestivalArtistExtras, canDeleteFestivalArtists } from "@/utils/permissions";
+import { canCreateFestivalArtistExtras, canDeleteFestivalArtists, canEditJobs } from "@/utils/permissions";
 import { queryKeys } from "@/lib/react-query";
+import { getOfflineFestivalContext, isBrowserOnline } from "@/lib/offline";
+import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
+import { FestivalOfflineBanner } from "@/components/festival/FestivalOfflineBanner";
+import { ArtistPageActions } from "@/components/festival/ArtistPageActions";
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
@@ -57,14 +60,19 @@ const FestivalArtistManagement = () => {
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isFullSchedulePrinting, setIsFullSchedulePrinting] = useState(false);
 
-  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists } = useArtistsQuery(jobId, selectedDate, dayStartTime);
+  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(jobId, selectedDate, dayStartTime);
   const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
   const {
     data: festivalSettings
   } = useQuery({
     queryKey: queryKeys.scope('festival-settings', jobId),
+    networkMode: "always",
     queryFn: async () => {
       if (!jobId) return null;
+      if (!isBrowserOnline()) {
+        const offlineContext = await getOfflineFestivalContext(jobId);
+        return offlineContext?.festivalSettings ?? null;
+      }
       const {
         data: existingSettings,
         error: fetchError
@@ -101,8 +109,13 @@ const FestivalArtistManagement = () => {
     refetch: refetchDateTypes
   } = useQuery({
     queryKey: queryKeys.scope('job-date-types', jobId),
+    networkMode: "always",
     queryFn: async () => {
       if (!jobId) return {};
+      if (!isBrowserOnline()) {
+        const offlineContext = await getOfflineFestivalContext(jobId);
+        return offlineContext?.dateTypes ?? {};
+      }
       const {
         data,
         error
@@ -127,9 +140,14 @@ const FestivalArtistManagement = () => {
 
   const { data: stageNamesData } = useQuery({
     queryKey: queryKeys.scope('festival-stages', jobId),
+    networkMode: "always",
     queryFn: async () => {
       if (!jobId) return {};
-      
+      if (!isBrowserOnline()) {
+        const offlineContext = await getOfflineFestivalContext(jobId);
+        return offlineContext?.stageNames ?? {};
+      }
+
       const { data: stages, error } = await supabase
         .from('festival_stages')
         .select('number, name')
@@ -162,8 +180,36 @@ const FestivalArtistManagement = () => {
   });
 
   useEffect(() => {
+    const applyJobDateRange = (startTime: string, endTime: string) => {
+      const startDate = new Date(startTime);
+      const endDate = new Date(endTime);
+      if (!isValid(startDate) || !isValid(endDate)) return;
+      const dates = eachDayOfInterval({ start: startDate, end: endDate });
+      setJobDates(dates);
+      const routeDateExists = routeDate
+        ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
+        : false;
+      setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
+    };
+
+    const applyOfflineJobDetails = async () => {
+      if (!jobId) return false;
+      const offlineContext = await getOfflineFestivalContext(jobId);
+      const offlineJob = offlineContext?.job;
+      if (!offlineJob) return false;
+
+      setJobTitle((offlineJob.title as string) || "");
+      applyJobDateRange(offlineJob.start_time as string, offlineJob.end_time as string);
+      setMaxStages(offlineContext.maxStages || 3);
+      return true;
+    };
+
     const fetchJobDetails = async () => {
       if (!jobId) return;
+      if (!isBrowserOnline()) {
+        const applied = await applyOfflineJobDetails();
+        if (applied) return;
+      }
       const { data, error } = await supabase
         .from("jobs")
         .select("title, start_time, end_time")
@@ -171,19 +217,10 @@ const FestivalArtistManagement = () => {
         .single();
       if (error) {
         console.error("Error fetching job details:", error);
+        await applyOfflineJobDetails();
       } else {
         setJobTitle(data.title);
-        const startDate = new Date(data.start_time);
-        const endDate = new Date(data.end_time);
-        if (isValid(startDate) && isValid(endDate)) {
-          const dates = eachDayOfInterval({ start: startDate, end: endDate });
-          setJobDates(dates);
-          const routeDateExists = routeDate
-            ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
-            : false;
-          const initialDate = routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd");
-          setSelectedDate(initialDate);
-        }
+        applyJobDateRange(data.start_time, data.end_time);
       }
 
       const { data: gearSetups, error: gearError } = await supabase
@@ -587,8 +624,12 @@ const FestivalArtistManagement = () => {
         </Button>
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl md:text-2xl font-bold truncate">{jobTitle}</h1>
-          <ConnectionIndicator />
+          <div className="flex items-center gap-2">
+            <FestivalOfflineControls jobId={jobId} canEdit={canEditJobs(userRole)} />
+            <ConnectionIndicator />
+          </div>
         </div>
+        {isOfflineData && <FestivalOfflineBanner />}
       </div>
 
       <Card className="mx-4 md:mx-6">
@@ -610,104 +651,18 @@ const FestivalArtistManagement = () => {
             </TooltipProvider>
           </CardTitle>
           
-          {/* Desktop buttons */}
-          <div className="hidden lg:flex items-center gap-2">
-            {showArtistControls && (
-              <Button
-                variant="outline"
-                onClick={() => setIsCopyDialogOpen(true)}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copiar Artistas
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={handlePrintFullSchedule}
-              disabled={isFullSchedulePrinting}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              {isFullSchedulePrinting ? "Generando..." : "Imprimir Horario Completo"}
-            </Button>
-            <Button onClick={() => {
-              setPrintDate(selectedDate);
+          <ArtistPageActions
+            showArtistControls={showArtistControls}
+            isFullSchedulePrinting={isFullSchedulePrinting}
+            selectedDate={selectedDate}
+            onAddArtist={handleAddArtist}
+            onCopyArtists={() => setIsCopyDialogOpen(true)}
+            onPrintFullSchedule={handlePrintFullSchedule}
+            onOpenPrintDialog={(date) => {
+              setPrintDate(date);
               setIsPrintDialogOpen(true);
-            }}>
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir Horario del Día
-            </Button>
-            {showArtistControls ? (
-              <Button onClick={handleAddArtist}>
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir Artista
-              </Button>
-            ) : (
-              <Button disabled title="Los artistas solo se pueden añadir en fechas de show">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir Artista
-              </Button>
-            )}
-          </div>
-
-          {/* Mobile - Primary action + menu */}
-          <div className="flex lg:hidden items-center gap-2 w-full sm:w-auto">
-            {showArtistControls ? (
-              <Button onClick={handleAddArtist} className="flex-1 sm:flex-initial">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir Artista
-              </Button>
-            ) : (
-              <Button disabled title="Los artistas solo se pueden añadir en fechas de show" className="flex-1 sm:flex-initial">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir Artista
-              </Button>
-            )}
-
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <Menu className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <SheetHeader>
-                  <SheetTitle>Acciones</SheetTitle>
-                </SheetHeader>
-                <div className="flex flex-col gap-3 mt-6">
-                  {showArtistControls && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsCopyDialogOpen(true)}
-                      className="justify-start w-full"
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copiar Artistas
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={handlePrintFullSchedule}
-                    disabled={isFullSchedulePrinting}
-                    className="justify-start w-full"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    {isFullSchedulePrinting ? "Generando..." : "Imprimir Horario Completo"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setPrintDate(selectedDate);
-                      setIsPrintDialogOpen(true);
-                    }}
-                    className="justify-start w-full"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Imprimir Horario del Día
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+            }}
+          />
         </CardHeader>
         <CardContent className="p-0">
           <div className="space-y-4 p-6">

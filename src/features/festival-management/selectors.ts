@@ -16,7 +16,7 @@ type StageRow = {
   number?: number | null;
 };
 
-type JobDateTypeRow = {
+export type JobDateTypeRow = {
   date?: string | null;
 };
 

@@ -40,6 +40,7 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
     queryKey: documentsQueryKey,
     enabled: Boolean(jobId),
     staleTime: 1000 * 60 * 2,
+    networkMode: "always", // the queryFn serves the offline snapshot when disconnected
     queryFn: () => {
       if (!jobId) {
         return Promise.resolve({ artistRiderFiles: [], jobDocuments: [] });
