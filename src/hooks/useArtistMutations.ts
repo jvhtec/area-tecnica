@@ -133,6 +133,9 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
           throw new Error("Sin conexión y sin copia offline de este festival");
         }
         const existing = snapshot.data.artists.find((row) => row.id === id);
+        if (!existing) {
+          throw new Error("El artista no existe en la copia offline de este festival");
+        }
         await queueFestivalChange({
           jobId,
           table: "festival_artists",

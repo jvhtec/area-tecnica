@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useOfflineFestival } from "@/hooks/festival/useOfflineFestival";
+import { cn } from "@/lib/utils";
 
 interface FestivalOfflineControlsProps {
   jobId?: string;
@@ -59,7 +60,7 @@ export const FestivalOfflineControls = ({ jobId, canEdit, className }: FestivalO
         <Button
           variant="outline"
           size="sm"
-          className={`relative flex items-center gap-2 hover:bg-accent/50 transition-all ${className ?? ""}`}
+          className={cn("relative flex items-center gap-2 hover:bg-accent/50 transition-all", className)}
         >
           {busy ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -106,10 +107,15 @@ export const FestivalOfflineControls = ({ jobId, canEdit, className }: FestivalO
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem disabled={!isOnline || busy} onSelect={() => download()}>
+        <DropdownMenuItem disabled={!isOnline || busy || pendingCount > 0} onSelect={() => download()}>
           <CloudDownload className="h-4 w-4 mr-2" />
           {hasSnapshot ? "Actualizar copia offline" : "Descargar para uso offline"}
         </DropdownMenuItem>
+        {pendingCount > 0 && (
+          <div className="px-2 pb-1 text-xs text-muted-foreground">
+            Sincroniza o descarta los cambios pendientes antes de actualizar la copia.
+          </div>
+        )}
 
         {canEdit && (
           <DropdownMenuItem disabled={!isOnline || busy || pendingCount === 0} onSelect={() => sync()}>
@@ -129,24 +135,22 @@ export const FestivalOfflineControls = ({ jobId, canEdit, className }: FestivalO
           </DropdownMenuItem>
         )}
 
+        {(hasSnapshot || pendingCount > 0) && <DropdownMenuSeparator />}
+        {pendingCount > 0 && (
+          <DropdownMenuItem disabled={busy || !isOnline} onSelect={() => discardChanges()}>
+            <Undo2 className="h-4 w-4 mr-2" />
+            Descartar cambios pendientes
+          </DropdownMenuItem>
+        )}
         {hasSnapshot && (
-          <>
-            <DropdownMenuSeparator />
-            {pendingCount > 0 && (
-              <DropdownMenuItem disabled={busy} onSelect={() => discardChanges()}>
-                <Undo2 className="h-4 w-4 mr-2" />
-                Descartar cambios pendientes
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              disabled={busy}
-              onSelect={() => removeOfflineCopy()}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Eliminar copia offline
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem
+            disabled={busy}
+            onSelect={() => removeOfflineCopy()}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Eliminar copia offline
+          </DropdownMenuItem>
         )}
 
         {hasSnapshot && isOnline && (

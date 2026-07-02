@@ -68,12 +68,9 @@ describe("syncFestivalPendingChanges", () => {
   it("applies an update when the server row is unchanged", async () => {
     await seedChange({ operation: "update", baseUpdatedAt: "2026-07-01T10:00:00Z" });
 
-    const selectBuilder = createMockQueryBuilder({
-      data: { id: "artist-1", updated_at: "2026-07-01T10:00:00Z" },
-      error: null,
-    });
-    const updateBuilder = createMockQueryBuilder({ data: null, error: null });
-    mockSupabase.from.mockReturnValueOnce(selectBuilder).mockReturnValueOnce(updateBuilder);
+    // Conditional write matched the row: one row returned
+    const updateBuilder = createMockQueryBuilder({ data: [{ id: "artist-1" }], error: null });
+    mockSupabase.from.mockReturnValueOnce(updateBuilder);
 
     const result = await syncFestivalPendingChanges(JOB_ID, { skipSnapshotRefresh: true });
 
@@ -81,17 +78,20 @@ describe("syncFestivalPendingChanges", () => {
     expect(result.conflicts).toHaveLength(0);
     expect(result.failed).toHaveLength(0);
     expect(updateBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ stage: 2 }));
+    expect(updateBuilder.eq).toHaveBeenCalledWith("updated_at", "2026-07-01T10:00:00Z");
     expect(await getPendingChanges(JOB_ID)).toHaveLength(0);
   });
 
   it("reports a conflict when the server row changed since download", async () => {
     await seedChange({ operation: "update", baseUpdatedAt: "2026-07-01T10:00:00Z", label: "Banda Uno" });
 
+    // Conditional write matched zero rows; the follow-up read finds the row
+    const updateBuilder = createMockQueryBuilder({ data: [], error: null });
     const selectBuilder = createMockQueryBuilder({
       data: { id: "artist-1", updated_at: "2026-07-02T09:00:00Z" },
       error: null,
     });
-    mockSupabase.from.mockReturnValueOnce(selectBuilder);
+    mockSupabase.from.mockReturnValueOnce(updateBuilder).mockReturnValueOnce(selectBuilder);
 
     const result = await syncFestivalPendingChanges(JOB_ID, { skipSnapshotRefresh: true });
 
@@ -109,25 +109,24 @@ describe("syncFestivalPendingChanges", () => {
   it("applies a conflicting update when force is enabled", async () => {
     await seedChange({ operation: "update", baseUpdatedAt: "2026-07-01T10:00:00Z" });
 
-    const selectBuilder = createMockQueryBuilder({
-      data: { id: "artist-1", updated_at: "2026-07-02T09:00:00Z" },
-      error: null,
-    });
-    const updateBuilder = createMockQueryBuilder({ data: null, error: null });
-    mockSupabase.from.mockReturnValueOnce(selectBuilder).mockReturnValueOnce(updateBuilder);
+    const updateBuilder = createMockQueryBuilder({ data: [{ id: "artist-1" }], error: null });
+    mockSupabase.from.mockReturnValueOnce(updateBuilder);
 
     const result = await syncFestivalPendingChanges(JOB_ID, { force: true, skipSnapshotRefresh: true });
 
     expect(result.applied).toBe(1);
     expect(result.conflicts).toHaveLength(0);
+    // Force skips the updated_at guard so modified rows are overwritten
+    expect(updateBuilder.eq).not.toHaveBeenCalledWith("updated_at", "2026-07-01T10:00:00Z");
     expect(await getPendingChanges(JOB_ID)).toHaveLength(0);
   });
 
   it("reports a conflict when the record was deleted on the server", async () => {
     await seedChange({ operation: "update" });
 
+    const updateBuilder = createMockQueryBuilder({ data: [], error: null });
     const selectBuilder = createMockQueryBuilder({ data: null, error: null });
-    mockSupabase.from.mockReturnValueOnce(selectBuilder);
+    mockSupabase.from.mockReturnValueOnce(updateBuilder).mockReturnValueOnce(selectBuilder);
 
     const result = await syncFestivalPendingChanges(JOB_ID, { skipSnapshotRefresh: true });
 
@@ -138,14 +137,33 @@ describe("syncFestivalPendingChanges", () => {
   it("treats deleting an already-deleted record as applied", async () => {
     await seedChange({ operation: "delete", payload: null });
 
+    const deleteBuilder = createMockQueryBuilder({ data: [], error: null });
     const selectBuilder = createMockQueryBuilder({ data: null, error: null });
-    mockSupabase.from.mockReturnValueOnce(selectBuilder);
+    mockSupabase.from.mockReturnValueOnce(deleteBuilder).mockReturnValueOnce(selectBuilder);
 
     const result = await syncFestivalPendingChanges(JOB_ID, { skipSnapshotRefresh: true });
 
     expect(result.applied).toBe(1);
     expect(result.conflicts).toHaveLength(0);
     expect(await getPendingChanges(JOB_ID)).toHaveLength(0);
+  });
+
+  it("reports a delete conflict when the server row changed since download", async () => {
+    await seedChange({ operation: "delete", payload: null, baseUpdatedAt: "2026-07-01T10:00:00Z" });
+
+    const deleteBuilder = createMockQueryBuilder({ data: [], error: null });
+    const selectBuilder = createMockQueryBuilder({
+      data: { id: "artist-1", updated_at: "2026-07-02T09:00:00Z" },
+      error: null,
+    });
+    mockSupabase.from.mockReturnValueOnce(deleteBuilder).mockReturnValueOnce(selectBuilder);
+
+    const result = await syncFestivalPendingChanges(JOB_ID, { skipSnapshotRefresh: true });
+
+    expect(result.applied).toBe(0);
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0].reason).toBe("modified_on_server");
+    expect(await getPendingChanges(JOB_ID)).toHaveLength(1);
   });
 
   it("inserts offline-created rows with their client-generated id and strips client-only fields", async () => {
@@ -175,14 +193,9 @@ describe("syncFestivalPendingChanges", () => {
   it("keeps failed changes queued and reports the error", async () => {
     await seedChange({ operation: "update" });
 
-    const selectBuilder = createMockQueryBuilder({
-      data: { id: "artist-1", updated_at: "2026-07-01T10:00:00Z" },
-      error: null,
-    });
-    const updateBuilder = createMockQueryBuilder({ data: null, error: { message: "RLS denied" } });
     // The thenable builder resolves with { error }, which festival-sync turns into a throw
-    updateBuilder.__setResult({ data: null, error: new Error("RLS denied") });
-    mockSupabase.from.mockReturnValueOnce(selectBuilder).mockReturnValueOnce(updateBuilder);
+    const updateBuilder = createMockQueryBuilder({ data: null, error: new Error("RLS denied") });
+    mockSupabase.from.mockReturnValueOnce(updateBuilder);
 
     const result = await syncFestivalPendingChanges(JOB_ID, { skipSnapshotRefresh: true });
 

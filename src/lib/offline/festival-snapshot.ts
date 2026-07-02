@@ -16,6 +16,8 @@ const PAGE_SIZE = 1000;
 /**
  * Fetches every row matching a filter, paginating past the PostgREST
  * 1000-row default so large festivals are captured completely.
+ * Pages are ordered by the unique `id` column so pagination is stable
+ * (no skipped or duplicated rows between pages).
  */
 const fetchAllRows = async (
   table: string,
@@ -26,7 +28,11 @@ const fetchAllRows = async (
   let from = 0;
 
   for (;;) {
-    let query = supabase.from(table as never).select("*").range(from, from + PAGE_SIZE - 1);
+    let query = supabase
+      .from(table as never)
+      .select("*")
+      .order("id" as never, { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
     query = Array.isArray(filterValue)
       ? query.in(filterColumn as never, filterValue as never)
       : query.eq(filterColumn as never, filterValue as never);

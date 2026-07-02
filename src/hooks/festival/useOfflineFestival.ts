@@ -77,6 +77,14 @@ export const useOfflineFestival = (jobId?: string) => {
       toast.error("Sin conexión", { description: "Conéctate a internet para descargar los datos del festival." });
       return;
     }
+    // A refresh overwrites the local snapshot with server data, which would
+    // hide queued edits while they remain pending sync.
+    if ((await countPendingChanges(jobId)) > 0) {
+      toast.error("Cambios pendientes", {
+        description: "Sincroniza o descarta los cambios pendientes antes de actualizar la copia offline.",
+      });
+      return;
+    }
     setIsDownloading(true);
     try {
       const snapshot = await downloadFestivalSnapshot(jobId);
@@ -110,21 +118,29 @@ export const useOfflineFestival = (jobId?: string) => {
                 ? `${result.applied} cambio${result.applied === 1 ? "" : "s"} enviado${result.applied === 1 ? "" : "s"} al servidor.`
                 : "No había cambios pendientes.",
           });
-        } else if (result.conflicts.length > 0) {
-          const names = result.conflicts
-            .map((conflict) => conflict.label)
-            .filter(Boolean)
-            .slice(0, 3)
-            .join(", ");
-          toast.warning("Sincronización con conflictos", {
-            description: `${result.applied} aplicados, ${result.conflicts.length} en conflicto${
-              names ? ` (${names})` : ""
-            }. Usa "Forzar sincronización" para sobrescribir o descarta los cambios.`,
-            duration: 8000,
-          });
         } else {
-          toast.error("Error de sincronización", {
-            description: `${result.failed.length} cambio${result.failed.length === 1 ? "" : "s"} no se pudieron enviar: ${result.failed[0]?.message ?? ""}`,
+          // Report conflicts and failures together so neither gets hidden
+          const parts = [`${result.applied} aplicados`];
+          if (result.conflicts.length > 0) {
+            const names = result.conflicts
+              .map((conflict) => conflict.label)
+              .filter(Boolean)
+              .slice(0, 3)
+              .join(", ");
+            parts.push(`${result.conflicts.length} en conflicto${names ? ` (${names})` : ""}`);
+          }
+          if (result.failed.length > 0) {
+            parts.push(
+              `${result.failed.length} con error${result.failed[0]?.message ? ` (${result.failed[0].message})` : ""}`,
+            );
+          }
+          const hint =
+            result.conflicts.length > 0
+              ? ' Usa "Forzar sincronización" para sobrescribir o descarta los cambios.'
+              : "";
+          const showToast = result.failed.length > 0 ? toast.error : toast.warning;
+          showToast("Sincronización incompleta", {
+            description: `${parts.join(", ")}.${hint}`,
             duration: 8000,
           });
         }
@@ -149,16 +165,26 @@ export const useOfflineFestival = (jobId?: string) => {
 
   const discardChanges = useCallback(async () => {
     if (!jobId) return;
+    if (!isBrowserOnline()) {
+      toast.error("Sin conexión", {
+        description: "Conéctate a internet para descartar los cambios y restaurar la copia offline.",
+      });
+      return;
+    }
+    // Restore the snapshot from the server BEFORE dropping the queue: if the
+    // download fails the queue stays intact, so the local copy never shows
+    // edits that can no longer be synchronized or discarded cleanly.
+    try {
+      await downloadFestivalSnapshot(jobId);
+    } catch (error) {
+      console.error("No se pudo restaurar la copia offline antes de descartar cambios:", error);
+      toast.error("Error", {
+        description: "No se pudo restaurar la copia offline. Los cambios pendientes se mantienen.",
+      });
+      return;
+    }
     const discarded = await discardPendingChanges(jobId);
     setLastSyncResult(null);
-    if (isBrowserOnline()) {
-      // Re-download so the local copy no longer shows the discarded edits.
-      try {
-        await downloadFestivalSnapshot(jobId);
-      } catch (error) {
-        console.warn("No se pudo refrescar la copia offline tras descartar cambios:", error);
-      }
-    }
     toast.success("Cambios descartados", {
       description: `${discarded} cambio${discarded === 1 ? "" : "s"} pendiente${discarded === 1 ? "" : "s"} eliminado${discarded === 1 ? "" : "s"}.`,
     });

@@ -36,11 +36,12 @@ Crear, editar y eliminar artistas funciona sin conexión:
 Con conexión, el menú Offline muestra **Sincronizar cambios** (solo roles de edición). El motor (`src/lib/offline/festival-sync.ts`):
 
 1. Aplica los cambios encolados en orden cronológico.
-2. Antes de cada update/delete compara el `updated_at` del servidor con el observado al descargar:
-   - Si coinciden → aplica el cambio.
-   - Si difieren o la fila fue borrada → lo reporta como **conflicto** y lo deja encolado.
-3. Los conflictos pueden resolverse con **Forzar sincronización** (sobrescribe el servidor) o **Descartar cambios pendientes**.
+2. Cada update/delete se escribe de forma condicional (filtrado por el `updated_at` observado al descargar), por lo que la detección de conflictos es atómica:
+   - Si la escritura afecta a la fila → aplicado.
+   - Si no afecta a ninguna fila (modificada o borrada en el servidor) → se reporta como **conflicto** y queda encolado.
+3. Los conflictos pueden resolverse con **Forzar sincronización** (sobrescribe el servidor) o **Descartar cambios pendientes** (requiere conexión: primero restaura la instantánea desde el servidor y solo entonces vacía la cola).
 4. Tras una sincronización limpia se re-descarga la instantánea para alinear la copia local.
+5. Mientras haya cambios pendientes no se permite **Actualizar copia offline**, para no sobrescribir las ediciones locales con datos del servidor.
 
 ## Arquitectura
 

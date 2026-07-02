@@ -180,6 +180,18 @@ const FestivalArtistManagement = () => {
   });
 
   useEffect(() => {
+    const applyJobDateRange = (startTime: string, endTime: string) => {
+      const startDate = new Date(startTime);
+      const endDate = new Date(endTime);
+      if (!isValid(startDate) || !isValid(endDate)) return;
+      const dates = eachDayOfInterval({ start: startDate, end: endDate });
+      setJobDates(dates);
+      const routeDateExists = routeDate
+        ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
+        : false;
+      setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
+    };
+
     const applyOfflineJobDetails = async () => {
       if (!jobId) return false;
       const offlineContext = await getOfflineFestivalContext(jobId);
@@ -187,16 +199,7 @@ const FestivalArtistManagement = () => {
       if (!offlineJob) return false;
 
       setJobTitle((offlineJob.title as string) || "");
-      const startDate = new Date(offlineJob.start_time as string);
-      const endDate = new Date(offlineJob.end_time as string);
-      if (isValid(startDate) && isValid(endDate)) {
-        const dates = eachDayOfInterval({ start: startDate, end: endDate });
-        setJobDates(dates);
-        const routeDateExists = routeDate
-          ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
-          : false;
-        setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
-      }
+      applyJobDateRange(offlineJob.start_time as string, offlineJob.end_time as string);
       setMaxStages(offlineContext.maxStages || 3);
       return true;
     };
@@ -217,17 +220,7 @@ const FestivalArtistManagement = () => {
         await applyOfflineJobDetails();
       } else {
         setJobTitle(data.title);
-        const startDate = new Date(data.start_time);
-        const endDate = new Date(data.end_time);
-        if (isValid(startDate) && isValid(endDate)) {
-          const dates = eachDayOfInterval({ start: startDate, end: endDate });
-          setJobDates(dates);
-          const routeDateExists = routeDate
-            ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
-            : false;
-          const initialDate = routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd");
-          setSelectedDate(initialDate);
-        }
+        applyJobDateRange(data.start_time, data.end_time);
       }
 
       const { data: gearSetups, error: gearError } = await supabase

@@ -165,6 +165,34 @@ describe("festival offline queue", () => {
     expect(snapshot?.data.artists.map((artist) => artist.id)).not.toContain("artist-1");
   });
 
+  it("serializes concurrent changes so coalescing and snapshot writes are not lost", async () => {
+    await Promise.all([
+      queueFestivalChange({
+        jobId: JOB_ID,
+        table: "festival_artists",
+        operation: "update",
+        recordId: "artist-1",
+        payload: { stage: 2 },
+        baseUpdatedAt: "2026-07-01T10:00:00Z",
+      }),
+      queueFestivalChange({
+        jobId: JOB_ID,
+        table: "festival_artists",
+        operation: "update",
+        recordId: "artist-1",
+        payload: { notes: "concurrente" },
+      }),
+    ]);
+
+    const pending = await getPendingChanges(JOB_ID);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].payload).toMatchObject({ stage: 2, notes: "concurrente" });
+
+    const snapshot = await getFestivalSnapshot(JOB_ID);
+    const artist = snapshot?.data.artists.find((row) => row.id === "artist-1");
+    expect(artist).toMatchObject({ stage: 2, notes: "concurrente" });
+  });
+
   it("discards every pending change of the festival", async () => {
     await queueFestivalChange({
       jobId: JOB_ID,

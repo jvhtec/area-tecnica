@@ -3,6 +3,7 @@ import {
   buildFallbackStageOptions,
   buildFestivalStageOptions,
   buildJobDates,
+  type JobDateTypeRow,
 } from "@/features/festival-management/selectors";
 import { getFestivalSnapshot, isBrowserOnline } from "@/lib/offline";
 import {
@@ -143,7 +144,7 @@ const buildOfflineJobDetails = async (jobId: string): Promise<FestivalJobDetails
     artistCount: snapshot.data.artists.length,
     festivalStageOptions: stageData.options,
     job,
-    jobDates: buildJobDates(job, snapshot.data.jobDateTypes as never),
+    jobDates: buildJobDates(job, snapshot.data.jobDateTypes as JobDateTypeRow[]),
     maxStages,
     venueData: resolveFestivalVenueData(
       snapshot.data.hojaVenue as HojaVenueRow | null,
@@ -152,24 +153,11 @@ const buildOfflineJobDetails = async (jobId: string): Promise<FestivalJobDetails
   };
 };
 
-export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJobDetailsData> => {
-  console.log("Fetching job details for jobId:", jobId);
-
-  if (!isBrowserOnline()) {
-    const offlineDetails = await buildOfflineJobDetails(jobId);
-    if (offlineDetails) {
-      return offlineDetails;
-    }
-  }
-
+const fetchFestivalJobDetailsOnline = async (jobId: string): Promise<FestivalJobDetailsData> => {
   const { data: jobData, error: jobError } = await supabase.from("jobs").select("*").eq("id", jobId).single();
 
   if (jobError) {
     console.error("Error fetching job data:", jobError);
-    const offlineDetails = await buildOfflineJobDetails(jobId);
-    if (offlineDetails) {
-      return offlineDetails;
-    }
     throw jobError;
   }
 
@@ -231,6 +219,29 @@ export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJo
   };
 };
 
+export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJobDetailsData> => {
+  console.log("Fetching job details for jobId:", jobId);
+
+  if (!isBrowserOnline()) {
+    const offlineDetails = await buildOfflineJobDetails(jobId);
+    if (offlineDetails) {
+      return offlineDetails;
+    }
+  }
+
+  try {
+    return await fetchFestivalJobDetailsOnline(jobId);
+  } catch (error) {
+    // Any failure while assembling the online response (job, artist count,
+    // venue, dates) falls back to the offline snapshot when available.
+    const offlineDetails = await buildOfflineJobDetails(jobId);
+    if (offlineDetails) {
+      return offlineDetails;
+    }
+    throw error;
+  }
+};
+
 const buildOfflineDocuments = async (jobId: string): Promise<FestivalDocumentsData | null> => {
   const snapshot = await getFestivalSnapshot(jobId);
   if (!snapshot) {
@@ -258,14 +269,7 @@ const buildOfflineDocuments = async (jobId: string): Promise<FestivalDocumentsDa
   return { artistRiderFiles, jobDocuments };
 };
 
-export const fetchFestivalDocuments = async (jobId: string): Promise<FestivalDocumentsData> => {
-  if (!isBrowserOnline()) {
-    const offlineDocuments = await buildOfflineDocuments(jobId);
-    if (offlineDocuments) {
-      return offlineDocuments;
-    }
-  }
-
+const fetchFestivalDocumentsOnline = async (jobId: string): Promise<FestivalDocumentsData> => {
   const { data: jobDocs, error: jobDocsError } = await supabase
     .from("job_documents")
     .select("id, file_name, file_path, uploaded_at, read_only, template_type")
@@ -318,4 +322,24 @@ export const fetchFestivalDocuments = async (jobId: string): Promise<FestivalDoc
     artistRiderFiles: riderData,
     jobDocuments: (jobDocs || []) as JobDocumentEntry[],
   };
+};
+
+export const fetchFestivalDocuments = async (jobId: string): Promise<FestivalDocumentsData> => {
+  if (!isBrowserOnline()) {
+    const offlineDocuments = await buildOfflineDocuments(jobId);
+    if (offlineDocuments) {
+      return offlineDocuments;
+    }
+  }
+
+  try {
+    return await fetchFestivalDocumentsOnline(jobId);
+  } catch (error) {
+    // Online fetch failed mid-request: serve the snapshot when available.
+    const offlineDocuments = await buildOfflineDocuments(jobId);
+    if (offlineDocuments) {
+      return offlineDocuments;
+    }
+    throw error;
+  }
 };

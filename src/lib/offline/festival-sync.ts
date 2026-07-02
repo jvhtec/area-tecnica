@@ -5,6 +5,7 @@ import { getPendingChanges, removePendingChange } from "./festival-offline-queue
 import { isBrowserOnline, notifyOfflineFestivalChanged } from "./offline-events";
 import type {
   OfflinePendingChange,
+  OfflineSyncableTable,
   OfflineSyncConflictReason,
   OfflineSyncResult,
 } from "./types";
@@ -13,17 +14,17 @@ type Row = Record<string, unknown>;
 
 /**
  * Columns that exist only on the client (joins/derived flags) and must be
- * stripped before writing a row back to the server.
+ * stripped before writing a row back to the server, per syncable table.
  */
-const CLIENT_ONLY_FIELDS = new Set([
-  "artist_submitted",
-  "festival_artist_form_submissions",
-]);
+const CLIENT_ONLY_FIELDS: Record<OfflineSyncableTable, ReadonlySet<string>> = {
+  festival_artists: new Set(["artist_submitted", "festival_artist_form_submissions"]),
+};
 
-const sanitizePayload = (payload: Row | null): Row => {
+const sanitizePayload = (table: OfflineSyncableTable, payload: Row | null): Row => {
+  const excluded = CLIENT_ONLY_FIELDS[table];
   const clean: Row = {};
   Object.entries(payload ?? {}).forEach(([key, value]) => {
-    if (!CLIENT_ONLY_FIELDS.has(key)) {
+    if (!excluded.has(key)) {
       clean[key] = value;
     }
   });
@@ -53,7 +54,7 @@ const fetchServerUpdatedAt = async (
 
 const applyChange = async (change: OfflinePendingChange, force: boolean): Promise<ApplyOutcome> => {
   if (change.operation === "insert") {
-    const payload = sanitizePayload(change.payload);
+    const payload = sanitizePayload(change.table, change.payload);
     payload.id = change.recordId;
     const { error } = await supabase.from(change.table).insert([payload as never]);
     if (error) {
@@ -65,34 +66,50 @@ const applyChange = async (change: OfflinePendingChange, force: boolean): Promis
     return { status: "applied" };
   }
 
-  const server = await fetchServerUpdatedAt(change);
+  // Conflict detection is done atomically: the write is filtered by the
+  // updated_at observed at download time, so a row modified on the server
+  // between check and write simply matches zero rows. The follow-up read
+  // only distinguishes deleted_on_server from modified_on_server.
+  const guardByBase = !force && Boolean(change.baseUpdatedAt);
 
   if (change.operation === "update") {
+    let query = supabase
+      .from(change.table)
+      .update(sanitizePayload(change.table, change.payload) as never)
+      .eq("id", change.recordId);
+    if (guardByBase) {
+      query = query.eq("updated_at", change.baseUpdatedAt as string);
+    }
+    const { data, error } = await query.select("id");
+    if (error) throw error;
+    if ((data ?? []).length > 0) {
+      return { status: "applied" };
+    }
+
+    const server = await fetchServerUpdatedAt(change);
     if (!server.exists) {
       return { status: "conflict", reason: "deleted_on_server" };
     }
-    if (!force && change.baseUpdatedAt && server.updatedAt && server.updatedAt !== change.baseUpdatedAt) {
-      return { status: "conflict", reason: "modified_on_server" };
-    }
-    const { error } = await supabase
-      .from(change.table)
-      .update(sanitizePayload(change.payload) as never)
-      .eq("id", change.recordId);
-    if (error) throw error;
-    return { status: "applied" };
+    return { status: "conflict", reason: "modified_on_server" };
   }
 
   // delete
+  let query = supabase.from(change.table).delete().eq("id", change.recordId);
+  if (guardByBase) {
+    query = query.eq("updated_at", change.baseUpdatedAt as string);
+  }
+  const { data, error } = await query.select("id");
+  if (error) throw error;
+  if ((data ?? []).length > 0) {
+    return { status: "applied" };
+  }
+
+  const server = await fetchServerUpdatedAt(change);
   if (!server.exists) {
     // Already gone on the server: nothing to do.
     return { status: "applied" };
   }
-  if (!force && change.baseUpdatedAt && server.updatedAt && server.updatedAt !== change.baseUpdatedAt) {
-    return { status: "conflict", reason: "modified_on_server" };
-  }
-  const { error } = await supabase.from(change.table).delete().eq("id", change.recordId);
-  if (error) throw error;
-  return { status: "applied" };
+  return { status: "conflict", reason: "modified_on_server" };
 };
 
 export interface SyncOptions {

@@ -60,6 +60,13 @@ const openDb = (): Promise<IDBDatabase> => {
         dbPromise = null;
         reject(request.error ?? new Error("No se pudo abrir la base de datos offline"));
       };
+
+      // Another tab holds an older connection open and blocks the upgrade;
+      // settle instead of hanging forever, and retry on the next access.
+      request.onblocked = () => {
+        dbPromise = null;
+        reject(new Error("La base de datos offline está bloqueada por otra pestaña"));
+      };
     });
   }
 

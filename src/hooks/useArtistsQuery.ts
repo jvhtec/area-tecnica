@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +14,6 @@ import { queryKeys } from "@/lib/react-query";
 export const useArtistsQuery = (jobId: string | undefined, selectedDate: string, dayStartTime: string = "07:00") => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [isOfflineData, setIsOfflineData] = useState(false);
 
   const fetchArtistsOnline = async () => {
     const { data, error } = await supabase
@@ -68,37 +66,35 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
     return processedArtists;
   };
 
-  // Query for fetching artists
+  // Query for fetching artists. The result carries an `isOffline` marker so
+  // the flag always matches the cached payload (a separate useState could
+  // desync when React Query reuses cached data across remounts).
   const {
-    data: artists = [],
+    data: artistsResult,
     isLoading,
     error,
     refetch
   } = useQuery({
     queryKey: queryKeys.scope('festival-artists', jobId, selectedDate),
     queryFn: async () => {
-      if (!jobId || !selectedDate) return [];
+      if (!jobId || !selectedDate) return { rows: [], isOffline: false };
 
       // Offline: serve the downloaded snapshot (with local edits applied)
       if (!isBrowserOnline()) {
         const offlineArtists = await getOfflineArtistsForDate(jobId, selectedDate, dayStartTime);
         if (offlineArtists) {
-          setIsOfflineData(true);
-          return offlineArtists;
+          return { rows: offlineArtists, isOffline: true };
         }
         throw new Error("Sin conexión y sin copia offline de este festival");
       }
 
       try {
-        const onlineArtists = await fetchArtistsOnline();
-        setIsOfflineData(false);
-        return onlineArtists;
+        return { rows: await fetchArtistsOnline(), isOffline: false };
       } catch (fetchError) {
         // Network dropped mid-request: fall back to the offline copy if available
         const offlineArtists = await getOfflineArtistsForDate(jobId, selectedDate, dayStartTime);
         if (offlineArtists) {
-          setIsOfflineData(true);
-          return offlineArtists;
+          return { rows: offlineArtists, isOffline: true };
         }
         throw fetchError;
       }
@@ -108,6 +104,9 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
     refetchOnWindowFocus: true,
     networkMode: "always", // run the queryFn even offline so the snapshot can be served
   });
+
+  const artists = artistsResult?.rows ?? [];
+  const isOfflineData = artistsResult?.isOffline ?? false;
 
   // Mutation for deleting artists
   const deleteArtistMutation = useMutation({
@@ -120,13 +119,16 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
           throw new Error("Sin conexión y sin copia offline de este festival");
         }
         const artist = snapshot.data.artists.find((row) => row.id === artistId);
+        if (!artist) {
+          throw new Error("El artista no existe en la copia offline de este festival");
+        }
         await queueFestivalChange({
           jobId,
           table: "festival_artists",
           operation: "delete",
           recordId: artistId,
-          baseUpdatedAt: (artist?.updated_at as string | null) ?? null,
-          label: (artist?.name as string | undefined) ?? undefined,
+          baseUpdatedAt: (artist.updated_at as string | null) ?? null,
+          label: (artist.name as string | undefined) ?? undefined,
         });
         return { offline: true };
       }

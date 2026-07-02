@@ -13,9 +13,41 @@ export const generateOfflineId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-${Math.random()
-    .toString(16)
-    .slice(2, 10)}`;
+  // RFC 4122 v4 fallback: the id becomes the row's uuid primary key on
+  // sync, so it must be a valid UUID even in older WebViews.
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
+// Serializes queue/snapshot writes per festival so concurrent
+// queueFestivalChange calls can't interleave their read-modify-write
+// cycles (stale queue coalescing or lost snapshot mutations).
+const jobWriteLocks = new Map<string, Promise<void>>();
+
+const withJobWriteLock = <T>(jobId: string, fn: () => Promise<T>): Promise<T> => {
+  const previous = jobWriteLocks.get(jobId) ?? Promise.resolve();
+  const result = previous.then(fn, fn);
+  const tail = result.then(
+    (): void => undefined,
+    (): void => undefined,
+  );
+  jobWriteLocks.set(jobId, tail);
+  tail.then(() => {
+    if (jobWriteLocks.get(jobId) === tail) {
+      jobWriteLocks.delete(jobId);
+    }
+  });
+  return result;
 };
 
 export const getPendingChanges = async (jobId?: string): Promise<OfflinePendingChange[]> => {
@@ -120,35 +152,37 @@ export interface QueueFestivalChangeInput {
 
 /**
  * Queues an offline mutation and reflects it immediately in the local
- * snapshot so offline reads show the edited data.
+ * snapshot so offline reads show the edited data. Writes for the same
+ * festival are serialized to avoid stale read-modify-write races.
  */
-export const queueFestivalChange = async (input: QueueFestivalChangeInput): Promise<void> => {
-  const incoming: OfflinePendingChange = {
-    id: generateOfflineId(),
-    jobId: input.jobId,
-    table: input.table,
-    operation: input.operation,
-    recordId: input.recordId,
-    payload: input.payload ?? null,
-    baseUpdatedAt: input.baseUpdatedAt ?? null,
-    createdAt: new Date().toISOString(),
-    label: input.label,
-  };
+export const queueFestivalChange = (input: QueueFestivalChangeInput): Promise<void> =>
+  withJobWriteLock(input.jobId, async () => {
+    const incoming: OfflinePendingChange = {
+      id: generateOfflineId(),
+      jobId: input.jobId,
+      table: input.table,
+      operation: input.operation,
+      recordId: input.recordId,
+      payload: input.payload ?? null,
+      baseUpdatedAt: input.baseUpdatedAt ?? null,
+      createdAt: new Date().toISOString(),
+      label: input.label,
+    };
 
-  const pending = await getPendingChanges(input.jobId);
-  const existing = pending.find(
-    (change) => change.table === input.table && change.recordId === input.recordId,
-  );
+    const pending = await getPendingChanges(input.jobId);
+    const existing = pending.find(
+      (change) => change.table === input.table && change.recordId === input.recordId,
+    );
 
-  const merged = coalesce(existing, incoming);
+    const merged = coalesce(existing, incoming);
 
-  if (existing && (!merged || merged.id !== existing.id)) {
-    await offlineDb.remove(QUEUE_STORE, existing.id);
-  }
-  if (merged) {
-    await offlineDb.put(QUEUE_STORE, merged);
-  }
+    if (existing && (!merged || merged.id !== existing.id)) {
+      await offlineDb.remove(QUEUE_STORE, existing.id);
+    }
+    if (merged) {
+      await offlineDb.put(QUEUE_STORE, merged);
+    }
 
-  await mutateSnapshot(incoming);
-  notifyOfflineFestivalChanged(input.jobId);
-};
+    await mutateSnapshot(incoming);
+    notifyOfflineFestivalChanged(input.jobId);
+  });
