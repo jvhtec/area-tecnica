@@ -2,6 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  generateOfflineId,
+  getFestivalSnapshot,
+  isBrowserOnline,
+  queueFestivalChange,
+} from "@/lib/offline";
 
 import { queryKeys } from "@/lib/react-query";
 
@@ -64,8 +70,28 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
   const { toast } = useToast();
 
   const createArtistMutation = useMutation({
+    networkMode: "always",
     mutationFn: async (artistData: FestivalArtistInsert) => {
       const dataToInsert = formatArtistTimeData({ ...artistData, job_id: jobId });
+
+      // Offline: store the new artist in the local snapshot and queue it
+      if (!isBrowserOnline() && jobId) {
+        const snapshot = await getFestivalSnapshot(jobId);
+        if (!snapshot) {
+          throw new Error("Sin conexión y sin copia offline de este festival");
+        }
+        const offlineId = generateOfflineId();
+        await queueFestivalChange({
+          jobId,
+          table: "festival_artists",
+          operation: "insert",
+          recordId: offlineId,
+          payload: dataToInsert as Record<string, unknown>,
+          label: (dataToInsert as { name?: string }).name,
+        });
+        return { ...dataToInsert, id: offlineId, __offline: true };
+      }
+
       const { data, error } = await supabase
         .from("festival_artists")
         .insert([dataToInsert])
@@ -75,11 +101,14 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
+      const savedOffline = Boolean((data as { __offline?: boolean })?.__offline);
       toast({
-        title: "Success",
-        description: "Artist created successfully",
+        title: savedOffline ? "Guardado offline" : "Success",
+        description: savedOffline
+          ? "Artista guardado localmente. Sincroniza cuando vuelvas a tener conexión."
+          : "Artist created successfully",
       });
     },
     onError: (error: unknown) => {
@@ -93,8 +122,29 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
   });
 
   const updateArtistMutation = useMutation({
+    networkMode: "always",
     mutationFn: async ({ id, ...updateData }: FestivalArtistUpdatePayload) => {
       const dataToUpdate = formatArtistTimeData(updateData);
+
+      // Offline: apply to the local snapshot and queue for manual sync
+      if (!isBrowserOnline() && jobId) {
+        const snapshot = await getFestivalSnapshot(jobId);
+        if (!snapshot) {
+          throw new Error("Sin conexión y sin copia offline de este festival");
+        }
+        const existing = snapshot.data.artists.find((row) => row.id === id);
+        await queueFestivalChange({
+          jobId,
+          table: "festival_artists",
+          operation: "update",
+          recordId: id,
+          payload: dataToUpdate as Record<string, unknown>,
+          baseUpdatedAt: (existing?.updated_at as string | null) ?? null,
+          label: (dataToUpdate as { name?: string }).name ?? ((existing?.name as string | undefined) ?? undefined),
+        });
+        return { ...existing, ...dataToUpdate, id, __offline: true };
+      }
+
       const { data, error } = await supabase
         .from("festival_artists")
         .update(dataToUpdate)
@@ -105,11 +155,14 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
+      const savedOffline = Boolean((data as { __offline?: boolean })?.__offline);
       toast({
-        title: "Success",
-        description: "Artist updated successfully",
+        title: savedOffline ? "Guardado offline" : "Success",
+        description: savedOffline
+          ? "Cambios guardados localmente. Sincroniza cuando vuelvas a tener conexión."
+          : "Artist updated successfully",
       });
     },
     onError: (error: unknown) => {

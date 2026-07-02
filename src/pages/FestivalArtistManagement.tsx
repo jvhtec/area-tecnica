@@ -24,8 +24,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { canCreateFestivalArtistExtras, canDeleteFestivalArtists } from "@/utils/permissions";
+import { canCreateFestivalArtistExtras, canDeleteFestivalArtists, canEditJobs } from "@/utils/permissions";
 import { queryKeys } from "@/lib/react-query";
+import { getOfflineFestivalContext, isBrowserOnline } from "@/lib/offline";
+import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
+import { CloudOff } from "lucide-react";
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
@@ -57,14 +60,19 @@ const FestivalArtistManagement = () => {
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isFullSchedulePrinting, setIsFullSchedulePrinting] = useState(false);
 
-  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists } = useArtistsQuery(jobId, selectedDate, dayStartTime);
+  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(jobId, selectedDate, dayStartTime);
   const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
   const {
     data: festivalSettings
   } = useQuery({
     queryKey: queryKeys.scope('festival-settings', jobId),
+    networkMode: "always",
     queryFn: async () => {
       if (!jobId) return null;
+      if (!isBrowserOnline()) {
+        const offlineContext = await getOfflineFestivalContext(jobId);
+        return offlineContext?.festivalSettings ?? null;
+      }
       const {
         data: existingSettings,
         error: fetchError
@@ -101,8 +109,13 @@ const FestivalArtistManagement = () => {
     refetch: refetchDateTypes
   } = useQuery({
     queryKey: queryKeys.scope('job-date-types', jobId),
+    networkMode: "always",
     queryFn: async () => {
       if (!jobId) return {};
+      if (!isBrowserOnline()) {
+        const offlineContext = await getOfflineFestivalContext(jobId);
+        return offlineContext?.dateTypes ?? {};
+      }
       const {
         data,
         error
@@ -127,9 +140,14 @@ const FestivalArtistManagement = () => {
 
   const { data: stageNamesData } = useQuery({
     queryKey: queryKeys.scope('festival-stages', jobId),
+    networkMode: "always",
     queryFn: async () => {
       if (!jobId) return {};
-      
+      if (!isBrowserOnline()) {
+        const offlineContext = await getOfflineFestivalContext(jobId);
+        return offlineContext?.stageNames ?? {};
+      }
+
       const { data: stages, error } = await supabase
         .from('festival_stages')
         .select('number, name')
@@ -162,8 +180,33 @@ const FestivalArtistManagement = () => {
   });
 
   useEffect(() => {
+    const applyOfflineJobDetails = async () => {
+      if (!jobId) return false;
+      const offlineContext = await getOfflineFestivalContext(jobId);
+      const offlineJob = offlineContext?.job;
+      if (!offlineJob) return false;
+
+      setJobTitle((offlineJob.title as string) || "");
+      const startDate = new Date(offlineJob.start_time as string);
+      const endDate = new Date(offlineJob.end_time as string);
+      if (isValid(startDate) && isValid(endDate)) {
+        const dates = eachDayOfInterval({ start: startDate, end: endDate });
+        setJobDates(dates);
+        const routeDateExists = routeDate
+          ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
+          : false;
+        setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
+      }
+      setMaxStages(offlineContext.maxStages || 3);
+      return true;
+    };
+
     const fetchJobDetails = async () => {
       if (!jobId) return;
+      if (!isBrowserOnline()) {
+        const applied = await applyOfflineJobDetails();
+        if (applied) return;
+      }
       const { data, error } = await supabase
         .from("jobs")
         .select("title, start_time, end_time")
@@ -171,6 +214,7 @@ const FestivalArtistManagement = () => {
         .single();
       if (error) {
         console.error("Error fetching job details:", error);
+        await applyOfflineJobDetails();
       } else {
         setJobTitle(data.title);
         const startDate = new Date(data.start_time);
@@ -587,8 +631,20 @@ const FestivalArtistManagement = () => {
         </Button>
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl md:text-2xl font-bold truncate">{jobTitle}</h1>
-          <ConnectionIndicator />
+          <div className="flex items-center gap-2">
+            <FestivalOfflineControls jobId={jobId} canEdit={canEditJobs(userRole)} />
+            <ConnectionIndicator />
+          </div>
         </div>
+        {isOfflineData && (
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+            <CloudOff className="h-4 w-4 shrink-0" />
+            <span>
+              Estás viendo la copia offline de este festival. Los cambios se guardarán localmente y podrás
+              sincronizarlos cuando vuelvas a tener conexión.
+            </span>
+          </div>
+        )}
       </div>
 
       <Card className="mx-4 md:mx-6">

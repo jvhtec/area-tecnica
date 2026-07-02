@@ -4,6 +4,7 @@ import {
   buildFestivalStageOptions,
   buildJobDates,
 } from "@/features/festival-management/selectors";
+import { getFestivalSnapshot, isBrowserOnline } from "@/lib/offline";
 import {
   normalizeVenueCoordinates,
   resolveHojaVenue,
@@ -114,13 +115,61 @@ const fetchJobDates = async (jobId: string, job: FestivalJob) => {
   return [new Date()];
 };
 
+const buildOfflineJobDetails = async (jobId: string): Promise<FestivalJobDetailsData | null> => {
+  const snapshot = await getFestivalSnapshot(jobId);
+  if (!snapshot?.data.job) {
+    return null;
+  }
+
+  const jobRow = snapshot.data.job as Record<string, unknown>;
+  const job = {
+    ...jobRow,
+    location_id: (jobRow.location_id as string | null) ?? undefined,
+    tour_date_id: (jobRow.tour_date_id as string | null) ?? undefined,
+  } as FestivalJob;
+
+  const latestGearSetup = [...snapshot.data.gearSetups].sort((a, b) =>
+    String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")),
+  )[0];
+  let maxStages = Math.max(Number(latestGearSetup?.max_stages) || 1, 1);
+
+  const stageRows = snapshot.data.stages
+    .map((stage) => ({ number: stage.number as number, name: (stage.name as string) ?? null }))
+    .sort((a, b) => a.number - b.number);
+  const stageData = buildFestivalStageOptions(stageRows, maxStages);
+  maxStages = stageData.maxStages;
+
+  return {
+    artistCount: snapshot.data.artists.length,
+    festivalStageOptions: stageData.options,
+    job,
+    jobDates: buildJobDates(job, snapshot.data.jobDateTypes as never),
+    maxStages,
+    venueData: resolveFestivalVenueData(
+      snapshot.data.hojaVenue as HojaVenueRow | null,
+      snapshot.data.location as LocationRow | null,
+    ),
+  };
+};
+
 export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJobDetailsData> => {
   console.log("Fetching job details for jobId:", jobId);
+
+  if (!isBrowserOnline()) {
+    const offlineDetails = await buildOfflineJobDetails(jobId);
+    if (offlineDetails) {
+      return offlineDetails;
+    }
+  }
 
   const { data: jobData, error: jobError } = await supabase.from("jobs").select("*").eq("id", jobId).single();
 
   if (jobError) {
     console.error("Error fetching job data:", jobError);
+    const offlineDetails = await buildOfflineJobDetails(jobId);
+    if (offlineDetails) {
+      return offlineDetails;
+    }
     throw jobError;
   }
 
@@ -182,7 +231,41 @@ export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJo
   };
 };
 
+const buildOfflineDocuments = async (jobId: string): Promise<FestivalDocumentsData | null> => {
+  const snapshot = await getFestivalSnapshot(jobId);
+  if (!snapshot) {
+    return null;
+  }
+
+  const artistNames = new Map(
+    snapshot.data.artists.map((artist) => [artist.id as string, (artist.name as string) || "Unknown"]),
+  );
+
+  const artistRiderFiles = snapshot.data.artistFiles
+    .map((file) => ({
+      ...(file as unknown as ArtistRiderFile),
+      festival_artists: {
+        id: file.artist_id as string,
+        name: artistNames.get(file.artist_id as string) || "Unknown",
+      },
+    }))
+    .sort((a, b) => String(b.uploaded_at ?? "").localeCompare(String(a.uploaded_at ?? "")));
+
+  const jobDocuments = [...snapshot.data.jobDocuments].sort((a, b) =>
+    String(b.uploaded_at ?? "").localeCompare(String(a.uploaded_at ?? "")),
+  ) as unknown as JobDocumentEntry[];
+
+  return { artistRiderFiles, jobDocuments };
+};
+
 export const fetchFestivalDocuments = async (jobId: string): Promise<FestivalDocumentsData> => {
+  if (!isBrowserOnline()) {
+    const offlineDocuments = await buildOfflineDocuments(jobId);
+    if (offlineDocuments) {
+      return offlineDocuments;
+    }
+  }
+
   const { data: jobDocs, error: jobDocsError } = await supabase
     .from("job_documents")
     .select("id, file_name, file_path, uploaded_at, read_only, template_type")

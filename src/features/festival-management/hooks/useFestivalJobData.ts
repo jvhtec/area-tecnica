@@ -14,6 +14,7 @@ export const useFestivalJobData = ({ jobId, toast }: { jobId?: string; toast: To
     queryKey: jobDetailsQueryKey,
     enabled: Boolean(jobId),
     staleTime: 1000 * 60 * 2,
+    networkMode: "always", // the queryFn serves the offline snapshot when disconnected
     queryFn: () => {
       if (!jobId) {
         throw new Error("Missing festival job id");
