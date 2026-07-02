@@ -12,8 +12,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MobileArtistList } from "@/components/festival/mobile/MobileArtistList";
 import type { MobileArtistRiderFile } from "@/components/festival/mobile/MobileArtistCard";
+import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
 import { Theme } from "./types";
 import { createQueryKey } from "@/lib/optimized-react-query";
+import { getFestivalSnapshot, isBrowserOnline } from "@/lib/offline";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { canEditJobs } from "@/utils/permissions";
 import type { Tables } from "@/integrations/supabase/types";
 
 type TechnicianArtistReadOnlyModalProps = {
@@ -140,6 +144,22 @@ const mapRawToReadOnlyArtist = (artist: FestivalArtistRow): ReadOnlyArtist => ({
   wired_mics: asArray<ReadOnlyWiredMic>(artist.wired_mics),
 });
 
+const sortReadOnlyArtists = (rows: ReadOnlyArtist[]): ReadOnlyArtist[] =>
+  [...rows].sort((left, right) => {
+    const leftDate = String(left.date || "");
+    const rightDate = String(right.date || "");
+    if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+    return String(left.show_start || "").localeCompare(String(right.show_start || ""));
+  });
+
+const fetchOfflineReadOnlyArtists = async (jobId: string): Promise<ReadOnlyArtist[] | null> => {
+  const snapshot = await getFestivalSnapshot(jobId);
+  if (!snapshot) return null;
+  return sortReadOnlyArtists(
+    snapshot.data.artists.map((row) => mapRawToReadOnlyArtist(row as unknown as FestivalArtistRow)),
+  );
+};
+
 export function TechnicianArtistReadOnlyModal({
   theme,
   isDark,
@@ -151,35 +171,61 @@ export function TechnicianArtistReadOnlyModal({
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [stagePlotUrls, setStagePlotUrls] = useState<Record<string, string>>({});
   const [riderFilesByArtistId, setRiderFilesByArtistId] = useState<Record<string, MobileArtistRiderFile[]>>({});
+  const { userRole } = useOptimizedAuth();
 
   const { data: artists = [], isLoading: artistsLoading } = useQuery({
     queryKey: createQueryKey.technician.technicianReadonlyArtists(job?.id),
+    networkMode: "always", // the queryFn serves the offline snapshot when disconnected
     queryFn: async () => {
-      const { data, error } = await dataLayerClient.from("festival_artists")
-        .select("*")
-        .eq("job_id", job?.id)
-        .order("date", { ascending: true });
+      if (!isBrowserOnline()) {
+        const offlineArtists = await fetchOfflineReadOnlyArtists(job.id);
+        if (offlineArtists) return offlineArtists;
+        throw new Error("Sin conexión y sin copia offline de este festival");
+      }
 
-      if (error) throw error;
-      return (data || []).map(mapRawToReadOnlyArtist).sort((left, right) => {
-        const leftDate = String(left.date || "");
-        const rightDate = String(right.date || "");
-        if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
-        return String(left.show_start || "").localeCompare(String(right.show_start || ""));
-      });
+      try {
+        const { data, error } = await dataLayerClient.from("festival_artists")
+          .select("*")
+          .eq("job_id", job?.id)
+          .order("date", { ascending: true });
+
+        if (error) throw error;
+        return sortReadOnlyArtists((data || []).map(mapRawToReadOnlyArtist));
+      } catch (fetchError) {
+        // Network dropped mid-request: fall back to the offline copy if available
+        const offlineArtists = await fetchOfflineReadOnlyArtists(job.id);
+        if (offlineArtists) return offlineArtists;
+        throw fetchError;
+      }
     },
     enabled: !!job?.id,
   });
 
   const { data: festivalStages = [] } = useQuery({
     queryKey: createQueryKey.technician.technicianReadonlyFestivalStages(job?.id),
+    networkMode: "always",
     queryFn: async () => {
+      const readOfflineStages = async (): Promise<FestivalStage[] | null> => {
+        const snapshot = await getFestivalSnapshot(job.id);
+        if (!snapshot) return null;
+        return snapshot.data.stages
+          .filter((stage) => typeof stage.number === "number")
+          .map((stage) => ({
+            number: stage.number as number,
+            name: (stage.name as string) ?? `Escenario ${stage.number as number}`,
+          }));
+      };
+
+      if (!isBrowserOnline()) {
+        return (await readOfflineStages()) ?? [];
+      }
+
       const { data, error } = await dataLayerClient.from("festival_stages")
         .select("number, name")
         .eq("job_id", job?.id);
       if (error) {
         console.warn("TechnicianArtistReadOnlyModal: failed loading stage names", error);
-        return [];
+        return (await readOfflineStages()) ?? [];
       }
       return (data || []) as FestivalStage[];
     },
@@ -200,7 +246,9 @@ export function TechnicianArtistReadOnlyModal({
     const loadStagePlotUrls = async () => {
       const artistsWithPlot = artists.filter((artist) => Boolean(artist.stage_plot_file_path));
 
-      if (artistsWithPlot.length === 0) {
+      // Signed URLs require a connection; binary files are not part of the
+      // offline snapshot.
+      if (artistsWithPlot.length === 0 || !isBrowserOnline()) {
         if (!cancelled) setStagePlotUrls({});
         return;
       }
@@ -235,10 +283,48 @@ export function TechnicianArtistReadOnlyModal({
   useEffect(() => {
     let cancelled = false;
 
+    type RiderFileRow = {
+      id: string;
+      file_name: string;
+      file_path: string;
+      uploaded_at: string;
+      artist_id: string | null;
+    };
+
+    const groupRiderFiles = (files: RiderFileRow[]) => {
+      const grouped: Record<string, MobileArtistRiderFile[]> = {};
+      files.forEach((file) => {
+        if (!file.artist_id) return;
+        if (!grouped[file.artist_id]) grouped[file.artist_id] = [];
+        grouped[file.artist_id].push({
+          id: file.id,
+          file_name: file.file_name,
+          file_path: file.file_path,
+          uploaded_at: file.uploaded_at,
+        });
+      });
+      return grouped;
+    };
+
+    const loadOfflineRiderFiles = async (): Promise<Record<string, MobileArtistRiderFile[]> | null> => {
+      const snapshot = await getFestivalSnapshot(job.id);
+      if (!snapshot) return null;
+      const files = [...snapshot.data.artistFiles].sort((a, b) =>
+        String(b.uploaded_at ?? "").localeCompare(String(a.uploaded_at ?? "")),
+      );
+      return groupRiderFiles(files as unknown as RiderFileRow[]);
+    };
+
     const loadRiderFiles = async () => {
       const artistIds = artists.map((artist) => artist.id).filter(Boolean);
       if (artistIds.length === 0) {
         if (!cancelled) setRiderFilesByArtistId({});
+        return;
+      }
+
+      if (!isBrowserOnline()) {
+        const offlineFiles = await loadOfflineRiderFiles();
+        if (!cancelled) setRiderFilesByArtistId(offlineFiles ?? {});
         return;
       }
 
@@ -256,23 +342,12 @@ export function TechnicianArtistReadOnlyModal({
       const { data, error } = await query;
       if (error) {
         console.warn("TechnicianArtistReadOnlyModal: failed loading rider files", error);
-        if (!cancelled) setRiderFilesByArtistId({});
+        const offlineFiles = await loadOfflineRiderFiles();
+        if (!cancelled) setRiderFilesByArtistId(offlineFiles ?? {});
         return;
       }
 
-      const grouped: Record<string, MobileArtistRiderFile[]> = {};
-      (data || []).forEach((file) => {
-        if (!file.artist_id) return;
-        if (!grouped[file.artist_id]) grouped[file.artist_id] = [];
-        grouped[file.artist_id].push({
-          id: file.id,
-          file_name: file.file_name,
-          file_path: file.file_path,
-          uploaded_at: file.uploaded_at,
-        });
-      });
-
-      if (!cancelled) setRiderFilesByArtistId(grouped);
+      if (!cancelled) setRiderFilesByArtistId(groupRiderFiles(data || []));
     };
 
     void loadRiderFiles();
@@ -280,7 +355,7 @@ export function TechnicianArtistReadOnlyModal({
     return () => {
       cancelled = true;
     };
-  }, [artists]);
+  }, [artists, job.id]);
 
   const handleDownloadRiderFile = async (file: { file_path: string; file_name: string }) => {
     try {
@@ -384,13 +459,16 @@ export function TechnicianArtistReadOnlyModal({
               Artistas · {job?.title || "Trabajo"}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className={`p-2 ${theme.textMuted} hover:${theme.textMain} rounded-full transition-colors`}
-            aria-label="Cerrar"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <FestivalOfflineControls jobId={job?.id} canEdit={canEditJobs(userRole)} />
+            <button
+              onClick={onClose}
+              className={`p-2 ${theme.textMuted} hover:${theme.textMain} rounded-full transition-colors`}
+              aria-label="Cerrar"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className={`px-4 py-3 border-b ${theme.divider} shrink-0`}>
