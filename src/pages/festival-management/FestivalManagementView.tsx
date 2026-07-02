@@ -124,7 +124,6 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6">
-      {/* Modern Header Card with Gradient */}
       <Card className="border-0 shadow-lg bg-gradient-to-br from-background via-background to-accent/5">
         <CardHeader className="pb-4">
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
@@ -161,7 +160,6 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                 )}
               </div>
 
-              {/* Venue Map Preview */}
               {(venueData.address || venueData.coordinates) && (
                 <div className="mt-3">
                   {isMapLoading ? (
