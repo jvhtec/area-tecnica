@@ -222,17 +222,15 @@ export const getOfflineFestivalContext = async (jobId: string): Promise<OfflineF
   const snapshot = await getFestivalSnapshot(jobId);
   if (!snapshot) return null;
 
-  const dateTypes: Record<string, string> = {};
-  snapshot.data.jobDateTypes.forEach((item) => {
-    dateTypes[`${jobId}-${item.date as string}`] = item.type as string;
-  });
+  const dateTypes = Object.fromEntries(
+    snapshot.data.jobDateTypes.map((item) => [`${jobId}-${item.date as string}`, item.type as string]),
+  );
 
-  const stageNames: Record<number, string> = {};
-  snapshot.data.stages.forEach((stage) => {
-    if (typeof stage.number === "number") {
-      stageNames[stage.number] = (stage.name as string) ?? `Escenario ${stage.number}`;
-    }
-  });
+  const stageNames = Object.fromEntries(
+    snapshot.data.stages
+      .filter((stage) => typeof stage.number === "number")
+      .map((stage) => [stage.number as number, (stage.name as string) ?? `Escenario ${stage.number as number}`]),
+  ) as Record<number, string>;
 
   const latestGearSetup = [...snapshot.data.gearSetups].sort((a, b) =>
     compareTimeStrings(b.created_at, a.created_at),
