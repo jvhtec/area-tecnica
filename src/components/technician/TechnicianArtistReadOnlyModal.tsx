@@ -447,10 +447,10 @@ export function TechnicianArtistReadOnlyModal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}
+      className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}
     >
       <div
-        className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? "bg-[#0f1219]" : "bg-white"} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}
+        className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] supports-[height:1dvh]:h-[85dvh] max-h-full ${isDark ? "bg-[#0f1219]" : "bg-white"} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}
       >
         <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>
           <div className="flex items-center gap-2 min-w-0">
