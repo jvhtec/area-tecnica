@@ -15,7 +15,12 @@ import type { MobileArtistRiderFile } from "@/components/festival/mobile/MobileA
 import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
 import { Theme } from "./types";
 import { createQueryKey } from "@/lib/optimized-react-query";
-import { getFestivalSnapshot, isBrowserOnline } from "@/lib/offline";
+import {
+  fetchWithOfflineFallback,
+  getFestivalSnapshot,
+  getOfflineFileBlob,
+  isBrowserOnline,
+} from "@/lib/offline";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { canEditJobs } from "@/utils/permissions";
 import type { Tables } from "@/integrations/supabase/types";
@@ -177,13 +182,7 @@ export function TechnicianArtistReadOnlyModal({
     queryKey: createQueryKey.technician.technicianReadonlyArtists(job?.id),
     networkMode: "always", // the queryFn serves the offline snapshot when disconnected
     queryFn: async () => {
-      if (!isBrowserOnline()) {
-        const offlineArtists = await fetchOfflineReadOnlyArtists(job.id);
-        if (offlineArtists) return offlineArtists;
-        throw new Error("Sin conexión y sin copia offline de este festival");
-      }
-
-      try {
+      const fetchArtistsOnline = async () => {
         const { data, error } = await dataLayerClient.from("festival_artists")
           .select("*")
           .eq("job_id", job?.id)
@@ -191,12 +190,15 @@ export function TechnicianArtistReadOnlyModal({
 
         if (error) throw error;
         return sortReadOnlyArtists((data || []).map(mapRawToReadOnlyArtist));
-      } catch (fetchError) {
-        // Network dropped mid-request: fall back to the offline copy if available
-        const offlineArtists = await fetchOfflineReadOnlyArtists(job.id);
-        if (offlineArtists) return offlineArtists;
-        throw fetchError;
-      }
+      };
+
+      // Snapshot fallback covers browser-offline, fetch failures and
+      // slow/unresponsive networks (timeout-raced).
+      const result = await fetchWithOfflineFallback({
+        online: fetchArtistsOnline,
+        offline: () => fetchOfflineReadOnlyArtists(job.id),
+      });
+      return result.data;
     },
     enabled: !!job?.id,
   });
@@ -216,18 +218,24 @@ export function TechnicianArtistReadOnlyModal({
           }));
       };
 
-      if (!isBrowserOnline()) {
-        return (await readOfflineStages()) ?? [];
-      }
+      const fetchStagesOnline = async () => {
+        const { data, error } = await dataLayerClient.from("festival_stages")
+          .select("number, name")
+          .eq("job_id", job?.id);
+        if (error) throw error;
+        return (data || []) as FestivalStage[];
+      };
 
-      const { data, error } = await dataLayerClient.from("festival_stages")
-        .select("number, name")
-        .eq("job_id", job?.id);
-      if (error) {
+      try {
+        const result = await fetchWithOfflineFallback({
+          online: fetchStagesOnline,
+          offline: readOfflineStages,
+        });
+        return result.data;
+      } catch (error) {
         console.warn("TechnicianArtistReadOnlyModal: failed loading stage names", error);
-        return (await readOfflineStages()) ?? [];
+        return [];
       }
-      return (data || []) as FestivalStage[];
     },
     enabled: !!job?.id,
   });
@@ -239,20 +247,30 @@ export function TechnicianArtistReadOnlyModal({
 
   useEffect(() => {
     let cancelled = false;
+    const objectUrls: string[] = [];
 
     const loadStagePlotUrls = async () => {
       const artistsWithPlot = artists.filter((artist) => Boolean(artist.stage_plot_file_path));
 
-      // Signed URLs require a connection; binary files are not part of the
-      // offline snapshot.
-      if (artistsWithPlot.length === 0 || !isBrowserOnline()) {
+      if (artistsWithPlot.length === 0) {
         if (!cancelled) setStagePlotUrls({});
         return;
       }
 
-      const signedUrlEntries = await Promise.all(
+      const urlEntries = await Promise.all(
         artistsWithPlot.map(async (artist): Promise<[string, string] | null> => {
           if (!artist.stage_plot_file_path) return null;
+
+          // Cached blob first: renders offline and skips the signed-URL
+          // round-trip when the festival was downloaded.
+          const cachedBlob = await getOfflineFileBlob("festival_artist_files", artist.stage_plot_file_path);
+          if (cachedBlob) {
+            const objectUrl = URL.createObjectURL(cachedBlob);
+            objectUrls.push(objectUrl);
+            return [artist.id, objectUrl];
+          }
+
+          if (!isBrowserOnline()) return null;
           const { data, error } = await dataLayerClient.storage
             .from("festival_artist_files")
             .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
@@ -263,7 +281,7 @@ export function TechnicianArtistReadOnlyModal({
 
       if (!cancelled) {
         setStagePlotUrls(
-          Object.fromEntries(signedUrlEntries.filter((entry): entry is [string, string] => entry !== null)),
+          Object.fromEntries(urlEntries.filter((entry): entry is [string, string] => entry !== null)),
         );
       }
     };
@@ -272,6 +290,7 @@ export function TechnicianArtistReadOnlyModal({
 
     return () => {
       cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [artists]);
 
@@ -355,12 +374,21 @@ export function TechnicianArtistReadOnlyModal({
 
   const handleDownloadRiderFile = async (file: { file_path: string; file_name: string }) => {
     try {
-      const { data, error } = await dataLayerClient.storage.from("festival_artist_files").download(file.file_path);
-      if (error || !data) {
-        toast.error("Error al descargar el archivo", { description: error?.message || "No se pudo obtener el archivo" });
-        return;
+      // Cached copy first so riders open offline (and instantly when cached)
+      let blob = await getOfflineFileBlob("festival_artist_files", file.file_path);
+      if (!blob) {
+        const { data, error } = await dataLayerClient.storage.from("festival_artist_files").download(file.file_path);
+        if (error || !data) {
+          toast.error("Error al descargar el archivo", {
+            description: !isBrowserOnline()
+              ? "Sin conexión y sin copia offline de este archivo. Actualiza la copia offline con conexión."
+              : error?.message || "No se pudo obtener el archivo",
+          });
+          return;
+        }
+        blob = data;
       }
-      const url = window.URL.createObjectURL(data);
+      const url = window.URL.createObjectURL(blob);
       const link = window.document.createElement("a");
       link.href = url;
       link.download = file.file_name;

@@ -5,7 +5,7 @@ import {
   buildJobDates,
   type JobDateTypeRow,
 } from "@/features/festival-management/selectors";
-import { getFestivalSnapshot, isBrowserOnline } from "@/lib/offline";
+import { fetchWithOfflineFallback, getFestivalSnapshot } from "@/lib/offline";
 import {
   normalizeVenueCoordinates,
   resolveHojaVenue,
@@ -222,24 +222,13 @@ const fetchFestivalJobDetailsOnline = async (jobId: string): Promise<FestivalJob
 export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJobDetailsData> => {
   console.log("Fetching job details for jobId:", jobId);
 
-  if (!isBrowserOnline()) {
-    const offlineDetails = await buildOfflineJobDetails(jobId);
-    if (offlineDetails) {
-      return offlineDetails;
-    }
-  }
-
-  try {
-    return await fetchFestivalJobDetailsOnline(jobId);
-  } catch (error) {
-    // Any failure while assembling the online response (job, artist count,
-    // venue, dates) falls back to the offline snapshot when available.
-    const offlineDetails = await buildOfflineJobDetails(jobId);
-    if (offlineDetails) {
-      return offlineDetails;
-    }
-    throw error;
-  }
+  // Snapshot fallback covers browser-offline, online failures and
+  // slow/unresponsive networks (timeout-raced).
+  const result = await fetchWithOfflineFallback({
+    online: () => fetchFestivalJobDetailsOnline(jobId),
+    offline: () => buildOfflineJobDetails(jobId),
+  });
+  return result.data;
 };
 
 const buildOfflineDocuments = async (jobId: string): Promise<FestivalDocumentsData | null> => {
@@ -325,21 +314,9 @@ const fetchFestivalDocumentsOnline = async (jobId: string): Promise<FestivalDocu
 };
 
 export const fetchFestivalDocuments = async (jobId: string): Promise<FestivalDocumentsData> => {
-  if (!isBrowserOnline()) {
-    const offlineDocuments = await buildOfflineDocuments(jobId);
-    if (offlineDocuments) {
-      return offlineDocuments;
-    }
-  }
-
-  try {
-    return await fetchFestivalDocumentsOnline(jobId);
-  } catch (error) {
-    // Online fetch failed mid-request: serve the snapshot when available.
-    const offlineDocuments = await buildOfflineDocuments(jobId);
-    if (offlineDocuments) {
-      return offlineDocuments;
-    }
-    throw error;
-  }
+  const result = await fetchWithOfflineFallback({
+    online: () => fetchFestivalDocumentsOnline(jobId),
+    offline: () => buildOfflineDocuments(jobId),
+  });
+  return result.data;
 };

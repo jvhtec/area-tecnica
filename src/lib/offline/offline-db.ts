@@ -8,15 +8,18 @@
 
 export const SNAPSHOT_STORE = "festival-snapshots";
 export const QUEUE_STORE = "festival-pending-changes";
+export const FILES_STORE = "festival-files";
 
-export type OfflineStoreName = typeof SNAPSHOT_STORE | typeof QUEUE_STORE;
+export type OfflineStoreName = typeof SNAPSHOT_STORE | typeof QUEUE_STORE | typeof FILES_STORE;
 
 const DB_NAME = "sector-pro-offline";
-const DB_VERSION = 1;
+// v2: adds the festival-files store (binary blobs for riders/stage plots/documents)
+const DB_VERSION = 2;
 
 const STORE_KEY_PATHS: Record<OfflineStoreName, string> = {
   [SNAPSHOT_STORE]: "jobId",
   [QUEUE_STORE]: "id",
+  [FILES_STORE]: "key",
 };
 
 const hasIndexedDb = () => typeof indexedDB !== "undefined";
@@ -26,6 +29,7 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 const memoryStores: Record<OfflineStoreName, Map<string, unknown>> = {
   [SNAPSHOT_STORE]: new Map(),
   [QUEUE_STORE]: new Map(),
+  [FILES_STORE]: new Map(),
 };
 
 const openDb = (): Promise<IDBDatabase> => {
@@ -142,4 +146,5 @@ export const offlineDb = {
 export const __resetOfflineDbForTests = () => {
   memoryStores[SNAPSHOT_STORE].clear();
   memoryStores[QUEUE_STORE].clear();
+  memoryStores[FILES_STORE].clear();
 };

@@ -12,6 +12,7 @@ import type {
 } from "@/features/festival-management/types";
 import { supabase } from "@/integrations/supabase/client";
 import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
+import { getOfflineFileBlob } from "@/lib/offline";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
@@ -23,6 +24,11 @@ import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
   const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
+
+  // Cached copy first so documents open offline (and instantly when cached)
+  const cachedBlob = await getOfflineFileBlob(bucket, path);
+  if (cachedBlob) return URL.createObjectURL(cachedBlob);
+
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
 
   if (error) throw error;
@@ -31,6 +37,10 @@ export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
 
 export const downloadJobDocumentBlob = async (docEntry: JobDocumentEntry) => {
   const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
+
+  const cachedBlob = await getOfflineFileBlob(bucket, path);
+  if (cachedBlob) return cachedBlob;
+
   const { data, error } = await supabase.storage.from(bucket).download(path);
 
   if (error) throw error;
@@ -38,6 +48,9 @@ export const downloadJobDocumentBlob = async (docEntry: JobDocumentEntry) => {
 };
 
 export const getRiderSignedUrl = async (file: ArtistRiderFile) => {
+  const cachedBlob = await getOfflineFileBlob("festival_artist_files", file.file_path);
+  if (cachedBlob) return URL.createObjectURL(cachedBlob);
+
   const { data, error } = await supabase.storage.from("festival_artist_files").createSignedUrl(file.file_path, 3600);
 
   if (error) throw error;
@@ -45,6 +58,9 @@ export const getRiderSignedUrl = async (file: ArtistRiderFile) => {
 };
 
 export const downloadRiderBlob = async (file: ArtistRiderFile) => {
+  const cachedBlob = await getOfflineFileBlob("festival_artist_files", file.file_path);
+  if (cachedBlob) return cachedBlob;
+
   const { data, error } = await supabase.storage.from("festival_artist_files").download(file.file_path);
 
   if (error) throw error;

@@ -5,7 +5,7 @@ import {
   countPendingChanges,
   deleteFestivalSnapshot,
   discardPendingChanges,
-  downloadFestivalSnapshot,
+  downloadFestivalSnapshotWithFiles,
   getFestivalSnapshot,
   isBrowserOnline,
   subscribeOfflineFestivalChanged,
@@ -87,10 +87,21 @@ export const useOfflineFestival = (jobId?: string) => {
     }
     setIsDownloading(true);
     try {
-      const snapshot = await downloadFestivalSnapshot(jobId);
-      toast.success("Datos offline descargados", {
-        description: `${snapshot.data.artists.length} artistas disponibles sin conexión.`,
-      });
+      const { snapshot, files } = await downloadFestivalSnapshotWithFiles(jobId);
+      const fileSummary =
+        files.total > 0
+          ? ` y ${files.downloaded} de ${files.total} archivos (riders, planos, documentos)`
+          : "";
+      if (files.failed > 0) {
+        toast.warning("Datos offline descargados con avisos", {
+          description: `${snapshot.data.artists.length} artistas${fileSummary}. ${files.failed} archivo${files.failed === 1 ? "" : "s"} no se pudieron descargar.`,
+          duration: 8000,
+        });
+      } else {
+        toast.success("Datos offline descargados", {
+          description: `${snapshot.data.artists.length} artistas${fileSummary} disponibles sin conexión.`,
+        });
+      }
     } catch (error) {
       console.error("Error descargando datos offline:", error);
       toast.error("Error", { description: "No se pudieron descargar los datos para uso offline." });
@@ -175,7 +186,7 @@ export const useOfflineFestival = (jobId?: string) => {
     // download fails the queue stays intact, so the local copy never shows
     // edits that can no longer be synchronized or discarded cleanly.
     try {
-      await downloadFestivalSnapshot(jobId);
+      await downloadFestivalSnapshotWithFiles(jobId);
     } catch (error) {
       console.error("No se pudo restaurar la copia offline antes de descartar cambios:", error);
       toast.error("Error", {
