@@ -22,15 +22,11 @@ const CLIENT_ONLY_FIELDS: Record<OfflineSyncableTable, ReadonlySet<string>> = {
 
 const sanitizePayload = (table: OfflineSyncableTable, payload: Row | null): Row => {
   const excluded = CLIENT_ONLY_FIELDS[table];
-  const clean: Row = {};
-  Object.entries(payload ?? {}).forEach(([key, value]) => {
-    if (!excluded.has(key)) {
-      clean[key] = value;
-    }
-  });
+  const clean = Object.fromEntries(
+    Object.entries(payload ?? {}).filter(([key]) => key !== "updated_at" && !excluded.has(key)),
+  );
   // updated_at is maintained by the server; sending the stale local value
   // would defeat conflict detection for later syncs.
-  delete clean.updated_at;
   return clean;
 };
 

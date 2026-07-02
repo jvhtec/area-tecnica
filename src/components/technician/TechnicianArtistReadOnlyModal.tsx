@@ -232,13 +232,10 @@ export function TechnicianArtistReadOnlyModal({
     enabled: !!job?.id,
   });
 
-  const stageNames = useMemo(() => {
-    const names: Record<number, string> = {};
-    festivalStages.forEach((stage) => {
-      names[stage.number] = stage.name;
-    });
-    return names;
-  }, [festivalStages]);
+  const stageNames = useMemo(
+    () => Object.fromEntries(festivalStages.map((stage) => [stage.number, stage.name])) as Record<number, string>,
+    [festivalStages],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -253,22 +250,21 @@ export function TechnicianArtistReadOnlyModal({
         return;
       }
 
-      const nextUrls: Record<string, string> = {};
-      await Promise.all(
-        artistsWithPlot.map(async (artist) => {
-          if (!artist.stage_plot_file_path) return;
+      const signedUrlEntries = await Promise.all(
+        artistsWithPlot.map(async (artist): Promise<[string, string] | null> => {
+          if (!artist.stage_plot_file_path) return null;
           const { data, error } = await dataLayerClient.storage
             .from("festival_artist_files")
             .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
 
-          if (!error && data?.signedUrl) {
-            nextUrls[artist.id] = data.signedUrl;
-          }
+          return !error && data?.signedUrl ? [artist.id, data.signedUrl] : null;
         })
       );
 
       if (!cancelled) {
-        setStagePlotUrls(nextUrls);
+        setStagePlotUrls(
+          Object.fromEntries(signedUrlEntries.filter((entry): entry is [string, string] => entry !== null)),
+        );
       }
     };
 
@@ -278,7 +274,6 @@ export function TechnicianArtistReadOnlyModal({
       cancelled = true;
     };
   }, [artists]);
-
 
   useEffect(() => {
     let cancelled = false;
@@ -292,18 +287,19 @@ export function TechnicianArtistReadOnlyModal({
     };
 
     const groupRiderFiles = (files: RiderFileRow[]) => {
-      const grouped: Record<string, MobileArtistRiderFile[]> = {};
+      const grouped = new Map<string, MobileArtistRiderFile[]>();
       files.forEach((file) => {
         if (!file.artist_id) return;
-        if (!grouped[file.artist_id]) grouped[file.artist_id] = [];
-        grouped[file.artist_id].push({
+        const artistFiles = grouped.get(file.artist_id) ?? [];
+        artistFiles.push({
           id: file.id,
           file_name: file.file_name,
           file_path: file.file_path,
           uploaded_at: file.uploaded_at,
         });
+        grouped.set(file.artist_id, artistFiles);
       });
-      return grouped;
+      return Object.fromEntries(grouped);
     };
 
     const loadOfflineRiderFiles = async (): Promise<Record<string, MobileArtistRiderFile[]> | null> => {
