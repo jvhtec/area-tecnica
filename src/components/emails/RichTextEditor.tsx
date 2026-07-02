@@ -1,6 +1,6 @@
-import { useEffect, useRef, useMemo } from "react";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import { useEffect, useRef } from "react";
+import Quill from "quill";
+import "quill/dist/quill.snow.css";
 import "./RichTextEditor.css";
 
 interface RichTextEditorProps {
@@ -10,69 +10,167 @@ interface RichTextEditorProps {
   minHeight?: string;
 }
 
+const EMPTY_EDITOR_HTML = "<p><br></p>";
+
+const EDITOR_MODULES = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    [{ size: ["small", false, "large", "huge"] }],
+    ["bold", "italic", "underline", "strike"],
+    [{ color: [] as string[] }, { background: [] as string[] }],
+    [{ list: "ordered" }, { list: "bullet" }],
+    [{ align: [] as string[] }],
+    ["link"],
+    ["clean"],
+  ],
+};
+
+const EDITOR_FORMATS = [
+  "header",
+  "size",
+  "bold",
+  "italic",
+  "underline",
+  "strike",
+  "color",
+  "background",
+  "list",
+  "bullet",
+  "align",
+  "link",
+];
+
+function normalizeQuillListHtml(html: string): string {
+  if (!html.includes("data-list") && !html.includes("ql-ui")) {
+    return html;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  template.content.querySelectorAll(".ql-ui").forEach((node) => node.remove());
+
+  template.content.querySelectorAll("ol").forEach((list) => {
+    const childNodes = Array.from(list.childNodes);
+    const hasQuillListItems = childNodes.some((node) => {
+      return node.nodeType === 1
+        && (node as Element).tagName === "LI"
+        && (node as Element).hasAttribute("data-list");
+    });
+
+    if (!hasQuillListItems) {
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    let currentList: HTMLOListElement | HTMLUListElement | null = null;
+    let currentListTagName: "ol" | "ul" | null = null;
+
+    childNodes.forEach((node) => {
+      if (node.nodeType === 3 && !node.textContent?.trim()) {
+        return;
+      }
+
+      if (node.nodeType !== 1 || (node as Element).tagName !== "LI") {
+        currentList = null;
+        currentListTagName = null;
+        fragment.appendChild(node);
+        return;
+      }
+
+      const item = node as HTMLLIElement;
+      const listTagName = item.getAttribute("data-list") === "bullet" ? "ul" : "ol";
+      item.removeAttribute("data-list");
+
+      if (!currentList || currentListTagName !== listTagName) {
+        currentList = document.createElement(listTagName);
+        currentListTagName = listTagName;
+        fragment.appendChild(currentList);
+      }
+
+      currentList.appendChild(item);
+    });
+
+    list.replaceWith(fragment);
+  });
+
+  return template.innerHTML;
+}
+
+function normalizeEditorHtml(html: string): string {
+  return html === EMPTY_EDITOR_HTML ? "" : normalizeQuillListHtml(html);
+}
+
 export function RichTextEditor({
   value,
   onChange,
   placeholder = "Escribe tu mensaje aquí...",
   minHeight = "250px",
 }: RichTextEditorProps) {
-  const quillRef = useRef<ReactQuill>(null);
-
-  // Configure the toolbar with essential formatting options
-  const modules = useMemo(
-    () => ({
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        [{ size: ["small", false, "large", "huge"] }],
-        ["bold", "italic", "underline", "strike"],
-        [{ color: [] as string[] }, { background: [] as string[] }],
-        [{ list: "ordered" }, { list: "bullet" }],
-        [{ align: [] as string[] }],
-        ["link"],
-        ["clean"],
-      ],
-      clipboard: {
-        matchVisual: false,
-      },
-    }),
-    []
-  );
-
-  const formats = [
-    "header",
-    "size",
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "color",
-    "background",
-    "list",
-    "bullet",
-    "align",
-    "link",
-  ];
-
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const quillRef = useRef<Quill | null>(null);
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
 
   useEffect(() => {
-    // Set CSS custom properties for dynamic styling
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
     if (wrapperRef.current) {
-      wrapperRef.current.style.setProperty('--editor-min-height', minHeight);
+      wrapperRef.current.style.setProperty("--editor-min-height", minHeight);
     }
   }, [minHeight]);
 
+  useEffect(() => {
+    if (!wrapperRef.current || !editorRef.current || quillRef.current) return;
+
+    const wrapperElement = wrapperRef.current;
+    const editorElement = editorRef.current;
+    const quill = new Quill(editorElement, {
+      theme: "snow",
+      modules: EDITOR_MODULES,
+      formats: EDITOR_FORMATS,
+      placeholder,
+    });
+
+    quillRef.current = quill;
+    if (valueRef.current) {
+      quill.clipboard.dangerouslyPasteHTML(valueRef.current, "silent");
+    }
+
+    const handleTextChange = () => {
+      const nextValue = normalizeEditorHtml(quill.root.innerHTML);
+      valueRef.current = nextValue;
+      onChangeRef.current(nextValue);
+    };
+
+    quill.on("text-change", handleTextChange);
+
+    return () => {
+      quill.off("text-change", handleTextChange);
+      quillRef.current = null;
+      Array.from(wrapperElement.children).forEach((child) => {
+        if (child !== editorElement && child.classList.contains("ql-toolbar")) {
+          child.remove();
+        }
+      });
+      editorElement.className = "rich-text-editor";
+      editorElement.replaceChildren();
+    };
+  }, [placeholder]);
+
+  useEffect(() => {
+    const quill = quillRef.current;
+    if (!quill || value === valueRef.current) return;
+
+    valueRef.current = value;
+    quill.clipboard.dangerouslyPasteHTML(value || "", "silent");
+  }, [value]);
+
   return (
     <div className="rich-text-editor-wrapper" ref={wrapperRef}>
-      <ReactQuill
-        ref={quillRef}
-        theme="snow"
-        value={value}
-        onChange={onChange}
-        modules={modules}
-        formats={formats}
-        placeholder={placeholder}
-      />
+      <div ref={editorRef} className="rich-text-editor" />
     </div>
   );
 }
