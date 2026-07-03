@@ -30,6 +30,7 @@ import { useFestivalArtistJobDetails } from "@/hooks/festival/useFestivalArtistJ
 import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
 import { FestivalOfflineBanner } from "@/components/festival/FestivalOfflineBanner";
 import { ArtistPageActions } from "@/components/festival/ArtistPageActions";
+import { FestivalPushFeedButton } from "@/components/festival/FestivalPushFeedButton";
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
@@ -40,11 +41,13 @@ const FestivalArtistManagement = () => {
   const { userRole } = useOptimizedAuth();
   const artistActionPermissions = { canDelete: canDeleteFestivalArtists(userRole), canCreateExtras: canCreateFestivalArtistExtras(userRole) };
   const routeDate = searchParams.get("date") || "";
+  const routeStage = searchParams.get("stage") || "all";
+  const normalizedRouteStage = routeStage && routeStage !== "all" ? routeStage : "all";
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [stageFilter, setStageFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState(normalizedRouteStage);
   const [riderFilter, setRiderFilter] = useState("all");
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -226,6 +229,26 @@ const FestivalArtistManagement = () => {
       return nextParams;
     }, { replace: true });
   }, [selectedDate, setSearchParams]);
+
+  useEffect(() => {
+    setStageFilter((current) => (current === normalizedRouteStage ? current : normalizedRouteStage));
+  }, [normalizedRouteStage]);
+
+  useEffect(() => {
+    setSearchParams((previousParams) => {
+      const currentStage = previousParams.get("stage") || "all";
+      if (currentStage === stageFilter || (!previousParams.has("stage") && stageFilter === "all")) {
+        return previousParams;
+      }
+      const nextParams = new URLSearchParams(previousParams);
+      if (stageFilter === "all") {
+        nextParams.delete("stage");
+      } else {
+        nextParams.set("stage", stageFilter);
+      }
+      return nextParams;
+    }, { replace: true });
+  }, [stageFilter, setSearchParams]);
 
   const { data: logoData } = useQuery({
     queryKey: queryKeys.scope('festival-logo', jobId),
@@ -603,6 +626,7 @@ const FestivalArtistManagement = () => {
           <h1 className="text-xl md:text-2xl font-bold truncate">{jobTitle}</h1>
           <div className="flex items-center gap-2">
             <FestivalOfflineControls jobId={jobId} canEdit={canEditJobs(userRole)} />
+            <FestivalPushFeedButton jobId={jobId} />
             <ConnectionIndicator />
           </div>
         </div>

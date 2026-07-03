@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -33,6 +33,9 @@ type TechnicianArtistReadOnlyModalProps = {
     title?: string;
   };
   onClose: () => void;
+  initialDate?: string | null;
+  initialStage?: string | null;
+  headerAction?: ReactNode;
 };
 
 type ReadOnlyArtist = {
@@ -170,9 +173,12 @@ export function TechnicianArtistReadOnlyModal({
   isDark,
   job,
   onClose,
+  initialDate,
+  initialStage,
+  headerAction,
 }: TechnicianArtistReadOnlyModalProps) {
-  const [selectedStage, setSelectedStage] = useState<string>("all");
-  const [selectedDay, setSelectedDay] = useState<string>("all");
+  const [selectedStage, setSelectedStage] = useState<string>(initialStage || "all");
+  const [selectedDay, setSelectedDay] = useState<string>(initialDate || "all");
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [stagePlotUrls, setStagePlotUrls] = useState<Record<string, string>>({});
   const [riderFilesByArtistId, setRiderFilesByArtistId] = useState<Record<string, MobileArtistRiderFile[]>>({});
@@ -244,6 +250,14 @@ export function TechnicianArtistReadOnlyModal({
     () => Object.fromEntries(festivalStages.map((stage) => [stage.number, stage.name])) as Record<number, string>,
     [festivalStages],
   );
+
+  useEffect(() => {
+    if (initialStage) setSelectedStage(initialStage);
+  }, [initialStage]);
+
+  useEffect(() => {
+    if (initialDate) setSelectedDay(initialDate);
+  }, [initialDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -416,6 +430,14 @@ export function TechnicianArtistReadOnlyModal({
     }));
   }, [artists, stageNames]);
 
+  useEffect(() => {
+    if (artistsLoading) return;
+    if (selectedStage === "all") return;
+    if (!stageOptions.some((option) => option.value === selectedStage)) {
+      setSelectedStage("all");
+    }
+  }, [artistsLoading, selectedStage, stageOptions]);
+
   const stageFilteredArtists = useMemo(() => {
     if (selectedStage === "all") return artists;
     return artists.filter((artist) => String(artist.stage) === selectedStage);
@@ -434,11 +456,12 @@ export function TechnicianArtistReadOnlyModal({
   }, [stageFilteredArtists]);
 
   useEffect(() => {
+    if (artistsLoading) return;
     if (selectedDay === "all") return;
     if (!dayOptions.some((option) => option.value === selectedDay)) {
       setSelectedDay("all");
     }
-  }, [dayOptions, selectedDay]);
+  }, [artistsLoading, dayOptions, selectedDay]);
 
   const filteredArtists = useMemo(() => {
     if (selectedDay === "all") return stageFilteredArtists;
@@ -487,6 +510,7 @@ export function TechnicianArtistReadOnlyModal({
             </h2>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {headerAction}
             <FestivalOfflineControls jobId={job?.id} canEdit={canEditJobs(userRole)} />
             <button
               onClick={onClose}

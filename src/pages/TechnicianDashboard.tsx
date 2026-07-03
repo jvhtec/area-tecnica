@@ -31,6 +31,7 @@ import { SoundVisionModal } from '@/components/technician/SoundVisionModal';
 import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates';
 import { TechnicianArtistReadOnlyModal } from '@/components/technician/TechnicianArtistReadOnlyModal';
 import { TechnicianRfTableModal } from '@/components/technician/TechnicianRfTableModal';
+import { FestivalPushFeedButton } from '@/components/festival/FestivalPushFeedButton';
 
 // Type definitions
 interface TechnicianJobData {
@@ -397,6 +398,13 @@ const TechnicianDashboard = () => {
           isDark={isDark}
           job={selectedJob}
           onClose={() => setActiveModal(null)}
+          headerAction={
+            <FestivalPushFeedButton
+              jobId={selectedJob.id}
+              compact
+              onActivatePushClick={() => setTab('profile')}
+            />
+          }
         />
       )}
       {activeModal === 'rf-table' && selectedJob && (

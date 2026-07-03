@@ -102,11 +102,27 @@ vi.mock("@/components/technician/DetailsModal", () => ({
 }));
 
 vi.mock("@/components/technician/TechnicianArtistReadOnlyModal", () => ({
-  TechnicianArtistReadOnlyModal: (): null => null,
+  TechnicianArtistReadOnlyModal: ({
+    job,
+    initialDate,
+    initialStage,
+  }: {
+    job: { id: string; title?: string };
+    initialDate?: string;
+    initialStage?: string;
+  }) => (
+    <div data-testid="artist-modal">
+      Artistas {job.id} {initialDate} {initialStage}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/technician/TechnicianRfTableModal", () => ({
   TechnicianRfTableModal: (): null => null,
+}));
+
+vi.mock("@/components/festival/FestivalPushFeedButton", () => ({
+  FestivalPushFeedButton: (): null => null,
 }));
 
 vi.mock("@/components/incident-reports/TechnicianIncidentReportDialog", () => ({
@@ -274,5 +290,46 @@ describe("TechnicianSuperApp", () => {
     expect(setThemeMock).toHaveBeenCalledWith("dark");
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("dark");
     expect(window.localStorage.getItem("theme-preference")).toBe("dark");
+  });
+
+  it("opens technician artist deep links with date and stage filters", async () => {
+    const profileBuilder = createMockQueryBuilder({
+      data: createTechnicianProfile({ id: "technician-user", role: "technician", department: "sound" }),
+      error: null,
+    });
+    const assignmentBuilder = createMockQueryBuilder({
+      data: [],
+      error: null,
+    });
+    const shiftsBuilder = createMockQueryBuilder({
+      data: [{ id: "festival-shift-1" }],
+      error: null,
+    });
+    const shiftAssignmentsBuilder = createMockQueryBuilder({
+      data: [{ shift_id: "festival-shift-1" }],
+      error: null,
+    });
+    const jobBuilder = createMockQueryBuilder({
+      data: createJob({ id: "festival-job-1", title: "Festival Uno", job_type: "festival" }),
+      error: null,
+    });
+
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "profiles") return profileBuilder;
+      if (table === "job_assignments") return assignmentBuilder;
+      if (table === "festival_shifts") return shiftsBuilder;
+      if (table === "festival_shift_assignments") return shiftAssignmentsBuilder;
+      if (table === "jobs") return jobBuilder;
+      return createMockQueryBuilder();
+    });
+
+    renderWithProviders(<TechnicianSuperApp />, {
+      route: "/tech-app?open=artists&jobId=festival-job-1&date=2026-07-03&stage=2",
+    });
+
+    expect(await screen.findByTestId("artist-modal"))
+      .toHaveTextContent("Artistas festival-job-1 2026-07-03 2");
+    expect(shiftsBuilder.eq).toHaveBeenCalledWith("job_id", "festival-job-1");
+    expect(shiftAssignmentsBuilder.eq).toHaveBeenCalledWith("technician_id", "technician-user");
   });
 });

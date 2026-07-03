@@ -1872,6 +1872,130 @@ export type Database = {
           },
         ]
       }
+      festival_push_delivery_log: {
+        Row: {
+          created_at: string
+          due_at: string
+          event_key: string
+          event_kind: string
+          id: string
+          job_id: string
+          payload: Json
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_at: string
+          event_key: string
+          event_kind: string
+          id?: string
+          job_id: string
+          payload?: Json
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string
+          event_key?: string
+          event_kind?: string
+          id?: string
+          job_id?: string
+          payload?: Json
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_push_delivery_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_delivery_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "festival_push_delivery_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_delivery_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      festival_push_subscriptions: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          job_id: string
+          stages: number[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          job_id: string
+          stages?: number[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          job_id?: string
+          stages?: number[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_push_subscriptions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_subscriptions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "festival_push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       festival_gear_setups: {
         Row: {
           available_analog_runs: number | null
