@@ -26,6 +26,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
+import { getOfflineFileBlob, isBrowserOnline } from "@/lib/offline";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
@@ -288,6 +289,7 @@ export const ArtistTable = ({
 
   useEffect(() => {
     let isCancelled = false;
+    const objectUrls: string[] = [];
 
     const loadStagePlotUrls = async () => {
       const artistsWithPlot = artists.filter((artist) => Boolean(artist.stage_plot_file_path));
@@ -304,6 +306,21 @@ export const ArtistTable = ({
       await Promise.all(
         artistsWithPlot.map(async (artist) => {
           if (!artist.stage_plot_file_path) return;
+
+          // Cached blob first: renders offline and skips the signed-URL
+          // round-trip when the festival was downloaded.
+          const cachedBlob = await getOfflineFileBlob("festival_artist_files", artist.stage_plot_file_path);
+          // Cleanup may have already revoked the tracked URLs; creating one
+          // now would leak it
+          if (isCancelled) return;
+          if (cachedBlob) {
+            const objectUrl = URL.createObjectURL(cachedBlob);
+            objectUrls.push(objectUrl);
+            nextUrls[artist.id] = objectUrl;
+            return;
+          }
+
+          if (!isBrowserOnline()) return;
           const { data, error } = await dataLayerClient.storage
             .from("festival_artist_files")
             .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
@@ -323,6 +340,7 @@ export const ArtistTable = ({
 
     return () => {
       isCancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [artists]);
 
@@ -1071,11 +1089,12 @@ export const ArtistTable = ({
         </div>
       </TooltipProvider>
 
+      {/* No `capture` attribute: mobile browsers then offer the chooser
+          (camera roll / take photo / files) instead of forcing the camera */}
       <input
         ref={stagePlotInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={handleStagePlotUpload}
       />

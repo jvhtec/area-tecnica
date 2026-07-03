@@ -1,5 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
+import { resolveJobDocLocation } from "@/utils/jobDocuments";
 
+import {
+  deleteOfflineFilesForJob,
+  downloadFestivalFiles,
+  type OfflineFileDownloadStats,
+  type OfflineFileRef,
+} from "./festival-files";
 import { offlineDb, QUEUE_STORE, SNAPSHOT_STORE } from "./offline-db";
 import { notifyOfflineFestivalChanged } from "./offline-events";
 import {
@@ -59,11 +66,60 @@ const fetchMaybeSingle = async (table: string, filterColumn: string, filterValue
   return (data as Row | null) ?? null;
 };
 
+export interface FestivalSnapshotDownloadResult {
+  snapshot: OfflineFestivalSnapshot;
+  files: OfflineFileDownloadStats;
+}
+
+const collectSnapshotFileRefs = (data: OfflineFestivalSnapshotData): OfflineFileRef[] => {
+  const refs: OfflineFileRef[] = [];
+
+  data.artistFiles.forEach((file) => {
+    if (typeof file.file_path === "string" && file.file_path) {
+      refs.push({
+        bucket: "festival_artist_files",
+        path: file.file_path,
+        fileName: (file.file_name as string) || "rider",
+      });
+    }
+  });
+
+  data.artists.forEach((artist) => {
+    if (typeof artist.stage_plot_file_path === "string" && artist.stage_plot_file_path) {
+      refs.push({
+        bucket: "festival_artist_files",
+        path: artist.stage_plot_file_path,
+        fileName: (artist.stage_plot_file_name as string) || "stage-plot",
+      });
+    }
+  });
+
+  data.jobDocuments.forEach((doc) => {
+    if (typeof doc.file_path === "string" && doc.file_path) {
+      const { bucket, path } = resolveJobDocLocation(doc.file_path);
+      refs.push({ bucket, path, fileName: (doc.file_name as string) || "documento" });
+    }
+  });
+
+  return refs;
+};
+
 /**
  * Downloads the full dataset of a festival (job, settings, dates, stages,
- * gear, artists, riders metadata, shifts, documents) and persists it to
+ * gear, artists, riders, stage plots, shifts, documents) and persists it to
  * IndexedDB so the festival can be consulted and edited without connection.
+ * Binary files download after the metadata; per-file failures are reported
+ * in the result but never abort the snapshot.
  */
+export const downloadFestivalSnapshotWithFiles = async (
+  jobId: string,
+): Promise<FestivalSnapshotDownloadResult> => {
+  const snapshot = await downloadFestivalSnapshot(jobId);
+  const files = await downloadFestivalFiles(jobId, collectSnapshotFileRefs(snapshot.data));
+  notifyOfflineFestivalChanged(jobId);
+  return { snapshot, files };
+};
+
 export const downloadFestivalSnapshot = async (jobId: string): Promise<OfflineFestivalSnapshot> => {
   const { data: job, error: jobError } = await supabase.from("jobs").select("*").eq("id", jobId).single();
   if (jobError) throw jobError;
@@ -148,11 +204,12 @@ export const saveFestivalSnapshot = async (snapshot: OfflineFestivalSnapshot): P
   notifyOfflineFestivalChanged(snapshot.jobId);
 };
 
-/** Removes the offline copy and any pending changes queued against it. */
+/** Removes the offline copy, its cached files and any pending changes. */
 export const deleteFestivalSnapshot = async (jobId: string): Promise<void> => {
   await offlineDb.remove(SNAPSHOT_STORE, jobId);
   const pending = await offlineDb.getAll<OfflinePendingChange>(QUEUE_STORE);
   await Promise.all(pending.filter((change) => change.jobId === jobId).map((change) => offlineDb.remove(QUEUE_STORE, change.id)));
+  await deleteOfflineFilesForJob(jobId);
   notifyOfflineFestivalChanged(jobId);
 };
 

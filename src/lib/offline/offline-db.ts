@@ -8,15 +8,24 @@
 
 export const SNAPSHOT_STORE = "festival-snapshots";
 export const QUEUE_STORE = "festival-pending-changes";
+export const FILES_STORE = "festival-files";
 
-export type OfflineStoreName = typeof SNAPSHOT_STORE | typeof QUEUE_STORE;
+export type OfflineStoreName = typeof SNAPSHOT_STORE | typeof QUEUE_STORE | typeof FILES_STORE;
 
 const DB_NAME = "sector-pro-offline";
-const DB_VERSION = 1;
+// v2: adds the festival-files store (binary blobs for riders/stage plots/documents)
+// v3: adds the jobId index on festival-files so per-festival deletes/prunes
+//     don't materialize every cached blob
+const DB_VERSION = 3;
 
 const STORE_KEY_PATHS: Record<OfflineStoreName, string> = {
   [SNAPSHOT_STORE]: "jobId",
   [QUEUE_STORE]: "id",
+  [FILES_STORE]: "key",
+};
+
+const STORE_INDEXES: Partial<Record<OfflineStoreName, string[]>> = {
+  [FILES_STORE]: ["jobId"],
 };
 
 const hasIndexedDb = () => typeof indexedDB !== "undefined";
@@ -26,6 +35,7 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 const memoryStores: Record<OfflineStoreName, Map<string, unknown>> = {
   [SNAPSHOT_STORE]: new Map(),
   [QUEUE_STORE]: new Map(),
+  [FILES_STORE]: new Map(),
 };
 
 const openDb = (): Promise<IDBDatabase> => {
@@ -35,10 +45,17 @@ const openDb = (): Promise<IDBDatabase> => {
 
       request.onupgradeneeded = () => {
         const db = request.result;
+        const upgradeTransaction = request.transaction;
         (Object.keys(STORE_KEY_PATHS) as OfflineStoreName[]).forEach((store) => {
-          if (!db.objectStoreNames.contains(store)) {
-            db.createObjectStore(store, { keyPath: STORE_KEY_PATHS[store] });
-          }
+          const objectStore = db.objectStoreNames.contains(store)
+            ? upgradeTransaction?.objectStore(store)
+            : db.createObjectStore(store, { keyPath: STORE_KEY_PATHS[store] });
+          if (!objectStore) return;
+          (STORE_INDEXES[store] ?? []).forEach((indexName) => {
+            if (!objectStore.indexNames.contains(indexName)) {
+              objectStore.createIndex(indexName, indexName);
+            }
+          });
         });
       };
 
@@ -121,6 +138,22 @@ export const offlineDb = {
     return runTransaction<T[]>(store, "readonly", (os) => os.getAll() as IDBRequest<T[]>);
   },
 
+  /**
+   * Primary keys of records whose indexed field equals `value`. Reads only
+   * the index, so record payloads (e.g. cached blobs) are never loaded.
+   */
+  async getKeysByIndex(store: OfflineStoreName, indexName: string, value: string): Promise<string[]> {
+    if (!hasIndexedDb()) {
+      return Array.from(memoryStores[store].entries())
+        .filter(([, record]) => (record as Record<string, unknown>)[indexName] === value)
+        .map(([key]) => key);
+    }
+    const keys = await runTransaction<IDBValidKey[]>(store, "readonly", (os) =>
+      os.index(indexName).getAllKeys(IDBKeyRange.only(value)),
+    );
+    return keys.map((key) => String(key));
+  },
+
   async put(store: OfflineStoreName, value: unknown): Promise<void> {
     if (!hasIndexedDb()) {
       memoryStores[store].set(getRecordKey(store, value), cloneValue(value));
@@ -142,4 +175,5 @@ export const offlineDb = {
 export const __resetOfflineDbForTests = () => {
   memoryStores[SNAPSHOT_STORE].clear();
   memoryStores[QUEUE_STORE].clear();
+  memoryStores[FILES_STORE].clear();
 };

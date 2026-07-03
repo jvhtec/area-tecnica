@@ -16,11 +16,19 @@ Desde la cabecera de **Gestión de Festival** o de **Gestión de Artistas**, el 
 
 Las consultas se paginan (1000 filas por página), por lo que festivales grandes se capturan completos.
 
+Tras los metadatos se descargan también los **archivos binarios**: riders (PDF), stage plots y documentos del trabajo. Se guardan como blobs en IndexedDB (`festival-files`) y los fallos individuales no abortan la descarga (se reportan en el toast).
+
 > El app shell y los chunks JS ya se cachean vía service worker (`public/sw.js`); la instantánea cubre la capa de datos.
 
 ### Lectura offline
 
-Cuando `navigator.onLine` es `false` (o la petición de red falla), las páginas de gestión de festival y de artistas sirven la instantánea local. Un banner ámbar indica que se está viendo la copia offline. Las queries afectadas usan `networkMode: "always"` para que React Query ejecute el `queryFn` sin conexión.
+Las páginas de gestión de festival, la de artistas y el modal de artistas del tech app sirven la instantánea local cuando:
+
+- el navegador reporta sin conexión (`navigator.onLine === false`),
+- la petición de red falla, o
+- la red tarda más de ~4 s en responder: si hay copia offline se sirve; si no la hay, la lectura sigue esperando a la red (`fetchWithOfflineFallback` — `navigator.onLine` suele reportar `true` en recintos con cobertura inutilizable).
+
+Un banner ámbar indica que se está viendo la copia offline. Las queries afectadas usan `networkMode: "always"` para que React Query ejecute el `queryFn` sin conexión. Los riders, stage plots y documentos se sirven desde los blobs cacheados (también con conexión, para abrirlos al instante).
 
 ### Edición offline (roles con `canEditJobs`)
 
@@ -65,5 +73,5 @@ Con conexión, el menú Offline muestra **Sincronizar cambios** (solo roles de e
 ## Limitaciones actuales
 
 - La edición offline cubre **artistas** (la superficie principal de trabajo en campo). Turnos y setups de equipo se descargan para consulta; su edición offline puede añadirse extendiendo `OfflineSyncableTable` y encolando en sus mutaciones.
-- Los archivos binarios (riders PDF, logos) no se descargan; solo sus metadatos.
+- Los logos del festival no se cachean como blob (solo riders, stage plots y documentos del trabajo).
 - La resolución de conflictos es por registro (último en escribir gana al forzar), no por campo.

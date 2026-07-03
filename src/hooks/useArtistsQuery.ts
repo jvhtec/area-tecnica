@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
+  fetchWithOfflineFallback,
   getFestivalSnapshot,
   getOfflineArtistsForDate,
   isBrowserOnline,
@@ -79,25 +80,13 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
     queryFn: async () => {
       if (!jobId || !selectedDate) return { rows: [], isOffline: false };
 
-      // Offline: serve the downloaded snapshot (with local edits applied)
-      if (!isBrowserOnline()) {
-        const offlineArtists = await getOfflineArtistsForDate(jobId, selectedDate, dayStartTime);
-        if (offlineArtists) {
-          return { rows: offlineArtists, isOffline: true };
-        }
-        throw new Error("Sin conexión y sin copia offline de este festival");
-      }
-
-      try {
-        return { rows: await fetchArtistsOnline(), isOffline: false };
-      } catch (fetchError) {
-        // Network dropped mid-request: fall back to the offline copy if available
-        const offlineArtists = await getOfflineArtistsForDate(jobId, selectedDate, dayStartTime);
-        if (offlineArtists) {
-          return { rows: offlineArtists, isOffline: true };
-        }
-        throw fetchError;
-      }
+      // Serves the snapshot when the browser is offline, the fetch fails, or
+      // the network is too slow to answer (weak festival-site connectivity).
+      const result = await fetchWithOfflineFallback({
+        online: fetchArtistsOnline,
+        offline: () => getOfflineArtistsForDate(jobId, selectedDate, dayStartTime),
+      });
+      return { rows: result.data, isOffline: result.fromOffline };
     },
     enabled: !!jobId && !!selectedDate,
     staleTime: 1000 * 60 * 2, // 2 minutes

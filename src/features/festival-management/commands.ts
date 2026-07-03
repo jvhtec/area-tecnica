@@ -12,6 +12,7 @@ import type {
 } from "@/features/festival-management/types";
 import { supabase } from "@/integrations/supabase/client";
 import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
+import { getOfflineFileBlob } from "@/lib/offline";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
@@ -21,35 +22,50 @@ import { optimizeImageForUpload } from "@/utils/imageOptimization";
 import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
-export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
-  const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
+// Blob object URLs created for offline-cached files stay valid long enough
+// for the viewer tab to load, then get revoked to release the memory.
+const OFFLINE_OBJECT_URL_TTL_MS = 60_000;
+
+// Cached copy first so files open offline (and instantly when cached)
+const getViewableUrl = async (bucket: string, path: string) => {
+  const cachedBlob = await getOfflineFileBlob(bucket, path);
+  if (cachedBlob) {
+    const objectUrl = URL.createObjectURL(cachedBlob);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), OFFLINE_OBJECT_URL_TTL_MS);
+    return objectUrl;
+  }
+
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
 
   if (error) throw error;
   return data?.signedUrl ?? null;
 };
 
-export const downloadJobDocumentBlob = async (docEntry: JobDocumentEntry) => {
-  const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
+const getDownloadableBlob = async (bucket: string, path: string) => {
+  const cachedBlob = await getOfflineFileBlob(bucket, path);
+  if (cachedBlob) return cachedBlob;
+
   const { data, error } = await supabase.storage.from(bucket).download(path);
 
   if (error) throw error;
   return data;
 };
 
-export const getRiderSignedUrl = async (file: ArtistRiderFile) => {
-  const { data, error } = await supabase.storage.from("festival_artist_files").createSignedUrl(file.file_path, 3600);
-
-  if (error) throw error;
-  return data?.signedUrl ?? null;
+export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
+  const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
+  return getViewableUrl(bucket, path);
 };
 
-export const downloadRiderBlob = async (file: ArtistRiderFile) => {
-  const { data, error } = await supabase.storage.from("festival_artist_files").download(file.file_path);
-
-  if (error) throw error;
-  return data;
+export const downloadJobDocumentBlob = async (docEntry: JobDocumentEntry) => {
+  const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
+  return getDownloadableBlob(bucket, path);
 };
+
+export const getRiderSignedUrl = async (file: ArtistRiderFile) =>
+  getViewableUrl("festival_artist_files", file.file_path);
+
+export const downloadRiderBlob = async (file: ArtistRiderFile) =>
+  getDownloadableBlob("festival_artist_files", file.file_path);
 
 export const downloadBlobInBrowser = (blob: Blob, fileName: string) => {
   const url = window.URL.createObjectURL(blob);

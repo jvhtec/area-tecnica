@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { ConnectionIndicator } from "@/components/ui/connection-indicator";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { format, eachDayOfInterval, isValid, addDays, parseISO, setHours, setMinutes } from "date-fns";
+import { format } from "date-fns";
 import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";
 import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +25,8 @@ import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { canCreateFestivalArtistExtras, canDeleteFestivalArtists, canEditJobs } from "@/utils/permissions";
 import { queryKeys } from "@/lib/react-query";
-import { getOfflineFestivalContext, isBrowserOnline } from "@/lib/offline";
+import { fetchWithOfflineFallback, getOfflineFestivalContext } from "@/lib/offline";
+import { useFestivalArtistJobDetails } from "@/hooks/festival/useFestivalArtistJobDetails";
 import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
 import { FestivalOfflineBanner } from "@/components/festival/FestivalOfflineBanner";
 import { ArtistPageActions } from "@/components/festival/ArtistPageActions";
@@ -42,9 +43,6 @@ const FestivalArtistManagement = () => {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
-  const [jobTitle, setJobTitle] = useState("");
-  const [jobDates, setJobDates] = useState<Date[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [riderFilter, setRiderFilter] = useState("all");
@@ -55,10 +53,12 @@ const FestivalArtistManagement = () => {
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const [logoUrl, setLogoUrl] = useState("");
-  const [maxStages, setMaxStages] = useState(3);
   const [stageNames, setStageNames] = useState<Record<number, string>>({});
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isFullSchedulePrinting, setIsFullSchedulePrinting] = useState(false);
+
+  const { jobTitle, jobDates, selectedDate, setSelectedDate, maxStages } =
+    useFestivalArtistJobDetails(jobId, routeDate);
 
   const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(jobId, selectedDate, dayStartTime);
   const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
@@ -69,33 +69,50 @@ const FestivalArtistManagement = () => {
     networkMode: "always",
     queryFn: async () => {
       if (!jobId) return null;
-      if (!isBrowserOnline()) {
-        const offlineContext = await getOfflineFestivalContext(jobId);
-        return offlineContext?.festivalSettings ?? null;
-      }
-      const {
-        data: existingSettings,
-        error: fetchError
-      } = await supabase.from('festival_settings').select('*').eq('job_id', jobId).maybeSingle();
-      if (fetchError) {
-        console.error('Error fetching festival settings:', fetchError);
+
+      // Read-only inside the fallback race: a timed-out online promise is
+      // abandoned, so it must never write. Throws on Supabase errors so
+      // fetchWithOfflineFallback can serve the snapshot.
+      const fetchSettingsOnline = async () => {
+        const {
+          data: existingSettings,
+          error: fetchError
+        } = await supabase.from('festival_settings').select('*').eq('job_id', jobId).maybeSingle();
+        if (fetchError) throw fetchError;
+        return { settings: existingSettings ?? null };
+      };
+
+      try {
+        const result = await fetchWithOfflineFallback({
+          online: fetchSettingsOnline,
+          offline: async () => {
+            const offlineContext = await getOfflineFestivalContext(jobId);
+            return offlineContext ? { settings: offlineContext.festivalSettings } : null;
+          },
+        });
+        if (result.fromOffline || result.data.settings) {
+          return result.data.settings;
+        }
+
+        // Row confirmed missing by a live online read: create the defaults
+        // here, outside the race, where the write is awaited (never abandoned)
+        const {
+          data: newSettings,
+          error: createError
+        } = await supabase.from('festival_settings').insert({
+          job_id: jobId,
+          day_start_time: "07:00"
+        }).select().single();
+        if (createError) {
+          console.error('Error creating festival settings:', createError);
+          return null;
+        }
+        return newSettings;
+      } catch (error) {
+        // No snapshot to fall back to: keep the previous default behaviour
+        console.error('Error fetching festival settings:', error);
         return null;
       }
-      if (existingSettings) {
-        return existingSettings;
-      }
-      const {
-        data: newSettings,
-        error: createError
-      } = await supabase.from('festival_settings').insert({
-        job_id: jobId,
-        day_start_time: "07:00"
-      }).select().single();
-      if (createError) {
-        console.error('Error creating festival settings:', createError);
-        return null;
-      }
-      return newSettings;
     },
     enabled: !!jobId
   });
@@ -112,23 +129,35 @@ const FestivalArtistManagement = () => {
     networkMode: "always",
     queryFn: async () => {
       if (!jobId) return {};
-      if (!isBrowserOnline()) {
-        const offlineContext = await getOfflineFestivalContext(jobId);
-        return offlineContext?.dateTypes ?? {};
-      }
-      const {
-        data,
-        error
-      } = await supabase.from('job_date_types').select('*').eq('job_id', jobId);
-      if (error) {
+
+      // Throws on error so the snapshot fallback kicks in — an empty map
+      // would silently mark every festival date as a show day.
+      const fetchDateTypesOnline = async () => {
+        const {
+          data,
+          error
+        } = await supabase.from('job_date_types').select('*').eq('job_id', jobId);
+        if (error) throw error;
+        const dateTypeMap: Record<string, string> = {};
+        data.forEach(item => {
+          dateTypeMap[`${jobId}-${item.date}`] = item.type;
+        });
+        return dateTypeMap;
+      };
+
+      try {
+        const result = await fetchWithOfflineFallback({
+          online: fetchDateTypesOnline,
+          offline: async () => (await getOfflineFestivalContext(jobId))?.dateTypes ?? null,
+        });
+        return result.data;
+      } catch (error) {
+        // Return null (not {}) so previously loaded date types are kept:
+        // the state effect skips null, while an empty map would silently
+        // mark every festival date as a show day.
         console.error('Error fetching date types:', error);
-        return {};
+        return null;
       }
-      const dateTypeMap: Record<string, string> = {};
-      data.forEach(item => {
-        dateTypeMap[`${jobId}-${item.date}`] = item.type;
-      });
-      return dateTypeMap;
     },
     enabled: !!jobId
   });
@@ -143,26 +172,33 @@ const FestivalArtistManagement = () => {
     networkMode: "always",
     queryFn: async () => {
       if (!jobId) return {};
-      if (!isBrowserOnline()) {
-        const offlineContext = await getOfflineFestivalContext(jobId);
-        return offlineContext?.stageNames ?? {};
-      }
 
-      const { data: stages, error } = await supabase
-        .from('festival_stages')
-        .select('number, name')
-        .eq('job_id', jobId);
-        
-      if (error) {
+      // Throws on error so the snapshot fallback kicks in
+      const fetchStageNamesOnline = async () => {
+        const { data: stages, error } = await supabase
+          .from('festival_stages')
+          .select('number, name')
+          .eq('job_id', jobId);
+
+        if (error) throw error;
+
+        const stageMap: Record<number, string> = {};
+        stages?.forEach(stage => {
+          stageMap[stage.number] = stage.name;
+        });
+        return stageMap;
+      };
+
+      try {
+        const result = await fetchWithOfflineFallback({
+          online: fetchStageNamesOnline,
+          offline: async () => (await getOfflineFestivalContext(jobId))?.stageNames ?? null,
+        });
+        return result.data;
+      } catch (error) {
         console.error('Error fetching stage names:', error);
         return {};
       }
-      
-      const stageMap: Record<number, string> = {};
-      stages?.forEach(stage => {
-        stageMap[stage.number] = stage.name;
-      });
-      return stageMap;
     },
     enabled: !!jobId
   });
@@ -178,65 +214,6 @@ const FestivalArtistManagement = () => {
     filter: `job_id=eq.${jobId}`,
     queryKey: queryKeys.scope("festival-artists", jobId, selectedDate)
   });
-
-  useEffect(() => {
-    const applyJobDateRange = (startTime: string, endTime: string) => {
-      const startDate = new Date(startTime);
-      const endDate = new Date(endTime);
-      if (!isValid(startDate) || !isValid(endDate)) return;
-      const dates = eachDayOfInterval({ start: startDate, end: endDate });
-      setJobDates(dates);
-      const routeDateExists = routeDate
-        ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
-        : false;
-      setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
-    };
-
-    const applyOfflineJobDetails = async () => {
-      if (!jobId) return false;
-      const offlineContext = await getOfflineFestivalContext(jobId);
-      const offlineJob = offlineContext?.job;
-      if (!offlineJob) return false;
-
-      setJobTitle((offlineJob.title as string) || "");
-      applyJobDateRange(offlineJob.start_time as string, offlineJob.end_time as string);
-      setMaxStages(offlineContext.maxStages || 3);
-      return true;
-    };
-
-    const fetchJobDetails = async () => {
-      if (!jobId) return;
-      if (!isBrowserOnline()) {
-        const applied = await applyOfflineJobDetails();
-        if (applied) return;
-      }
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("title, start_time, end_time")
-        .eq("id", jobId)
-        .single();
-      if (error) {
-        console.error("Error fetching job details:", error);
-        await applyOfflineJobDetails();
-      } else {
-        setJobTitle(data.title);
-        applyJobDateRange(data.start_time, data.end_time);
-      }
-
-      const { data: gearSetups, error: gearError } = await supabase
-        .from("festival_gear_setups")
-        .select("max_stages")
-        .eq("job_id", jobId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (gearError) {
-        console.error("Error fetching gear setup:", gearError);
-      } else if (gearSetups && gearSetups.length > 0) {
-        setMaxStages(gearSetups[0].max_stages || 3);
-      }
-    };
-    fetchJobDetails();
-  }, [jobId]);
 
   useEffect(() => {
     if (!selectedDate) return;
