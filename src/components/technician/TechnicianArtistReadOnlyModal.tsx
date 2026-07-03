@@ -264,6 +264,9 @@ export function TechnicianArtistReadOnlyModal({
           // Cached blob first: renders offline and skips the signed-URL
           // round-trip when the festival was downloaded.
           const cachedBlob = await getOfflineFileBlob("festival_artist_files", artist.stage_plot_file_path);
+          // Cleanup may have already revoked the tracked URLs; creating one
+          // now would leak it
+          if (cancelled) return null;
           if (cachedBlob) {
             const objectUrl = URL.createObjectURL(cachedBlob);
             objectUrls.push(objectUrl);

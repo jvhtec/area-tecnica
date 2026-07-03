@@ -70,27 +70,16 @@ const FestivalArtistManagement = () => {
     queryFn: async () => {
       if (!jobId) return null;
 
-      // Throws on Supabase errors so fetchWithOfflineFallback can serve the
-      // snapshot; resolving a default here would mask the failure as fresh
-      // online data.
+      // Read-only inside the fallback race: a timed-out online promise is
+      // abandoned, so it must never write. Throws on Supabase errors so
+      // fetchWithOfflineFallback can serve the snapshot.
       const fetchSettingsOnline = async () => {
         const {
           data: existingSettings,
           error: fetchError
         } = await supabase.from('festival_settings').select('*').eq('job_id', jobId).maybeSingle();
         if (fetchError) throw fetchError;
-        if (existingSettings) {
-          return { settings: existingSettings };
-        }
-        const {
-          data: newSettings,
-          error: createError
-        } = await supabase.from('festival_settings').insert({
-          job_id: jobId,
-          day_start_time: "07:00"
-        }).select().single();
-        if (createError) throw createError;
-        return { settings: newSettings };
+        return { settings: existingSettings ?? null };
       };
 
       try {
@@ -101,7 +90,24 @@ const FestivalArtistManagement = () => {
             return offlineContext ? { settings: offlineContext.festivalSettings } : null;
           },
         });
-        return result.data.settings;
+        if (result.fromOffline || result.data.settings) {
+          return result.data.settings;
+        }
+
+        // Row confirmed missing by a live online read: create the defaults
+        // here, outside the race, where the write is awaited (never abandoned)
+        const {
+          data: newSettings,
+          error: createError
+        } = await supabase.from('festival_settings').insert({
+          job_id: jobId,
+          day_start_time: "07:00"
+        }).select().single();
+        if (createError) {
+          console.error('Error creating festival settings:', createError);
+          return null;
+        }
+        return newSettings;
       } catch (error) {
         // No snapshot to fall back to: keep the previous default behaviour
         console.error('Error fetching festival settings:', error);
@@ -146,8 +152,11 @@ const FestivalArtistManagement = () => {
         });
         return result.data;
       } catch (error) {
+        // Return null (not {}) so previously loaded date types are kept:
+        // the state effect skips null, while an empty map would silently
+        // mark every festival date as a show day.
         console.error('Error fetching date types:', error);
-        return {};
+        return null;
       }
     },
     enabled: !!jobId

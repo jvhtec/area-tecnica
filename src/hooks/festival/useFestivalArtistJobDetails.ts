@@ -8,7 +8,7 @@ type JobHeaderDetails = {
   title: string;
   startTime: string;
   endTime: string;
-  maxStages: number | null;
+  maxStages: number;
 };
 
 /**
@@ -60,7 +60,9 @@ export const useFestivalArtistJobDetails = (jobId: string | undefined, routeDate
         .single();
       if (error) throw error;
 
-      let maxStagesValue: number | null = null;
+      // Default to 3 so a job without gear setup (or a gear-query error)
+      // resets the previous job's stage count instead of letting it persist
+      let maxStagesValue = 3;
       const { data: gearSetups, error: gearError } = await supabase
         .from("festival_gear_setups")
         .select("max_stages")
@@ -90,9 +92,7 @@ export const useFestivalArtistJobDetails = (jobId: string | undefined, routeDate
         const details = result.data;
         setJobTitle(details.title);
         applyJobDateRange(details.startTime, details.endTime);
-        if (details.maxStages !== null) {
-          setMaxStages(details.maxStages);
-        }
+        setMaxStages(details.maxStages);
       } catch (error) {
         console.error("Error fetching job details:", error);
       }
@@ -104,9 +104,23 @@ export const useFestivalArtistJobDetails = (jobId: string | undefined, routeDate
     };
     // routeDate is intentionally read at fetch time only: it tracks
     // selectedDate via the URL, and re-running on every date change would
-    // refetch the job for nothing.
+    // refetch the job for nothing. URL -> state sync for later routeDate
+    // changes is handled by the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  // Keep selectedDate in sync when ?date= changes for the same job (e.g.
+  // browser back/forward), without refetching the job. In-app date picks
+  // round-trip through the URL and land here as a no-op.
+  useEffect(() => {
+    if (!routeDate || jobDates.length === 0) return;
+    const routeDateExists = jobDates.some(
+      (festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate,
+    );
+    if (routeDateExists) {
+      setSelectedDate((current) => (current === routeDate ? current : routeDate));
+    }
+  }, [routeDate, jobDates]);
 
   return { jobTitle, jobDates, selectedDate, setSelectedDate, maxStages };
 };
