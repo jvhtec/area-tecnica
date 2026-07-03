@@ -3,6 +3,7 @@ import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
 import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
+import { handleFestivalFeedTick } from "./festivalFeed.ts";
 import type {
   CheckScheduledBody,
   NativePushTokenRow,
@@ -586,6 +587,10 @@ export async function handleCheckScheduled(
 ) {
   const type = body.type;
   console.log(`🔍 Checking scheduled notification: ${type}`);
+
+  if (type === EVENT_TYPES.FESTIVAL_FEED_TICK) {
+    return handleFestivalFeedTick(client);
+  }
 
   // Check if it's time to send
   const { shouldSend, config } = await checkAndGetScheduleConfig(client, type, body.force);

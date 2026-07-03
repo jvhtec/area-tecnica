@@ -27,6 +27,7 @@ import {
 import createFolderIcon from "@/assets/icons/icon.png";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
+import { FestivalPushFeedButton } from "@/components/festival/FestivalPushFeedButton";
 import { FestivalWeatherSection } from "@/components/festival/FestivalWeatherSection";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
@@ -50,11 +51,9 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
     isSchedulingRoute,
     isArtistRoute,
     isGearRoute,
-
     venueData,
     mapPreviewUrl,
     isMapLoading,
-
     handlePrintButtonClick,
     isPrinting,
 
@@ -200,6 +199,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2 items-start">
               <FestivalOfflineControls jobId={jobId} canEdit={canEdit} />
+              <FestivalPushFeedButton jobId={jobId} />
               {canEdit && (
                 <>
                   <Button

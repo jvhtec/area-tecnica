@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -57,6 +57,7 @@ import { DetailsModal } from '@/components/technician/DetailsModal';
 import { AboutModal } from '@/components/technician/AboutModal';
 import { TechnicianArtistReadOnlyModal } from '@/components/technician/TechnicianArtistReadOnlyModal';
 import { TechnicianRfTableModal } from '@/components/technician/TechnicianRfTableModal';
+import { FestivalPushFeedButton } from '@/components/festival/FestivalPushFeedButton';
 import type { JobWithLocationAndDocs } from '@/types/job';
 
 
@@ -140,6 +141,8 @@ export default function TechnicianSuperApp() {
   const [showRatesModal, setShowRatesModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [artistDeepLinkFilters, setArtistDeepLinkFilters] = useState<{ date?: string; stage?: string }>({});
+  const handledArtistDeepLinkRef = useRef<string | null>(null);
 
   // Handle deeplink to open About modal via URL param
   useEffect(() => {
@@ -150,6 +153,13 @@ export default function TechnicianSuperApp() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const routeTab = searchParams.get('tab');
+    if (routeTab && ['dashboard', 'jobs', 'availability', 'profile'].includes(routeTab)) {
+      setTab(routeTab);
+    }
+  }, [searchParams]);
 
   // Set up real-time subscriptions
   useTechnicianDashboardSubscriptions();
@@ -342,8 +352,145 @@ export default function TechnicianSuperApp() {
 
   const handleOpenAction = (action: string, jobData?: TechnicianJobData) => {
     // TechJobCard already extracts job data before calling onAction
+    if (action === 'artists') {
+      setArtistDeepLinkFilters({});
+    }
     setSelectedJob(jobData || null);
     setActiveModal(action);
+  };
+
+  useEffect(() => {
+    const openTarget = searchParams.get('open');
+    const jobIdParam = searchParams.get('jobId');
+    if (openTarget !== 'artists' || !jobIdParam || !user?.id || isLoading) return;
+
+    const dateParam = searchParams.get('date') || undefined;
+    const stageParam = searchParams.get('stage') || undefined;
+    const deepLinkKey = `${jobIdParam}:${dateParam || ''}:${stageParam || ''}`;
+    if (handledArtistDeepLinkRef.current === deepLinkKey) return;
+
+    let cancelled = false;
+
+    const openArtistModal = async () => {
+      const assignedJob = (assignments as TechnicianAssignment[]).find(
+        (assignment) => assignment.job_id === jobIdParam || assignment.jobs?.id === jobIdParam,
+      );
+
+      if (assignedJob?.jobs) {
+        if (cancelled) return;
+        setSelectedJob(assignedJob.jobs);
+        setArtistDeepLinkFilters({ date: dateParam, stage: stageParam });
+        setActiveModal('artists');
+        handledArtistDeepLinkRef.current = deepLinkKey;
+        return;
+      }
+
+      const { data: shifts, error: shiftsError } = await dataLayerClient
+        .from('festival_shifts')
+        .select('id')
+        .eq('job_id', jobIdParam);
+
+      if (shiftsError) {
+        console.error('Error resolving festival artist deep link shifts:', shiftsError);
+        return;
+      }
+
+      const shiftIds = (shifts || []).map((shift) => shift.id).filter(Boolean);
+      if (shiftIds.length === 0) {
+        toast.error('No tienes acceso a los artistas de este festival');
+        handledArtistDeepLinkRef.current = deepLinkKey;
+        return;
+      }
+
+      const { data: shiftAssignments, error: assignmentError } = await dataLayerClient
+        .from('festival_shift_assignments')
+        .select('shift_id')
+        .eq('technician_id', user.id)
+        .in('shift_id', shiftIds)
+        .limit(1);
+
+      if (assignmentError) {
+        console.error('Error resolving festival artist deep link assignments:', assignmentError);
+        return;
+      }
+
+      if (!shiftAssignments || shiftAssignments.length === 0) {
+        toast.error('No tienes acceso a los artistas de este festival');
+        handledArtistDeepLinkRef.current = deepLinkKey;
+        return;
+      }
+
+      const { data: jobData, error: jobError } = await dataLayerClient
+        .from('jobs')
+        .select(`
+          id,
+          title,
+          description,
+          start_time,
+          end_time,
+          created_at,
+          timezone,
+          location_id,
+          job_type,
+          color,
+          status,
+          preventive_resource_technician_id,
+          location:locations(name),
+          job_date_types(date, type),
+          job_documents(
+            id,
+            file_name,
+            file_path,
+            visible_to_tech,
+            uploaded_at,
+            read_only,
+            template_type
+          )
+        `)
+        .eq('id', jobIdParam)
+        .maybeSingle();
+
+      if (jobError || !jobData) {
+        console.error('Error resolving festival artist deep link job:', jobError);
+        toast.error('No se pudo abrir el festival');
+        handledArtistDeepLinkRef.current = deepLinkKey;
+        return;
+      }
+
+      if (cancelled) return;
+
+      const resolvedJob = {
+        ...jobData,
+        created_at: jobData.created_at || '',
+        job_type: jobData.job_type || 'festival',
+        artist_count: 0,
+      } as TechnicianJobData;
+
+      setSelectedJob(resolvedJob);
+      setArtistDeepLinkFilters({ date: dateParam, stage: stageParam });
+      setActiveModal('artists');
+      handledArtistDeepLinkRef.current = deepLinkKey;
+    };
+
+    void openArtistModal();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignments, isLoading, searchParams, user?.id]);
+
+  const closeArtistsModal = () => {
+    setActiveModal(null);
+    setArtistDeepLinkFilters({});
+
+    if (searchParams.get('open') === 'artists') {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('open');
+      nextParams.delete('jobId');
+      nextParams.delete('date');
+      nextParams.delete('stage');
+      setSearchParams(nextParams, { replace: true });
+    }
   };
 
   const userName = userProfile?.first_name && userProfile?.last_name
@@ -437,7 +584,16 @@ export default function TechnicianSuperApp() {
           theme={t}
           isDark={isDark}
           job={selectedJob}
-          onClose={() => setActiveModal(null)}
+          onClose={closeArtistsModal}
+          initialDate={artistDeepLinkFilters.date}
+          initialStage={artistDeepLinkFilters.stage}
+          headerAction={
+            <FestivalPushFeedButton
+              jobId={selectedJob.id}
+              compact
+              onActivatePushClick={() => setTab('profile')}
+            />
+          }
         />
       )}
       {activeModal === 'rf-table' && selectedJob && (
