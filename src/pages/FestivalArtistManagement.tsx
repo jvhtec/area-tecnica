@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { ConnectionIndicator } from "@/components/ui/connection-indicator";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { format, eachDayOfInterval, isValid, addDays, parseISO, setHours, setMinutes } from "date-fns";
+import { format } from "date-fns";
 import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";
 import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +26,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { canCreateFestivalArtistExtras, canDeleteFestivalArtists, canEditJobs } from "@/utils/permissions";
 import { queryKeys } from "@/lib/react-query";
 import { fetchWithOfflineFallback, getOfflineFestivalContext } from "@/lib/offline";
+import { useFestivalArtistJobDetails } from "@/hooks/festival/useFestivalArtistJobDetails";
 import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
 import { FestivalOfflineBanner } from "@/components/festival/FestivalOfflineBanner";
 import { ArtistPageActions } from "@/components/festival/ArtistPageActions";
@@ -42,9 +43,6 @@ const FestivalArtistManagement = () => {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
-  const [jobTitle, setJobTitle] = useState("");
-  const [jobDates, setJobDates] = useState<Date[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [riderFilter, setRiderFilter] = useState("all");
@@ -55,10 +53,12 @@ const FestivalArtistManagement = () => {
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const [logoUrl, setLogoUrl] = useState("");
-  const [maxStages, setMaxStages] = useState(3);
   const [stageNames, setStageNames] = useState<Record<number, string>>({});
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isFullSchedulePrinting, setIsFullSchedulePrinting] = useState(false);
+
+  const { jobTitle, jobDates, selectedDate, setSelectedDate, maxStages } =
+    useFestivalArtistJobDetails(jobId, routeDate);
 
   const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(jobId, selectedDate, dayStartTime);
   const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
@@ -205,97 +205,6 @@ const FestivalArtistManagement = () => {
     filter: `job_id=eq.${jobId}`,
     queryKey: queryKeys.scope("festival-artists", jobId, selectedDate)
   });
-
-  useEffect(() => {
-    const applyJobDateRange = (startTime: string, endTime: string) => {
-      const startDate = new Date(startTime);
-      const endDate = new Date(endTime);
-      if (!isValid(startDate) || !isValid(endDate)) return;
-      const dates = eachDayOfInterval({ start: startDate, end: endDate });
-      setJobDates(dates);
-      const routeDateExists = routeDate
-        ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
-        : false;
-      setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
-    };
-
-    // The fetchers only RETURN data; state is applied once for whichever
-    // side wins the race. A timed-out online fetch that resolves later must
-    // not overwrite the snapshot's title/dates/maxStages with mixed context.
-    type JobHeaderDetails = {
-      title: string;
-      startTime: string;
-      endTime: string;
-      maxStages: number | null;
-    };
-
-    const readOfflineJobDetails = async (): Promise<JobHeaderDetails | null> => {
-      if (!jobId) return null;
-      const offlineContext = await getOfflineFestivalContext(jobId);
-      const offlineJob = offlineContext?.job;
-      if (!offlineJob) return null;
-
-      return {
-        title: (offlineJob.title as string) || "",
-        startTime: offlineJob.start_time as string,
-        endTime: offlineJob.end_time as string,
-        maxStages: offlineContext.maxStages || 3,
-      };
-    };
-
-    const fetchJobDetailsOnline = async (): Promise<JobHeaderDetails> => {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("title, start_time, end_time")
-        .eq("id", jobId)
-        .single();
-      if (error) throw error;
-
-      let maxStagesValue: number | null = null;
-      const { data: gearSetups, error: gearError } = await supabase
-        .from("festival_gear_setups")
-        .select("max_stages")
-        .eq("job_id", jobId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (gearError) {
-        console.error("Error fetching gear setup:", gearError);
-      } else if (gearSetups && gearSetups.length > 0) {
-        maxStagesValue = gearSetups[0].max_stages || 3;
-      }
-
-      return { title: data.title, startTime: data.start_time, endTime: data.end_time, maxStages: maxStagesValue };
-    };
-
-    let cancelled = false;
-
-    const fetchJobDetails = async () => {
-      if (!jobId) return;
-      try {
-        // Race the network against the snapshot so a weak connection never
-        // leaves the page stuck on "Cargando".
-        const result = await fetchWithOfflineFallback({
-          online: fetchJobDetailsOnline,
-          offline: readOfflineJobDetails,
-        });
-        if (cancelled) return;
-
-        const details = result.data;
-        setJobTitle(details.title);
-        applyJobDateRange(details.startTime, details.endTime);
-        if (details.maxStages !== null) {
-          setMaxStages(details.maxStages);
-        }
-      } catch (error) {
-        console.error("Error fetching job details:", error);
-      }
-    };
-    fetchJobDetails();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [jobId]);
 
   useEffect(() => {
     if (!selectedDate) return;
