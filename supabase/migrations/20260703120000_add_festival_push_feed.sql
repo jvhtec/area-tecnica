@@ -58,6 +58,9 @@ CREATE INDEX IF NOT EXISTS idx_festival_push_delivery_log_job_due
 CREATE INDEX IF NOT EXISTS idx_festival_push_delivery_log_event_kind
   ON public.festival_push_delivery_log (event_kind);
 
+CREATE INDEX IF NOT EXISTS idx_festival_push_delivery_log_sent_at
+  ON public.festival_push_delivery_log (sent_at);
+
 CREATE OR REPLACE FUNCTION public.get_festival_assigned_stages(
   p_user_id uuid,
   p_job_id uuid
@@ -214,5 +217,19 @@ BEGIN
     'festival-push-feed-tick',
     '* * * * *',
     $$SELECT public.invoke_scheduled_push_notification('festival.feed.tick')$$
+  );
+
+  IF EXISTS (
+    SELECT 1
+    FROM cron.job
+    WHERE jobname = 'festival-push-delivery-log-cleanup'
+  ) THEN
+    PERFORM cron.unschedule('festival-push-delivery-log-cleanup');
+  END IF;
+
+  PERFORM cron.schedule(
+    'festival-push-delivery-log-cleanup',
+    '17 4 * * *',
+    $$DELETE FROM public.festival_push_delivery_log WHERE sent_at < now() - interval '14 days'$$
   );
 END $cron$;

@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(30);
+SELECT plan(32);
 
 SELECT has_table('public', 'festival_push_subscriptions', 'festival push subscriptions table exists');
 SELECT has_table('public', 'festival_push_delivery_log', 'festival push delivery log table exists');
@@ -189,6 +189,29 @@ SELECT ok(
       AND indexname = 'idx_festival_push_delivery_log_job_due'
   ),
   'festival push delivery log has a job/due index'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'festival_push_delivery_log'
+      AND indexname = 'idx_festival_push_delivery_log_sent_at'
+  ),
+  'festival push delivery log has a sent_at cleanup index'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM cron.job
+    WHERE jobname = 'festival-push-delivery-log-cleanup'
+      AND schedule = '17 4 * * *'
+      AND command ILIKE '%festival_push_delivery_log%'
+      AND command ILIKE '%14 days%'
+  ),
+  'festival push delivery log has a scheduled retention cleanup'
 );
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);

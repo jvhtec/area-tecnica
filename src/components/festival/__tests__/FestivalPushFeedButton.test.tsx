@@ -27,6 +27,24 @@ const renderButton = (onActivatePushClick = vi.fn()) =>
     </MemoryRouter>,
   );
 
+const defaultStageOptions = [
+  { number: 1, label: "Escenario Norte", assigned: true },
+  { number: 2, label: "Escenario Sur", assigned: true },
+];
+
+const createFeedState = (overrides = {}) => ({
+  subscription: { enabled: false, stages: [] as number[] },
+  isSubscribed: false,
+  selectedStages: [] as number[],
+  stageOptions: defaultStageOptions.map((stage) => ({ ...stage })),
+  canChooseAnyStage: false,
+  isLoading: false,
+  isSaving: false,
+  error: null as Error | null,
+  save: vi.fn().mockResolvedValue({ enabled: true, stages: [1, 2] }),
+  ...overrides,
+});
+
 describe("FestivalPushFeedButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,20 +52,7 @@ describe("FestivalPushFeedButton", () => {
       subscription: { endpoint: "https://push.example/sub" },
       isInitializing: false,
     });
-    feedStateMock.mockReturnValue({
-      subscription: { enabled: false, stages: [] },
-      isSubscribed: false,
-      selectedStages: [],
-      stageOptions: [
-        { number: 1, label: "Escenario Norte", assigned: true },
-        { number: 2, label: "Escenario Sur", assigned: true },
-      ],
-      canChooseAnyStage: false,
-      isLoading: false,
-      isSaving: false,
-      error: null,
-      save: vi.fn().mockResolvedValue({ enabled: true, stages: [1, 2] }),
-    });
+    feedStateMock.mockImplementation(() => createFeedState());
   });
 
   it("shows Spanish guidance when device push is inactive", async () => {
@@ -72,20 +77,7 @@ describe("FestivalPushFeedButton", () => {
   it("saves multiple selected stages", async () => {
     const user = userEvent.setup();
     const save = vi.fn().mockResolvedValue({ enabled: true, stages: [1, 2] });
-    feedStateMock.mockReturnValue({
-      subscription: { enabled: false, stages: [] },
-      isSubscribed: false,
-      selectedStages: [],
-      stageOptions: [
-        { number: 1, label: "Escenario Norte", assigned: true },
-        { number: 2, label: "Escenario Sur", assigned: true },
-      ],
-      canChooseAnyStage: true,
-      isLoading: false,
-      isSaving: false,
-      error: null,
-      save,
-    });
+    feedStateMock.mockImplementation(() => createFeedState({ canChooseAnyStage: true, save }));
 
     renderButton();
 
@@ -98,6 +90,31 @@ describe("FestivalPushFeedButton", () => {
     expect(save).toHaveBeenCalledWith({
       enabled: true,
       stages: [1, 2],
+    });
+  });
+
+  it("keeps draft stage choices when the hook returns fresh references", async () => {
+    const user = userEvent.setup();
+    const save = vi.fn().mockResolvedValue({ enabled: true, stages: [1] });
+    feedStateMock.mockImplementation(() => createFeedState({ canChooseAnyStage: true, save }));
+
+    const view = renderButton();
+
+    await user.click(screen.getByRole("button", { name: /feed de avisos del festival/i }));
+    await user.click(screen.getByText("Escenario Norte"));
+
+    view.rerender(
+      <MemoryRouter>
+        <FestivalPushFeedButton jobId="job-1" />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("switch"));
+    await user.click(screen.getByRole("button", { name: /guardar/i }));
+
+    expect(save).toHaveBeenCalledWith({
+      enabled: true,
+      stages: [1],
     });
   });
 });

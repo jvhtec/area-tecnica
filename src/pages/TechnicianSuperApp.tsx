@@ -390,8 +390,11 @@ export default function TechnicianSuperApp() {
         .select('id')
         .eq('job_id', jobIdParam);
 
+      if (cancelled) return;
+
       if (shiftsError) {
         console.error('Error resolving festival artist deep link shifts:', shiftsError);
+        handledArtistDeepLinkRef.current = deepLinkKey;
         return;
       }
 
@@ -409,8 +412,11 @@ export default function TechnicianSuperApp() {
         .in('shift_id', shiftIds)
         .limit(1);
 
+      if (cancelled) return;
+
       if (assignmentError) {
         console.error('Error resolving festival artist deep link assignments:', assignmentError);
+        handledArtistDeepLinkRef.current = deepLinkKey;
         return;
       }
 
@@ -450,14 +456,14 @@ export default function TechnicianSuperApp() {
         .eq('id', jobIdParam)
         .maybeSingle();
 
+      if (cancelled) return;
+
       if (jobError || !jobData) {
         console.error('Error resolving festival artist deep link job:', jobError);
         toast.error('No se pudo abrir el festival');
         handledArtistDeepLinkRef.current = deepLinkKey;
         return;
       }
-
-      if (cancelled) return;
 
       const resolvedJob = {
         ...jobData,
@@ -482,6 +488,7 @@ export default function TechnicianSuperApp() {
   const closeArtistsModal = () => {
     setActiveModal(null);
     setArtistDeepLinkFilters({});
+    handledArtistDeepLinkRef.current = null;
 
     if (searchParams.get('open') === 'artists') {
       const nextParams = new URLSearchParams(searchParams);

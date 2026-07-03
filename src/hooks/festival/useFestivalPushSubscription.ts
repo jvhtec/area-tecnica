@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { queryKeys } from "@/lib/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { normalizeFestivalStages } from "@/utils/festivalPushStages";
 
 export type FestivalPushStageOption = {
   number: number;
@@ -27,10 +28,6 @@ type SaveFestivalPushSubscriptionInput = {
 
 const isManagementSubscriber = (role: string | null | undefined) =>
   role === "admin" || role === "management";
-
-const normalizeStages = (stages: number[]) =>
-  Array.from(new Set(stages.filter((stage) => Number.isInteger(stage) && stage > 0)))
-    .sort((left, right) => left - right);
 
 export const useFestivalPushSubscription = (jobId?: string) => {
   const { user, userRole } = useOptimizedAuth();
@@ -155,7 +152,7 @@ export const useFestivalPushSubscription = (jobId?: string) => {
     mutationFn: async ({ enabled, stages }: SaveFestivalPushSubscriptionInput) => {
       if (!jobId || !user?.id) throw new Error("No se pudo identificar el festival o el usuario.");
 
-      const normalizedStages = normalizeStages(stages)
+      const normalizedStages = normalizeFestivalStages(stages)
         .filter((stage) => selectableStageNumbers.has(stage));
 
       if (enabled && normalizedStages.length === 0) {
@@ -194,7 +191,7 @@ export const useFestivalPushSubscription = (jobId?: string) => {
   return {
     subscription: subscriptionQuery.data ?? null,
     isSubscribed: Boolean(subscriptionQuery.data?.enabled && (subscriptionQuery.data.stages ?? []).length > 0),
-    selectedStages: normalizeStages(subscriptionQuery.data?.stages ?? []),
+    selectedStages: normalizeFestivalStages(subscriptionQuery.data?.stages ?? []),
     stageOptions: stagesQuery.data ?? [],
     canChooseAnyStage,
     isLoading: subscriptionQuery.isLoading || stagesQuery.isLoading,

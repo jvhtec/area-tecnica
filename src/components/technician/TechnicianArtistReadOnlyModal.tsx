@@ -430,6 +430,14 @@ export function TechnicianArtistReadOnlyModal({
     }));
   }, [artists, stageNames]);
 
+  useEffect(() => {
+    if (artistsLoading) return;
+    if (selectedStage === "all") return;
+    if (!stageOptions.some((option) => option.value === selectedStage)) {
+      setSelectedStage("all");
+    }
+  }, [artistsLoading, selectedStage, stageOptions]);
+
   const stageFilteredArtists = useMemo(() => {
     if (selectedStage === "all") return artists;
     return artists.filter((artist) => String(artist.stage) === selectedStage);
@@ -448,11 +456,12 @@ export function TechnicianArtistReadOnlyModal({
   }, [stageFilteredArtists]);
 
   useEffect(() => {
+    if (artistsLoading) return;
     if (selectedDay === "all") return;
     if (!dayOptions.some((option) => option.value === selectedDay)) {
       setSelectedDay("all");
     }
-  }, [dayOptions, selectedDay]);
+  }, [artistsLoading, dayOptions, selectedDay]);
 
   const filteredArtists = useMemo(() => {
     if (selectedDay === "all") return stageFilteredArtists;

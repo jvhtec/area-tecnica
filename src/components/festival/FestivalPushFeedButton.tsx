@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useFestivalPushSubscription } from "@/hooks/festival/useFestivalPushSubscription";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { cn } from "@/lib/utils";
+import { normalizeFestivalStages } from "@/utils/festivalPushStages";
 
 type FestivalPushFeedButtonProps = {
   jobId?: string;
@@ -21,9 +22,6 @@ type FestivalPushFeedButtonProps = {
 
 const sameStages = (left: number[], right: number[]) =>
   left.length === right.length && left.every((stage, index) => stage === right[index]);
-
-const normalizeStages = (stages: number[]) =>
-  Array.from(new Set(stages)).sort((left, right) => left - right);
 
 export const FestivalPushFeedButton = ({
   jobId,
@@ -39,7 +37,11 @@ export const FestivalPushFeedButton = ({
   const [draftStages, setDraftStages] = useState<number[]>([]);
 
   const hasDevicePush = Boolean(push.subscription);
-  const selectedStages = useMemo(() => normalizeStages(feed.selectedStages), [feed.selectedStages]);
+  const selectedStageKey = normalizeFestivalStages(feed.selectedStages).join(",");
+  const selectedStages = useMemo(
+    () => selectedStageKey ? selectedStageKey.split(",").map(Number) : [],
+    [selectedStageKey],
+  );
 
   useEffect(() => {
     setDraftEnabled(feed.subscription?.enabled ?? false);
@@ -53,11 +55,11 @@ export const FestivalPushFeedButton = ({
   const isActive = hasDevicePush && feed.isSubscribed;
   const isDirty =
     draftEnabled !== (feed.subscription?.enabled ?? false) ||
-    !sameStages(normalizeStages(draftStages), selectedStages);
+    !sameStages(normalizeFestivalStages(draftStages), selectedStages);
 
   const handleToggleStage = (stage: number, checked: boolean) => {
     setDraftStages((current) => {
-      if (checked) return normalizeStages([...current, stage]);
+      if (checked) return normalizeFestivalStages([...current, stage]);
       return current.filter((item) => item !== stage);
     });
   };
@@ -72,11 +74,15 @@ export const FestivalPushFeedButton = ({
   };
 
   const handleSave = async () => {
-    await feed.save({
-      enabled: draftEnabled,
-      stages: draftStages,
-    });
-    setOpen(false);
+    try {
+      await feed.save({
+        enabled: draftEnabled,
+        stages: draftStages,
+      });
+      setOpen(false);
+    } catch {
+      // The mutation already shows the Spanish error toast.
+    }
   };
 
   const triggerIcon = isBusy ? (
