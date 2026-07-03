@@ -26,7 +26,7 @@ Las páginas de gestión de festival, la de artistas y el modal de artistas del 
 
 - el navegador reporta sin conexión (`navigator.onLine === false`),
 - la petición de red falla, o
-- la red tarda más de ~4 s en responder (`fetchWithOfflineFallback` — `navigator.onLine` suele reportar `true` en recintos con cobertura inutilizable, así que las lecturas nunca esperan a la red indefinidamente).
+- la red tarda más de ~4 s en responder: si hay copia offline se sirve; si no la hay, la lectura sigue esperando a la red (`fetchWithOfflineFallback` — `navigator.onLine` suele reportar `true` en recintos con cobertura inutilizable).
 
 Un banner ámbar indica que se está viendo la copia offline. Las queries afectadas usan `networkMode: "always"` para que React Query ejecute el `queryFn` sin conexión. Los riders, stage plots y documentos se sirven desde los blobs cacheados (también con conexión, para abrirlos al instante).
 

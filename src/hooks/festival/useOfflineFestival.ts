@@ -186,7 +186,13 @@ export const useOfflineFestival = (jobId?: string) => {
     // download fails the queue stays intact, so the local copy never shows
     // edits that can no longer be synchronized or discarded cleanly.
     try {
-      await downloadFestivalSnapshotWithFiles(jobId);
+      const { files } = await downloadFestivalSnapshotWithFiles(jobId);
+      if (files.failed > 0) {
+        toast.warning("Copia restaurada con avisos", {
+          description: `${files.failed} archivo${files.failed === 1 ? "" : "s"} no se pudieron restaurar.`,
+          duration: 8000,
+        });
+      }
     } catch (error) {
       console.error("No se pudo restaurar la copia offline antes de descartar cambios:", error);
       toast.error("Error", {

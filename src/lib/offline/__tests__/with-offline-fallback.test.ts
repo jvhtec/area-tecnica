@@ -1,13 +1,40 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fetchWithOfflineFallback } from "../with-offline-fallback";
 
-// Node has no navigator, so isBrowserOnline() reports online here; the
-// browser-offline branch is exercised indirectly via the error paths.
+// Node has no navigator by default, so isBrowserOnline() reports online;
+// the browser-offline branch is exercised by stubbing navigator below.
 
 const never = () => new Promise<string>(() => {});
 
 describe("fetchWithOfflineFallback", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("serves the snapshot immediately when the browser is offline", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+
+    const online = vi.fn(async () => "online");
+    const result = await fetchWithOfflineFallback({
+      online,
+      offline: async () => "offline",
+    });
+
+    expect(result).toEqual({ data: "offline", fromOffline: true });
+    expect(online).not.toHaveBeenCalled();
+  });
+
+  it("throws immediately when the browser is offline and there is no snapshot", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+
+    await expect(
+      fetchWithOfflineFallback({
+        online: async () => "online",
+        offline: async (): Promise<string | null> => null,
+      }),
+    ).rejects.toThrow("Sin conexión y sin copia offline de este festival");
+  });
   it("returns online data when the fetch answers in time", async () => {
     const result = await fetchWithOfflineFallback({
       online: async () => "online",

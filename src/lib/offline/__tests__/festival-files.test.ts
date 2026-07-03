@@ -61,6 +61,21 @@ describe("festival offline files", () => {
     expect(await getOfflineFileBlob("festival_artist_files", "riders/broken.pdf")).toBeNull();
   });
 
+  it("keeps a previously cached file when a re-download fails", async () => {
+    mockStorageDownload();
+    await downloadFestivalFiles(JOB_ID, [
+      { bucket: "festival_artist_files", path: "riders/a.pdf", fileName: "a.pdf" },
+    ]);
+
+    mockStorageDownload(["riders/a.pdf"]);
+    const stats = await downloadFestivalFiles(JOB_ID, [
+      { bucket: "festival_artist_files", path: "riders/a.pdf", fileName: "a.pdf" },
+    ]);
+
+    expect(stats).toEqual({ total: 1, downloaded: 0, failed: 1 });
+    expect(await getOfflineFileBlob("festival_artist_files", "riders/a.pdf")).not.toBeNull();
+  });
+
   it("prunes files that no longer belong to the festival on refresh", async () => {
     mockStorageDownload();
 

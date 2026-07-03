@@ -14,12 +14,18 @@ export type OfflineStoreName = typeof SNAPSHOT_STORE | typeof QUEUE_STORE | type
 
 const DB_NAME = "sector-pro-offline";
 // v2: adds the festival-files store (binary blobs for riders/stage plots/documents)
-const DB_VERSION = 2;
+// v3: adds the jobId index on festival-files so per-festival deletes/prunes
+//     don't materialize every cached blob
+const DB_VERSION = 3;
 
 const STORE_KEY_PATHS: Record<OfflineStoreName, string> = {
   [SNAPSHOT_STORE]: "jobId",
   [QUEUE_STORE]: "id",
   [FILES_STORE]: "key",
+};
+
+const STORE_INDEXES: Partial<Record<OfflineStoreName, string[]>> = {
+  [FILES_STORE]: ["jobId"],
 };
 
 const hasIndexedDb = () => typeof indexedDB !== "undefined";
@@ -39,10 +45,17 @@ const openDb = (): Promise<IDBDatabase> => {
 
       request.onupgradeneeded = () => {
         const db = request.result;
+        const upgradeTransaction = request.transaction;
         (Object.keys(STORE_KEY_PATHS) as OfflineStoreName[]).forEach((store) => {
-          if (!db.objectStoreNames.contains(store)) {
-            db.createObjectStore(store, { keyPath: STORE_KEY_PATHS[store] });
-          }
+          const objectStore = db.objectStoreNames.contains(store)
+            ? upgradeTransaction?.objectStore(store)
+            : db.createObjectStore(store, { keyPath: STORE_KEY_PATHS[store] });
+          if (!objectStore) return;
+          (STORE_INDEXES[store] ?? []).forEach((indexName) => {
+            if (!objectStore.indexNames.contains(indexName)) {
+              objectStore.createIndex(indexName, indexName);
+            }
+          });
         });
       };
 
@@ -123,6 +136,22 @@ export const offlineDb = {
       return Array.from(memoryStores[store].values()).map((value) => cloneValue(value as T));
     }
     return runTransaction<T[]>(store, "readonly", (os) => os.getAll() as IDBRequest<T[]>);
+  },
+
+  /**
+   * Primary keys of records whose indexed field equals `value`. Reads only
+   * the index, so record payloads (e.g. cached blobs) are never loaded.
+   */
+  async getKeysByIndex(store: OfflineStoreName, indexName: string, value: string): Promise<string[]> {
+    if (!hasIndexedDb()) {
+      return Array.from(memoryStores[store].entries())
+        .filter(([, record]) => (record as Record<string, unknown>)[indexName] === value)
+        .map(([key]) => key);
+    }
+    const keys = await runTransaction<IDBValidKey[]>(store, "readonly", (os) =>
+      os.index(indexName).getAllKeys(IDBKeyRange.only(value)),
+    );
+    return keys.map((key) => String(key));
   },
 
   async put(store: OfflineStoreName, value: unknown): Promise<void> {

@@ -70,15 +70,15 @@ const FestivalArtistManagement = () => {
     queryFn: async () => {
       if (!jobId) return null;
 
+      // Throws on Supabase errors so fetchWithOfflineFallback can serve the
+      // snapshot; resolving a default here would mask the failure as fresh
+      // online data.
       const fetchSettingsOnline = async () => {
         const {
           data: existingSettings,
           error: fetchError
         } = await supabase.from('festival_settings').select('*').eq('job_id', jobId).maybeSingle();
-        if (fetchError) {
-          console.error('Error fetching festival settings:', fetchError);
-          return { settings: null };
-        }
+        if (fetchError) throw fetchError;
         if (existingSettings) {
           return { settings: existingSettings };
         }
@@ -89,21 +89,24 @@ const FestivalArtistManagement = () => {
           job_id: jobId,
           day_start_time: "07:00"
         }).select().single();
-        if (createError) {
-          console.error('Error creating festival settings:', createError);
-          return { settings: null };
-        }
+        if (createError) throw createError;
         return { settings: newSettings };
       };
 
-      const result = await fetchWithOfflineFallback({
-        online: fetchSettingsOnline,
-        offline: async () => {
-          const offlineContext = await getOfflineFestivalContext(jobId);
-          return offlineContext ? { settings: offlineContext.festivalSettings } : null;
-        },
-      });
-      return result.data.settings;
+      try {
+        const result = await fetchWithOfflineFallback({
+          online: fetchSettingsOnline,
+          offline: async () => {
+            const offlineContext = await getOfflineFestivalContext(jobId);
+            return offlineContext ? { settings: offlineContext.festivalSettings } : null;
+          },
+        });
+        return result.data.settings;
+      } catch (error) {
+        // No snapshot to fall back to: keep the previous default behaviour
+        console.error('Error fetching festival settings:', error);
+        return null;
+      }
     },
     enabled: !!jobId
   });
@@ -121,15 +124,14 @@ const FestivalArtistManagement = () => {
     queryFn: async () => {
       if (!jobId) return {};
 
+      // Throws on error so the snapshot fallback kicks in — an empty map
+      // would silently mark every festival date as a show day.
       const fetchDateTypesOnline = async () => {
         const {
           data,
           error
         } = await supabase.from('job_date_types').select('*').eq('job_id', jobId);
-        if (error) {
-          console.error('Error fetching date types:', error);
-          return {};
-        }
+        if (error) throw error;
         const dateTypeMap: Record<string, string> = {};
         data.forEach(item => {
           dateTypeMap[`${jobId}-${item.date}`] = item.type;
@@ -137,11 +139,16 @@ const FestivalArtistManagement = () => {
         return dateTypeMap;
       };
 
-      const result = await fetchWithOfflineFallback({
-        online: fetchDateTypesOnline,
-        offline: async () => (await getOfflineFestivalContext(jobId))?.dateTypes ?? null,
-      });
-      return result.data;
+      try {
+        const result = await fetchWithOfflineFallback({
+          online: fetchDateTypesOnline,
+          offline: async () => (await getOfflineFestivalContext(jobId))?.dateTypes ?? null,
+        });
+        return result.data;
+      } catch (error) {
+        console.error('Error fetching date types:', error);
+        return {};
+      }
     },
     enabled: !!jobId
   });
@@ -157,16 +164,14 @@ const FestivalArtistManagement = () => {
     queryFn: async () => {
       if (!jobId) return {};
 
+      // Throws on error so the snapshot fallback kicks in
       const fetchStageNamesOnline = async () => {
         const { data: stages, error } = await supabase
           .from('festival_stages')
           .select('number, name')
           .eq('job_id', jobId);
 
-        if (error) {
-          console.error('Error fetching stage names:', error);
-          return {};
-        }
+        if (error) throw error;
 
         const stageMap: Record<number, string> = {};
         stages?.forEach(stage => {
@@ -175,11 +180,16 @@ const FestivalArtistManagement = () => {
         return stageMap;
       };
 
-      const result = await fetchWithOfflineFallback({
-        online: fetchStageNamesOnline,
-        offline: async () => (await getOfflineFestivalContext(jobId))?.stageNames ?? null,
-      });
-      return result.data;
+      try {
+        const result = await fetchWithOfflineFallback({
+          online: fetchStageNamesOnline,
+          offline: async () => (await getOfflineFestivalContext(jobId))?.stageNames ?? null,
+        });
+        return result.data;
+      } catch (error) {
+        console.error('Error fetching stage names:', error);
+        return {};
+      }
     },
     enabled: !!jobId
   });
@@ -209,19 +219,31 @@ const FestivalArtistManagement = () => {
       setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
     };
 
-    const applyOfflineJobDetails = async () => {
-      if (!jobId) return false;
-      const offlineContext = await getOfflineFestivalContext(jobId);
-      const offlineJob = offlineContext?.job;
-      if (!offlineJob) return false;
-
-      setJobTitle((offlineJob.title as string) || "");
-      applyJobDateRange(offlineJob.start_time as string, offlineJob.end_time as string);
-      setMaxStages(offlineContext.maxStages || 3);
-      return true;
+    // The fetchers only RETURN data; state is applied once for whichever
+    // side wins the race. A timed-out online fetch that resolves later must
+    // not overwrite the snapshot's title/dates/maxStages with mixed context.
+    type JobHeaderDetails = {
+      title: string;
+      startTime: string;
+      endTime: string;
+      maxStages: number | null;
     };
 
-    const fetchJobDetailsOnline = async () => {
+    const readOfflineJobDetails = async (): Promise<JobHeaderDetails | null> => {
+      if (!jobId) return null;
+      const offlineContext = await getOfflineFestivalContext(jobId);
+      const offlineJob = offlineContext?.job;
+      if (!offlineJob) return null;
+
+      return {
+        title: (offlineJob.title as string) || "",
+        startTime: offlineJob.start_time as string,
+        endTime: offlineJob.end_time as string,
+        maxStages: offlineContext.maxStages || 3,
+      };
+    };
+
+    const fetchJobDetailsOnline = async (): Promise<JobHeaderDetails> => {
       const { data, error } = await supabase
         .from("jobs")
         .select("title, start_time, end_time")
@@ -229,9 +251,7 @@ const FestivalArtistManagement = () => {
         .single();
       if (error) throw error;
 
-      setJobTitle(data.title);
-      applyJobDateRange(data.start_time, data.end_time);
-
+      let maxStagesValue: number | null = null;
       const { data: gearSetups, error: gearError } = await supabase
         .from("festival_gear_setups")
         .select("max_stages")
@@ -241,25 +261,40 @@ const FestivalArtistManagement = () => {
       if (gearError) {
         console.error("Error fetching gear setup:", gearError);
       } else if (gearSetups && gearSetups.length > 0) {
-        setMaxStages(gearSetups[0].max_stages || 3);
+        maxStagesValue = gearSetups[0].max_stages || 3;
       }
-      return true;
+
+      return { title: data.title, startTime: data.start_time, endTime: data.end_time, maxStages: maxStagesValue };
     };
+
+    let cancelled = false;
 
     const fetchJobDetails = async () => {
       if (!jobId) return;
       try {
         // Race the network against the snapshot so a weak connection never
         // leaves the page stuck on "Cargando".
-        await fetchWithOfflineFallback({
+        const result = await fetchWithOfflineFallback({
           online: fetchJobDetailsOnline,
-          offline: async () => ((await applyOfflineJobDetails()) ? true : null),
+          offline: readOfflineJobDetails,
         });
+        if (cancelled) return;
+
+        const details = result.data;
+        setJobTitle(details.title);
+        applyJobDateRange(details.startTime, details.endTime);
+        if (details.maxStages !== null) {
+          setMaxStages(details.maxStages);
+        }
       } catch (error) {
         console.error("Error fetching job details:", error);
       }
     };
     fetchJobDetails();
+
+    return () => {
+      cancelled = true;
+    };
   }, [jobId]);
 
   useEffect(() => {
