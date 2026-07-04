@@ -274,9 +274,11 @@ export const PrintOptionsDialog = ({
       throw error;
     }
 
-    // Filter artists with missing riders
-    const missingRiderArtists = artists?.filter(artist => 
-      Boolean(artist.rider_missing)
+    // Include artists whose rider is missing, plus copied riders flagged as
+    // outdated (unless the warning was dismissed).
+    const missingRiderArtists = artists?.filter(artist =>
+      Boolean(artist.rider_missing) ||
+      (Boolean(artist.rider_copied_from_date) && !artist.rider_outdated_dismissed)
     ) || [];
 
     const { data: stageRows } = await dataLayerClient.from('festival_stages')
@@ -313,6 +315,8 @@ export const PrintOptionsDialog = ({
           end: artist.show_end || ''
         },
         formUrl: publicFormLinksByArtistId[artist.id],
+        status: artist.rider_missing ? 'missing' : 'outdated',
+        copiedFromDate: artist.rider_copied_from_date || undefined,
       }))
     };
 

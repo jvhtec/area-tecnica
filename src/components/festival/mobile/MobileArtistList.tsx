@@ -212,6 +212,7 @@ export const MobileArtistList = ({
             onOpenStagePlotCapture={onOpenStagePlotCapture}
             onDeleteStagePlot={onDeleteStagePlot}
             onCreateFlexExtras={onCreateFlexExtras}
+            onOutdatedRiderDismissed={onArtistsChanged}
             printingArtistId={printingArtistId}
             deletingArtistId={deletingArtistId}
             uploadingStagePlotArtistId={uploadingStagePlotArtistId}

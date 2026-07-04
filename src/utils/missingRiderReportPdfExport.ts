@@ -14,6 +14,10 @@ export interface MissingRiderArtist {
     end: string;
   };
   formUrl?: string;
+  /** 'missing' = no rider received; 'outdated' = rider copied from a past show. */
+  status?: 'missing' | 'outdated';
+  /** For outdated riders, the source show date the rider was copied from. */
+  copiedFromDate?: string;
 }
 
 export interface MissingRiderReportData {
@@ -163,7 +167,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
   doc.setFontSize(12);
   doc.setTextColor(warningColor);
   doc.setFont('helvetica', 'bold');
-  doc.text('Aún no hemos recibido los riders de los siguientes artistas:', 20, yPosition);
+  doc.text('Riders pendientes o desactualizados de los siguientes artistas:', 20, yPosition);
   markCurrentPageAsContent();
   
   yPosition += 15;
@@ -202,13 +206,27 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
         dateText = 'TBA';
       }
 
-      const start = artist.showTime?.start || '-';
-      const end = artist.showTime?.end || '-';
+      let estadoText = 'Faltante';
+      if (artist.status === 'outdated') {
+        let sourceText = '';
+        try {
+          if (artist.copiedFromDate) {
+            const d = new Date(artist.copiedFromDate);
+            if (!isNaN(d.getTime())) {
+              sourceText = format(d, 'd MMM', { locale: es });
+            }
+          }
+        } catch {
+          sourceText = '';
+        }
+        estadoText = sourceText ? `Desactualizado\n(de ${sourceText})` : 'Desactualizado';
+      }
 
       return [
         artist.name,
         artist.stageName || `Escenario ${artist.stage}`,
         dateText,
+        estadoText,
         qrByRowIndex[index] ? '' : 'N/A'
       ];
     });
@@ -216,7 +234,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
     // Add table
     autoTable(doc, {
       startY: yPosition,
-      head: [['Artista', 'Escenario', 'Fecha', 'QR Formulario Público']],
+      head: [['Artista', 'Escenario', 'Fecha', 'Estado', 'QR Formulario Público']],
       body: tableData,
       theme: 'grid',
       headStyles: {
@@ -236,10 +254,11 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
       margin: { left: marginLeft, right: marginRight, top: topMarginForContinuedPages, bottom: footerReserve },
       rowPageBreak: 'avoid',
       columnStyles: {
-        0: { cellWidth: 50 }, // Artist
-        1: { cellWidth: 42, overflow: 'ellipsize' }, // Escenario (no wrap)
-        2: { cellWidth: 28 }, // Fecha
-        3: { cellWidth: 40 }  // QR
+        0: { cellWidth: 44 }, // Artist
+        1: { cellWidth: 36, overflow: 'ellipsize' }, // Escenario (no wrap)
+        2: { cellWidth: 22 }, // Fecha
+        3: { cellWidth: 28 }, // Estado
+        4: { cellWidth: 34 }  // QR
       },
       didDrawPage: () => {
         const pageNumber = doc.getCurrentPageInfo().pageNumber;
@@ -254,7 +273,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
         if (hookData.section !== 'body') return;
         markCurrentPageAsContent();
 
-        if (hookData.column.index !== 3) return;
+        if (hookData.column.index !== 4) return;
 
         const qrDataUrl = qrByRowIndex[hookData.row.index];
         const formUrl = data.artists[hookData.row.index]?.formUrl;

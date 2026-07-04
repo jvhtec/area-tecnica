@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
 import { getOfflineFileBlob, isBrowserOnline } from "@/lib/offline";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
+import { OutdatedRiderBadge } from "./OutdatedRiderBadge";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { buildReadableFilename } from "@/utils/fileName";
@@ -76,6 +77,8 @@ interface Artist {
   extras_djbooth: boolean;
   notes?: string;
   rider_missing?: boolean;
+  rider_copied_from_date?: string | null;
+  rider_outdated_dismissed?: boolean;
   foh_tech?: boolean;
   mon_tech?: boolean;
   isaftermidnight?: boolean;
@@ -1011,9 +1014,18 @@ export const ArtistTable = ({
                       {/* Estado: rider + material */}
                       <TableCell className="px-2 py-2 align-top">
                         <div className="flex flex-col items-start gap-1">
-                          <Badge variant={artist.rider_missing ? "destructive" : "default"} className="text-[10px] px-1 py-0">
-                            {artist.rider_missing ? "Faltante" : "Completo"}
-                          </Badge>
+                          {artist.rider_copied_from_date && !artist.rider_outdated_dismissed ? (
+                            <OutdatedRiderBadge
+                              artistId={artist.id}
+                              copiedFromDate={artist.rider_copied_from_date}
+                              onDismissed={() => onArtistStagePlotUpdated?.()}
+                              compact
+                            />
+                          ) : (
+                            <Badge variant={artist.rider_missing ? "destructive" : "default"} className="text-[10px] px-1 py-0">
+                              {artist.rider_missing ? "Faltante" : "Completo"}
+                            </Badge>
+                          )}
                           {gearComparison ? (
                             <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
                           ) : (
