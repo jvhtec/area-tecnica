@@ -6,6 +6,7 @@ export {
   getFestivalSnapshot,
   deleteFestivalSnapshot,
   getOfflineArtistsForDate,
+  getOfflineArtistsForJob,
   getOfflineFestivalContext,
   type OfflineFestivalContext,
   type FestivalSnapshotDownloadResult,

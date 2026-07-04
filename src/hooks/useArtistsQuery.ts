@@ -6,18 +6,31 @@ import {
   fetchWithOfflineFallback,
   getFestivalSnapshot,
   getOfflineArtistsForDate,
+  getOfflineArtistsForJob,
   isBrowserOnline,
   queueFestivalChange,
 } from "@/lib/offline";
 
 
 import { queryKeys } from "@/lib/react-query";
-export const useArtistsQuery = (jobId: string | undefined, selectedDate: string, dayStartTime: string = "07:00") => {
+
+interface UseArtistsQueryOptions {
+  /** When true, fetches artists across every festival date instead of just `selectedDate` (used by the "search all dates" mode). */
+  searchAllDates?: boolean;
+}
+
+export const useArtistsQuery = (
+  jobId: string | undefined,
+  selectedDate: string,
+  dayStartTime: string = "07:00",
+  options: UseArtistsQueryOptions = {},
+) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { searchAllDates = false } = options;
 
   const fetchArtistsOnline = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("festival_artists")
       .select(`
         *,
@@ -26,8 +39,14 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
           status
         )
       `)
-      .eq("job_id", jobId)
-      .eq("date", selectedDate)
+      .eq("job_id", jobId);
+
+    if (!searchAllDates) {
+      query = query.eq("date", selectedDate);
+    }
+
+    const { data, error } = await query
+      .order("date", { ascending: true })
       .order("show_start", { ascending: true });
 
     if (error) throw error;
@@ -76,7 +95,9 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
     error,
     refetch
   } = useQuery({
-    queryKey: queryKeys.scope('festival-artists', jobId, selectedDate),
+    queryKey: searchAllDates
+      ? queryKeys.scope('festival-artists', jobId, 'all-dates')
+      : queryKeys.scope('festival-artists', jobId, selectedDate),
     queryFn: async () => {
       if (!jobId || !selectedDate) return { rows: [], isOffline: false };
 
@@ -84,7 +105,9 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
       // the network is too slow to answer (weak festival-site connectivity).
       const result = await fetchWithOfflineFallback({
         online: fetchArtistsOnline,
-        offline: () => getOfflineArtistsForDate(jobId, selectedDate, dayStartTime),
+        offline: () => searchAllDates
+          ? getOfflineArtistsForJob(jobId, dayStartTime)
+          : getOfflineArtistsForDate(jobId, selectedDate, dayStartTime),
       });
       return { rows: result.data, isOffline: result.fromOffline };
     },
@@ -131,7 +154,10 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
       return { offline: false };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
+      // Prefix match invalidates every cached date bucket (and the
+      // "search all dates" bucket) for this job, not just `selectedDate` —
+      // needed since the deleted artist may have been found via cross-date search.
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId) });
       toast({
         title: result?.offline ? "Guardado offline" : "Success",
         description: result?.offline
@@ -149,9 +175,10 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
     }
   });
 
-  // Function to invalidate and refetch artists
+  // Function to invalidate and refetch artists. Prefix match covers every
+  // cached date bucket plus the "search all dates" bucket for this job.
   const invalidateArtists = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId) });
   };
 
   return {

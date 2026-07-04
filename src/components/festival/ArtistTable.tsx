@@ -6,6 +6,7 @@ import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, ExternalLink, ImageOff, ImagePlus, Loader2 } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -118,6 +119,8 @@ interface ArtistTableProps {
   dayStartTime: string;
   jobId?: string;
   selectedDate?: string;
+  /** True while the search box is matching artists across every festival date, not just `selectedDate`. */
+  crossDateSearch?: boolean;
   onArtistStagePlotUpdated?: () => void;
   canDelete: boolean;
   canCreateExtras: boolean;
@@ -134,6 +137,7 @@ export const ArtistTable = ({
   dayStartTime,
   jobId,
   selectedDate,
+  crossDateSearch = false,
   onArtistStagePlotUpdated,
   canDelete,
   canCreateExtras
@@ -794,6 +798,11 @@ export const ArtistTable = ({
                         <div className="space-y-1">
                           <div className="font-medium text-sm break-words">{artist.name}</div>
                           <div className="flex flex-wrap gap-1">
+                            {crossDateSearch && artist.date && (
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                                {format(parseISO(artist.date), "d MMM", { locale: es })}
+                              </Badge>
+                            )}
                             <Badge variant="outline" className="text-[10px] px-1 py-0">{getStageDisplayName(artist.stage)}</Badge>
                             {artist.artist_submitted && (
                               <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-100 text-amber-900 border-amber-300" title="Enviado por artista mediante formulario público">
@@ -1062,6 +1071,7 @@ export const ArtistTable = ({
               gearComparisons={gearComparisons}
               jobId={jobId || ""}
               selectedDate={selectedDate || ""}
+              crossDateSearch={crossDateSearch}
               onEditArtist={onEditArtist}
               onDeleteArtist={handleDeleteClick}
               onGenerateLink={handleGenerateLink}

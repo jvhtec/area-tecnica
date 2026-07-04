@@ -260,6 +260,48 @@ export const getOfflineArtistsForDate = async (
     .sort((a, b) => compareTimeStrings(a.show_start, b.show_start));
 };
 
+/**
+ * Returns every artist across all festival dates (used when the artist
+ * search box searches beyond the currently selected date), processed the
+ * same way as `getOfflineArtistsForDate`, or null when no snapshot exists.
+ */
+export const getOfflineArtistsForJob = async (
+  jobId: string,
+  dayStartTime = "07:00",
+): Promise<Row[] | null> => {
+  const snapshot = await getFestivalSnapshot(jobId);
+  if (!snapshot) return null;
+
+  const submittedArtistIds = new Set(
+    snapshot.data.artistFormSubmissions
+      .filter((submission) => submission.status === "submitted")
+      .map((submission) => submission.artist_id as string),
+  );
+
+  return snapshot.data.artists
+    .map((artist) => {
+      const processed: Row = {
+        ...artist,
+        artist_submitted: submittedArtistIds.has(artist.id as string),
+      };
+
+      if (processed.isaftermidnight === undefined || processed.isaftermidnight === null) {
+        const showStart = processed.show_start;
+        if (typeof showStart === "string" && showStart) {
+          const [hours] = showStart.split(":").map(Number);
+          const [startHour] = dayStartTime.split(":").map(Number);
+          processed.isaftermidnight = hours < startHour;
+        }
+      }
+
+      return processed;
+    })
+    .sort((a, b) => {
+      const dateCompare = compareTimeStrings(a.date, b.date);
+      return dateCompare !== 0 ? dateCompare : compareTimeStrings(a.show_start, b.show_start);
+    });
+};
+
 export interface OfflineFestivalContext {
   job: Row | null;
   festivalSettings: Row | null;

@@ -1,3 +1,5 @@
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -223,6 +225,8 @@ interface MobileArtistCardProps {
   stageName: string;
   stagePlotUrl?: string;
   gearComparison?: ArtistGearComparison;
+  /** True while the search box is matching artists across every festival date, not just the selected one. */
+  showDateBadge?: boolean;
   mode?: 'edit' | 'readonly';
   onEditCategory: (artistId: string, category: MobileConfigCategory) => void;
   onEditArtist: (artist: Artist) => void;
@@ -248,6 +252,7 @@ export const MobileArtistCard = ({
   stageName,
   stagePlotUrl,
   gearComparison,
+  showDateBadge = false,
   mode = 'edit',
   onEditCategory,
   onEditArtist,
@@ -283,6 +288,11 @@ export const MobileArtistCard = ({
               {artist.artist_submitted && (
                 <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-900 border-amber-300">
                   Enviado
+                </Badge>
+              )}
+              {showDateBadge && artist.date && (
+                <Badge variant="secondary" className="text-[10px]">
+                  {format(parseISO(artist.date), "d MMM", { locale: es })}
                 </Badge>
               )}
               <Badge variant="outline" className="text-[10px]">{stageName}</Badge>

@@ -76,6 +76,8 @@ interface MobileArtistListProps {
   gearComparisons: Record<string, ArtistGearComparison>;
   jobId: string;
   selectedDate: string;
+  /** True while the search box is matching artists across every festival date, not just `selectedDate`. */
+  crossDateSearch?: boolean;
   onEditArtist: (artist: Artist) => void;
   onDeleteArtist: (artist: Artist) => void;
   onGenerateLink: (artist: Artist) => void;
@@ -104,6 +106,7 @@ export const MobileArtistList = ({
   gearComparisons,
   jobId,
   selectedDate,
+  crossDateSearch = false,
   onEditArtist,
   onDeleteArtist,
   onGenerateLink,
@@ -202,6 +205,7 @@ export const MobileArtistList = ({
             stageName={stageNames[artist.stage] || `Stage ${artist.stage}`}
             stagePlotUrl={stagePlotUrls[artist.id]}
             gearComparison={gearComparisons[artist.id]}
+            showDateBadge={crossDateSearch}
             mode={mode}
             onEditCategory={handleEditCategory}
             onEditArtist={onEditArtist}
