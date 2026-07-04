@@ -9,8 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Stack**: React 18 + TypeScript, Vite 6, Supabase (Auth, DB, Storage, Edge Functions), Tailwind CSS + shadcn/ui, TanStack React Query, Zustand
 
 **Deployment**: Cloudflare Pages
-- Main branch → sector-pro.work (production)
-- Dev branch → preview deployments
+- `main` branch → sector-pro.work (production)
+- Any other branch/PR → automatic preview deployment (`https://<commit-hash>.area-tecnica.pages.dev`) — see `DEPLOYMENT.md`
 
 ## Development Commands
 
@@ -67,6 +67,26 @@ npm run test:e2e          # Playwright smoke tests (Chromium)
 # Linting
 npm run lint:functions    # ESLint on Supabase edge functions (Deno globals)
 ```
+
+### Governance & CI Gates
+```bash
+# Full governance gate (same as CI `governance` job) — run before pushing broad changes
+npm run governance
+
+# Individual gates (all chained by `governance` above)
+npm run governance:source     # Source-boundary rules (ratcheted baseline)
+npm run governance:filesize   # File-size budget — blocks new/grown "god files"
+npm run governance:functions  # Structural checks on every supabase/functions/* dir
+npm run governance:exposure   # Edge Function JWT/exposure classification vs supabase/config.toml
+npm run governance:sql-grants # Flags new GRANT EXECUTE ... TO anon/PUBLIC in migrations
+npm run governance:actions    # GitHub Actions must be pinned to full commit SHAs
+npm run ci:db:migrations      # Migration filename/timestamp ordering check
+npm run audit:deps            # Dependency vulnerability audit vs reviewed baseline
+
+# Bundle size budget (also runs inside the CI `build` job)
+npm run budget:bundle
+```
+**Note**: `npm run governance` is what the CI `governance` job runs — run it locally before pushing changes that touch edge functions, migrations, workflows, or many files at once.
 
 ### Pre-Commit Security
 ```bash
@@ -143,11 +163,16 @@ src/
 │   ├── activity/       # Activity feed and notifications
 │   ├── staffing/       # Staffing and crew management
 │   ├── timesheets/     # Timesheet calculation logic
-│   └── rates/          # Rate management and approvals
-├── hooks/              # Custom React hooks (100+ hooks)
+│   ├── rates/          # Rate management and approvals
+│   ├── festival-management/ # Festival-specific feature logic
+│   ├── lights/         # Lighting department feature logic
+│   ├── tour-ops/        # Tour operations feature logic
+│   ├── wallboard/       # Digital signage feature logic
+│   └── technical-tools/ # Misc technical utilities (RF/frequency tools, etc.)
+├── hooks/              # Custom React hooks (150+ hooks)
 ├── stores/             # Zustand global state stores
 ├── integrations/       # External service integrations
-│   └── supabase/       # Supabase client, types (8999 lines of DB types)
+│   └── supabase/       # Supabase client, types (11,700+ lines of DB types)
 ├── lib/                # Core libraries and utilities
 ├── utils/              # Utility functions
 │   ├── pdf/            # PDF generation utilities
@@ -193,7 +218,7 @@ src/
 
 #### 3. Supabase Integration
 - **Client**: Unified client at `src/lib/supabase-client.ts`
-- **Types**: Auto-generated database types in `src/integrations/supabase/types.ts` (8999 lines)
+- **Types**: Auto-generated database types in `src/integrations/supabase/types.ts` (11,700+ lines)
 - **Auth Config**: PKCE flow, auto-refresh, localStorage persistence
 - **Realtime Config**: 1 event/sec rate limit, 30s timeout, 15s heartbeat
 - **Connection Management**:
@@ -225,7 +250,7 @@ Each major feature (festivals, tours, jobs, equipment) follows a consistent patt
 
 ### Database Schema Overview (Supabase)
 
-The database is extensive with 85+ migrations. Key tables:
+The database is extensive with 170+ migrations. Key tables:
 
 **Core Entities**:
 - `profiles` - User profiles with roles, departments, contact info
@@ -416,12 +441,17 @@ npm test                # Vitest watch mode (interactive development)
 npm run test:run        # Vitest single run (CI-friendly)
 npm run test:critical   # Critical workflow tests (auth, assignments, timesheets, etc. — file list in package.json)
 npm run test:coverage   # Coverage report
-npm run test:e2e        # Playwright smoke tests (requires Chromium)
+npm run test:e2e        # Playwright smoke tests, desktop viewport (requires Chromium) — this is what CI runs
+npm run test:e2e:mobile # Same specs, iPhone 13 viewport (390x844) — opt-in, not run by CI
 ```
+
+**Mocking auth in Playwright specs**: `tests/e2e/support/app.ts` exports `bootstrapApp(page, { auth, tables, rpc, functions })`, which seeds a fake Supabase session into `localStorage` and intercepts `/supabase/*` requests — this is how e2e specs render authenticated routes without a live Supabase project. Reuse it for any one-off visual check too (see `/ui-check`) rather than trying to log in for real.
+
+**Mobile viewport test coverage is thin**: almost every e2e spec runs at the default desktop viewport regardless of what it's testing (`tests/e2e/tour-management.spec.ts`'s "anchors the mobile navbar" test is the only one that calls `page.setViewportSize()`). The mobile/desktop UI split triggers at `MOBILE_BREAKPOINT` (768px, `src/hooks/use-mobile.tsx`) — a spec exercising `Mobile*`-prefixed components should run under the `mobile-chromium` project (`--project=mobile-chromium` or `npm run test:e2e:mobile`), not assume desktop-viewport behavior generalizes.
 
 ### CI/CD Pipeline (GitHub Actions)
 
-Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`main` or manual dispatch:
+Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`main` or manual dispatch. The `dev` trigger is vestigial — per the Git Workflow section above there's no `dev` integration branch anymore, branches are cut from and PR'd back into `main` directly:
 
 | Job | Timeout | What it does |
 |-----|---------|-------------|
@@ -439,13 +469,19 @@ Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`
 
 Node jobs use Node 20 and `npm ci --legacy-peer-deps`.
 
+Two additional workflows run independently of `tests.yml`:
+- **`.github/workflows/codeql.yml`** — CodeQL analysis (`javascript-typescript`, `security-extended,security-and-quality` queries) on PR/push to `dev`/`main`, weekly cron, and manual dispatch.
+- **`.github/workflows/security.yml`** — `dependency_review` (PR-only, fails on high-severity advisories not on the allow-list) and `sbom` (generates and uploads a CycloneDX SBOM).
+
+All checks across all three workflows are enumerated in `docs/release/production-release-checklist.md`, which is the pre-merge gate list for production PRs.
+
 ### Supabase Edge Functions
 
-62 Deno/TypeScript edge functions in `supabase/functions/`. Key categories:
+67 Deno/TypeScript edge functions in `supabase/functions/` (plus `_shared/`). Key categories:
 
-**Email Services** (11+ functions): `send-corporate-email`, `send-onboarding-email`, `send-staffing-email`, `send-timesheet-reminder`, `send-bug-resolution-email`, `send-expense-notification`, `send-job-payout-email`, `send-password-reset`, `send-tour-availability`, `send-vacation-decision`, `send-warehouse-message`
+**Email Services** (15+ functions): `send-corporate-email`, `send-onboarding-email`, `send-staffing-email`, `send-timesheet-reminder`, `send-bug-resolution-email`, `send-expense-notification`, `send-job-payout-email`, `send-job-whatsapp-message`, `send-password-reset`, `send-payout-override-notification`, `send-tour-availability`, `send-vacation-decision`, `send-warehouse-message`, `auto-send-timesheet-reminders`, `cleanup-corporate-email-images`
 
-**Flex Integration**: `create-flex-folders`, `apply-flex-status`, `archive-to-flex`, `sync-flex-crew-for-job`, `manage-flex-crew-assignments`, `persist-flex-elements`, `secure-flex-api`, `fetch-flex-*`
+**Flex Integration**: `create-flex-folders`, `apply-flex-status`, `archive-to-flex`, `backfill-flex-doc-tecnica`, `sync-flex-crew-for-job`, `manage-flex-crew-assignments`, `persist-flex-elements`, `secure-flex-api`, `fetch-flex-*` (contact-info, image, inventory-model)
 
 **Staffing Engine**: `staffing-orchestrator` (campaign-based crew matching with ranking, distance, reliability scoring), `staffing-click` (technician response handler), `staffing-sweeper` (cleanup), `notify-staffing-cancellation`
 
@@ -453,11 +489,15 @@ Node jobs use Node 20 and `npm ci --legacy-peer-deps`.
 
 **Document Generation**: `generate-memoria-tecnica`, `generate-lights-memoria-tecnica`, `generate-video-memoria-tecnica`, `generate-sv-report`
 
-**External Services**: `create-whatsapp-group`, `create-transport-request`, `get-google-maps-key`, `get-mapbox-token`, `static-map`, `place-photos`, `place-restaurants`, `image-proxy`, `tech-calendar-ics`
+**External Services**: `create-whatsapp-group`, `create-transport-request`, `get-google-maps-key`, `get-mapbox-token`, `static-map`, `place-photos`, `place-restaurants`, `image-proxy`, `tech-calendar-ics`, `waha-session` (WhatsApp session management)
 
 **Wallboard**: `wallboard-auth`, `wallboard-feed`, `wallboard-debug`
 
-**System**: `system-health`, `security-audit`, `background-job-deletion`, `evaluate-achievements`, `push/` (WebSocket push bridge)
+**Jobs, Timesheets & Misc**: `job-hoja-de-ruta-link`, `recalc-timesheet-amount`, `set-job-preventive-resource`, `tour-guest-document-url`
+
+**Feedback**: `submit-bug-report`, `submit-feature-request`
+
+**System**: `system-health`, `security-audit`, `background-job-deletion`, `evaluate-achievements`, `health`, `get-secret`, `csp-report`, `push/` (WebSocket push bridge)
 
 **Shared utilities** live in `supabase/functions/_shared/` (CORS headers, Supabase client init, response helpers).
 
@@ -715,20 +755,25 @@ For full Cloudflare + Supabase staging setup, see `docs/STAGING_SETUP.md`.
 
 ## Git Workflow
 
-**DO NOT** work directly on `main` branch. Always use `dev` or feature branches.
+**DO NOT** work directly on `main` branch. There is no `dev` integration branch — always branch from the latest `main`.
 
 ```bash
 # Start new work
-git checkout dev
-git pull origin dev
+git fetch origin main
+git checkout -b feat/short-description origin/main   # or fix/, refactor/, docs/, chore/ — see .github/GIT_HYGIENE.md
 
 # Make changes and commit
 git add .
 git commit -m "feat: description"  # Use conventional commits
-git push origin dev
+
+# Keep it rebased on main before opening/updating a PR
+git fetch origin main
+git rebase origin/main
+
+git push -u origin feat/short-description
 
 # Create PR to merge into main
-# After approval, merge triggers production deployment
+# After approval, merge triggers production deployment; every pushed branch also gets its own Cloudflare preview deployment
 ```
 
 **Conventional Commit Prefixes**: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
@@ -797,8 +842,9 @@ npx supabase start
 - **DEPLOYMENT.md** — Cloudflare Pages setup, environment variables configuration, deployment process, rollback, troubleshooting
 - **SECURITY.md** — Known vulnerabilities, accepted risks, security best practices, incident response plan
 - **CHANGELOG.md** — Release notes and version history
-- **docs/** — 60+ feature docs: push notifications, staging setup, staffing orchestrator, wallboard, SoundVision, audit reports, workflows
-- **docs/README.md** — Documentation index organized by category
+- **docs/** — 100+ feature docs: push notifications, staging setup, staffing orchestrator, wallboard, SoundVision, audit reports, workflows. Includes `staffing/`, `operations/`, `performance/`, `release/`, and `data_audit_phase0/` subfolders.
+- **docs/README.md** — Documentation index organized by category. **Partial index**: it tracks the curated "workflows" and "festival architecture" docs but not the large volume of one-off audit/fix/summary docs at the root of `docs/` or several newer subfolders — if a topic isn't listed there, search `docs/` directly (`ls docs/`, `grep -r`) rather than assuming it doesn't exist.
+- **docs/release/production-release-checklist.md** — Required pre-merge checklist for production PRs to `main` (all CI checks incl. CodeQL/dependency-review/SBOM, CodeRabbit resolution, migration dry-run)
 - **.github/GIT_HYGIENE.md** — Branch naming, PR workflow, stale branch cleanup
 
 ### External Documentation
@@ -864,7 +910,7 @@ alias zmain='cd /path/to/area-tecnica && claude'
 - Name worktrees after the task: `feature-auth`, `bugfix-timesheets`, `refactor-pdf`
 - Keep a dedicated "analysis" worktree for read-only investigation (logs, queries, exploration)
 - Always `npm ci --legacy-peer-deps` in new worktrees unless intentionally updating dependencies
-- Merge back to dev/main via PR, never cross-merge between worktrees
+- Merge back to `main` via PR, never cross-merge between worktrees
 
 ### Plan Mode First
 
@@ -898,15 +944,23 @@ Custom slash commands live in `.claude/commands/`. Use them frequently:
 | `/review-plan` | Review a plan as staff engineer |
 | `/fix <error>` | Diagnose and fix a bug |
 | `/techdebt` | Scan for tech debt and duplicated code |
-| `/ci-fix` | Fix failing build/CI |
+| `/ci-fix <job/error>` | Triage and fix any failing CI check — lint/typecheck/build, any of the 7 `governance` sub-gates, migration/db-lint/RLS jobs, or CodeQL/dependency-review/SBOM |
+| `/new-migration <description>` | Scaffold a Supabase migration with correct timestamp/ordering, RLS, and matching pgTAP coverage |
+| `/new-edge-function <description>` | Scaffold an Edge Function using `createHttpHandler`, pre-wired for the exposure-classification governance gate |
+| `/ui-check <route/feature>` | Visually verify a UI change at desktop + mobile viewport using the mock-auth Playwright harness (no live credentials needed) |
+| `/i18n-check [path]` | Catch hardcoded English UI strings (incl. Zod validation messages) in a diff or path — Spanish is the only supported UI language |
 | `/verify` | Verify changes are correct (diff, build, logic check) |
 | `/update-notes` | Capture session learnings in `.claude/notes/` |
 
 **Creating new commands:** If you do something more than once a day, turn it into a command. Create a markdown file in `.claude/commands/<name>.md` with instructions.
 
 **Skills** (in `.claude/skills/`) are more advanced commands that support frontmatter for model selection, tool restrictions, and subagent execution:
-- `plan-review` -- Two-phase plan + self-review in a subagent
-- `techdebt-scan` -- Deep tech debt scan using Explore agent
+- `plan-review` -- Two-phase plan + self-review, forked into a `Plan` subagent (keeps the main context clean)
+- `techdebt-scan` -- Deep tech debt scan, forked into an `Explore` subagent (read-only)
+- `release-readiness` -- Cross-checks the current branch/PR against `docs/release/production-release-checklist.md` (migrations, local validation, CI status across all 3 workflows, CodeRabbit), forked into `general-purpose` (needs GitHub MCP tools)
+- `critical-invariant-check` -- Checks a change against this app's 5 documented "don't bypass" invariants (assignment cascade, staffing state machine, Flex folder hierarchy, server-side timesheet calc, Edge Function exposure classification), forked into `Explore` (read-only)
+
+All four skills set `disable-model-invocation: true`, so they only run when explicitly invoked (e.g. `/release-readiness`), never auto-triggered. `plan-review`/`techdebt-scan` overlap in purpose with the `/plan` + `/review-plan` and `/techdebt` commands — prefer the commands for quick, inline work in the current session; reach for a skill when the investigation is large enough that you want it isolated in its own subagent context instead of bloating the main conversation, or when it needs tools (like GitHub MCP) that a simple inline command wouldn't reach for.
 
 ### Subagents
 
@@ -961,7 +1015,7 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Always use `--legacy-peer-deps`** with npm (peer dependency conflicts with vite 6, date-fns 3)
 - **Keep `package-lock.json` committed** and use `npm ci --legacy-peer-deps` for deterministic installs
 - **Timezone is always Europe/Madrid** for all date operations
-- **UI text is in Spanish** -- don't introduce English strings in user-facing components
+- **UI text is in Spanish** -- don't introduce English strings in user-facing components. This is a live, recurring slip, not a hypothetical: the codebase already has dozens of hardcoded English strings (`Save`, `Cancel`, `Delete`, `Loading...`) scattered across components. Run `/i18n-check` on new/changed files before committing UI work rather than assuming it's fine because "the rest of the app already has some."
 - **date-fns must stay at ^3.6.0** -- react-day-picker breaks on v4
 - **Supabase types are auto-generated** -- don't manually edit `src/integrations/supabase/types.ts`
 - **Tour assignments cascade** -- removing a tour assignment must remove related job assignments and timesheets
@@ -974,6 +1028,6 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Staffing campaign state machine** — don't bypass status transitions in the staffing orchestrator flow
 - **CI requires Node 20** — GitHub Actions workflow uses Node 20; match locally for consistency
 - **Playwright needs Chromium** — `npm run test:e2e` requires Playwright browsers installed (`npx playwright install chromium`)
-- **100 SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
+- **170+ SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
 - **Validate types with `npm run typecheck`, not bare `npx tsc --noEmit`** — CI gates on `tsc -p tsconfig.app.json`, which is stricter; a plain tsc run can pass while CI fails (e.g. typed-supabase-client casts)
 - **Don't manually edit archive/ or src/legacy/** — these are retained for reference only, no new runtime imports

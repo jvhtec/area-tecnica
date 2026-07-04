@@ -9,18 +9,18 @@ This file provides working guidance for coding agents operating in this reposito
 - Primary stack: React 18 + TypeScript + Vite 6 + Supabase + Tailwind + shadcn/ui + TanStack Query + Zustand
 - Deployment:
   - `main` → production (`sector-pro.work`)
-  - `dev` → preview environments
+  - Any other branch/PR → automatic Cloudflare Pages preview deployment (`https://<commit-hash>.area-tecnica.pages.dev`)
 
 ## Non-negotiable rules
 
 1. Branch discipline
-   - Default to a new feature branch from current remote `main`:
+   - There is no `dev` integration branch. Always branch from current remote `main`:
      ```bash
      git fetch origin main
      git switch -c codex/<short-description> origin/main
      ```
-   - Work from `dev` only when explicitly requested for preview-environment work.
    - Never commit directly to `main`.
+   - Keep the branch rebased on `main` before opening/updating a PR (`git fetch origin main && git rebase origin/main`).
 
 2. Dependency install
    - CI and clean local verification use:
@@ -52,7 +52,7 @@ Follow the repository architecture documented in `ARCHITECTURE.md`.
 
 - `src/components/` — feature/domain UI (festival, tours, jobs, matrix, equipment, logistics, messages, timesheet, sound, lights, video, etc.)
 - `src/pages/` — route-level, lazy-loaded pages
-- `src/features/` — co-located feature logic modules (activity, staffing, timesheets, rates, lights)
+- `src/features/` — co-located feature logic modules (activity, staffing, timesheets, rates, festival-management, lights, tour-ops, wallboard, technical-tools)
 - `src/hooks/` — reusable and feature hooks (including auth/push)
 - `src/lib/` — core platform libraries (query config, Supabase wrappers, push, shortcuts, streamdeck, flex)
 - `src/stores/` — Zustand global state
@@ -118,6 +118,8 @@ If changes affect mobile runtime behavior, ensure Capacitor sync path remains va
 npm run cap:sync
 ```
 
+`npm run governance` chains 7 sub-gates (`governance:source`, `:filesize`, `:functions`, `:exposure`, `:sql-grants`, `:actions`, plus `ci:db:migrations` and `audit:deps`) — run it directly if you only need to debug one gate, e.g. `npm run governance:exposure` for Edge Function JWT/exposure classification drift.
+
 ## Production PR workflow
 
 Use this workflow for production-bound work unless the user explicitly requests a different release path:
@@ -139,7 +141,7 @@ Use this workflow for production-bound work unless the user explicitly requests 
    npm run budget:bundle
    ```
 4. Commit, push the branch, and open a PR to `main`.
-5. Wait for all GitHub CI checks and CodeRabbit to finish. Inspect CodeRabbit summary, inline comments, and pre-merge checks.
+5. Wait for all GitHub CI checks and CodeRabbit to finish. Inspect CodeRabbit summary, inline comments, and pre-merge checks. CI spans three workflows: `.github/workflows/tests.yml` (11 jobs: lint, typecheck, governance, test_critical, test_run, build, e2e_smoke, migration_ordering, migration_apply, db_lint, rls_rpc_security_tests), `.github/workflows/codeql.yml` (CodeQL analysis), and `.github/workflows/security.yml` (dependency review + SBOM generation) — all must be green.
 6. Address every actionable CI or CodeRabbit issue with follow-up commits, rerun relevant local validation, push, and wait again until clean.
 7. Before merging:
    - If the PR includes Supabase migrations, run a production `supabase db push --linked --dry-run`, apply the pending migrations to the linked production project, and confirm a follow-up dry run reports the remote database is up to date.
@@ -155,3 +157,5 @@ For the full production release checklist, use `docs/release/production-release-
   - Build: `npm run build`
 - Do not change build pipeline assumptions unless the task explicitly requires it.
 - If architecture/docs diverge from code, align new work with actual code and update docs.
+- `docs/README.md` is a partial index — it covers curated workflow/architecture docs but not the many one-off audit/fix/summary docs at the root of `docs/` or newer subfolders (`staffing/`, `operations/`, `performance/`, `release/`, `data_audit_phase0/`). If a topic isn't in the index, search `docs/` directly before concluding it isn't documented.
+- Repo-wide counts drift fast in this codebase (170+ Supabase migrations, 67 Edge Functions, 150+ hooks as of this writing) — don't trust a stale number from a doc; verify with `ls`/`wc -l` when a count matters for a decision.
