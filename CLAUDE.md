@@ -441,8 +441,13 @@ npm test                # Vitest watch mode (interactive development)
 npm run test:run        # Vitest single run (CI-friendly)
 npm run test:critical   # Critical workflow tests (auth, assignments, timesheets, etc. — file list in package.json)
 npm run test:coverage   # Coverage report
-npm run test:e2e        # Playwright smoke tests (requires Chromium)
+npm run test:e2e        # Playwright smoke tests, desktop viewport (requires Chromium) — this is what CI runs
+npm run test:e2e:mobile # Same specs, iPhone 13 viewport (390x844) — opt-in, not run by CI
 ```
+
+**Mocking auth in Playwright specs**: `tests/e2e/support/app.ts` exports `bootstrapApp(page, { auth, tables, rpc, functions })`, which seeds a fake Supabase session into `localStorage` and intercepts `/supabase/*` requests — this is how e2e specs render authenticated routes without a live Supabase project. Reuse it for any one-off visual check too (see `/ui-check`) rather than trying to log in for real.
+
+**Mobile viewport test coverage is thin**: almost every e2e spec runs at the default desktop viewport regardless of what it's testing (`tests/e2e/tour-management.spec.ts`'s "anchors the mobile navbar" test is the only one that calls `page.setViewportSize()`). The mobile/desktop UI split triggers at `MOBILE_BREAKPOINT` (768px, `src/hooks/use-mobile.tsx`) — a spec exercising `Mobile*`-prefixed components should run under the `mobile-chromium` project (`--project=mobile-chromium` or `npm run test:e2e:mobile`), not assume desktop-viewport behavior generalizes.
 
 ### CI/CD Pipeline (GitHub Actions)
 
@@ -937,6 +942,7 @@ Custom slash commands live in `.claude/commands/`. Use them frequently:
 | `/ci-fix <job/error>` | Triage and fix any failing CI check — lint/typecheck/build, any of the 7 `governance` sub-gates, migration/db-lint/RLS jobs, or CodeQL/dependency-review/SBOM |
 | `/new-migration <description>` | Scaffold a Supabase migration with correct timestamp/ordering, RLS, and matching pgTAP coverage |
 | `/new-edge-function <description>` | Scaffold an Edge Function using `createHttpHandler`, pre-wired for the exposure-classification governance gate |
+| `/ui-check <route/feature>` | Visually verify a UI change at desktop + mobile viewport using the mock-auth Playwright harness (no live credentials needed) |
 | `/verify` | Verify changes are correct (diff, build, logic check) |
 | `/update-notes` | Capture session learnings in `.claude/notes/` |
 

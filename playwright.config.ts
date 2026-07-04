@@ -28,5 +28,15 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
       },
     },
+    {
+      // Opt-in mobile-viewport project. Not run by `npm run test:e2e` (CI pins
+      // --project=chromium) — use `npm run test:e2e:mobile` or
+      // `--project=mobile-chromium` to exercise the app below the 768px
+      // mobile/desktop breakpoint (see src/hooks/use-mobile.tsx).
+      name: "mobile-chromium",
+      use: {
+        ...devices["iPhone 13"],
+      },
+    },
   ],
 });
