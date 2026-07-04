@@ -934,7 +934,9 @@ Custom slash commands live in `.claude/commands/`. Use them frequently:
 | `/review-plan` | Review a plan as staff engineer |
 | `/fix <error>` | Diagnose and fix a bug |
 | `/techdebt` | Scan for tech debt and duplicated code |
-| `/ci-fix` | Fix failing build/CI |
+| `/ci-fix <job/error>` | Triage and fix any failing CI check — lint/typecheck/build, any of the 7 `governance` sub-gates, migration/db-lint/RLS jobs, or CodeQL/dependency-review/SBOM |
+| `/new-migration <description>` | Scaffold a Supabase migration with correct timestamp/ordering, RLS, and matching pgTAP coverage |
+| `/new-edge-function <description>` | Scaffold an Edge Function using `createHttpHandler`, pre-wired for the exposure-classification governance gate |
 | `/verify` | Verify changes are correct (diff, build, logic check) |
 | `/update-notes` | Capture session learnings in `.claude/notes/` |
 
