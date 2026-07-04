@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -36,15 +36,19 @@ export const MicrophoneAnalysisPreview = ({
 }: MicrophoneAnalysisPreviewProps) => {
   const [includeSpares, setIncludeSpares] = useState(true);
   const [spares, setSpares] = useState<Record<string, number>>({});
+  const wasOpenRef = useRef(false);
 
-  // Seed the spare amounts from the suggestion policy whenever the dialog opens
-  // with a fresh set of requirements, so re-opening always reflects the current
-  // analysis rather than a stale hand-edited state.
+  // Seed the spare amounts from the suggestion policy only when the dialog
+  // transitions to open, so a background/focus refetch that swaps
+  // peakRequirements while the dialog is already open doesn't wipe the user's
+  // manual spare edits. Re-opening always reseeds from the current analysis.
   useEffect(() => {
-    if (!open) return;
-    const suggestions = suggestMicrophoneSpares(peakRequirements);
-    setSpares(Object.fromEntries(suggestions.map((s) => [s.model, s.spareQuantity])));
-    setIncludeSpares(true);
+    if (open && !wasOpenRef.current) {
+      const suggestions = suggestMicrophoneSpares(peakRequirements);
+      setSpares(Object.fromEntries(suggestions.map((s) => [s.model, s.spareQuantity])));
+      setIncludeSpares(true);
+    }
+    wasOpenRef.current = open;
   }, [open, peakRequirements]);
 
   const setSpareFor = (model: string, next: number) => {

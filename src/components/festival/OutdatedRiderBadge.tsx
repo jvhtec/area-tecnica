@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { History, X, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,7 +19,9 @@ interface OutdatedRiderBadgeProps {
 
 const formatSourceDate = (date: string | null | undefined): string => {
   if (!date) return "otra fecha";
-  const parsed = new Date(date);
+  // Parse as a date-only value (parseISO treats "YYYY-MM-DD" as local midnight)
+  // so a Postgres `date` isn't shifted back a day for users behind UTC.
+  const parsed = parseISO(date);
   return Number.isNaN(parsed.getTime()) ? date : format(parsed, "d 'de' MMMM 'de' yyyy", { locale: es });
 };
 

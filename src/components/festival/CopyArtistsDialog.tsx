@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarIcon, Users, Clock, Search, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { queryKeys } from "@/lib/react-query";
@@ -48,7 +48,8 @@ const SEARCH_LIMIT = 50;
 
 const formatShowDate = (date: string | null | undefined) => {
   if (!date) return "";
-  const parsed = new Date(date);
+  // parseISO keeps a date-only "YYYY-MM-DD" on its calendar day (no UTC shift).
+  const parsed = parseISO(date);
   return Number.isNaN(parsed.getTime()) ? date : format(parsed, "d MMM yyyy");
 };
 

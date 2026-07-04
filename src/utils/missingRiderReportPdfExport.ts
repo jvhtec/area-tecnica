@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { generateQRCode } from '@/utils/qrcode';
@@ -211,7 +211,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
         let sourceText = '';
         try {
           if (artist.copiedFromDate) {
-            const d = new Date(artist.copiedFromDate);
+            const d = parseISO(artist.copiedFromDate);
             if (!isNaN(d.getTime())) {
               sourceText = format(d, 'd MMM', { locale: es });
             }
