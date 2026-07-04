@@ -150,6 +150,34 @@ describe("compareArtistRequirements", () => {
 
     expect(result.mismatches.filter((m) => m.type === "console" && m.severity === "error")).toHaveLength(0);
   });
+
+  it("does not validate a wireless system flagged band-provided even when the top-level flag says festival", () => {
+    // Top-level wireless_provided_by is "festival" (the default), but this
+    // particular system is individually marked band-provided - e.g. left over
+    // from a setup that used to be "mixed". It must be skipped, not validated
+    // against inventory that doesn't have it.
+    const artist = makeArtist({
+      wireless_provided_by: "festival",
+      wireless_systems: [
+        { model: "Shure AD", quantity_hh: 2, quantity_bp: 0, provided_by: "band" },
+      ],
+    });
+    const result = compareArtistRequirements(artist, globalSetupWith([]), null);
+
+    expect(result.mismatches.filter((m) => m.type === "wireless")).toHaveLength(0);
+  });
+
+  it("does not validate an IEM system flagged band-provided even when the top-level flag says festival", () => {
+    const artist = makeArtist({
+      iem_provided_by: "festival",
+      iem_systems: [
+        { model: "PSM1000", quantity_hh: 2, quantity_bp: 0, provided_by: "band" },
+      ],
+    });
+    const result = compareArtistRequirements(artist, globalSetupWith([]), null);
+
+    expect(result.mismatches.filter((m) => m.type === "iem")).toHaveLength(0);
+  });
 });
 
 describe("calculateEquipmentNeeds", () => {
@@ -181,6 +209,46 @@ describe("calculateEquipmentNeeds", () => {
     const needs = calculateEquipmentNeeds([artist], globalSetupWith([{ model: "SD7", quantity: 1 }]), {});
 
     expect(needs.consoles.foh).toHaveLength(0);
+  });
+
+  it("does not report a shortage when multiple artists on the same stage share one reused console", () => {
+    // Five acts on the same stage all use the house SD7 sequentially - they
+    // don't need five physical consoles, just the one that's configured.
+    const artists = Array.from({ length: 5 }, (_, i) =>
+      makeArtist({ name: `Band ${i}`, stage: 1, foh_console: "SD7", foh_console_provided_by: "festival" })
+    );
+    const needs = calculateEquipmentNeeds(artists, globalSetupWith([{ model: "SD7", quantity: 1 }]), {});
+
+    expect(needs.consoles.foh).toHaveLength(0);
+  });
+
+  it("reports the shortage based on the busiest artist, not the sum of every artist's need", () => {
+    // Two artists share a stage and both want the house wireless model, but
+    // only one of them needs 4 handhelds at once (their own set); the other
+    // only needs 1. The stage only needs to cover the peak (4), not 4+1=5.
+    const busyArtist = makeArtist({
+      name: "Busy Band",
+      stage: 1,
+      wireless_systems: [
+        { model: "ULXD", quantity_hh: 4, quantity_bp: 0, provided_by: "festival" },
+      ],
+    });
+    const quietArtist = makeArtist({
+      name: "Quiet Band",
+      stage: 1,
+      wireless_systems: [
+        { model: "ULXD", quantity_hh: 1, quantity_bp: 0, provided_by: "festival" },
+      ],
+    });
+    const needs = calculateEquipmentNeeds(
+      [busyArtist, quietArtist],
+      globalSetupWith([]),
+      {}
+    );
+
+    const ulxd = needs.wireless.find((w) => w.model === "ULXD");
+    expect(ulxd).toBeDefined();
+    expect(ulxd!.additionalHH).toBe(4);
   });
 });
 

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { ConfigSummaryRow } from "./ConfigSummaryRow";
 import { GearMismatchIndicator } from "../GearMismatchIndicator";
+import { OutdatedRiderBadge } from "../OutdatedRiderBadge";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
 import {
   FOH_DRIVE_LABELS,
@@ -54,6 +55,8 @@ interface Artist {
   extras_djbooth: boolean;
   notes?: string;
   rider_missing?: boolean;
+  rider_copied_from_date?: string | null;
+  rider_outdated_dismissed?: boolean;
   foh_tech?: boolean;
   mon_tech?: boolean;
   isaftermidnight?: boolean;
@@ -242,6 +245,7 @@ interface MobileArtistCardProps {
   deletingStagePlotArtistId: string | null;
   isCreatingExtrasFor: (id: string) => boolean;
   onCreateFlexExtras: (artistId: string, artistName: string, artistDate: string, showStart: string, showEnd: string, isAfterMidnight: boolean) => void;
+  onOutdatedRiderDismissed?: () => void;
   riderFiles?: MobileArtistRiderFile[];
   canDelete: boolean;
   canCreateExtras: boolean;
@@ -268,6 +272,7 @@ export const MobileArtistCard = ({
   deletingStagePlotArtistId,
   isCreatingExtrasFor,
   onCreateFlexExtras,
+  onOutdatedRiderDismissed,
   riderFiles = [],
   canDelete,
   canCreateExtras,
@@ -296,12 +301,21 @@ export const MobileArtistCard = ({
                 </Badge>
               )}
               <Badge variant="outline" className="text-[10px]">{stageName}</Badge>
-              <Badge
-                variant={artist.rider_missing ? "destructive" : "default"}
-                className="text-[10px]"
-              >
-                {artist.rider_missing ? "Faltante" : "Completo"}
-              </Badge>
+              {artist.rider_copied_from_date && !artist.rider_outdated_dismissed ? (
+                <OutdatedRiderBadge
+                  artistId={artist.id}
+                  copiedFromDate={artist.rider_copied_from_date}
+                  onDismissed={onOutdatedRiderDismissed}
+                  compact
+                />
+              ) : (
+                <Badge
+                  variant={artist.rider_missing ? "destructive" : "default"}
+                  className="text-[10px]"
+                >
+                  {artist.rider_missing ? "Faltante" : "Completo"}
+                </Badge>
+              )}
               {artist.isaftermidnight && (
                 <Badge variant="outline" className="text-[10px] bg-blue-700 text-white">
                   AM

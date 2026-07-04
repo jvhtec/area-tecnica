@@ -803,11 +803,12 @@ export const generateAndMergeFestivalPDFs = async (
       console.log("Processing Missing Rider Report generation");
       
       if (artists && artists.length > 0) {
-        const missingRiderArtists = artists.filter(artist => 
-          Boolean(artist.rider_missing)
+        const missingRiderArtists = artists.filter(artist =>
+          Boolean(artist.rider_missing) ||
+          (Boolean(artist.rider_copied_from_date) && !artist.rider_outdated_dismissed)
         );
-        
-        console.log(`Found ${missingRiderArtists.length} artists with missing riders out of ${artists.length} total artists`);
+
+        console.log(`Found ${missingRiderArtists.length} artists with missing or outdated riders out of ${artists.length} total artists`);
         
         // Use chronological sorting for Missing Rider Report as well
         const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists);
@@ -832,9 +833,11 @@ export const generateAndMergeFestivalPDFs = async (
               end: artist.show_end || ''
             },
             formUrl: publicFormLinksByArtistId[artist.id],
+            status: artist.rider_missing ? 'missing' as const : 'outdated' as const,
+            copiedFromDate: artist.rider_copied_from_date || undefined,
           }))
         };
-        
+
         try {
           console.log("Generating Missing Rider Report PDF with data:", {
             artistCount: missingRiderData.artists.length,

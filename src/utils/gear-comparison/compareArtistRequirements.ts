@@ -375,8 +375,9 @@ export const compareArtistRequirements = (
         });
       }
     } else {
-      // Festival-only setup: validate all systems
-      artist.wireless_systems.forEach(artistWireless => {
+      // Festival-only setup: validate all systems, except any individually
+      // flagged as band-provided (e.g. left over from a previous mixed setup).
+      artist.wireless_systems.filter(system => (system.provided_by || 'festival') !== 'band').forEach(artistWireless => {
         const availableWireless = availableGear.wireless_systems.find(
           w => w.model.toLowerCase() === artistWireless.model.toLowerCase()
         );
@@ -498,8 +499,9 @@ export const compareArtistRequirements = (
         });
       }
     } else {
-      // Festival-only setup: validate all systems
-      artist.iem_systems.forEach(artistIEM => {
+      // Festival-only setup: validate all systems, except any individually
+      // flagged as band-provided (e.g. left over from a previous mixed setup).
+      artist.iem_systems.filter(system => (system.provided_by || 'festival') !== 'band').forEach(artistIEM => {
         const availableIEM = availableGear.iem_systems.find(
           iem => iem.model.toLowerCase() === artistIEM.model.toLowerCase()
         );

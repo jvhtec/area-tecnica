@@ -51,20 +51,20 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange, 
     setAnalysisPreviewOpen(true);
   };
 
-  const handleConfirmLoadRequirements = async () => {
-    if (!analysisData || readOnly) return;
+  const handleConfirmLoadRequirements = async (requirements: WiredMic[]) => {
+    if (readOnly) return;
 
     setIsLoadingRequirements(true);
-    
+
     try {
       console.log('=== LOADING REQUIREMENTS DEBUG ===');
-      console.log('Analysis data peak requirements:', analysisData.peakRequirements);
+      console.log('Requirements to load (peak + spares):', requirements);
       console.log('Existing wired mics:', wiredMics);
-      
+
       // Ensure we're working with proper arrays
       const existingMics = Array.isArray(wiredMics) ? wiredMics : [];
-      const newRequirements = Array.isArray(analysisData.peakRequirements) ? analysisData.peakRequirements : [];
-      
+      const newRequirements = Array.isArray(requirements) ? requirements : [];
+
       // Merge with existing mics, combining quantities for same models
       const existingMicsMap = new Map(existingMics.map(mic => [mic.model, mic]));
       

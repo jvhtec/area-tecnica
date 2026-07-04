@@ -66,20 +66,25 @@ export const calculateEquipmentNeeds = (
     }
   });
 
-  // Calculate cumulative requirements per stage
+  // Calculate peak per-stage requirements. Artists on a stage perform
+  // sequentially, not concurrently, and festival-provided gear is reused
+  // between sets rather than consumed per artist - so the requirement for a
+  // given model/category is the busiest single artist's need, not the sum
+  // across every artist who happens to use it. Summing here would report,
+  // e.g., "need 4 more consoles" when 5 acts share one house desk.
   artists.forEach(artist => {
     const stageReq = stageRequirements[artist.stage];
 
     // Only count festival-provided equipment
-    
+
     // FOH Console
     if (artist.foh_console && artist.foh_console_provided_by !== 'band') {
-      stageReq.fohConsoles[artist.foh_console] = (stageReq.fohConsoles[artist.foh_console] || 0) + 1;
+      stageReq.fohConsoles[artist.foh_console] = Math.max(stageReq.fohConsoles[artist.foh_console] || 0, 1);
     }
 
     // Monitor Console
     if (!artist.monitors_from_foh && artist.mon_console && artist.mon_console_provided_by !== 'band') {
-      stageReq.monConsoles[artist.mon_console] = (stageReq.monConsoles[artist.mon_console] || 0) + 1;
+      stageReq.monConsoles[artist.mon_console] = Math.max(stageReq.monConsoles[artist.mon_console] || 0, 1);
     }
 
     // Wireless (only festival-provided)
@@ -90,9 +95,10 @@ export const calculateEquipmentNeeds = (
           if (!stageReq.wireless[key]) {
             stageReq.wireless[key] = { channels: 0, hh: 0, bp: 0 };
           }
-          stageReq.wireless[key].channels += getRequiredWirelessChannels(system);
-          stageReq.wireless[key].hh += system.quantity_hh || 0;
-          stageReq.wireless[key].bp += system.quantity_bp || 0;
+          const entry = stageReq.wireless[key];
+          entry.channels = Math.max(entry.channels, getRequiredWirelessChannels(system));
+          entry.hh = Math.max(entry.hh, system.quantity_hh || 0);
+          entry.bp = Math.max(entry.bp, system.quantity_bp || 0);
         }
       });
     }
@@ -105,8 +111,9 @@ export const calculateEquipmentNeeds = (
           if (!stageReq.iem[key]) {
             stageReq.iem[key] = { channels: 0, bp: 0 };
           }
-          stageReq.iem[key].channels += system.quantity_hh || system.quantity || 0;
-          stageReq.iem[key].bp += system.quantity_bp || 0;
+          const entry = stageReq.iem[key];
+          entry.channels = Math.max(entry.channels, system.quantity_hh || system.quantity || 0);
+          entry.bp = Math.max(entry.bp, system.quantity_bp || 0);
         }
       });
     }
@@ -114,31 +121,31 @@ export const calculateEquipmentNeeds = (
     // Microphones (only festival-provided)
     if (artist.wired_mics && (artist.mic_kit === 'festival' || artist.mic_kit === 'mixed')) {
       artist.wired_mics.forEach(mic => {
-        stageReq.microphones[mic.model] = (stageReq.microphones[mic.model] || 0) + mic.quantity;
+        stageReq.microphones[mic.model] = Math.max(stageReq.microphones[mic.model] || 0, mic.quantity);
       });
     }
 
     // Monitors
     if (artist.monitors_enabled) {
-      stageReq.monitors += artist.monitors_quantity || 0;
+      stageReq.monitors = Math.max(stageReq.monitors, artist.monitors_quantity || 0);
     }
 
     // Infrastructure (only festival-provided)
     if (artist.infrastructure_provided_by !== 'band') {
       if (artist.infra_cat6) {
-        stageReq.infrastructure.cat6 += artist.infra_cat6_quantity || 0;
+        stageReq.infrastructure.cat6 = Math.max(stageReq.infrastructure.cat6, artist.infra_cat6_quantity || 0);
       }
       if (artist.infra_hma) {
-        stageReq.infrastructure.hma += artist.infra_hma_quantity || 0;
+        stageReq.infrastructure.hma = Math.max(stageReq.infrastructure.hma, artist.infra_hma_quantity || 0);
       }
       if (artist.infra_coax) {
-        stageReq.infrastructure.coax += artist.infra_coax_quantity || 0;
+        stageReq.infrastructure.coax = Math.max(stageReq.infrastructure.coax, artist.infra_coax_quantity || 0);
       }
       if (artist.infra_opticalcon_duo) {
-        stageReq.infrastructure.opticalcon_duo += artist.infra_opticalcon_duo_quantity || 0;
+        stageReq.infrastructure.opticalcon_duo = Math.max(stageReq.infrastructure.opticalcon_duo, artist.infra_opticalcon_duo_quantity || 0);
       }
       if (artist.infra_analog) {
-        stageReq.infrastructure.analog += artist.infra_analog || 0;
+        stageReq.infrastructure.analog = Math.max(stageReq.infrastructure.analog, artist.infra_analog || 0);
       }
     }
 
