@@ -54,6 +54,40 @@ describe("festival feed event generation", () => {
     expect(events[0].eventKey).toContain("artist:artist-1:soundcheck_15:");
   });
 
+  it("skips soundcheck moments when the soundcheck flag is off despite a stale start time", () => {
+    const events = buildFestivalFeedArtistEvents([
+      {
+        ...artistBase,
+        soundcheck: false,
+        soundcheck_start: "09:30:00",
+      },
+    ]);
+
+    expect(events.map((event) => event.eventKind)).toEqual([
+      "linecheck_15",
+      "linecheck_now",
+      "show_15",
+      "show_now",
+    ]);
+  });
+
+  it("skips line check moments when the line check flag is off despite a stale start time", () => {
+    const events = buildFestivalFeedArtistEvents([
+      {
+        ...artistBase,
+        line_check: false,
+        line_check_start: "21:30:00",
+      },
+    ]);
+
+    expect(events.map((event) => event.eventKind)).toEqual([
+      "soundcheck_15",
+      "soundcheck_now",
+      "show_15",
+      "show_now",
+    ]);
+  });
+
   it("uses Madrid timezone and moves line check/show after midnight to the next civil day", () => {
     const events = buildFestivalFeedArtistEvents([
       {
