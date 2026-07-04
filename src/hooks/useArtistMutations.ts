@@ -102,7 +102,10 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
+      // Prefix match invalidates every cached date bucket (and the
+      // "search all dates" bucket) for this job — the edited artist may have
+      // been found via cross-date search rather than the current tab's date.
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId) });
       const savedOffline = Boolean((data as { __offline?: boolean })?.__offline);
       toast({
         title: savedOffline ? "Guardado offline" : "Success",
@@ -159,7 +162,10 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
+      // Prefix match invalidates every cached date bucket (and the
+      // "search all dates" bucket) for this job — the edited artist may have
+      // been found via cross-date search rather than the current tab's date.
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId) });
       const savedOffline = Boolean((data as { __offline?: boolean })?.__offline);
       toast({
         title: savedOffline ? "Guardado offline" : "Success",

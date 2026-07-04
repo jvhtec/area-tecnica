@@ -105,7 +105,7 @@ export const ArtistManagementForm = ({
     return {
       name: artistData?.name || "",
       stage: artistData?.stage || 1,
-      date: selectedDate,
+      date: artistData?.date || selectedDate,
       show_start: artistData?.show_start || "20:00",
       show_end: artistData?.show_end || "21:00",
       soundcheck: artistData?.soundcheck || false,

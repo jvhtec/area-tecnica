@@ -31,7 +31,7 @@ export const ArtistTableFilters = ({
           <Label htmlFor="search" className="text-sm">Buscar artista</Label>
           <Input
             id="search"
-            placeholder="Buscar por nombre..."
+            placeholder="Buscar por nombre en todas las fechas..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             className="h-10"
