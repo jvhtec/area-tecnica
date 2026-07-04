@@ -217,7 +217,7 @@ const FestivalArtistManagement = () => {
   useRealtimeSubscription({
     table: "festival_artists",
     filter: `job_id=eq.${jobId}`,
-    queryKey: queryKeys.scope("festival-artists", jobId, selectedDate)
+    queryKey: queryKeys.scope("festival-artists", jobId) // Broader key for prefix matching both per-date and 'all-dates' cache entries
   });
 
   useEffect(() => {
