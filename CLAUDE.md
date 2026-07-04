@@ -943,6 +943,7 @@ Custom slash commands live in `.claude/commands/`. Use them frequently:
 | `/new-migration <description>` | Scaffold a Supabase migration with correct timestamp/ordering, RLS, and matching pgTAP coverage |
 | `/new-edge-function <description>` | Scaffold an Edge Function using `createHttpHandler`, pre-wired for the exposure-classification governance gate |
 | `/ui-check <route/feature>` | Visually verify a UI change at desktop + mobile viewport using the mock-auth Playwright harness (no live credentials needed) |
+| `/i18n-check [path]` | Catch hardcoded English UI strings (incl. Zod validation messages) in a diff or path — Spanish is the only supported UI language |
 | `/verify` | Verify changes are correct (diff, build, logic check) |
 | `/update-notes` | Capture session learnings in `.claude/notes/` |
 
@@ -1009,7 +1010,7 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Always use `--legacy-peer-deps`** with npm (peer dependency conflicts with vite 6, date-fns 3)
 - **Keep `package-lock.json` committed** and use `npm ci --legacy-peer-deps` for deterministic installs
 - **Timezone is always Europe/Madrid** for all date operations
-- **UI text is in Spanish** -- don't introduce English strings in user-facing components
+- **UI text is in Spanish** -- don't introduce English strings in user-facing components. This is a live, recurring slip, not a hypothetical: the codebase already has dozens of hardcoded English strings (`Save`, `Cancel`, `Delete`, `Loading...`) scattered across components. Run `/i18n-check` on new/changed files before committing UI work rather than assuming it's fine because "the rest of the app already has some."
 - **date-fns must stay at ^3.6.0** -- react-day-picker breaks on v4
 - **Supabase types are auto-generated** -- don't manually edit `src/integrations/supabase/types.ts`
 - **Tour assignments cascade** -- removing a tour assignment must remove related job assignments and timesheets
