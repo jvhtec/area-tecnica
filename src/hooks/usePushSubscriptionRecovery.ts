@@ -83,7 +83,7 @@ export function usePushSubscriptionRecovery() {
             onClick: () => {
               // Navigate to notifications settings
               // User will need to manually re-enable
-              window.location.hash = '#/profile'; // or wherever your push settings are
+              window.location.href = '/profile';
             },
           },
           cancel: {

@@ -112,15 +112,6 @@ git push origin --delete abandoned-feature
 git branch -D abandoned-feature  # -D for force delete
 ```
 
-### Keeping Dev Clean
-
-**Reset dev to match main** (after major merges):
-```bash
-git checkout dev
-git reset --hard main
-git push origin dev --force
-```
-
 ## GitHub Settings
 
 ### Enable Auto-Delete Branches
@@ -129,8 +120,7 @@ git push origin dev --force
 3. Merged PR branches will auto-delete ✅
 
 ### Protected Branches
-- `main` - Require PR reviews, no direct pushes
-- `dev` - Team collaboration branch
+- `main` - Require PR reviews, no direct pushes. There is no `dev` integration branch — branches are cut from and PR'd directly into `main`.
 
 ## Automation (GitHub Actions)
 

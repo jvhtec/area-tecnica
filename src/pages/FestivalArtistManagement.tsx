@@ -63,7 +63,9 @@ const FestivalArtistManagement = () => {
   const { jobTitle, jobDates, selectedDate, setSelectedDate, maxStages } =
     useFestivalArtistJobDetails(jobId, routeDate);
 
-  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(jobId, selectedDate, dayStartTime);
+  // A non-empty search term searches every festival date instead of just the selected one.
+  const isCrossDateSearch = searchTerm.trim().length > 0;
+  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(jobId, selectedDate, dayStartTime, { searchAllDates: isCrossDateSearch });
   const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
   const {
     data: festivalSettings
@@ -215,7 +217,7 @@ const FestivalArtistManagement = () => {
   useRealtimeSubscription({
     table: "festival_artists",
     filter: `job_id=eq.${jobId}`,
-    queryKey: queryKeys.scope("festival-artists", jobId, selectedDate)
+    queryKey: queryKeys.scope("festival-artists", jobId) // Broader key for prefix matching both per-date and 'all-dates' cache entries
   });
 
   useEffect(() => {
@@ -698,17 +700,18 @@ const FestivalArtistManagement = () => {
             {selectedDate && (
               isShowDate(new Date(selectedDate)) ? (
                 <div className="w-full">
-                  <ArtistTable 
+                  <ArtistTable
                     artists={artistRows}
-                    isLoading={artistsLoading} 
-                    onEditArtist={handleEditArtist} 
-                    onDeleteArtist={handleDeleteArtist} 
+                    isLoading={artistsLoading}
+                    onEditArtist={handleEditArtist}
+                    onDeleteArtist={handleDeleteArtist}
                     searchTerm={searchTerm}
                     stageFilter={stageFilter}
                     riderFilter={riderFilter}
                     dayStartTime={dayStartTime}
                     jobId={jobId}
                     selectedDate={selectedDate}
+                    crossDateSearch={isCrossDateSearch}
                     onArtistStagePlotUpdated={invalidateArtists}
                     {...artistActionPermissions}
                   />
