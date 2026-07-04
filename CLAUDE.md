@@ -9,8 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Stack**: React 18 + TypeScript, Vite 6, Supabase (Auth, DB, Storage, Edge Functions), Tailwind CSS + shadcn/ui, TanStack React Query, Zustand
 
 **Deployment**: Cloudflare Pages
-- Main branch → sector-pro.work (production)
-- Dev branch → preview deployments
+- `main` branch → sector-pro.work (production)
+- Any other branch/PR → automatic preview deployment (`https://<commit-hash>.area-tecnica.pages.dev`) — see `DEPLOYMENT.md`
 
 ## Development Commands
 
@@ -451,7 +451,7 @@ npm run test:e2e:mobile # Same specs, iPhone 13 viewport (390x844) — opt-in, n
 
 ### CI/CD Pipeline (GitHub Actions)
 
-Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`main` or manual dispatch:
+Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`main` or manual dispatch. The `dev` trigger is vestigial — per the Git Workflow section above there's no `dev` integration branch anymore, branches are cut from and PR'd back into `main` directly:
 
 | Job | Timeout | What it does |
 |-----|---------|-------------|
@@ -755,20 +755,25 @@ For full Cloudflare + Supabase staging setup, see `docs/STAGING_SETUP.md`.
 
 ## Git Workflow
 
-**DO NOT** work directly on `main` branch. Always use `dev` or feature branches.
+**DO NOT** work directly on `main` branch. There is no `dev` integration branch — always branch from the latest `main`.
 
 ```bash
 # Start new work
-git checkout dev
-git pull origin dev
+git fetch origin main
+git checkout -b feat/short-description origin/main   # or fix/, refactor/, docs/, chore/ — see .github/GIT_HYGIENE.md
 
 # Make changes and commit
 git add .
 git commit -m "feat: description"  # Use conventional commits
-git push origin dev
+
+# Keep it rebased on main before opening/updating a PR
+git fetch origin main
+git rebase origin/main
+
+git push -u origin feat/short-description
 
 # Create PR to merge into main
-# After approval, merge triggers production deployment
+# After approval, merge triggers production deployment; every pushed branch also gets its own Cloudflare preview deployment
 ```
 
 **Conventional Commit Prefixes**: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
@@ -905,7 +910,7 @@ alias zmain='cd /path/to/area-tecnica && claude'
 - Name worktrees after the task: `feature-auth`, `bugfix-timesheets`, `refactor-pdf`
 - Keep a dedicated "analysis" worktree for read-only investigation (logs, queries, exploration)
 - Always `npm ci --legacy-peer-deps` in new worktrees unless intentionally updating dependencies
-- Merge back to dev/main via PR, never cross-merge between worktrees
+- Merge back to `main` via PR, never cross-merge between worktrees
 
 ### Plan Mode First
 

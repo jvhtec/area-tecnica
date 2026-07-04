@@ -9,18 +9,18 @@ This file provides working guidance for coding agents operating in this reposito
 - Primary stack: React 18 + TypeScript + Vite 6 + Supabase + Tailwind + shadcn/ui + TanStack Query + Zustand
 - Deployment:
   - `main` → production (`sector-pro.work`)
-  - `dev` → preview environments
+  - Any other branch/PR → automatic Cloudflare Pages preview deployment (`https://<commit-hash>.area-tecnica.pages.dev`)
 
 ## Non-negotiable rules
 
 1. Branch discipline
-   - Default to a new feature branch from current remote `main`:
+   - There is no `dev` integration branch. Always branch from current remote `main`:
      ```bash
      git fetch origin main
      git switch -c codex/<short-description> origin/main
      ```
-   - Work from `dev` only when explicitly requested for preview-environment work.
    - Never commit directly to `main`.
+   - Keep the branch rebased on `main` before opening/updating a PR (`git fetch origin main && git rebase origin/main`).
 
 2. Dependency install
    - CI and clean local verification use:
