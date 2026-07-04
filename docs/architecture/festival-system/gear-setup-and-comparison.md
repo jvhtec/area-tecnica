@@ -46,7 +46,7 @@ Core service: `src/utils/gearComparisonService.ts`.
 
 ### Stage resolution behavior
 
-- Stage 1 may use global setup when stage override is absent.
+- Stage 1 **always** resolves from the global setup - it never reads a stage-1-specific row, even if one exists. There is no "override" path for stage 1.
 - Other stages rely on explicit stage setup; missing stage setup is treated as empty inventory.
 
 This design keeps capacity assumptions explicit and conservative for multi-stage festivals.
