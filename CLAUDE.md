@@ -945,8 +945,10 @@ Custom slash commands live in `.claude/commands/`. Use them frequently:
 **Skills** (in `.claude/skills/`) are more advanced commands that support frontmatter for model selection, tool restrictions, and subagent execution:
 - `plan-review` -- Two-phase plan + self-review, forked into a `Plan` subagent (keeps the main context clean)
 - `techdebt-scan` -- Deep tech debt scan, forked into an `Explore` subagent (read-only)
+- `release-readiness` -- Cross-checks the current branch/PR against `docs/release/production-release-checklist.md` (migrations, local validation, CI status across all 3 workflows, CodeRabbit), forked into `general-purpose` (needs GitHub MCP tools)
+- `critical-invariant-check` -- Checks a change against this app's 5 documented "don't bypass" invariants (assignment cascade, staffing state machine, Flex folder hierarchy, server-side timesheet calc, Edge Function exposure classification), forked into `Explore` (read-only)
 
-Both skills set `disable-model-invocation: true`, so they only run when explicitly invoked (`/plan-review`, `/techdebt-scan`), never auto-triggered. They overlap in purpose with the `/plan` + `/review-plan` and `/techdebt` commands above — prefer the commands for quick, inline work in the current session; reach for the skills when the investigation is large enough that you want it isolated in its own subagent context instead of bloating the main conversation.
+All four skills set `disable-model-invocation: true`, so they only run when explicitly invoked (e.g. `/release-readiness`), never auto-triggered. `plan-review`/`techdebt-scan` overlap in purpose with the `/plan` + `/review-plan` and `/techdebt` commands — prefer the commands for quick, inline work in the current session; reach for a skill when the investigation is large enough that you want it isolated in its own subagent context instead of bloating the main conversation, or when it needs tools (like GitHub MCP) that a simple inline command wouldn't reach for.
 
 ### Subagents
 
