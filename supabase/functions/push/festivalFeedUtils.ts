@@ -194,8 +194,10 @@ const normalizeStageLabel = (jobId: string, stage: number | null, stageNames?: M
 };
 
 const getArtistMomentTime = (artist: FestivalFeedArtist, source: ArtistMomentConfig["source"]): string | null => {
-  if (source === "soundcheck") return artist.soundcheck_start;
-  if (source === "linecheck") return artist.line_check_start;
+  // soundcheck_start/line_check_start can hold stale values after the artist is
+  // toggled off in the form, so the enabled flag is the source of truth.
+  if (source === "soundcheck") return artist.soundcheck ? artist.soundcheck_start : null;
+  if (source === "linecheck") return artist.line_check ? artist.line_check_start : null;
   return artist.show_start;
 };
 
