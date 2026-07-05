@@ -209,7 +209,7 @@ describe("MobileNavBar", () => {
   })
 
   it("snaps back to bottom:0 the instant focus leaves an input, even if visualViewport still reports an inset", async () => {
-    const visualViewport = mockVisualViewport({
+    mockVisualViewport({
       height: 700,
       innerHeight: 760,
       offsetTop: 0,
