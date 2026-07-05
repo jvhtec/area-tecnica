@@ -110,14 +110,16 @@ export const useSelectedTechnicalStage = ({
 
 export const TechnicalStageSelector = ({
   disabled = false,
-  label = "Stage",
+  label = "Escenario",
   onChange,
+  placeholder = "Seleccione un escenario",
   selectedStageNumber,
   stages,
 }: {
   disabled?: boolean;
   label?: string;
   onChange: (stageNumber: number) => void;
+  placeholder?: string;
   selectedStageNumber: number | null;
   stages: TechnicalStage[];
 }) => {
@@ -132,7 +134,7 @@ export const TechnicalStageSelector = ({
         onValueChange={(value) => onChange(Number(value))}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Select stage" />
+          <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {stages.map((stage) => (

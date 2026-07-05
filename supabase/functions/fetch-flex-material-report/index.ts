@@ -47,6 +47,7 @@ const isFlexReportType = (value: string): value is FlexReportType =>
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_DEPARTMENTS = new Set(["sound", "lights", "video", "production"]);
+const UNVERIFIED_OVERRIDE_ROLES = new Set(["admin", "management"]);
 // Preference order when a job/department has multiple quote-type folders.
 const QUOTE_FOLDER_TYPES = ["comercial_presupuesto", "dryhire_presupuesto", "presupuestos_recibidos"];
 
@@ -75,6 +76,13 @@ const getTechnicalStageStorageScope = (stageNumber: number, stageName?: string |
   const nameSlug = normalizePathSegment(stageName || "");
   return nameSlug ? `stage-${stageNumber}-${nameSlug}` : `stage-${stageNumber}`;
 };
+
+const hasPdfMagic = (bytes: Uint8Array) =>
+  bytes.length >= 4 &&
+  bytes[0] === 0x25 &&
+  bytes[1] === 0x50 &&
+  bytes[2] === 0x44 &&
+  bytes[3] === 0x46;
 
 serve(createHttpHandler(async (req: Request) => {
   const body = await readBoundedJsonObject<FetchFlexMaterialReportBody>(req, { maxBytes: 4 * 1024 });
@@ -131,15 +139,26 @@ serve(createHttpHandler(async (req: Request) => {
 
   if (overrideElementId) {
     elementId = overrideElementId;
-    const { data: matches } = await supabase
+    const { data: matches, error: matchError } = await supabase
       .from("flex_folders")
-      .select("job_id, folder_type")
+      .select("job_id, department, folder_type")
       .eq("element_id", overrideElementId)
       .limit(1);
+    if (matchError) {
+      throw new HttpError(500, "Failed to validate Flex override element", {
+        code: "flex_override_lookup_failed",
+        exposeDetails: false,
+      });
+    }
     const match = matches?.[0];
-    elementValidated = Boolean(match);
-    elementJobMismatch = Boolean(match && match.job_id !== jobId);
+    elementValidated = Boolean(match && match.job_id === jobId && match.department === department);
+    elementJobMismatch = Boolean(match && (match.job_id !== jobId || match.department !== department));
     folderType = match?.folder_type ?? null;
+    if (!elementValidated && !UNVERIFIED_OVERRIDE_ROLES.has(caller.role)) {
+      throw new HttpError(403, "Flex override element is not valid for this job and department", {
+        code: "invalid_flex_override_scope",
+      });
+    }
   } else {
     const { data: folders, error: folderError } = await supabase
       .from("flex_folders")
@@ -223,6 +242,12 @@ serve(createHttpHandler(async (req: Request) => {
       : new TextEncoder().encode(rawText);
   } catch {
     pdfBytes = new TextEncoder().encode(rawText);
+  }
+
+  if (!hasPdfMagic(pdfBytes)) {
+    throw new HttpError(502, "Flex did not return a valid PDF", {
+      code: "invalid_flex_pdf",
+    });
   }
 
   const bucket = "job-documents";

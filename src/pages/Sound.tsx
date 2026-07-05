@@ -40,7 +40,7 @@ import { isManagementRole } from "@/utils/permissions";
 import { queryKeys } from "@/lib/react-query";
 const Sound = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -75,8 +75,14 @@ const Sound = () => {
   useEffect(() => {
     if (shouldOpenMemoriaFromUrl) {
       setShowMemoriaTecnica(true);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("tool");
+        next.delete("memoria");
+        return next;
+      }, { replace: true });
     }
-  }, [shouldOpenMemoriaFromUrl]);
+  }, [shouldOpenMemoriaFromUrl, setSearchParams]);
 
   // Generate navigation items for mobile nav bar
   const navigationItems = useMemo(() => {

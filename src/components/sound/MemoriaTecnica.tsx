@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
 import { isStorageNotFoundError, uploadStorageObject } from "@/utils/storageUpload";
 import { useMemoriaJobAndStage } from "@/features/technical-tools/memoria/useMemoriaJobAndStage";
+import { formatMemoriaUploadDate } from "@/features/technical-tools/memoria/dateFormat";
 import {
   useMemoriaAutoFill,
   type MemoriaAutoFillCategorySpec,
@@ -556,7 +557,7 @@ export const MemoriaTecnica = () => {
                   {!doc.file && detected && (
                     <p className="text-xs text-muted-foreground">
                       Detectado: {detected.fileName}
-                      {detected.uploadedAt ? ` (${new Date(detected.uploadedAt).toLocaleDateString()})` : ""}
+                      {detected.uploadedAt ? ` (${formatMemoriaUploadDate(detected.uploadedAt)})` : ""}
                     </p>
                   )}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">

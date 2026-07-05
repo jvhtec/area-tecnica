@@ -38,9 +38,13 @@ export const upsertMemoriaTecnicaDocument = async (
   if (findError) throw findError;
 
   if (existing?.id) {
-    const { error } = await client.from(table).update(payload).eq("id", existing.id);
+    const { data: updated, error } = await client
+      .from(table)
+      .update(payload)
+      .eq("id", existing.id)
+      .select("id");
     if (error) throw error;
-    return;
+    if ((updated || []).length > 0) return;
   }
 
   const { error: insertError } = await client.from(table).insert(payload);
@@ -58,6 +62,11 @@ export const upsertMemoriaTecnicaDocument = async (
   const { data: winner, error: raceFindError } = await raceQuery.maybeSingle();
   if (raceFindError || !winner?.id) throw insertError;
 
-  const { error: updateError } = await client.from(table).update(payload).eq("id", winner.id);
+  const { data: updated, error: updateError } = await client
+    .from(table)
+    .update(payload)
+    .eq("id", winner.id)
+    .select("id");
   if (updateError) throw updateError;
+  if (!updated || updated.length === 0) throw insertError;
 };

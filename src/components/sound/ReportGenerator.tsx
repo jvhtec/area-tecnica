@@ -74,6 +74,7 @@ export const ReportGenerator = () => {
 
   const {
     hasMultipleStages,
+    isLoadingStages,
     selectedStage,
     selectedStageNumber,
     setSelectedStageNumber,
@@ -268,16 +269,24 @@ export const ReportGenerator = () => {
     if (!selectedJobId) {
       toast({
         title: "Error",
-        description: "Please select a job before generating the report.",
+        description: "Seleccione un trabajo antes de generar el informe.",
         variant: "destructive",
       });
       return;
     }
 
-    if (hasMultipleStages && !selectedStageNumber) {
+    if (isLoadingStages) {
+      toast({
+        title: "Cargando escenarios",
+        description: "Espere a que se carguen los escenarios antes de generar el informe.",
+      });
+      return;
+    }
+
+    if (hasMultipleStages && selectedStageNumber == null) {
       toast({
         title: "Error",
-        description: "Please select a stage before generating the report.",
+        description: "Seleccione un escenario antes de generar el informe.",
         variant: "destructive",
       });
       return;
@@ -286,8 +295,8 @@ export const ReportGenerator = () => {
     const selectedJob = jobs?.find(job => job.id === selectedJobId);
     const stageLabel = formatTechnicalStageLabel(selectedStage);
     const jobTitle = stageLabel
-      ? `${selectedJob?.title || "Unnamed_Job"} - ${stageLabel}`
-      : selectedJob?.title || "Unnamed_Job";
+      ? `${selectedJob?.title || "Trabajo_sin_nombre"} - ${stageLabel}`
+      : selectedJob?.title || "Trabajo_sin_nombre";
     const jobDate = selectedJob?.start_time 
       ? format(new Date(selectedJob.start_time), "MMMM dd, yyyy")
       : format(new Date(), "MMMM dd, yyyy");
@@ -386,14 +395,14 @@ export const ReportGenerator = () => {
         cleanupScope: getTechnicalStageStorageScope(selectedStage),
       });
       toast({
-        title: "Success",
-        description: "Report generated and saved to the job's documents.",
+        title: "Éxito",
+        description: "Informe generado y guardado en los documentos del trabajo.",
       });
     } catch (error) {
       console.error('Error uploading SV report:', error);
       toast({
         title: "Error",
-        description: "Failed to save the generated report.",
+        description: "No se pudo guardar el informe generado.",
         variant: "destructive",
       });
     }
@@ -423,10 +432,10 @@ export const ReportGenerator = () => {
         <div className="space-y-6">
           {/* Job Selection */}
           <div className="space-y-2">
-            <Label htmlFor="jobSelect">Job</Label>
+            <Label htmlFor="jobSelect">Trabajo</Label>
             <Select value={selectedJobId} onValueChange={setSelectedJobId}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a job" />
+                <SelectValue placeholder="Seleccione un trabajo" />
               </SelectTrigger>
               <SelectContent>
                 {jobs?.map(job => (
@@ -439,7 +448,7 @@ export const ReportGenerator = () => {
           </div>
 
           <TechnicalStageSelector
-            label="Stage"
+            label="Escenario"
             selectedStageNumber={selectedStageNumber}
             stages={jobStages}
             onChange={setSelectedStageNumber}
@@ -447,7 +456,7 @@ export const ReportGenerator = () => {
 
           {/* Report System Selection */}
           <div className="space-y-2">
-            <Label className="mb-2">Report System</Label>
+            <Label className="mb-2">Sistema del informe</Label>
             <RadioGroup 
               value={reportSystem}
               onValueChange={(value) => setReportSystem(value as "LA" | "Turbo")}
@@ -466,7 +475,7 @@ export const ReportGenerator = () => {
 
           {/* Equipment List */}
           <div className="space-y-2">
-            <Label htmlFor="equipamiento">Equipment List</Label>
+            <Label htmlFor="equipamiento">Listado de equipo</Label>
             <Textarea
               id="equipamiento"
               value={equipamiento}

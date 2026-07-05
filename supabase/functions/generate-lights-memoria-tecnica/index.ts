@@ -10,6 +10,12 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
+const clampSignedUrlTtl = (value: unknown) => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return 3600;
+  return Math.min(3600, Math.max(60, Math.floor(numericValue)));
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -17,9 +23,10 @@ serve(async (req) => {
   }
 
   try {
-    const { documentUrls, projectName, logoUrl, expiresIn = 3600 } = await req.json();
+    const { documentUrls, projectName, logoUrl, expiresIn } = await req.json();
+    const signedUrlTtl = clampSignedUrlTtl(expiresIn);
     
-    console.log('Starting PDF generation with inputs:', { projectName, logoUrl, documentUrls });
+    console.log('Starting PDF generation for project:', projectName);
 
     // Create merged PDF
     const mergedPdf = await PDFDocument.create();
@@ -69,7 +76,7 @@ serve(async (req) => {
     // Add customer logo if provided
     if (logoUrl) {
       try {
-        console.log('Fetching customer logo from URL:', logoUrl);
+        console.log('Fetching customer logo');
         const logoResponse = await fetch(logoUrl, {
           headers: {
             'Cache-Control': 'no-cache',
@@ -162,7 +169,7 @@ serve(async (req) => {
 
     if (isMemoriaCompleta) {
       // For memoria completa, just append the complete document after the cover page
-      console.log('Appending complete memoria PDF from:', documentUrls.memoria_completa);
+      console.log('Appending complete memoria PDF');
       try {
         const pdfResponse = await fetch(documentUrls.memoria_completa, {
           headers: {
@@ -230,7 +237,7 @@ serve(async (req) => {
         if (!url) continue;
 
         try {
-          console.log(`Fetching PDF from URL: ${url}`);
+          console.log(`Fetching PDF for ${doc.id}`);
           const pdfResponse = await fetch(url, {
             headers: {
               'Cache-Control': 'no-cache',
@@ -322,7 +329,7 @@ serve(async (req) => {
     try {
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(safeFileName, expiresIn);
+        .createSignedUrl(safeFileName, signedUrlTtl);
       if (signedUrlError) throw signedUrlError;
       signedUrl = signedUrlData.signedUrl;
     } catch (e) {
@@ -332,7 +339,7 @@ serve(async (req) => {
           'Authorization': `Bearer ${supabaseServiceKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ expiresIn, paths: [safeFileName] }),
+        body: JSON.stringify({ expiresIn: signedUrlTtl, paths: [safeFileName] }),
       });
       if (!res.ok) {
         const txt = await res.text();
@@ -349,8 +356,8 @@ serve(async (req) => {
       JSON.stringify({
         url: signedUrl,
         fileName: safeFileName,
-        expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-        expiresIn: expiresIn,
+        expiresAt: new Date(Date.now() + signedUrlTtl * 1000).toISOString(),
+        expiresIn: signedUrlTtl,
       }),
       {
         headers: {
