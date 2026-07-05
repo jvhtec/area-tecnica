@@ -258,7 +258,7 @@ export const TourManagementDialog = ({
             <div className="border-b pb-4">
               <h3 className="text-sm font-medium mb-3">Configuración de Tour Pack</h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                   <div className="flex items-center gap-3">
                     <Package className="h-4 w-4 text-blue-600" />
                     <div>
@@ -266,7 +266,7 @@ export const TourManagementDialog = ({
                       <p className="text-xs text-muted-foreground">Establecer todas las fechas de esta gira como paquete S</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       variant="outline"

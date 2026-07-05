@@ -349,7 +349,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Vista Previa - Correo de Pago</DialogTitle>
           <DialogDescription>
@@ -376,10 +376,10 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
 
           {/* Preview Content */}
           {selectedAttachment && (
-            <Tabs defaultValue="email" className="flex-1 flex flex-col overflow-hidden">
-              <TabsList>
-                <TabsTrigger value="email">Email HTML</TabsTrigger>
-                <TabsTrigger value="data">Datos</TabsTrigger>
+            <Tabs defaultValue="email" className="flex-1 flex flex-col overflow-hidden min-w-0">
+              <TabsList className="w-full sm:w-auto">
+                <TabsTrigger value="email" className="flex-1 sm:flex-none">Email HTML</TabsTrigger>
+                <TabsTrigger value="data" className="flex-1 sm:flex-none">Datos</TabsTrigger>
               </TabsList>
 
               <TabsContent value="email" className="flex-1 overflow-auto border rounded-md p-4">

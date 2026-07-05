@@ -398,7 +398,7 @@ export default function GlobalTasks() {
             {DEPARTMENT_LABELS[dept] || dept} — tareas de departamento y tareas globales
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
             <Filter className="h-4 w-4 mr-1" />
             Filtros
