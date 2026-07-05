@@ -10,11 +10,40 @@ import {
   requireEnvValues,
 } from "../_shared/http.ts";
 
-// Fixed Flex report constants confirmed against the live Flex account -- only the
-// PROJECT_ELEMENT_ID (the quote's flex_folders.element_id) varies per job/department.
-const FLEX_REPORT_TEMPLATE_ID = "5367741d-f6fe-4120-af68-a79a68bbfb43";
-const FLEX_PROJECT_ELEMENT_DEFINITION_ID = "9bfb850c-b117-11df-b8d5-00e08175e43e"; // matches FLEX_FOLDER_IDS.presupuesto
-const FLEX_DOCUMENT_VIEW_ID = "ca6b072c-b122-11df-b8d5-00e08175e43e";
+// Fixed Flex report constants confirmed against the live Flex account. Only
+// PROJECT_ELEMENT_ID varies per job/department for the material-list report.
+const FLEX_REPORT_DEFINITIONS = {
+  "material-list": {
+    generateId: "5367741d-f6fe-4120-af68-a79a68bbfb43",
+    projectElementDefinitionId: "9bfb850c-b117-11df-b8d5-00e08175e43e", // matches FLEX_FOLDER_IDS.presupuesto
+    documentViewId: "ca6b072c-b122-11df-b8d5-00e08175e43e",
+    format: "pdf",
+    paperSize: "A4",
+    orientation: "portrait",
+    storageCategory: "calculators/lista-material",
+    fileNamePrefix: "Listado de Material",
+    displayName: "lista de material",
+    includeCacheBuster: false,
+  },
+  quote: {
+    generateId: "generate-pdf",
+    projectElementDefinitionId: "9bfb850c-b117-11df-b8d5-00e08175e43e",
+    documentViewId: "ca6b072c-b122-11df-b8d5-00e08175e43e",
+    format: "pdf",
+    paperSize: "A4",
+    orientation: null,
+    storageCategory: "flex-reports/presupuestos",
+    fileNamePrefix: "Presupuesto",
+    displayName: "presupuesto",
+    includeCacheBuster: true,
+  },
+} as const;
+
+type FlexReportType = keyof typeof FLEX_REPORT_DEFINITIONS;
+
+const DEFAULT_REPORT_TYPE: FlexReportType = "material-list";
+const isFlexReportType = (value: string): value is FlexReportType =>
+  Object.prototype.hasOwnProperty.call(FLEX_REPORT_DEFINITIONS, value);
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_DEPARTMENTS = new Set(["sound", "lights", "video", "production"]);
@@ -25,6 +54,7 @@ interface FetchFlexMaterialReportBody extends Record<string, unknown> {
   jobId?: unknown;
   department?: unknown;
   overrideElementId?: unknown;
+  reportType?: unknown;
   stageName?: unknown;
   stageNumber?: unknown;
 }
@@ -52,6 +82,9 @@ serve(createHttpHandler(async (req: Request) => {
   const jobId = typeof body.jobId === "string" ? body.jobId : null;
   const department = typeof body.department === "string" ? body.department : null;
   const overrideElementId = typeof body.overrideElementId === "string" ? body.overrideElementId : null;
+  const reportType = typeof body.reportType === "string" && body.reportType.trim()
+    ? body.reportType.trim()
+    : DEFAULT_REPORT_TYPE;
   const stageNumber =
     typeof body.stageNumber === "number" && Number.isInteger(body.stageNumber) && body.stageNumber > 0
       ? body.stageNumber
@@ -69,9 +102,14 @@ serve(createHttpHandler(async (req: Request) => {
   if (overrideElementId && !UUID_PATTERN.test(overrideElementId)) {
     throw new HttpError(400, "overrideElementId must be a UUID", { code: "invalid_override_element_id" });
   }
+  if (!isFlexReportType(reportType)) {
+    throw new HttpError(400, "Unsupported reportType", { code: "invalid_report_type" });
+  }
   if (body.stageNumber !== undefined && stageNumber === null) {
     throw new HttpError(400, "stageNumber must be a positive integer", { code: "invalid_stage_number" });
   }
+
+  const reportDefinition = FLEX_REPORT_DEFINITIONS[reportType];
 
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = requireEnvValues(
     ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const,
@@ -142,17 +180,22 @@ serve(createHttpHandler(async (req: Request) => {
     });
   }
 
-  const reportUrl = new URL(`https://sectorpro.flexrentalsolutions.com/f5/api/report/generate/${FLEX_REPORT_TEMPLATE_ID}`);
+  const reportUrl = new URL(`https://sectorpro.flexrentalsolutions.com/f5/api/report/generate/${reportDefinition.generateId}`);
+  if (reportDefinition.includeCacheBuster) {
+    reportUrl.searchParams.set("_dc", Date.now().toString());
+  }
   reportUrl.searchParams.set("parameterSubmission", "true");
   reportUrl.searchParams.set("REPORT_TIME_ZONE", "Europe/Madrid");
   reportUrl.searchParams.set("REPORT_LOCALE", "es_ES");
   reportUrl.searchParams.set("REPORT_CURRENCY_SYMBOL", "€");
-  reportUrl.searchParams.set("PROJECT_ELEMENT_DEFINITION_ID", FLEX_PROJECT_ELEMENT_DEFINITION_ID);
+  reportUrl.searchParams.set("PROJECT_ELEMENT_DEFINITION_ID", reportDefinition.projectElementDefinitionId);
   reportUrl.searchParams.set("PROJECT_ELEMENT_ID", elementId);
-  reportUrl.searchParams.set("DOCUMENT_VIEW_ID", FLEX_DOCUMENT_VIEW_ID);
-  reportUrl.searchParams.set("REPORT_FORMAT", "pdf");
-  reportUrl.searchParams.set("REPORT_PAPER_SIZE", "A4");
-  reportUrl.searchParams.set("REPORT_ORIENTATION", "portrait");
+  reportUrl.searchParams.set("DOCUMENT_VIEW_ID", reportDefinition.documentViewId);
+  reportUrl.searchParams.set("REPORT_FORMAT", reportDefinition.format);
+  reportUrl.searchParams.set("REPORT_PAPER_SIZE", reportDefinition.paperSize);
+  if (reportDefinition.orientation) {
+    reportUrl.searchParams.set("REPORT_ORIENTATION", reportDefinition.orientation);
+  }
 
   const flexResponse = await fetchWithRetry(reportUrl.toString(), {
     headers: {
@@ -183,13 +226,13 @@ serve(createHttpHandler(async (req: Request) => {
   }
 
   const bucket = "job-documents";
-  const category = `calculators/lista-material/${department}`;
+  const category = `${reportDefinition.storageCategory}/${department}`;
   const stageScope = stageNumber ? getTechnicalStageStorageScope(stageNumber, stageName) : null;
   const baseFolder = stageScope ? `${category}/${jobId}/${stageScope}` : `${category}/${jobId}`;
-  const fileName = `Listado de Material - ${sanitizeFileNameSegment(department)}.pdf`;
+  const fileName = `${reportDefinition.fileNamePrefix} - ${sanitizeFileNameSegment(department)}.pdf`;
   const objectPath = `${baseFolder}/${crypto.randomUUID()}-${sanitizeFileNameSegment(fileName)}`;
 
-  // Clean up any previous auto-fetched materials list for this job before writing the new one.
+  // Clean up any previous auto-fetched report for this job before writing the new one.
   const { data: existingObjects } = await supabase.storage.from(bucket).list(baseFolder);
   if (existingObjects && existingObjects.length > 0) {
     await supabase.storage.from(bucket).remove(existingObjects.map((f) => `${baseFolder}/${f.name}`));
@@ -200,7 +243,7 @@ serve(createHttpHandler(async (req: Request) => {
     .from(bucket)
     .upload(objectPath, pdfBytes, { contentType: "application/pdf", upsert: false });
   if (uploadError) {
-    throw new HttpError(500, "Failed to store the generated materials list", {
+    throw new HttpError(500, `Failed to store the generated ${reportDefinition.displayName}`, {
       code: "storage_upload_failed",
       exposeDetails: false,
     });
@@ -217,7 +260,7 @@ serve(createHttpHandler(async (req: Request) => {
     visible_to_tech: true,
   });
   if (insertError) {
-    throw new HttpError(500, "Failed to record the generated materials list", {
+    throw new HttpError(500, `Failed to record the generated ${reportDefinition.displayName}`, {
       code: "job_document_insert_failed",
       exposeDetails: false,
     });
@@ -227,7 +270,7 @@ serve(createHttpHandler(async (req: Request) => {
     .from(bucket)
     .createSignedUrl(objectPath, 3600);
   if (signError || !signedUrlData) {
-    throw new HttpError(500, "Failed to sign the generated materials list URL", {
+    throw new HttpError(500, `Failed to sign the generated ${reportDefinition.displayName} URL`, {
       code: "sign_url_failed",
       exposeDetails: false,
     });
@@ -240,5 +283,6 @@ serve(createHttpHandler(async (req: Request) => {
     folderType,
     elementValidated,
     elementJobMismatch,
+    reportType,
   });
 }, { allowedMethods: ["POST"] }));
