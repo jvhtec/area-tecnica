@@ -13,7 +13,7 @@ interface EmailComposerDialogProps {
 export const EmailComposerDialog = ({ open, onOpenChange }: EmailComposerDialogProps) => {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-[#0f1219] border-[#1f232e] text-slate-100">
+            <DialogContent className="max-w-3xl max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto bg-[#0f1219] border-[#1f232e] text-slate-100">
                 <DialogHeader>
                     <DialogTitle>Redactar Email Corporativo</DialogTitle>
                 </DialogHeader>

@@ -21,7 +21,7 @@ export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, tou
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl w-[96vw] max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-6xl w-[96vw] max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Task Manager</DialogTitle>
         </DialogHeader>

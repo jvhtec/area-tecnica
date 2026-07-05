@@ -79,8 +79,8 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <CardTitle className="text-base">Aprobaciones de tarifas</CardTitle>
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <div className="w-full md:w-64">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div className="w-full sm:flex-1 md:w-64 md:flex-none">
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar trabajos o giras" />
             </div>
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>

@@ -200,7 +200,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   if (isJobLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex flex-col overflow-y-auto">
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
@@ -213,7 +213,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] max-h-[92vh] flex flex-col overflow-y-auto overflow-x-hidden px-3 sm:px-6">
+      <DialogContent className="w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] max-h-[calc(92vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex flex-col overflow-y-auto overflow-x-hidden px-3 sm:px-6">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
             <Calendar className="h-4 w-4 md:h-5 md:w-5" />

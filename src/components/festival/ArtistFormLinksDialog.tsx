@@ -356,7 +356,7 @@ export const ArtistFormLinksDialog = ({
   const titleDate = dateFilter === ALL_DATES_VALUE ? "Todas las fechas" : formatDateLabel(dateFilter);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[calc(80vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Enlaces de Formularios de Artistas - {titleDate}</DialogTitle>
         </DialogHeader>
@@ -365,10 +365,10 @@ export const ArtistFormLinksDialog = ({
           <div className="rounded-md border border-muted px-3 py-2 text-sm text-muted-foreground">
             Los enlaces públicos expiran en 7 días. Puedes filtrar por fecha o ver todas las fechas del festival.
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Fecha:</span>
             <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-[240px]">
+              <SelectTrigger className="w-full sm:w-[240px]">
                 <SelectValue placeholder="Selecciona fecha" />
               </SelectTrigger>
               <SelectContent>

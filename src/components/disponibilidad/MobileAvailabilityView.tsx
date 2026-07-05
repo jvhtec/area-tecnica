@@ -84,7 +84,7 @@ export function MobileAvailabilityView({
                                     <Menu className="h-5 w-5" />
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="right" className="w-[300px] bg-[#0f1219] border-l border-[#1f232e]">
+                            <SheetContent side="right" className="w-[85vw] max-w-[300px] bg-[#0f1219] border-l border-[#1f232e]">
                                 <SheetHeader className="mb-6">
                                     <SheetTitle className="text-white">Acciones</SheetTitle>
                                 </SheetHeader>

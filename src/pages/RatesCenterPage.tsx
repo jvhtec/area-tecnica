@@ -57,10 +57,10 @@ export default function RatesCenterPage() {
 
       <RatesCenterHeader overview={overview} isLoading={isLoading} />
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof TABS[number]['id'])}>
-        <TabsList className="w-full sm:w-auto">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof TABS[number]['id'])} className="min-w-0">
+        <TabsList className="w-full justify-start overflow-x-auto sm:w-auto sm:justify-center sm:overflow-visible">
           {TABS.map((tab) => (
-            <TabsTrigger key={tab.id} value={tab.id} className="flex-1 sm:flex-none">
+            <TabsTrigger key={tab.id} value={tab.id} className="shrink-0">
               {tab.label}
             </TabsTrigger>
           ))}

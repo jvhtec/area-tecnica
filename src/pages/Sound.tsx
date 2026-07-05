@@ -491,7 +491,7 @@ const Sound = () => {
       )}
 
       <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Generador de Reportes</DialogTitle>
           </DialogHeader>
@@ -500,7 +500,7 @@ const Sound = () => {
       </Dialog>
 
       <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Calculadora de Amplificadores</DialogTitle>
           </DialogHeader>
@@ -509,7 +509,7 @@ const Sound = () => {
       </Dialog>
 
       <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Memoria Técnica</DialogTitle>
           </DialogHeader>
@@ -518,7 +518,7 @@ const Sound = () => {
       </Dialog>
 
       <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Reporte de Incidencia</DialogTitle>
           </DialogHeader>

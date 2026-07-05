@@ -17,7 +17,7 @@ export const MessagesDialog = ({ open, onOpenChange }: MessagesDialogProps) => {
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-[#0f1219] border-[#1f232e] text-slate-100">
+                <DialogContent className="max-w-2xl max-h-[calc(80vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto bg-[#0f1219] border-[#1f232e] text-slate-100">
                     <DialogHeader className="flex flex-row items-center justify-between">
                         <DialogTitle>Mensajes</DialogTitle>
                         <Button

@@ -271,14 +271,14 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
+      <DialogContent className="max-w-5xl max-h-[calc(95dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
         <DialogHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
               <Euro className="h-4 w-4 md:h-5 md:w-5" />
               Gestor de Tarifas y Extras
             </DialogTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <Badge variant={approved ? 'default' : 'secondary'} className="hidden sm:inline-flex">
                 {approved ? 'Tarifas base liberadas' : 'Aprobación base pendiente'}
               </Badge>
@@ -380,11 +380,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
           </p>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="by-date">Por fecha</TabsTrigger>
-            <TabsTrigger value="extras">Catálogo de extras</TabsTrigger>
-            <TabsTrigger value="base">Tarifas base</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0 space-y-4">
+          <TabsList className="w-full justify-start overflow-x-auto sm:w-auto sm:justify-center sm:overflow-visible">
+            <TabsTrigger value="by-date" className="shrink-0">Por fecha</TabsTrigger>
+            <TabsTrigger value="extras" className="shrink-0">Catálogo de extras</TabsTrigger>
+            <TabsTrigger value="base" className="shrink-0">Tarifas base</TabsTrigger>
           </TabsList>
 
           {/* By Date Tab */}
@@ -397,7 +397,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
               </CardHeader>
               <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <Select value={selectedJobId} onValueChange={(v) => setSelectedJobId(v)}>
-                  <SelectTrigger className="min-w-[260px]"><SelectValue placeholder="Elegir fecha" /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-auto sm:min-w-[260px]"><SelectValue placeholder="Elegir fecha" /></SelectTrigger>
                   <SelectContent>
                     {tourJobs.map((j) => (
                       <SelectItem
@@ -413,7 +413,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:ml-auto">
                   <Badge variant="outline" className="w-fit">
                     <Users className="h-3 w-3 mr-1" />
                     {quotes.length} asignaciones
@@ -595,7 +595,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                             <span>{errorCode === 'category_missing' && 'Falta categoría'}{errorCode === 'house_rate_missing' && 'Falta tarifa de house tech'}{errorCode === 'tour_base_missing' && 'Falta tarifa base de gira para la categoría'}</span>
                           </div>
                           {errorCode === 'category_missing' && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Label className="text-xs">Establecer categoría:</Label>
                               <Select onValueChange={(val) => {
                                 if (isTimesheetCategory(val)) {
@@ -615,7 +615,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                             </div>
                           )}
                           {errorCode === 'house_rate_missing' && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Label className="text-xs min-w-[120px]">Día base (en plantilla):</Label>
                               <Input
                                 type="number"
