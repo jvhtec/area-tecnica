@@ -25,10 +25,26 @@ interface FetchFlexMaterialReportBody extends Record<string, unknown> {
   jobId?: unknown;
   department?: unknown;
   overrideElementId?: unknown;
+  stageName?: unknown;
+  stageNumber?: unknown;
 }
 
 const sanitizeFileNameSegment = (value: string) =>
   value.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_{2,}/g, "_").replace(/^_|_$/g, "") || "segment";
+
+const normalizePathSegment = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+const getTechnicalStageStorageScope = (stageNumber: number, stageName?: string | null) => {
+  const nameSlug = normalizePathSegment(stageName || "");
+  return nameSlug ? `stage-${stageNumber}-${nameSlug}` : `stage-${stageNumber}`;
+};
 
 serve(createHttpHandler(async (req: Request) => {
   const body = await readBoundedJsonObject<FetchFlexMaterialReportBody>(req, { maxBytes: 4 * 1024 });
@@ -36,6 +52,13 @@ serve(createHttpHandler(async (req: Request) => {
   const jobId = typeof body.jobId === "string" ? body.jobId : null;
   const department = typeof body.department === "string" ? body.department : null;
   const overrideElementId = typeof body.overrideElementId === "string" ? body.overrideElementId : null;
+  const stageNumber =
+    typeof body.stageNumber === "number" && Number.isInteger(body.stageNumber) && body.stageNumber > 0
+      ? body.stageNumber
+      : null;
+  const stageName = typeof body.stageName === "string" && body.stageName.trim()
+    ? body.stageName.trim()
+    : null;
 
   if (!jobId || !UUID_PATTERN.test(jobId)) {
     throw new HttpError(400, "A valid jobId is required", { code: "invalid_job_id" });
@@ -45,6 +68,9 @@ serve(createHttpHandler(async (req: Request) => {
   }
   if (overrideElementId && !UUID_PATTERN.test(overrideElementId)) {
     throw new HttpError(400, "overrideElementId must be a UUID", { code: "invalid_override_element_id" });
+  }
+  if (body.stageNumber !== undefined && stageNumber === null) {
+    throw new HttpError(400, "stageNumber must be a positive integer", { code: "invalid_stage_number" });
   }
 
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = requireEnvValues(
@@ -157,8 +183,9 @@ serve(createHttpHandler(async (req: Request) => {
   }
 
   const bucket = "job-documents";
-  const category = "calculators/lista-material";
-  const baseFolder = `${category}/${jobId}`;
+  const category = `calculators/lista-material/${department}`;
+  const stageScope = stageNumber ? getTechnicalStageStorageScope(stageNumber, stageName) : null;
+  const baseFolder = stageScope ? `${category}/${jobId}/${stageScope}` : `${category}/${jobId}`;
   const fileName = `Listado de Material - ${sanitizeFileNameSegment(department)}.pdf`;
   const objectPath = `${baseFolder}/${crypto.randomUUID()}-${sanitizeFileNameSegment(fileName)}`;
 

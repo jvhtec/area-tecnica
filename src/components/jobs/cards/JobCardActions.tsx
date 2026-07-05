@@ -135,6 +135,28 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     navigate(`${path}?${params.toString()}`);
   }, [department, job.id, navigate]);
 
+  const navigateToMemoria = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const params = new URLSearchParams({ jobId: job.id });
+    let path = "";
+
+    switch (department) {
+      case "lights":
+        path = "/lights-memoria-tecnica";
+        break;
+      case "video":
+        path = "/video-memoria-tecnica";
+        break;
+      case "sound":
+      default:
+        path = "/sound";
+        params.set("tool", "memoria");
+        break;
+    }
+
+    navigate(`${path}?${params.toString()}`);
+  }, [department, job.id, navigate]);
+
   const handleManageJob = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const params = new URLSearchParams({ singleJob: "true" });
@@ -193,6 +215,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         isMobile={isMobile}
         isTechnicianUser={isTechnicianUser}
         navigateToCalculator={navigateToCalculator}
+        navigateToMemoria={navigateToMemoria}
         openProductionWhatsappDialog={productionWhatsapp.openProductionWhatsappDialog}
         openWarehouseWhatsappDialog={warehouseWhatsapp.openWarehouseWhatsappDialog}
         technicalPower={technicalPower}

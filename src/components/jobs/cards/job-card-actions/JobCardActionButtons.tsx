@@ -3,6 +3,7 @@ import {
   Clock,
   Edit,
   ExternalLink,
+  FileStack,
   FolderPlus,
   Info,
   ListChecks,
@@ -52,6 +53,7 @@ type JobCardActionButtonsProps = JobCardActionsProps & {
   isMobile: boolean;
   isTechnicianUser: boolean;
   navigateToCalculator: (e: React.MouseEvent, type: "pesos" | "consumos") => void;
+  navigateToMemoria: (e: React.MouseEvent) => void;
   openProductionWhatsappDialog: () => void;
   openWarehouseWhatsappDialog: () => void;
   technicalPower: TechnicalPowerPackState;
@@ -95,6 +97,7 @@ export const JobCardActionButtons = ({
   isTechnicianUser,
   job,
   navigateToCalculator,
+  navigateToMemoria,
   onAddFlexFolders,
   onAssignmentDialogOpen,
   onCreateFlexFolders,
@@ -312,6 +315,16 @@ export const JobCardActionButtons = ({
           <Zap className="h-4 w-4" />
           <span className="hidden sm:inline">Consumos</span>
           {defaultsInfo?.power && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Existen valores predeterminados de gira" />}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          title="Memoria Técnica"
+          onClick={navigateToMemoria}
+        >
+          <FileStack className="h-4 w-4" />
+          <span className="hidden sm:inline">Memoria</span>
         </Button>
       </>
     )}

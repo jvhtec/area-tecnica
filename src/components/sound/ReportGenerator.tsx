@@ -16,7 +16,6 @@ import { FolderOpen, Check, X, Upload } from "lucide-react";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import type jsPDF from "jspdf";
 import {
-  appendTechnicalStageToFilename,
   formatTechnicalStageLabel,
   TechnicalStageSelector,
   useSelectedTechnicalStage,

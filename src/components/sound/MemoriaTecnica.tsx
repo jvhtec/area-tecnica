@@ -13,16 +13,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
 import { isStorageNotFoundError, uploadStorageObject } from "@/utils/storageUpload";
 import { useMemoriaJobAndStage } from "@/features/technical-tools/memoria/useMemoriaJobAndStage";
-import { useMemoriaAutoFill } from "@/features/technical-tools/memoria/useMemoriaAutoFill";
+import {
+  useMemoriaAutoFill,
+  type MemoriaAutoFillCategorySpec,
+} from "@/features/technical-tools/memoria/useMemoriaAutoFill";
 import { TechnicalStageSelector } from "@/features/technical-tools/stage/stageAllocation";
 import { upsertMemoriaTecnicaDocument } from "@/utils/memoriaTecnicaDocuments";
 import { fetchFlexMaterialReport } from "@/utils/flexMaterialReport";
 
-const AUTO_FILL_CATEGORIES: Record<string, string> = {
-  material: "calculators/lista-material",
+const AUTO_FILL_CATEGORIES: Record<string, MemoriaAutoFillCategorySpec> = {
+  material: "calculators/lista-material/sound",
   soundvision: "calculators/sv-report",
   weight: "calculators/pesos",
-  power: "calculators/consumos",
+  power: { category: "calculators/consumos", powerDepartment: "sound" },
 };
 
 interface PDFFile {
@@ -50,6 +53,7 @@ export const MemoriaTecnica = () => {
   const {
     jobs,
     isLoadingJobs,
+    jobIdFromUrl,
     selectedJobId,
     setSelectedJobId,
     selectedJob,
@@ -81,10 +85,19 @@ export const MemoriaTecnica = () => {
       toast({ title: "Error", description: "Por favor, seleccione un trabajo", variant: "destructive" });
       return;
     }
+    if (hasMultipleStages && !selectedStage) {
+      toast({ title: "Error", description: "Por favor, seleccione un escenario", variant: "destructive" });
+      return;
+    }
     setIsFetchingFlexMaterial(true);
     setFlexMaterialWarning(null);
     try {
-      const result = await fetchFlexMaterialReport(selectedJobId, "sound", flexOverrideElementId.trim());
+      const result = await fetchFlexMaterialReport(
+        selectedJobId,
+        "sound",
+        flexOverrideElementId.trim(),
+        hasMultipleStages ? selectedStage : null
+      );
       if (!result.elementValidated) {
         setFlexMaterialWarning("El ID de elemento de Flex indicado no coincide con ningún presupuesto conocido.");
       } else if (result.elementJobMismatch) {
@@ -375,34 +388,37 @@ export const MemoriaTecnica = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Job + Stage Selection */}
-          <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-            <div className="space-y-2">
-              <Label htmlFor="memoria-job-select">Trabajo</Label>
-              <Select
-                value={selectedJobId}
-                onValueChange={setSelectedJobId}
-                disabled={isLoadingJobs}
-              >
-                <SelectTrigger id="memoria-job-select" className="w-full">
-                  <SelectValue placeholder="Seleccione un trabajo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobs?.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>
-                      {job.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {(!jobIdFromUrl || jobStages.length > 1) && (
+            <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+              {!jobIdFromUrl && (
+                <div className="space-y-2">
+                  <Label htmlFor="memoria-job-select">Trabajo</Label>
+                  <Select
+                    value={selectedJobId}
+                    onValueChange={setSelectedJobId}
+                    disabled={isLoadingJobs}
+                  >
+                    <SelectTrigger id="memoria-job-select" className="w-full">
+                      <SelectValue placeholder="Seleccione un trabajo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jobs?.map((job) => (
+                        <SelectItem key={job.id} value={job.id}>
+                          {job.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <TechnicalStageSelector
+                label="Escenario"
+                selectedStageNumber={selectedStageNumber}
+                stages={jobStages}
+                onChange={setSelectedStageNumber}
+              />
             </div>
-            <TechnicalStageSelector
-              label="Escenario"
-              selectedStageNumber={selectedStageNumber}
-              stages={jobStages}
-              onChange={setSelectedStageNumber}
-            />
-          </div>
+          )}
 
           {/* Project Name Section */}
           <div className="space-y-2">

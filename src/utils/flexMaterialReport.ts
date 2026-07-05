@@ -1,4 +1,5 @@
 import { dataLayerClient } from "@/services/dataLayerClient";
+import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
 
 export interface FlexMaterialReportResult {
   url: string;
@@ -20,10 +21,17 @@ export type FlexMaterialReportDepartment = "sound" | "lights" | "video" | "produ
 export const fetchFlexMaterialReport = async (
   jobId: string,
   department: FlexMaterialReportDepartment,
-  overrideElementId?: string
+  overrideElementId?: string,
+  stage?: TechnicalStage | null
 ): Promise<FlexMaterialReportResult> => {
   const { data, error } = await dataLayerClient.functions.invoke("fetch-flex-material-report", {
-    body: { jobId, department, overrideElementId: overrideElementId || undefined },
+    body: {
+      jobId,
+      department,
+      overrideElementId: overrideElementId || undefined,
+      stageNumber: stage?.number,
+      stageName: stage?.name,
+    },
   });
 
   if (error) {

@@ -11,6 +11,8 @@ export interface StageAwareJobDocument {
   uploaded_at: string | null;
 }
 
+export type StageAwareJobDocumentFilter = (document: StageAwareJobDocument) => boolean;
+
 /**
  * uploadJobPdfWithCleanup writes to `${category}/${jobId}[/${scope}]/${uuid}-${name}`.
  * Given a full file_path known to start with `${category}/${jobId}/`, return the
@@ -37,7 +39,8 @@ export const parseStageScopeSegment = (
 export const findLatestJobDocumentForStage = async (
   jobId: string,
   category: string,
-  stage?: TechnicalStage | null
+  stage?: TechnicalStage | null,
+  filter?: StageAwareJobDocumentFilter
 ): Promise<StageAwareJobDocument | null> => {
   const { data, error } = await dataLayerClient
     .from("job_documents")
@@ -51,7 +54,9 @@ export const findLatestJobDocumentForStage = async (
   const wantedScope = getTechnicalStageStorageScope(stage ?? null) ?? null;
 
   const match = (data || []).find(
-    (doc) => parseStageScopeSegment(doc.file_path, jobId, category) === wantedScope
+    (doc) =>
+      parseStageScopeSegment(doc.file_path, jobId, category) === wantedScope &&
+      (!filter || filter(doc))
   );
 
   return match ?? null;

@@ -38,6 +38,7 @@ export const useMemoriaJobAndStage = () => {
   return {
     jobs,
     isLoadingJobs,
+    jobIdFromUrl,
     selectedJobId,
     setSelectedJobId,
     selectedJob,

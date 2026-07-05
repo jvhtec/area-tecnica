@@ -363,7 +363,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in PDF generation:', error);
     return new Response(
-      JSON.stringify({ error: error.message, stack: error.stack }),
+      JSON.stringify({ error: 'Error al generar la memoria técnica' }),
       {
         headers: {
           ...corsHeaders,
