@@ -90,7 +90,7 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[96vw] max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-hidden">
+      <DialogContent className="max-w-5xl w-[96vw] max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Tareas Pendientes

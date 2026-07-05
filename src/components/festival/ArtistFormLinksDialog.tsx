@@ -356,7 +356,7 @@ export const ArtistFormLinksDialog = ({
   const titleDate = dateFilter === ALL_DATES_VALUE ? "Todas las fechas" : formatDateLabel(dateFilter);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[calc(80vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[calc(80vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Enlaces de Formularios de Artistas - {titleDate}</DialogTitle>
         </DialogHeader>

@@ -1675,7 +1675,7 @@ export const TourDefaultsManager = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[calc(95vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[calc(95vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base md:text-lg truncate">Valores por Defecto de Gira: {tour?.name}</DialogTitle>
         </DialogHeader>

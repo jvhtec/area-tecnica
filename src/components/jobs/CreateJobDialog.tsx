@@ -302,7 +302,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
+      <DialogContent className="max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Trabajo</DialogTitle>
         </DialogHeader>

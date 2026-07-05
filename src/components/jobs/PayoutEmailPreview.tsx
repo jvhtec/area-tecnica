@@ -349,7 +349,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[calc(90vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Vista Previa - Correo de Pago</DialogTitle>
           <DialogDescription>

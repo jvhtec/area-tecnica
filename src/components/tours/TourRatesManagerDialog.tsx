@@ -271,7 +271,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[calc(95dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
+      <DialogContent className="max-w-5xl max-h-[calc(95dvh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
         <DialogHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
