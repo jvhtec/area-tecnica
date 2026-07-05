@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
 import { isStorageNotFoundError, uploadStorageObject } from "@/utils/storageUpload";
+import { useMemoriaJobAndStage } from "@/features/technical-tools/memoria/useMemoriaJobAndStage";
+import { useMemoriaAutoFill } from "@/features/technical-tools/memoria/useMemoriaAutoFill";
+import { TechnicalStageSelector } from "@/features/technical-tools/stage/stageAllocation";
+import { upsertMemoriaTecnicaDocument } from "@/utils/memoriaTecnicaDocuments";
+
+const AUTO_FILL_CATEGORIES: Record<string, string> = {
+  soundvision: "calculators/sv-report",
+  weight: "calculators/pesos",
+  power: "calculators/consumos",
+};
 
 interface PDFFile {
   file: File;
@@ -34,10 +44,35 @@ export const MemoriaTecnica = () => {
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   const [logoSource, setLogoSource] = useState<"upload" | "existing">("upload");
   const [selectedLogoOption, setSelectedLogoOption] = useState<string | null>(null);
-  
+
+  const {
+    jobs,
+    isLoadingJobs,
+    selectedJobId,
+    setSelectedJobId,
+    selectedJob,
+    hasMultipleStages,
+    selectedStage,
+    selectedStageNumber,
+    setSelectedStageNumber,
+    stages: jobStages,
+  } = useMemoriaJobAndStage();
+
+  useEffect(() => {
+    if (selectedJob?.title) {
+      setProjectName(selectedJob.title);
+    }
+  }, [selectedJob?.title]);
+
+  const { detected: detectedDocuments } = useMemoriaAutoFill(
+    selectedJobId,
+    hasMultipleStages ? selectedStage : null,
+    AUTO_FILL_CATEGORIES
+  );
+
   // Fetch logo options
   const { logoOptions, isLoading: isLoadingLogos } = useLogoOptions();
-  
+
   const [documents, setDocuments] = useState<DocumentSection[]>([
     { id: "material", title: "Listado de Material", file: null, landscape: false },
     { id: "soundvision", title: "Informe SoundVision", file: null, landscape: false },
@@ -45,8 +80,8 @@ export const MemoriaTecnica = () => {
     { id: "power", title: "Informe de Consumos", file: null, landscape: false },
     { id: "rigging", title: "Plano de Rigging", file: null, landscape: true }
   ]);
-  // Preferred bucket names (try in order)
-  const STORAGE_BUCKET_CANDIDATES = ['Memoria Tecnica', 'memoria-tecnica', 'sound-memoria-tecnica'];
+  // Preferred bucket names (try in order) -- must match generate-memoria-tecnica's own list
+  const STORAGE_BUCKET_CANDIDATES = ['Memoria Tecnica', 'memoria-tecnica'];
 
   const handleLogoUpload = async (file: File) => {
     if (!file.type.includes('image/')) {
@@ -153,6 +188,24 @@ export const MemoriaTecnica = () => {
   };
 
   const generateMemoriaTecnica = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasMultipleStages && !selectedStageNumber) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un escenario",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!projectName.trim()) {
       toast({
         title: "Error",
@@ -162,7 +215,7 @@ export const MemoriaTecnica = () => {
       return;
     }
 
-    const availableDocuments = documents.filter(doc => doc.file !== null);
+    const availableDocuments = documents.filter(doc => doc.file !== null || detectedDocuments[doc.id]);
     if (availableDocuments.length === 0) {
       toast({
         title: "Error",
@@ -202,18 +255,27 @@ export const MemoriaTecnica = () => {
       const documentUrls: Record<string, string> = {};
       for (let i = 0; i < availableDocuments.length; i++) {
         const doc = availableDocuments[i];
-        if (!doc.file) continue;
 
         try {
-          const path = `${projectName}/${doc.id}_${Date.now()}.pdf`;
-          const url = await uploadToStorage(doc.file.file, path);
-          documentUrls[doc.id] = url;
+          if (doc.file) {
+            const path = `${projectName}/${doc.id}_${Date.now()}.pdf`;
+            documentUrls[doc.id] = await uploadToStorage(doc.file.file, path);
+          } else {
+            const detected = detectedDocuments[doc.id];
+            if (detected) {
+              const { data, error: signError } = await dataLayerClient.storage
+                .from('job-documents')
+                .createSignedUrl(detected.filePath, 3600);
+              if (signError) throw signError;
+              documentUrls[doc.id] = data.signedUrl;
+            }
+          }
           setProgress((i + 1) / availableDocuments.length * 50);
         } catch (error) {
-          console.error(`Error uploading document ${doc.id}:`, error);
+          console.error(`Error resolving document ${doc.id}:`, error);
           toast({
             title: "Error",
-            description: `Error al subir el documento ${doc.title}`,
+            description: `Error al obtener el documento ${doc.title}`,
             variant: "destructive",
           });
           return;
@@ -233,22 +295,19 @@ export const MemoriaTecnica = () => {
 
       setProgress(80);
 
-      const { error: dbError } = await dataLayerClient.from('memoria_tecnica_documents')
-        .insert({
-          project_name: projectName,
-          logo_url: logoUrl,
-          material_list_url: documentUrls.material,
-          soundvision_report_url: documentUrls.soundvision,
-          weight_report_url: documentUrls.weight,
-          power_report_url: documentUrls.power,
-          rigging_plot_url: documentUrls.rigging,
-          final_document_url: response.data.url
-        });
-
-      if (dbError) {
-        console.error('Database error:', dbError);
-        throw dbError;
-      }
+      await upsertMemoriaTecnicaDocument('memoria_tecnica_documents', {
+        job_id: selectedJobId,
+        stage_number: hasMultipleStages ? selectedStageNumber : null,
+        stage_name: hasMultipleStages ? selectedStage?.name ?? null : null,
+        project_name: projectName,
+        logo_url: logoUrl,
+        material_list_url: documentUrls.material,
+        soundvision_report_url: documentUrls.soundvision,
+        weight_report_url: documentUrls.weight,
+        power_report_url: documentUrls.power,
+        rigging_plot_url: documentUrls.rigging,
+        final_document_url: response.data.url
+      });
 
       setProgress(100);
       setGeneratedPdfUrl(response.data.url);
@@ -282,6 +341,35 @@ export const MemoriaTecnica = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Job + Stage Selection */}
+          <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+            <div className="space-y-2">
+              <Label htmlFor="memoria-job-select">Trabajo</Label>
+              <Select
+                value={selectedJobId}
+                onValueChange={setSelectedJobId}
+                disabled={isLoadingJobs}
+              >
+                <SelectTrigger id="memoria-job-select" className="w-full">
+                  <SelectValue placeholder="Seleccione un trabajo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <TechnicalStageSelector
+              label="Escenario"
+              selectedStageNumber={selectedStageNumber}
+              stages={jobStages}
+              onChange={setSelectedStageNumber}
+            />
+          </div>
+
           {/* Project Name Section */}
           <div className="space-y-2">
             <Label htmlFor="projectName">Nombre del Proyecto</Label>
@@ -410,52 +498,66 @@ export const MemoriaTecnica = () => {
           {/* Documents Upload Section with muted background */}
           <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
             <h3 className="font-semibold text-sm">Documentos</h3>
-            {documents.map((doc) => (
-              <div key={doc.id} className="space-y-2">
-                <Label>{doc.title}</Label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    className="hidden"
-                    id={`file-${doc.id}`}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, doc.id);
-                    }}
-                  />
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="w-full"
-                  >
-                    <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
-                      {doc.file ? (
-                        <>
-                          <FileCheck className="h-4 w-4" />
-                          Archivo cargado
-                        </>
-                      ) : (
-                        <>
-                          <FilePlus className="h-4 w-4" />
-                          Subir archivo
-                        </>
-                      )}
-                    </label>
-                  </Button>
-                  {doc.file && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => window.open(doc.file?.url, '_blank')}
-                      className="shrink-0"
-                    >
-                      <File className="h-4 w-4" />
-                    </Button>
+            {documents.map((doc) => {
+              const detected = detectedDocuments[doc.id];
+              return (
+                <div key={doc.id} className="space-y-2">
+                  <Label>{doc.title}</Label>
+                  {!doc.file && detected && (
+                    <p className="text-xs text-muted-foreground">
+                      Detectado: {detected.fileName}
+                      {detected.uploadedAt ? ` (${new Date(detected.uploadedAt).toLocaleDateString()})` : ""}
+                    </p>
                   )}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      id={`file-${doc.id}`}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file, doc.id);
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      asChild
+                      className="w-full"
+                    >
+                      <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
+                        {doc.file ? (
+                          <>
+                            <FileCheck className="h-4 w-4" />
+                            Archivo cargado
+                          </>
+                        ) : detected ? (
+                          <>
+                            <FileCheck className="h-4 w-4" />
+                            Reemplazar
+                          </>
+                        ) : (
+                          <>
+                            <FilePlus className="h-4 w-4" />
+                            Subir archivo
+                          </>
+                        )}
+                      </label>
+                    </Button>
+                    {doc.file && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(doc.file?.url, '_blank')}
+                        className="shrink-0"
+                      >
+                        <File className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Progress Section */}

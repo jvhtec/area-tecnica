@@ -15,6 +15,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FolderOpen, Check, X, Upload } from "lucide-react";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import type jsPDF from "jspdf";
+import {
+  appendTechnicalStageToFilename,
+  formatTechnicalStageLabel,
+  TechnicalStageSelector,
+  useSelectedTechnicalStage,
+} from "@/features/technical-tools/stage/stageAllocation";
+import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
+import { uploadJobPdfWithCleanup } from "@/utils/jobDocumentsUpload";
 
 const reportSections = [
   {
@@ -64,6 +72,17 @@ export const ReportGenerator = () => {
   const [jobLogo, setJobLogo] = useState<string | undefined>(undefined);
   const [mappingResult, setMappingResult] = useState<MappingResult | null>(null);
   const [showMappingPreview, setShowMappingPreview] = useState(false);
+
+  const {
+    hasMultipleStages,
+    selectedStage,
+    selectedStageNumber,
+    setSelectedStageNumber,
+    stages: jobStages,
+  } = useSelectedTechnicalStage({
+    enabled: Boolean(selectedJobId),
+    jobId: selectedJobId,
+  });
 
   useEffect(() => {
     const loadJobLogo = async () => {
@@ -256,8 +275,20 @@ export const ReportGenerator = () => {
       return;
     }
 
+    if (hasMultipleStages && !selectedStageNumber) {
+      toast({
+        title: "Error",
+        description: "Please select a stage before generating the report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const selectedJob = jobs?.find(job => job.id === selectedJobId);
-    const jobTitle = selectedJob?.title || "Unnamed_Job";
+    const stageLabel = formatTechnicalStageLabel(selectedStage);
+    const jobTitle = stageLabel
+      ? `${selectedJob?.title || "Unnamed_Job"} - ${stageLabel}`
+      : selectedJob?.title || "Unnamed_Job";
     const jobDate = selectedJob?.start_time 
       ? format(new Date(selectedJob.start_time), "MMMM dd, yyyy")
       : format(new Date(), "MMMM dd, yyyy");
@@ -322,47 +353,51 @@ export const ReportGenerator = () => {
     }
 
     // Add footer logo (Sector Pro)
-    const footerLogo = new Image();
-    footerLogo.crossOrigin = 'anonymous';
-    footerLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-    
-    footerLogo.onload = () => {
-      pdf.setPage(pdf.getNumberOfPages());
-      const logoWidth = 50;
-      const logoHeight = logoWidth * (footerLogo.height / footerLogo.width);
-      const xPosition = (pageWidth - logoWidth) / 2;
-      const yPosition = pageHeight - 20;
-      
-      try {
-        pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        const blob = pdf.output('blob');
-        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-        pdf.save(filename);
-        toast({
-          title: "Success",
-          description: "Report generated successfully",
-        });
-      } catch (error) {
-        console.error('Error adding footer logo:', error);
-        const blob = pdf.output('blob');
-        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-        pdf.save(filename);
-        toast({
-          title: "Success",
-          description: "Report generated successfully (without logo)",
-        });
-      }
-    };
+    await new Promise<void>((resolve) => {
+      const footerLogo = new Image();
+      footerLogo.crossOrigin = 'anonymous';
+      footerLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
 
-    footerLogo.onerror = () => {
-      console.error('Failed to load footer logo');
-      const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-      pdf.save(filename);
+      footerLogo.onload = () => {
+        pdf.setPage(pdf.getNumberOfPages());
+        const logoWidth = 50;
+        const logoHeight = logoWidth * (footerLogo.height / footerLogo.width);
+        const xPosition = (pageWidth - logoWidth) / 2;
+        const yPosition = pageHeight - 20;
+
+        try {
+          pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
+        } catch (error) {
+          console.error('Error adding footer logo:', error);
+        }
+        resolve();
+      };
+
+      footerLogo.onerror = () => {
+        console.error('Failed to load footer logo');
+        resolve();
+      };
+    });
+
+    const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+    const blob = pdf.output('blob');
+
+    try {
+      await uploadJobPdfWithCleanup(selectedJobId, blob, filename, "calculators/sv-report", {
+        cleanupScope: getTechnicalStageStorageScope(selectedStage),
+      });
       toast({
         title: "Success",
-        description: "Report generated successfully (without logo)",
+        description: "Report generated and saved to the job's documents.",
       });
-    };
+    } catch (error) {
+      console.error('Error uploading SV report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save the generated report.",
+        variant: "destructive",
+      });
+    }
   };
 
   const addImageToPDF = async (pdf: jsPDF, file: File, viewType: string, x: number, y: number, width: number) => {
@@ -403,6 +438,13 @@ export const ReportGenerator = () => {
               </SelectContent>
             </Select>
           </div>
+
+          <TechnicalStageSelector
+            label="Stage"
+            selectedStageNumber={selectedStageNumber}
+            stages={jobStages}
+            onChange={setSelectedStageNumber}
+          />
 
           {/* Report System Selection */}
           <div className="space-y-2">
