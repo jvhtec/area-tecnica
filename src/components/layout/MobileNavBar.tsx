@@ -38,7 +38,45 @@ function getVisualViewportBottomOffset() {
 }
 
 /**
- * Tracks browser UI and keyboard viewport changes that can move fixed mobile chrome.
+ * Whether the currently focused element is one that would plausibly bring up
+ * the on-screen keyboard. This is the ONLY legitimate reason the fixed nav
+ * should ever be offset from `bottom: 0`.
+ */
+function isEditableElementFocused() {
+  if (typeof document === "undefined") {
+    return false
+  }
+
+  const active = document.activeElement as HTMLElement | null
+  if (!active) {
+    return false
+  }
+
+  if (active.tagName === "INPUT" || active.tagName === "TEXTAREA") {
+    return true
+  }
+
+  return active.isContentEditable === true
+}
+
+/**
+ * Tracks the on-screen-keyboard inset for fixed mobile chrome.
+ *
+ * iOS standalone PWAs have a well-documented WebKit bug where, after the app
+ * is backgrounded and resumed (even briefly, and with no keyboard ever
+ * involved), `visualViewport.height`/`offsetTop` can come back stale or
+ * simply wrong — and stay wrong until a full reload, i.e. a plain resize/
+ * scroll does NOT self-correct it. An earlier fix here tried to work around
+ * that by recomputing from `visualViewport` on every resume signal, but that
+ * still trusts numbers the browser itself is misreporting, so it can just as
+ * easily "fix" the offset to a wrong nonzero value and pin the nav mid-screen.
+ *
+ * The only time a nonzero offset is ever legitimate is while the on-screen
+ * keyboard is up, which requires a focused text input/textarea/contenteditable.
+ * So we hard-clamp the offset to 0 whenever nothing editable is focused,
+ * regardless of what `visualViewport` reports — including immediately on
+ * resume — and only consult `visualViewport` while an editable element is
+ * genuinely focused.
  */
 function useVisualViewportBottomOffset() {
   const [bottomOffset, setBottomOffset] = useState(0)
@@ -48,20 +86,6 @@ function useVisualViewportBottomOffset() {
       return undefined
     }
 
-    const updateBottomOffset = () => {
-      setBottomOffset(getVisualViewportBottomOffset())
-    }
-
-    updateBottomOffset()
-
-    // iOS often resumes a backgrounded/minimized PWA without firing a "resize"
-    // event even though the WebKit-reported viewport offsets were stale at the
-    // moment it was backgrounded (e.g. mid-keyboard-dismiss or mid-chrome
-    // animation). Without a recompute on resume, the fixed nav stays pinned to
-    // that stale offset and visibly "unsticks" from the bottom. Recompute on
-    // the visibility/pageshow signals below, with a couple of rAF-deferred
-    // follow-ups since WebKit can report the old viewport values for a frame
-    // or two right after resume.
     let pendingFrames: number[] = []
 
     const cancelPendingFrames = () => {
@@ -69,6 +93,15 @@ function useVisualViewportBottomOffset() {
       pendingFrames = []
     }
 
+    const updateBottomOffset = () => {
+      setBottomOffset(isEditableElementFocused() ? getVisualViewportBottomOffset() : 0)
+    }
+
+    updateBottomOffset()
+
+    // Recompute a few times after resume in case an editable element was
+    // already focused (keyboard open) before backgrounding and WebKit needs a
+    // frame or two to report the correct post-resume viewport metrics.
     const recomputeOnResume = () => {
       cancelPendingFrames()
       updateBottomOffset()
@@ -96,6 +129,10 @@ function useVisualViewportBottomOffset() {
     // "unstick". Keyboard and browser-chrome changes still arrive via "resize".
     document.addEventListener("visibilitychange", handleVisibilityChange)
     window.addEventListener("pageshow", recomputeOnResume)
+    // Focus state is what gates whether we trust visualViewport at all, so
+    // transitions in/out of an editable element must recompute immediately.
+    document.addEventListener("focusin", updateBottomOffset)
+    document.addEventListener("focusout", updateBottomOffset)
 
     return () => {
       window.removeEventListener("resize", updateBottomOffset)
@@ -103,6 +140,8 @@ function useVisualViewportBottomOffset() {
       visualViewport?.removeEventListener("resize", updateBottomOffset)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("pageshow", recomputeOnResume)
+      document.removeEventListener("focusin", updateBottomOffset)
+      document.removeEventListener("focusout", updateBottomOffset)
       cancelPendingFrames()
     }
   }, [])

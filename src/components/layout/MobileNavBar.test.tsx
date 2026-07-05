@@ -153,7 +153,7 @@ describe("MobileNavBar", () => {
     expect(nav).toHaveClass("fixed", "bottom-0")
   })
 
-  it("offsets the nav to the visual viewport bottom when browser chrome changes visible height", async () => {
+  it("ignores a visualViewport offset when nothing editable is focused", async () => {
     const visualViewport = mockVisualViewport({
       height: 700,
       innerHeight: 760,
@@ -164,6 +164,33 @@ describe("MobileNavBar", () => {
 
     const nav = screen.getByRole("navigation", { name: /navegación principal/i })
 
+    // No input is focused, so even though visualViewport reports a 60px inset
+    // (as if the keyboard/chrome shrank the visible area), the nav must stay
+    // pinned to the true bottom edge.
+    act(() => {
+      visualViewport.dispatch("resize")
+    })
+    expect(nav.style.bottom).toBe("")
+  })
+
+  it("offsets the nav to the visual viewport bottom while an input is focused", async () => {
+    const visualViewport = mockVisualViewport({
+      height: 700,
+      innerHeight: 760,
+      offsetTop: 0,
+    })
+
+    renderMobileNav()
+
+    const nav = screen.getByRole("navigation", { name: /navegación principal/i })
+    const input = document.createElement("input")
+    document.body.appendChild(input)
+
+    act(() => {
+      input.focus()
+      input.dispatchEvent(new FocusEvent("focusin", { bubbles: true }))
+    })
+
     await waitFor(() => expect(nav.style.bottom).toBe("60px"))
 
     ;(window.visualViewport as unknown as { height: number }).height = 760
@@ -173,10 +200,46 @@ describe("MobileNavBar", () => {
     })
 
     await waitFor(() => expect(nav.style.bottom).toBe(""))
+
+    act(() => {
+      input.blur()
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }))
+    })
+    document.body.removeChild(input)
   })
 
-  it("recomputes the offset on visibilitychange when iOS resumes a backgrounded PWA without firing resize", async () => {
-    mockVisualViewport({
+  it("snaps back to bottom:0 the instant focus leaves an input, even if visualViewport still reports an inset", async () => {
+    const visualViewport = mockVisualViewport({
+      height: 700,
+      innerHeight: 760,
+      offsetTop: 0,
+    })
+
+    renderMobileNav()
+
+    const nav = screen.getByRole("navigation", { name: /navegación principal/i })
+    const input = document.createElement("input")
+    document.body.appendChild(input)
+
+    act(() => {
+      input.focus()
+      input.dispatchEvent(new FocusEvent("focusin", { bubbles: true }))
+    })
+    await waitFor(() => expect(nav.style.bottom).toBe("60px"))
+
+    // visualViewport still reports the keyboard-open inset (WebKit can lag
+    // here), but focus has already moved away from the input.
+    act(() => {
+      input.blur()
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }))
+    })
+
+    expect(nav.style.bottom).toBe("")
+    document.body.removeChild(input)
+  })
+
+  it("forces the offset back to 0 on resume even when visualViewport keeps reporting a stale inset and no input is focused", async () => {
+    const visualViewport = mockVisualViewport({
       height: 700,
       innerHeight: 760,
       offsetTop: 0,
@@ -188,30 +251,29 @@ describe("MobileNavBar", () => {
 
       const nav = screen.getByRole("navigation", { name: /navegación principal/i })
 
-      await waitFor(() => expect(nav.style.bottom).toBe("60px"))
+      // Nothing is focused, so the bar must already be pinned to the bottom...
+      expect(nav.style.bottom).toBe("")
 
+      // ...and resuming a backgrounded PWA where WebKit's visualViewport API
+      // keeps misreporting a stale inset (the reported bug: no keyboard was
+      // ever involved) must not pull the bar away from the bottom edge.
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
         value: "visible",
       })
 
-      // Dispatch while the viewport is still reporting the stale (backgrounded)
-      // height, mirroring WebKit reporting old values for a frame or two after
-      // resume. The immediate recompute should see no change yet.
       act(() => {
         document.dispatchEvent(new Event("visibilitychange"))
-      })
-      expect(nav.style.bottom).toBe("60px")
-
-      // The corrected height only becomes available a frame later, without any
-      // "resize" event firing on resume (the iOS PWA behavior this guards
-      // against).
-      ;(window.visualViewport as unknown as { height: number }).height = 760
-
-      act(() => {
         raf.flush()
       })
 
+      expect(nav.style.bottom).toBe("")
+
+      // Even an explicit resize firing with the same stale, nonzero
+      // visualViewport reading must not move the bar while unfocused.
+      act(() => {
+        visualViewport.dispatch("resize")
+      })
       expect(nav.style.bottom).toBe("")
     } finally {
       raf.restore()
