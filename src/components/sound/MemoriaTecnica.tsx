@@ -16,8 +16,10 @@ import { useMemoriaJobAndStage } from "@/features/technical-tools/memoria/useMem
 import { useMemoriaAutoFill } from "@/features/technical-tools/memoria/useMemoriaAutoFill";
 import { TechnicalStageSelector } from "@/features/technical-tools/stage/stageAllocation";
 import { upsertMemoriaTecnicaDocument } from "@/utils/memoriaTecnicaDocuments";
+import { fetchFlexMaterialReport } from "@/utils/flexMaterialReport";
 
 const AUTO_FILL_CATEGORIES: Record<string, string> = {
+  material: "calculators/lista-material",
   soundvision: "calculators/sv-report",
   weight: "calculators/pesos",
   power: "calculators/consumos",
@@ -64,11 +66,43 @@ export const MemoriaTecnica = () => {
     }
   }, [selectedJob?.title]);
 
-  const { detected: detectedDocuments } = useMemoriaAutoFill(
+  const { detected: detectedDocuments, refetch: refetchAutoFill } = useMemoriaAutoFill(
     selectedJobId,
     hasMultipleStages ? selectedStage : null,
     AUTO_FILL_CATEGORIES
   );
+
+  const [flexOverrideElementId, setFlexOverrideElementId] = useState("");
+  const [isFetchingFlexMaterial, setIsFetchingFlexMaterial] = useState(false);
+  const [flexMaterialWarning, setFlexMaterialWarning] = useState<string | null>(null);
+
+  const handleFetchFlexMaterial = async () => {
+    if (!selectedJobId) {
+      toast({ title: "Error", description: "Por favor, seleccione un trabajo", variant: "destructive" });
+      return;
+    }
+    setIsFetchingFlexMaterial(true);
+    setFlexMaterialWarning(null);
+    try {
+      const result = await fetchFlexMaterialReport(selectedJobId, "sound", flexOverrideElementId.trim());
+      if (!result.elementValidated) {
+        setFlexMaterialWarning("El ID de elemento de Flex indicado no coincide con ningún presupuesto conocido.");
+      } else if (result.elementJobMismatch) {
+        setFlexMaterialWarning("El ID de elemento de Flex indicado pertenece a otro trabajo. Verifique antes de usarlo.");
+      }
+      refetchAutoFill();
+      toast({ title: "Éxito", description: "Lista de material obtenida de Flex" });
+    } catch (error) {
+      console.error("Error fetching Flex material report:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo obtener la lista de material",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingFlexMaterial(false);
+    }
+  };
 
   // Fetch logo options
   const { logoOptions, isLoading: isLoadingLogos } = useLogoOptions();
@@ -555,6 +589,33 @@ export const MemoriaTecnica = () => {
                       </Button>
                     )}
                   </div>
+                  {doc.id === "material" && (
+                    <div className="space-y-2 pt-1">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          placeholder="ID de elemento de Flex (opcional, para forzar un presupuesto concreto)"
+                          value={flexOverrideElementId}
+                          onChange={(e) => setFlexOverrideElementId(e.target.value)}
+                          className="text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={handleFetchFlexMaterial}
+                          disabled={isFetchingFlexMaterial || !selectedJobId}
+                          className="shrink-0"
+                        >
+                          {isFetchingFlexMaterial ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : null}
+                          Obtener de Flex
+                        </Button>
+                      </div>
+                      {flexMaterialWarning && (
+                        <p className="text-xs text-destructive">{flexMaterialWarning}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

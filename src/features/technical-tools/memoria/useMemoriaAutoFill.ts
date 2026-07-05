@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
 import { findLatestJobDocumentForStage } from "@/utils/jobDocuments/stageAwareLookup";
 
@@ -21,13 +21,16 @@ export const useMemoriaAutoFill = (
   jobId: string,
   stage: TechnicalStage | null,
   categoriesBySection: Record<string, string>
-): { detected: Record<string, DetectedMemoriaDocument | null>; isLoading: boolean } => {
+): { detected: Record<string, DetectedMemoriaDocument | null>; isLoading: boolean; refetch: () => void } => {
   const [detected, setDetected] = useState<Record<string, DetectedMemoriaDocument | null>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [refetchToken, setRefetchToken] = useState(0);
   const categoriesKey = Object.entries(categoriesBySection)
     .map(([section, category]) => `${section}:${category}`)
     .sort()
     .join(",");
+
+  const refetch = useCallback(() => setRefetchToken((token) => token + 1), []);
 
   useEffect(() => {
     if (!jobId) {
@@ -66,7 +69,7 @@ export const useMemoriaAutoFill = (
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, stage?.number, categoriesKey]);
+  }, [jobId, stage?.number, categoriesKey, refetchToken]);
 
-  return { detected, isLoading };
+  return { detected, isLoading, refetch };
 };

@@ -37,6 +37,11 @@
       "verifyJwt": true,
       "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT and requires admin/management before fetching Flex inventory model details."
     },
+    "fetch-flex-material-report": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; requires requireAuthenticatedRole (admin/management/house_tech) before resolving a job's Flex quote element and fetching its materials-list report."
+    },
     "generate-lights-memoria-tecnica": { "class": "authenticated-user", "verifyJwt": true },
     "generate-memoria-tecnica": { "class": "authenticated-user", "verifyJwt": true },
     "generate-sv-report": { "class": "authenticated-user", "verifyJwt": true },
