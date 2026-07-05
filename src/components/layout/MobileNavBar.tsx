@@ -37,6 +37,21 @@ function getVisualViewportBottomOffset() {
   return Math.max(0, Math.round(layoutViewportHeight - visualViewportBottom))
 }
 
+// Input types that bring up a text-style on-screen keyboard. Excludes
+// checkbox/radio/file/range/color/date/time/etc., which either show no
+// keyboard at all or a non-text picker that doesn't resize the viewport the
+// same way — trusting visualViewport while one of those is focused would let
+// a stale WebKit reading detach the nav again with no keyboard in sight.
+const TEXT_ENTRY_INPUT_TYPES = new Set([
+  "text",
+  "search",
+  "email",
+  "url",
+  "tel",
+  "password",
+  "number",
+])
+
 /**
  * Whether the currently focused element is one that would plausibly bring up
  * the on-screen keyboard. This is the ONLY legitimate reason the fixed nav
@@ -52,8 +67,12 @@ function isEditableElementFocused() {
     return false
   }
 
-  if (active.tagName === "INPUT" || active.tagName === "TEXTAREA") {
+  if (active.tagName === "TEXTAREA") {
     return true
+  }
+
+  if (active.tagName === "INPUT") {
+    return TEXT_ENTRY_INPUT_TYPES.has((active as HTMLInputElement).type)
   }
 
   return active.isContentEditable === true

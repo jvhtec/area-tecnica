@@ -1681,7 +1681,7 @@ export const TourDefaultsManager = ({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:h-10 sm:grid-cols-4 sm:gap-0">
             <TabsTrigger value="sound">Sonido</TabsTrigger>
             <TabsTrigger value="lights">Luces</TabsTrigger>
             <TabsTrigger value="video">Vídeo</TabsTrigger>
