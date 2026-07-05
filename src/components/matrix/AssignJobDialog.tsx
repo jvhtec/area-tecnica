@@ -1145,7 +1145,7 @@ export const AssignJobDialog = ({
           }
         }}
       >
-        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <AlertDialogContent className="max-w-2xl max-h-[calc(80vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {conflictWarning?.result.hasHardConflict ? '⛔ Conflicto de Horario' : '⚠️ Conflicto Potencial'}

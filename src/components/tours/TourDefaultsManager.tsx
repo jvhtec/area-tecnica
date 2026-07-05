@@ -1221,12 +1221,12 @@ export const TourDefaultsManager = ({
 
         {/* Power Defaults */}
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <h4 className="text-lg font-semibold flex items-center gap-2">
               <Calculator className="h-5 w-5" />
               Valores por Defecto de Potencia ({powerTables.length})
             </h4>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -1440,12 +1440,12 @@ export const TourDefaultsManager = ({
 
         {/* Weight Defaults */}
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <h4 className="text-lg font-semibold flex items-center gap-2">
               <Weight className="h-5 w-5" />
               Valores por Defecto de Peso ({weightTables.length})
             </h4>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -1675,13 +1675,13 @@ export const TourDefaultsManager = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[calc(95vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base md:text-lg truncate">Valores por Defecto de Gira: {tour?.name}</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:h-10 sm:grid-cols-4 sm:gap-0">
             <TabsTrigger value="sound">Sonido</TabsTrigger>
             <TabsTrigger value="lights">Luces</TabsTrigger>
             <TabsTrigger value="video">Vídeo</TabsTrigger>

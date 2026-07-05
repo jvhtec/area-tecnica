@@ -515,7 +515,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-[625px] max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-[625px] max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] flex flex-col overflow-hidden">
         {isClosureLocked && (
           <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50">
             <AlertCircle className="h-4 w-4" />

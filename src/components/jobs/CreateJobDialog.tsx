@@ -302,7 +302,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Trabajo</DialogTitle>
         </DialogHeader>
@@ -439,7 +439,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
           <div className="space-y-2">
             <Label>Departamentos</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {TECHNICAL_DEPARTMENTS.map((department) => (
                 <Button
                   key={department}

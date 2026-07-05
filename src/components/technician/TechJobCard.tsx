@@ -194,7 +194,7 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
 
             {/* Expense Dialog */}
             <Dialog open={expenseDialogOpen} onOpenChange={(open) => { setExpenseDialogOpen(open); if (!open) setShowExpenseForm(false); }}>
-                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl max-h-[calc(85vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Receipt className="h-5 w-5" />
