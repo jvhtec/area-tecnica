@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
+import { getHojaDeRutaDialogClassName } from "@/components/hoja-de-ruta/hojaDeRutaDialogClassName";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
@@ -34,7 +35,6 @@ import { JobCardHeader } from "../JobCardHeader";
 import { JobCardProgress } from "../JobCardProgress";
 import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
 import { isManagementRole } from "@/utils/permissions";
-
 
 import { queryKeys } from "@/lib/react-query";
 export interface JobCardNewViewProps {
@@ -675,13 +675,7 @@ export function JobCardNewView({
           {isProjectManagementPage && (
             <>
               <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-                <DialogContent
-                  className={
-                    isMobile
-                      ? "flex h-dvh max-h-dvh w-[100vw] max-w-[100vw] flex-col gap-0 overflow-hidden rounded-none p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-                      : "flex w-[96vw] max-w-[96vw] h-[85vh] max-h-[85vh] flex-col gap-0 overflow-hidden p-0"
-                  }
-                >
+                <DialogContent className={getHojaDeRutaDialogClassName(isMobile)}>
                   <ModernHojaDeRuta jobId={job.id} embedded />
                 </DialogContent>
               </Dialog>

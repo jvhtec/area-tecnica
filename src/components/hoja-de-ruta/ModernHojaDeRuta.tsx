@@ -1,15 +1,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -23,8 +20,6 @@ import {
   Hotel,
   Image,
   Settings,
-  Save,
-  Download,
   Upload,
   Sparkles,
   CheckCircle2,
@@ -39,14 +34,11 @@ import {
   Bed,
   Activity,
   Palette,
-  Globe,
-  MoreHorizontal,
   RefreshCw,
   Database,
   UtensilsCrossed,
   AlertCircle,
   FileDown,
-  Loader2,
   CloudSun
 } from "lucide-react";
 
@@ -65,6 +57,10 @@ import { ModernLogisticsSection } from "./sections/ModernLogisticsSection";
 import { ModernScheduleSection } from "./sections/ModernScheduleSection";
 import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
+import { HojaDeRutaHeaderActions } from "./components/HojaDeRutaHeaderActions";
+import { MobileSectionSwitcher } from "./components/MobileSectionSwitcher";
+import { MobileSaveBar } from "./components/MobileSaveBar";
+import { QuickNavigationSidebar } from "./components/QuickNavigationSidebar";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 import {
@@ -734,96 +730,18 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
               </div>
 
               {/* Action Buttons */}
-              {isMobile ? (
-                // Guardar lives in the sticky bottom bar on mobile (thumb-reachable);
-                // the header only keeps a compact overflow menu for the secondary actions.
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      aria-label="Más acciones"
-                      className="h-11 w-11 shrink-0"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-48 p-1">
-                    <PopoverClose asChild>
-                      <button
-                        type="button"
-                        onClick={() => { void handlePreviewPDF(); }}
-                        disabled={!selectedJobId || !isInitialized || isSaving || isGenerating || isPreviewing}
-                        className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Vista previa
-                      </button>
-                    </PopoverClose>
-                    <PopoverClose asChild>
-                      <button
-                        type="button"
-                        onClick={() => setShowPrintDialog(true)}
-                        disabled={!selectedJobId}
-                        className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Exportar
-                      </button>
-                    </PopoverClose>
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                <>
-                  {/* Simplified Save Button - Always enabled when job is selected */}
-                  <Button
-                    onClick={handleSave}
-                    disabled={!selectedJobId || !isInitialized || isSaving}
-                    variant="outline"
-                    size="sm"
-                    aria-label="Guardar hoja de ruta"
-                    className="h-11 min-w-[44px] border-2 border-green-500 text-green-600 hover:bg-green-50"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        <span className="hidden sm:inline">Guardar</span>
-                      </>
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={() => { void handlePreviewPDF(); }}
-                    disabled={!selectedJobId || !isInitialized || isSaving || isGenerating || isPreviewing}
-                    variant="outline"
-                    size="sm"
-                    aria-label="Vista previa PDF"
-                    className="h-11 min-w-[44px] border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
-                  >
-                    {isPreviewing && previewingTarget === "full" ? (
-                      <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
-                    ) : (
-                      <Eye className="w-4 h-4 sm:mr-2" />
-                    )}
-                    <span className="hidden sm:inline">Vista previa</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => setShowPrintDialog(true)}
-                    disabled={!selectedJobId}
-                    aria-label="Exportar"
-                    className="h-11 min-w-[44px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Exportar</span>
-                  </Button>
-                </>
-              )}
+              <HojaDeRutaHeaderActions
+                isMobile={isMobile}
+                selectedJobId={selectedJobId}
+                isInitialized={isInitialized}
+                isSaving={isSaving}
+                isGenerating={isGenerating}
+                isPreviewing={isPreviewing}
+                previewingTarget={previewingTarget}
+                onSave={handleSave}
+                onPreviewPDF={() => { void handlePreviewPDF(); }}
+                onExport={() => setShowPrintDialog(true)}
+              />
             </div>
           </div>
 
@@ -862,37 +780,12 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
       <div className={cn(embedded && "flex-1 overflow-y-auto")}>
       <div className={cn("max-w-screen-2xl mx-auto px-4 md:px-6 py-4 md:py-8", isMobile && "pb-24")}>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-          {/* Sidebar with Templates (hidden on mobile, replaced by horizontal nav) */}
-          <div className="hidden md:block md:col-span-3">
-            <div className={cn("sticky space-y-4", embedded ? "top-0" : "top-24")}>
-              {/* Quick Navigation */}
-              <Card className="border-2">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Navegación Rápida
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {tabConfig.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <Button
-                        key={tab.id}
-                        variant={activeTab === tab.id ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`w-full justify-start ${activeTab === tab.id ? 'bg-primary text-primary-foreground' : ''}`}
-                      >
-                        <Icon className={`w-4 h-4 mr-2 ${tab.color}`} />
-                        {tab.label}
-                      </Button>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          <QuickNavigationSidebar
+            tabConfig={tabConfig}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            embedded={embedded}
+          />
 
           {/* Main Content Area */}
           <div className="md:col-span-9">
@@ -901,46 +794,13 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              {/* Mobile section switcher */}
-              <div
-                className={cn(
-                  "md:hidden -mx-4 px-4 mb-3 sticky z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40 py-2 space-y-2",
-                  // When embedded, the page header lives outside the scroll region (flex `shrink-0`),
-                  // so this only needs to clear the scroll container's own top, not the header's height.
-                  embedded ? "top-0" : "top-[68px]"
-                )}
-              >
-                <Select value={activeTab} onValueChange={setActiveTab}>
-                  <SelectTrigger className="w-full h-11" aria-label="Seleccionar sección">
-                    <SelectValue>
-                      {(() => {
-                        const current = tabConfig.find((tab) => tab.id === activeTab) ?? tabConfig[0];
-                        const Icon = current.icon;
-                        return (
-                          <span className="flex items-center gap-2">
-                            <Icon className={`w-4 h-4 ${current.color}`} />
-                            {current.label}
-                          </span>
-                        );
-                      })()}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tabConfig.map((tab) => {
-                      const Icon = tab.icon;
-                      return (
-                        <SelectItem key={tab.id} value={tab.id}>
-                          <span className="flex items-center gap-2">
-                            <Icon className={`w-4 h-4 ${tab.color}`} />
-                            {tab.label}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-                <ModernProgressTracker progress={completionProgress} />
-              </div>
+              <MobileSectionSwitcher
+                tabConfig={tabConfig}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                progress={completionProgress}
+                embedded={embedded}
+              />
 
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 {/* Tab Contents */}
@@ -1094,26 +954,11 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
       </div>
 
       {isMobile && (
-        <div className="fixed inset-x-0 bottom-0 z-50 shrink-0 border-t bg-background/95 backdrop-blur px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button
-            onClick={handleSave}
-            disabled={!selectedJobId || !isInitialized || isSaving}
-            variant="outline"
-            className="w-full h-11 border-2 border-green-500 text-green-600 hover:bg-green-50"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Guardar
-              </>
-            )}
-          </Button>
-        </div>
+        <MobileSaveBar
+          onSave={handleSave}
+          disabled={!selectedJobId || !isInitialized || isSaving}
+          isSaving={isSaving}
+        />
       )}
 
       <HojaDeRutaPrintDialog
