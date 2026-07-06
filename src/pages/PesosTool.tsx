@@ -278,7 +278,7 @@ const PesosTool: React.FC = () => {
       } else if (result.uploaded === 0 && result.removed === 0) {
         toast({
           title: 'Ningún PDF actualizado',
-          description: 'No se generó ningún PDF de fecha: revisa que la fecha de gira tenga un paquete o conjunto por defecto asignado.',
+          description: 'No se generó ningún PDF de fecha: revisa que las fechas de gira tengan un paquete o conjunto por defecto asignado.',
           variant: 'destructive',
         });
       }
