@@ -355,6 +355,12 @@ export const TourDefaultsManager = ({
             description: `${result.errors.length} documento(s) no se pudieron refrescar.`,
             variant: 'destructive',
           });
+        } else if (result.uploaded === 0 && result.removed === 0) {
+          toast({
+            title: 'Ningún PDF actualizado',
+            description: 'No se generó ningún PDF de fecha: revisa que las fechas de gira tengan un paquete o conjunto por defecto asignado.',
+            variant: 'destructive',
+          });
         } else if (!silent) {
           toast({
             title: 'PDFs sincronizados',
