@@ -92,6 +92,7 @@ export const EVENT_TYPES = {
   // Scheduled notifications
   DAILY_MORNING_SUMMARY: 'daily.morning.summary',
   FESTIVAL_FEED_TICK: 'festival.feed.tick',
+  PROGRAMA_FEED_TICK: 'programa.feed.tick',
 } as const;
 
 // Push notification configuration

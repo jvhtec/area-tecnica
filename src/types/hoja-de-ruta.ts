@@ -1,5 +1,6 @@
 import type { LogisticsHojaCategory } from "@/constants/logisticsHojaCategories";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf/section-options";
+import type { ActiveDepartment } from "@/types/department";
 
 // Core interfaces - most comprehensive version first
 export interface WeatherData {
@@ -171,6 +172,11 @@ export interface ProgramRow {
   item: string;
   dept?: string;
   notes?: string;
+  id?: string;
+  // When true, assigned technicians (with push enabled) get a push reminder at `time`.
+  notify?: boolean;
+  // Scopes the push to technicians in these departments on this job; empty/undefined = everyone assigned.
+  departments?: ActiveDepartment[];
 }
 
 export interface ProgramDay {

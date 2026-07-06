@@ -3,8 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ProgramRow } from '@/types/hoja-de-ruta';
-import { Plus, Trash2, Copy, ArrowUp, ArrowDown, FileDown } from 'lucide-react';
+import { ACTIVE_DEPARTMENTS, DEPARTMENT_LABELS, type ActiveDepartment } from '@/types/department';
+import { Plus, Trash2, Copy, ArrowUp, ArrowDown, FileDown, Bell } from 'lucide-react';
 
 type TimeFormat = '24h' | '12h';
 
@@ -57,7 +60,9 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
         ra.time !== rb.time ||
         ra.item !== rb.item ||
         (ra.dept || '') !== (rb.dept || '') ||
-        (ra.notes || '') !== (rb.notes || '')
+        (ra.notes || '') !== (rb.notes || '') ||
+        !!ra.notify !== !!rb.notify ||
+        (ra.departments || []).join(',') !== (rb.departments || []).join(',')
       ) {
         return false;
       }
@@ -107,6 +112,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
     const lastTime = rows.length ? rows[rows.length - 1].time : '09:00';
     const nextTime = roundToSnap(incrementTime(lastTime, snap));
     const newRow: ProgramRow = {
+      id: crypto.randomUUID(),
       time: nextTime,
       item: preset?.item || '',
       dept: preset?.dept || '',
@@ -135,7 +141,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
   const duplicateRow = (index: number) => {
     setRows((r) => {
       const copy = [...r];
-      copy.splice(index + 1, 0, { ...r[index] });
+      copy.splice(index + 1, 0, { ...r[index], id: crypto.randomUUID() });
       return copy;
     });
   };
@@ -226,48 +232,77 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
         </div>
 
         {/* Rows */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {rows.map((row, idx) => (
-            <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-              <Input
-                type="time"
-                step={stepSeconds}
-                value={row.time}
-                onChange={(e) => updateRow(idx, { time: roundToSnap(e.target.value) })}
-                className="col-span-2"
-              />
-              <Input
-                value={row.item}
-                onChange={(e) => updateRow(idx, { item: e.target.value })}
-                placeholder="Actividad"
-                className="col-span-4"
-              />
-              <Input
-                value={row.dept || ''}
-                onChange={(e) => updateRow(idx, { dept: e.target.value })}
-                placeholder="Depto/Líder"
-                className="col-span-3"
-              />
-              <div className="col-span-3 flex items-center gap-2">
+            <div key={row.id || idx} className="space-y-1.5 rounded-md border border-transparent p-1.5 hover:border-border">
+              <div className="grid grid-cols-12 gap-2 items-center">
                 <Input
-                  value={row.notes || ''}
-                  onChange={(e) => updateRow(idx, { notes: e.target.value })}
-                  placeholder="Notas"
+                  type="time"
+                  step={stepSeconds}
+                  value={row.time}
+                  onChange={(e) => updateRow(idx, { time: roundToSnap(e.target.value) })}
+                  className="col-span-2"
                 />
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => moveRow(idx, -1)} title="Subir">
-                    <ArrowUp className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => moveRow(idx, 1)} title="Bajar">
-                    <ArrowDown className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => duplicateRow(idx)} title="Duplicar">
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => deleteRow(idx)} title="Eliminar">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                <Input
+                  value={row.item}
+                  onChange={(e) => updateRow(idx, { item: e.target.value })}
+                  placeholder="Actividad"
+                  className="col-span-4"
+                />
+                <Input
+                  value={row.dept || ''}
+                  onChange={(e) => updateRow(idx, { dept: e.target.value })}
+                  placeholder="Depto/Líder"
+                  className="col-span-3"
+                />
+                <div className="col-span-3 flex items-center gap-2">
+                  <Input
+                    value={row.notes || ''}
+                    onChange={(e) => updateRow(idx, { notes: e.target.value })}
+                    placeholder="Notas"
+                  />
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => moveRow(idx, -1)} title="Subir">
+                      <ArrowUp className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => moveRow(idx, 1)} title="Bajar">
+                      <ArrowDown className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => duplicateRow(idx)} title="Duplicar">
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteRow(idx)} title="Eliminar">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pl-1">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Checkbox
+                    checked={!!row.notify}
+                    onCheckedChange={(checked) => updateRow(idx, { notify: checked === true })}
+                  />
+                  <Bell className="w-3.5 h-3.5" />
+                  Notificar a los asignados a esta hora
+                </label>
+                {row.notify && (
+                  <ToggleGroup
+                    type="multiple"
+                    size="sm"
+                    value={row.departments || []}
+                    onValueChange={(value) => updateRow(idx, { departments: value as ActiveDepartment[] })}
+                  >
+                    {ACTIVE_DEPARTMENTS.map((dept) => (
+                      <ToggleGroupItem key={dept} value={dept} className="text-xs px-2 py-1 h-7">
+                        {DEPARTMENT_LABELS[dept]}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                )}
+                {row.notify && (row.departments || []).length === 0 && (
+                  <span className="text-xs text-muted-foreground">(todos los asignados)</span>
+                )}
               </div>
             </div>
           ))}

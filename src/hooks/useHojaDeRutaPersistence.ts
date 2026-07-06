@@ -7,6 +7,7 @@ import type {
   AuxiliaryMachineryRequirement,
   Transport,
   WeatherData,
+  ProgramDay,
 } from "@/types/hoja-de-ruta";
 import type { Json } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +19,16 @@ import {
   normalizeVenueCoordinates,
   resolveHojaVenue,
 } from "@/utils/hoja-de-ruta/venue-resolution";
+
+// Older programa rows were saved before `id` existed; backfill so push notifications
+// have a stable dedup key without forcing a one-time data migration.
+const backfillProgramDayIds = (days: ProgramDay[] | undefined): ProgramDay[] | undefined => {
+  if (!Array.isArray(days)) return days;
+  return days.map((day) => ({
+    ...day,
+    rows: (day.rows || []).map((row) => (row.id ? row : { ...row, id: crypto.randomUUID() })),
+  }));
+};
 
 
 
@@ -265,7 +276,7 @@ export const useHojaDeRutaPersistence = (
         })) : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
         schedule: mainData.schedule || '',
         // Load multi-day program if available
-        programScheduleDays: (mainData as any).program_schedule_json || undefined,
+        programScheduleDays: backfillProgramDayIds((mainData as any).program_schedule_json || undefined),
         powerRequirements: mainData.power_requirements || '',
         auxiliaryNeeds: mainData.auxiliary_needs || '',
         auxiliaryStaffSetupQty: toSafeNonNegativeInt(mainData.aux_staff_setup_qty),

@@ -4,6 +4,7 @@ import { jsonResponse } from "./http.ts";
 import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
 import { handleFestivalFeedTick } from "./festivalFeed.ts";
+import { handleProgramaFeedTick } from "./programaFeed.ts";
 import type {
   CheckScheduledBody,
   NativePushTokenRow,
@@ -590,6 +591,10 @@ export async function handleCheckScheduled(
 
   if (type === EVENT_TYPES.FESTIVAL_FEED_TICK) {
     return handleFestivalFeedTick(client);
+  }
+
+  if (type === EVENT_TYPES.PROGRAMA_FEED_TICK) {
+    return handleProgramaFeedTick(client);
   }
 
   // Check if it's time to send
