@@ -805,7 +805,7 @@ export const generateAndMergeFestivalPDFs = async (
       if (artists && artists.length > 0) {
         const missingRiderArtists = artists.filter(artist =>
           Boolean(artist.rider_missing) ||
-          (Boolean(artist.rider_copied_from_date) && !artist.rider_outdated_dismissed)
+          ((Boolean(artist.rider_outdated) || Boolean(artist.rider_copied_from_date)) && !artist.rider_outdated_dismissed)
         );
 
         console.log(`Found ${missingRiderArtists.length} artists with missing or outdated riders out of ${artists.length} total artists`);

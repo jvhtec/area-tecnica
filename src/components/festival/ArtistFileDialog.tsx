@@ -129,6 +129,21 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
         }
       }
 
+      const { error: artistUpdateError } = await dataLayerClient
+        .from("festival_artists")
+        .update({
+          rider_missing: false,
+          rider_outdated: false,
+          rider_copied_from_date: null,
+          rider_outdated_dismissed: false,
+        })
+        .eq("id", artistId);
+
+      if (artistUpdateError) {
+        console.error("Artist rider state update error:", artistUpdateError);
+        throw artistUpdateError;
+      }
+
       toast({
         title: "Éxito",
         description:
@@ -165,17 +180,16 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
     if (!selectedFile) return;
 
     try {
-      // First delete from storage
-      const { error: storageError } = await dataLayerClient.storage
+      const { count: referenceCount, error: countError } = await dataLayerClient
         .from('festival_artist_files')
-        .remove([selectedFile.file_path]);
+        .select('id', { count: 'exact', head: true })
+        .eq('file_path', selectedFile.file_path);
 
-      if (storageError) {
-        console.error("Storage delete error:", storageError);
-        throw storageError;
+      if (countError) {
+        console.error("File reference count error:", countError);
+        throw countError;
       }
 
-      // Then delete the database record
       const { error: dbError } = await dataLayerClient.from('festival_artist_files')
         .delete()
         .eq('id', selectedFile.id);
@@ -183,6 +197,16 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       if (dbError) {
         console.error("Database delete error:", dbError);
         throw dbError;
+      }
+
+      if ((referenceCount ?? 0) <= 1) {
+        const { error: storageError } = await dataLayerClient.storage
+          .from('festival_artist_files')
+          .remove([selectedFile.file_path]);
+
+        if (storageError) {
+          console.error("Storage delete error:", storageError);
+        }
       }
 
       toast({

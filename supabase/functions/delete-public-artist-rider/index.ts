@@ -146,12 +146,14 @@ serve(createHttpHandler(async (req) => {
       return jsonResponse({ ok: false, error: "file_not_found" }, { status: 404 });
     }
 
-    const { error: storageError } = await supabaseAdmin.storage
+    const { count: referenceCount, error: referenceCountError } = await supabaseAdmin
       .from("festival_artist_files")
-      .remove([fileRow.file_path]);
+      .select("id", { count: "exact", head: true })
+      .eq("file_path", fileRow.file_path);
 
-    if (storageError) {
-      console.error("[delete-public-artist-rider] storage remove error", storageError);
+    if (referenceCountError) {
+      console.error("[delete-public-artist-rider] file reference count error", referenceCountError);
+      return jsonResponse({ ok: false, error: "file_reference_count_failed" }, { status: 500 });
     }
 
     const { error: deleteError } = await supabaseAdmin
@@ -163,6 +165,16 @@ serve(createHttpHandler(async (req) => {
     if (deleteError) {
       console.error("[delete-public-artist-rider] metadata delete error", deleteError);
       return jsonResponse({ ok: false, error: "metadata_delete_failed" }, { status: 500 });
+    }
+
+    if ((referenceCount ?? 0) <= 1) {
+      const { error: storageError } = await supabaseAdmin.storage
+        .from("festival_artist_files")
+        .remove([fileRow.file_path]);
+
+      if (storageError) {
+        console.error("[delete-public-artist-rider] storage remove error", storageError);
+      }
     }
 
     return jsonResponse({ ok: true, deleted_file_id: fileRow.id }, { status: 200 });

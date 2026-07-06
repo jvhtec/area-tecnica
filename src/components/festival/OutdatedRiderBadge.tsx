@@ -25,10 +25,10 @@ const formatSourceDate = (date: string | null | undefined): string => {
   return Number.isNaN(parsed.getTime()) ? date : format(parsed, "d 'de' MMMM 'de' yyyy", { locale: es });
 };
 
-// Warns that an artist's rider/specs were copied from a previous show date and
-// may be stale. Details surface on hover (desktop) or tap (mobile); the warning
-// is dismissible per artist ("defeatable"), after which the row falls back to
-// the normal rider status badge.
+// Warns that an artist's rider/specs were imported or copied and may be stale.
+// Details surface on hover (desktop) or tap (mobile); the warning is
+// dismissible per artist, after which the row falls back to the normal rider
+// status badge.
 export const OutdatedRiderBadge = ({ artistId, copiedFromDate, onDismissed, compact = false }: OutdatedRiderBadgeProps) => {
   const isMobile = useIsMobile();
   const [isDismissing, setIsDismissing] = useState(false);
@@ -57,7 +57,7 @@ export const OutdatedRiderBadge = ({ artistId, copiedFromDate, onDismissed, comp
       className={`bg-amber-100 text-amber-900 border-amber-300 ${compact ? "text-[10px] px-1 py-0" : "text-xs"}`}
     >
       <History className={`${compact ? "h-3 w-3" : "h-3.5 w-3.5"} mr-1`} />
-      Rider antiguo
+      Desactualizado
     </Badge>
   );
 
@@ -65,7 +65,9 @@ export const OutdatedRiderBadge = ({ artistId, copiedFromDate, onDismissed, comp
     <div className="max-w-xs space-y-1.5">
       <p className="font-medium text-amber-900">Rider posiblemente desactualizado</p>
       <p className="text-xs text-muted-foreground">
-        Copiado de la fecha {formatSourceDate(copiedFromDate)}.
+        {copiedFromDate
+          ? `Copiado de la fecha ${formatSourceDate(copiedFromDate)}.`
+          : "Importado desde la biblioteca de riders."}
       </p>
       <p className="text-xs text-muted-foreground">
         Solicita un rider más reciente si es posible antes de la producción.

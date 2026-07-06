@@ -9,6 +9,7 @@ import {
   FileText,
   FolderPlus,
   Layout,
+  Library,
   Link as LinkIcon,
   Loader2,
   MapPin,
@@ -80,6 +81,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
     isAssignmentDialogOpen,
     handleNavigateTimesheets,
     handleOpenRouteSheet,
+    handleOpenRiderLibrary,
 
     flexStatus,
     handleCreateFlexFolders,
@@ -419,6 +421,19 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                       Abrir
                     </Button>
                   </div>
+                </div>
+
+                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                    <Library className="h-4 w-4 flex-shrink-0" />
+                    Biblioteca de Riders
+                  </div>
+                  <p className="text-xs md:text-sm text-muted-foreground">
+                    Importa riders existentes como copias técnicas para este trabajo.
+                  </p>
+                  <Button onClick={() => handleOpenRiderLibrary()} disabled={!jobId} size="sm" className="w-full">
+                    Abrir Biblioteca
+                  </Button>
                 </div>
 
                 <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">

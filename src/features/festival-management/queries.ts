@@ -3,6 +3,7 @@ import {
   buildFallbackStageOptions,
   buildFestivalStageOptions,
   buildJobDates,
+  buildRiderLibraryEntries,
   type JobDateTypeRow,
 } from "@/features/festival-management/selectors";
 import { fetchWithOfflineFallback, getFestivalSnapshot } from "@/lib/offline";
@@ -17,6 +18,10 @@ import type {
   FestivalJobDetailsData,
   FestivalVenueData,
   JobDocumentEntry,
+  RiderLibraryEntry,
+  RiderLibraryFile,
+  RiderLibrarySourceArtist,
+  RiderLibrarySourceJob,
 } from "@/features/festival-management/types";
 
 type LocationRow = {
@@ -319,4 +324,91 @@ export const fetchFestivalDocuments = async (jobId: string): Promise<FestivalDoc
     offline: () => buildOfflineDocuments(jobId),
   });
   return result.data;
+};
+
+const fetchTargetJobRiderFilePaths = async (jobId: string) => {
+  const { data: targetArtists, error: artistError } = await supabase
+    .from("festival_artists")
+    .select("id")
+    .eq("job_id", jobId);
+
+  if (artistError) throw artistError;
+
+  const targetArtistIds = (targetArtists || []).map((artist) => artist.id);
+  if (targetArtistIds.length === 0) return [];
+
+  const { data: targetFiles, error: filesError } = await supabase
+    .from("festival_artist_files")
+    .select("file_path")
+    .in("artist_id", targetArtistIds);
+
+  if (filesError) throw filesError;
+
+  return (targetFiles || []).map((file) => file.file_path).filter((value): value is string => Boolean(value));
+};
+
+export const fetchRiderLibrary = async (targetJobId: string): Promise<RiderLibraryEntry[]> => {
+  const [{ data: filesData, error: filesError }, targetFilePaths] = await Promise.all([
+    supabase
+      .from("festival_artist_files")
+      .select("id, artist_id, file_name, file_path, file_type, file_size, uploaded_by, uploaded_at")
+      .not("artist_id", "is", null)
+      .order("uploaded_at", { ascending: false }),
+    fetchTargetJobRiderFilePaths(targetJobId),
+  ]);
+
+  if (filesError) throw filesError;
+
+  const files: RiderLibraryFile[] = (filesData || [])
+    .filter((file) => Boolean(file.artist_id))
+    .map((file) => ({
+      artist_id: file.artist_id as string,
+      file_name: file.file_name,
+      file_path: file.file_path,
+      file_size: file.file_size,
+      file_type: file.file_type,
+      id: file.id,
+      uploaded_at: file.uploaded_at,
+      uploaded_by: file.uploaded_by,
+    }));
+
+  if (files.length === 0) return [];
+
+  const artistIds = Array.from(new Set(files.map((file) => file.artist_id)));
+  const { data: artistsData, error: artistsError } = await supabase
+    .from("festival_artists")
+    .select("id, name, job_id, date, stage")
+    .in("id", artistIds);
+
+  if (artistsError) throw artistsError;
+
+  const artists: RiderLibrarySourceArtist[] = (artistsData || []).map((artist) => ({
+    date: artist.date,
+    id: artist.id,
+    job_id: artist.job_id,
+    name: artist.name,
+    stage: artist.stage,
+  }));
+
+  const jobIds = Array.from(
+    new Set(artists.map((artist) => artist.job_id).filter((value): value is string => Boolean(value))),
+  );
+  const jobs: RiderLibrarySourceJob[] = [];
+
+  if (jobIds.length > 0) {
+    const { data: jobsData, error: jobsError } = await supabase
+      .from("jobs")
+      .select("id, title, job_type, start_time, end_time")
+      .in("id", jobIds);
+
+    if (jobsError) throw jobsError;
+    jobs.push(...(jobsData || []));
+  }
+
+  return buildRiderLibraryEntries({
+    artistsById: new Map(artists.map((artist) => [artist.id, artist])),
+    files,
+    jobsById: new Map(jobs.map((job) => [job.id, job])),
+    targetFilePaths,
+  });
 };

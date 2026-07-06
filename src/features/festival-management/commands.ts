@@ -9,6 +9,8 @@ import type {
   FestivalVenueData,
   FestivalWhatsappDepartment,
   JobDocumentEntry,
+  RiderLibraryImportInput,
+  RiderLibraryImportResult,
 } from "@/features/festival-management/types";
 import { supabase } from "@/integrations/supabase/client";
 import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
@@ -66,6 +68,51 @@ export const getRiderSignedUrl = async (file: ArtistRiderFile) =>
 
 export const downloadRiderBlob = async (file: ArtistRiderFile) =>
   getDownloadableBlob("festival_artist_files", file.file_path);
+
+export const getRiderImportErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error || "");
+
+  if (message.includes("duplicate_rider_import")) {
+    return "Este trabajo ya referencia al menos uno de los archivos de ese rider.";
+  }
+  if (message.includes("not_authorized")) {
+    return "No tienes permisos para importar riders.";
+  }
+  if (message.includes("source_artist_has_no_riders")) {
+    return "El artista seleccionado no tiene riders para importar.";
+  }
+  if (message.includes("invalid_target_stage")) {
+    return "Selecciona un escenario válido para importar el rider.";
+  }
+  if (message.includes("missing_required_argument")) {
+    return "Selecciona una fecha y escenario antes de importar.";
+  }
+
+  return message || "No se pudo importar el rider.";
+};
+
+export const importArtistRiderToJob = async ({
+  sourceArtistId,
+  targetDate,
+  targetJobId,
+  targetStage,
+}: RiderLibraryImportInput): Promise<RiderLibraryImportResult> => {
+  const { data, error } = await supabase.rpc("import_artist_rider_to_job", {
+    p_source_artist_id: sourceArtistId,
+    p_target_date: targetDate,
+    p_target_job_id: targetJobId,
+    p_target_stage: targetStage,
+  });
+
+  if (error) throw error;
+
+  const result = data?.[0];
+  if (!result) {
+    throw new Error("No se recibió confirmación de importación.");
+  }
+
+  return result as RiderLibraryImportResult;
+};
 
 export const downloadBlobInBrowser = (blob: Blob, fileName: string) => {
   const url = window.URL.createObjectURL(blob);

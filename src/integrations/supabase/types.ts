@@ -1677,6 +1677,7 @@ export type Database = {
           rf_festival_wireless: number | null
           rider_copied_from_date: string | null
           rider_missing: boolean | null
+          rider_outdated: boolean
           rider_outdated_dismissed: boolean
           show_end: string | null
           show_start: string | null
@@ -1759,6 +1760,7 @@ export type Database = {
           rf_festival_wireless?: number | null
           rider_copied_from_date?: string | null
           rider_missing?: boolean | null
+          rider_outdated?: boolean
           rider_outdated_dismissed?: boolean
           show_end?: string | null
           show_start?: string | null
@@ -1841,6 +1843,7 @@ export type Database = {
           rf_festival_wireless?: number | null
           rider_copied_from_date?: string | null
           rider_missing?: boolean | null
+          rider_outdated?: boolean
           rider_outdated_dismissed?: boolean
           show_end?: string | null
           show_start?: string | null
@@ -10556,6 +10559,20 @@ export type Database = {
         }
       }
       assert_soundvision_access: { Args: never; Returns: boolean }
+      import_artist_rider_to_job: {
+        Args: {
+          p_source_artist_id: string
+          p_target_date: string
+          p_target_job_id: string
+          p_target_stage: number
+        }
+        Returns: {
+          imported_artist_id: string
+          imported_file_count: number
+          target_date: string
+          target_stage: number
+        }[]
+      }
       attempt_whatsapp_send: {
         Args: {
           _actor_id: string

@@ -53,14 +53,82 @@ export interface ArtistRiderFile {
   id: string;
   file_name: string;
   file_path: string;
+  file_size?: number | null;
+  file_type?: string | null;
   created_at: string;
   uploaded_at?: string | null;
+  uploaded_by?: string | null;
   artist_id?: string;
   festival_artists?: {
     id: string;
     name: string;
   } | null;
 }
+
+export type RiderStatus = "missing" | "outdated" | "complete";
+
+export type RiderFreshnessArtist = {
+  rider_copied_from_date?: string | null;
+  rider_missing?: boolean | null;
+  rider_outdated?: boolean | null;
+  rider_outdated_dismissed?: boolean | null;
+};
+
+export type RiderLibraryFile = {
+  id: string;
+  artist_id: string;
+  created_at?: string | null;
+  file_name: string;
+  file_path: string;
+  file_size?: number | null;
+  file_type?: string | null;
+  uploaded_at?: string | null;
+  uploaded_by?: string | null;
+};
+
+export type RiderLibrarySourceArtist = {
+  id: string;
+  date?: string | null;
+  job_id?: string | null;
+  name: string;
+  stage?: number | null;
+};
+
+export type RiderLibrarySourceJob = {
+  id: string;
+  end_time?: string | null;
+  job_type?: JobType | string | null;
+  start_time?: string | null;
+  title?: string | null;
+};
+
+export type RiderLibraryEntry = {
+  alreadyImported: boolean;
+  artistId: string;
+  artistName: string;
+  duplicateFilePaths: string[];
+  files: RiderLibraryFile[];
+  latestUploadedAt: string | null;
+  sourceDate: string | null;
+  sourceJobId: string | null;
+  sourceJobTitle: string;
+  sourceJobType: JobType | string | null;
+  sourceStage: number | null;
+};
+
+export type RiderLibraryImportInput = {
+  sourceArtistId: string;
+  targetDate: string;
+  targetJobId: string;
+  targetStage: number;
+};
+
+export type RiderLibraryImportResult = {
+  imported_artist_id: string;
+  imported_file_count: number;
+  target_date: string;
+  target_stage: number;
+};
 
 export type FestivalStageOption = {
   number: number;
@@ -135,6 +203,7 @@ type FestivalManagementLocalVm = {
   handleOpenAssignments: () => void;
   handleOpenJobDetails: () => void;
   handleOpenRouteSheet: () => void;
+  handleOpenRiderLibrary: (initialDate?: string | null) => void;
   handleRefreshAll: () => void;
   humanizeDepartment: (department: Department) => string;
   isArtistRoute: boolean;
@@ -148,6 +217,7 @@ type FestivalManagementLocalVm = {
   isManagementUser?: boolean;
   isPlanningViewOnly: boolean;
   isRouteSheetOpen: boolean;
+  isRiderLibraryOpen: boolean;
   isSchedulingRoute: boolean;
   isSingleJobMode: boolean;
   isViewOnly: boolean;
@@ -162,6 +232,8 @@ type FestivalManagementLocalVm = {
   setIsJobDetailsOpen: Dispatch<SetStateAction<boolean>>;
   setIsJobPresetsOpen: Dispatch<SetStateAction<boolean>>;
   setIsRouteSheetOpen: Dispatch<SetStateAction<boolean>>;
+  setIsRiderLibraryOpen: Dispatch<SetStateAction<boolean>>;
+  riderLibraryInitialDate: string | null;
   userRole: string | null | undefined;
   venueData: FestivalVenueData;
 };

@@ -45,6 +45,9 @@ interface Artist {
   extras_wired?: string;
   notes?: string;
   rider_missing?: boolean;
+  rider_copied_from_date?: string | null;
+  rider_outdated?: boolean;
+  rider_outdated_dismissed?: boolean;
   foh_tech?: boolean;
   mon_tech?: boolean;
   isaftermidnight?: boolean;

@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 import { PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
+import { RiderLibraryDialog } from "@/components/festival/RiderLibraryDialog";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
@@ -18,6 +19,7 @@ import {
   requiresFestivalWhatsappStage,
 } from "@/features/festival-management/selectors";
 import type { FestivalManagementVm } from "@/features/festival-management/types";
+import { canEditJobs } from "@/utils/permissions";
 
 export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) => {
   const {
@@ -29,6 +31,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
     isPlanningViewOnly,
     isHouseTech,
     isManagementUser,
+    userRole,
 
     isAssignmentDialogOpen,
     setIsAssignmentDialogOpen,
@@ -117,10 +120,15 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
     setIsDeleteDialogOpen,
     isDeleting,
     handleDeleteJob,
+    isRiderLibraryOpen,
+    setIsRiderLibraryOpen,
+    riderLibraryInitialDate,
+    handleOpenRiderLibrary,
   } = vm;
   const festivalWhatsappStageOptions = buildFestivalWhatsappStageOptions(festivalStageOptions, maxStages);
   const requiresStageScopedWhatsapp = requiresFestivalWhatsappStage(maxStages, waDepartment);
   const canUpdateExistingWaGroup = !!waGroup && requiresStageScopedWhatsapp;
+  const canImportRiders = canEditJobs(userRole);
 
   return (
     <>
@@ -169,6 +177,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
               jobDates={jobDates}
               isViewOnly={isPlanningViewOnly}
               onCreateWhatsappGroup={isManagementUser ? () => setIsWhatsappDialogOpen(true) : undefined}
+              onOpenRiderLibrary={canImportRiders ? handleOpenRiderLibrary : undefined}
             />
           ) : (
             <Card>
@@ -198,6 +207,17 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
       )}
 
       {jobId && <JobPresetManagerDialog open={isJobPresetsOpen} onOpenChange={setIsJobPresetsOpen} jobId={jobId} />}
+
+      <RiderLibraryDialog
+        canImport={canImportRiders}
+        initialDate={riderLibraryInitialDate}
+        jobDates={jobDates}
+        jobId={jobId}
+        maxStages={maxStages}
+        onOpenChange={setIsRiderLibraryOpen}
+        open={isRiderLibraryOpen}
+        stageOptions={festivalStageOptions}
+      />
 
       <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
         <DialogContent className="sm:max-w-lg">

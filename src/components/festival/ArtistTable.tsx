@@ -38,6 +38,7 @@ import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 import { ArtistActionButtons } from "./ArtistActionButtons";
 import { buildArtistPdfData } from "@/utils/artistPdfDataMapper";
+import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 
 interface Artist {
   id: string;
@@ -79,6 +80,7 @@ interface Artist {
   notes?: string;
   rider_missing?: boolean;
   rider_copied_from_date?: string | null;
+  rider_outdated?: boolean;
   rider_outdated_dismissed?: boolean;
   foh_tech?: boolean;
   mon_tech?: boolean;
@@ -578,7 +580,8 @@ export const ArtistTable = ({
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = stageFilter === "all" || artist.stage?.toString() === stageFilter;
-    const matchesRider = riderFilter === "all" || riderFilter === "missing" && artist.rider_missing || riderFilter === "complete" && !artist.rider_missing;
+    const riderStatus = getArtistRiderStatus(artist);
+    const matchesRider = riderFilter === "all" || riderStatus === riderFilter;
     return matchesSearch && matchesStage && matchesRider;
   });
 
@@ -1023,7 +1026,7 @@ export const ArtistTable = ({
                       {/* Estado: rider + material */}
                       <TableCell className="px-2 py-2 align-top">
                         <div className="flex flex-col items-start gap-1">
-                          {artist.rider_copied_from_date && !artist.rider_outdated_dismissed ? (
+                          {getArtistRiderStatus(artist) === "outdated" ? (
                             <OutdatedRiderBadge
                               artistId={artist.id}
                               copiedFromDate={artist.rider_copied_from_date}
