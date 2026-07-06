@@ -13,6 +13,7 @@ import type { JobCardJob } from "@/components/jobs/cards/job-card-actions/types"
 import {
   fetchFlexMaterialReport,
   type FlexMaterialReportDepartment,
+  type FlexMaterialReportType,
 } from "@/utils/flexMaterialReport";
 
 type PrintableDepartment = Extract<FlexMaterialReportDepartment, "sound" | "lights">;
@@ -30,6 +31,8 @@ const QUOTE_FOLDER_TYPES = new Set([
 
 type PrintFlexReportActionProps = {
   job: JobCardJob;
+  department?: PrintableDepartment;
+  reportType?: FlexMaterialReportType;
 };
 
 const getFolderElementId = (folder: NonNullable<JobCardJob["flex_folders"]>[number]) =>
@@ -43,9 +46,56 @@ const hasQuoteForDepartment = (job: JobCardJob, department: PrintableDepartment)
     Boolean(getFolderElementId(folder))
   );
 
-export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
+const REPORT_COPY: Record<FlexMaterialReportType, {
+  buttonLabel: string;
+  dropdownTitle: string;
+  errorTitle: string;
+  fallbackError: string;
+  loadingLabel: (label: string) => string;
+  scopedTitle: (label: string) => string;
+  successDescription: (label: string) => string;
+  successTitle: string;
+  unavailableDropdownTitle: string;
+  unavailableScopedTitle: (label: string) => string;
+}> = {
+  "material-list": {
+    buttonLabel: "Lista Material",
+    dropdownTitle: "Imprimir lista de material de Flex",
+    errorTitle: "No se pudo imprimir la lista",
+    fallbackError: "No se pudo obtener la lista de material de Flex.",
+    loadingLabel: (label) => `Lista ${label}`,
+    scopedTitle: (label) => `Imprimir lista de material de ${label} desde Flex`,
+    successDescription: (label) => `Se ha abierto la lista de material de ${label}.`,
+    successTitle: "Lista de material generada",
+    unavailableDropdownTitle: "No hay presupuesto de sonido o iluminación en Flex",
+    unavailableScopedTitle: (label) => `No hay presupuesto de ${label} en Flex`,
+  },
+  quote: {
+    buttonLabel: "Presupuesto",
+    dropdownTitle: "Imprimir presupuesto de Flex",
+    errorTitle: "No se pudo imprimir el presupuesto",
+    fallbackError: "No se pudo obtener el presupuesto de Flex.",
+    loadingLabel: (label) => `Presupuesto ${label}`,
+    scopedTitle: (label) => `Imprimir presupuesto de ${label} desde Flex`,
+    successDescription: (label) => `Se ha abierto el presupuesto de ${label}.`,
+    successTitle: "Presupuesto generado",
+    unavailableDropdownTitle: "No hay presupuesto de sonido o iluminación en Flex",
+    unavailableScopedTitle: (label) => `No hay presupuesto de ${label} en Flex`,
+  },
+};
+
+export const PrintFlexReportAction = ({
+  job,
+  department,
+  reportType = "material-list",
+}: PrintFlexReportActionProps) => {
   const { toast } = useToast();
   const [loadingDepartment, setLoadingDepartment] = React.useState<PrintableDepartment | null>(null);
+  const copy = REPORT_COPY[reportType];
+  const scopedDepartmentOption = React.useMemo(
+    () => MATERIAL_LIST_DEPARTMENTS.find((option) => option.department === department) ?? null,
+    [department]
+  );
   const quoteAvailability = React.useMemo(
     () => new Map(
       MATERIAL_LIST_DEPARTMENTS.map(({ department }) => [
@@ -57,7 +107,7 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
   );
   const hasAnyQuote = Array.from(quoteAvailability.values()).some(Boolean);
 
-  const handlePrintMaterialList = React.useCallback(async (department: PrintableDepartment, label: string) => {
+  const handlePrintReport = React.useCallback(async (department: PrintableDepartment, label: string) => {
     if (!job.id || loadingDepartment || !quoteAvailability.get(department)) return;
 
     setLoadingDepartment(department);
@@ -70,7 +120,7 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
         department,
         undefined,
         null,
-        "material-list"
+        reportType
       );
 
       if (reportWindow) {
@@ -80,24 +130,49 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
         window.open(result.url, "_blank", "noopener,noreferrer");
       }
       toast({
-        title: "Lista de material generada",
-        description: `Se ha abierto la lista de material de ${label}.`,
+        title: copy.successTitle,
+        description: copy.successDescription(label),
       });
     } catch (error: unknown) {
       reportWindow?.close();
       toast({
-        title: "No se pudo imprimir la lista",
-        description: error instanceof Error ? error.message : "No se pudo obtener la lista de material de Flex.",
+        title: copy.errorTitle,
+        description: error instanceof Error ? error.message : copy.fallbackError,
         variant: "destructive",
       });
     } finally {
       setLoadingDepartment(null);
     }
-  }, [job.id, loadingDepartment, quoteAvailability, toast]);
+  }, [copy, job.id, loadingDepartment, quoteAvailability, reportType, toast]);
 
   const loadingLabel = MATERIAL_LIST_DEPARTMENTS.find(
     (option) => option.department === loadingDepartment
   )?.label;
+
+  if (scopedDepartmentOption) {
+    const isAvailable = quoteAvailability.get(scopedDepartmentOption.department) ?? false;
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2"
+        disabled={!!loadingDepartment || !isAvailable}
+        onClick={() => void handlePrintReport(scopedDepartmentOption.department, scopedDepartmentOption.label)}
+        title={
+          isAvailable
+            ? copy.scopedTitle(scopedDepartmentOption.label)
+            : copy.unavailableScopedTitle(scopedDepartmentOption.label)
+        }
+      >
+        {loadingDepartment ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Printer className="h-4 w-4" />
+        )}
+        <span className="hidden sm:inline">{copy.buttonLabel}</span>
+      </Button>
+    );
+  }
 
   return (
     <DropdownMenu>
@@ -107,7 +182,7 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
           size="sm"
           className="gap-2"
           disabled={!!loadingDepartment || !hasAnyQuote}
-          title={hasAnyQuote ? "Imprimir lista de material de Flex" : "No hay presupuesto de sonido o iluminación en Flex"}
+          title={hasAnyQuote ? copy.dropdownTitle : copy.unavailableDropdownTitle}
         >
           {loadingDepartment ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -115,7 +190,7 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
             <Printer className="h-4 w-4" />
           )}
           <span className="hidden sm:inline">
-            {loadingLabel ? `Lista ${loadingLabel}` : "Lista Material"}
+            {loadingLabel ? copy.loadingLabel(loadingLabel) : copy.buttonLabel}
           </span>
           {!loadingDepartment && <ChevronDown className="h-3.5 w-3.5" />}
         </Button>
@@ -127,7 +202,7 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
             disabled={!quoteAvailability.get(department)}
             onSelect={(event) => {
               event.preventDefault();
-              void handlePrintMaterialList(department, label);
+              void handlePrintReport(department, label);
             }}
           >
             {label}
