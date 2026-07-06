@@ -192,7 +192,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
 
             {/* Image Gallery */}
             {imagePreviews.venue.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <AnimatePresence>
                   {imagePreviews.venue.map((preview, index) => (
                     <motion.div

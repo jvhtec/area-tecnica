@@ -106,7 +106,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                   exit={{ opacity: 0, x: 20 }}
                   className="p-4 border-2 border-gray-200 rounded-lg bg-gradient-to-r from-orange-50 to-transparent"
                 >
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <User className="w-4 h-4" />

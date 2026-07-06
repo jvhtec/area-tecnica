@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
@@ -271,6 +272,7 @@ export function JobCardNewView({
   handleFlexPickerConfirm,
 }: JobCardNewViewProps) {
   const reducedMotion = useReducedMotion();
+  const isMobile = useIsMobile();
   const canManageTransportRequests = userDepartment === "logistics" || isManagementRole(userRole);
   const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
@@ -673,10 +675,14 @@ export function JobCardNewView({
           {isProjectManagementPage && (
             <>
               <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-                <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
-                  <div className="h-full overflow-auto">
-                    <ModernHojaDeRuta jobId={job.id} />
-                  </div>
+                <DialogContent
+                  className={
+                    isMobile
+                      ? "flex h-dvh max-h-dvh w-[100vw] max-w-[100vw] flex-col gap-0 overflow-hidden rounded-none p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+                      : "flex w-[96vw] max-w-[96vw] h-[85vh] max-h-[85vh] flex-col gap-0 overflow-hidden p-0"
+                  }
+                >
+                  <ModernHojaDeRuta jobId={job.id} embedded />
                 </DialogContent>
               </Dialog>
               <ProjectNotesDialog

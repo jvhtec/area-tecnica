@@ -223,8 +223,8 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
           </Button>
         </div>
 
-        {/* Grid header */}
-        <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground">
+        {/* Grid header (hidden on mobile, where rows stack in a single column) */}
+        <div className="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground">
           <div className="col-span-2">Hora</div>
           <div className="col-span-4">Ítem</div>
           <div className="col-span-3">Depto/Líder</div>
@@ -235,27 +235,27 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
         <div className="space-y-3">
           {rows.map((row, idx) => (
             <div key={row.id || idx} className="space-y-1.5 rounded-md border border-transparent p-1.5 hover:border-border">
-              <div className="grid grid-cols-12 gap-2 items-center">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:items-center">
                 <Input
                   type="time"
                   step={stepSeconds}
                   value={row.time}
                   onChange={(e) => updateRow(idx, { time: roundToSnap(e.target.value) })}
-                  className="col-span-2"
+                  className="sm:col-span-2"
                 />
                 <Input
                   value={row.item}
                   onChange={(e) => updateRow(idx, { item: e.target.value })}
                   placeholder="Actividad"
-                  className="col-span-4"
+                  className="sm:col-span-4"
                 />
                 <Input
                   value={row.dept || ''}
                   onChange={(e) => updateRow(idx, { dept: e.target.value })}
                   placeholder="Depto/Líder"
-                  className="col-span-3"
+                  className="sm:col-span-3"
                 />
-                <div className="col-span-3 flex items-center gap-2">
+                <div className="sm:col-span-3 flex items-center gap-2">
                   <Input
                     value={row.notes || ''}
                     onChange={(e) => updateRow(idx, { notes: e.target.value })}
