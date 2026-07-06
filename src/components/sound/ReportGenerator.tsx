@@ -53,6 +53,9 @@ type MappingResult = {
   missing: { filename: string; section: string; view: string }[];
 };
 
+const filePickerLabelClass =
+  "inline-flex h-9 w-full cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-auto";
+
 export const ReportGenerator = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
@@ -88,6 +91,9 @@ export const ReportGenerator = () => {
     const key = `${section}-${view}`;
     setImages(prev => ({ ...prev, [key]: file }));
   };
+
+  const getImageInputId = (section: string, view: string) =>
+    `sv-report-${section}-${view}`.replace(/[^a-z0-9_-]+/gi, "-").toLowerCase();
 
   const toggleIsoView = (section: string) => {
     setIsoViewEnabled(prev => ({
@@ -452,20 +458,23 @@ export const ReportGenerator = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <Label htmlFor="folderSelect" className="cursor-pointer flex-1 sm:flex-initial">
-                <div className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 border rounded-md hover:bg-background transition-colors">
-                  <FolderOpen className="h-4 w-4" />
-                  <span className="text-sm">Select Folder</span>
-                </div>
-              </Label>
               <input
-                id="folderSelect"
+                id="sv-report-folder-input"
                 type="file"
-                {...({ webkitdirectory: "" } as any)}
+                {...({ webkitdirectory: "", directory: "" } as any)}
                 multiple
                 onChange={handleFolderSelection}
-                className="hidden"
+                className="sr-only"
               />
+              <label
+                htmlFor="sv-report-folder-input"
+                role="button"
+                tabIndex={0}
+                className={filePickerLabelClass}
+              >
+                <FolderOpen className="h-4 w-4 mr-2" />
+                <span>Select Folder</span>
+              </label>
             </div>
 
             <div className="text-xs text-muted-foreground">
@@ -532,12 +541,25 @@ export const ReportGenerator = () => {
                         <Label className="text-xs font-medium">Top View</Label>
                         {hasTopImage && <Check className="h-3 w-3 text-green-600" />}
                       </div>
-                      <Input
+                      <input
+                        id={getImageInputId(section.title, "Top View")}
                         type="file"
                         accept="image/*"
-                        onChange={(e) => handleImageChange(section.title, "Top View", e.target.files?.[0] || null)}
-                        className="text-sm"
+                        onChange={(e) => {
+                          handleImageChange(section.title, "Top View", e.target.files?.[0] || null);
+                          e.target.value = "";
+                        }}
+                        className="sr-only"
                       />
+                      <label
+                        htmlFor={getImageInputId(section.title, "Top View")}
+                        role="button"
+                        tabIndex={0}
+                        className={`${filePickerLabelClass} justify-start sm:w-full`}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Select file
+                      </label>
                       {hasTopImage && (
                         <div className="text-xs text-muted-foreground">
                           📁 {hasTopImage.name}
@@ -551,12 +573,25 @@ export const ReportGenerator = () => {
                           <Label className="text-xs font-medium">ISO View</Label>
                           {hasIsoImage && <Check className="h-3 w-3 text-green-600" />}
                         </div>
-                        <Input
+                        <input
+                          id={getImageInputId(section.title, "ISO View")}
                           type="file"
                           accept="image/*"
-                          onChange={(e) => handleImageChange(section.title, "ISO View", e.target.files?.[0] || null)}
-                          className="text-sm"
+                          onChange={(e) => {
+                            handleImageChange(section.title, "ISO View", e.target.files?.[0] || null);
+                            e.target.value = "";
+                          }}
+                          className="sr-only"
                         />
+                        <label
+                          htmlFor={getImageInputId(section.title, "ISO View")}
+                          role="button"
+                          tabIndex={0}
+                          className={`${filePickerLabelClass} justify-start sm:w-full`}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Select file
+                        </label>
                         {hasIsoImage && (
                           <div className="text-xs text-muted-foreground">
                             📁 {hasIsoImage.name}
