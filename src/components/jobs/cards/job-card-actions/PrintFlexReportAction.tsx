@@ -61,6 +61,9 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
     if (!job.id || loadingDepartment || !quoteAvailability.get(department)) return;
 
     setLoadingDepartment(department);
+    // Open the tab synchronously (still within the click's user-gesture window) so
+    // popup blockers don't drop the navigation once the async fetch resolves later.
+    const reportWindow = window.open("", "_blank");
     try {
       const result = await fetchFlexMaterialReport(
         job.id,
@@ -70,12 +73,18 @@ export const PrintFlexReportAction = ({ job }: PrintFlexReportActionProps) => {
         "material-list"
       );
 
-      window.open(result.url, "_blank", "noopener,noreferrer");
+      if (reportWindow) {
+        reportWindow.opener = null;
+        reportWindow.location.href = result.url;
+      } else {
+        window.open(result.url, "_blank", "noopener,noreferrer");
+      }
       toast({
         title: "Lista de material generada",
         description: `Se ha abierto la lista de material de ${label}.`,
       });
     } catch (error: unknown) {
+      reportWindow?.close();
       toast({
         title: "No se pudo imprimir la lista",
         description: error instanceof Error ? error.message : "No se pudo obtener la lista de material de Flex.",

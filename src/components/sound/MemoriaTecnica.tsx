@@ -59,6 +59,7 @@ export const MemoriaTecnica = () => {
     setSelectedJobId,
     selectedJob,
     hasMultipleStages,
+    isLoadingStages,
     selectedStage,
     selectedStageNumber,
     setSelectedStageNumber,
@@ -84,6 +85,10 @@ export const MemoriaTecnica = () => {
   const handleFetchFlexMaterial = async () => {
     if (!selectedJobId) {
       toast({ title: "Error", description: "Por favor, seleccione un trabajo", variant: "destructive" });
+      return;
+    }
+    if (isLoadingStages) {
+      toast({ title: "Cargando escenarios", description: "Espere a que se carguen los escenarios antes de continuar." });
       return;
     }
     if (hasMultipleStages && !selectedStage) {
@@ -241,6 +246,14 @@ export const MemoriaTecnica = () => {
         title: "Error",
         description: "Por favor, seleccione un trabajo",
         variant: "destructive",
+      });
+      return;
+    }
+
+    if (isLoadingStages) {
+      toast({
+        title: "Cargando escenarios",
+        description: "Espere a que se carguen los escenarios antes de continuar.",
       });
       return;
     }

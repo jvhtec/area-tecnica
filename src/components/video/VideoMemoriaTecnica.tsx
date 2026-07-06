@@ -57,6 +57,7 @@ export const VideoMemoriaTecnica = () => {
     setSelectedJobId,
     selectedJob,
     hasMultipleStages,
+    isLoadingStages,
     selectedStage,
     selectedStageNumber,
     setSelectedStageNumber,
@@ -82,6 +83,10 @@ export const VideoMemoriaTecnica = () => {
   const handleFetchFlexMaterial = async () => {
     if (!selectedJobId) {
       toast({ title: "Error", description: "Por favor, seleccione un trabajo", variant: "destructive" });
+      return;
+    }
+    if (isLoadingStages) {
+      toast({ title: "Cargando escenarios", description: "Espere a que se carguen los escenarios antes de continuar." });
       return;
     }
     if (hasMultipleStages && !selectedStage) {
@@ -223,6 +228,14 @@ export const VideoMemoriaTecnica = () => {
         title: "Error",
         description: "Por favor, seleccione un trabajo",
         variant: "destructive",
+      });
+      return;
+    }
+
+    if (isLoadingStages) {
+      toast({
+        title: "Cargando escenarios",
+        description: "Espere a que se carguen los escenarios antes de continuar.",
       });
       return;
     }

@@ -257,12 +257,22 @@ serve(createHttpHandler(async (req: Request) => {
   const fileName = `${reportDefinition.fileNamePrefix} - ${sanitizeFileNameSegment(department)}.pdf`;
   const objectPath = `${baseFolder}/${crypto.randomUUID()}-${sanitizeFileNameSegment(fileName)}`;
 
-  // Clean up any previous auto-fetched report for this job before writing the new one.
+  // Clean up any previous auto-fetched report for this exact job/department/stage
+  // scope before writing the new one. Scope both the storage removal and the
+  // job_documents delete to the same direct-children list -- baseFolder may have
+  // stage-scoped sibling subfolders (a non-stage caller like PrintFlexReportAction
+  // and a stage-aware Memoria form can both write under the same job/department),
+  // and storage.list() doesn't recurse into those, so a broader `LIKE baseFolder/%`
+  // delete on job_documents would drop sibling stage rows without removing their
+  // underlying storage objects.
   const { data: existingObjects } = await supabase.storage.from(bucket).list(baseFolder);
-  if (existingObjects && existingObjects.length > 0) {
-    await supabase.storage.from(bucket).remove(existingObjects.map((f) => `${baseFolder}/${f.name}`));
+  const existingObjectPaths = (existingObjects || [])
+    .filter((entry) => entry.id)
+    .map((entry) => `${baseFolder}/${entry.name}`);
+  if (existingObjectPaths.length > 0) {
+    await supabase.storage.from(bucket).remove(existingObjectPaths);
+    await supabase.from("job_documents").delete().eq("job_id", jobId).in("file_path", existingObjectPaths);
   }
-  await supabase.from("job_documents").delete().eq("job_id", jobId).like("file_path", `${baseFolder}/%`);
 
   const { error: uploadError } = await supabase.storage
     .from(bucket)

@@ -50,6 +50,7 @@ export const useMemoriaAutoFill = (
   useEffect(() => {
     if (!jobId) {
       setDetected({});
+      setIsLoading(false);
       return;
     }
 
