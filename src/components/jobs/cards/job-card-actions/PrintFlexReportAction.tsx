@@ -98,6 +98,18 @@ const REPORT_COPY: Record<FlexMaterialReportType, {
   },
 };
 
+const ReportAvailabilityLight = ({ available }: { available: boolean }) => (
+  <span
+    aria-hidden="true"
+    className={[
+      "h-2.5 w-2.5 shrink-0 rounded-full border ring-2",
+      available
+        ? "border-emerald-500 bg-emerald-400 ring-emerald-400/25"
+        : "border-slate-300 bg-slate-300 ring-slate-300/20",
+    ].join(" ")}
+  />
+);
+
 export const PrintFlexReportAction = ({
   job,
   department,
@@ -178,6 +190,7 @@ export const PrintFlexReportAction = ({
             : copy.unavailableScopedTitle(scopedDepartmentOption.label)
         }
       >
+        <ReportAvailabilityLight available={isAvailable} />
         {loadingDepartment ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
@@ -198,6 +211,7 @@ export const PrintFlexReportAction = ({
           disabled={!!loadingDepartment || !hasAnyQuote}
           title={hasAnyQuote ? copy.dropdownTitle : copy.unavailableDropdownTitle}
         >
+          <ReportAvailabilityLight available={hasAnyQuote} />
           {loadingDepartment ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -213,12 +227,14 @@ export const PrintFlexReportAction = ({
         {MATERIAL_LIST_DEPARTMENTS.map(({ department, label }) => (
           <DropdownMenuItem
             key={department}
+            className="gap-2"
             disabled={!quoteAvailability.get(department)}
             onSelect={(event) => {
               event.preventDefault();
               void handlePrintReport(department, label);
             }}
           >
+            <ReportAvailabilityLight available={quoteAvailability.get(department) ?? false} />
             {label}
           </DropdownMenuItem>
         ))}
