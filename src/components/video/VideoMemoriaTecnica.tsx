@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,21 +11,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
 import { uploadStorageObject } from "@/utils/storageUpload";
-import { useMemoriaJobAndStage } from "@/features/technical-tools/memoria/useMemoriaJobAndStage";
-import { formatMemoriaUploadDate } from "@/features/technical-tools/memoria/dateFormat";
-import {
-  useMemoriaAutoFill,
-  type MemoriaAutoFillCategorySpec,
-} from "@/features/technical-tools/memoria/useMemoriaAutoFill";
-import { TechnicalStageSelector } from "@/features/technical-tools/stage/stageAllocation";
-import { upsertMemoriaTecnicaDocument } from "@/utils/memoriaTecnicaDocuments";
-import { fetchFlexMaterialReport } from "@/utils/flexMaterialReport";
-
-const AUTO_FILL_CATEGORIES: Record<string, MemoriaAutoFillCategorySpec> = {
-  material: "calculators/lista-material/video",
-  weight: "calculators/pesos",
-  power: { category: "calculators/consumos", powerDepartment: "video" },
-};
 
 interface PDFFile {
   file: File;
@@ -48,82 +33,10 @@ export const VideoMemoriaTecnica = () => {
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   const [logoSource, setLogoSource] = useState<"upload" | "existing">("upload");
   const [selectedLogoOption, setSelectedLogoOption] = useState<string | null>(null);
-
-  const {
-    jobs,
-    isLoadingJobs,
-    jobIdFromUrl,
-    selectedJobId,
-    setSelectedJobId,
-    selectedJob,
-    hasMultipleStages,
-    isLoadingStages,
-    selectedStage,
-    selectedStageNumber,
-    setSelectedStageNumber,
-    stages: jobStages,
-  } = useMemoriaJobAndStage();
-
-  useEffect(() => {
-    if (selectedJob?.title) {
-      setProjectName(selectedJob.title);
-    }
-  }, [selectedJob?.title]);
-
-  const { detected: detectedDocuments, refetch: refetchAutoFill } = useMemoriaAutoFill(
-    selectedJobId,
-    hasMultipleStages ? selectedStage : null,
-    AUTO_FILL_CATEGORIES
-  );
-
-  const [flexOverrideElementId, setFlexOverrideElementId] = useState("");
-  const [isFetchingFlexMaterial, setIsFetchingFlexMaterial] = useState(false);
-  const [flexMaterialWarning, setFlexMaterialWarning] = useState<string | null>(null);
-
-  const handleFetchFlexMaterial = async () => {
-    if (!selectedJobId) {
-      toast({ title: "Error", description: "Por favor, seleccione un trabajo", variant: "destructive" });
-      return;
-    }
-    if (isLoadingStages) {
-      toast({ title: "Cargando escenarios", description: "Espere a que se carguen los escenarios antes de continuar." });
-      return;
-    }
-    if (hasMultipleStages && !selectedStage) {
-      toast({ title: "Error", description: "Por favor, seleccione un escenario", variant: "destructive" });
-      return;
-    }
-    setIsFetchingFlexMaterial(true);
-    setFlexMaterialWarning(null);
-    try {
-      const result = await fetchFlexMaterialReport(
-        selectedJobId,
-        "video",
-        flexOverrideElementId.trim(),
-        hasMultipleStages ? selectedStage : null
-      );
-      if (!result.elementValidated) {
-        setFlexMaterialWarning("El ID de elemento de Flex indicado no coincide con ningún presupuesto conocido.");
-      } else if (result.elementJobMismatch) {
-        setFlexMaterialWarning("El ID de elemento de Flex indicado pertenece a otro trabajo. Verifique antes de usarlo.");
-      }
-      refetchAutoFill();
-      toast({ title: "Éxito", description: "Lista de material obtenida de Flex" });
-    } catch (error) {
-      console.error("Error fetching Flex material report:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo obtener la lista de material",
-        variant: "destructive",
-      });
-    } finally {
-      setIsFetchingFlexMaterial(false);
-    }
-  };
-
+  
   // Fetch logo options
   const { logoOptions, isLoading: isLoadingLogos } = useLogoOptions();
-
+  
   const [documents, setDocuments] = useState<DocumentSection[]>([
     { id: "material", title: "Listado de Material", file: null, landscape: false },
     { id: "weight", title: "Informe de Pesos", file: null, landscape: false },
@@ -212,7 +125,6 @@ export const VideoMemoriaTecnica = () => {
       path,
       file,
       contentType: file.type || 'application/octet-stream',
-      upsert: true,
     });
 
     const { data: { publicUrl } } = dataLayerClient.storage
@@ -223,32 +135,6 @@ export const VideoMemoriaTecnica = () => {
   };
 
   const generateMemoriaTecnica = async () => {
-    if (!selectedJobId) {
-      toast({
-        title: "Error",
-        description: "Por favor, seleccione un trabajo",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isLoadingStages) {
-      toast({
-        title: "Cargando escenarios",
-        description: "Espere a que se carguen los escenarios antes de continuar.",
-      });
-      return;
-    }
-
-    if (hasMultipleStages && !selectedStageNumber) {
-      toast({
-        title: "Error",
-        description: "Por favor, seleccione un escenario",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!projectName.trim()) {
       toast({
         title: "Error",
@@ -258,7 +144,7 @@ export const VideoMemoriaTecnica = () => {
       return;
     }
 
-    const availableDocuments = documents.filter(doc => doc.file !== null || detectedDocuments[doc.id]);
+    const availableDocuments = documents.filter(doc => doc.file !== null);
     if (availableDocuments.length === 0) {
       toast({
         title: "Error",
@@ -298,27 +184,18 @@ export const VideoMemoriaTecnica = () => {
       const documentUrls: Record<string, string> = {};
       for (let i = 0; i < availableDocuments.length; i++) {
         const doc = availableDocuments[i];
+        if (!doc.file) continue;
 
         try {
-          if (doc.file) {
-            const path = `${projectName}/${doc.id}_${Date.now()}.pdf`;
-            documentUrls[doc.id] = await uploadToStorage(doc.file.file, path);
-          } else {
-            const detected = detectedDocuments[doc.id];
-            if (detected) {
-              const { data, error: signError } = await dataLayerClient.storage
-                .from('job-documents')
-                .createSignedUrl(detected.filePath, 3600);
-              if (signError) throw signError;
-              documentUrls[doc.id] = data.signedUrl;
-            }
-          }
+          const path = `${projectName}/${doc.id}_${Date.now()}.pdf`;
+          const url = await uploadToStorage(doc.file.file, path);
+          documentUrls[doc.id] = url;
           setProgress((i + 1) / availableDocuments.length * 50);
         } catch (error) {
-          console.error(`Error resolving document ${doc.id}:`, error);
+          console.error(`Error uploading document ${doc.id}:`, error);
           toast({
             title: "Error",
-            description: `Error al obtener el documento ${doc.title}`,
+            description: `Error al subir el documento ${doc.title}`,
             variant: "destructive",
           });
           return;
@@ -338,18 +215,21 @@ export const VideoMemoriaTecnica = () => {
 
       setProgress(80);
 
-      await upsertMemoriaTecnicaDocument('video_memoria_tecnica_documents', {
-        job_id: selectedJobId,
-        stage_number: hasMultipleStages ? selectedStageNumber : null,
-        stage_name: hasMultipleStages ? selectedStage?.name ?? null : null,
-        project_name: projectName,
-        logo_url: logoUrl,
-        material_list_url: documentUrls.material,
-        weight_report_url: documentUrls.weight,
-        power_report_url: documentUrls.power,
-        pixel_map_url: documentUrls.pixel,
-        final_document_url: response.data.url
-      });
+      const { error: dbError } = await dataLayerClient.from('video_memoria_tecnica_documents')
+        .insert({
+          project_name: projectName,
+          logo_url: logoUrl,
+          material_list_url: documentUrls.material,
+          weight_report_url: documentUrls.weight,
+          power_report_url: documentUrls.power,
+          pixel_map_url: documentUrls.pixel,
+          final_document_url: response.data.url
+        });
+
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw dbError;
+      }
 
       setProgress(100);
       setGeneratedPdfUrl(response.data.url);
@@ -380,38 +260,6 @@ export const VideoMemoriaTecnica = () => {
         <div>
           <h2 className="text-lg font-semibold mb-4">Memoria Técnica de Video</h2>
           <div className="space-y-4">
-            {(!jobIdFromUrl || jobStages.length > 1) && (
-              <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                {!jobIdFromUrl && (
-                  <div className="space-y-2">
-                    <Label htmlFor="memoria-job-select">Trabajo</Label>
-                    <Select
-                      value={selectedJobId}
-                      onValueChange={setSelectedJobId}
-                      disabled={isLoadingJobs}
-                    >
-                      <SelectTrigger id="memoria-job-select" className="w-full">
-                        <SelectValue placeholder="Seleccione un trabajo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {jobs?.map((job) => (
-                          <SelectItem key={job.id} value={job.id}>
-                            {job.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <TechnicalStageSelector
-                  label="Escenario"
-                  selectedStageNumber={selectedStageNumber}
-                  stages={jobStages}
-                  onChange={setSelectedStageNumber}
-                />
-              </div>
-            )}
-
             <div>
               <Label htmlFor="projectName">Nombre del Proyecto</Label>
               <Input
@@ -533,92 +381,51 @@ export const VideoMemoriaTecnica = () => {
             </div>
 
             <div className="space-y-4">
-              {documents.map((doc) => {
-                const detected = detectedDocuments[doc.id];
-                return (
-                  <div key={doc.id} className="space-y-2">
-                    <Label>{doc.title}</Label>
-                    {!doc.file && detected && (
-                      <p className="text-xs text-muted-foreground">
-                        Detectado: {detected.fileName}
-                        {detected.uploadedAt ? ` (${formatMemoriaUploadDate(detected.uploadedAt)})` : ""}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="file"
-                        accept=".pdf"
-                        className="hidden"
-                        id={`file-${doc.id}`}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload(file, doc.id);
-                        }}
-                      />
-                      <Button
-                        variant="outline"
-                        asChild
-                        className="w-full"
-                      >
-                        <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
-                          {doc.file ? (
-                            <>
-                              <FileCheck className="h-4 w-4" />
-                              Archivo cargado
-                            </>
-                          ) : detected ? (
-                            <>
-                              <FileCheck className="h-4 w-4" />
-                              Reemplazar
-                            </>
-                          ) : (
-                            <>
-                              <FilePlus className="h-4 w-4" />
-                              Subir archivo
-                            </>
-                          )}
-                        </label>
-                      </Button>
-                      {doc.file && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => window.open(doc.file?.url, '_blank')}
-                        >
-                          <File className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {doc.id === "material" && (
-                      <div className="space-y-2 pt-1">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Input
-                            placeholder="ID de elemento de Flex (opcional, para forzar un presupuesto concreto)"
-                            value={flexOverrideElementId}
-                            onChange={(e) => setFlexOverrideElementId(e.target.value)}
-                            className="text-xs"
-                          />
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={handleFetchFlexMaterial}
-                            disabled={isFetchingFlexMaterial || !selectedJobId}
-                            className="shrink-0"
-                          >
-                            {isFetchingFlexMaterial ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            ) : null}
-                            Obtener de Flex
-                          </Button>
-                        </div>
-                        {flexMaterialWarning && (
-                          <p className="text-xs text-destructive">{flexMaterialWarning}</p>
+              {documents.map((doc) => (
+                <div key={doc.id} className="space-y-2">
+                  <Label>{doc.title}</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      id={`file-${doc.id}`}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file, doc.id);
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      asChild
+                      className="w-full"
+                    >
+                      <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
+                        {doc.file ? (
+                          <>
+                            <FileCheck className="h-4 w-4" />
+                            Archivo cargado
+                          </>
+                        ) : (
+                          <>
+                            <FilePlus className="h-4 w-4" />
+                            Subir archivo
+                          </>
                         )}
-                      </div>
+                      </label>
+                    </Button>
+                    {doc.file && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(doc.file?.url, '_blank')}
+                      >
+                        <File className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
 
             {isGenerating && (

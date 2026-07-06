@@ -15,13 +15,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FolderOpen, Check, X, Upload } from "lucide-react";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import type jsPDF from "jspdf";
-import {
-  formatTechnicalStageLabel,
-  TechnicalStageSelector,
-  useSelectedTechnicalStage,
-} from "@/features/technical-tools/stage/stageAllocation";
-import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
-import { uploadJobPdfWithCleanup } from "@/utils/jobDocumentsUpload";
 
 const reportSections = [
   {
@@ -71,18 +64,6 @@ export const ReportGenerator = () => {
   const [jobLogo, setJobLogo] = useState<string | undefined>(undefined);
   const [mappingResult, setMappingResult] = useState<MappingResult | null>(null);
   const [showMappingPreview, setShowMappingPreview] = useState(false);
-
-  const {
-    hasMultipleStages,
-    isLoadingStages,
-    selectedStage,
-    selectedStageNumber,
-    setSelectedStageNumber,
-    stages: jobStages,
-  } = useSelectedTechnicalStage({
-    enabled: Boolean(selectedJobId),
-    jobId: selectedJobId,
-  });
 
   useEffect(() => {
     const loadJobLogo = async () => {
@@ -269,34 +250,14 @@ export const ReportGenerator = () => {
     if (!selectedJobId) {
       toast({
         title: "Error",
-        description: "Seleccione un trabajo antes de generar el informe.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isLoadingStages) {
-      toast({
-        title: "Cargando escenarios",
-        description: "Espere a que se carguen los escenarios antes de generar el informe.",
-      });
-      return;
-    }
-
-    if (hasMultipleStages && selectedStageNumber == null) {
-      toast({
-        title: "Error",
-        description: "Seleccione un escenario antes de generar el informe.",
+        description: "Please select a job before generating the report.",
         variant: "destructive",
       });
       return;
     }
 
     const selectedJob = jobs?.find(job => job.id === selectedJobId);
-    const stageLabel = formatTechnicalStageLabel(selectedStage);
-    const jobTitle = stageLabel
-      ? `${selectedJob?.title || "Trabajo_sin_nombre"} - ${stageLabel}`
-      : selectedJob?.title || "Trabajo_sin_nombre";
+    const jobTitle = selectedJob?.title || "Unnamed_Job";
     const jobDate = selectedJob?.start_time 
       ? format(new Date(selectedJob.start_time), "MMMM dd, yyyy")
       : format(new Date(), "MMMM dd, yyyy");
@@ -361,51 +322,47 @@ export const ReportGenerator = () => {
     }
 
     // Add footer logo (Sector Pro)
-    await new Promise<void>((resolve) => {
-      const footerLogo = new Image();
-      footerLogo.crossOrigin = 'anonymous';
-      footerLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+    const footerLogo = new Image();
+    footerLogo.crossOrigin = 'anonymous';
+    footerLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+    
+    footerLogo.onload = () => {
+      pdf.setPage(pdf.getNumberOfPages());
+      const logoWidth = 50;
+      const logoHeight = logoWidth * (footerLogo.height / footerLogo.width);
+      const xPosition = (pageWidth - logoWidth) / 2;
+      const yPosition = pageHeight - 20;
+      
+      try {
+        pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
+        const blob = pdf.output('blob');
+        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+        pdf.save(filename);
+        toast({
+          title: "Success",
+          description: "Report generated successfully",
+        });
+      } catch (error) {
+        console.error('Error adding footer logo:', error);
+        const blob = pdf.output('blob');
+        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+        pdf.save(filename);
+        toast({
+          title: "Success",
+          description: "Report generated successfully (without logo)",
+        });
+      }
+    };
 
-      footerLogo.onload = () => {
-        pdf.setPage(pdf.getNumberOfPages());
-        const logoWidth = 50;
-        const logoHeight = logoWidth * (footerLogo.height / footerLogo.width);
-        const xPosition = (pageWidth - logoWidth) / 2;
-        const yPosition = pageHeight - 20;
-
-        try {
-          pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding footer logo:', error);
-        }
-        resolve();
-      };
-
-      footerLogo.onerror = () => {
-        console.error('Failed to load footer logo');
-        resolve();
-      };
-    });
-
-    const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-    const blob = pdf.output('blob');
-
-    try {
-      await uploadJobPdfWithCleanup(selectedJobId, blob, filename, "calculators/sv-report", {
-        cleanupScope: getTechnicalStageStorageScope(selectedStage),
-      });
+    footerLogo.onerror = () => {
+      console.error('Failed to load footer logo');
+      const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+      pdf.save(filename);
       toast({
-        title: "Éxito",
-        description: "Informe generado y guardado en los documentos del trabajo.",
+        title: "Success",
+        description: "Report generated successfully (without logo)",
       });
-    } catch (error) {
-      console.error('Error uploading SV report:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar el informe generado.",
-        variant: "destructive",
-      });
-    }
+    };
   };
 
   const addImageToPDF = async (pdf: jsPDF, file: File, viewType: string, x: number, y: number, width: number) => {
@@ -432,10 +389,10 @@ export const ReportGenerator = () => {
         <div className="space-y-6">
           {/* Job Selection */}
           <div className="space-y-2">
-            <Label htmlFor="jobSelect">Trabajo</Label>
+            <Label htmlFor="jobSelect">Job</Label>
             <Select value={selectedJobId} onValueChange={setSelectedJobId}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccione un trabajo" />
+                <SelectValue placeholder="Select a job" />
               </SelectTrigger>
               <SelectContent>
                 {jobs?.map(job => (
@@ -447,16 +404,9 @@ export const ReportGenerator = () => {
             </Select>
           </div>
 
-          <TechnicalStageSelector
-            label="Escenario"
-            selectedStageNumber={selectedStageNumber}
-            stages={jobStages}
-            onChange={setSelectedStageNumber}
-          />
-
           {/* Report System Selection */}
           <div className="space-y-2">
-            <Label className="mb-2">Sistema del informe</Label>
+            <Label className="mb-2">Report System</Label>
             <RadioGroup 
               value={reportSystem}
               onValueChange={(value) => setReportSystem(value as "LA" | "Turbo")}
@@ -475,7 +425,7 @@ export const ReportGenerator = () => {
 
           {/* Equipment List */}
           <div className="space-y-2">
-            <Label htmlFor="equipamiento">Listado de equipo</Label>
+            <Label htmlFor="equipamiento">Equipment List</Label>
             <Textarea
               id="equipamiento"
               value={equipamiento}
