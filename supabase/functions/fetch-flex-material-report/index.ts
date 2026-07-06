@@ -261,7 +261,7 @@ serve(createHttpHandler(async (req: Request) => {
   const stageScope = stageNumber ? getTechnicalStageStorageScope(stageNumber, stageName) : null;
   const baseFolder = stageScope ? `${category}/${jobId}/${stageScope}` : `${category}/${jobId}`;
   const fileName = `${reportDefinition.fileNamePrefix} - ${sanitizeFileNameSegment(department)}.pdf`;
-  const objectPath = `${baseFolder}/${crypto.randomUUID()}-${sanitizeFileNameSegment(fileName)}`;
+  const objectPath = `${baseFolder}/${fileName}`;
 
   // Clean up any previous auto-fetched report for this exact job/department/stage
   // scope before writing the new one. Scope both the storage removal and the
@@ -282,7 +282,7 @@ serve(createHttpHandler(async (req: Request) => {
 
   const { error: uploadError } = await supabase.storage
     .from(bucket)
-    .upload(objectPath, pdfBytes, { contentType: "application/pdf", upsert: false });
+    .upload(objectPath, pdfBytes, { contentType: "application/pdf", upsert: true });
   if (uploadError) {
     throw new HttpError(500, `Failed to store the generated ${reportDefinition.displayName}`, {
       code: "storage_upload_failed",
