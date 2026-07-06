@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTourDefaultDocumentPlan,
+  getTourDefaultDocumentNoUpdateToast,
   getTourDefaultDocumentObjectPath,
   type TourDefaultDocumentPlanItem,
   type TourDefaultDocumentSyncData,
@@ -236,5 +237,29 @@ describe("tour default document sync planning", () => {
       reason: "no_tables",
       objectPath: "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight.pdf",
     });
+  });
+});
+
+describe("tour default document sync notifications", () => {
+  it("warns when sync only skipped dates because package defaults are unresolved", () => {
+    expect(
+      getTourDefaultDocumentNoUpdateToast({
+        uploaded: 0,
+        removed: 6,
+        skipped: 6,
+        errors: [],
+      })
+    ).toMatchObject({ title: "Ningún PDF actualizado", variant: "destructive" });
+  });
+
+  it("does not warn for cleanup-only slots without unresolved package defaults", () => {
+    expect(
+      getTourDefaultDocumentNoUpdateToast({
+        uploaded: 0,
+        removed: 6,
+        skipped: 0,
+        errors: [],
+      })
+    ).toBeNull();
   });
 });

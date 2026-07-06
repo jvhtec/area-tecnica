@@ -23,7 +23,7 @@ import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tou
 import { getDepartmentLabel } from "@/types/department";
 import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 import { getResolvedPowerPosition } from "@/utils/powerPositions";
-import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
+import { getTourDefaultDocumentNoUpdateToast, syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 import {
   DEPARTMENT_PACKAGE_LABELS,
   TOUR_PACKAGE_LABELS,
@@ -355,14 +355,8 @@ export const TourDefaultsManager = ({
             description: `${result.errors.length} documento(s) no se pudieron refrescar.`,
             variant: 'destructive',
           });
-        } else if (result.uploaded === 0 && result.removed === 0) {
-          toast({
-            title: 'Ningún PDF actualizado',
-            description: 'No se generó ningún PDF de fecha: revisa que las fechas de gira tengan un paquete o conjunto por defecto asignado.',
-            variant: 'destructive',
-          });
         } else if (!silent) {
-          toast({
+          toast(getTourDefaultDocumentNoUpdateToast(result) ?? {
             title: 'PDFs sincronizados',
             description: `${result.uploaded} documento(s) actualizados y ${result.removed} ruta(s) limpiadas.`,
           });

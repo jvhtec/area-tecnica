@@ -87,6 +87,9 @@ export interface SyncTourDefaultDocumentsResult {
   }>;
 }
 
+export type TourDefaultDocumentSyncToastPayload = { title: string; description: string; variant: "destructive" };
+type TourDefaultDocumentSyncToast = (payload: TourDefaultDocumentSyncToastPayload) => void;
+
 export interface SyncTourDefaultDocumentsOptions {
   tourId: string;
   tourDateIds?: string[];
@@ -95,6 +98,26 @@ export interface SyncTourDefaultDocumentsOptions {
   fetchLogo?: (tourId: string) => Promise<string | undefined>;
   exportPdf?: typeof exportToPDF;
 }
+
+export const getTourDefaultDocumentNoUpdateToast = (
+  result: SyncTourDefaultDocumentsResult
+): TourDefaultDocumentSyncToastPayload | null =>
+  result.errors.length === 0 && result.uploaded === 0 && result.skipped > 0
+    ? {
+        title: "Ningún PDF actualizado",
+        description:
+          "No se generó ningún PDF automático: revisa que las fechas de gira tengan un paquete o conjunto por defecto asignado.",
+        variant: "destructive",
+      }
+    : null;
+
+export const toastTourDefaultDocumentNoUpdate = (
+  result: SyncTourDefaultDocumentsResult,
+  toast: TourDefaultDocumentSyncToast
+) => {
+  const payload = getTourDefaultDocumentNoUpdateToast(result);
+  if (payload) toast(payload);
+};
 
 const isRecord = (value: unknown): value is JsonRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);

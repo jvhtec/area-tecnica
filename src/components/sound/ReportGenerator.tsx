@@ -55,6 +55,15 @@ const FILENAME_MAPPING = {
   'SUB': { section: 'SUBS SPL(Z) 32-80Hz', view: 'Top View' }
 };
 
+const downloadPdfBlob = (blob: Blob, filename: string) => {
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = window.document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(downloadUrl);
+};
+
 type MappingResult = {
   found: { filename: string; section: string; view: string }[];
   missing: { filename: string; section: string; view: string }[];
@@ -390,24 +399,29 @@ export const ReportGenerator = () => {
     const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
     const blob = pdf.output('blob');
 
-    try {
-      await uploadJobPdfWithCleanup(selectedJobId, blob, filename, "calculators/sv-report", {
-        cleanupScope: getTechnicalStageStorageScope(selectedStage),
+    downloadPdfBlob(blob, filename);
+    toast({
+      title: "Descarga iniciada",
+      description: "El informe se está subiendo a los documentos del trabajo en segundo plano.",
+    });
+
+    void uploadJobPdfWithCleanup(selectedJobId, blob, filename, "calculators/sv-report", {
+      cleanupScope: getTechnicalStageStorageScope(selectedStage),
+    })
+      .then(() => {
+        toast({
+          title: "Informe guardado",
+          description: "La descarga local se inició y el informe se guardó en los documentos del trabajo.",
+        });
+      })
+      .catch((error) => {
+        console.error('Error uploading SV report:', error);
+        toast({
+          title: "Subida fallida",
+          description: "El informe se descargó localmente, pero no se pudo guardar en los documentos del trabajo.",
+          variant: "destructive",
+        });
       });
-      toast({
-        title: "Éxito",
-        description: "Informe generado, descargado y guardado en los documentos del trabajo.",
-      });
-    } catch (error) {
-      console.error('Error uploading SV report:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar el informe generado en los documentos del trabajo.",
-        variant: "destructive",
-      });
-    } finally {
-      pdf.save(filename);
-    }
   };
 
   const addImageToPDF = async (pdf: jsPDF, file: File, viewType: string, x: number, y: number, width: number) => {

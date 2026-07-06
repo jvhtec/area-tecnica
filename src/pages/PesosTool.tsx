@@ -25,7 +25,7 @@ import { CopyToStageMenu } from '@/features/technical-tools/table-presets/CopyTo
 import { QuickPresetsMenu } from '@/features/technical-tools/table-presets/QuickPresetsMenu';
 import type { TourPackageSize } from '@/utils/tourPackages';
 import { optimizedInvalidation, queryKeys } from '@/lib/react-query';
-import { syncTourDefaultDocuments } from '@/utils/tourDefaultDocumentSync';
+import { syncTourDefaultDocuments, toastTourDefaultDocumentNoUpdate } from '@/utils/tourDefaultDocumentSync';
 import {
   cloneTablesToStage,
   remapClusterIds,
@@ -260,7 +260,6 @@ const PesosTool: React.FC = () => {
 
   const syncDefaultDocumentsAfterMutation = async () => {
     if ((!isTourDefaults && !isDefaults) || !tourId) return;
-
     try {
       const result = await syncTourDefaultDocuments({ tourId });
       optimizedInvalidation.invalidateQueryKeys(queryClient, [
@@ -275,13 +274,7 @@ const PesosTool: React.FC = () => {
           description: `${result.errors.length} documento(s) predeterminados no se pudieron actualizar.`,
           variant: 'destructive',
         });
-      } else if (result.uploaded === 0 && result.removed === 0) {
-        toast({
-          title: 'Ningún PDF actualizado',
-          description: 'No se generó ningún PDF de fecha: revisa que las fechas de gira tengan un paquete o conjunto por defecto asignado.',
-          variant: 'destructive',
-        });
-      }
+      } else { toastTourDefaultDocumentNoUpdate(result, toast); }
     } catch (error) {
       console.error('Error syncing tour default documents:', error);
       toast({
