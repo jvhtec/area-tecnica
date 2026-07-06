@@ -1004,6 +1004,158 @@ describe('JobCardActions', () => {
       );
     });
 
+    it('prints a scoped Flex material list directly from the sound project tab', async () => {
+      const user = userEvent.setup();
+      dataLayerFunctionsInvokeMock.mockResolvedValueOnce({
+        data: {
+          url: 'https://example.test/sound-material-list.pdf',
+          fileName: 'Listado de Material - sound.pdf',
+          elementId: 'sound-quote-element',
+          folderType: 'comercial_presupuesto',
+          elementValidated: true,
+          elementJobMismatch: false,
+          reportType: 'material-list',
+        },
+        error: null,
+      });
+
+      const props = {
+        ...defaultProps,
+        department: 'sound',
+        job: {
+          ...defaultProps.job,
+          flex_folders: [
+            {
+              id: 'sound-quote-folder',
+              department: 'sound',
+              element_id: 'sound-quote-element',
+              folder_type: 'comercial_presupuesto',
+            },
+            {
+              id: 'lights-quote-folder',
+              department: 'lights',
+              element_id: 'lights-quote-element',
+              folder_type: 'comercial_presupuesto',
+            },
+          ],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      const materialButton = screen.getByRole('button', { name: /Lista Material/i });
+      expect(materialButton).toHaveAttribute('title', 'Imprimir lista de material de Sonido desde Flex');
+      expect(screen.queryByText('Sonido')).toBeNull();
+
+      await user.click(materialButton);
+
+      await waitFor(() => {
+        expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
+          'fetch-flex-material-report',
+          expect.objectContaining({
+            body: expect.objectContaining({
+              jobId: 'test-job-id',
+              department: 'sound',
+              reportType: 'material-list',
+            }),
+          })
+        );
+      });
+      expect(window.open).toHaveBeenCalledWith(
+        'https://example.test/sound-material-list.pdf',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    });
+
+    it('prints a scoped Flex quote directly from the lights project tab', async () => {
+      const user = userEvent.setup();
+      dataLayerFunctionsInvokeMock.mockResolvedValueOnce({
+        data: {
+          url: 'https://example.test/lights-quote.pdf',
+          fileName: 'Presupuesto - lights.pdf',
+          elementId: 'lights-quote-element',
+          folderType: 'comercial_presupuesto',
+          elementValidated: true,
+          elementJobMismatch: false,
+          reportType: 'quote',
+        },
+        error: null,
+      });
+
+      const props = {
+        ...defaultProps,
+        department: 'lights',
+        job: {
+          ...defaultProps.job,
+          flex_folders: [
+            {
+              id: 'sound-quote-folder',
+              department: 'sound',
+              element_id: 'sound-quote-element',
+              folder_type: 'comercial_presupuesto',
+            },
+            {
+              id: 'lights-quote-folder',
+              department: 'lights',
+              element_id: 'lights-quote-element',
+              folder_type: 'comercial_presupuesto',
+            },
+          ],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      const quoteButton = screen.getByRole('button', { name: /Presupuesto/i });
+      expect(quoteButton).toHaveAttribute('title', 'Imprimir presupuesto de Iluminación desde Flex');
+      expect(screen.queryByText('Iluminación')).toBeNull();
+
+      await user.click(quoteButton);
+
+      await waitFor(() => {
+        expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
+          'fetch-flex-material-report',
+          expect.objectContaining({
+            body: expect.objectContaining({
+              jobId: 'test-job-id',
+              department: 'lights',
+              reportType: 'quote',
+            }),
+          })
+        );
+      });
+      expect(window.open).toHaveBeenCalledWith(
+        'https://example.test/lights-quote.pdf',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    });
+
+    it('does not enable scoped quote printing from a Presupuestos Recibidos container', () => {
+      const props = {
+        ...defaultProps,
+        department: 'lights',
+        job: {
+          ...defaultProps.job,
+          flex_folders: [
+            {
+              id: 'lights-pr-folder',
+              department: 'lights',
+              element_id: 'lights-pr-element',
+              folder_type: 'presupuestos_recibidos',
+            },
+          ],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      expect(screen.getByRole('button', { name: /Lista Material/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /Presupuesto/i })).toBeDisabled();
+      expect(screen.getByTitle('No hay presupuesto de Iluminación en Flex')).toBeTruthy();
+    });
+
     it('should render the technical power summary button for project management managers', () => {
       render(<JobCardActions {...defaultProps} />);
 

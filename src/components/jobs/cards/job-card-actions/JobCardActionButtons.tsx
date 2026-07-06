@@ -171,6 +171,7 @@ export const JobCardActionButtons = ({
   whatsappRequest,
 }: JobCardActionButtonsProps) => {
   const isProductionDepartment = department === "production";
+  const flexReportDepartment = department === "sound" || department === "lights" ? department : null;
   const normalizedJobType = String(job.job_type || "").toLowerCase();
   const canOpenTimesheets = !["dryhire", "dry_hire"].includes(normalizedJobType) && (
     normalizedJobType !== "tourdate" || hasPrepDayDateType(job.job_date_types)
@@ -390,6 +391,20 @@ export const JobCardActionButtons = ({
           <FileStack className="h-4 w-4" />
           <span className="hidden sm:inline">Memoria</span>
         </Button>
+      </>
+    )}
+    {flexReportDepartment && isProjectManagementPage && isManagementUser && (
+      <>
+        <PrintFlexReportAction
+          job={job}
+          department={flexReportDepartment}
+          reportType="material-list"
+        />
+        <PrintFlexReportAction
+          job={job}
+          department={flexReportDepartment}
+          reportType="quote"
+        />
       </>
     )}
     {technicalPower.canGenerateTechnicalPowerPack && allowedJobType && (
