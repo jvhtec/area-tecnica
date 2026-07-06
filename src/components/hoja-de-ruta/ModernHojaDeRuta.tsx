@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +8,8 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -19,8 +20,6 @@ import {
   Hotel,
   Image,
   Settings,
-  Save,
-  Download,
   Upload,
   Sparkles,
   CheckCircle2,
@@ -35,14 +34,11 @@ import {
   Bed,
   Activity,
   Palette,
-  Globe,
-  MoreHorizontal,
   RefreshCw,
   Database,
   UtensilsCrossed,
   AlertCircle,
   FileDown,
-  Loader2,
   CloudSun
 } from "lucide-react";
 
@@ -61,6 +57,10 @@ import { ModernLogisticsSection } from "./sections/ModernLogisticsSection";
 import { ModernScheduleSection } from "./sections/ModernScheduleSection";
 import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
+import { HojaDeRutaHeaderActions } from "@/components/hoja-de-ruta/components/HojaDeRutaHeaderActions";
+import { MobileSectionSwitcher } from "@/components/hoja-de-ruta/components/MobileSectionSwitcher";
+import { MobileSaveBar } from "@/components/hoja-de-ruta/components/MobileSaveBar";
+import { QuickNavigationSidebar } from "@/components/hoja-de-ruta/components/QuickNavigationSidebar";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 import {
@@ -81,13 +81,19 @@ import {
 } from "@/utils/hoja-de-ruta/pdf";
 import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { LucideIcon } from "lucide-react";
+import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
 
 type ModernHojaDeRutaProps = {
   jobId?: string;
+  // Set when rendered inside a Dialog (e.g. JobCardNewView's "Hoja de Ruta" modal)
+  // instead of the standalone /hoja-de-ruta page — switches the root layout from
+  // page-flow (min-h-screen) to a flex column that stretches to fill its parent.
+  embedded?: boolean;
 };
 
-export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
+export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaProps) => {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const routedJobId = jobId ?? searchParams.get("jobId") ?? searchParams.get("openHojaDeRuta") ?? undefined;
   const [activeTab, setActiveTab] = useState("event");
@@ -637,7 +643,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     { id: "restaurants", icon: UtensilsCrossed, color: "text-emerald-600" },
   ];
 
-  const tabConfig: Array<{ id: HojaDeRutaPdfSectionId; label: string; icon: LucideIcon; color: string }> = tabPresentationConfig.map((section) => ({
+  const tabConfig: HojaDeRutaTabOption[] = tabPresentationConfig.map((section) => ({
     ...section,
     label: getHojaDeRutaPdfSectionLabel(section.id),
   }));
@@ -671,12 +677,17 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
   const DataSourceIcon = dataSourceInfo.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+    <div
+      className={cn(
+        "bg-gradient-to-br from-background via-background to-muted/20",
+        embedded ? "h-full flex flex-col overflow-hidden" : "min-h-screen"
+      )}
+    >
       {/* Modern Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border/40"
+        className="shrink-0 sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border/40"
       >
         {/* Use custom max width + responsive padding to avoid double container padding and overflow on mobile */}
         <div className="max-w-screen-2xl mx-auto px-4 md:px-6 py-3 md:py-4">
@@ -718,56 +729,20 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
               <div className="hidden md:block">
                 <ModernProgressTracker progress={completionProgress} />
               </div>
-              
+
               {/* Action Buttons */}
-
-              {/* Simplified Save Button - Always enabled when job is selected */}
-              <Button
-                onClick={handleSave}
-                disabled={!selectedJobId || !isInitialized || isSaving}
-                variant="outline"
-                size="sm"
-                aria-label="Guardar hoja de ruta"
-                className="h-11 min-w-[44px] border-2 border-green-500 text-green-600 hover:bg-green-50"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Guardar</span>
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={() => { void handlePreviewPDF(); }}
-                disabled={!selectedJobId || !isInitialized || isSaving || isGenerating || isPreviewing}
-                variant="outline"
-                size="sm"
-                aria-label="Vista previa PDF"
-                className="h-11 min-w-[44px] border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
-              >
-                {isPreviewing && previewingTarget === "full" ? (
-                  <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
-                ) : (
-                  <Eye className="w-4 h-4 sm:mr-2" />
-                )}
-                <span className="hidden sm:inline">Vista previa</span>
-              </Button>
-
-              <Button
-                onClick={() => setShowPrintDialog(true)}
-                disabled={!selectedJobId}
-                aria-label="Exportar"
-                className="h-11 min-w-[44px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">Exportar</span>
-              </Button>
+              <HojaDeRutaHeaderActions
+                isMobile={isMobile}
+                selectedJobId={selectedJobId}
+                isInitialized={isInitialized}
+                isSaving={isSaving}
+                isGenerating={isGenerating}
+                isPreviewing={isPreviewing}
+                previewingTarget={previewingTarget}
+                onSave={handleSave}
+                onPreviewPDF={() => { void handlePreviewPDF(); }}
+                onExport={() => setShowPrintDialog(true)}
+              />
             </div>
           </div>
 
@@ -803,39 +778,15 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
       </motion.div>
 
       {/* Main Content */}
-      <div className="max-w-screen-2xl mx-auto px-4 md:px-6 py-4 md:py-8">
+      <div className={cn(embedded && "flex-1 overflow-y-auto")}>
+      <div className={cn("max-w-screen-2xl mx-auto px-4 md:px-6 py-4 md:py-8", isMobile && "pb-24")}>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-          {/* Sidebar with Templates (hidden on mobile, replaced by horizontal nav) */}
-          <div className="hidden md:block md:col-span-3">
-            <div className="sticky top-24 space-y-4">
-              {/* Quick Navigation */}
-              <Card className="border-2">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Navegación Rápida
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {tabConfig.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <Button
-                        key={tab.id}
-                        variant={activeTab === tab.id ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`w-full justify-start ${activeTab === tab.id ? 'bg-primary text-primary-foreground' : ''}`}
-                      >
-                        <Icon className={`w-4 h-4 mr-2 ${tab.color}`} />
-                        {tab.label}
-                      </Button>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          <QuickNavigationSidebar
+            tabConfig={tabConfig}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            embedded={embedded}
+          />
 
           {/* Main Content Area */}
           <div className="md:col-span-9">
@@ -844,37 +795,13 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              {/* Mobile horizontal section tabs */}
-              <div className="md:hidden -mx-4 px-4 mb-3 sticky top-[68px] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40">
-                <nav aria-label="Secciones de Hoja de Ruta" role="tablist" className="flex items-center gap-2.5 py-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {tabConfig.map((tab) => {
-                    const Icon = tab.icon;
-                    const active = activeTab === tab.id;
-                    const iconClass = active ? 'text-primary-foreground' : 'text-foreground/70';
-                    return (
-                      <button
-                        key={tab.id}
-                        role="tab"
-                        aria-selected={active}
-                        aria-controls={`panel-${tab.id}`}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`shrink-0 inline-flex items-center h-9 px-3 rounded-full border text-[13px] leading-none min-w-[44px] transition-colors ${
-                          active
-                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                            : 'bg-muted/60 text-foreground border-border/60 hover:bg-muted'
-                        }`}
-                      >
-                        <Icon className={`w-4 h-4 mr-1.5 ${iconClass}`} />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </nav>
-                {/* Mobile progress below tabs */}
-                <div className="py-2">
-                  <ModernProgressTracker progress={completionProgress} />
-                </div>
-              </div>
+              <MobileSectionSwitcher
+                tabConfig={tabConfig}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                progress={completionProgress}
+                embedded={embedded}
+              />
 
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 {/* Tab Contents */}
@@ -1025,6 +952,15 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
           </div>
         </div>
       </div>
+      </div>
+
+      {isMobile && (
+        <MobileSaveBar
+          onSave={handleSave}
+          disabled={!selectedJobId || !isInitialized || isSaving}
+          isSaving={isSaving}
+        />
+      )}
 
       <HojaDeRutaPrintDialog
         showDialog={showPrintDialog}

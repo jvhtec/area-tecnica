@@ -52,7 +52,7 @@ export const MultiDayScheduleBuilder: React.FC<MultiDayScheduleBuilderProps> = (
       const clone: ProgramDay = {
         label: `${src.label || `Día ${index + 1}`} (copia)`,
         date: src.date,
-        rows: src.rows.map((r) => ({ ...r } as ProgramRow)),
+        rows: src.rows.map((r) => ({ ...r, id: crypto.randomUUID() } as ProgramRow)),
       };
       return [...d, clone];
     });

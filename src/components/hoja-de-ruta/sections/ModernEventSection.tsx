@@ -136,7 +136,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="job-select">Trabajo Base</Label>
                   <Select value={selectedJobId} onValueChange={setSelectedJobId}>
@@ -174,7 +174,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   animate={{ opacity: 1, height: "auto" }}
                   className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200"
                 >
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="font-medium text-blue-700">Fechas:</span>
                       <p className="text-blue-600">
@@ -215,7 +215,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="event-name" className="text-sm font-medium">
                   Nombre del Evento *
@@ -243,7 +243,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="venue-name" className="text-sm font-medium">
                   Nombre del Venue *

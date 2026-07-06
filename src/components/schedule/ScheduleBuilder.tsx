@@ -3,8 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ProgramRow } from '@/types/hoja-de-ruta';
-import { Plus, Trash2, Copy, ArrowUp, ArrowDown, FileDown } from 'lucide-react';
+import { ACTIVE_DEPARTMENTS, DEPARTMENT_LABELS, type ActiveDepartment } from '@/types/department';
+import { Plus, Trash2, Copy, ArrowUp, ArrowDown, FileDown, Bell } from 'lucide-react';
 
 type TimeFormat = '24h' | '12h';
 
@@ -21,15 +24,15 @@ type ScheduleBuilderProps = {
 };
 
 const defaultPresets: Array<Pick<ProgramRow, 'item' | 'dept' | 'notes'>> = [
-  { item: 'Venue Access', dept: 'PM/Venue', notes: '' },
-  { item: 'Load-In', dept: 'All Depts', notes: '' },
-  { item: 'Lighting Focus', dept: 'Lighting', notes: '' },
-  { item: 'Soundcheck', dept: 'Audio', notes: '' },
-  { item: 'Video Check', dept: 'Video', notes: '' },
-  { item: 'Meal Break', dept: 'Hospitality', notes: '' },
-  { item: 'Doors', dept: 'FOH/Security', notes: '' },
-  { item: 'Show Start', dept: 'Stage', notes: '' },
-  { item: 'Load-Out', dept: 'All Depts', notes: '' },
+  { item: 'Acceso al recinto', dept: 'PM/Recinto', notes: '' },
+  { item: 'Montaje', dept: 'Todos los deptos.', notes: '' },
+  { item: 'Enfoque de iluminación', dept: 'Iluminación', notes: '' },
+  { item: 'Prueba de sonido', dept: 'Sonido', notes: '' },
+  { item: 'Prueba de vídeo', dept: 'Vídeo', notes: '' },
+  { item: 'Comida', dept: 'Hostelería', notes: '' },
+  { item: 'Apertura de puertas', dept: 'FOH/Seguridad', notes: '' },
+  { item: 'Inicio del show', dept: 'Escenario', notes: '' },
+  { item: 'Desmontaje', dept: 'Todos los deptos.', notes: '' },
 ];
 
 export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
@@ -57,7 +60,9 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
         ra.time !== rb.time ||
         ra.item !== rb.item ||
         (ra.dept || '') !== (rb.dept || '') ||
-        (ra.notes || '') !== (rb.notes || '')
+        (ra.notes || '') !== (rb.notes || '') ||
+        !!ra.notify !== !!rb.notify ||
+        (ra.departments || []).join(',') !== (rb.departments || []).join(',')
       ) {
         return false;
       }
@@ -107,6 +112,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
     const lastTime = rows.length ? rows[rows.length - 1].time : '09:00';
     const nextTime = roundToSnap(incrementTime(lastTime, snap));
     const newRow: ProgramRow = {
+      id: crypto.randomUUID(),
       time: nextTime,
       item: preset?.item || '',
       dept: preset?.dept || '',
@@ -135,7 +141,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
   const duplicateRow = (index: number) => {
     setRows((r) => {
       const copy = [...r];
-      copy.splice(index + 1, 0, { ...r[index] });
+      copy.splice(index + 1, 0, { ...r[index], id: crypto.randomUUID() });
       return copy;
     });
   };
@@ -181,7 +187,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
           <span>Constructor de Programa</span>
           <div className="flex items-center gap-2">
             {headerControls}
-            <Label className="text-xs text-muted-foreground">Snap</Label>
+            <Label className="text-xs text-muted-foreground">Intervalo</Label>
             <select
               className="border rounded px-2 py-1 text-xs"
               value={snap}
@@ -217,8 +223,8 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
           </Button>
         </div>
 
-        {/* Grid header */}
-        <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground">
+        {/* Grid header (hidden on mobile, where rows stack in a single column) */}
+        <div className="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground">
           <div className="col-span-2">Hora</div>
           <div className="col-span-4">Ítem</div>
           <div className="col-span-3">Depto/Líder</div>
@@ -226,48 +232,79 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
         </div>
 
         {/* Rows */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {rows.map((row, idx) => (
-            <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-              <Input
-                type="time"
-                step={stepSeconds}
-                value={row.time}
-                onChange={(e) => updateRow(idx, { time: roundToSnap(e.target.value) })}
-                className="col-span-2"
-              />
-              <Input
-                value={row.item}
-                onChange={(e) => updateRow(idx, { item: e.target.value })}
-                placeholder="Actividad"
-                className="col-span-4"
-              />
-              <Input
-                value={row.dept || ''}
-                onChange={(e) => updateRow(idx, { dept: e.target.value })}
-                placeholder="Depto/Líder"
-                className="col-span-3"
-              />
-              <div className="col-span-3 flex items-center gap-2">
+            <div key={row.id || idx} className="space-y-1.5 rounded-md border border-transparent p-1.5 hover:border-border">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:items-center">
+                <Input
+                  type="time"
+                  step={stepSeconds}
+                  value={row.time}
+                  onChange={(e) => updateRow(idx, { time: roundToSnap(e.target.value) })}
+                  className="sm:col-span-2 min-w-0"
+                />
+                <Input
+                  value={row.item}
+                  onChange={(e) => updateRow(idx, { item: e.target.value })}
+                  placeholder="Actividad"
+                  className="sm:col-span-4 min-w-0"
+                />
+                <Input
+                  value={row.dept || ''}
+                  onChange={(e) => updateRow(idx, { dept: e.target.value })}
+                  placeholder="Depto/Líder"
+                  className="sm:col-span-3 min-w-0"
+                />
                 <Input
                   value={row.notes || ''}
                   onChange={(e) => updateRow(idx, { notes: e.target.value })}
                   placeholder="Notas"
+                  className="sm:col-span-3 min-w-0"
                 />
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => moveRow(idx, -1)} title="Subir">
-                    <ArrowUp className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => moveRow(idx, 1)} title="Bajar">
-                    <ArrowDown className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => duplicateRow(idx)} title="Duplicar">
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => deleteRow(idx)} title="Eliminar">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+              </div>
+              {/* Row actions live on their own row so Notas always gets full width
+                  instead of being squeezed alongside four icon buttons on narrow screens. */}
+              <div className="flex items-center justify-end gap-1">
+                <Button variant="ghost" size="icon" onClick={() => moveRow(idx, -1)} title="Subir">
+                  <ArrowUp className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => moveRow(idx, 1)} title="Bajar">
+                  <ArrowDown className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => duplicateRow(idx)} title="Duplicar">
+                  <Copy className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => deleteRow(idx)} title="Eliminar">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pl-1">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Checkbox
+                    checked={!!row.notify}
+                    onCheckedChange={(checked) => updateRow(idx, { notify: checked === true })}
+                  />
+                  <Bell className="w-3.5 h-3.5" />
+                  Notificar a los asignados a esta hora
+                </label>
+                {row.notify && (
+                  <ToggleGroup
+                    type="multiple"
+                    size="sm"
+                    className="flex-wrap justify-start"
+                    value={row.departments || []}
+                    onValueChange={(value) => updateRow(idx, { departments: value as ActiveDepartment[] })}
+                  >
+                    {ACTIVE_DEPARTMENTS.map((dept) => (
+                      <ToggleGroupItem key={dept} value={dept} className="text-xs px-2 py-1 h-7">
+                        {DEPARTMENT_LABELS[dept]}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                )}
+                {row.notify && (row.departments || []).length === 0 && (
+                  <span className="text-xs text-muted-foreground">(todos los asignados)</span>
+                )}
               </div>
             </div>
           ))}

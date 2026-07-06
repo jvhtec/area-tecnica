@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
+import { getHojaDeRutaDialogClassName } from "@/components/hoja-de-ruta/hojaDeRutaDialogClassName";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
@@ -33,7 +35,6 @@ import { JobCardHeader } from "../JobCardHeader";
 import { JobCardProgress } from "../JobCardProgress";
 import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
 import { isManagementRole } from "@/utils/permissions";
-
 
 import { queryKeys } from "@/lib/react-query";
 export interface JobCardNewViewProps {
@@ -271,6 +272,7 @@ export function JobCardNewView({
   handleFlexPickerConfirm,
 }: JobCardNewViewProps) {
   const reducedMotion = useReducedMotion();
+  const isMobile = useIsMobile();
   const canManageTransportRequests = userDepartment === "logistics" || isManagementRole(userRole);
   const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
@@ -673,10 +675,8 @@ export function JobCardNewView({
           {isProjectManagementPage && (
             <>
               <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-                <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
-                  <div className="h-full overflow-auto">
-                    <ModernHojaDeRuta jobId={job.id} />
-                  </div>
+                <DialogContent className={getHojaDeRutaDialogClassName(isMobile)}>
+                  <ModernHojaDeRuta jobId={job.id} embedded />
                 </DialogContent>
               </Dialog>
               <ProjectNotesDialog
