@@ -3,6 +3,7 @@ import {
   Clock,
   Edit,
   ExternalLink,
+  FileStack,
   FolderPlus,
   Info,
   ListChecks,
@@ -13,6 +14,7 @@ import {
   ScrollText,
   Settings,
   Trash2,
+  Truck,
   Upload,
   Users,
   Zap,
@@ -20,6 +22,7 @@ import {
 
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
+import { PrintFlexReportAction } from "@/components/jobs/cards/job-card-actions/PrintFlexReportAction";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -35,9 +38,14 @@ import type {
   TechnicalPowerPackState,
 } from "@/components/jobs/cards/job-card-actions/types";
 import { cn } from "@/lib/utils";
+import { getDepartmentLabel } from "@/types/department";
 import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
 import { hasPrepDayDateType } from "@/utils/timesheetPrepDays";
 import { canSubmitTechnicianIncidentReports } from "@/utils/permissions";
+import {
+  TECHNICAL_POWER_DEPARTMENTS,
+  type TechnicalPowerDepartment,
+} from "@/utils/technicalPowerTypes";
 
 type JobCardActionButtonsProps = JobCardActionsProps & {
   allowedJobType: boolean;
@@ -52,6 +60,7 @@ type JobCardActionButtonsProps = JobCardActionsProps & {
   isMobile: boolean;
   isTechnicianUser: boolean;
   navigateToCalculator: (e: React.MouseEvent, type: "pesos" | "consumos") => void;
+  navigateToMemoria: (e: React.MouseEvent) => void;
   openProductionWhatsappDialog: () => void;
   openWarehouseWhatsappDialog: () => void;
   technicalPower: TechnicalPowerPackState;
@@ -66,6 +75,44 @@ const WAREHOUSE_LABEL_BY_DEPARTMENT: Partial<Record<NonNullable<JobCardActionsPr
 
 const getWarehouseDepartmentLabel = (department: JobCardActionsProps["department"]) => (
   department ? WAREHOUSE_LABEL_BY_DEPARTMENT[department] ?? department : "sonido"
+);
+
+const getTechnicalPowerIndicatorState = (
+  technicalPower: TechnicalPowerPackState,
+  department: TechnicalPowerDepartment
+) => {
+  if (
+    technicalPower.isTechnicalPowerDepartmentsLoading ||
+    technicalPower.isTechnicalPowerSummaryPreviewLoading
+  ) {
+    return { className: "bg-muted-foreground/40", label: "comprobando" };
+  }
+
+  const status = technicalPower.technicalPowerSummaryStatus;
+  if (status.availableDepartments.includes(department)) {
+    return { className: "bg-emerald-500", label: "listo" };
+  }
+
+  if (status.requiredDepartments.includes(department)) {
+    return { className: "bg-amber-500", label: "pendiente" };
+  }
+
+  return { className: "bg-muted-foreground/25", label: "no requerido" };
+};
+
+const TechnicalPowerStatusDots = ({ technicalPower }: { technicalPower: TechnicalPowerPackState }) => (
+  <span className="ml-1 inline-flex items-center gap-1" aria-label="Estado resumen potencia por departamento">
+    {TECHNICAL_POWER_DEPARTMENTS.map((department) => {
+      const indicator = getTechnicalPowerIndicatorState(technicalPower, department);
+      return (
+        <span
+          key={department}
+          className={cn("h-2 w-2 rounded-full", indicator.className)}
+          title={`${getDepartmentLabel(department)}: ${indicator.label}`}
+        />
+      );
+    })}
+  </span>
 );
 
 export const JobCardActionButtons = ({
@@ -95,6 +142,7 @@ export const JobCardActionButtons = ({
   isTechnicianUser,
   job,
   navigateToCalculator,
+  navigateToMemoria,
   onAddFlexFolders,
   onAssignmentDialogOpen,
   onCreateFlexFolders,
@@ -122,10 +170,17 @@ export const JobCardActionButtons = ({
   whatsappGroup,
   whatsappRequest,
 }: JobCardActionButtonsProps) => {
+  const isProductionDepartment = department === "production";
   const normalizedJobType = String(job.job_type || "").toLowerCase();
   const canOpenTimesheets = !["dryhire", "dry_hire"].includes(normalizedJobType) && (
     normalizedJobType !== "tourdate" || hasPrepDayDateType(job.job_date_types)
   );
+  const showProductionLogisticsAction =
+    isProductionDepartment &&
+    isProjectManagementPage &&
+    isManagementUser &&
+    job.job_type !== "dryhire" &&
+    Boolean(onTransportClick);
 
   return (
   <div className={cn("flex flex-wrap", isMobile ? "gap-1" : "gap-1.5")} onClick={(e) => e.stopPropagation()}>
@@ -141,7 +196,19 @@ export const JobCardActionButtons = ({
         <span className="hidden sm:inline">Tareas</span>
       </Button>
     )}
-    {transportButtonLabel && onTransportClick && (
+    {showProductionLogisticsAction && (
+      <Button
+        variant={transportButtonTone || "outline"}
+        size="sm"
+        onClick={onTransportClick}
+        className="gap-2"
+        title="Logística"
+      >
+        <Truck className="h-4 w-4" />
+        <span className="hidden sm:inline">Logística</span>
+      </Button>
+    )}
+    {!isProductionDepartment && transportButtonLabel && onTransportClick && (
       <Button
         variant={transportButtonTone || "outline"}
         size="sm"
@@ -246,7 +313,7 @@ export const JobCardActionButtons = ({
         <span className="hidden sm:inline">{isTechnicianUser ? "Ver Trabajo" : "Gestionar Trabajo"}</span>
       </Button>
     )}
-    {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
+    {!isProductionDepartment && !isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
       <Button
         variant="outline"
         size="sm"
@@ -267,7 +334,7 @@ export const JobCardActionButtons = ({
     >
       <RefreshCw className="h-4 w-4" />
     </Button>
-    {isProjectManagementPage && canSyncFlex && (
+    {!isProductionDepartment && isProjectManagementPage && canSyncFlex && (
       <Button
         variant="ghost"
         size="icon"
@@ -278,7 +345,7 @@ export const JobCardActionButtons = ({
         <RefreshCw className="h-4 w-4" />
       </Button>
     )}
-    {canOpenTimesheets && (
+    {!isProductionDepartment && canOpenTimesheets && (
       <Button
         variant="ghost"
         size="icon"
@@ -289,7 +356,7 @@ export const JobCardActionButtons = ({
         <Clock className="h-4 w-4" />
       </Button>
     )}
-    {canViewCalculators && allowedJobType && (
+    {!isProductionDepartment && canViewCalculators && allowedJobType && (
       <>
         <Button
           variant="outline"
@@ -312,6 +379,16 @@ export const JobCardActionButtons = ({
           <Zap className="h-4 w-4" />
           <span className="hidden sm:inline">Consumos</span>
           {defaultsInfo?.power && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Existen valores predeterminados de gira" />}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          title="Memoria Técnica"
+          onClick={navigateToMemoria}
+        >
+          <FileStack className="h-4 w-4" />
+          <span className="hidden sm:inline">Memoria</span>
         </Button>
       </>
     )}
@@ -341,6 +418,9 @@ export const JobCardActionButtons = ({
                   <ScrollText className="h-4 w-4" />
                 )}
                 <span className="hidden sm:inline">Resumen Potencia</span>
+                {isProductionDepartment && (
+                  <TechnicalPowerStatusDots technicalPower={technicalPower} />
+                )}
               </Button>
             </span>
           </TooltipTrigger>
@@ -350,7 +430,10 @@ export const JobCardActionButtons = ({
         </Tooltip>
       </TooltipProvider>
     )}
-    {canSubmitTechnicianIncidentReports(userRole) && job.job_type !== "dryhire" && (
+    {isProductionDepartment && isProjectManagementPage && isManagementUser && (
+      <PrintFlexReportAction job={job} />
+    )}
+    {!isProductionDepartment && canSubmitTechnicianIncidentReports(userRole) && job.job_type !== "dryhire" && (
       <TechnicianIncidentReportDialog
         job={job}
         techName={techName}
@@ -409,7 +492,7 @@ export const JobCardActionButtons = ({
             <span className="hidden sm:inline">Abrir Flex</span>
           </Button>
 
-          {job.job_type !== "dryhire" && onAddFlexFolders ? (
+          {!isProductionDepartment && job.job_type !== "dryhire" && onAddFlexFolders ? (
             <Button
               variant="ghost"
               size="icon"
@@ -434,7 +517,7 @@ export const JobCardActionButtons = ({
             </Button>
           ) : null}
         </>
-      ) : (
+      ) : !isProductionDepartment ? (
         <Button
           variant="ghost"
           size="icon"
@@ -461,7 +544,7 @@ export const JobCardActionButtons = ({
             />
           )}
         </Button>
-      )
+      ) : null
     )}
     <Button
       variant="ghost"
@@ -481,8 +564,12 @@ export const JobCardActionButtons = ({
         <FolderPlus className="h-4 w-4" />
       )}
     </Button>
-    <ArchiveToFlexAction job={job} />
-    <BackfillDocTecnicaAction job={job} />
+    {!isProductionDepartment && (
+      <>
+        <ArchiveToFlexAction job={job} />
+        <BackfillDocTecnicaAction job={job} />
+      </>
+    )}
     {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
       <div className="relative">
         <input
@@ -499,7 +586,7 @@ export const JobCardActionButtons = ({
         </Button>
       </div>
     )}
-    {isProjectManagementPage && canSyncFlex && (
+    {!isProductionDepartment && isProjectManagementPage && canSyncFlex && (
       <Button
         variant="outline"
         size="sm"

@@ -1,12 +1,19 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
+};
+
+const clampSignedUrlTtl = (value: unknown) => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return 3600;
+  return Math.min(3600, Math.max(60, Math.floor(numericValue)));
 };
 
 serve(async (req) => {
@@ -16,9 +23,10 @@ serve(async (req) => {
   }
 
   try {
-    const { documentUrls, projectName, logoUrl } = await req.json();
+    const { documentUrls, projectName, logoUrl, expiresIn } = await req.json();
+    const signedUrlTtl = clampSignedUrlTtl(expiresIn);
     
-    console.log('Starting PDF generation with inputs:', { projectName, logoUrl, documentUrls });
+    console.log('Starting PDF generation for project:', projectName);
 
     // Create merged PDF
     const mergedPdf = await PDFDocument.create();
@@ -68,7 +76,7 @@ serve(async (req) => {
     // Add customer logo if provided
     if (logoUrl) {
       try {
-        console.log('Fetching customer logo from URL:', logoUrl);
+        console.log('Fetching customer logo');
         const logoResponse = await fetch(logoUrl, {
           headers: {
             'Cache-Control': 'no-cache',
@@ -161,7 +169,7 @@ serve(async (req) => {
 
     if (isMemoriaCompleta) {
       // For memoria completa, just append the complete document after the cover page
-      console.log('Appending complete memoria PDF from:', documentUrls.memoria_completa);
+      console.log('Appending complete memoria PDF');
       try {
         const pdfResponse = await fetch(documentUrls.memoria_completa, {
           headers: {
@@ -229,7 +237,7 @@ serve(async (req) => {
         if (!url) continue;
 
         try {
-          console.log(`Fetching PDF from URL: ${url}`);
+          console.log(`Fetching PDF for ${doc.id}`);
           const pdfResponse = await fetch(url, {
             headers: {
               'Cache-Control': 'no-cache',
@@ -261,40 +269,98 @@ serve(async (req) => {
     // Get Supabase configuration
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
+
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing Supabase configuration');
     }
 
-    // Upload to Supabase Storage
-    const uploadResponse = await fetch(
-      `${supabaseUrl}/storage/v1/object/lights-memoria-tecnica/${encodeURIComponent(safeFileName)}`,
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const bucket = 'lights-memoria-tecnica';
+    const encodedBucket = encodeURIComponent(bucket);
+    const encodedPath = encodeURIComponent(safeFileName);
+
+    // Upload to Supabase Storage. Allow overwriting (x-upsert) and auto-create the
+    // bucket on first use, mirroring generate-memoria-tecnica/generate-video-memoria-tecnica.
+    let uploadResponse = await fetch(
+      `${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${supabaseServiceKey}`,
           'Content-Type': 'application/pdf',
+          'x-upsert': 'true',
         },
         body: pdfBytes,
       }
     );
 
-    if (!uploadResponse.ok) {
-      console.error('Upload failed with status:', uploadResponse.status);
+    if (uploadResponse.status === 404) {
+      await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: bucket, name: bucket, public: false }),
+      });
+      uploadResponse = await fetch(
+        `${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/pdf',
+            'x-upsert': 'true',
+          },
+          body: pdfBytes,
+        }
+      );
+    }
+
+    if (!uploadResponse.ok && uploadResponse.status !== 409) {
       const errorText = await uploadResponse.text();
-      console.error('Upload error details:', errorText);
+      console.error('Upload failed with status:', uploadResponse.status, errorText);
       throw new Error(`Storage upload failed: ${uploadResponse.status} - ${errorText}`);
     }
 
-    // Get the public URL
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/lights-memoria-tecnica/${encodeURIComponent(safeFileName)}`;
-    
-    console.log('Successfully generated memoria tecnica:', publicUrl);
-    
+    // Generate a signed URL (bucket is private) rather than assuming a public URL.
+    console.log('Generating signed URL...');
+    let signedUrl = '';
+    try {
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(safeFileName, signedUrlTtl);
+      if (signedUrlError) throw signedUrlError;
+      signedUrl = signedUrlData.signedUrl;
+    } catch (e) {
+      const res = await fetch(`${supabaseUrl}/storage/v1/object/sign/${encodedBucket}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ expiresIn: signedUrlTtl, paths: [safeFileName] }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Failed to sign URL: ${res.status} ${res.statusText} ${txt}`);
+      }
+      const body = await res.json();
+      signedUrl = body[0]?.signedURL || body[0]?.signedUrl || '';
+      if (!signedUrl) throw new Error('Signed URL missing in response');
+    }
+
+    console.log('Successfully generated memoria tecnica:', safeFileName);
+
     return new Response(
-      JSON.stringify({ url: publicUrl }),
-      { 
-        headers: { 
+      JSON.stringify({
+        url: signedUrl,
+        fileName: safeFileName,
+        expiresAt: new Date(Date.now() + signedUrlTtl * 1000).toISOString(),
+        expiresIn: signedUrlTtl,
+      }),
+      {
+        headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
         },
@@ -304,9 +370,9 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in PDF generation:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { 
+      JSON.stringify({ error: 'Error al generar la memoria técnica' }),
+      {
+        headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
         },

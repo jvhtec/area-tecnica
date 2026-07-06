@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { ReportGenerator } from "../components/sound/ReportGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
@@ -40,6 +40,7 @@ import { isManagementRole } from "@/utils/permissions";
 import { queryKeys } from "@/lib/react-query";
 const Sound = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -68,6 +69,20 @@ const Sound = () => {
   const { user, userRole, hasSoundVisionAccess, userDepartment, isLoading: authLoading } = useOptimizedAuth();
   const canManageJobs = isManagementRole(userRole);
   const canUseDetailsOnlyMode = canManageJobs || userRole === "house_tech";
+  const shouldOpenMemoriaFromUrl =
+    searchParams.get("tool") === "memoria" || searchParams.get("memoria") === "true";
+
+  useEffect(() => {
+    if (shouldOpenMemoriaFromUrl) {
+      setShowMemoriaTecnica(true);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("tool");
+        next.delete("memoria");
+        return next;
+      }, { replace: true });
+    }
+  }, [shouldOpenMemoriaFromUrl, setSearchParams]);
 
   // Generate navigation items for mobile nav bar
   const navigationItems = useMemo(() => {

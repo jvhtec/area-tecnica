@@ -339,6 +339,10 @@ describe('JobCardActions', () => {
       writable: true,
       value: vi.fn(),
     });
+    Object.defineProperty(window, 'open', {
+      writable: true,
+      value: vi.fn(),
+    });
     // Mock useFlexUuid hook
     vi.spyOn(useFlexUuidModule, 'useFlexUuid').mockReturnValue({
       flexUuid: null,
@@ -881,6 +885,123 @@ describe('JobCardActions', () => {
       expect(screen.getByRole('dialog')).toHaveTextContent('Enviar WhatsApp');
       expect(screen.getByDisplayValue(/Para el trabajo “Test Job”/)).toBeTruthy();
       expect(screen.getByDisplayValue(/Ubicación: Arena — Madrid/)).toBeTruthy();
+    });
+
+    it('limits production project-management actions to the production allow-list', () => {
+      const props = {
+        ...defaultProps,
+        canSyncFlex: true,
+        canUploadDocuments: true,
+        department: 'production',
+        foldersAreCreated: true,
+        onJobDetailsClick: vi.fn(),
+        onOpenFlexLogs: vi.fn(),
+        onOpenTasks: vi.fn(),
+        onTransportClick: vi.fn(),
+        showUpload: true,
+        transportButtonLabel: 'Requests (1)',
+      };
+
+      render(<JobCardActions {...props} />);
+
+      expect(screen.getByRole('button', { name: /Tareas/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Logística/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Aviso WA/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Ver Detalles/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Gestionar Trabajo/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Resumen Potencia/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Lista Material/i })).toBeDisabled();
+      expect(screen.getByTitle('Actualizar')).toBeTruthy();
+      expect(screen.getByTitle('Editar detalles del trabajo')).toBeTruthy();
+      expect(screen.getByTitle('Eliminar trabajo')).toBeTruthy();
+      expect(screen.getByTitle(/Abrir en Flex|No hay un elemento Flex válido disponible/)).toBeTruthy();
+      expect(screen.getByTitle('Crear estructura de carpetas locales')).toBeTruthy();
+      expect(screen.getAllByLabelText('Subir documento').length).toBeGreaterThan(0);
+
+      expect(screen.queryByRole('button', { name: /^Requests/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Asignar/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Pesos/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Consumos/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Memoria/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Registros/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Archivar/i })).toBeNull();
+      expect(screen.queryByTitle('Rellenar Doc Técnica')).toBeNull();
+      expect(screen.queryByTitle('Añadir carpetas Flex')).toBeNull();
+      expect(screen.queryByTitle('Gestionar Hojas de Tiempo')).toBeNull();
+    });
+
+    it('disables the production material-list print button until a quote exists', () => {
+      render(<JobCardActions {...defaultProps} department="production" />);
+
+      expect(screen.getByRole('button', { name: /Lista Material/i })).toBeDisabled();
+      expect(screen.getByTitle('No hay presupuesto de sonido o iluminación en Flex')).toBeTruthy();
+    });
+
+    it('shows production technical-power department status dots', () => {
+      jobDepartmentsQueryState.data = ['sound', 'lights'];
+      technicalPowerSummaryQueryState.data = createTechnicalPowerSummary(['lights']);
+
+      render(<JobCardActions {...defaultProps} department="production" />);
+
+      expect(screen.getByLabelText('Estado resumen potencia por departamento')).toBeTruthy();
+      expect(screen.getByTitle('Sonido: listo')).toBeTruthy();
+      expect(screen.getByTitle('Iluminación: pendiente')).toBeTruthy();
+      expect(screen.getByTitle('Video: no requerido')).toBeTruthy();
+    });
+
+    it('prints a Flex material list for the selected production department option', async () => {
+      const user = userEvent.setup();
+      dataLayerFunctionsInvokeMock.mockResolvedValueOnce({
+        data: {
+          url: 'https://example.test/material-list.pdf',
+          fileName: 'Listado de Material - sound.pdf',
+          elementId: 'flex-element-id',
+          folderType: 'comercial_presupuesto',
+          elementValidated: true,
+          elementJobMismatch: false,
+          reportType: 'material-list',
+        },
+        error: null,
+      });
+
+      const props = {
+        ...defaultProps,
+        department: 'production',
+        job: {
+          ...defaultProps.job,
+          flex_folders: [
+            {
+              id: 'sound-quote-folder',
+              department: 'sound',
+              element_id: 'sound-quote-element',
+              folder_type: 'comercial_presupuesto',
+            },
+          ],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: /Lista Material/i }));
+      await user.click(await screen.findByText('Sonido'));
+
+      await waitFor(() => {
+        expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
+          'fetch-flex-material-report',
+          expect.objectContaining({
+            body: expect.objectContaining({
+              jobId: 'test-job-id',
+              department: 'sound',
+              reportType: 'material-list',
+            }),
+          })
+        );
+      });
+      expect(window.open).toHaveBeenCalledWith(
+        'https://example.test/material-list.pdf',
+        '_blank',
+        'noopener,noreferrer'
+      );
     });
 
     it('should render the technical power summary button for project management managers', () => {
