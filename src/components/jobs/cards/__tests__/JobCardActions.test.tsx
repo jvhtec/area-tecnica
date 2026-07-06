@@ -1075,7 +1075,7 @@ describe('JobCardActions', () => {
           url: 'https://example.test/lights-quote.pdf',
           fileName: 'Presupuesto - lights.pdf',
           elementId: 'lights-quote-element',
-          folderType: 'presupuestos_recibidos',
+          folderType: 'comercial_presupuesto',
           elementValidated: true,
           elementJobMismatch: false,
           reportType: 'quote',
@@ -1099,7 +1099,7 @@ describe('JobCardActions', () => {
               id: 'lights-quote-folder',
               department: 'lights',
               element_id: 'lights-quote-element',
-              folder_type: 'presupuestos_recibidos',
+              folder_type: 'comercial_presupuesto',
             },
           ],
         },
@@ -1130,6 +1130,30 @@ describe('JobCardActions', () => {
         '_blank',
         'noopener,noreferrer'
       );
+    });
+
+    it('does not enable scoped quote printing from a Presupuestos Recibidos container', () => {
+      const props = {
+        ...defaultProps,
+        department: 'lights',
+        job: {
+          ...defaultProps.job,
+          flex_folders: [
+            {
+              id: 'lights-pr-folder',
+              department: 'lights',
+              element_id: 'lights-pr-element',
+              folder_type: 'presupuestos_recibidos',
+            },
+          ],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      expect(screen.getByRole('button', { name: /Lista Material/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /Presupuesto/i })).toBeDisabled();
+      expect(screen.getByTitle('No hay presupuesto de Iluminación en Flex')).toBeTruthy();
     });
 
     it('should render the technical power summary button for project management managers', () => {

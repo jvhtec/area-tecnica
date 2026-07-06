@@ -23,10 +23,15 @@ const MATERIAL_LIST_DEPARTMENTS: Array<{ department: PrintableDepartment; label:
   { department: "lights", label: "Iluminación" },
 ];
 
-const QUOTE_FOLDER_TYPES = new Set([
+const MATERIAL_LIST_FOLDER_TYPES = new Set([
   "comercial_presupuesto",
   "dryhire_presupuesto",
   "presupuestos_recibidos",
+]);
+
+const PRINTABLE_QUOTE_FOLDER_TYPES = new Set([
+  "comercial_presupuesto",
+  "dryhire_presupuesto",
 ]);
 
 type PrintFlexReportActionProps = {
@@ -38,13 +43,22 @@ type PrintFlexReportActionProps = {
 const getFolderElementId = (folder: NonNullable<JobCardJob["flex_folders"]>[number]) =>
   folder.element_id || folder.elementId || null;
 
-const hasQuoteForDepartment = (job: JobCardJob, department: PrintableDepartment) =>
-  (job.flex_folders || []).some((folder) =>
+const getReportFolderTypes = (reportType: FlexMaterialReportType) =>
+  reportType === "quote" ? PRINTABLE_QUOTE_FOLDER_TYPES : MATERIAL_LIST_FOLDER_TYPES;
+
+const hasReportForDepartment = (
+  job: JobCardJob,
+  department: PrintableDepartment,
+  reportType: FlexMaterialReportType
+) => {
+  const folderTypes = getReportFolderTypes(reportType);
+  return (job.flex_folders || []).some((folder) =>
     folder.department === department &&
     typeof folder.folder_type === "string" &&
-    QUOTE_FOLDER_TYPES.has(folder.folder_type) &&
+    folderTypes.has(folder.folder_type) &&
     Boolean(getFolderElementId(folder))
   );
+};
 
 const REPORT_COPY: Record<FlexMaterialReportType, {
   buttonLabel: string;
@@ -98,12 +112,12 @@ export const PrintFlexReportAction = ({
   );
   const quoteAvailability = React.useMemo(
     () => new Map(
-      MATERIAL_LIST_DEPARTMENTS.map(({ department }) => [
-        department,
-        hasQuoteForDepartment(job, department),
+      MATERIAL_LIST_DEPARTMENTS.map(({ department: optionDepartment }) => [
+        optionDepartment,
+        hasReportForDepartment(job, optionDepartment, reportType),
       ])
     ),
-    [job]
+    [job, reportType]
   );
   const hasAnyQuote = Array.from(quoteAvailability.values()).some(Boolean);
 

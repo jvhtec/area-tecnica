@@ -48,8 +48,13 @@ const isFlexReportType = (value: string): value is FlexReportType =>
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_DEPARTMENTS = new Set(["sound", "lights", "video", "production"]);
 const UNVERIFIED_OVERRIDE_ROLES = new Set(["admin", "management"]);
-// Preference order when a job/department has multiple quote-type folders.
-const QUOTE_FOLDER_TYPES = ["comercial_presupuesto", "dryhire_presupuesto", "presupuestos_recibidos"];
+// Preference order when a job/department has multiple report-capable folders.
+// `presupuestos_recibidos` is a container used by the material-list workflow,
+// but quote printing must resolve to a real presupuesto element.
+const REPORT_FOLDER_TYPES: Record<FlexReportType, string[]> = {
+  "material-list": ["comercial_presupuesto", "dryhire_presupuesto", "presupuestos_recibidos"],
+  quote: ["comercial_presupuesto", "dryhire_presupuesto"],
+};
 
 interface FetchFlexMaterialReportBody extends Record<string, unknown> {
   jobId?: unknown;
@@ -160,12 +165,13 @@ serve(createHttpHandler(async (req: Request) => {
       });
     }
   } else {
+    const reportFolderTypes = REPORT_FOLDER_TYPES[reportType];
     const { data: folders, error: folderError } = await supabase
       .from("flex_folders")
       .select("element_id, folder_type, created_at")
       .eq("job_id", jobId)
       .eq("department", department)
-      .in("folder_type", QUOTE_FOLDER_TYPES)
+      .in("folder_type", reportFolderTypes)
       .order("created_at", { ascending: false });
 
     if (folderError) {
@@ -176,7 +182,7 @@ serve(createHttpHandler(async (req: Request) => {
     }
 
     const ranked = (folders || []).slice().sort((a, b) => {
-      const rankDiff = QUOTE_FOLDER_TYPES.indexOf(a.folder_type) - QUOTE_FOLDER_TYPES.indexOf(b.folder_type);
+      const rankDiff = reportFolderTypes.indexOf(a.folder_type) - reportFolderTypes.indexOf(b.folder_type);
       return rankDiff !== 0 ? rankDiff : 0;
     });
 
