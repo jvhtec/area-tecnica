@@ -274,11 +274,7 @@ export const PrintOptionsDialog = ({
       throw error;
     }
 
-    // Missing riders, plus imported/copied riders flagged outdated (unless dismissed).
-    const missingRiderArtists = artists?.filter(artist =>
-      Boolean(artist.rider_missing) ||
-      ((Boolean(artist.rider_outdated) || Boolean(artist.rider_copied_from_date)) && !artist.rider_outdated_dismissed)
-    ) || [];
+    const missingRiderArtists = artists?.filter(artist => Boolean(artist.rider_missing) || ((Boolean(artist.rider_outdated) || Boolean(artist.rider_copied_from_date)) && !artist.rider_outdated_dismissed)) || [];
 
     const { data: stageRows } = await dataLayerClient.from('festival_stages')
       .select('number, name')

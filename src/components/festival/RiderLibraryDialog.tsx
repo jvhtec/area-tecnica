@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { importArtistRiderToJob, getRiderImportErrorMessage } from "@/features/festival-management/commands";
 import { fetchRiderLibrary } from "@/features/festival-management/queries";
 import type { FestivalStageOption, RiderLibraryEntry } from "@/features/festival-management/types";
@@ -33,6 +34,8 @@ type ImportMutationInput = {
   targetDate: string;
   targetStage: number;
 };
+
+const ALL_SOURCE_JOBS_VALUE = "all";
 
 const formatDateValue = (date: Date) => format(date, "yyyy-MM-dd");
 
@@ -69,6 +72,8 @@ const normalizeJobType = (value?: string | null) => {
   return value.replace(/_/g, " ");
 };
 
+const getSourceJobKey = (entry: RiderLibraryEntry) => entry.sourceJobId || `unlinked:${entry.sourceJobTitle}`;
+
 export const RiderLibraryDialog = ({
   canImport,
   initialDate,
@@ -82,6 +87,8 @@ export const RiderLibraryDialog = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [libraryMode, setLibraryMode] = useState<"browse" | "search">("browse");
+  const [sourceJobFilter, setSourceJobFilter] = useState(ALL_SOURCE_JOBS_VALUE);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [stageByArtist, setStageByArtist] = useState<Record<string, string>>({});
@@ -102,6 +109,8 @@ export const RiderLibraryDialog = ({
     if (!open) return;
 
     setSearchTerm("");
+    setSourceJobFilter(ALL_SOURCE_JOBS_VALUE);
+    setLibraryMode("browse");
     setStageByArtist({});
 
     if (dateOptions.length === 1) {
@@ -154,10 +163,58 @@ export const RiderLibraryDialog = ({
     },
   });
 
-  const entries = riderLibraryQuery.data ?? [];
+  const entries = useMemo(() => riderLibraryQuery.data ?? [], [riderLibraryQuery.data]);
+  const sourceJobOptions = useMemo(() => {
+    const options = new Map<
+      string,
+      {
+        count: number;
+        files: number;
+        latestUploadedAt: string | null;
+        sourceJobTitle: string;
+        sourceJobType: string;
+      }
+    >();
+
+    entries.forEach((entry) => {
+      const key = getSourceJobKey(entry);
+      const existing = options.get(key);
+      const latestCandidate = entry.latestUploadedAt ? new Date(entry.latestUploadedAt).getTime() : 0;
+      const latestExisting = existing?.latestUploadedAt ? new Date(existing.latestUploadedAt).getTime() : 0;
+
+      if (!existing) {
+        options.set(key, {
+          count: 1,
+          files: entry.files.length,
+          latestUploadedAt: entry.latestUploadedAt,
+          sourceJobTitle: entry.sourceJobTitle,
+          sourceJobType: normalizeJobType(entry.sourceJobType),
+        });
+        return;
+      }
+
+      existing.count += 1;
+      existing.files += entry.files.length;
+      if (latestCandidate > latestExisting) {
+        existing.latestUploadedAt = entry.latestUploadedAt;
+      }
+    });
+
+    return Array.from(options.entries())
+      .map(([value, option]) => ({ value, ...option }))
+      .sort((a, b) => {
+        const latestA = a.latestUploadedAt ? new Date(a.latestUploadedAt).getTime() : 0;
+        const latestB = b.latestUploadedAt ? new Date(b.latestUploadedAt).getTime() : 0;
+        return latestB - latestA || a.sourceJobTitle.localeCompare(b.sourceJobTitle);
+      });
+  }, [entries]);
+  const totalFileCount = entries.reduce((total, entry) => total + entry.files.length, 0);
   const normalizedSearch = searchTerm.trim().toLowerCase();
-  const filteredEntries = normalizedSearch
-    ? entries.filter((entry) => {
+  const filteredEntries =
+    libraryMode === "browse"
+      ? entries.filter((entry) => sourceJobFilter === ALL_SOURCE_JOBS_VALUE || getSourceJobKey(entry) === sourceJobFilter)
+      : normalizedSearch
+        ? entries.filter((entry) => {
         const haystack = [
           entry.artistName,
           entry.sourceJobTitle,
@@ -168,8 +225,8 @@ export const RiderLibraryDialog = ({
           .join(" ")
           .toLowerCase();
         return haystack.includes(normalizedSearch);
-      })
-    : entries;
+        })
+        : entries;
 
   const defaultStageValueFor = (entry: RiderLibraryEntry) => {
     const sourceStage = entry.sourceStage ? String(entry.sourceStage) : "";
@@ -206,19 +263,59 @@ export const RiderLibraryDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 border-b px-5 py-4 md:grid-cols-[1fr_220px]">
-          <div className="space-y-2">
-            <Label htmlFor="rider-library-search">Buscar</Label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="rider-library-search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Artista, trabajo o archivo"
-                className="pl-9"
-              />
-            </div>
+        <div className="grid gap-4 border-b px-5 py-4 md:grid-cols-[1fr_220px]">
+          <div className="min-w-0">
+            <Tabs value={libraryMode} onValueChange={(value) => setLibraryMode(value as "browse" | "search")}>
+              <TabsList className="grid w-full grid-cols-2 sm:w-[260px]">
+                <TabsTrigger value="browse" className="gap-2">
+                  <Library className="h-4 w-4" />
+                  Explorar
+                </TabsTrigger>
+                <TabsTrigger value="search" className="gap-2">
+                  <Search className="h-4 w-4" />
+                  Buscar
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="browse" className="mt-3 space-y-3">
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="rider-library-source-job">Trabajo origen</Label>
+                    <Select value={sourceJobFilter} onValueChange={setSourceJobFilter}>
+                      <SelectTrigger id="rider-library-source-job">
+                        <SelectValue placeholder="Seleccionar trabajo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL_SOURCE_JOBS_VALUE}>Todos los trabajos ({entries.length})</SelectItem>
+                        {sourceJobOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.sourceJobTitle} ({option.count})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary">{entries.length} artistas</Badge>
+                    <Badge variant="outline">{totalFileCount} archivos</Badge>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="search" className="mt-3 space-y-2">
+                <Label htmlFor="rider-library-search">Buscar</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="rider-library-search"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Artista, trabajo o archivo"
+                    className="pl-9"
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <div className="space-y-2">
@@ -258,7 +355,7 @@ export const RiderLibraryDialog = ({
               </div>
             ) : filteredEntries.length === 0 ? (
               <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
-                No hay riders disponibles para los filtros actuales.
+                {entries.length === 0 ? "No hay riders disponibles en la biblioteca." : "No hay riders disponibles para los filtros actuales."}
               </div>
             ) : (
               filteredEntries.map((entry) => {

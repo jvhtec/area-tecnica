@@ -8,8 +8,6 @@ import {
   Eye,
   FileText,
   FolderPlus,
-  Layout,
-  Library,
   Link as LinkIcon,
   Loader2,
   MapPin,
@@ -42,6 +40,7 @@ import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
 import { canSubmitTechnicianIncidentReports, isDepartmentManagementRole, isManagementRole } from "@/utils/permissions";
 
 import { FestivalManagementDialogs } from "./FestivalManagementDialogs";
+import { FestivalManagementNavCards } from "./FestivalManagementNavCards";
 
 export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => {
   const {
@@ -270,96 +269,14 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
 
       {!isSchedulingRoute && !isArtistRoute && !isGearRoute && (
         <>
-          {/* Modern Navigation Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
-            <Card
-              className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
-              onClick={() => navigate(`/festival-management/${jobId}/artists`)}
-            >
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-3 text-base md:text-lg">
-                  <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
-                    <Users className="h-5 w-5 md:h-6 md:w-6" />
-                  </div>
-                  <span className="group-hover:text-primary transition-colors">Artistas</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-                    {artistCount}
-                  </p>
-                  <p className="text-xs md:text-sm text-muted-foreground">Total de Artistas</p>
-                </div>
-                <Button
-                  className="w-full group-hover:shadow-md transition-shadow"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/festival-management/${jobId}/artists`);
-                  }}
-                >
-                  {isViewOnly ? "Ver Artistas" : "Gestionar Artistas"}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
-              onClick={() => navigate(`/festival-management/${jobId}/gear`)}
-            >
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-3 text-base md:text-lg">
-                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
-                    <Layout className="h-5 w-5 md:h-6 md:w-6" />
-                  </div>
-                  <span className="group-hover:text-primary transition-colors">Escenarios y Equipo</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">Gestiona escenarios y equipo técnico</p>
-                <Button
-                  className="w-full group-hover:shadow-md transition-shadow"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/festival-management/${jobId}/gear`);
-                  }}
-                >
-                  {isPlanningViewOnly ? "Ver Equipo" : "Gestionar Equipo"}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
-              onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}
-            >
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-3 text-base md:text-lg">
-                  <div className="p-2 rounded-lg bg-green-500/10 text-green-500 group-hover:bg-green-500/20 transition-colors">
-                    <Calendar className="h-5 w-5 md:h-6 md:w-6" />
-                  </div>
-                  <span className="group-hover:text-primary transition-colors">Planificación</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">
-                  Gestiona turnos y asignaciones de personal
-                </p>
-                <Button
-                  className="w-full group-hover:shadow-md transition-shadow"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/festival-management/${jobId}/scheduling`);
-                  }}
-                >
-                  {isPlanningViewOnly ? "Ver Planificación" : "Gestionar Planificación"}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          <FestivalManagementNavCards
+            artistCount={artistCount}
+            isPlanningViewOnly={isPlanningViewOnly}
+            isViewOnly={isViewOnly}
+            jobId={jobId}
+            navigate={navigate}
+            onOpenRiderLibrary={() => handleOpenRiderLibrary()}
+          />
 
           <Card>
             <CardHeader className="pb-3">
@@ -421,19 +338,6 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                       Abrir
                     </Button>
                   </div>
-                </div>
-
-                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
-                  <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
-                    <Library className="h-4 w-4 flex-shrink-0" />
-                    Biblioteca de Riders
-                  </div>
-                  <p className="text-xs md:text-sm text-muted-foreground">
-                    Importa riders existentes como copias técnicas para este trabajo.
-                  </p>
-                  <Button onClick={() => handleOpenRiderLibrary()} disabled={!jobId} size="sm" className="w-full">
-                    Abrir Biblioteca
-                  </Button>
                 </div>
 
                 <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
