@@ -23,7 +23,7 @@ import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tou
 import { getDepartmentLabel } from "@/types/department";
 import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 import { getResolvedPowerPosition } from "@/utils/powerPositions";
-import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
+import { getTourDefaultDocumentNoUpdateToast, syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 import {
   DEPARTMENT_PACKAGE_LABELS,
   TOUR_PACKAGE_LABELS,
@@ -356,7 +356,7 @@ export const TourDefaultsManager = ({
             variant: 'destructive',
           });
         } else if (!silent) {
-          toast({
+          toast(getTourDefaultDocumentNoUpdateToast(result) ?? {
             title: 'PDFs sincronizados',
             description: `${result.uploaded} documento(s) actualizados y ${result.removed} ruta(s) limpiadas.`,
           });

@@ -12,7 +12,7 @@ import type { TourPackageSize } from "@/utils/tourPackages";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { optimizedInvalidation, queryKeys } from "@/lib/react-query";
 import { exportToPDF } from "@/utils/pdfExport";
-import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
+import { syncTourDefaultDocuments, toastTourDefaultDocumentNoUpdate } from "@/utils/tourDefaultDocumentSync";
 import {
   CUSTOM_POWER_POSITION_VALUE,
   NO_POWER_POSITION_VALUE,
@@ -246,7 +246,6 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
   const syncDefaultDocumentsAfterMutation = useCallback(async () => {
     if (!isTourDefaults || !tourIdParam) return;
-
     try {
       const result = await syncTourDefaultDocuments({ tourId: tourIdParam });
       optimizedInvalidation.invalidateQueryKeys(queryClient, [
@@ -261,7 +260,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
           description: `${result.errors.length} documento(s) predeterminados no se pudieron actualizar.`,
           variant: "destructive",
         });
-      }
+      } else { toastTourDefaultDocumentNoUpdate(result, toast); }
     } catch (error) {
       console.error("Error syncing tour default documents:", error);
       toast({
