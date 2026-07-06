@@ -57,10 +57,10 @@ import { ModernLogisticsSection } from "./sections/ModernLogisticsSection";
 import { ModernScheduleSection } from "./sections/ModernScheduleSection";
 import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
-import { HojaDeRutaHeaderActions } from "./components/HojaDeRutaHeaderActions";
-import { MobileSectionSwitcher } from "./components/MobileSectionSwitcher";
-import { MobileSaveBar } from "./components/MobileSaveBar";
-import { QuickNavigationSidebar } from "./components/QuickNavigationSidebar";
+import { HojaDeRutaHeaderActions } from "@/components/hoja-de-ruta/components/HojaDeRutaHeaderActions";
+import { MobileSectionSwitcher } from "@/components/hoja-de-ruta/components/MobileSectionSwitcher";
+import { MobileSaveBar } from "@/components/hoja-de-ruta/components/MobileSaveBar";
+import { QuickNavigationSidebar } from "@/components/hoja-de-ruta/components/QuickNavigationSidebar";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 import {
@@ -81,6 +81,7 @@ import {
 } from "@/utils/hoja-de-ruta/pdf";
 import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { LucideIcon } from "lucide-react";
+import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
 
 type ModernHojaDeRutaProps = {
   jobId?: string;
@@ -642,7 +643,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     { id: "restaurants", icon: UtensilsCrossed, color: "text-emerald-600" },
   ];
 
-  const tabConfig: Array<{ id: HojaDeRutaPdfSectionId; label: string; icon: LucideIcon; color: string }> = tabPresentationConfig.map((section) => ({
+  const tabConfig: HojaDeRutaTabOption[] = tabPresentationConfig.map((section) => ({
     ...section,
     label: getHojaDeRutaPdfSectionLabel(section.id),
   }));

@@ -1,12 +1,10 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { ModernProgressTracker } from "./ModernProgressTracker";
-import type { LucideIcon } from "lucide-react";
-
-type TabOption = { id: string; label: string; icon: LucideIcon; color: string };
+import { ModernProgressTracker } from "@/components/hoja-de-ruta/components/ModernProgressTracker";
+import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
 
 type MobileSectionSwitcherProps = {
-  tabConfig: TabOption[];
+  tabConfig: HojaDeRutaTabOption[];
   activeTab: string;
   onTabChange: (tabId: string) => void;
   progress: number;

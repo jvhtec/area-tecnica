@@ -2,12 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Globe } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-
-type TabOption = { id: string; label: string; icon: LucideIcon; color: string };
+import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
 
 type QuickNavigationSidebarProps = {
-  tabConfig: TabOption[];
+  tabConfig: HojaDeRutaTabOption[];
   activeTab: string;
   onTabChange: (tabId: string) => void;
   embedded: boolean;

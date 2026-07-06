@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Download, Eye, Loader2, MoreHorizontal, Save } from "lucide-react";
-import type { HojaDeRutaPrintPreviewTarget } from "../HojaDeRutaPrintDialog";
+import type { HojaDeRutaPrintPreviewTarget } from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
 
 type HojaDeRutaHeaderActionsProps = {
   isMobile: boolean;
