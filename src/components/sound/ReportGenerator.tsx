@@ -396,15 +396,17 @@ export const ReportGenerator = () => {
       });
       toast({
         title: "Éxito",
-        description: "Informe generado y guardado en los documentos del trabajo.",
+        description: "Informe generado, descargado y guardado en los documentos del trabajo.",
       });
     } catch (error) {
       console.error('Error uploading SV report:', error);
       toast({
         title: "Error",
-        description: "No se pudo guardar el informe generado.",
+        description: "No se pudo guardar el informe generado en los documentos del trabajo.",
         variant: "destructive",
       });
+    } finally {
+      pdf.save(filename);
     }
   };
 
