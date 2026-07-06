@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  backfillMissingRowIds,
   buildProgramaDueEvents,
   buildProgramaMessage,
   buildProgramaPayload,
@@ -153,6 +154,86 @@ describe("programa feed recipient targeting", () => {
       "lx-tech",
       "sound-tech",
     ]);
+  });
+
+  it("normalizes department casing so it matches the lowercased values deriveAssignmentDepartments produces", () => {
+    const [event] = buildProgramaDueEvents(
+      job,
+      [
+        {
+          date: "2026-07-06",
+          rows: [{ id: "row-1", time: "18:00", item: "Lighting Focus", notify: true, departments: [" Lights " as never] }],
+        },
+      ],
+      new Date("2026-07-06T10:00:00.000Z"),
+    );
+
+    expect(event.departments).toEqual(["lights"]);
+
+    const assignments: ProgramaAssignment[] = [
+      { ...baseAssignment, technician_id: "lx-tech", lights_role: "LD" },
+    ];
+    expect(resolveProgramaRecipients(event, assignments).map((r) => r.technician_id)).toEqual(["lx-tech"]);
+  });
+
+  it("broadcasts instead of silently dropping recipients when every stored department value is unrecognized", () => {
+    const [event] = buildProgramaDueEvents(
+      job,
+      [
+        {
+          date: "2026-07-06",
+          rows: [{ id: "row-1", time: "18:00", item: "Legacy row", notify: true, departments: ["FOH/Security" as never] }],
+        },
+      ],
+      new Date("2026-07-06T10:00:00.000Z"),
+    );
+
+    expect(event.departments).toEqual([]);
+
+    const assignments: ProgramaAssignment[] = [
+      { ...baseAssignment, technician_id: "lx-tech", lights_role: "LD" },
+      { ...baseAssignment, technician_id: "sound-tech", sound_role: "FOH" },
+    ];
+    expect(resolveProgramaRecipients(event, assignments).map((r) => r.technician_id)).toEqual([
+      "lx-tech",
+      "sound-tech",
+    ]);
+  });
+});
+
+describe("programa feed legacy row id backfill", () => {
+  it("assigns ids only to rows that are missing one and flags the result as changed", () => {
+    const days: ProgramaProgramDay[] = [
+      {
+        date: "2026-07-06",
+        rows: [
+          { id: "row-1", time: "18:00", item: "Soundcheck" },
+          { time: "19:00", item: "Doors" },
+        ],
+      },
+    ];
+
+    const result = backfillMissingRowIds(days);
+
+    expect(result.changed).toBe(true);
+    expect(result.days[0].rows?.[0].id).toBe("row-1");
+    expect(result.days[0].rows?.[1].id).toEqual(expect.any(String));
+    expect(result.days[0].rows?.[1].id).not.toBe("");
+  });
+
+  it("reports unchanged when every row already has an id", () => {
+    const days: ProgramaProgramDay[] = [
+      { date: "2026-07-06", rows: [{ id: "row-1", time: "18:00", item: "Soundcheck" }] },
+    ];
+
+    const result = backfillMissingRowIds(days);
+    expect(result.changed).toBe(false);
+    expect(result.days).toEqual(days);
+  });
+
+  it("handles missing/non-array input without throwing", () => {
+    expect(backfillMissingRowIds(undefined)).toEqual({ days: [], changed: false });
+    expect(backfillMissingRowIds(null)).toEqual({ days: [], changed: false });
   });
 });
 

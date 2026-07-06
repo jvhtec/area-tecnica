@@ -92,6 +92,28 @@ export const deriveAssignmentDepartments = (assignment: ProgramaAssignment): str
   return Array.from(departments);
 };
 
+// Legacy rows (saved before `notify`/`id` existed) only get an `id` once the
+// frontend re-saves the whole hoja de ruta. Rather than depend on that, the
+// edge function backfills+persists ids itself the first time it sees a gap —
+// see handleProgramaFeedTick's write-back after loading each job's programa.
+export const backfillMissingRowIds = (
+  days: ProgramaProgramDay[] | null | undefined,
+): { days: ProgramaProgramDay[]; changed: boolean } => {
+  if (!Array.isArray(days)) return { days: days ?? [], changed: false };
+
+  let changed = false;
+  const backfilled = days.map((day) => ({
+    ...day,
+    rows: (day.rows ?? []).map((row) => {
+      if (row.id) return row;
+      changed = true;
+      return { ...row, id: crypto.randomUUID() };
+    }),
+  }));
+
+  return { days: backfilled, changed };
+};
+
 const TIME_PATTERN = /^\d{2}:\d{2}(:\d{2})?$/;
 
 // Builds due-events for rows marked `notify: true`. Rows tied to a specific day
@@ -133,7 +155,13 @@ export const buildProgramaDueEvents = (
           notes: row.notes ?? null,
           time: row.time,
           departments: Array.isArray(row.departments)
-            ? row.departments.filter((d): d is string => typeof d === "string")
+            ? Array.from(
+              new Set(
+                row.departments
+                  .map((d) => normalizeDepartment(d))
+                  .filter((d): d is string => d !== null),
+              ),
+            )
             : [],
         });
       }

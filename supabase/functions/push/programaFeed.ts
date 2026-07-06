@@ -5,6 +5,7 @@ import { sendPayloadToUsers } from "./broadcast/delivery.ts";
 import type { PushPayload } from "./types.ts";
 import { addDaysToDateKey, formatDateKeyInTimeZone, isDueInWindow, zonedDateTimeToUtc } from "./festivalFeedUtils.ts";
 import {
+  backfillMissingRowIds,
   buildProgramaDueEvents,
   buildProgramaPayload,
   PROGRAMA_FEED_TIMEZONE,
@@ -99,13 +100,34 @@ const loadEligibleJobsWithProgramas = async (
 
   const jobById = new Map((jobs ?? []).map((job) => [job.id, job]));
 
-  return (hojas ?? [])
-    .map((hoja) => {
-      const job = jobById.get(hoja.job_id);
-      if (!job || !Array.isArray(hoja.program_schedule_json)) return null;
-      return { job, days: hoja.program_schedule_json };
-    })
-    .filter((entry): entry is { job: ProgramaJob; days: ProgramaProgramDay[] } => entry !== null);
+  const entries: Array<{ job: ProgramaJob; days: ProgramaProgramDay[] }> = [];
+
+  for (const hoja of hojas ?? []) {
+    const job = jobById.get(hoja.job_id);
+    if (!job || !Array.isArray(hoja.program_schedule_json)) continue;
+
+    // Rows saved before `notify`/`id` existed only pick up an id once the frontend
+    // re-saves the whole hoja de ruta. Backfill and persist it here so `notify: true`
+    // rows are never silently skipped by buildProgramaDueEvents' `row.id` check.
+    const { days, changed } = backfillMissingRowIds(hoja.program_schedule_json);
+    if (changed) {
+      const { error: updateError } = await client
+        .from("hoja_de_ruta")
+        .update({ program_schedule_json: days })
+        .eq("job_id", hoja.job_id);
+
+      if (updateError) {
+        console.error("programa feed failed persisting backfilled row ids", {
+          jobId: hoja.job_id,
+          error: updateError,
+        });
+      }
+    }
+
+    entries.push({ job, days });
+  }
+
+  return entries;
 };
 
 const loadAssignmentsByJob = async (
@@ -197,6 +219,27 @@ const insertDeliveryLog = async (
   return "failed";
 };
 
+// The delivery log row doubles as a dedupe claim (so two ticks that both see the
+// same due event don't double-send) and a delivery record. If the send ends up
+// delivering to zero devices, release the claim so a later tick — still inside
+// the ~70s due window — can retry instead of the reminder being silently and
+// permanently dropped on a transient failure.
+const releaseDeliveryLogClaim = async (
+  client: ProgramaFeedClient,
+  userId: string,
+  eventKey: string,
+): Promise<void> => {
+  const { error } = await client
+    .from("programa_push_delivery_log")
+    .delete()
+    .eq("user_id", userId)
+    .eq("event_key", eventKey);
+
+  if (error) {
+    console.error("programa feed failed releasing delivery log claim", { userId, eventKey, error });
+  }
+};
+
 export async function handleProgramaFeedTick(
   client: ProgramaFeedClient,
   now = new Date(),
@@ -242,22 +285,29 @@ export async function handleProgramaFeedTick(
 
     const payload = buildProgramaPayload(job, event);
 
-    for (const recipient of recipients) {
+    // Each recipient's claim/send/release is independent (distinct user_id +
+    // event_key), so dispatching the event's recipients concurrently is safe.
+    await Promise.all(recipients.map(async (recipient) => {
       const logStatus = await insertDeliveryLog(client, recipient.technician_id, event, payload);
 
       if (logStatus === "duplicate") {
         duplicateUsers++;
-        continue;
+        return;
       }
       if (logStatus === "failed") {
         failedLogInserts++;
-        continue;
+        return;
       }
 
       attemptedUsers++;
       const results = await sendPayloadToUsers(client, [recipient.technician_id], payload);
-      deliveredCount += results.filter((result) => result.ok).length;
-    }
+      const delivered = results.filter((result) => result.ok).length;
+      deliveredCount += delivered;
+
+      if (delivered === 0) {
+        await releaseDeliveryLogClaim(client, recipient.technician_id, event.eventKey);
+      }
+    }));
   }
 
   return jsonResponse({
