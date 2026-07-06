@@ -261,7 +261,7 @@ serve(createHttpHandler(async (req: Request) => {
   const stageScope = stageNumber ? getTechnicalStageStorageScope(stageNumber, stageName) : null;
   const baseFolder = stageScope ? `${category}/${jobId}/${stageScope}` : `${category}/${jobId}`;
   const fileName = `${reportDefinition.fileNamePrefix} - ${sanitizeFileNameSegment(department)}.pdf`;
-  const objectPath = `${baseFolder}/${crypto.randomUUID()}-${sanitizeFileNameSegment(fileName)}`;
+  const objectPath = `${baseFolder}/${fileName}`;
 
   // Clean up any previous auto-fetched report for this exact job/department/stage
   // scope before writing the new one. Scope both the storage removal and the
@@ -282,7 +282,7 @@ serve(createHttpHandler(async (req: Request) => {
 
   const { error: uploadError } = await supabase.storage
     .from(bucket)
-    .upload(objectPath, pdfBytes, { contentType: "application/pdf", upsert: false });
+    .upload(objectPath, pdfBytes, { contentType: "application/pdf", cacheControl: "0", upsert: true });
   if (uploadError) {
     throw new HttpError(500, `Failed to store the generated ${reportDefinition.displayName}`, {
       code: "storage_upload_failed",
@@ -309,7 +309,7 @@ serve(createHttpHandler(async (req: Request) => {
 
   const { data: signedUrlData, error: signError } = await supabase.storage
     .from(bucket)
-    .createSignedUrl(objectPath, 3600);
+    .createSignedUrl(objectPath, 3600, { cacheNonce: crypto.randomUUID() });
   if (signError || !signedUrlData) {
     throw new HttpError(500, `Failed to sign the generated ${reportDefinition.displayName} URL`, {
       code: "sign_url_failed",
