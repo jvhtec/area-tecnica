@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(15);
+SELECT plan(21);
 
 SELECT has_column('public', 'festival_artists', 'rider_outdated', 'festival artists track explicit outdated rider state');
 
@@ -52,6 +52,28 @@ SELECT ok(
 SELECT ok(
   has_function_privilege('authenticated', 'public.import_artist_rider_to_job(uuid, uuid, date, integer)', 'EXECUTE'),
   'authenticated callers can execute the rider library import RPC'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'delete_festival_artist_file_reference'
+      AND pg_get_function_identity_arguments(p.oid) = 'p_file_id uuid, p_artist_id uuid'
+  ),
+  'rider file reference delete RPC exists with the expected signature'
+);
+
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.delete_festival_artist_file_reference(uuid, uuid)', 'EXECUTE'),
+  'anon cannot execute the rider file reference delete RPC'
+);
+
+SELECT ok(
+  has_function_privilege('authenticated', 'public.delete_festival_artist_file_reference(uuid, uuid)', 'EXECUTE'),
+  'authenticated callers can execute the rider file reference delete RPC'
 );
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
@@ -359,6 +381,15 @@ SELECT throws_ok(
   'house tech cannot import riders from the library'
 );
 
+SELECT throws_ok(
+  $$SELECT * FROM public.delete_festival_artist_file_reference(
+    '14000000-0000-0000-0000-000000000001'::uuid
+  )$$,
+  '42501',
+  'not_authorized',
+  'house tech cannot delete rider file references'
+);
+
 SELECT set_config('request.jwt.claim.sub', '11000000-0000-0000-0000-000000000001', false);
 
 SELECT is(
@@ -432,6 +463,44 @@ SELECT throws_ok(
   '23505',
   'duplicate_rider_import',
   'duplicate import is blocked when the target job already references a source file path'
+);
+
+SELECT is(
+  (
+    SELECT should_delete_storage
+    FROM public.delete_festival_artist_file_reference(
+      (
+        SELECT imported_file.id
+        FROM public.festival_artist_files imported_file
+        JOIN public.festival_artists imported_artist ON imported_artist.id = imported_file.artist_id
+        WHERE imported_artist.job_id = '12000000-0000-0000-0000-000000000002'::uuid
+          AND imported_artist.name = 'Source Rider Artist'
+          AND imported_file.file_path = 'shared/source-rider.pdf'
+        LIMIT 1
+      ),
+      (
+        SELECT imported_artist.id
+        FROM public.festival_artist_files imported_file
+        JOIN public.festival_artists imported_artist ON imported_artist.id = imported_file.artist_id
+        WHERE imported_artist.job_id = '12000000-0000-0000-0000-000000000002'::uuid
+          AND imported_artist.name = 'Source Rider Artist'
+          AND imported_file.file_path = 'shared/source-rider.pdf'
+        LIMIT 1
+      )
+    )
+  ),
+  false,
+  'deleting an imported rider metadata row preserves shared storage while the source still references it'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.festival_artist_files
+    WHERE id = '14000000-0000-0000-0000-000000000001'::uuid
+      AND file_path = 'shared/source-rider.pdf'
+  ),
+  'deleting a shared rider reference leaves the source rider metadata row intact'
 );
 
 SELECT throws_ok(

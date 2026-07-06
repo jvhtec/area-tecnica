@@ -119,7 +119,7 @@ export const groupFestivalRiderFiles = (artistRiderFiles: ArtistRiderFile[]): Gr
 
   artistRiderFiles.forEach((file) => {
     const artistId = file.artist_id || file.festival_artists?.id || "unknown";
-    const artistName = file.festival_artists?.name || "Unknown Artist";
+    const artistName = file.festival_artists?.name || "Artista desconocido";
 
     if (!map.has(artistId)) {
       map.set(artistId, { artistId, artistName, files: [] });
@@ -148,7 +148,7 @@ export const getArtistRiderStatus = (artist: RiderFreshnessArtist): RiderStatus 
 };
 
 const normalizeRecordMap = <T extends { id: string }>(items: Map<string, T> | Record<string, T>) =>
-  items instanceof Map ? items : new Map(Object.entries(items));
+  items instanceof Map ? items : new Map(Object.values(items).map((item) => [item.id, item] as const));
 
 const toUploadedAtSortValue = (value?: string | null) => {
   if (!value) return 0;
@@ -184,7 +184,7 @@ export const buildRiderLibraryEntries = ({
       entries.set(artist.id, {
         alreadyImported: duplicateFilePaths.length > 0,
         artistId: artist.id,
-        artistName: artist.name || "Unknown Artist",
+        artistName: artist.name || "Artista desconocido",
         duplicateFilePaths,
         files: [file],
         latestUploadedAt: file.uploaded_at ?? null,

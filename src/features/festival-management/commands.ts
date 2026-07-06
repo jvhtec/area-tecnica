@@ -87,8 +87,11 @@ export const getRiderImportErrorMessage = (error: unknown) => {
   if (message.includes("missing_required_argument")) {
     return "Selecciona una fecha y escenario antes de importar.";
   }
+  if (message.includes("No se recibió confirmación de importación.")) {
+    return message;
+  }
 
-  return message || "No se pudo importar el rider.";
+  return "No se pudo importar el rider. Inténtalo de nuevo o revisa los permisos del trabajo.";
 };
 
 export const importArtistRiderToJob = async ({

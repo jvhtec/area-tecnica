@@ -51,26 +51,30 @@ BEGIN
   SELECT *
   INTO v_source_artist
   FROM public.festival_artists
-  WHERE id = p_source_artist_id;
+  WHERE id = p_source_artist_id
+  FOR SHARE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'source_artist_not_found'
       USING ERRCODE = 'P0002';
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.jobs
-    WHERE id = p_target_job_id
-  ) THEN
+  PERFORM 1
+  FROM public.jobs
+  WHERE id = p_target_job_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'target_job_not_found'
       USING ERRCODE = 'P0002';
   END IF;
 
-  SELECT count(*)::integer
-  INTO v_file_count
+  PERFORM 1
   FROM public.festival_artist_files
-  WHERE artist_id = p_source_artist_id;
+  WHERE artist_id = p_source_artist_id
+  FOR SHARE;
+
+  GET DIAGNOSTICS v_file_count = ROW_COUNT;
 
   IF v_file_count = 0 THEN
     RAISE EXCEPTION 'source_artist_has_no_riders'
@@ -268,3 +272,64 @@ COMMENT ON FUNCTION public.import_artist_rider_to_job(uuid, uuid, date, integer)
 
 REVOKE ALL ON FUNCTION public.import_artist_rider_to_job(uuid, uuid, date, integer) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.import_artist_rider_to_job(uuid, uuid, date, integer) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.delete_festival_artist_file_reference(
+  p_file_id uuid,
+  p_artist_id uuid DEFAULT NULL
+)
+RETURNS TABLE (
+  deleted_file_id uuid,
+  file_path text,
+  should_delete_storage boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_role text;
+  v_file public.festival_artist_files%ROWTYPE;
+  v_remaining_references integer;
+BEGIN
+  v_role := public.get_current_user_role();
+  IF auth.role() <> 'service_role'
+    AND (v_role IS NULL OR v_role <> ALL (ARRAY['admin', 'management', 'logistics'])) THEN
+    RAISE EXCEPTION 'not_authorized'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF p_file_id IS NULL THEN
+    RAISE EXCEPTION 'missing_required_argument'
+      USING ERRCODE = '22023';
+  END IF;
+
+  SELECT *
+  INTO v_file
+  FROM public.festival_artist_files
+  WHERE id = p_file_id
+    AND (p_artist_id IS NULL OR artist_id = p_artist_id)
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'file_not_found'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  DELETE FROM public.festival_artist_files
+  WHERE id = v_file.id;
+
+  SELECT count(*)::integer
+  INTO v_remaining_references
+  FROM public.festival_artist_files remaining_file
+  WHERE remaining_file.file_path = v_file.file_path;
+
+  RETURN QUERY
+  SELECT v_file.id, v_file.file_path, v_remaining_references = 0;
+END;
+$$;
+
+COMMENT ON FUNCTION public.delete_festival_artist_file_reference(uuid, uuid) IS
+  'Deletes one rider file metadata reference and reports whether the shared storage object has no remaining references.';
+
+REVOKE ALL ON FUNCTION public.delete_festival_artist_file_reference(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.delete_festival_artist_file_reference(uuid, uuid) TO authenticated, service_role;

@@ -10559,6 +10559,14 @@ export type Database = {
         }
       }
       assert_soundvision_access: { Args: never; Returns: boolean }
+      delete_festival_artist_file_reference: {
+        Args: { p_artist_id?: string; p_file_id: string }
+        Returns: {
+          deleted_file_id: string
+          file_path: string
+          should_delete_storage: boolean
+        }[]
+      }
       import_artist_rider_to_job: {
         Args: {
           p_source_artist_id: string

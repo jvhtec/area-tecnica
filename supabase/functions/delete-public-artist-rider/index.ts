@@ -146,38 +146,34 @@ serve(createHttpHandler(async (req) => {
       return jsonResponse({ ok: false, error: "file_not_found" }, { status: 404 });
     }
 
-    const { count: referenceCount, error: referenceCountError } = await supabaseAdmin
-      .from("festival_artist_files")
-      .select("id", { count: "exact", head: true })
-      .eq("file_path", fileRow.file_path);
-
-    if (referenceCountError) {
-      console.error("[delete-public-artist-rider] file reference count error", referenceCountError);
-      return jsonResponse({ ok: false, error: "file_reference_count_failed" }, { status: 500 });
-    }
-
-    const { error: deleteError } = await supabaseAdmin
-      .from("festival_artist_files")
-      .delete()
-      .eq("id", fileRow.id)
-      .eq("artist_id", formRow.artist_id);
+    const { data: deleteRows, error: deleteError } = await supabaseAdmin
+      .rpc("delete_festival_artist_file_reference", {
+        p_artist_id: formRow.artist_id,
+        p_file_id: fileRow.id,
+      });
 
     if (deleteError) {
       console.error("[delete-public-artist-rider] metadata delete error", deleteError);
       return jsonResponse({ ok: false, error: "metadata_delete_failed" }, { status: 500 });
     }
 
-    if ((referenceCount ?? 0) <= 1) {
+    const deleteResult = deleteRows?.[0];
+    if (!deleteResult) {
+      console.error("[delete-public-artist-rider] metadata delete returned no result");
+      return jsonResponse({ ok: false, error: "metadata_delete_failed" }, { status: 500 });
+    }
+
+    if (deleteResult.should_delete_storage && deleteResult.file_path) {
       const { error: storageError } = await supabaseAdmin.storage
         .from("festival_artist_files")
-        .remove([fileRow.file_path]);
+        .remove([deleteResult.file_path]);
 
       if (storageError) {
         console.error("[delete-public-artist-rider] storage remove error", storageError);
       }
     }
 
-    return jsonResponse({ ok: true, deleted_file_id: fileRow.id }, { status: 200 });
+    return jsonResponse({ ok: true, deleted_file_id: deleteResult.deleted_file_id }, { status: 200 });
   } catch (error) {
     if (error instanceof HttpError) throw error;
     console.error("[delete-public-artist-rider] unexpected error", error);

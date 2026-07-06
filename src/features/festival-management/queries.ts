@@ -38,6 +38,8 @@ type HojaVenueRow = {
   venue_longitude?: number | null;
 };
 
+const RIDER_LIBRARY_FILE_LIMIT = 1000;
+
 export const resolveFestivalVenueData = (
   hojaData: HojaVenueRow | null | undefined,
   location: LocationRow | null | undefined
@@ -353,7 +355,8 @@ export const fetchRiderLibrary = async (targetJobId: string): Promise<RiderLibra
       .from("festival_artist_files")
       .select("id, artist_id, file_name, file_path, file_type, file_size, uploaded_by, uploaded_at")
       .not("artist_id", "is", null)
-      .order("uploaded_at", { ascending: false }),
+      .order("uploaded_at", { ascending: false })
+      .limit(RIDER_LIBRARY_FILE_LIMIT),
     fetchTargetJobRiderFilePaths(targetJobId),
   ]);
 

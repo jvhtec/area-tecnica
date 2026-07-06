@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { CalendarDays, FileText, FolderInput, Library, Loader2, Search } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -36,8 +36,19 @@ type ImportMutationInput = {
 };
 
 const ALL_SOURCE_JOBS_VALUE = "all";
+const FESTIVAL_TIMEZONE = "Europe/Madrid";
 
-const formatDateValue = (date: Date) => format(date, "yyyy-MM-dd");
+const JOB_TYPE_LABELS: Record<string, string> = {
+  ciclo: "Ciclo",
+  dryhire: "Dry hire",
+  evento: "Evento",
+  festival: "Festival",
+  single: "Trabajo único",
+  tour: "Gira",
+  tourdate: "Fecha de gira",
+};
+
+const formatDateValue = (date: Date) => formatInTimeZone(date, FESTIVAL_TIMEZONE, "yyyy-MM-dd");
 
 const formatDisplayDate = (value?: string | null) => {
   if (!value) return "Sin fecha";
@@ -47,7 +58,7 @@ const formatDisplayDate = (value?: string | null) => {
   }
 
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "Sin fecha" : parsed.toLocaleDateString("es-ES");
+  return Number.isNaN(parsed.getTime()) ? "Sin fecha" : formatInTimeZone(parsed, FESTIVAL_TIMEZONE, "dd/MM/yyyy");
 };
 
 const formatUploadDate = (value?: string | null) => {
@@ -55,10 +66,7 @@ const formatUploadDate = (value?: string | null) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Sin fecha de subida";
 
-  return parsed.toLocaleString("es-ES", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
+  return formatInTimeZone(parsed, FESTIVAL_TIMEZONE, "dd/MM/yy, HH:mm");
 };
 
 const formatFileSize = (value?: number | null) => {
@@ -69,6 +77,7 @@ const formatFileSize = (value?: number | null) => {
 
 const normalizeJobType = (value?: string | null) => {
   if (!value) return "Sin tipo";
+  if (JOB_TYPE_LABELS[value]) return JOB_TYPE_LABELS[value];
   return value.replace(/_/g, " ");
 };
 
@@ -100,7 +109,7 @@ export const RiderLibraryDialog = ({
   const resolvedStageOptions = useMemo(() => {
     if (stageOptions.length > 0) return stageOptions;
     return Array.from({ length: Math.max(maxStages, 1) }, (_, index) => ({
-      name: `Stage ${index + 1}`,
+      name: `Escenario ${index + 1}`,
       number: index + 1,
     }));
   }, [maxStages, stageOptions]);
@@ -147,7 +156,7 @@ export const RiderLibraryDialog = ({
 
       toast({
         title: "Rider importado",
-        description: `${entry.artistName} importado a ${formatDisplayDate(targetDate)}, Stage ${targetStage}. ${result.imported_file_count} archivo(s) referenciados.`,
+        description: `${entry.artistName} importado a ${formatDisplayDate(targetDate)}, Escenario ${targetStage}. ${result.imported_file_count} archivo(s) referenciados.`,
         action: {
           label: "Abrir tabla",
           onClick: () => navigate(`/festival-management/${jobId}/artists?date=${targetDate}&stage=${targetStage}`),
@@ -219,7 +228,7 @@ export const RiderLibraryDialog = ({
           entry.artistName,
           entry.sourceJobTitle,
           entry.sourceDate,
-          entry.sourceStage ? `stage ${entry.sourceStage}` : "",
+          entry.sourceStage ? `escenario ${entry.sourceStage} stage ${entry.sourceStage}` : "",
           ...entry.files.map((file) => file.file_name),
         ]
           .join(" ")
@@ -381,16 +390,16 @@ export const RiderLibraryDialog = ({
                           <span>{entry.sourceJobTitle}</span>
                           <span>{normalizeJobType(entry.sourceJobType)}</span>
                           <span>{formatDisplayDate(entry.sourceDate)}</span>
-                          <span>Stage {entry.sourceStage ?? "sin asignar"}</span>
+                          <span>Escenario {entry.sourceStage ?? "sin asignar"}</span>
                         </div>
                       </div>
 
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                         <div className="w-full sm:w-36">
-                          <Label className="mb-1 block text-xs">Stage destino</Label>
+                          <Label className="mb-1 block text-xs">Escenario destino</Label>
                           {resolvedStageOptions.length <= 1 ? (
                             <div className="flex h-9 items-center rounded-md border px-3 text-sm">
-                              {resolvedStageOptions[0]?.name ?? "Stage 1"}
+                              {resolvedStageOptions[0]?.name ?? "Escenario 1"}
                             </div>
                           ) : (
                             <Select
