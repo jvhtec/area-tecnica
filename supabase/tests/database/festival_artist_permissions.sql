@@ -130,6 +130,7 @@ SELECT ok(
       AND policyname = 'p_storage_festival_artist_files_authorized_select'
       AND cmd = 'SELECT'
       AND qual ILIKE '%festival_artist_files%'
+      AND qual ILIKE '%file_path%'
       AND qual ILIKE '%admin%'
       AND qual ILIKE '%management%'
       AND qual ILIKE '%logistics%'

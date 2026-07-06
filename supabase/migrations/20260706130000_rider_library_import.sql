@@ -10,6 +10,34 @@ CREATE INDEX IF NOT EXISTS idx_festival_artist_files_uploaded_at
 CREATE INDEX IF NOT EXISTS idx_festival_artist_files_file_path
   ON public.festival_artist_files (file_path);
 
+DROP POLICY IF EXISTS "p_storage_festival_artist_files_authorized_select" ON storage.objects;
+
+CREATE POLICY "p_storage_festival_artist_files_authorized_select"
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'festival_artist_files'
+  AND public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text, 'house_tech'::text])
+  AND (
+    EXISTS (
+      SELECT 1
+      FROM public.festival_artists fa
+      WHERE fa.id = CASE
+        WHEN split_part(storage.objects.name, '/', 1) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          THEN split_part(storage.objects.name, '/', 1)::uuid
+        ELSE NULL
+      END
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.festival_artist_files faf
+      JOIN public.festival_artists fa ON fa.id = faf.artist_id
+      WHERE faf.file_path = storage.objects.name
+    )
+  )
+);
+
 CREATE OR REPLACE FUNCTION public.import_artist_rider_to_job(
   p_source_artist_id uuid,
   p_target_job_id uuid,
