@@ -59,6 +59,7 @@ DECLARE
   v_source_artist public.festival_artists%ROWTYPE;
   v_imported_artist_id uuid;
   v_file_count integer;
+  v_file_path text;
 BEGIN
   v_role := public.get_current_user_role();
   IF v_role IS NULL OR v_role <> ALL (ARRAY['admin', 'management', 'logistics']) THEN
@@ -108,6 +109,18 @@ BEGIN
     RAISE EXCEPTION 'source_artist_has_no_riders'
       USING ERRCODE = 'P0002';
   END IF;
+
+  -- Serialize against delete_festival_artist_file_reference for every path this
+  -- import will reference, in a fixed order, so a concurrent delete can't drop
+  -- the shared storage object out from under this import (or vice versa).
+  FOR v_file_path IN
+    SELECT DISTINCT file_path
+    FROM public.festival_artist_files
+    WHERE artist_id = p_source_artist_id
+    ORDER BY file_path
+  LOOP
+    PERFORM pg_advisory_xact_lock(hashtextextended(v_file_path, 0));
+  END LOOP;
 
   IF EXISTS (
     SELECT 1
@@ -342,6 +355,11 @@ BEGIN
     RAISE EXCEPTION 'file_not_found'
       USING ERRCODE = 'P0002';
   END IF;
+
+  -- Serialize against import_artist_rider_to_job for this path: hold the lock
+  -- across the delete-then-count so a concurrent import can't insert a fresh
+  -- reference in between and end up pointing at a storage object we just removed.
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_file.file_path, 0));
 
   DELETE FROM public.festival_artist_files
   WHERE id = v_file.id;

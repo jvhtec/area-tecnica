@@ -271,6 +271,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
         <>
           <FestivalManagementNavCards
             artistCount={artistCount}
+            canImportRiders={canEdit}
             isPlanningViewOnly={isPlanningViewOnly}
             isViewOnly={isViewOnly}
             jobId={jobId}

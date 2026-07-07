@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type FestivalManagementNavCardsProps = {
   artistCount: number;
+  canImportRiders: boolean;
   isPlanningViewOnly: boolean;
   isViewOnly: boolean;
   jobId: string;
@@ -14,6 +15,7 @@ type FestivalManagementNavCardsProps = {
 
 export const FestivalManagementNavCards = ({
   artistCount,
+  canImportRiders,
   isPlanningViewOnly,
   isViewOnly,
   jobId,
@@ -109,33 +111,35 @@ export const FestivalManagementNavCards = ({
       </CardContent>
     </Card>
 
-    <Card
-      className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
-      onClick={onOpenRiderLibrary}
-    >
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-3 text-base md:text-lg">
-          <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-600 group-hover:bg-cyan-500/20 transition-colors">
-            <Library className="h-5 w-5 md:h-6 md:w-6" />
-          </div>
-          <span className="group-hover:text-primary transition-colors">Biblioteca de Riders</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">
-          Importa riders existentes como copias técnicas para este trabajo
-        </p>
-        <Button
-          className="w-full group-hover:shadow-md transition-shadow"
-          size="sm"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenRiderLibrary();
-          }}
-        >
-          Abrir Biblioteca
-        </Button>
-      </CardContent>
-    </Card>
+    {canImportRiders && (
+      <Card
+        className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
+        onClick={onOpenRiderLibrary}
+      >
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-3 text-base md:text-lg">
+            <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-600 group-hover:bg-cyan-500/20 transition-colors">
+              <Library className="h-5 w-5 md:h-6 md:w-6" />
+            </div>
+            <span className="group-hover:text-primary transition-colors">Biblioteca de Riders</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">
+            Importa riders existentes como copias técnicas para este trabajo
+          </p>
+          <Button
+            className="w-full group-hover:shadow-md transition-shadow"
+            size="sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenRiderLibrary();
+            }}
+          >
+            Abrir Biblioteca
+          </Button>
+        </CardContent>
+      </Card>
+    )}
   </div>
 );
