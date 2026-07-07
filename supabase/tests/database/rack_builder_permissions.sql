@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(23);
+SELECT plan(25);
 
 SELECT has_table('public', 'rack_builder_racks', 'rack builder racks table exists');
 SELECT has_table('public', 'rack_builder_devices', 'rack builder devices table exists');
@@ -165,6 +165,169 @@ SELECT ok(
   ),
   'rack layout item geometry validation trigger is installed'
 );
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'rack_builder_validate_layout_item_semantics'
+      AND p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=public, pg_temp']
+  ),
+  'rack layout item validation trigger function runs as a pinned security definer'
+);
+
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+
+INSERT INTO auth.users (
+  id,
+  instance_id,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  created_at,
+  updated_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  aud,
+  role
+) VALUES (
+  '82400000-0000-0000-0000-000000000001'::uuid,
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  'rack-builder-placement@test.local',
+  'test',
+  now(),
+  now(),
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{}'::jsonb,
+  'authenticated',
+  'authenticated'
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.profiles (id, email, first_name, last_name, role, department)
+VALUES (
+  '82400000-0000-0000-0000-000000000001'::uuid,
+  'rack-builder-placement@test.local',
+  'Rack',
+  'Builder',
+  'house_tech',
+  'sound'
+)
+ON CONFLICT (id) DO UPDATE
+SET email = excluded.email,
+    first_name = excluded.first_name,
+    last_name = excluded.last_name,
+    role = excluded.role,
+    department = excluded.department;
+
+INSERT INTO public.rack_builder_device_categories (id, name)
+VALUES ('82410000-0000-0000-0000-000000000001'::uuid, 'Placement Test Category')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.rack_builder_devices (
+  id,
+  brand,
+  model,
+  rack_units,
+  depth_mm,
+  category_id,
+  is_half_rack
+) VALUES (
+  '82410000-0000-0000-0000-000000000002'::uuid,
+  'Placement',
+  'Validator',
+  2,
+  200,
+  '82410000-0000-0000-0000-000000000001'::uuid,
+  false
+)
+ON CONFLICT (id) DO UPDATE
+SET brand = excluded.brand,
+    model = excluded.model,
+    rack_units = excluded.rack_units,
+    depth_mm = excluded.depth_mm,
+    category_id = excluded.category_id,
+    is_half_rack = excluded.is_half_rack;
+
+INSERT INTO public.rack_builder_racks (id, name, rack_units, depth_mm, width)
+VALUES ('82410000-0000-0000-0000-000000000003'::uuid, 'Placement Test Rack', 8, 600, 'single')
+ON CONFLICT (id) DO UPDATE
+SET name = excluded.name,
+    rack_units = excluded.rack_units,
+    depth_mm = excluded.depth_mm,
+    width = excluded.width;
+
+INSERT INTO public.rack_builder_projects (id, name)
+VALUES ('82410000-0000-0000-0000-000000000004'::uuid, 'Placement Test Project')
+ON CONFLICT (id) DO UPDATE
+SET name = excluded.name;
+
+INSERT INTO public.rack_builder_layouts (id, project_id, rack_id, name)
+VALUES (
+  '82410000-0000-0000-0000-000000000005'::uuid,
+  '82410000-0000-0000-0000-000000000004'::uuid,
+  '82410000-0000-0000-0000-000000000003'::uuid,
+  'Placement Test Layout'
+)
+ON CONFLICT (id) DO UPDATE
+SET project_id = excluded.project_id,
+    rack_id = excluded.rack_id,
+    name = excluded.name;
+
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', '82400000-0000-0000-0000-000000000001', false);
+
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$
+    INSERT INTO public.rack_builder_layout_items (
+      layout_id,
+      device_id,
+      start_u,
+      facing
+    ) VALUES (
+      '82410000-0000-0000-0000-000000000005'::uuid,
+      '82410000-0000-0000-0000-000000000002'::uuid,
+      1,
+      'front'
+    )
+  $$,
+  'authenticated sound users can insert valid equipment placements'
+);
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT set_config('request.jwt.claim.sub', '', false);
+
+DELETE FROM public.rack_builder_layout_items
+WHERE layout_id = '82410000-0000-0000-0000-000000000005'::uuid;
+
+DELETE FROM public.rack_builder_layouts
+WHERE id = '82410000-0000-0000-0000-000000000005'::uuid;
+
+DELETE FROM public.rack_builder_projects
+WHERE id = '82410000-0000-0000-0000-000000000004'::uuid;
+
+DELETE FROM public.rack_builder_racks
+WHERE id = '82410000-0000-0000-0000-000000000003'::uuid;
+
+DELETE FROM public.rack_builder_devices
+WHERE id = '82410000-0000-0000-0000-000000000002'::uuid;
+
+DELETE FROM public.rack_builder_device_categories
+WHERE id = '82410000-0000-0000-0000-000000000001'::uuid;
+
+DELETE FROM public.profiles
+WHERE id = '82400000-0000-0000-0000-000000000001'::uuid;
+
+DELETE FROM auth.users
+WHERE id = '82400000-0000-0000-0000-000000000001'::uuid;
 
 SELECT ok(
   EXISTS (
