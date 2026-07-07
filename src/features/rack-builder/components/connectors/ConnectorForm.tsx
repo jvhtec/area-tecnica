@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useRef, useState } from 'react'
 import type { ConnectorDefinition } from '../../types'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
@@ -44,9 +44,9 @@ export default function ConnectorForm({ initialData, onSubmit, onCancel }: Conne
   const [saving, setSaving] = useState(false)
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
 
-  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropImage, setCropImage] = useState<Blob | null>(null)
+  const [cropVersion, setCropVersion] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const localCropObjectUrlRef = useRef<string | null>(null)
   const { uploadImage, uploading } = useImageUpload()
   const normalizedGridWidth = Number.isFinite(gridWidth) && gridWidth > 0 ? Math.max(1, Math.round(gridWidth)) : 1
   const normalizedGridHeight = Number.isFinite(gridHeight) && gridHeight > 0 ? Math.max(1, Math.round(gridHeight)) : 1
@@ -57,40 +57,24 @@ export default function ConnectorForm({ initialData, onSubmit, onCancel }: Conne
   const cropOutputWidth = Math.max(1, Math.round(cropTargetWidthUnits * cropScale))
   const cropOutputHeight = Math.max(1, Math.round(cropTargetHeightUnits * cropScale))
 
-  useEffect(() => {
-    return () => {
-      if (localCropObjectUrlRef.current) URL.revokeObjectURL(localCropObjectUrlRef.current)
-    }
-  }, [])
-
   const handleFileSelect = (file: File) => {
     if (!ACCEPTED_CONNECTOR_IMAGE_TYPES.has(file.type)) {
       setImageUploadError('Use a JPEG, PNG, or WebP image.')
       return
     }
-    if (localCropObjectUrlRef.current) URL.revokeObjectURL(localCropObjectUrlRef.current)
-    const objectUrl = URL.createObjectURL(file)
-    localCropObjectUrlRef.current = objectUrl
     setImageUploadError(null)
-    setCropSrc(objectUrl)
+    setCropImage(file)
+    setCropVersion((version) => version + 1)
   }
 
   const handleCropComplete = async (blob: Blob) => {
     const path = await uploadImage(blob, 'catalog', { bucket: 'rack-builder-connector-images' })
     setImagePath(path)
-    if (localCropObjectUrlRef.current) {
-      URL.revokeObjectURL(localCropObjectUrlRef.current)
-      localCropObjectUrlRef.current = null
-    }
-    setCropSrc(null)
+    setCropImage(null)
   }
 
   const handleCloseCropper = () => {
-    if (localCropObjectUrlRef.current) {
-      URL.revokeObjectURL(localCropObjectUrlRef.current)
-      localCropObjectUrlRef.current = null
-    }
-    setCropSrc(null)
+    setCropImage(null)
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -233,11 +217,11 @@ export default function ConnectorForm({ initialData, onSubmit, onCancel }: Conne
         </div>
       </form>
 
-      <Modal isOpen={!!cropSrc} onClose={handleCloseCropper} title="Crop connector image">
-        {cropSrc && (
+      <Modal isOpen={!!cropImage} onClose={handleCloseCropper} title="Crop connector image">
+        {cropImage && (
           <ImageCropper
-            key={`${isDSize}-${normalizedGridWidth}-${normalizedGridHeight}`}
-            imageSrc={cropSrc}
+            key={`${cropVersion}-${isDSize}-${normalizedGridWidth}-${normalizedGridHeight}`}
+            image={cropImage}
             aspect={cropAspect}
             outputWidth={cropOutputWidth}
             outputHeight={cropOutputHeight}

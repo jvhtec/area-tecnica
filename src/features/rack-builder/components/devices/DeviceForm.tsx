@@ -55,8 +55,9 @@ export default function DeviceForm({
   const [saving, setSaving] = useState(false)
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
 
-  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropImage, setCropImage] = useState<Blob | null>(null)
   const [cropSide, setCropSide] = useState<'front' | 'rear'>('front')
+  const [cropVersion, setCropVersion] = useState(0)
   const normalizedRackUnits = normalizeRackUnits(rackUnits)
   const cropAspect = getRackPanelAspect(normalizedRackUnits, isHalfRack)
   const CROP_PX_PER_INCH = 100
@@ -67,13 +68,6 @@ export default function DeviceForm({
 
   const frontInputRef = useRef<HTMLInputElement>(null)
   const rearInputRef = useRef<HTMLInputElement>(null)
-  const localCropObjectUrlRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (localCropObjectUrlRef.current) URL.revokeObjectURL(localCropObjectUrlRef.current)
-    }
-  }, [])
 
   useEffect(() => {
     if (categoryId) return
@@ -86,44 +80,42 @@ export default function DeviceForm({
       setImageUploadError('Use a JPEG, PNG, or WebP image.')
       return
     }
-    if (localCropObjectUrlRef.current) URL.revokeObjectURL(localCropObjectUrlRef.current)
-    const objectUrl = URL.createObjectURL(file)
-    localCropObjectUrlRef.current = objectUrl
     setImageUploadError(null)
     setCropSide(side)
-    setCropSrc(objectUrl)
+    setCropImage(file)
+    setCropVersion((version) => version + 1)
   }
 
-  const handleEditExistingCrop = (side: 'front' | 'rear') => {
+  const handleEditExistingCrop = async (side: 'front' | 'rear') => {
     const imagePath = side === 'front' ? frontPath : rearPath
     const imageUrl = getDeviceImageUrl(imagePath)
     if (!imageUrl) return
-    if (localCropObjectUrlRef.current) {
-      URL.revokeObjectURL(localCropObjectUrlRef.current)
-      localCropObjectUrlRef.current = null
+    try {
+      const response = await fetch(imageUrl)
+      if (!response.ok) throw new Error('Image request failed')
+      const blob = await response.blob()
+      if (!ACCEPTED_DEVICE_IMAGE_TYPES.has(blob.type)) {
+        setImageUploadError('This image cannot be cropped. Use a JPEG, PNG, or WebP image.')
+        return
+      }
+      setImageUploadError(null)
+      setCropSide(side)
+      setCropImage(blob)
+      setCropVersion((version) => version + 1)
+    } catch {
+      setImageUploadError('Could not load this image for cropping.')
     }
-    setImageUploadError(null)
-    setCropSide(side)
-    setCropSrc(imageUrl)
   }
 
   const handleCropComplete = async (blob: Blob) => {
     const path = await uploadImage(blob, cropSide)
     if (cropSide === 'front') setFrontPath(path)
     else setRearPath(path)
-    if (localCropObjectUrlRef.current) {
-      URL.revokeObjectURL(localCropObjectUrlRef.current)
-      localCropObjectUrlRef.current = null
-    }
-    setCropSrc(null)
+    setCropImage(null)
   }
 
   const handleCloseCropper = () => {
-    if (localCropObjectUrlRef.current) {
-      URL.revokeObjectURL(localCropObjectUrlRef.current)
-      localCropObjectUrlRef.current = null
-    }
-    setCropSrc(null)
+    setCropImage(null)
   }
 
   const handleCreateCategory = async () => {
@@ -302,7 +294,7 @@ export default function DeviceForm({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => handleEditExistingCrop('front')}
+                onClick={() => void handleEditExistingCrop('front')}
               >
                 Edit crop
               </Button>
@@ -336,7 +328,7 @@ export default function DeviceForm({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => handleEditExistingCrop('rear')}
+                onClick={() => void handleEditExistingCrop('rear')}
               >
                 Edit crop
               </Button>
@@ -362,14 +354,14 @@ export default function DeviceForm({
       </form>
 
       <Modal
-        isOpen={!!cropSrc}
+        isOpen={!!cropImage}
         onClose={handleCloseCropper}
         title={`Crop ${cropSide} image`}
       >
-        {cropSrc && (
+        {cropImage && (
           <ImageCropper
-            key={`${cropSide}-${normalizedRackUnits}-${isHalfRack}`}
-            imageSrc={cropSrc}
+            key={`${cropVersion}-${cropSide}-${normalizedRackUnits}-${isHalfRack}`}
+            image={cropImage}
             aspect={cropAspect}
             outputWidth={cropOutputWidth}
             outputHeight={cropOutputHeight}

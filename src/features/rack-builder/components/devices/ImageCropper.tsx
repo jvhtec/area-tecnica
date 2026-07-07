@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import Button from '../ui/Button'
 
 interface ImageCropperProps {
-  imageSrc: string
+  image: Blob
   aspect?: number
   outputWidth?: number
   outputHeight?: number
@@ -80,19 +80,8 @@ function getCenteredAspectCrop(
   )
 }
 
-function getSafeImageSrc(imageSrc: string): string | null {
-  if (imageSrc.startsWith('blob:')) return imageSrc
-  try {
-    const url = new URL(imageSrc, window.location.origin)
-    if (url.protocol === 'http:' || url.protocol === 'https:') return url.href
-  } catch {
-    return null
-  }
-  return null
-}
-
 export default function ImageCropper({
-  imageSrc,
+  image,
   aspect,
   outputWidth,
   outputHeight,
@@ -101,9 +90,16 @@ export default function ImageCropper({
 }: ImageCropperProps) {
   const [crop, setCrop] = useState<Crop>()
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const imgRef = useRef<HTMLImageElement>(null)
-  const safeImageSrc = getSafeImageSrc(imageSrc)
-  const crossOrigin = safeImageSrc?.startsWith('blob:') ? undefined : 'anonymous'
+
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(image)
+    setImageUrl(objectUrl)
+    setCrop(undefined)
+    setCompletedCrop(undefined)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [image])
 
   const handleConfirm = useCallback(async () => {
     if (!imgRef.current || !completedCrop) return
@@ -114,7 +110,7 @@ export default function ImageCropper({
   return (
     <div className="space-y-4">
       <div className="overflow-hidden">
-        {safeImageSrc ? (
+        {imageUrl ? (
           <ReactCrop
             crop={crop}
             aspect={aspect}
@@ -124,8 +120,7 @@ export default function ImageCropper({
           >
             <img
               ref={imgRef}
-              src={safeImageSrc}
-              crossOrigin={crossOrigin}
+              src={imageUrl}
               alt="Crop preview"
               className="max-w-full block max-h-[55svh] sm:max-h-[70vh]"
               onLoad={(event) => {
@@ -141,7 +136,7 @@ export default function ImageCropper({
         )}
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
-        <Button onClick={handleConfirm} disabled={!completedCrop || !safeImageSrc} className="w-full sm:w-auto">
+        <Button onClick={handleConfirm} disabled={!completedCrop || !imageUrl} className="w-full sm:w-auto">
           Confirm Crop
         </Button>
         <Button variant="secondary" onClick={onCancel} className="w-full sm:w-auto">
