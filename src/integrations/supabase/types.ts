@@ -6459,6 +6459,453 @@ export type Database = {
         }
         Relationships: []
       }
+      rack_builder_connectors: {
+        Row: {
+          category: string
+          created_at: string
+          grid_height: number
+          grid_width: number
+          id: string
+          image_path: string
+          is_d_size: boolean
+          mounting: string
+          name: string
+          notes: string
+          updated_at: string
+          weight_kg: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          grid_height: number
+          grid_width: number
+          id: string
+          image_path: string
+          is_d_size?: boolean
+          mounting: string
+          name: string
+          notes?: string
+          updated_at?: string
+          weight_kg?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          grid_height?: number
+          grid_width?: number
+          id?: string
+          image_path?: string
+          is_d_size?: boolean
+          mounting?: string
+          name?: string
+          notes?: string
+          updated_at?: string
+          weight_kg?: number
+        }
+        Relationships: []
+      }
+      rack_builder_device_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rack_builder_devices: {
+        Row: {
+          brand: string
+          category_id: string
+          created_at: string
+          depth_mm: number
+          fav: boolean
+          front_image_path: string | null
+          id: string
+          invert_image_in_dark_mode: boolean
+          is_half_rack: boolean
+          model: string
+          power_w: number
+          rack_units: number
+          rear_image_path: string | null
+          updated_at: string
+          weight_kg: number
+        }
+        Insert: {
+          brand: string
+          category_id: string
+          created_at?: string
+          depth_mm: number
+          fav?: boolean
+          front_image_path?: string | null
+          id?: string
+          invert_image_in_dark_mode?: boolean
+          is_half_rack?: boolean
+          model: string
+          power_w?: number
+          rack_units: number
+          rear_image_path?: string | null
+          updated_at?: string
+          weight_kg?: number
+        }
+        Update: {
+          brand?: string
+          category_id?: string
+          created_at?: string
+          depth_mm?: number
+          fav?: boolean
+          front_image_path?: string | null
+          id?: string
+          invert_image_in_dark_mode?: boolean
+          is_half_rack?: boolean
+          model?: string
+          power_w?: number
+          rack_units?: number
+          rear_image_path?: string | null
+          updated_at?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rack_builder_devices_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_device_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rack_builder_layout_items: {
+        Row: {
+          custom_name: string | null
+          device_id: string | null
+          facing: Database["public"]["Enums"]["rack_builder_device_facing"]
+          force_full_width: boolean
+          id: string
+          layout_id: string
+          notes: string | null
+          panel_layout_id: string | null
+          preferred_lane: number | null
+          preferred_sub_lane: number | null
+          rack_ear_offset_mm: number
+          start_u: number
+        }
+        Insert: {
+          custom_name?: string | null
+          device_id?: string | null
+          facing?: Database["public"]["Enums"]["rack_builder_device_facing"]
+          force_full_width?: boolean
+          id?: string
+          layout_id: string
+          notes?: string | null
+          panel_layout_id?: string | null
+          preferred_lane?: number | null
+          preferred_sub_lane?: number | null
+          rack_ear_offset_mm?: number
+          start_u: number
+        }
+        Update: {
+          custom_name?: string | null
+          device_id?: string | null
+          facing?: Database["public"]["Enums"]["rack_builder_device_facing"]
+          force_full_width?: boolean
+          id?: string
+          layout_id?: string
+          notes?: string | null
+          panel_layout_id?: string | null
+          preferred_lane?: number | null
+          preferred_sub_lane?: number | null
+          rack_ear_offset_mm?: number
+          start_u?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rack_builder_layout_items_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_layouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rack_builder_layout_items_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rack_builder_layout_items_panel_layout_id_fkey"
+            columns: ["panel_layout_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_panel_layouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rack_builder_layouts: {
+        Row: {
+          created_at: string
+          drawing_state: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          id: string
+          name: string
+          project_id: string
+          rack_id: string
+          revision_number: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          id?: string
+          name: string
+          project_id: string
+          rack_id: string
+          revision_number?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          id?: string
+          name?: string
+          project_id?: string
+          rack_id?: string
+          revision_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rack_builder_layouts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rack_builder_layouts_rack_id_fkey"
+            columns: ["rack_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_racks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rack_builder_panel_layout_ports: {
+        Row: {
+          color: string | null
+          connector_id: string
+          created_at: string
+          hole_index: number
+          id: string
+          label: string | null
+          panel_layout_id: string
+          row_index: number
+          span_h: number
+          span_w: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          connector_id: string
+          created_at?: string
+          hole_index: number
+          id?: string
+          label?: string | null
+          panel_layout_id: string
+          row_index: number
+          span_h?: number
+          span_w?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          connector_id?: string
+          created_at?: string
+          hole_index?: number
+          id?: string
+          label?: string | null
+          panel_layout_id?: string
+          row_index?: number
+          span_h?: number
+          span_w?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rack_builder_panel_layout_ports_row_fk"
+            columns: ["panel_layout_id", "row_index"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_panel_layout_rows"
+            referencedColumns: ["panel_layout_id", "row_index"]
+          },
+        ]
+      }
+      rack_builder_panel_layout_rows: {
+        Row: {
+          active_column_map: Json
+          created_at: string
+          hole_count: number
+          id: string
+          panel_layout_id: string
+          row_index: number
+          updated_at: string
+        }
+        Insert: {
+          active_column_map?: Json
+          created_at?: string
+          hole_count: number
+          id?: string
+          panel_layout_id: string
+          row_index: number
+          updated_at?: string
+        }
+        Update: {
+          active_column_map?: Json
+          created_at?: string
+          hole_count?: number
+          id?: string
+          panel_layout_id?: string
+          row_index?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rack_builder_panel_layout_rows_panel_layout_id_fkey"
+            columns: ["panel_layout_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_panel_layouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rack_builder_panel_layouts: {
+        Row: {
+          created_at: string
+          depth_mm: number
+          drawing_state: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          facing: Database["public"]["Enums"]["rack_builder_device_facing"]
+          has_lacing_bar: boolean
+          height_ru: number
+          id: string
+          name: string
+          notes: string | null
+          project_id: string
+          revision_number: number
+          updated_at: string
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          depth_mm?: number
+          drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          facing?: Database["public"]["Enums"]["rack_builder_device_facing"]
+          has_lacing_bar?: boolean
+          height_ru: number
+          id?: string
+          name: string
+          notes?: string | null
+          project_id: string
+          revision_number?: number
+          updated_at?: string
+          weight_kg?: number
+        }
+        Update: {
+          created_at?: string
+          depth_mm?: number
+          drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          facing?: Database["public"]["Enums"]["rack_builder_device_facing"]
+          has_lacing_bar?: boolean
+          height_ru?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          project_id?: string
+          revision_number?: number
+          updated_at?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rack_builder_panel_layouts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rack_builder_projects: {
+        Row: {
+          created_at: string
+          drawing_state: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          id: string
+          name: string
+          owner: string | null
+          revision_number: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          id?: string
+          name: string
+          owner?: string | null
+          revision_number?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          id?: string
+          name?: string
+          owner?: string | null
+          revision_number?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rack_builder_racks: {
+        Row: {
+          created_at: string
+          depth_mm: number
+          id: string
+          name: string
+          rack_units: number
+          updated_at: string
+          width: Database["public"]["Enums"]["rack_builder_rack_width"]
+        }
+        Insert: {
+          created_at?: string
+          depth_mm: number
+          id?: string
+          name: string
+          rack_units: number
+          updated_at?: string
+          width?: Database["public"]["Enums"]["rack_builder_rack_width"]
+        }
+        Update: {
+          created_at?: string
+          depth_mm?: number
+          id?: string
+          name?: string
+          rack_units?: number
+          updated_at?: string
+          width?: Database["public"]["Enums"]["rack_builder_rack_width"]
+        }
+        Relationships: []
+      }
       role_skill_mapping: {
         Row: {
           created_at: string
@@ -11147,6 +11594,45 @@ export type Database = {
         Returns: boolean
       }
       normalize_text_for_match: { Args: { input: string }; Returns: string }
+      rack_builder_rpc_create_panel_layout: {
+        Args: {
+          p_default_hole_count: number
+          p_drawing_state: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          p_facing: Database["public"]["Enums"]["rack_builder_device_facing"]
+          p_has_lacing_bar: boolean
+          p_height_ru: number
+          p_name: string
+          p_notes: string
+          p_project_id: string
+          p_weight_kg: number
+        }
+        Returns: string
+      }
+      rack_builder_rpc_duplicate_panel_layout: {
+        Args: { p_new_name: string; p_project_id: string; p_source_id: string }
+        Returns: string
+      }
+      rack_builder_rpc_replace_panel_layout_ports: {
+        Args: { p_panel_layout_id: string; p_ports: Json }
+        Returns: undefined
+      }
+      rack_builder_rpc_replace_panel_layout_rows: {
+        Args: { p_panel_layout_id: string; p_rows: Json }
+        Returns: undefined
+      }
+      rack_builder_rpc_save_panel_layout: {
+        Args: {
+          p_drawing_state: Database["public"]["Enums"]["rack_builder_drawing_state"]
+          p_facing: Database["public"]["Enums"]["rack_builder_device_facing"]
+          p_has_lacing_bar: boolean
+          p_id: string
+          p_name: string
+          p_notes: string
+          p_ports: Json
+          p_rows: Json
+        }
+        Returns: undefined
+      }
       rank_staffing_candidates: {
         Args: {
           p_department: string
@@ -11553,6 +12039,9 @@ export type Database = {
         | "broadcast"
         | "natural"
         | "assigned_technicians"
+      rack_builder_device_facing: "front" | "rear"
+      rack_builder_drawing_state: "preliminary" | "rev" | "as_built"
+      rack_builder_rack_width: "single" | "dual"
       room_type: "single" | "double"
       staffing_notification_scope: "all_departments" | "own_department"
       task_status: "not_started" | "in_progress" | "completed"

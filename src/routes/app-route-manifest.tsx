@@ -13,6 +13,7 @@ import {
   canManagePayouts,
   hasTechnicianSelfServiceAccess,
   isAdminRole,
+  isManagementRole,
 } from "@/utils/permissions";
 
 type RouteComponent = React.LazyExoticComponent<React.ComponentType<Record<string, never>>>;
@@ -79,6 +80,27 @@ const FestivalsDepartmentGuard = ({ children }: { children: React.ReactNode }) =
   const isSoundMember = userDepartment?.toLowerCase() === SOUND_DEPARTMENT;
 
   if (!isAdmin && !isSoundMember) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Mirrors the rack_builder_* RLS boundary exactly (current_user_department()
+// = ANY (ARRAY['sound','admin','management']) OR is_admin_or_management()),
+// so a house_tech in another department can't land on a page that RLS then
+// renders empty/broken for them - see PR #824 review discussion.
+const RackBuilderDepartmentGuard = ({ children }: { children: React.ReactNode }) => {
+  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+
+  if (isLoading) {
+    return <RedirectingAccessLoader />;
+  }
+
+  const isManagement = isManagementRole(userRole);
+  const isSoundMember = userDepartment?.toLowerCase() === SOUND_DEPARTMENT;
+
+  if (!isManagement && !isSoundMember) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -154,6 +176,7 @@ export const accessPolicies = {
   }),
   soundTools: withRoleAccess(SOUND_TOOL_ROLES),
   soundToolsWithTechnician: withRoleAccess(SOUND_TOOL_ROLES_WITH_TECH),
+  rackBuilder: withRoleAccess(SOUND_TOOL_ROLES, { guard: RackBuilderDepartmentGuard }),
 } as const;
 
 export type AccessPolicyId = keyof typeof accessPolicies;
@@ -238,6 +261,17 @@ const SoundVisionFiles = lazyPage(() => import("@/pages/SoundVisionFiles"));
 const Privacy = lazyPage(() => import("@/pages/Privacy"));
 const StagePlot = lazyPage(() => import("@/pages/StagePlot"));
 const SysCalc = lazyPage(() => import("@/pages/SysCalc"));
+const RackBuilderProjectManagerPage = lazyPage(() => import("@/pages/rack-builder/ProjectManagerPage"));
+const RackBuilderRackManagerPage = lazyPage(() => import("@/pages/rack-builder/RackManagerPage"));
+const RackBuilderDeviceManagerPage = lazyPage(() => import("@/pages/rack-builder/DeviceManagerPage"));
+const RackBuilderConnectorManagerPage = lazyPage(() => import("@/pages/rack-builder/ConnectorManagerPage"));
+const RackBuilderPanelLayoutsOverviewPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutsOverviewPage"));
+const RackBuilderLayoutEditorPage = lazyPage(() => import("@/pages/rack-builder/LayoutEditorPage"));
+const RackBuilderPanelLayoutManagerPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutManagerPage"));
+const RackBuilderPanelLayoutEditorPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutEditorPage"));
+const RackBuilderPanelLayoutPrintPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutPrintPage"));
+const RackBuilderProjectPrintPage = lazyPage(() => import("@/pages/rack-builder/ProjectPrintPage"));
+const RackBuilderLayoutPrintPage = lazyPage(() => import("@/pages/rack-builder/LayoutPrintPage"));
 const GlobalTasks = lazyPage(() => import("@/pages/GlobalTasks"));
 const Achievements = lazyPage(() => import("@/pages/Achievements"));
 
@@ -910,6 +944,102 @@ export const appRoutes: readonly AppRoute[] = [
     layout: "app",
     access: "soundToolsWithTechnician",
     breadcrumb: { label: "SysCalc" },
+  },
+  {
+    id: "rackBuilderProjects",
+    path: "/rack-builder",
+    component: RackBuilderProjectManagerPage,
+    layout: "app",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder" },
+  },
+  {
+    id: "rackBuilderProjectsAlias",
+    path: "/rack-builder/projects",
+    component: RackBuilderProjectManagerPage,
+    layout: "app",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder" },
+  },
+  {
+    id: "rackBuilderRacks",
+    path: "/rack-builder/racks",
+    component: RackBuilderRackManagerPage,
+    layout: "app",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Bastidores" },
+  },
+  {
+    id: "rackBuilderDevices",
+    path: "/rack-builder/devices",
+    component: RackBuilderDeviceManagerPage,
+    layout: "app",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Dispositivos" },
+  },
+  {
+    id: "rackBuilderConnectors",
+    path: "/rack-builder/connectors",
+    component: RackBuilderConnectorManagerPage,
+    layout: "app",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Conectores" },
+  },
+  {
+    id: "rackBuilderPanelsOverview",
+    path: "/rack-builder/panels",
+    component: RackBuilderPanelLayoutsOverviewPage,
+    layout: "app",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Diseños de panel" },
+  },
+  {
+    id: "rackBuilderLayoutEditor",
+    path: "/rack-builder/editor/project/:projectId",
+    component: RackBuilderLayoutEditorPage,
+    layout: "fullscreen",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Editor" },
+  },
+  {
+    id: "rackBuilderPanelManager",
+    path: "/rack-builder/editor/project/:projectId/panels",
+    component: RackBuilderPanelLayoutManagerPage,
+    layout: "app",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Diseños de panel" },
+  },
+  {
+    id: "rackBuilderPanelEditor",
+    path: "/rack-builder/editor/project/:projectId/panels/:panelLayoutId",
+    component: RackBuilderPanelLayoutEditorPage,
+    layout: "fullscreen",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Editor de panel" },
+  },
+  {
+    id: "rackBuilderPanelPrint",
+    path: "/rack-builder/editor/project/:projectId/panels/:panelLayoutId/print",
+    component: RackBuilderPanelLayoutPrintPage,
+    layout: "fullscreen",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Impresión de panel" },
+  },
+  {
+    id: "rackBuilderProjectPrintAll",
+    path: "/rack-builder/editor/project/:projectId/print/all",
+    component: RackBuilderProjectPrintPage,
+    layout: "fullscreen",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Impresión de proyecto" },
+  },
+  {
+    id: "rackBuilderLayoutPrint",
+    path: "/rack-builder/editor/project/:projectId/print/:layoutId",
+    component: RackBuilderLayoutPrintPage,
+    layout: "fullscreen",
+    access: "rackBuilder",
+    breadcrumb: { label: "Rack Builder – Impresión de diseño" },
   },
   {
     id: "videoConsumosTool",
