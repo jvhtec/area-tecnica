@@ -257,6 +257,9 @@ function applyColorNormalization(): () => void {
   const safeCtx = ctx
 
   function toSrgb(color: string): string {
+    // Reset to a known value first: if `color` fails to parse, the canvas
+    // silently keeps the previous fillStyle instead of throwing, so without
+    // this reset a bad value would resolve to whatever color came before it.
     safeCtx.fillStyle = '#000000'
     safeCtx.fillStyle = color
     return safeCtx.fillStyle
@@ -316,6 +319,8 @@ function normalizeCloneInlineStyles(documentClone: Document) {
 
   function replaceModernColors(text: string): string {
     return text.replace(MODERN_COLOR_RE, (match) => {
+      // Same reset-then-assign pattern as toSrgb() above - guards against
+      // an unparsable match silently inheriting the previous fillStyle.
       safeCtx.fillStyle = '#000000'
       safeCtx.fillStyle = match
       return safeCtx.fillStyle
