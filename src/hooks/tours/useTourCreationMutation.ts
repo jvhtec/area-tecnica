@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Department } from "@/types/department";
 import { InvoicingCompany } from "@/types/job";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
+import { createFlexFolder } from "@/utils/flex-folders/api";
 import { 
   FLEX_FOLDER_IDS, 
   DEPARTMENT_IDS, 
@@ -23,35 +24,6 @@ interface TourCreationData {
 export const useTourCreationMutation = () => {
   const { getOrCreateLocation } = useLocationManagement();
 
-  const createFlexFolder = async (payload: Record<string, any>) => {
-    console.log("Creating Flex folder with payload:", payload);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('secure-flex-api', {
-        body: {
-          endpoint: '/element',
-          method: 'POST',
-          payload
-        }
-      });
-
-      if (error) {
-        console.error("Secure Flex API error:", error);
-        throw new Error(error.message || "Failed to create folder in Flex");
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to create folder in Flex");
-      }
-
-      console.log("Created Flex folder:", data.data);
-      return data.data;
-    } catch (error) {
-      console.error("Error creating Flex folder:", error);
-      throw error;
-    }
-  };
-
   const createFlexFolders = async (tour: any, startDate: string, endDate: string) => {
     console.log("Creating Flex folders for tour:", tour.id);
     
@@ -62,7 +34,6 @@ export const useTourCreationMutation = () => {
 
       const mainFolderPayload = {
         definitionId: FLEX_FOLDER_IDS.mainFolder,
-        parentElementId: null as string | null,
         open: true,
         locked: false,
         name: tour.name,

@@ -6,6 +6,7 @@ import {
   RESPONSIBLE_PERSON_IDS, 
   DEPARTMENT_SUFFIXES 
 } from "@/utils/flex-folders/constants";
+import { createFlexFolder } from "@/utils/flex-folders/api";
 
 export interface TourFolderCreationResult {
   success: boolean;
@@ -98,37 +99,12 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
       endDate = dates[dates.length - 1];
     }
 
-    const createFlexFolder = async (payload: Record<string, any>) => {
-      console.log("Creating Flex folder with payload:", payload);
-      
-      const { data, error } = await supabase.functions.invoke('secure-flex-api', {
-        body: {
-          endpoint: '/element',
-          method: 'POST',
-          payload
-        }
-      });
-
-      if (error) {
-        console.error("Secure Flex API error:", error);
-        throw new Error(error.message || "Failed to create folder in Flex");
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to create folder in Flex");
-      }
-
-      console.log("Created Flex folder:", data.data);
-      return data.data;
-    };
-
     const formattedStartDate = new Date(startDate).toISOString().split('.')[0] + '.000Z';
     const formattedEndDate = new Date(endDate).toISOString().split('.')[0] + '.000Z';
     const documentNumber = new Date(startDate).toISOString().slice(2, 10).replace(/-/g, '');
 
     const mainFolderPayload = {
       definitionId: FLEX_FOLDER_IDS.mainFolder,
-      parentElementId: null as string | null,
       open: true,
       locked: false,
       name: tour.name,
