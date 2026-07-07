@@ -238,6 +238,17 @@ const SoundVisionFiles = lazyPage(() => import("@/pages/SoundVisionFiles"));
 const Privacy = lazyPage(() => import("@/pages/Privacy"));
 const StagePlot = lazyPage(() => import("@/pages/StagePlot"));
 const SysCalc = lazyPage(() => import("@/pages/SysCalc"));
+const RackBuilderProjectManagerPage = lazyPage(() => import("@/pages/rack-builder/ProjectManagerPage"));
+const RackBuilderRackManagerPage = lazyPage(() => import("@/pages/rack-builder/RackManagerPage"));
+const RackBuilderDeviceManagerPage = lazyPage(() => import("@/pages/rack-builder/DeviceManagerPage"));
+const RackBuilderConnectorManagerPage = lazyPage(() => import("@/pages/rack-builder/ConnectorManagerPage"));
+const RackBuilderPanelLayoutsOverviewPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutsOverviewPage"));
+const RackBuilderLayoutEditorPage = lazyPage(() => import("@/pages/rack-builder/LayoutEditorPage"));
+const RackBuilderPanelLayoutManagerPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutManagerPage"));
+const RackBuilderPanelLayoutEditorPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutEditorPage"));
+const RackBuilderPanelLayoutPrintPage = lazyPage(() => import("@/pages/rack-builder/PanelLayoutPrintPage"));
+const RackBuilderProjectPrintPage = lazyPage(() => import("@/pages/rack-builder/ProjectPrintPage"));
+const RackBuilderLayoutPrintPage = lazyPage(() => import("@/pages/rack-builder/LayoutPrintPage"));
 const GlobalTasks = lazyPage(() => import("@/pages/GlobalTasks"));
 const Achievements = lazyPage(() => import("@/pages/Achievements"));
 
@@ -910,6 +921,102 @@ export const appRoutes: readonly AppRoute[] = [
     layout: "app",
     access: "soundToolsWithTechnician",
     breadcrumb: { label: "SysCalc" },
+  },
+  {
+    id: "rackBuilderProjects",
+    path: "/rack-builder",
+    component: RackBuilderProjectManagerPage,
+    layout: "app",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder" },
+  },
+  {
+    id: "rackBuilderProjectsAlias",
+    path: "/rack-builder/projects",
+    component: RackBuilderProjectManagerPage,
+    layout: "app",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder" },
+  },
+  {
+    id: "rackBuilderRacks",
+    path: "/rack-builder/racks",
+    component: RackBuilderRackManagerPage,
+    layout: "app",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Racks" },
+  },
+  {
+    id: "rackBuilderDevices",
+    path: "/rack-builder/devices",
+    component: RackBuilderDeviceManagerPage,
+    layout: "app",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Devices" },
+  },
+  {
+    id: "rackBuilderConnectors",
+    path: "/rack-builder/connectors",
+    component: RackBuilderConnectorManagerPage,
+    layout: "app",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Connectors" },
+  },
+  {
+    id: "rackBuilderPanelsOverview",
+    path: "/rack-builder/panels",
+    component: RackBuilderPanelLayoutsOverviewPage,
+    layout: "app",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Panel Layouts" },
+  },
+  {
+    id: "rackBuilderLayoutEditor",
+    path: "/rack-builder/editor/project/:projectId",
+    component: RackBuilderLayoutEditorPage,
+    layout: "fullscreen",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Editor" },
+  },
+  {
+    id: "rackBuilderPanelManager",
+    path: "/rack-builder/editor/project/:projectId/panels",
+    component: RackBuilderPanelLayoutManagerPage,
+    layout: "app",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Panel Layouts" },
+  },
+  {
+    id: "rackBuilderPanelEditor",
+    path: "/rack-builder/editor/project/:projectId/panels/:panelLayoutId",
+    component: RackBuilderPanelLayoutEditorPage,
+    layout: "fullscreen",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Panel Editor" },
+  },
+  {
+    id: "rackBuilderPanelPrint",
+    path: "/rack-builder/editor/project/:projectId/panels/:panelLayoutId/print",
+    component: RackBuilderPanelLayoutPrintPage,
+    layout: "fullscreen",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Panel Print" },
+  },
+  {
+    id: "rackBuilderProjectPrintAll",
+    path: "/rack-builder/editor/project/:projectId/print/all",
+    component: RackBuilderProjectPrintPage,
+    layout: "fullscreen",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Project Print" },
+  },
+  {
+    id: "rackBuilderLayoutPrint",
+    path: "/rack-builder/editor/project/:projectId/print/:layoutId",
+    component: RackBuilderLayoutPrintPage,
+    layout: "fullscreen",
+    access: "soundTools",
+    breadcrumb: { label: "Rack Builder – Layout Print" },
   },
   {
     id: "videoConsumosTool",

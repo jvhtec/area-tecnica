@@ -1,0 +1,628 @@
+/* WYSIWYG Rack UI CSS */
+
+.rack-blueprint-container {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 20px;
+  background: transparent;
+  user-select: none;
+}
+
+.rack-u-labels {
+  display: flex;
+  flex-direction: column;
+  padding-top: 59px; /* Align with the top slot: header (35px) + top casing (24px) */
+}
+
+.rack-u-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 50px;
+}
+
+.rack-u-label-text {
+  color: #ccc;
+  font-size: 14px;
+  font-family: 'IBM Plex Mono', 'Consolas', monospace;
+  font-weight: 600;
+}
+
+.rack-u-label-line {
+  width: 24px;
+  height: 1px;
+  background: #555;
+}
+
+.rack-blueprint-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rack-blueprint {
+  --rack-slot-height: 40px;
+  position: relative;
+  background: #000;
+  border-left: 10px solid #222;
+  border-right: 10px solid #222;
+  color: #fff;
+}
+
+.rack-casing-top, .rack-casing-bottom {
+  width: 100%;
+  height: 24px;
+  background: #222;
+  position: relative;
+}
+
+.rack-casing-top {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-bottom: 2px solid #111;
+}
+
+.rack-casing-bottom {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  border-top: 2px solid #111;
+}
+
+/* Corner protectors */
+.rack-casing-top::before, .rack-casing-top::after,
+.rack-casing-bottom::before, .rack-casing-bottom::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #555;
+}
+
+.rack-casing-top::before { top: 0; left: 0; border-right: none; border-bottom: none; border-top-left-radius: 4px; }
+.rack-casing-top::after { top: 0; right: 0; border-left: none; border-bottom: none; border-top-right-radius: 4px; }
+.rack-casing-bottom::before { bottom: 0; left: 0; border-right: none; border-top: none; border-bottom-left-radius: 4px; }
+.rack-casing-bottom::after { bottom: 0; right: 0; border-left: none; border-top: none; border-bottom-right-radius: 4px; }
+
+.rack-blueprint-header {
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #aaa;
+  background: #111;
+  border-bottom: 1px solid #333;
+}
+
+.rack-blueprint-body {
+  position: relative;
+  background: #0a0a0a;
+}
+
+.rack-blueprint-rails {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.rack-blueprint-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background: #1a1a1a;
+  border-left: 1px solid #333;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Holes inside rails */
+.rack-blueprint-rail::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at center, #000 2.5px, transparent 2.5px);
+  background-size: 100% 10px; /* 4 holes per 40px U */
+  background-repeat: repeat-y;
+}
+
+.rack-blueprint-rail-left { left: 0; }
+.rack-blueprint-rail-right { right: 0; }
+
+.rack-blueprint-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  border-left: 1px solid #333;
+  border-right: 1px solid #333;
+}
+.rack-blueprint-divider::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 3px center, #000 2.5px, transparent 2.5px), radial-gradient(circle at 11px center, #000 2.5px, transparent 2.5px);
+  background-size: 100% 10px;
+  background-repeat: repeat-y;
+}
+
+.rack-slot-row {
+  position: relative;
+  height: var(--rack-slot-height);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05); /* very faint horizontal line */
+  transition: background-color 0.18s ease;
+  box-sizing: border-box;
+}
+
+.rack-slot-row:last-child {
+  border-bottom: none;
+}
+
+.rack-slot-track {
+  position: absolute;
+  inset: 0 14px; /* inside the rails */
+}
+
+.rack-slot-row.rack-slot-drop-ok {
+  background: rgba(74, 222, 128, 0.15);
+}
+.rack-slot-row.rack-slot-drop-ok .rack-slot-track {
+  outline: 1px solid rgba(74, 222, 128, 0.5);
+}
+
+.rack-slot-row.rack-slot-drop-bad {
+  background: rgba(248, 113, 113, 0.15);
+}
+.rack-slot-row.rack-slot-drop-bad .rack-slot-track {
+  outline: 1px solid rgba(248, 113, 113, 0.5);
+}
+
+.rack-device-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.rack-device-wrap {
+  position: absolute;
+  pointer-events: none;
+}
+
+.rack-device {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: #050505;
+  overflow: hidden;
+  cursor: grab;
+  pointer-events: auto;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rack-device:active {
+  cursor: grabbing;
+}
+
+.rack-device--dragging {
+  opacity: 0.5;
+  touch-action: none;
+}
+
+.rack-device-media {
+  position: absolute;
+  inset: 0;
+  background: #0a0a0a;
+  overflow: hidden;
+}
+
+.rack-device--has-image .rack-device-media {
+  background: #000;
+}
+
+.rack-device-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+
+.dark .rack-device-media img.rack-device-image--invert-in-dark {
+  filter: invert(1);
+}
+
+.rack-device--has-image .rack-device-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rack-device--has-image .rack-device-media img {
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  object-fit: cover;
+}
+
+.rack-device-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: #0a0a0a;
+}
+
+/* Wireframe aesthetic for fallback */
+.rack-device-wire {
+  position: absolute;
+  inset: 4px;
+  border: 1px solid #333;
+  pointer-events: none;
+}
+
+.rack-device-screw {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid #555;
+  background: #111;
+  pointer-events: none;
+}
+
+.rack-device-screw.lt { top: 4px; left: 4px; }
+.rack-device-screw.rt { top: 4px; right: 4px; }
+.rack-device-screw.lb { bottom: 4px; left: 4px; }
+.rack-device-screw.rb { bottom: 4px; right: 4px; }
+
+.rack-device-meta {
+  position: absolute;
+  inset: auto 12px 6px 12px;
+  min-width: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.rack-device-title {
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #000;
+}
+
+.rack-device-note {
+  color: #aaa;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rack-device-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.rack-device:hover .rack-device-actions {
+  opacity: 1;
+}
+
+.rack-device-action {
+  border: 1px solid #444;
+  border-radius: 2px;
+  background: #000;
+  color: #fff;
+  font-size: 10px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.rack-device-action:hover {
+  background: #222;
+}
+
+/* Simplified view */
+.rack-device--simplified {
+  background: #0a0a0a;
+}
+
+.rack-device-simplified-layout {
+  position: absolute;
+  inset: 6px 8px;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.rack-device-simplified-brand {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 40%;
+  z-index: 1;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rack-device-simplified-model {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  max-width: 40%;
+  z-index: 1;
+  color: #aaa;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rack-device-simplified-notes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #ccc;
+  white-space: pre-line;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+
+.rack-device-simplified-name {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  max-width: 50%;
+  z-index: 1;
+  color: #8ab4f8;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rack-ghost-wrap {
+  position: absolute;
+  pointer-events: none;
+}
+
+.rack-ghost-outline {
+  height: 100%;
+  width: 100%;
+  border: 1px dashed #555;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  box-sizing: border-box;
+}
+
+.rack-ghost-label {
+  color: #777;
+  font-size: 10px;
+}
+
+.rack-opposite-preview-wrap {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.42;
+  filter: saturate(0.55) brightness(0.9);
+}
+
+.rack-opposite-preview-wrap .rack-device {
+  border: 1px dashed rgba(148, 163, 184, 0.55);
+}
+
+.rack-opposite-preview-wrap .rack-device-media img {
+  opacity: 0.9;
+}
+
+.rack-casters {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 40px;
+  height: 40px;
+}
+
+.rack-caster {
+  width: 40px;
+  height: 40px;
+  background-image: radial-gradient(circle at center, #111 40%, transparent 41%), linear-gradient(to right, transparent 30%, #333 30%, #333 70%, transparent 70%);
+  background-position: center bottom, center top;
+  background-size: 40px 40px, 40px 20px;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+.rack-caster::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 5px solid #444;
+  box-sizing: border-box;
+}
+
+.rack-side-body {
+  position: relative;
+  background: #0a0a0a;
+  padding: 10px;
+}
+
+.rack-side-legend {
+  display: flex;
+  justify-content: space-between;
+  color: #888;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.rack-side-lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.rack-side-lane {
+  position: relative;
+  border: 1px solid #222;
+  background: #050505;
+  overflow: hidden;
+}
+
+.rack-side-lane-label {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  z-index: 4;
+  font-size: 9px;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.rack-side-slot-guide {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rack-side-slot-guide:last-child {
+  border-bottom: none;
+}
+
+.rack-depth-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rack-depth-item {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.rack-depth-item--front {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.75);
+}
+
+.rack-depth-item--rear {
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(148, 163, 184, 0.65);
+}
+
+.rack-depth-item--near {
+  opacity: 1;
+}
+
+.rack-depth-item--far {
+  opacity: 0.45;
+}
+
+.rack-depth-item--conflict {
+  border-color: rgba(248, 113, 113, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.7);
+}
+
+.rack-depth-item-label {
+  color: #dbeafe;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: center;
+  text-shadow: 0 1px 2px #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.rack-blueprint-container--compact {
+  width: 100%;
+  gap: 8px;
+  padding: 0;
+}
+
+.rack-blueprint-container--compact .rack-blueprint-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.rack-blueprint-container--compact .rack-blueprint {
+  width: 100% !important;
+}
+
+.rack-blueprint-container--compact .rack-u-labels {
+  padding-top: 51px;
+}
+
+.rack-blueprint-container--compact .rack-u-label-row {
+  width: 36px;
+}
+
+.rack-blueprint-container--compact .rack-u-label-text {
+  font-size: 11px;
+}
+
+.rack-blueprint-container--compact .rack-u-label-line {
+  width: 12px;
+}
+
+.rack-blueprint-container--compact .rack-casters {
+  display: none;
+}

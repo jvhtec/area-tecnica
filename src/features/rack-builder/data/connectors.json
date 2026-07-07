@@ -1,0 +1,90 @@
+[
+  {
+    "id": "xlr_d_series",
+    "name": "XLR (D-Series)",
+    "category": "audio",
+    "image_path": "/connectors/d-series.svg",
+    "grid_width": 1,
+    "grid_height": 1,
+    "mounting": "both",
+    "notes": "Unified 24 mm D-size cut-out.",
+    "weight_kg": 0.07
+  },
+  {
+    "id": "ethercon_rj45",
+    "name": "RJ45 / etherCON",
+    "category": "data",
+    "image_path": "/connectors/rj45.svg",
+    "grid_width": 1,
+    "grid_height": 1,
+    "mounting": "both",
+    "notes": "D-size shell with RJ45 insert.",
+    "weight_kg": 0.06
+  },
+  {
+    "id": "powercon_true1",
+    "name": "powerCON TRUE1",
+    "category": "power",
+    "image_path": "/connectors/powercon.svg",
+    "grid_width": 1,
+    "grid_height": 2,
+    "mounting": "front",
+    "notes": "Locking release tab, front mounting only.",
+    "weight_kg": 0.12
+  },
+  {
+    "id": "speakon_d",
+    "name": "speakON (D-Series)",
+    "category": "audio",
+    "image_path": "/connectors/d-series.svg",
+    "grid_width": 1,
+    "grid_height": 1,
+    "mounting": "both",
+    "notes": "Speaker connector in D-size format.",
+    "weight_kg": 0.08
+  },
+  {
+    "id": "bnc_d",
+    "name": "BNC (D-Series)",
+    "category": "data",
+    "image_path": "/connectors/d-series.svg",
+    "grid_width": 1,
+    "grid_height": 1,
+    "mounting": "both",
+    "notes": "Coax connector in D-size format.",
+    "weight_kg": 0.05
+  },
+  {
+    "id": "soca_lk37",
+    "name": "Socapex / LK37",
+    "category": "multipin",
+    "image_path": "/connectors/socapex.svg",
+    "grid_width": 2,
+    "grid_height": 2,
+    "mounting": "front",
+    "notes": "Approx. 46 mm mounting hole.",
+    "weight_kg": 0.35
+  },
+  {
+    "id": "cee_16a",
+    "name": "CEE 16A",
+    "category": "power",
+    "image_path": "/connectors/cee.svg",
+    "grid_width": 2,
+    "grid_height": 3,
+    "mounting": "front",
+    "notes": "Industrial power connector.",
+    "weight_kg": 0.42
+  },
+  {
+    "id": "blank_insert",
+    "name": "Blank Insert",
+    "category": "other",
+    "image_path": "/connectors/blank.svg",
+    "grid_width": 1,
+    "grid_height": 1,
+    "mounting": "both",
+    "notes": "Filler for unused holes.",
+    "weight_kg": 0.02
+  }
+]
