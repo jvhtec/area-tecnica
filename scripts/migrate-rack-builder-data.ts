@@ -43,6 +43,8 @@ interface TableCopyStep {
   conflictKey: string
   /** Handled separately by copyDeviceCategories() - kept here only so verifyRowCounts() covers it. */
   skipGenericCopy?: boolean
+  /** Target migrations may seed additional catalog rows that are intentionally preserved. */
+  allowTargetSuperset?: boolean
 }
 
 const TABLE_STEPS: TableCopyStep[] = [
@@ -51,7 +53,7 @@ const TABLE_STEPS: TableCopyStep[] = [
   { sourceTable: 'racks', targetTable: 'rack_builder_racks', conflictKey: 'id' },
   { sourceTable: 'projects', targetTable: 'rack_builder_projects', conflictKey: 'id' },
   { sourceTable: 'layouts', targetTable: 'rack_builder_layouts', conflictKey: 'id' },
-  { sourceTable: 'connectors', targetTable: 'rack_builder_connectors', conflictKey: 'id' },
+  { sourceTable: 'connectors', targetTable: 'rack_builder_connectors', conflictKey: 'id', allowTargetSuperset: true },
   { sourceTable: 'panel_layouts', targetTable: 'rack_builder_panel_layouts', conflictKey: 'id' },
   { sourceTable: 'panel_layout_rows', targetTable: 'rack_builder_panel_layout_rows', conflictKey: 'id' },
   { sourceTable: 'panel_layout_ports', targetTable: 'rack_builder_panel_layout_ports', conflictKey: 'id' },
@@ -192,9 +194,12 @@ async function verifyRowCounts(): Promise<void> {
   for (const step of TABLE_STEPS) {
     const { count: sourceCount } = await oldClient.from(step.sourceTable).select('*', { count: 'exact', head: true })
     const { count: targetCount } = await newClient.from(step.targetTable).select('*', { count: 'exact', head: true })
-    const matches = sourceCount === targetCount
+    const sourceTotal = sourceCount ?? 0
+    const targetTotal = targetCount ?? 0
+    const matches = step.allowTargetSuperset ? targetTotal >= sourceTotal : sourceTotal === targetTotal
     if (!matches) hasMismatch = true
-    console.log(`  ${step.targetTable}: source=${sourceCount ?? 0} target=${targetCount ?? 0} [${matches ? 'ok' : 'MISMATCH'}]`)
+    const status = matches ? (step.allowTargetSuperset && targetTotal > sourceTotal ? 'ok: target superset' : 'ok') : 'MISMATCH'
+    console.log(`  ${step.targetTable}: source=${sourceTotal} target=${targetTotal} [${status}]`)
   }
   if (hasMismatch) {
     throw new Error('Row count verification failed - see MISMATCH rows above')
