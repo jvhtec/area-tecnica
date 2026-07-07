@@ -80,6 +80,26 @@ function getCenteredAspectCrop(
   )
 }
 
+async function rasterizeImageBlob(image: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(image)
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas context unavailable')
+    ctx.drawImage(bitmap, 0, 0)
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob)
+        else reject(new Error('Failed to rasterize image'))
+      }, 'image/png')
+    })
+  } finally {
+    bitmap.close()
+  }
+}
+
 export default function ImageCropper({
   image,
   aspect,
@@ -91,14 +111,32 @@ export default function ImageCropper({
   const [crop, setCrop] = useState<Crop>()
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
   const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
-    const objectUrl = URL.createObjectURL(image)
-    setImageUrl(objectUrl)
+    let active = true
+    let objectUrl: string | null = null
+    setImageUrl(null)
+    setImageError(null)
     setCrop(undefined)
     setCompletedCrop(undefined)
-    return () => URL.revokeObjectURL(objectUrl)
+    void rasterizeImageBlob(image)
+      .then((rasterizedImage) => {
+        objectUrl = URL.createObjectURL(rasterizedImage)
+        if (active) {
+          setImageUrl(objectUrl)
+        } else {
+          URL.revokeObjectURL(objectUrl)
+        }
+      })
+      .catch(() => {
+        if (active) setImageError('This image cannot be cropped.')
+      })
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
   }, [image])
 
   const handleConfirm = useCallback(async () => {
@@ -129,10 +167,12 @@ export default function ImageCropper({
               }}
             />
           </ReactCrop>
-        ) : (
+        ) : imageError ? (
           <p className="text-sm text-red-600" role="alert">
-            This image source cannot be cropped.
+            {imageError}
           </p>
+        ) : (
+          <p className="text-sm text-gray-600">Preparing image...</p>
         )}
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
