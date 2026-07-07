@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(21);
+SELECT plan(23);
 
 SELECT has_column('public', 'festival_artists', 'rider_outdated', 'festival artists track explicit outdated rider state');
 
@@ -64,6 +64,19 @@ SELECT ok(
       AND pg_get_function_identity_arguments(p.oid) = 'p_file_id uuid, p_artist_id uuid'
   ),
   'rider file reference delete RPC exists with the expected signature'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'delete_festival_artist_file_reference'
+      AND p.prosecdef
+      AND array_to_string(p.proconfig, ',') ILIKE '%search_path=pg_catalog, public%'
+  ),
+  'rider file reference delete RPC is security definer with a pinned search_path'
 );
 
 SELECT ok(
@@ -501,6 +514,19 @@ SELECT ok(
       AND file_path = 'shared/source-rider.pdf'
   ),
   'deleting a shared rider reference leaves the source rider metadata row intact'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM public.festival_artist_files imported_file
+    JOIN public.festival_artists imported_artist ON imported_artist.id = imported_file.artist_id
+    WHERE imported_artist.job_id = '12000000-0000-0000-0000-000000000002'::uuid
+      AND imported_artist.name = 'Source Rider Artist'
+      AND imported_file.file_path = 'shared/source-rider.pdf'
+  ),
+  0,
+  'deleting a shared rider reference removes the target metadata row'
 );
 
 SELECT throws_ok(

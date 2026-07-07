@@ -1,5 +1,13 @@
 ALTER TABLE public.festival_artists
-  ADD COLUMN IF NOT EXISTS rider_outdated boolean NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS rider_outdated boolean DEFAULT false;
+
+UPDATE public.festival_artists
+SET rider_outdated = false
+WHERE rider_outdated IS NULL;
+
+ALTER TABLE public.festival_artists
+  ALTER COLUMN rider_outdated SET DEFAULT false,
+  ALTER COLUMN rider_outdated SET NOT NULL;
 
 COMMENT ON COLUMN public.festival_artists.rider_outdated IS
   'Explicit rider freshness flag. Imported/copied riders are marked true until a current rider is uploaded for the artist.';
@@ -9,6 +17,24 @@ CREATE INDEX IF NOT EXISTS idx_festival_artist_files_uploaded_at
 
 CREATE INDEX IF NOT EXISTS idx_festival_artist_files_file_path
   ON public.festival_artist_files (file_path);
+
+DROP POLICY IF EXISTS "p_festival_artist_files_public_select_1fa3b3" ON public.festival_artist_files;
+
+CREATE POLICY "p_festival_artist_files_public_select_1fa3b3"
+ON public.festival_artist_files
+FOR SELECT
+TO authenticated
+USING (
+  public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text])
+  OR EXISTS (
+    SELECT 1
+    FROM public.festival_artists fa
+    JOIN public.job_assignments ja ON ja.job_id = fa.job_id
+    WHERE fa.id = festival_artist_files.artist_id
+      AND ja.technician_id = auth.uid()
+  )
+  OR public.is_admin_or_management()
+);
 
 DROP POLICY IF EXISTS "p_storage_festival_artist_files_authorized_select" ON storage.objects;
 

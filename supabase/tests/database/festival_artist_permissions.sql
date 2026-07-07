@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(16);
+SELECT plan(17);
 
 SELECT is(
   (
@@ -82,6 +82,24 @@ SELECT ok(
       AND qual ILIKE '%house_tech%'
   ),
   'house techs retain festival artist read access'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'festival_artist_files'
+      AND policyname = 'p_festival_artist_files_public_select_1fa3b3'
+      AND cmd = 'SELECT'
+      AND qual ILIKE '%admin%'
+      AND qual ILIKE '%management%'
+      AND qual ILIKE '%logistics%'
+      AND qual ILIKE '%job_assignments%'
+      AND qual ILIKE '%auth.uid%'
+      AND qual NOT ILIKE '%OR true%'
+  ),
+  'festival artist file metadata reads are scoped to elevated roles or assigned jobs'
 );
 
 SELECT ok(

@@ -9,6 +9,7 @@ import {
   useArtistExternalMetadata,
   useOverrideArtistExternalMetadata,
 } from "@/hooks/useArtistExternalMetadata";
+import { useToast } from "@/hooks/use-toast";
 
 type ArtistMetadataHoverCardProps = {
   artistName: string;
@@ -21,6 +22,7 @@ export const ArtistMetadataHoverCard = ({ artistName, canManage, children }: Art
   const [showOverrideInput, setShowOverrideInput] = useState(false);
   const [manualQid, setManualQid] = useState("");
 
+  const { toast } = useToast();
   const metadataQuery = useArtistExternalMetadata(artistName, open);
   const overrideMutation = useOverrideArtistExternalMetadata();
 
@@ -38,6 +40,13 @@ export const ArtistMetadataHoverCard = ({ artistName, canManage, children }: Art
           setShowOverrideInput(false);
           setManualQid("");
         },
+        onError: (error) => {
+          toast({
+            title: "No se pudo vincular el QID",
+            description: error instanceof Error ? error.message : "Revisa el QID de Wikidata e inténtalo de nuevo.",
+            variant: "destructive",
+          });
+        },
       },
     );
   };
@@ -51,51 +60,59 @@ export const ArtistMetadataHoverCard = ({ artistName, canManage, children }: Art
             <Loader2 className="h-4 w-4 animate-spin" />
             Buscando información pública…
           </div>
-        ) : metadataQuery.isError || !metadata || metadata.matchStatus === "no_match" ? (
+        ) : metadataQuery.isError || !metadata ? (
           <p className="text-sm text-muted-foreground">No se encontró metadata pública para este artista.</p>
         ) : (
           <div className="space-y-2">
-            <div className="flex items-start gap-3">
-              {metadata.thumbnailUrl && (
-                <img
-                  src={metadata.thumbnailUrl}
-                  alt={metadata.displayArtistName}
-                  className="h-14 w-14 flex-shrink-0 rounded-md object-cover"
-                  loading="lazy"
-                />
-              )}
-              <div className="min-w-0 space-y-0.5">
-                <p className="truncate text-sm font-semibold">{metadata.displayArtistName}</p>
-                {metadata.description && (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{metadata.description}</p>
+            {metadata.matchStatus === "no_match" ? (
+              <p className="text-sm text-muted-foreground">No se encontró metadata pública para este artista.</p>
+            ) : (
+              <>
+                <div className="flex items-start gap-3">
+                  {metadata.thumbnailUrl && (
+                    <img
+                      src={metadata.thumbnailUrl}
+                      alt={metadata.displayArtistName}
+                      className="h-14 w-14 flex-shrink-0 rounded-md object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="truncate text-sm font-semibold">{metadata.displayArtistName}</p>
+                    {metadata.description && (
+                      <p className="line-clamp-2 text-xs text-muted-foreground">{metadata.description}</p>
+                    )}
+                  </div>
+                </div>
+
+                {(metadata.country || metadata.foundedOrBirthYear || metadata.genres.length > 0) && (
+                  <div className="flex flex-wrap gap-1">
+                    {metadata.country && <Badge variant="outline">{metadata.country}</Badge>}
+                    {metadata.foundedOrBirthYear && (
+                      <Badge variant="outline">Desde {metadata.foundedOrBirthYear}</Badge>
+                    )}
+                    {metadata.genres.slice(0, 2).map((genre) => (
+                      <Badge key={genre} variant="secondary">
+                        {genre}
+                      </Badge>
+                    ))}
+                  </div>
                 )}
-              </div>
-            </div>
 
-            {(metadata.country || metadata.foundedOrBirthYear || metadata.genres.length > 0) && (
-              <div className="flex flex-wrap gap-1">
-                {metadata.country && <Badge variant="outline">{metadata.country}</Badge>}
-                {metadata.foundedOrBirthYear && <Badge variant="outline">Desde {metadata.foundedOrBirthYear}</Badge>}
-                {metadata.genres.slice(0, 2).map((genre) => (
-                  <Badge key={genre} variant="secondary">
-                    {genre}
-                  </Badge>
-                ))}
-              </div>
-            )}
+                {metadata.extract && <p className="line-clamp-3 text-xs text-muted-foreground">{metadata.extract}</p>}
 
-            {metadata.extract && <p className="line-clamp-3 text-xs text-muted-foreground">{metadata.extract}</p>}
-
-            {metadata.wikipediaUrl && (
-              <a
-                href={metadata.wikipediaUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                Wikipedia / Wikidata
-                <ExternalLink className="h-3 w-3" />
-              </a>
+                {metadata.wikipediaUrl && (
+                  <a
+                    href={metadata.wikipediaUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    Wikipedia / Wikidata
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </>
             )}
 
             {isUncertain && canManage && (
@@ -126,6 +143,13 @@ export const ArtistMetadataHoverCard = ({ artistName, canManage, children }: Art
                   >
                     Coincidencia dudosa · Vincular QID de Wikidata manualmente
                   </Button>
+                )}
+                {overrideMutation.isError && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {overrideMutation.error instanceof Error
+                      ? overrideMutation.error.message
+                      : "No se pudo vincular el QID de Wikidata."}
+                  </p>
                 )}
               </div>
             )}

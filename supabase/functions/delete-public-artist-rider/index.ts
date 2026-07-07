@@ -153,6 +153,10 @@ serve(createHttpHandler(async (req) => {
       });
 
     if (deleteError) {
+      if (deleteError.code === "P0002" || deleteError.message === "file_not_found") {
+        return jsonResponse({ ok: true, deleted_file_id: fileRow.id, already_deleted: true }, { status: 200 });
+      }
+
       console.error("[delete-public-artist-rider] metadata delete error", deleteError);
       return jsonResponse({ ok: false, error: "metadata_delete_failed" }, { status: 500 });
     }

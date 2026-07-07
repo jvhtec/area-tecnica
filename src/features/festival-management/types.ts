@@ -55,7 +55,7 @@ export interface ArtistRiderFile {
   file_path: string;
   file_size?: number | null;
   file_type?: string | null;
-  created_at: string;
+  created_at?: string | null;
   uploaded_at?: string | null;
   uploaded_by?: string | null;
   artist_id?: string;

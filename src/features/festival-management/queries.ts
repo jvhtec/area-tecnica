@@ -364,9 +364,9 @@ export const fetchRiderLibrary = async (targetJobId: string): Promise<RiderLibra
 
   const files: RiderLibraryFile[] = (filesData || [])
     .filter((file) => Boolean(file.artist_id))
-    .map((file) => ({
-      artist_id: file.artist_id as string,
-      file_name: file.file_name,
+      .map((file) => ({
+        artist_id: file.artist_id as string,
+        file_name: file.file_name,
       file_path: file.file_path,
       file_size: file.file_size,
       file_type: file.file_type,

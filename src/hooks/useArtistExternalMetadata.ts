@@ -44,6 +44,8 @@ type MetadataRow = {
   last_checked_at: string | null;
 };
 
+const METADATA_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 function mapRow(row: MetadataRow): ArtistExternalMetadata {
   return {
     normalizedArtistName: row.normalized_artist_name,
@@ -66,6 +68,13 @@ function mapRow(row: MetadataRow): ArtistExternalMetadata {
   };
 }
 
+function isFreshMetadataRow(row: MetadataRow): boolean {
+  if (row.match_status === "pending") return false;
+
+  const lastChecked = row.last_checked_at ? new Date(row.last_checked_at).getTime() : 0;
+  return lastChecked > 0 && Date.now() - lastChecked < METADATA_CACHE_TTL_MS;
+}
+
 async function invokeEnrich(body: Record<string, unknown>): Promise<ArtistExternalMetadata> {
   const { data, error } = await supabase.functions.invoke("enrich-artist-metadata", { body });
 
@@ -73,7 +82,7 @@ async function invokeEnrich(body: Record<string, unknown>): Promise<ArtistExtern
     throw new Error(error.message || "No se pudo consultar la metadata del artista.");
   }
 
-  return mapRow(data as MetadataRow);
+  return data as ArtistExternalMetadata;
 }
 
 /**
@@ -89,13 +98,17 @@ export function useArtistExternalMetadata(artistName: string, enabled: boolean) 
     enabled: enabled && Boolean(normalizedArtistName),
     staleTime: 10 * 60 * 1000,
     queryFn: async (): Promise<ArtistExternalMetadata> => {
-      const { data: cached } = await supabase
+      const { data: cached, error: cacheError } = await supabase
         .from("artist_external_metadata")
         .select("*")
         .eq("normalized_artist_name", normalizedArtistName)
         .maybeSingle();
 
-      if (cached) {
+      if (cacheError) {
+        throw new Error(cacheError.message || "No se pudo consultar la metadata en caché.");
+      }
+
+      if (cached && isFreshMetadataRow(cached as MetadataRow)) {
         return mapRow(cached as MetadataRow);
       }
 

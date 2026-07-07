@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { CalendarDays, FileText, FolderInput, Library, Loader2, Search } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -102,6 +102,7 @@ export const RiderLibraryDialog = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [stageByArtist, setStageByArtist] = useState<Record<string, string>>({});
+  const wasOpenRef = useRef(false);
 
   const dateOptions = useMemo(
     () => Array.from(new Set(jobDates.map(formatDateValue).filter(Boolean))),
@@ -116,7 +117,10 @@ export const RiderLibraryDialog = ({
   }, [maxStages, stageOptions]);
 
   useEffect(() => {
-    if (!open) return;
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = open;
+
+    if (!open || wasOpen) return;
 
     setSearchTerm("");
     setSourceJobFilter(ALL_SOURCE_JOBS_VALUE);
