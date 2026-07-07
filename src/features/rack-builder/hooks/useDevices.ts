@@ -284,7 +284,7 @@ export function useDevices() {
 
 export function getDeviceImageUrl(path: string | null, bucket = 'rack-builder-device-images'): string | null {
   if (!path) return null
-  if (path.startsWith('data:')) return path
+  if (path.startsWith('data:')) return null
   if (path.startsWith('http://') || path.startsWith('https://')) return path
   if (path.startsWith('/')) {
     const base = import.meta.env.BASE_URL || '/'

@@ -97,7 +97,7 @@ export default function RackGrid({
 
     updateHeight(node.getBoundingClientRect().width)
 
-    const observer = new ResizeObserver((entries) => {
+    const observer = new window.ResizeObserver((entries) => {
       const entry = entries[0]
       if (entry) updateHeight(entry.contentRect.width)
     })

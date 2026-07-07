@@ -9,6 +9,9 @@ import { getDeviceImageUrl } from '../../hooks/useDevices'
 import type { Device, DeviceCategory } from '../../types'
 import { getRackPanelAspect, normalizeRackUnits, RACK_PANEL_WIDTH_UNITS, RACK_HALF_PANEL_WIDTH_UNITS } from '../../lib/rackVisual'
 
+const ACCEPTED_DEVICE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const DEVICE_IMAGE_ACCEPT = Array.from(ACCEPTED_DEVICE_IMAGE_TYPES).join(',')
+
 interface DeviceFormProps {
   initialData?: Device
   categories: DeviceCategory[]
@@ -50,6 +53,7 @@ export default function DeviceForm({
   const [newCategoryName, setNewCategoryName] = useState('')
   const [creatingCategory, setCreatingCategory] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null)
 
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropSide, setCropSide] = useState<'front' | 'rear'>('front')
@@ -63,6 +67,13 @@ export default function DeviceForm({
 
   const frontInputRef = useRef<HTMLInputElement>(null)
   const rearInputRef = useRef<HTMLInputElement>(null)
+  const localCropObjectUrlRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (localCropObjectUrlRef.current) URL.revokeObjectURL(localCropObjectUrlRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (categoryId) return
@@ -71,14 +82,27 @@ export default function DeviceForm({
   }, [categories, categoryId, initialData?.category_id])
 
   const handleFileSelect = (side: 'front' | 'rear', file: File) => {
+    if (!ACCEPTED_DEVICE_IMAGE_TYPES.has(file.type)) {
+      setImageUploadError('Use a JPEG, PNG, or WebP image.')
+      return
+    }
+    if (localCropObjectUrlRef.current) URL.revokeObjectURL(localCropObjectUrlRef.current)
+    const objectUrl = URL.createObjectURL(file)
+    localCropObjectUrlRef.current = objectUrl
+    setImageUploadError(null)
     setCropSide(side)
-    setCropSrc(URL.createObjectURL(file))
+    setCropSrc(objectUrl)
   }
 
   const handleEditExistingCrop = (side: 'front' | 'rear') => {
     const imagePath = side === 'front' ? frontPath : rearPath
     const imageUrl = getDeviceImageUrl(imagePath)
     if (!imageUrl) return
+    if (localCropObjectUrlRef.current) {
+      URL.revokeObjectURL(localCropObjectUrlRef.current)
+      localCropObjectUrlRef.current = null
+    }
+    setImageUploadError(null)
     setCropSide(side)
     setCropSrc(imageUrl)
   }
@@ -87,6 +111,18 @@ export default function DeviceForm({
     const path = await uploadImage(blob, cropSide)
     if (cropSide === 'front') setFrontPath(path)
     else setRearPath(path)
+    if (localCropObjectUrlRef.current) {
+      URL.revokeObjectURL(localCropObjectUrlRef.current)
+      localCropObjectUrlRef.current = null
+    }
+    setCropSrc(null)
+  }
+
+  const handleCloseCropper = () => {
+    if (localCropObjectUrlRef.current) {
+      URL.revokeObjectURL(localCropObjectUrlRef.current)
+      localCropObjectUrlRef.current = null
+    }
     setCropSrc(null)
   }
 
@@ -247,7 +283,7 @@ export default function DeviceForm({
             <input
               ref={frontInputRef}
               type="file"
-              accept="image/*"
+              accept={DEVICE_IMAGE_ACCEPT}
               className="sr-only"
               onChange={(e) => {
                 const file = e.target.files?.[0]
@@ -281,7 +317,7 @@ export default function DeviceForm({
             <input
               ref={rearInputRef}
               type="file"
-              accept="image/*"
+              accept={DEVICE_IMAGE_ACCEPT}
               className="sr-only"
               onChange={(e) => {
                 const file = e.target.files?.[0]
@@ -309,6 +345,12 @@ export default function DeviceForm({
           </div>
         </div>
 
+        {imageUploadError && (
+          <p className="text-sm text-red-600" role="alert">
+            {imageUploadError}
+          </p>
+        )}
+
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">
           <Button variant="secondary" type="button" onClick={onCancel} className="w-full sm:w-auto">
             Cancel
@@ -321,7 +363,7 @@ export default function DeviceForm({
 
       <Modal
         isOpen={!!cropSrc}
-        onClose={() => setCropSrc(null)}
+        onClose={handleCloseCropper}
         title={`Crop ${cropSide} image`}
       >
         {cropSrc && (
@@ -332,7 +374,7 @@ export default function DeviceForm({
             outputWidth={cropOutputWidth}
             outputHeight={cropOutputHeight}
             onCropComplete={handleCropComplete}
-            onCancel={() => setCropSrc(null)}
+            onCancel={handleCloseCropper}
           />
         )}
       </Modal>

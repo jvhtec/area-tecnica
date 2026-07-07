@@ -80,6 +80,17 @@ function getCenteredAspectCrop(
   )
 }
 
+function getSafeImageSrc(imageSrc: string): string | null {
+  if (imageSrc.startsWith('blob:')) return imageSrc
+  try {
+    const url = new URL(imageSrc, window.location.origin)
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.href
+  } catch {
+    return null
+  }
+  return null
+}
+
 export default function ImageCropper({
   imageSrc,
   aspect,
@@ -91,7 +102,8 @@ export default function ImageCropper({
   const [crop, setCrop] = useState<Crop>()
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
   const imgRef = useRef<HTMLImageElement>(null)
-  const crossOrigin = imageSrc.startsWith('blob:') || imageSrc.startsWith('data:') ? undefined : 'anonymous'
+  const safeImageSrc = getSafeImageSrc(imageSrc)
+  const crossOrigin = safeImageSrc?.startsWith('blob:') ? undefined : 'anonymous'
 
   const handleConfirm = useCallback(async () => {
     if (!imgRef.current || !completedCrop) return
@@ -102,28 +114,34 @@ export default function ImageCropper({
   return (
     <div className="space-y-4">
       <div className="overflow-hidden">
-        <ReactCrop
-          crop={crop}
-          aspect={aspect}
-          keepSelection
-          onChange={setCrop}
-          onComplete={setCompletedCrop}
-        >
-          <img
-            ref={imgRef}
-            src={imageSrc}
-            crossOrigin={crossOrigin}
-            alt="Crop preview"
-            className="max-w-full block max-h-[55svh] sm:max-h-[70vh]"
-            onLoad={(event) => {
-              const target = event.currentTarget
-              setCrop(getCenteredAspectCrop(target.width, target.height, aspect))
-            }}
-          />
-        </ReactCrop>
+        {safeImageSrc ? (
+          <ReactCrop
+            crop={crop}
+            aspect={aspect}
+            keepSelection
+            onChange={setCrop}
+            onComplete={setCompletedCrop}
+          >
+            <img
+              ref={imgRef}
+              src={safeImageSrc}
+              crossOrigin={crossOrigin}
+              alt="Crop preview"
+              className="max-w-full block max-h-[55svh] sm:max-h-[70vh]"
+              onLoad={(event) => {
+                const target = event.currentTarget
+                setCrop(getCenteredAspectCrop(target.width, target.height, aspect))
+              }}
+            />
+          </ReactCrop>
+        ) : (
+          <p className="text-sm text-red-600" role="alert">
+            This image source cannot be cropped.
+          </p>
+        )}
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
-        <Button onClick={handleConfirm} disabled={!completedCrop} className="w-full sm:w-auto">
+        <Button onClick={handleConfirm} disabled={!completedCrop || !safeImageSrc} className="w-full sm:w-auto">
           Confirm Crop
         </Button>
         <Button variant="secondary" onClick={onCancel} className="w-full sm:w-auto">

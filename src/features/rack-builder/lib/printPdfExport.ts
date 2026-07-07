@@ -233,6 +233,21 @@ function prunePdfClone(documentClone: Document, clonedSheet: HTMLElement) {
 }
 
 const MODERN_COLOR_RE = /oklch\([^)]*\)|oklab\([^)]*\)/gi
+const parsedCssColorCache = new Map<string, string>()
+
+function parseCssColorWithCanvas(color: string): string {
+  const cached = parsedCssColorCache.get(color)
+  if (cached) return cached
+
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return '#000000'
+
+  ctx.fillStyle = color
+  const parsed = typeof ctx.fillStyle === 'string' && ctx.fillStyle ? ctx.fillStyle : '#000000'
+  parsedCssColorCache.set(color, parsed)
+  return parsed
+}
 
 /**
  * Temporarily rewrite oklch()/oklab() in the **live** document's stylesheets
@@ -249,20 +264,8 @@ const MODERN_COLOR_RE = /oklch\([^)]*\)|oklab\([^)]*\)/gi
  * Returns a cleanup function that restores every modified stylesheet.
  */
 function applyColorNormalization(): () => void {
-  const canvas = document.createElement('canvas')
-  canvas.width = 1
-  canvas.height = 1
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return () => {}
-  const safeCtx = ctx
-
   function toSrgb(color: string): string {
-    // Reset to a known value first: if `color` fails to parse, the canvas
-    // silently keeps the previous fillStyle instead of throwing, so without
-    // this reset a bad value would resolve to whatever color came before it.
-    safeCtx.fillStyle = '#000000'
-    safeCtx.fillStyle = color
-    return safeCtx.fillStyle
+    return parseCssColorWithCanvas(color)
   }
 
   function replaceModernColors(text: string): string {
@@ -310,21 +313,8 @@ function applyColorNormalization(): () => void {
  * html2canvas clone (fast – only touches elements with a style attr).
  */
 function normalizeCloneInlineStyles(documentClone: Document) {
-  const canvas = document.createElement('canvas')
-  canvas.width = 1
-  canvas.height = 1
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-  const safeCtx = ctx
-
   function replaceModernColors(text: string): string {
-    return text.replace(MODERN_COLOR_RE, (match) => {
-      // Same reset-then-assign pattern as toSrgb() above - guards against
-      // an unparsable match silently inheriting the previous fillStyle.
-      safeCtx.fillStyle = '#000000'
-      safeCtx.fillStyle = match
-      return safeCtx.fillStyle
-    })
+    return text.replace(MODERN_COLOR_RE, (match) => parseCssColorWithCanvas(match))
   }
 
   for (const el of documentClone.querySelectorAll('[style]')) {

@@ -77,7 +77,7 @@ export function useAutoScaleFont(
     compute()
 
     let rafId = 0
-    const observer = new ResizeObserver(() => {
+    const observer = new window.ResizeObserver(() => {
       cancelAnimationFrame(rafId)
       rafId = requestAnimationFrame(compute)
     })

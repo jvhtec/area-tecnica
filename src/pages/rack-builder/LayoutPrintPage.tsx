@@ -114,7 +114,7 @@ export default function LayoutPrintPage() {
     if (!frame || !content) return
 
     const frameId = window.requestAnimationFrame(() => recalculateScale())
-    const observer = new ResizeObserver(() => recalculateScale())
+    const observer = new window.ResizeObserver(() => recalculateScale())
     observer.observe(frame)
     observer.observe(content)
 
