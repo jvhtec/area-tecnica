@@ -497,6 +497,75 @@ export type Database = {
           },
         ]
       }
+      artist_external_metadata: {
+        Row: {
+          country: string | null
+          created_at: string
+          description: string | null
+          display_artist_name: string
+          extract: string | null
+          founded_or_birth_year: string | null
+          genres: string[]
+          id: string
+          last_checked_at: string | null
+          match_confidence: number | null
+          match_status: string
+          normalized_artist_name: string
+          official_website: string | null
+          source: string
+          thumbnail_url: string | null
+          updated_at: string
+          wikidata_qid: string | null
+          wikipedia_lang: string | null
+          wikipedia_title: string | null
+          wikipedia_url: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          display_artist_name: string
+          extract?: string | null
+          founded_or_birth_year?: string | null
+          genres?: string[]
+          id?: string
+          last_checked_at?: string | null
+          match_confidence?: number | null
+          match_status?: string
+          normalized_artist_name: string
+          official_website?: string | null
+          source?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          wikidata_qid?: string | null
+          wikipedia_lang?: string | null
+          wikipedia_title?: string | null
+          wikipedia_url?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          display_artist_name?: string
+          extract?: string | null
+          founded_or_birth_year?: string | null
+          genres?: string[]
+          id?: string
+          last_checked_at?: string | null
+          match_confidence?: number | null
+          match_status?: string
+          normalized_artist_name?: string
+          official_website?: string | null
+          source?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          wikidata_qid?: string | null
+          wikipedia_lang?: string | null
+          wikipedia_title?: string | null
+          wikipedia_url?: string | null
+        }
+        Relationships: []
+      }
       assignment_audit_log: {
         Row: {
           action: string

@@ -4,6 +4,7 @@ import { CalendarDays, FileText, FolderInput, Library, Loader2, Search } from "l
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
+import { ArtistMetadataHoverCard } from "@/components/festival/ArtistMetadataHoverCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -379,7 +380,9 @@ export const RiderLibraryDialog = ({
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-base font-semibold">{entry.artistName}</h3>
+                          <ArtistMetadataHoverCard artistName={entry.artistName} canManage={canImport}>
+                            <h3 className="w-fit max-w-full truncate text-base font-semibold">{entry.artistName}</h3>
+                          </ArtistMetadataHoverCard>
                           {entry.alreadyImported ? (
                             <Badge variant="secondary">Ya referenciado</Badge>
                           ) : (
