@@ -13,31 +13,38 @@ returns trigger
 language plpgsql
 as $$
 declare
-  target_hole_count integer;
+  min_hole_count integer;
+  touched_row_count integer;
   overlap_count integer;
 begin
-  select hole_count into target_hole_count
+  -- A port with span_h > 1 visually covers every row from row_index up to
+  -- (but excluding) row_index + span_h. All of those rows must exist for
+  -- this panel, and span_w must fit within the narrowest of them.
+  select min(hole_count), count(*) into min_hole_count, touched_row_count
   from rack_builder_panel_layout_rows
-  where panel_layout_id = new.panel_layout_id and row_index = new.row_index;
+  where panel_layout_id = new.panel_layout_id
+    and row_index >= new.row_index
+    and row_index < new.row_index + new.span_h;
 
-  if target_hole_count is null then
-    raise exception 'RB_ROW: target row does not exist for panel_layout_id=% row_index=%', new.panel_layout_id, new.row_index;
+  if touched_row_count is distinct from new.span_h then
+    raise exception 'RB_ROW: target row(s) do not exist for panel_layout_id=% row_index=% span_h=%', new.panel_layout_id, new.row_index, new.span_h;
   end if;
 
-  if new.hole_index < 0 or new.hole_index + new.span_w > target_hole_count then
-    raise exception 'RB_PORT_BOUNDS: hole_index=% span_w=% but row has % holes', new.hole_index, new.span_w, target_hole_count;
+  if new.hole_index < 0 or new.hole_index + new.span_w > min_hole_count then
+    raise exception 'RB_PORT_BOUNDS: hole_index=% span_w=% but a spanned row has only % holes', new.hole_index, new.span_w, min_hole_count;
   end if;
 
   select count(*) into overlap_count
   from rack_builder_panel_layout_ports
   where panel_layout_id = new.panel_layout_id
-    and row_index = new.row_index
     and id is distinct from new.id
+    and row_index < new.row_index + new.span_h
+    and row_index + span_h > new.row_index
     and hole_index < new.hole_index + new.span_w
     and hole_index + span_w > new.hole_index;
 
   if overlap_count > 0 then
-    raise exception 'RB_PORT_OVERLAP: port overlaps with existing port on row_index=%', new.row_index;
+    raise exception 'RB_PORT_OVERLAP: port overlaps with existing port spanning row_index=% span_h=%', new.row_index, new.span_h;
   end if;
 
   return new;
@@ -61,7 +68,8 @@ begin
     select id, hole_index, span_w into violating_port
     from rack_builder_panel_layout_ports
     where panel_layout_id = new.panel_layout_id
-      and row_index = new.row_index
+      and row_index <= new.row_index
+      and row_index + span_h > new.row_index
       and hole_index + span_w > new.hole_count
     limit 1;
 

@@ -116,10 +116,15 @@ async function copyDeviceCategories(): Promise<Map<string, string>> {
   const rowsToInsert: typeof rows = []
 
   for (const row of rows) {
-    const existingId = existingIdByLowerName.get(String(row.name).toLowerCase())
+    const lowerName = String(row.name).toLowerCase()
+    const existingId = existingIdByLowerName.get(lowerName)
     if (existingId) {
       idRemap.set(row.id, existingId)
     } else {
+      // Track this row's own name too, so a later source row with the same
+      // (case-insensitive) name remaps to it instead of both being inserted
+      // and colliding on the target's unique lower(name) index.
+      existingIdByLowerName.set(lowerName, row.id)
       rowsToInsert.push(row)
     }
   }
@@ -151,18 +156,23 @@ async function copyBucket(sourceBucket: string, targetBucket: string): Promise<v
   const paths = await listAllPaths(sourceBucket, '')
   console.log(`  ${sourceBucket}: ${paths.length} objects`)
 
+  const failures: string[] = []
   for (const path of paths) {
     const { data: blob, error: downloadError } = await oldClient.storage.from(sourceBucket).download(path)
     if (downloadError || !blob) {
-      console.warn(`    skip ${path}: ${downloadError?.message ?? 'no data'}`)
+      failures.push(`${path}: ${downloadError?.message ?? 'no data'}`)
       continue
     }
     const { error: uploadError } = await newClient.storage.from(targetBucket).upload(path, blob, { upsert: true })
     if (uploadError) {
-      console.warn(`    failed ${path}: ${uploadError.message}`)
+      failures.push(`${path}: ${uploadError.message}`)
     }
   }
   void objects
+
+  if (failures.length > 0) {
+    throw new Error(`Failed to copy ${failures.length}/${paths.length} object(s) from ${sourceBucket}:\n  ${failures.join('\n  ')}`)
+  }
 }
 
 /** Recursively lists every object path under a folder prefix (list() is not recursive). */
@@ -185,11 +195,16 @@ async function listAllPaths(bucket: string, prefix: string): Promise<string[]> {
 
 async function verifyRowCounts(): Promise<void> {
   console.log('\nRow count comparison:')
+  let hasMismatch = false
   for (const step of TABLE_STEPS) {
     const { count: sourceCount } = await oldClient.from(step.sourceTable).select('*', { count: 'exact', head: true })
     const { count: targetCount } = await newClient.from(step.targetTable).select('*', { count: 'exact', head: true })
-    const flag = sourceCount === targetCount ? 'ok' : 'MISMATCH'
-    console.log(`  ${step.targetTable}: source=${sourceCount ?? 0} target=${targetCount ?? 0} [${flag}]`)
+    const matches = sourceCount === targetCount
+    if (!matches) hasMismatch = true
+    console.log(`  ${step.targetTable}: source=${sourceCount ?? 0} target=${targetCount ?? 0} [${matches ? 'ok' : 'MISMATCH'}]`)
+  }
+  if (hasMismatch) {
+    throw new Error('Row count verification failed - see MISMATCH rows above')
   }
 }
 

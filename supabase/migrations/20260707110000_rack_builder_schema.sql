@@ -149,11 +149,13 @@ create index rack_builder_panel_layout_ports_panel_layout_id_idx
 
 create extension if not exists btree_gist;
 
+-- Ranges (not row_index equality) so a port with span_h > 1 is checked for
+-- overlap against every row it visually spans, not just its starting row.
 alter table rack_builder_panel_layout_ports
   add constraint rack_builder_panel_layout_ports_no_overlap_excl
   exclude using gist (
     panel_layout_id with =,
-    row_index with =,
+    int4range(row_index, row_index + span_h) with &&,
     int4range(hole_index, hole_index + span_w) with &&
   );
 

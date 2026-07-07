@@ -12,7 +12,7 @@
     "src/components/tours/TourDateManagementDialog.tsx": 1342,
     "src/components/matrix/StaffingCampaignPanel.tsx": 1297,
     "src/components/soundvision/SoundVisionInteractiveMap.tsx": 1293,
-    "src/routes/app-route-manifest.tsx": 1387,
+    "src/routes/app-route-manifest.tsx": 1410,
     "src/utils/rates-pdf-export.ts": 1244,
     "src/components/festival/ArtistTable.tsx": 1242,
     "src/components/matrix/AssignJobDialog.tsx": 1238,

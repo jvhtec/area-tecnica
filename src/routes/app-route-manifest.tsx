@@ -13,6 +13,7 @@ import {
   canManagePayouts,
   hasTechnicianSelfServiceAccess,
   isAdminRole,
+  isManagementRole,
 } from "@/utils/permissions";
 
 type RouteComponent = React.LazyExoticComponent<React.ComponentType<Record<string, never>>>;
@@ -79,6 +80,27 @@ const FestivalsDepartmentGuard = ({ children }: { children: React.ReactNode }) =
   const isSoundMember = userDepartment?.toLowerCase() === SOUND_DEPARTMENT;
 
   if (!isAdmin && !isSoundMember) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Mirrors the rack_builder_* RLS boundary exactly (current_user_department()
+// = ANY (ARRAY['sound','admin','management']) OR is_admin_or_management()),
+// so a house_tech in another department can't land on a page that RLS then
+// renders empty/broken for them - see PR #824 review discussion.
+const RackBuilderDepartmentGuard = ({ children }: { children: React.ReactNode }) => {
+  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+
+  if (isLoading) {
+    return <RedirectingAccessLoader />;
+  }
+
+  const isManagement = isManagementRole(userRole);
+  const isSoundMember = userDepartment?.toLowerCase() === SOUND_DEPARTMENT;
+
+  if (!isManagement && !isSoundMember) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -154,6 +176,7 @@ export const accessPolicies = {
   }),
   soundTools: withRoleAccess(SOUND_TOOL_ROLES),
   soundToolsWithTechnician: withRoleAccess(SOUND_TOOL_ROLES_WITH_TECH),
+  rackBuilder: withRoleAccess(SOUND_TOOL_ROLES, { guard: RackBuilderDepartmentGuard }),
 } as const;
 
 export type AccessPolicyId = keyof typeof accessPolicies;
@@ -927,7 +950,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder",
     component: RackBuilderProjectManagerPage,
     layout: "app",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder" },
   },
   {
@@ -935,7 +958,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/projects",
     component: RackBuilderProjectManagerPage,
     layout: "app",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder" },
   },
   {
@@ -943,7 +966,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/racks",
     component: RackBuilderRackManagerPage,
     layout: "app",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Racks" },
   },
   {
@@ -951,7 +974,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/devices",
     component: RackBuilderDeviceManagerPage,
     layout: "app",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Devices" },
   },
   {
@@ -959,7 +982,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/connectors",
     component: RackBuilderConnectorManagerPage,
     layout: "app",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Connectors" },
   },
   {
@@ -967,7 +990,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/panels",
     component: RackBuilderPanelLayoutsOverviewPage,
     layout: "app",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Panel Layouts" },
   },
   {
@@ -975,7 +998,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/editor/project/:projectId",
     component: RackBuilderLayoutEditorPage,
     layout: "fullscreen",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Editor" },
   },
   {
@@ -983,7 +1006,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/editor/project/:projectId/panels",
     component: RackBuilderPanelLayoutManagerPage,
     layout: "app",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Panel Layouts" },
   },
   {
@@ -991,7 +1014,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/editor/project/:projectId/panels/:panelLayoutId",
     component: RackBuilderPanelLayoutEditorPage,
     layout: "fullscreen",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Panel Editor" },
   },
   {
@@ -999,7 +1022,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/editor/project/:projectId/panels/:panelLayoutId/print",
     component: RackBuilderPanelLayoutPrintPage,
     layout: "fullscreen",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Panel Print" },
   },
   {
@@ -1007,7 +1030,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/editor/project/:projectId/print/all",
     component: RackBuilderProjectPrintPage,
     layout: "fullscreen",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Project Print" },
   },
   {
@@ -1015,7 +1038,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/rack-builder/editor/project/:projectId/print/:layoutId",
     component: RackBuilderLayoutPrintPage,
     layout: "fullscreen",
-    access: "soundTools",
+    access: "rackBuilder",
     breadcrumb: { label: "Rack Builder – Layout Print" },
   },
   {
