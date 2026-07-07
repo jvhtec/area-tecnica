@@ -364,6 +364,26 @@ async function notifyRiderUpload(
   }
 }
 
+async function clearArtistRiderFreshness(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  artistId: string,
+) {
+  const { error } = await supabaseAdmin
+    .from("festival_artists")
+    .update({
+      rider_missing: false,
+      rider_outdated: false,
+      rider_copied_from_date: null,
+      rider_outdated_dismissed: false,
+    })
+    .eq("id", artistId);
+
+  if (error) {
+    console.error("[upload-public-artist-rider] artist rider freshness update error", error);
+    throw new Error("artist_rider_state_update_failed");
+  }
+}
+
 async function insertUploadedRiderFiles(
   supabaseAdmin: ReturnType<typeof createClient>,
   context: UploadContext,
@@ -424,6 +444,8 @@ async function insertUploadedRiderFiles(
 
       insertedFiles.push(insertedFile as Record<string, unknown>);
     }
+
+    await clearArtistRiderFreshness(supabaseAdmin, context.formRow.artist_id);
   } catch (error) {
     if (insertedFiles.length > 0) {
       const insertedIds = insertedFiles
@@ -750,6 +772,8 @@ serve(createHttpHandler(async (req) => {
 
         insertedFiles.push(insertedFile as Record<string, unknown>);
       }
+
+      await clearArtistRiderFreshness(supabaseAdmin, formRow.artist_id);
     } catch (uploadError) {
       if (uploadedPaths.length > 0) {
         await supabaseAdmin.storage.from("festival_artist_files").remove(uploadedPaths);

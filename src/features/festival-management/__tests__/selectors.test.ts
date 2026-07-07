@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { formatInTimeZone } from "date-fns-tz";
 
 import {
+  buildRiderLibraryEntries,
   buildFestivalStageOptions,
   buildFestivalWhatsappStageOptions,
   buildJobDates,
   formatFestivalDateLabel,
+  getArtistRiderStatus,
   getFestivalFlexStatus,
   groupFestivalRiderFiles,
   normalizeFestivalWhatsappStage,
@@ -70,6 +72,67 @@ describe("festival management selectors", () => {
     ];
 
     expect(groupFestivalRiderFiles(files).map((group) => group.artistName)).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("derives rider status with missing taking priority over outdated", () => {
+    expect(getArtistRiderStatus({ rider_missing: true, rider_outdated: true })).toBe("missing");
+    expect(getArtistRiderStatus({ rider_missing: false, rider_outdated: true })).toBe("outdated");
+    expect(getArtistRiderStatus({ rider_missing: false, rider_copied_from_date: "2026-06-01" })).toBe("outdated");
+    expect(
+      getArtistRiderStatus({
+        rider_missing: false,
+        rider_outdated: true,
+        rider_outdated_dismissed: true,
+      }),
+    ).toBe("complete");
+    expect(getArtistRiderStatus({ rider_missing: false })).toBe("complete");
+  });
+
+  it("builds rider library entries sorted by latest upload and flags duplicate file paths", () => {
+    const entries = buildRiderLibraryEntries({
+      artistsById: {
+        "artist-a": { id: "artist-a", name: "Alpha", job_id: "job-a", date: "2026-06-01", stage: 2 },
+        "artist-b": { id: "artist-b", name: "Beta", job_id: "job-b", date: "2026-05-01", stage: 1 },
+      },
+      files: [
+        {
+          id: "file-old",
+          artist_id: "artist-a",
+          file_name: "alpha-old.pdf",
+          file_path: "riders/alpha-old.pdf",
+          uploaded_at: "2026-05-01T10:00:00.000Z",
+        },
+        {
+          id: "file-new",
+          artist_id: "artist-a",
+          file_name: "alpha-new.pdf",
+          file_path: "riders/alpha-new.pdf",
+          uploaded_at: "2026-06-01T10:00:00.000Z",
+        },
+        {
+          id: "file-beta",
+          artist_id: "artist-b",
+          file_name: "beta.pdf",
+          file_path: "riders/beta.pdf",
+          uploaded_at: "2026-07-01T10:00:00.000Z",
+        },
+      ],
+      jobsById: {
+        "job-a": { id: "job-a", title: "Source A", job_type: "festival" },
+        "job-b": { id: "job-b", title: "Source B", job_type: "tourdate" },
+      },
+      targetFilePaths: ["riders/alpha-new.pdf"],
+    });
+
+    expect(entries.map((entry) => entry.artistName)).toEqual(["Beta", "Alpha"]);
+    expect(entries[1]).toMatchObject({
+      alreadyImported: true,
+      duplicateFilePaths: ["riders/alpha-new.pdf"],
+      latestUploadedAt: "2026-06-01T10:00:00.000Z",
+      sourceJobTitle: "Source A",
+      sourceStage: 2,
+    });
+    expect(entries[1].files.map((file) => file.file_name)).toEqual(["alpha-new.pdf", "alpha-old.pdf"]);
   });
 
   it("normalizes WhatsApp stage state by department and stage count", () => {

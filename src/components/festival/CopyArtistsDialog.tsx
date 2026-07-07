@@ -273,6 +273,7 @@ export const CopyArtistsDialog = ({
           // can flag it as "outdated" (vs missing) and prompt for a fresher
           // rider. artistData.date still holds the source date here.
           rider_copied_from_date: artistData.date || null,
+          rider_outdated: true,
           rider_outdated_dismissed: false,
           // Reset times if option is selected
           show_start: copyOptions.resetTimes ? null : artistData.show_start,

@@ -64,6 +64,7 @@ export const ArtistTableFilters = ({
             <SelectContent>
               <SelectItem value="all">Todos los riders</SelectItem>
               <SelectItem value="complete">Rider completo</SelectItem>
+              <SelectItem value="outdated">Rider desactualizado</SelectItem>
               <SelectItem value="missing">Rider faltante</SelectItem>
             </SelectContent>
           </Select>

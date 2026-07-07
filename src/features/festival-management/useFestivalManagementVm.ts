@@ -49,6 +49,8 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [isRouteSheetOpen, setIsRouteSheetOpen] = useState(false);
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
+  const [isRiderLibraryOpen, setIsRiderLibraryOpen] = useState(false);
+  const [riderLibraryInitialDate, setRiderLibraryInitialDate] = useState<string | null>(null);
 
   const flexControls = useFestivalFlexControls({
     fetchDocuments: documents.fetchDocuments,
@@ -141,6 +143,11 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
     setIsRouteSheetOpen(true);
   }, []);
 
+  const handleOpenRiderLibrary = useCallback((initialDate?: string | null) => {
+    setRiderLibraryInitialDate(initialDate ?? null);
+    setIsRiderLibraryOpen(true);
+  }, []);
+
   const handleOpenJobDetails = useCallback(() => {
     if (!jobData.job) return;
     setIsJobDetailsOpen(true);
@@ -211,6 +218,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       handleOpenAssignments,
       handleOpenJobDetails,
       handleOpenRouteSheet,
+      handleOpenRiderLibrary,
       handleRefreshAll,
       navigateToCalculator,
 
@@ -218,6 +226,9 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       setIsAssignmentDialogOpen,
       isRouteSheetOpen,
       setIsRouteSheetOpen,
+      isRiderLibraryOpen,
+      setIsRiderLibraryOpen,
+      riderLibraryInitialDate,
       isJobDetailsOpen,
       setIsJobDetailsOpen,
       isJobPresetsOpen,

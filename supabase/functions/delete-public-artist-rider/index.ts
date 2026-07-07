@@ -146,26 +146,38 @@ serve(createHttpHandler(async (req) => {
       return jsonResponse({ ok: false, error: "file_not_found" }, { status: 404 });
     }
 
-    const { error: storageError } = await supabaseAdmin.storage
-      .from("festival_artist_files")
-      .remove([fileRow.file_path]);
-
-    if (storageError) {
-      console.error("[delete-public-artist-rider] storage remove error", storageError);
-    }
-
-    const { error: deleteError } = await supabaseAdmin
-      .from("festival_artist_files")
-      .delete()
-      .eq("id", fileRow.id)
-      .eq("artist_id", formRow.artist_id);
+    const { data: deleteRows, error: deleteError } = await supabaseAdmin
+      .rpc("delete_festival_artist_file_reference", {
+        p_artist_id: formRow.artist_id,
+        p_file_id: fileRow.id,
+      });
 
     if (deleteError) {
+      if (deleteError.code === "P0002" || deleteError.message === "file_not_found") {
+        return jsonResponse({ ok: true, deleted_file_id: fileRow.id, already_deleted: true }, { status: 200 });
+      }
+
       console.error("[delete-public-artist-rider] metadata delete error", deleteError);
       return jsonResponse({ ok: false, error: "metadata_delete_failed" }, { status: 500 });
     }
 
-    return jsonResponse({ ok: true, deleted_file_id: fileRow.id }, { status: 200 });
+    const deleteResult = deleteRows?.[0];
+    if (!deleteResult) {
+      console.error("[delete-public-artist-rider] metadata delete returned no result");
+      return jsonResponse({ ok: false, error: "metadata_delete_failed" }, { status: 500 });
+    }
+
+    if (deleteResult.should_delete_storage && deleteResult.file_path) {
+      const { error: storageError } = await supabaseAdmin.storage
+        .from("festival_artist_files")
+        .remove([deleteResult.file_path]);
+
+      if (storageError) {
+        console.error("[delete-public-artist-rider] storage remove error", storageError);
+      }
+    }
+
+    return jsonResponse({ ok: true, deleted_file_id: deleteResult.deleted_file_id }, { status: 200 });
   } catch (error) {
     if (error instanceof HttpError) throw error;
     console.error("[delete-public-artist-rider] unexpected error", error);

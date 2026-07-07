@@ -19,6 +19,7 @@ import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { fetchJobLogo, fetchLogoUrl } from "@/utils/pdf/logoUtils";
 import { ensurePublicArtistFormLinks } from "@/utils/publicArtistFormLinks";
 import { buildReadableFilename } from "@/utils/fileName";
+import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 import {
   attachShiftAssignmentsAndProfiles,
   buildArtistTableArtists,
@@ -274,8 +275,7 @@ export const PrintOptionsDialog = ({
       throw error;
     }
 
-    // Missing riders, plus copied riders flagged outdated (unless dismissed).
-    const missingRiderArtists = artists?.filter(artist => Boolean(artist.rider_missing) || (Boolean(artist.rider_copied_from_date) && !artist.rider_outdated_dismissed)) || [];
+    const missingRiderArtists = artists?.filter((artist) => getArtistRiderStatus(artist) !== 'complete') || [];
 
     const { data: stageRows } = await dataLayerClient.from('festival_stages')
       .select('number, name')
@@ -300,19 +300,19 @@ export const PrintOptionsDialog = ({
     const missingRiderData: MissingRiderReportData = {
       jobTitle,
       logoUrl,
-      artists: missingRiderArtists.map(artist => ({
-        id: artist.id,
-        name: artist.name || 'Unnamed Artist',
-        stage: artist.stage || 1,
-        stageName: stageNameByNumber.get(Number(artist.stage || 1)) || `Escenario ${artist.stage || 1}`,
-        date: artist.date || '',
-        showTime: {
-          start: artist.show_start || '',
-          end: artist.show_end || ''
-        },
-        formUrl: publicFormLinksByArtistId[artist.id],
-        status: artist.rider_missing ? 'missing' : 'outdated',
-        copiedFromDate: artist.rider_copied_from_date || undefined,
+      artists: missingRiderArtists.map((artist) => ({
+          id: artist.id,
+          name: artist.name || 'Unnamed Artist',
+          stage: artist.stage || 1,
+          stageName: stageNameByNumber.get(Number(artist.stage || 1)) || `Escenario ${artist.stage || 1}`,
+          date: artist.date || '',
+          showTime: {
+            start: artist.show_start || '',
+            end: artist.show_end || ''
+          },
+          formUrl: publicFormLinksByArtistId[artist.id],
+          status: getArtistRiderStatus(artist) === 'missing' ? 'missing' as const : 'outdated' as const,
+          copiedFromDate: artist.rider_copied_from_date || undefined,
       }))
     };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarX, MessageCircle, Plus, RefreshCw } from "lucide-react";
+import { CalendarX, Library, MessageCircle, Plus, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
 import { format } from "date-fns";
@@ -22,9 +22,16 @@ interface FestivalSchedulingProps {
   jobDates: Date[];
   isViewOnly?: boolean;
   onCreateWhatsappGroup?: () => void;
+  onOpenRiderLibrary?: (selectedDate?: string) => void;
 }
 
-export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false, onCreateWhatsappGroup }: FestivalSchedulingProps) => {
+export const FestivalScheduling = ({
+  jobId,
+  jobDates,
+  isViewOnly = false,
+  onCreateWhatsappGroup,
+  onOpenRiderLibrary,
+}: FestivalSchedulingProps) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("table");
@@ -227,6 +234,17 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false, onCrea
               >
                 <MessageCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">WhatsApp</span>
+              </Button>
+            )}
+            {!isViewOnly && onOpenRiderLibrary && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onOpenRiderLibrary(selectedDate)}
+                className="flex items-center gap-1"
+              >
+                <Library className="h-4 w-4" />
+                <span className="hidden sm:inline">Riders</span>
               </Button>
             )}
             {!isViewOnly && (

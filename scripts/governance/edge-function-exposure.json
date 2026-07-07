@@ -21,6 +21,7 @@
     "csp-report": { "class": "public-token", "verifyJwt": false, "internalGuard": "Browser report endpoint with no credentials. Applies a durable service-role rate limit, reads a size-bounded body, normalizes reports, strips query strings, and writes only normalized records via the service role. Returns 204 with no data." },
     "delete-public-artist-rider": { "class": "public-token", "verifyJwt": false, "internalGuard": "Festival artist form access token validated against the submission before any storage delete; guarded by durable ingress and token/document scoped rate limits." },
     "delete-user": { "class": "privileged-role", "verifyJwt": true },
+    "enrich-artist-metadata": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAuthenticatedRole to restrict callers to admin/management/logistics before resolving or caching any Wikidata/Wikipedia metadata." },
     "evaluate-achievements": { "class": "service-only", "verifyJwt": true, "internalGuard": "Requires a service-role bearer/apikey via requireServiceRoleRequest before running achievement evaluation RPCs." },
     "fetch-flex-contact-info": {
       "class": "privileged-role",

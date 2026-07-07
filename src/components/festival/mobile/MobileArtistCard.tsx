@@ -17,6 +17,7 @@ import {
   type FohDrive,
   type ConsolePosition,
 } from "@/constants/consoleDrive";
+import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 
 interface Artist {
   id: string;
@@ -56,6 +57,7 @@ interface Artist {
   notes?: string;
   rider_missing?: boolean;
   rider_copied_from_date?: string | null;
+  rider_outdated?: boolean;
   rider_outdated_dismissed?: boolean;
   foh_tech?: boolean;
   mon_tech?: boolean;
@@ -301,7 +303,7 @@ export const MobileArtistCard = ({
                 </Badge>
               )}
               <Badge variant="outline" className="text-[10px]">{stageName}</Badge>
-              {artist.rider_copied_from_date && !artist.rider_outdated_dismissed ? (
+              {getArtistRiderStatus(artist) === "outdated" ? (
                 <OutdatedRiderBadge
                   artistId={artist.id}
                   copiedFromDate={artist.rider_copied_from_date}

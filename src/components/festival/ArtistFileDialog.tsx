@@ -129,12 +129,30 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
         }
       }
 
+      const { error: artistUpdateError } = await dataLayerClient
+        .from("festival_artists")
+        .update({
+          rider_missing: false,
+          rider_outdated: false,
+          rider_copied_from_date: null,
+          rider_outdated_dismissed: false,
+        })
+        .eq("id", artistId);
+
+      if (artistUpdateError) {
+        console.error("Artist rider state update error:", artistUpdateError);
+      }
+
+      const uploadSuccessDescription =
+        selectedFiles.length === 1
+          ? "Archivo cargado correctamente"
+          : `${selectedFiles.length} archivos cargados correctamente`;
+
       toast({
-        title: "Éxito",
-        description:
-          selectedFiles.length === 1
-            ? "Archivo cargado correctamente"
-            : `${selectedFiles.length} archivos cargados correctamente`,
+        title: artistUpdateError ? "Carga completada con aviso" : "Éxito",
+        description: artistUpdateError
+          ? `${uploadSuccessDescription}, pero no se pudo actualizar el estado del rider.`
+          : uploadSuccessDescription,
       });
 
       fetchFiles();
@@ -165,24 +183,29 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
     if (!selectedFile) return;
 
     try {
-      // First delete from storage
-      const { error: storageError } = await dataLayerClient.storage
-        .from('festival_artist_files')
-        .remove([selectedFile.file_path]);
-
-      if (storageError) {
-        console.error("Storage delete error:", storageError);
-        throw storageError;
-      }
-
-      // Then delete the database record
-      const { error: dbError } = await dataLayerClient.from('festival_artist_files')
-        .delete()
-        .eq('id', selectedFile.id);
+      const { data: deleteRows, error: dbError } = await dataLayerClient
+        .rpc("delete_festival_artist_file_reference", {
+          p_file_id: selectedFile.id,
+        });
 
       if (dbError) {
         console.error("Database delete error:", dbError);
         throw dbError;
+      }
+
+      const deleteResult = deleteRows?.[0];
+      if (!deleteResult) {
+        throw new Error("No se recibió confirmación de eliminación.");
+      }
+
+      if (deleteResult.should_delete_storage && deleteResult.file_path) {
+        const { error: storageError } = await dataLayerClient.storage
+          .from('festival_artist_files')
+          .remove([deleteResult.file_path]);
+
+        if (storageError) {
+          console.error("Storage delete error:", storageError);
+        }
       }
 
       toast({
