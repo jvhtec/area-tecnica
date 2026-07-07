@@ -967,7 +967,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderRackManagerPage,
     layout: "app",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Racks" },
+    breadcrumb: { label: "Rack Builder – Bastidores" },
   },
   {
     id: "rackBuilderDevices",
@@ -975,7 +975,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderDeviceManagerPage,
     layout: "app",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Devices" },
+    breadcrumb: { label: "Rack Builder – Dispositivos" },
   },
   {
     id: "rackBuilderConnectors",
@@ -983,7 +983,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderConnectorManagerPage,
     layout: "app",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Connectors" },
+    breadcrumb: { label: "Rack Builder – Conectores" },
   },
   {
     id: "rackBuilderPanelsOverview",
@@ -991,7 +991,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderPanelLayoutsOverviewPage,
     layout: "app",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Panel Layouts" },
+    breadcrumb: { label: "Rack Builder – Diseños de panel" },
   },
   {
     id: "rackBuilderLayoutEditor",
@@ -1007,7 +1007,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderPanelLayoutManagerPage,
     layout: "app",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Panel Layouts" },
+    breadcrumb: { label: "Rack Builder – Diseños de panel" },
   },
   {
     id: "rackBuilderPanelEditor",
@@ -1015,7 +1015,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderPanelLayoutEditorPage,
     layout: "fullscreen",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Panel Editor" },
+    breadcrumb: { label: "Rack Builder – Editor de panel" },
   },
   {
     id: "rackBuilderPanelPrint",
@@ -1023,7 +1023,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderPanelLayoutPrintPage,
     layout: "fullscreen",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Panel Print" },
+    breadcrumb: { label: "Rack Builder – Impresión de panel" },
   },
   {
     id: "rackBuilderProjectPrintAll",
@@ -1031,7 +1031,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderProjectPrintPage,
     layout: "fullscreen",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Project Print" },
+    breadcrumb: { label: "Rack Builder – Impresión de proyecto" },
   },
   {
     id: "rackBuilderLayoutPrint",
@@ -1039,7 +1039,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: RackBuilderLayoutPrintPage,
     layout: "fullscreen",
     access: "rackBuilder",
-    breadcrumb: { label: "Rack Builder – Layout Print" },
+    breadcrumb: { label: "Rack Builder – Impresión de diseño" },
   },
   {
     id: "videoConsumosTool",

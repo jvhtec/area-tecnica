@@ -145,14 +145,6 @@ async function copyDeviceCategories(): Promise<Map<string, string>> {
 }
 
 async function copyBucket(sourceBucket: string, targetBucket: string): Promise<void> {
-  const { data: objects, error: listError } = await oldClient.storage.from(sourceBucket).list(undefined, {
-    limit: 1000,
-    sortBy: { column: 'name', order: 'asc' },
-  })
-  if (listError) {
-    throw new Error(`Failed to list ${sourceBucket}: ${listError.message}`)
-  }
-
   const paths = await listAllPaths(sourceBucket, '')
   console.log(`  ${sourceBucket}: ${paths.length} objects`)
 
@@ -168,8 +160,6 @@ async function copyBucket(sourceBucket: string, targetBucket: string): Promise<v
       failures.push(`${path}: ${uploadError.message}`)
     }
   }
-  void objects
-
   if (failures.length > 0) {
     throw new Error(`Failed to copy ${failures.length}/${paths.length} object(s) from ${sourceBucket}:\n  ${failures.join('\n  ')}`)
   }
@@ -178,7 +168,10 @@ async function copyBucket(sourceBucket: string, targetBucket: string): Promise<v
 /** Recursively lists every object path under a folder prefix (list() is not recursive). */
 async function listAllPaths(bucket: string, prefix: string): Promise<string[]> {
   const { data: entries, error } = await oldClient.storage.from(bucket).list(prefix, { limit: 1000 })
-  if (error || !entries) return []
+  if (error) {
+    throw new Error(`Failed to list ${bucket}${prefix ? `/${prefix}` : ''}: ${error.message}`)
+  }
+  if (!entries) return []
 
   const paths: string[] = []
   for (const entry of entries) {

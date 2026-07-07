@@ -54,14 +54,20 @@ SELECT ok(
 );
 
 SELECT ok(
-  has_table_privilege('authenticated', 'public.rack_builder_projects', 'SELECT, INSERT, UPDATE, DELETE')
-  AND has_table_privilege('authenticated', 'public.rack_builder_devices', 'SELECT, INSERT, UPDATE, DELETE'),
+  (
+    SELECT bool_and(has_table_privilege('authenticated', target_table, target_privilege))
+    FROM unnest(ARRAY['public.rack_builder_projects', 'public.rack_builder_devices']) AS tables(target_table)
+    CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) AS privileges(target_privilege)
+  ),
   'authenticated users have table grants before RLS filtering'
 );
 
 SELECT ok(
-  has_table_privilege('service_role', 'public.rack_builder_projects', 'SELECT, INSERT, UPDATE, DELETE')
-  AND has_table_privilege('service_role', 'public.rack_builder_devices', 'SELECT, INSERT, UPDATE, DELETE'),
+  (
+    SELECT bool_and(has_table_privilege('service_role', target_table, target_privilege))
+    FROM unnest(ARRAY['public.rack_builder_projects', 'public.rack_builder_devices']) AS tables(target_table)
+    CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) AS privileges(target_privilege)
+  ),
   'service_role retains rack_builder table access for migration/backfill'
 );
 
