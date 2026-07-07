@@ -15,9 +15,7 @@ import { DRAWING_STATE_OPTIONS } from '@/features/rack-builder/lib/drawingState'
 import type { DeviceFacing, DrawingState, PanelLayoutPort, PanelLayoutRow } from '@/features/rack-builder/types'
 import PanelLayoutCanvas from '@/features/rack-builder/components/panels/PanelLayoutCanvas'
 import PanelLayoutMobileView from '@/features/rack-builder/components/panels/PanelLayoutMobileView'
-import { CONNECTOR_ITEM_TYPE } from '@/features/rack-builder/components/panels/panelDndTypes'
 import {
-  AUTO_HOLE_COUNT,
   CATEGORY_DOT,
   DarkInput,
   DarkLabel,

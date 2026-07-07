@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { DndProvider } from 'react-dnd'
 import { useProjectRecord } from '@/features/rack-builder/hooks/useProjectRecord'
 import { useLayoutItems } from '@/features/rack-builder/hooks/useLayoutItems'
 import { useDevices } from '@/features/rack-builder/hooks/useDevices'

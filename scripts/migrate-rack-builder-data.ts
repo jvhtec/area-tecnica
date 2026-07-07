@@ -41,10 +41,12 @@ interface TableCopyStep {
   sourceTable: string
   targetTable: string
   conflictKey: string
+  /** Handled separately by copyDeviceCategories() - kept here only so verifyRowCounts() covers it. */
+  skipGenericCopy?: boolean
 }
 
 const TABLE_STEPS: TableCopyStep[] = [
-  { sourceTable: 'device_categories', targetTable: 'rack_builder_device_categories', conflictKey: 'id' },
+  { sourceTable: 'device_categories', targetTable: 'rack_builder_device_categories', conflictKey: 'id', skipGenericCopy: true },
   { sourceTable: 'devices', targetTable: 'rack_builder_devices', conflictKey: 'id' },
   { sourceTable: 'racks', targetTable: 'rack_builder_racks', conflictKey: 'id' },
   { sourceTable: 'projects', targetTable: 'rack_builder_projects', conflictKey: 'id' },
@@ -61,7 +63,7 @@ const BUCKET_STEPS = [
   { sourceBucket: 'connector-images', targetBucket: 'rack-builder-connector-images' },
 ]
 
-async function copyTable(step: TableCopyStep): Promise<void> {
+async function copyTable(step: TableCopyStep, rowTransform?: (row: Record<string, unknown>) => Record<string, unknown>): Promise<void> {
   const { data: rows, error: fetchError } = await oldClient.from(step.sourceTable).select('*')
   if (fetchError) {
     throw new Error(`Failed to read ${step.sourceTable}: ${fetchError.message}`)
@@ -71,13 +73,70 @@ async function copyTable(step: TableCopyStep): Promise<void> {
     return
   }
 
+  const payload = rowTransform ? rows.map(rowTransform) : rows
   const { error: upsertError } = await newClient
     .from(step.targetTable)
-    .upsert(rows, { onConflict: step.conflictKey })
+    .upsert(payload, { onConflict: step.conflictKey })
   if (upsertError) {
     throw new Error(`Failed to write ${step.targetTable}: ${upsertError.message}`)
   }
   console.log(`  ${step.sourceTable} -> ${step.targetTable}: ${rows.length} rows`)
+}
+
+/**
+ * device_categories needs special handling: the target already seeds an
+ * 'Uncategorized' row (with its own generated id) under a unique
+ * lower(name) index. Copying source categories by id would collide on that
+ * seed and abort the whole migration. Instead, merge by name - reuse the
+ * target's id for any name that already exists there, and only insert
+ * genuinely new categories under their original id. The returned map lets
+ * the devices step rewrite category_id to match wherever a merge happened.
+ */
+async function copyDeviceCategories(): Promise<Map<string, string>> {
+  const { data: rows, error: fetchError } = await oldClient.from('device_categories').select('*')
+  if (fetchError) {
+    throw new Error(`Failed to read device_categories: ${fetchError.message}`)
+  }
+  if (!rows || rows.length === 0) {
+    console.log('  device_categories: no rows')
+    return new Map()
+  }
+
+  const { data: existingRows, error: existingError } = await newClient
+    .from('rack_builder_device_categories')
+    .select('id, name')
+  if (existingError) {
+    throw new Error(`Failed to read rack_builder_device_categories: ${existingError.message}`)
+  }
+
+  const existingIdByLowerName = new Map<string, string>(
+    (existingRows ?? []).map((row: { id: string; name: string }) => [row.name.toLowerCase(), row.id]),
+  )
+  const idRemap = new Map<string, string>()
+  const rowsToInsert: typeof rows = []
+
+  for (const row of rows) {
+    const existingId = existingIdByLowerName.get(String(row.name).toLowerCase())
+    if (existingId) {
+      idRemap.set(row.id, existingId)
+    } else {
+      rowsToInsert.push(row)
+    }
+  }
+
+  if (rowsToInsert.length > 0) {
+    const { error: upsertError } = await newClient
+      .from('rack_builder_device_categories')
+      .upsert(rowsToInsert, { onConflict: 'id' })
+    if (upsertError) {
+      throw new Error(`Failed to write rack_builder_device_categories: ${upsertError.message}`)
+    }
+  }
+
+  console.log(
+    `  device_categories -> rack_builder_device_categories: ${rowsToInsert.length} inserted, ${idRemap.size} merged by name`,
+  )
+  return idRemap
 }
 
 async function copyBucket(sourceBucket: string, targetBucket: string): Promise<void> {
@@ -136,8 +195,18 @@ async function verifyRowCounts(): Promise<void> {
 
 async function main() {
   console.log('Copying tables (FK-safe order)...')
+  const categoryIdRemap = await copyDeviceCategories()
+
   for (const step of TABLE_STEPS) {
-    await copyTable(step)
+    if (step.skipGenericCopy) continue
+    const rowTransform =
+      step.sourceTable === 'devices' && categoryIdRemap.size > 0
+        ? (row: Record<string, unknown>) => ({
+            ...row,
+            category_id: categoryIdRemap.get(row.category_id as string) ?? row.category_id,
+          })
+        : undefined
+    await copyTable(step, rowTransform)
   }
 
   console.log('\nCopying storage objects...')

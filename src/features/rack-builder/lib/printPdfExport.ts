@@ -132,6 +132,45 @@ function shouldIgnorePdfCloneElement(element: Element): boolean {
 }
 
 /**
+ * Replaces every `color-mix(...)` call in `css` with a flat opaque fallback,
+ * scanning parens by hand instead of a regex so arbitrarily nested calls
+ * resolve in linear time (a nested-quantifier regex here is vulnerable to
+ * catastrophic backtracking on malformed/unterminated input).
+ */
+function replaceColorMixCalls(css: string): string {
+  const needle = 'color-mix('
+  let result = ''
+  let i = 0
+
+  while (i < css.length) {
+    const idx = css.indexOf(needle, i)
+    if (idx === -1) {
+      result += css.slice(i)
+      break
+    }
+
+    result += css.slice(i, idx)
+    let depth = 1
+    let j = idx + needle.length
+    while (j < css.length && depth > 0) {
+      if (css[j] === '(') depth++
+      else if (css[j] === ')') depth--
+      j++
+    }
+
+    if (depth === 0) {
+      result += 'rgb(0, 0, 0)'
+    } else {
+      // Unterminated call - no matching close paren; keep the original text.
+      result += css.slice(idx, j)
+    }
+    i = j
+  }
+
+  return result
+}
+
+/**
  * Rewrite CSS text to remove color functions that html2canvas-pro cannot parse.
  *
  * html2canvas-pro supports oklab/oklch/lab/lch/color, but NOT color-mix().
@@ -153,11 +192,9 @@ function rewriteUnsupportedColorsInCss(css: string): string {
   )
 
   // 2. Replace standalone color-mix() calls with a safe opaque fallback.
-  //    Nested parentheses are handled by matching up to 2 levels deep.
-  css = css.replace(
-    /color-mix\((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*\)/g,
-    'rgb(0, 0, 0)',
-  )
+  //    Uses a manual balanced-paren scan (not regex) so nesting depth is
+  //    unbounded and matching stays linear time regardless of input shape.
+  css = replaceColorMixCalls(css)
 
   // 3. Strip "in oklab" / "in oklch" from gradient interpolation hints.
   css = css.replace(
