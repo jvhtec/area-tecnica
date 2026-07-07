@@ -131,7 +131,7 @@ vi.mock("@/lib/supabase", () => {
   };
 });
 
-import { createTourRootFoldersManual } from "../tourFolders";
+import { createTourRootFoldersManual } from "@/utils/tourFolders";
 
 describe("createTourRootFoldersManual", () => {
   beforeEach(() => {
