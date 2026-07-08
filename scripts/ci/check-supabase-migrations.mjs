@@ -2,8 +2,9 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = new URL("../..", import.meta.url).pathname;
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const migrationsRoot = join(repoRoot, "supabase", "migrations");
 const files = readdirSync(migrationsRoot)
   .filter((file) => file.endsWith(".sql"))

@@ -4,6 +4,7 @@ import {
   createHttpHandler,
   HttpError,
   jsonResponse,
+  readBoundedJsonObject,
   requireEnvValues,
 } from "../_shared/http.ts";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
@@ -11,6 +12,7 @@ import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 10;
 const MAX_MULTIPART_BODY_BYTES = MAX_FILES_PER_REQUEST * MAX_FILE_SIZE_BYTES + 1024 * 1024;
+const MAX_JSON_BODY_BYTES = 64 * 1024;
 const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const INGRESS_RATE_LIMIT_MAX_REQUESTS = 30;
 const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
@@ -390,6 +392,7 @@ async function insertUploadedRiderFiles(
   files: Array<{ file_name: string; file_path: string; file_type: string | null; file_size: number }>,
 ) {
   const insertedFiles: Array<Record<string, unknown>> = [];
+  const uploadedPaths: string[] = [];
 
   try {
     for (const file of files) {
@@ -425,6 +428,23 @@ async function insertUploadedRiderFiles(
         throw new Error("uploaded_file_type_mismatch");
       }
 
+      const { data: existingReferences, error: existingReferenceError } = await supabaseAdmin
+        .from("festival_artist_files")
+        .select("id")
+        .eq("file_path", file.file_path)
+        .limit(1);
+
+      if (existingReferenceError) {
+        console.error("[upload-public-artist-rider] file metadata lookup error", existingReferenceError);
+        throw new Error("metadata_lookup_failed");
+      }
+
+      if ((existingReferences ?? []).length > 0) {
+        throw new Error("duplicate_file_path");
+      }
+
+      uploadedPaths.push(file.file_path);
+
       const { data: insertedFile, error: insertError } = await supabaseAdmin
         .from("festival_artist_files")
         .insert({
@@ -447,6 +467,16 @@ async function insertUploadedRiderFiles(
 
     await clearArtistRiderFreshness(supabaseAdmin, context.formRow.artist_id);
   } catch (error) {
+    if (uploadedPaths.length > 0) {
+      const { error: cleanupError } = await supabaseAdmin.storage
+        .from("festival_artist_files")
+        .remove(uploadedPaths);
+
+      if (cleanupError) {
+        console.error("[upload-public-artist-rider] signed upload cleanup error", cleanupError);
+      }
+    }
+
     if (insertedFiles.length > 0) {
       const insertedIds = insertedFiles
         .map((file) => String(file.id ?? ""))
@@ -500,8 +530,22 @@ serve(createHttpHandler(async (req) => {
     if (contentType.includes("application/json")) {
       let body: Record<string, unknown>;
       try {
-        body = await req.json() as Record<string, unknown>;
-      } catch {
+        body = await readBoundedJsonObject<Record<string, unknown>>(req, {
+          maxBytes: MAX_JSON_BODY_BYTES,
+        });
+      } catch (error) {
+        if (error instanceof HttpError && error.status === 413) {
+          return jsonResponse({ ok: false, error: "payload_too_large" }, { status: 413 });
+        }
+
+        if (error instanceof HttpError && error.status === 400) {
+          return jsonResponse({ ok: false, error: "invalid_json" }, { status: 400 });
+        }
+
+        throw error;
+      }
+
+      if (!body) {
         return jsonResponse({ ok: false, error: "invalid_json" }, { status: 400 });
       }
 
@@ -599,7 +643,8 @@ serve(createHttpHandler(async (req) => {
             errorCode === "invalid_file_path" ||
             errorCode === "uploaded_file_missing" ||
             errorCode === "uploaded_file_size_mismatch" ||
-            errorCode === "uploaded_file_type_mismatch"
+            errorCode === "uploaded_file_type_mismatch" ||
+            errorCode === "duplicate_file_path"
               ? 400
               : getFileValidationStatus(errorCode);
           return jsonResponse({ ok: false, error: errorCode }, { status });
