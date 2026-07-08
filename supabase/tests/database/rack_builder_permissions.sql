@@ -138,6 +138,7 @@ SELECT ok(
     WHERE conrelid = 'public.rack_builder_panel_layout_ports'::regclass
       AND conname = 'rack_builder_panel_layout_ports_panel_layout_id_fkey'
       AND confrelid = 'public.rack_builder_panel_layouts'::regclass
+      AND pg_get_constraintdef(oid) ILIKE '%ON DELETE CASCADE%'
   ),
   'panel layout ports expose a direct panel layout foreign key for PostgREST embeds'
 );
