@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(25);
+SELECT plan(26);
 
 SELECT has_table('public', 'rack_builder_racks', 'rack builder racks table exists');
 SELECT has_table('public', 'rack_builder_devices', 'rack builder devices table exists');
@@ -129,6 +129,18 @@ SELECT ok(
   NOT has_function_privilege('anon', 'public.rack_builder_rpc_replace_panel_layout_ports(uuid,jsonb)', 'EXECUTE')
   AND has_function_privilege('authenticated', 'public.rack_builder_rpc_replace_panel_layout_ports(uuid,jsonb)', 'EXECUTE'),
   'replace panel layout ports RPC is authenticated-only'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.rack_builder_panel_layout_ports'::regclass
+      AND conname = 'rack_builder_panel_layout_ports_panel_layout_id_fkey'
+      AND confrelid = 'public.rack_builder_panel_layouts'::regclass
+      AND pg_get_constraintdef(oid) ILIKE '%ON DELETE CASCADE%'
+  ),
+  'panel layout ports expose a direct panel layout foreign key for PostgREST embeds'
 );
 
 SELECT ok(

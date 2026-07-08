@@ -6744,6 +6744,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "rack_builder_panel_layout_ports_panel_layout_id_fkey"
+            columns: ["panel_layout_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_panel_layouts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "rack_builder_panel_layout_ports_row_fk"
             columns: ["panel_layout_id", "row_index"]
             isOneToOne: false
