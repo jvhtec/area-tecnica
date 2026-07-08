@@ -262,7 +262,7 @@ SELECT ok(
       AND qual ILIKE '%logistics%'
       AND qual ILIKE '%house_tech%'
       AND qual ILIKE '%festival_artists%'
-      AND qual ILIKE '%NOT EXISTS%'
+      AND qual ILIKE '%NOT%EXISTS%'
       AND qual NOT ILIKE '%''technician''%'
   ),
   'house techs may delete festival artist file storage objects while technicians cannot'
