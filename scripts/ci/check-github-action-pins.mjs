@@ -2,8 +2,9 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = new URL("../..", import.meta.url).pathname;
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const workflowsRoot = join(repoRoot, ".github", "workflows");
 const fullShaPattern = /^[a-f0-9]{40}$/i;
 const problems = [];

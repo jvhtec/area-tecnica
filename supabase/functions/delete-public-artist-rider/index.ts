@@ -168,12 +168,21 @@ serve(createHttpHandler(async (req) => {
     }
 
     if (deleteResult.should_delete_storage && deleteResult.file_path) {
-      const { error: storageError } = await supabaseAdmin.storage
+      const { count: remainingReferences, error: referenceCountError } = await supabaseAdmin
         .from("festival_artist_files")
-        .remove([deleteResult.file_path]);
+        .select("id", { count: "exact", head: true })
+        .eq("file_path", deleteResult.file_path);
 
-      if (storageError) {
-        console.error("[delete-public-artist-rider] storage remove error", storageError);
+      if (referenceCountError) {
+        console.error("[delete-public-artist-rider] storage reference count error", referenceCountError);
+      } else if ((remainingReferences ?? 0) === 0) {
+        const { error: storageError } = await supabaseAdmin.storage
+          .from("festival_artist_files")
+          .remove([deleteResult.file_path]);
+
+        if (storageError) {
+          console.error("[delete-public-artist-rider] storage remove error", storageError);
+        }
       }
     }
 

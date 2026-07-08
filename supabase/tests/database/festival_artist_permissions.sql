@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(17);
+SELECT plan(21);
 
 SELECT is(
   (
@@ -95,11 +95,13 @@ SELECT ok(
       AND qual ILIKE '%admin%'
       AND qual ILIKE '%management%'
       AND qual ILIKE '%logistics%'
+      AND qual ILIKE '%house_tech%'
       AND qual ILIKE '%job_assignments%'
       AND qual ILIKE '%auth.uid%'
+      AND qual ILIKE '%''technician''%'
       AND qual NOT ILIKE '%OR true%'
   ),
-  'festival artist file metadata reads are scoped to elevated roles or assigned jobs'
+  'festival artist file metadata reads are scoped to elevated roles or assigned technicians'
 );
 
 SELECT ok(
@@ -112,6 +114,48 @@ SELECT ok(
       AND with_check ILIKE '%house_tech%'
   ),
   'house techs may insert festival artist file metadata'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'festival_artist_files'
+      AND cmd = 'UPDATE'
+      AND qual ILIKE '%house_tech%'
+      AND with_check ILIKE '%house_tech%'
+      AND qual NOT ILIKE '%''technician''%'
+      AND with_check NOT ILIKE '%''technician''%'
+  ),
+  'house techs may update festival artist file metadata while technicians cannot'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'festival_artist_files'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%house_tech%'
+      AND qual NOT ILIKE '%''technician''%'
+  ),
+  'house techs may delete festival artist file metadata while technicians cannot'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'delete_festival_artist_file_reference'
+      AND pg_get_function_identity_arguments(p.oid) = 'p_file_id uuid, p_artist_id uuid'
+      AND pg_get_functiondef(p.oid) ILIKE '%house_tech%'
+      AND pg_get_functiondef(p.oid) NOT ILIKE '%''technician''%'
+  ),
+  'rider file delete RPC allows house techs but not technicians'
 );
 
 SELECT ok(
@@ -153,9 +197,12 @@ SELECT ok(
       AND qual ILIKE '%management%'
       AND qual ILIKE '%logistics%'
       AND qual ILIKE '%house_tech%'
+      AND qual ILIKE '%job_assignments%'
+      AND qual ILIKE '%auth.uid%'
+      AND qual ILIKE '%''technician''%'
       AND qual ILIKE '%festival_artists%'
   ),
-  'house techs may view festival artist file storage objects'
+  'house techs and assigned technicians may view festival artist file storage objects'
 );
 
 SELECT ok(
@@ -172,8 +219,9 @@ SELECT ok(
       AND with_check ILIKE '%logistics%'
       AND with_check ILIKE '%house_tech%'
       AND with_check ILIKE '%festival_artists%'
+      AND with_check NOT ILIKE '%''technician''%'
   ),
-  'house techs may upload festival artist file storage objects'
+  'house techs may upload festival artist file storage objects while technicians cannot'
 );
 
 SELECT ok(
@@ -194,8 +242,30 @@ SELECT ok(
       AND with_check ILIKE '%management%'
       AND with_check ILIKE '%logistics%'
       AND with_check ILIKE '%house_tech%'
+      AND qual NOT ILIKE '%''technician''%'
+      AND with_check NOT ILIKE '%''technician''%'
   ),
-  'house techs may upsert festival artist file storage objects'
+  'house techs may upsert festival artist file storage objects while technicians cannot'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_artist_files_authorized_delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%festival_artist_files%'
+      AND qual ILIKE '%admin%'
+      AND qual ILIKE '%management%'
+      AND qual ILIKE '%logistics%'
+      AND qual ILIKE '%house_tech%'
+      AND qual ILIKE '%festival_artists%'
+      AND qual ILIKE '%NOT%EXISTS%'
+      AND qual NOT ILIKE '%''technician''%'
+  ),
+  'house techs may delete festival artist file storage objects while technicians cannot'
 );
 
 SELECT ok(

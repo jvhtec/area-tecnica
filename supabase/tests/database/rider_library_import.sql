@@ -99,6 +99,7 @@ WHERE artist_id IN (
     '13000000-0000-0000-0000-000000000003'::uuid
   )
   OR file_path IN ('shared/source-rider.pdf', 'shared/second-rider.pdf')
+  OR file_path IN ('shared/house-delete-rider.pdf')
   OR artist_id IN (
     SELECT id
     FROM public.festival_artists
@@ -368,6 +369,16 @@ INSERT INTO public.festival_artist_files (
     23456,
     '11000000-0000-0000-0000-000000000001'::uuid,
     '2026-07-01 13:00:00+02'::timestamptz
+  ),
+  (
+    '14000000-0000-0000-0000-000000000003'::uuid,
+    '13000000-0000-0000-0000-000000000003'::uuid,
+    'house-delete-rider.pdf',
+    'shared/house-delete-rider.pdf',
+    'application/pdf',
+    34567,
+    '11000000-0000-0000-0000-000000000001'::uuid,
+    '2026-07-01 14:00:00+02'::timestamptz
   )
 ON CONFLICT (id) DO UPDATE
 SET artist_id = excluded.artist_id,
@@ -394,13 +405,15 @@ SELECT throws_ok(
   'house tech cannot import riders from the library'
 );
 
-SELECT throws_ok(
-  $$SELECT * FROM public.delete_festival_artist_file_reference(
-    '14000000-0000-0000-0000-000000000001'::uuid
-  )$$,
-  '42501',
-  'not_authorized',
-  'house tech cannot delete rider file references'
+SELECT is(
+  (
+    SELECT should_delete_storage
+    FROM public.delete_festival_artist_file_reference(
+      '14000000-0000-0000-0000-000000000003'::uuid
+    )
+  ),
+  true,
+  'house tech can delete rider file references'
 );
 
 SELECT set_config('request.jwt.claim.sub', '11000000-0000-0000-0000-000000000001', false);

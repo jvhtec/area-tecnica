@@ -24,11 +24,17 @@ function toPosix(path) {
 }
 
 function runAudit() {
+  const isWindows = process.platform === "win32";
   const result = spawnSync("npm", ["audit", "--json"], {
     cwd: repoRoot,
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
+    shell: isWindows,
   });
+
+  if (result.error) {
+    throw new Error(`Failed to run npm audit: ${result.error.message}`);
+  }
 
   const output = result.stdout || result.stderr;
 
