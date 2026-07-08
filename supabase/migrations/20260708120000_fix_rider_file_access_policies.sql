@@ -154,6 +154,11 @@ TO authenticated
 USING (
   bucket_id = 'festival_artist_files'
   AND public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text, 'house_tech'::text])
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.festival_artist_files faf
+    WHERE faf.file_path = storage.objects.name
+  )
   AND (
     EXISTS (
       SELECT 1
@@ -163,11 +168,6 @@ USING (
           THEN split_part(storage.objects.name, '/', 1)::uuid
         ELSE NULL
       END
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM public.festival_artist_files faf
-      WHERE faf.file_path = storage.objects.name
     )
   )
 );
