@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getDeviceImageUrl } from '../useDevices'
+import { getDeviceImageUrl } from '@/features/rack-builder/hooks/useDevices'
 
 const mocks = vi.hoisted(() => {
   const publicUrlForPath = vi.fn((path: string) => ({
