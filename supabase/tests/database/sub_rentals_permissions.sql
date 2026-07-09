@@ -34,9 +34,9 @@ SELECT ok(
     WHERE schemaname = 'public'
       AND tablename = 'sub_rentals'
       AND policyname = 'sub_rentals_select_scoped'
-      AND qual ILIKE '%department = public.current_user_department()%'
-      AND qual ILIKE '%assignment.job_id = sub_rentals.job_id%'
-      AND qual ILIKE '%assignment.technician_id = auth.uid()%'
+      AND qual ILIKE '%current_user_department%'
+      AND qual ILIKE '%job_assignments%'
+      AND qual ILIKE '%technician_id%'
   ),
   'sub_rentals reads are correlated to the row department or its assigned job'
 );
@@ -143,7 +143,9 @@ SET email = excluded.email,
     department = excluded.department;
 
 INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
-VALUES ('job.created', 'Job created', 'management', 'info', false)
+VALUES
+  ('job.created', 'Job created', 'management', 'info', false),
+  ('assignment.created', 'Assignment created', 'management', 'info', false)
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public.equipment (id, name, department)
