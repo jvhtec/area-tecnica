@@ -1,13 +1,21 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useProjects } from '@/features/rack-builder/hooks/useProjects'
 import { usePanelLayoutCounts } from '@/features/rack-builder/hooks/usePanelLayoutCounts'
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth'
+import { getRackBuilderProjectsPath, normalizeRackBuilderDepartment } from '@/features/rack-builder/lib/department'
 import PageHeader from '@/features/rack-builder/components/layout/PageHeader'
 import Button from '@/features/rack-builder/components/ui/Button'
 
 export default function PanelLayoutsOverviewPage() {
-  const { projects, loading: projectsLoading } = useProjects()
-  const { counts, loading: countsLoading } = usePanelLayoutCounts()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { userDepartment } = useOptimizedAuth()
+  const activeDepartment =
+    normalizeRackBuilderDepartment(searchParams.get('department'))
+    ?? normalizeRackBuilderDepartment(userDepartment)
+    ?? 'sound'
+  const { projects, loading: projectsLoading } = useProjects(activeDepartment)
+  const { counts, loading: countsLoading } = usePanelLayoutCounts()
 
   const loading = projectsLoading || countsLoading
 
@@ -22,7 +30,7 @@ export default function PanelLayoutsOverviewPage() {
         <p className="text-gray-500 text-sm">
           No projects yet. Create a project first to start designing panel layouts.
         </p>
-        <Button className="mt-3" onClick={() => navigate('/rack-builder/projects')}>
+        <Button className="mt-3" onClick={() => navigate(getRackBuilderProjectsPath(activeDepartment))}>
           Go to Projects
         </Button>
       </div>

@@ -11,6 +11,7 @@ import {
   VIEW_MODE_OPTIONS,
   type RackViewMode,
 } from '../../lib/layoutEditorHelpers'
+import { getRackBuilderProjectsPath } from '../../lib/department'
 import type {
   Device,
   DeviceCategory,
@@ -200,7 +201,7 @@ export default function MobileEditorView({
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 overflow-hidden">
       <header className="flex items-center justify-between px-4 h-14 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shrink-0 z-30" style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3.5rem + env(safe-area-inset-top))' }}>
-        <button onClick={() => navigate('/rack-builder/projects')} className="text-gray-600 dark:text-slate-300 text-sm font-semibold">
+        <button onClick={() => navigate(getRackBuilderProjectsPath(project.department))} className="text-gray-600 dark:text-slate-300 text-sm font-semibold">
           &larr; Back
         </button>
         <div className="flex flex-col items-center min-w-0 px-2">

@@ -60,6 +60,7 @@ const passThroughAccess: RouteAccessPolicy = {
 };
 
 const SOUND_DEPARTMENT = "sound";
+const RACK_BUILDER_DEPARTMENTS = new Set(["sound", "lights", "admin", "management"]);
 const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
 const SOUND_TOOL_ROLES_WITH_TECH = [...SOUND_TOOL_ROLES, "technician"] as const;
 const PERSONAL_ALLOWED_ROLES = ["admin", "management", "logistics", "house_tech"] as const;
@@ -86,10 +87,9 @@ const FestivalsDepartmentGuard = ({ children }: { children: React.ReactNode }) =
   return <>{children}</>;
 };
 
-// Mirrors the rack_builder_* RLS boundary exactly (current_user_department()
-// = ANY (ARRAY['sound','admin','management']) OR is_admin_or_management()),
-// so a house_tech in another department can't land on a page that RLS then
-// renders empty/broken for them - see PR #824 review discussion.
+// Mirrors the rack_builder_* RLS boundary: sound/lights departments plus
+// management/admin. A house_tech in another department should not land on
+// pages that RLS then renders empty/broken for them.
 const RackBuilderDepartmentGuard = ({ children }: { children: React.ReactNode }) => {
   const { userRole, userDepartment, isLoading } = useOptimizedAuth();
 
@@ -98,9 +98,9 @@ const RackBuilderDepartmentGuard = ({ children }: { children: React.ReactNode })
   }
 
   const isManagement = isManagementRole(userRole);
-  const isSoundMember = userDepartment?.toLowerCase() === SOUND_DEPARTMENT;
+  const isRackBuilderDepartmentMember = RACK_BUILDER_DEPARTMENTS.has(userDepartment?.toLowerCase() ?? "");
 
-  if (!isManagement && !isSoundMember) {
+  if (!isManagement && !isRackBuilderDepartmentMember) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -11,7 +11,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
-import { Scale, Zap, Calendar, FileText, Plus, Calculator, Lightbulb } from "lucide-react";
+import { Scale, Zap, Calendar, FileText, Plus, Calculator, Lightbulb, Server } from "lucide-react";
 import type { JobType } from "@/types/job";
 import { Button } from "@/components/ui/button";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
@@ -43,6 +43,7 @@ const Lights = () => {
       { label: "Pesos", to: "/lights-pesos-tool", icon: Scale },
       { label: "Consumos", to: "/lights-consumos-tool", icon: Calculator },
       { label: "Memoria técnica", to: "/lights-memoria-tecnica", icon: FileText },
+      { label: "Rack Builder", to: "/rack-builder?department=lights", icon: Server },
     ],
     [],
   );
@@ -176,6 +177,7 @@ const Lights = () => {
   const goToPesosTool = useCallback(() => navigate("/lights-pesos-tool"), [navigate]);
   const goToConsumosTool = useCallback(() => navigate("/lights-consumos-tool"), [navigate]);
   const goToMemoriaTecnica = useCallback(() => navigate("/lights-memoria-tecnica"), [navigate]);
+  const goToRackBuilder = useCallback(() => navigate("/rack-builder?department=lights"), [navigate]);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
@@ -238,6 +240,14 @@ const Lights = () => {
                 >
                   <FileText className="h-4 w-4" />
                   Memoria Técnica
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={goToRackBuilder}
+                  className="flex items-center gap-2"
+                >
+                  <Server className="h-4 w-4" />
+                  Rack Builder
                 </Button>
               </div>
             </div>

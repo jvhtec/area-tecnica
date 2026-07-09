@@ -2,12 +2,13 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(26);
+SELECT plan(31);
 
 SELECT has_table('public', 'rack_builder_racks', 'rack builder racks table exists');
 SELECT has_table('public', 'rack_builder_devices', 'rack builder devices table exists');
 SELECT has_table('public', 'rack_builder_projects', 'rack builder projects table exists');
 SELECT has_table('public', 'rack_builder_layout_items', 'rack builder layout items table exists');
+SELECT has_column('public', 'rack_builder_projects', 'department', 'rack builder projects track department ownership');
 
 SELECT ok(
   (
@@ -38,13 +39,21 @@ SELECT ok(
     WHERE schemaname = 'public'
       AND tablename LIKE 'rack_builder_%'
       AND cmd = 'ALL'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%current_user_department%'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%sound%'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%admin%'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%management%'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%is_admin_or_management%'
+      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%rack_builder_can_%'
   ) = 10,
-  'every rack_builder table policy is gated to sound/admin/management'
+  'every rack_builder table policy delegates to shared rack builder access helpers'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.rack_builder_projects'::regclass
+      AND conname = 'rack_builder_projects_department_check'
+      AND pg_get_constraintdef(oid) ILIKE '%sound%'
+      AND pg_get_constraintdef(oid) ILIKE '%lights%'
+  ),
+  'rack builder project departments are constrained to sound or lights'
 );
 
 SELECT ok(
@@ -217,6 +226,18 @@ INSERT INTO auth.users (
   '{}'::jsonb,
   'authenticated',
   'authenticated'
+), (
+  '82400000-0000-0000-0000-000000000002'::uuid,
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  'rack-builder-lights@test.local',
+  'test',
+  now(),
+  now(),
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{}'::jsonb,
+  'authenticated',
+  'authenticated'
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -228,6 +249,13 @@ VALUES (
   'Builder',
   'house_tech',
   'sound'
+), (
+  '82400000-0000-0000-0000-000000000002'::uuid,
+  'rack-builder-lights@test.local',
+  'Rack',
+  'Builder Lights',
+  'house_tech',
+  'lights'
 )
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
@@ -273,10 +301,13 @@ SET name = excluded.name,
     depth_mm = excluded.depth_mm,
     width = excluded.width;
 
-INSERT INTO public.rack_builder_projects (id, name)
-VALUES ('82410000-0000-0000-0000-000000000004'::uuid, 'Placement Test Project')
+INSERT INTO public.rack_builder_projects (id, name, department)
+VALUES
+  ('82410000-0000-0000-0000-000000000004'::uuid, 'Placement Test Project', 'sound'),
+  ('82410000-0000-0000-0000-000000000006'::uuid, 'Placement Lights Project', 'lights')
 ON CONFLICT (id) DO UPDATE
-SET name = excluded.name;
+SET name = excluded.name,
+    department = excluded.department;
 
 INSERT INTO public.rack_builder_layouts (id, project_id, rack_id, name)
 VALUES (
@@ -284,6 +315,11 @@ VALUES (
   '82410000-0000-0000-0000-000000000004'::uuid,
   '82410000-0000-0000-0000-000000000003'::uuid,
   'Placement Test Layout'
+), (
+  '82410000-0000-0000-0000-000000000007'::uuid,
+  '82410000-0000-0000-0000-000000000006'::uuid,
+  '82410000-0000-0000-0000-000000000003'::uuid,
+  'Placement Lights Layout'
 )
 ON CONFLICT (id) DO UPDATE
 SET project_id = excluded.project_id,
@@ -312,19 +348,80 @@ SELECT lives_ok(
   'authenticated sound users can insert valid equipment placements'
 );
 
+SELECT is(
+  ARRAY(
+    SELECT id
+    FROM public.rack_builder_projects
+    WHERE id IN (
+      '82410000-0000-0000-0000-000000000004'::uuid,
+      '82410000-0000-0000-0000-000000000006'::uuid
+    )
+    ORDER BY id
+  ),
+  ARRAY['82410000-0000-0000-0000-000000000004'::uuid],
+  'sound rack builder users only see sound projects'
+);
+
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', '82400000-0000-0000-0000-000000000002', false);
+
+SET ROLE authenticated;
+
+SELECT is(
+  ARRAY(
+    SELECT id
+    FROM public.rack_builder_projects
+    WHERE id IN (
+      '82410000-0000-0000-0000-000000000004'::uuid,
+      '82410000-0000-0000-0000-000000000006'::uuid
+    )
+    ORDER BY id
+  ),
+  ARRAY['82410000-0000-0000-0000-000000000006'::uuid],
+  'lights rack builder users only see lights projects'
+);
+
+SELECT lives_ok(
+  $$
+    INSERT INTO public.rack_builder_layout_items (
+      layout_id,
+      device_id,
+      start_u,
+      facing
+    ) VALUES (
+      '82410000-0000-0000-0000-000000000007'::uuid,
+      '82410000-0000-0000-0000-000000000002'::uuid,
+      1,
+      'front'
+    )
+  $$,
+  'authenticated lights users can insert valid equipment placements'
+);
+
 RESET ROLE;
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
 
 DELETE FROM public.rack_builder_layout_items
-WHERE layout_id = '82410000-0000-0000-0000-000000000005'::uuid;
+WHERE layout_id IN (
+  '82410000-0000-0000-0000-000000000005'::uuid,
+  '82410000-0000-0000-0000-000000000007'::uuid
+);
 
 DELETE FROM public.rack_builder_layouts
-WHERE id = '82410000-0000-0000-0000-000000000005'::uuid;
+WHERE id IN (
+  '82410000-0000-0000-0000-000000000005'::uuid,
+  '82410000-0000-0000-0000-000000000007'::uuid
+);
 
 DELETE FROM public.rack_builder_projects
-WHERE id = '82410000-0000-0000-0000-000000000004'::uuid;
+WHERE id IN (
+  '82410000-0000-0000-0000-000000000004'::uuid,
+  '82410000-0000-0000-0000-000000000006'::uuid
+);
 
 DELETE FROM public.rack_builder_racks
 WHERE id = '82410000-0000-0000-0000-000000000003'::uuid;
@@ -336,10 +433,16 @@ DELETE FROM public.rack_builder_device_categories
 WHERE id = '82410000-0000-0000-0000-000000000001'::uuid;
 
 DELETE FROM public.profiles
-WHERE id = '82400000-0000-0000-0000-000000000001'::uuid;
+WHERE id IN (
+  '82400000-0000-0000-0000-000000000001'::uuid,
+  '82400000-0000-0000-0000-000000000002'::uuid
+);
 
 DELETE FROM auth.users
-WHERE id = '82400000-0000-0000-0000-000000000001'::uuid;
+WHERE id IN (
+  '82400000-0000-0000-0000-000000000001'::uuid,
+  '82400000-0000-0000-0000-000000000002'::uuid
+);
 
 SELECT ok(
   EXISTS (
@@ -368,11 +471,9 @@ SELECT ok(
     WHERE schemaname = 'storage'
       AND tablename = 'objects'
       AND policyname LIKE 'rack_builder_%_images_%'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%current_user_department%'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%sound%'
-      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%is_admin_or_management%'
+      AND (COALESCE(qual, '') || COALESCE(with_check, '')) ILIKE '%rack_builder_can_use_tool%'
   ) = 8,
-  'rack builder storage object policies gate both buckets and all mutations'
+  'rack builder storage object policies gate both buckets and all mutations to rack builder users'
 );
 
 SELECT ok(
