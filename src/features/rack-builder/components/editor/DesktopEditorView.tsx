@@ -13,6 +13,7 @@ import {
   MAX_ZOOM_PERCENT,
   type RackViewMode,
 } from '../../lib/layoutEditorHelpers'
+import { getRackBuilderProjectsPath } from '@/features/rack-builder/lib/department'
 import type {
   ConnectorDefinition,
   Device,
@@ -187,7 +188,7 @@ export default function DesktopEditorView({
           <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 shrink-0">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
-                <Button variant="secondary" onClick={() => navigate('/rack-builder/projects')}>
+                <Button variant="secondary" onClick={() => navigate(getRackBuilderProjectsPath(project.department))}>
                   &larr; Back
                 </Button>
                 <div className="min-w-0">

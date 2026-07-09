@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
-import type { DrawingState, Project, ProjectSummary } from '../types'
+import type { DrawingState, Project, ProjectSummary, RackBuilderDepartment } from '../types'
 
 interface ProjectWithLayoutsRow extends Project {
   layouts?: Array<{ id: string }>
 }
 
-export function useProjects() {
+export function useProjects(activeDepartment: RackBuilderDepartment = 'sound') {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -16,6 +16,7 @@ export function useProjects() {
     const { data, error: err } = await supabase
       .from('rack_builder_projects')
       .select('*, layouts:rack_builder_layouts(id)')
+      .eq('department', activeDepartment)
       .order('created_at', { ascending: false })
 
     if (err) {
@@ -26,6 +27,7 @@ export function useProjects() {
         id: row.id,
         name: row.name,
         owner: row.owner ?? null,
+        department: row.department,
         drawing_state: row.drawing_state,
         revision_number: row.revision_number,
         created_at: row.created_at,
@@ -36,7 +38,7 @@ export function useProjects() {
       setError(null)
     }
     setLoading(false)
-  }, [])
+  }, [activeDepartment])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -61,6 +63,7 @@ export function useProjects() {
       .insert({
         name: payload.project_name,
         owner: payload.project_owner ?? null,
+        department: activeDepartment,
         drawing_state: payload.drawing_state,
       })
       .select()

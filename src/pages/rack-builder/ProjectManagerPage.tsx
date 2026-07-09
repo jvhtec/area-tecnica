@@ -1,8 +1,10 @@
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useActiveRackBuilderDepartment } from '@/features/rack-builder/hooks/useActiveRackBuilderDepartment'
 import { useProjects } from '@/features/rack-builder/hooks/useProjects'
 import { useRacks } from '@/features/rack-builder/hooks/useRacks'
 import { DRAWING_STATE_OPTIONS, formatDrawingState, formatRevisionLabel } from '@/features/rack-builder/lib/drawingState'
+import { formatRackBuilderDepartment } from '@/features/rack-builder/lib/department'
 import type { DrawingState, ProjectSummary } from '@/features/rack-builder/types'
 import PageHeader from '@/features/rack-builder/components/layout/PageHeader'
 import Button from '@/features/rack-builder/components/ui/Button'
@@ -12,9 +14,10 @@ import Input from '@/features/rack-builder/components/ui/Input'
 import Select from '@/features/rack-builder/components/ui/Select'
 
 export default function ProjectManagerPage() {
-  const { projects, loading: projectsLoading, createProjectWithInitialLayout, updateProject, deleteProject } = useProjects()
-  const { racks, loading: racksLoading } = useRacks()
   const navigate = useNavigate()
+  const activeDepartment = useActiveRackBuilderDepartment()
+  const { projects, loading: projectsLoading, createProjectWithInitialLayout, updateProject, deleteProject } = useProjects(activeDepartment)
+  const { racks, loading: racksLoading } = useRacks()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<ProjectSummary | undefined>()
@@ -98,7 +101,7 @@ export default function ProjectManagerPage() {
   return (
     <div>
       <PageHeader
-        title="Project Manager"
+        title={`Gestor de proyectos - ${formatRackBuilderDepartment(activeDepartment)}`}
         action={
           <Button onClick={openCreateModal} disabled={racks.length === 0}>
             New Project

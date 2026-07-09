@@ -6856,6 +6856,7 @@ export type Database = {
       rack_builder_projects: {
         Row: {
           created_at: string
+          department: string
           drawing_state: Database["public"]["Enums"]["rack_builder_drawing_state"]
           id: string
           name: string
@@ -6865,6 +6866,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          department?: string
           drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
           id?: string
           name: string
@@ -6874,6 +6876,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          department?: string
           drawing_state?: Database["public"]["Enums"]["rack_builder_drawing_state"]
           id?: string
           name?: string

@@ -145,7 +145,7 @@ const Sound = () => {
     { label: "Incident", onClick: () => setShowIncidentReport(true), icon: AlertTriangle, color: "text-red-500" },
     { label: "Plano Escenario", to: "/stage-plot", icon: Layout, color: "text-green-500" },
     { label: "SysCalc", to: "/syscalc", icon: Binary, color: "text-teal-500" },
-    { label: "Rack Builder", to: "/rack-builder", icon: Server, color: "text-amber-500" },
+    { label: "Rack Builder", to: "/rack-builder?department=sound", icon: Server, color: "text-amber-500" },
     {
       label: hasSoundVisionAccess ? "SoundVision" : "Request Access",
       to: hasSoundVisionAccess ? "/soundvision-files" : undefined,
@@ -405,7 +405,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => navigate('/rack-builder')}
+                  onClick={() => navigate('/rack-builder?department=sound')}
                 >
                   <Server className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Rack Builder
