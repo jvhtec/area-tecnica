@@ -19,19 +19,13 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/react-query";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import {
   duplicateSoundDocumentation,
+  fetchSoundDocumentationSourceJobs,
   SOUND_DOCUMENTATION_COPY_SCOPES,
+  type SoundDocumentationSourceJob,
   type SoundDocumentationCopyScope,
 } from "@/utils/duplicateSoundDocumentation";
-
-type SourceJob = {
-  id: string;
-  title: string;
-  start_time: string | null;
-  end_time: string | null;
-};
 
 type DuplicateSoundDocumentationDialogProps = {
   job: JobCardJob;
@@ -120,21 +114,10 @@ export const DuplicateSoundDocumentationDialog = ({
     }
   }, [open]);
 
-  const { data: sourceJobs = [], isLoading } = useQuery<SourceJob[]>({
+  const { data: sourceJobs = [], isLoading } = useQuery<SoundDocumentationSourceJob[]>({
     queryKey: queryKeys.scope("sound-documentation-copy-source-jobs", job.id),
     enabled: open && Boolean(job.id),
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient
-        .from("jobs")
-        .select("id, title, start_time, end_time")
-        .neq("id", job.id)
-        .in("job_type", ["single", "festival", "ciclo", "tourdate"])
-        .order("start_time", { ascending: false })
-        .limit(250);
-
-      if (error) throw error;
-      return (data || []) as SourceJob[];
-    },
+    queryFn: () => fetchSoundDocumentationSourceJobs(job.id),
   });
 
   const filteredJobs = React.useMemo(() => {
