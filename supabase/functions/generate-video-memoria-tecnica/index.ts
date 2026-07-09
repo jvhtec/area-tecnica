@@ -4,6 +4,7 @@ import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 import {
   fetchMemoriaSource,
   fetchOptionalMemoriaLogo,
+  getMemoriaPdfValidationMessage,
   isPdfBytes,
   requireMemoriaContext,
   SourceByteBudget,
@@ -242,18 +243,18 @@ serve(createHttpHandler(async (req) => {
       try {
         const sourceBytes = await fetchMemoriaSource(url, sourceBudget);
         if (!isPdfBytes(sourceBytes)) {
-          throw new HttpError(422, `Document ${key} is not a PDF`, { code: "invalid_pdf_source" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "invalid"), { code: "invalid_pdf_source" });
         }
         const pdf = await PDFDocument.load(sourceBytes);
         if (pdf.getPageCount() > 150) {
-          throw new HttpError(422, `Document ${key} has too many pages`, { code: "pdf_page_limit" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "page_limit"), { code: "pdf_page_limit" });
         }
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach((page) => mergedPdf.addPage(page));
       } catch (error) {
         if (error instanceof HttpError) throw error;
         console.warn("Video memoria rejected PDF", { key });
-        throw new HttpError(422, `Document ${key} cannot be read as a PDF`, {
+        throw new HttpError(422, getMemoriaPdfValidationMessage(key, "unreadable"), {
           code: "invalid_pdf_source",
         });
       }

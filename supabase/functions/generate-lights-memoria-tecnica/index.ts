@@ -4,6 +4,7 @@ import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import {
   fetchMemoriaSource,
   fetchOptionalMemoriaLogo,
+  getMemoriaPdfValidationMessage,
   isPdfBytes,
   requireMemoriaContext,
   SourceByteBudget,
@@ -129,11 +130,11 @@ serve(createHttpHandler(async (req) => {
       try {
         const sourceBytes = await fetchMemoriaSource(documentUrls.memoria_completa, sourceBudget);
         if (!isPdfBytes(sourceBytes)) {
-          throw new HttpError(422, "Complete memoria is not a PDF", { code: "invalid_pdf_source" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "invalid"), { code: "invalid_pdf_source" });
         }
         const pdf = await PDFDocument.load(sourceBytes);
         if (pdf.getPageCount() > 150) {
-          throw new HttpError(422, "Complete memoria has too many pages", { code: "pdf_page_limit" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "page_limit"), { code: "pdf_page_limit" });
         }
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach(page => mergedPdf.addPage(page));
@@ -141,7 +142,7 @@ serve(createHttpHandler(async (req) => {
       } catch (error) {
         if (error instanceof HttpError) throw error;
         console.warn("Lights memoria rejected complete PDF");
-        throw new HttpError(422, "Complete memoria cannot be read as a PDF", {
+        throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "unreadable"), {
           code: "invalid_pdf_source",
         });
       }
@@ -193,11 +194,11 @@ serve(createHttpHandler(async (req) => {
         try {
           const sourceBytes = await fetchMemoriaSource(url, sourceBudget);
           if (!isPdfBytes(sourceBytes)) {
-            throw new HttpError(422, `Document ${doc.id} is not a PDF`, { code: "invalid_pdf_source" });
+            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "invalid"), { code: "invalid_pdf_source" });
           }
           const pdf = await PDFDocument.load(sourceBytes);
           if (pdf.getPageCount() > 150) {
-            throw new HttpError(422, `Document ${doc.id} has too many pages`, { code: "pdf_page_limit" });
+            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "page_limit"), { code: "pdf_page_limit" });
           }
           const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
           pages.forEach(page => mergedPdf.addPage(page));
@@ -205,7 +206,7 @@ serve(createHttpHandler(async (req) => {
         } catch (error) {
           if (error instanceof HttpError) throw error;
           console.warn("Lights memoria rejected PDF", { key: doc.id });
-          throw new HttpError(422, `Document ${doc.id} cannot be read as a PDF`, {
+          throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "unreadable"), {
             code: "invalid_pdf_source",
           });
         }

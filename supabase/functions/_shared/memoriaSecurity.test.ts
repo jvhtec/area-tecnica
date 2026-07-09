@@ -18,16 +18,16 @@ describe("memoria PDF security boundary", () => {
   it("only accepts this project's supported Storage object URLs", () => {
     expect(assertAllowedStorageSourceUrl(signedSource, projectUrl)).toBe(signedSource);
     expect(() => assertAllowedStorageSourceUrl("https://example.com/report.pdf", projectUrl)).toThrow(
-      "Source must be a Supabase Storage object URL",
+      "El origen debe ser una URL de objeto de Supabase Storage",
     );
     expect(() => assertAllowedStorageSourceUrl(
       `${projectUrl}/storage/v1/object/sign/memoria-tecnica/report.pdf`,
       projectUrl,
-    )).toThrow("Signed storage URLs require a token");
+    )).toThrow("Las URL firmadas de almacenamiento requieren un token");
     expect(() => assertAllowedStorageSourceUrl(
       `${projectUrl}/rest/v1/profiles`,
       projectUrl,
-    )).toThrow("Source must be a Supabase Storage object URL");
+    )).toThrow("El origen debe ser una URL de objeto de Supabase Storage");
   });
 
   it("whitelists document keys and rejects malformed request values", () => {
@@ -44,11 +44,11 @@ describe("memoria PDF security boundary", () => {
     expect(() => parseMemoriaRequestInput({
       projectName: "Festival Norte",
       documentUrls: { arbitrary: signedSource },
-    }, projectUrl, ["material"])).toThrow("Unsupported document key");
+    }, projectUrl, ["material"])).toThrow("Clave de documento no admitida");
     expect(() => parseMemoriaRequestInput({
       projectName: "\u0000",
       documentUrls: { material: signedSource },
-    }, projectUrl, ["material"])).toThrow("projectName must be");
+    }, projectUrl, ["material"])).toThrow("El nombre del proyecto debe ser");
   });
 
   it("bounds source downloads and preserves only PDF/image signatures", async () => {

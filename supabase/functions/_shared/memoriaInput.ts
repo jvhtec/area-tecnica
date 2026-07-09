@@ -23,7 +23,7 @@ export class SourceByteBudget {
 
   reserve(bytes: number) {
     if (bytes > this.limitBytes - this.usedBytes) {
-      throw new HttpError(413, "Combined source documents are too large", {
+      throw new HttpError(413, "Los documentos de origen superan el tamaño total permitido", {
         code: "source_total_too_large",
       });
     }
@@ -43,7 +43,7 @@ const hasControlCharacters = (value: string) =>
 /** Ensures every caller-controlled source belongs to this project's Storage API. */
 export function assertAllowedStorageSourceUrl(value: unknown, supabaseUrl: string): string {
   if (typeof value !== "string" || !value.trim() || value.length > MAX_SOURCE_URL_LENGTH) {
-    throw new HttpError(400, "Invalid storage source URL", { code: "invalid_source_url" });
+    throw new HttpError(400, "La URL del archivo de almacenamiento no es válida", { code: "invalid_source_url" });
   }
 
   let source: URL;
@@ -52,7 +52,7 @@ export function assertAllowedStorageSourceUrl(value: unknown, supabaseUrl: strin
     source = new URL(value);
     project = new URL(supabaseUrl);
   } catch {
-    throw new HttpError(400, "Invalid storage source URL", { code: "invalid_source_url" });
+    throw new HttpError(400, "La URL del archivo de almacenamiento no es válida", { code: "invalid_source_url" });
   }
 
   const projectPath = project.pathname.replace(/\/$/, "");
@@ -66,13 +66,13 @@ export function assertAllowedStorageSourceUrl(value: unknown, supabaseUrl: strin
     source.origin !== project.origin ||
     !supportedObjectPrefixes.some((prefix) => sourceSuffix.startsWith(prefix))
   ) {
-    throw new HttpError(400, "Source must be a Supabase Storage object URL", {
+    throw new HttpError(400, "El origen debe ser una URL de objeto de Supabase Storage", {
       code: "invalid_source_origin",
     });
   }
 
   if (sourceSuffix.startsWith("sign/") && !source.searchParams.get("token")) {
-    throw new HttpError(400, "Signed storage URLs require a token", {
+    throw new HttpError(400, "Las URL firmadas de almacenamiento requieren un token", {
       code: "invalid_signed_source_url",
     });
   }
@@ -87,19 +87,19 @@ export function parseMemoriaRequestInput(
 ): MemoriaRequestInput {
   const projectName = typeof body.projectName === "string" ? body.projectName.trim() : "";
   if (!projectName || projectName.length > MAX_PROJECT_NAME_LENGTH || hasControlCharacters(projectName)) {
-    throw new HttpError(400, "projectName must be a non-empty, short text value", {
+    throw new HttpError(400, "El nombre del proyecto debe ser un texto breve y no vacío", {
       code: "invalid_project_name",
     });
   }
 
   if (!isRecord(body.documentUrls)) {
-    throw new HttpError(400, "documentUrls must be an object", { code: "invalid_document_urls" });
+    throw new HttpError(400, "documentUrls debe ser un objeto", { code: "invalid_document_urls" });
   }
 
   const allowedKeys = new Set(allowedDocumentKeys);
   const entries = Object.entries(body.documentUrls);
   if (entries.length === 0 || entries.length > MAX_DOCUMENTS) {
-    throw new HttpError(400, "Provide between one and five documents", {
+    throw new HttpError(400, "Debes proporcionar entre uno y cinco documentos", {
       code: "invalid_document_count",
     });
   }
@@ -107,7 +107,7 @@ export function parseMemoriaRequestInput(
   const documentUrls: Record<string, string> = {};
   for (const [key, value] of entries) {
     if (!allowedKeys.has(key)) {
-      throw new HttpError(400, `Unsupported document key: ${key}`, {
+      throw new HttpError(400, `Clave de documento no admitida: ${key}`, {
         code: "unsupported_document_key",
       });
     }
@@ -124,10 +124,10 @@ export function parseMemoriaRequestInput(
 const readBoundedResponse = async (response: Response, maxBytes: number, budget: SourceByteBudget) => {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
-    throw new HttpError(413, "Source file is too large", { code: "source_too_large" });
+    throw new HttpError(413, "El archivo de origen es demasiado grande", { code: "source_too_large" });
   }
   if (!response.body) {
-    throw new HttpError(422, "Source file has no body", { code: "empty_source" });
+    throw new HttpError(422, "El archivo de origen no contiene datos", { code: "empty_source" });
   }
 
   const reader = response.body.getReader();
@@ -139,7 +139,7 @@ const readBoundedResponse = async (response: Response, maxBytes: number, budget:
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      throw new HttpError(413, "Source file is too large", { code: "source_too_large" });
+      throw new HttpError(413, "El archivo de origen es demasiado grande", { code: "source_too_large" });
     }
     chunks.push(value);
   }
@@ -169,15 +169,15 @@ export async function fetchMemoriaSource(
       headers: { "Cache-Control": "no-cache" },
     });
     if (!response.ok) {
-      throw new HttpError(422, "Unable to load source file", { code: "source_fetch_failed" });
+      throw new HttpError(422, "No se pudo cargar el archivo de origen", { code: "source_fetch_failed" });
     }
     return await readBoundedResponse(response, options.maxBytes ?? MAX_SINGLE_PDF_BYTES, budget);
   } catch (error) {
     if (error instanceof HttpError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new HttpError(408, "Source file request timed out", { code: "source_fetch_timeout" });
+      throw new HttpError(408, "La solicitud del archivo de origen ha superado el tiempo de espera", { code: "source_fetch_timeout" });
     }
-    throw new HttpError(422, "Unable to load source file", { code: "source_fetch_failed" });
+    throw new HttpError(422, "No se pudo cargar el archivo de origen", { code: "source_fetch_failed" });
   } finally {
     clearTimeout(timeout);
   }
@@ -187,6 +187,20 @@ export const isPdfBytes = (bytes: Uint8Array) =>
   bytes.length >= 5 &&
   bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 &&
   bytes[3] === 0x46 && bytes[4] === 0x2d;
+
+export const getMemoriaPdfValidationMessage = (
+  documentLabel: string,
+  reason: "invalid" | "page_limit" | "unreadable",
+) => {
+  switch (reason) {
+    case "invalid":
+      return `El documento «${documentLabel}» no es un PDF válido`;
+    case "page_limit":
+      return `El documento «${documentLabel}» supera el límite de páginas`;
+    case "unreadable":
+      return `No se puede leer el documento «${documentLabel}» como PDF`;
+  }
+};
 
 export const getSupportedImageFormat = (bytes: Uint8Array): "png" | "jpg" | null => {
   const isPng =
@@ -202,7 +216,7 @@ export async function fetchOptionalMemoriaLogo(logoUrl: string | null, budget: S
   const bytes = await fetchMemoriaSource(logoUrl, budget, { maxBytes: MAX_LOGO_BYTES });
   const format = getSupportedImageFormat(bytes);
   if (!format) {
-    throw new HttpError(422, "Logo must be a PNG or JPEG image", { code: "invalid_logo_format" });
+    throw new HttpError(422, "El logotipo debe ser una imagen PNG o JPEG", { code: "invalid_logo_format" });
   }
   return { bytes, format };
 }

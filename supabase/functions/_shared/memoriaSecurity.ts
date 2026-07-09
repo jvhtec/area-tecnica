@@ -8,6 +8,7 @@ export {
   assertAllowedStorageSourceUrl,
   fetchMemoriaSource,
   fetchOptionalMemoriaLogo,
+  getMemoriaPdfValidationMessage,
   getSupportedImageFormat,
   isPdfBytes,
   parseMemoriaRequestInput,
@@ -80,7 +81,7 @@ export async function uploadGeneratedMemoriaPdf(
 
   if (!bucket) {
     console.error("Memoria PDF upload failed", lastError?.message);
-    throw new HttpError(500, "Unable to store generated PDF", {
+    throw new HttpError(500, "No se pudo guardar el PDF generado", {
       code: "output_upload_failed",
       exposeDetails: false,
     });
@@ -91,7 +92,7 @@ export async function uploadGeneratedMemoriaPdf(
     .createSignedUrl(objectPath, SIGNED_URL_TTL_SECONDS);
   if (error || !data?.signedUrl) {
     console.error("Memoria PDF signing failed", error?.message);
-    throw new HttpError(500, "Unable to sign generated PDF", {
+    throw new HttpError(500, "No se pudo firmar el PDF generado", {
       code: "output_sign_failed",
       exposeDetails: false,
     });

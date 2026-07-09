@@ -32,7 +32,7 @@ type TransportRequestItem = {
 const readOptionalText = (value: unknown, field: string, maxLength: number) => {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string" || value.length > maxLength) {
-    throw new HttpError(400, `${field} must be text up to ${maxLength} characters`, {
+    throw new HttpError(400, `El campo ${field} debe ser un texto de hasta ${maxLength} caracteres`, {
       code: `invalid_${field}`,
     });
   }
@@ -42,23 +42,23 @@ const readOptionalText = (value: unknown, field: string, maxLength: number) => {
 const parseItems = (value: unknown): TransportRequestItem[] => {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.length > 20) {
-    throw new HttpError(400, "items must be an array of at most 20 entries", { code: "invalid_items" });
+    throw new HttpError(400, "Los elementos deben ser una lista de como máximo 20 entradas", { code: "invalid_items" });
   }
 
   return value.map((item, index) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
-      throw new HttpError(400, `items[${index}] must be an object`, { code: "invalid_items" });
+      throw new HttpError(400, `El elemento ${index + 1} debe ser un objeto`, { code: "invalid_items" });
     }
 
     const record = item as Record<string, unknown>;
     const transportType = typeof record.transport_type === "string" ? record.transport_type.trim() : "";
     if (!VALID_TRANSPORT_TYPES.has(transportType)) {
-      throw new HttpError(400, `items[${index}].transport_type is invalid`, { code: "invalid_transport_type" });
+      throw new HttpError(400, `El tipo de transporte del elemento ${index + 1} no es válido`, { code: "invalid_transport_type" });
     }
 
     const leftover = record.leftover_space_meters;
     if (leftover !== undefined && leftover !== null && (typeof leftover !== "number" || !Number.isFinite(leftover))) {
-      throw new HttpError(400, `items[${index}].leftover_space_meters is invalid`, {
+      throw new HttpError(400, `El espacio restante del elemento ${index + 1} no es válido`, {
         code: "invalid_leftover_space_meters",
       });
     }
@@ -84,15 +84,15 @@ serve(createHttpHandler(async (req) => {
     : typeof body.subrental_id === "string" ? body.subrental_id : "";
 
   if (!UUID_PATTERN.test(jobId)) {
-    throw new HttpError(400, "job_id must be a UUID", { code: "invalid_job_id" });
+    throw new HttpError(400, "job_id debe ser un UUID válido", { code: "invalid_job_id" });
   }
   if (!VALID_DEPARTMENTS.has(department)) {
-    throw new HttpError(400, "department must be sound, lights, or video", {
+    throw new HttpError(400, "El departamento debe ser sound, lights o video", {
       code: "invalid_department",
     });
   }
   if (subrentalId !== null && !UUID_PATTERN.test(subrentalId)) {
-    throw new HttpError(400, "subrental_id must be a UUID", { code: "invalid_subrental_id" });
+    throw new HttpError(400, "subrental_id debe ser un UUID válido", { code: "invalid_subrental_id" });
   }
 
   const { SUPABASE_ANON_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = requireEnvValues(
@@ -103,11 +103,11 @@ serve(createHttpHandler(async (req) => {
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: { user }, error: userError } = await admin.auth.getUser(token);
   if (userError || !user) {
-    throw new HttpError(401, "Invalid or expired token", { code: "invalid_authorization" });
+    throw new HttpError(401, "El token no es válido o ha caducado", { code: "invalid_authorization" });
   }
 
   if (body.requested_by !== undefined && body.requested_by !== null && body.requested_by !== user.id) {
-    throw new HttpError(403, "created_by must match the authenticated user", {
+    throw new HttpError(403, "requested_by debe coincidir con el usuario autenticado", {
       code: "created_by_mismatch",
     });
   }
@@ -134,26 +134,26 @@ serve(createHttpHandler(async (req) => {
 
     if (subrentalError) {
       console.error("Transport sub-rental lookup failed", subrentalError.message);
-      throw new HttpError(500, "Unable to validate sub-rental", {
+      throw new HttpError(500, "No se pudo validar el subalquiler", {
         code: "subrental_lookup_failed",
         exposeDetails: false,
       });
     }
     if (!subrental) {
-      throw new HttpError(404, "Sub-rental was not found or is not accessible", {
+      throw new HttpError(404, "El subalquiler no se ha encontrado o no es accesible", {
         code: "subrental_not_found",
       });
     }
     if (subrental.job_id !== jobId || subrental.department !== department) {
-      throw new HttpError(403, "Sub-rental does not belong to this job and department", {
+      throw new HttpError(403, "El subalquiler no pertenece a este trabajo y departamento", {
         code: "subrental_scope_mismatch",
       });
     }
 
-    const vendorName = subrental.notes?.trim() || "Unknown vendor";
+    const vendorName = subrental.notes?.trim() || "Proveedor no especificado";
     const equipment = Array.isArray(subrental.equipment) ? subrental.equipment[0] : subrental.equipment;
     if (!description) {
-      description = `Subrental pickup: ${vendorName} (${equipment?.name || "equipment"})`;
+      description = `Recogida de subalquiler: ${vendorName} (${equipment?.name || "equipo"})`;
     }
 
     const marker = `[subrental:${subrentalId}]`;
@@ -167,7 +167,7 @@ serve(createHttpHandler(async (req) => {
       .maybeSingle();
     if (existingRequestError) {
       console.error("Transport duplicate lookup failed", existingRequestError.message);
-      throw new HttpError(500, "Unable to validate existing transport request", {
+      throw new HttpError(500, "No se pudo comprobar la solicitud de transporte existente", {
         code: "duplicate_lookup_failed",
         exposeDetails: false,
       });
@@ -175,7 +175,7 @@ serve(createHttpHandler(async (req) => {
     if (existingRequest) {
       return jsonResponse({
         id: existingRequest.id,
-        message: "Transport request already exists for this sub-rental",
+        message: "Ya existe una solicitud de transporte para este subalquiler",
         existing: true,
       });
     }
@@ -197,7 +197,7 @@ serve(createHttpHandler(async (req) => {
     .single();
   if (insertError || !transportRequest) {
     console.warn("Transport request was denied or failed", insertError?.message);
-    throw new HttpError(403, "Not permitted to create a transport request for this job", {
+    throw new HttpError(403, "No tienes permiso para crear una solicitud de transporte para este trabajo", {
       code: "transport_request_forbidden",
     });
   }
@@ -213,7 +213,7 @@ serve(createHttpHandler(async (req) => {
         .delete()
         .eq("id", transportRequest.id);
       if (rollbackError) console.error("Transport request rollback failed", rollbackError.message);
-      throw new HttpError(500, "Unable to create transport request items", {
+      throw new HttpError(500, "No se pudieron crear los elementos de la solicitud de transporte", {
         code: "transport_items_create_failed",
         exposeDetails: false,
       });
@@ -238,7 +238,7 @@ serve(createHttpHandler(async (req) => {
 
   return jsonResponse({
     id: transportRequest.id,
-    message: "Transport request created successfully",
+    message: "Solicitud de transporte creada correctamente",
     description,
   });
 }), {
