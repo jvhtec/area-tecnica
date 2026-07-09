@@ -1,36 +1,25 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  fetchMemoriaSource,
+  fetchOptionalMemoriaLogo,
+  getMemoriaPdfValidationMessage,
+  isPdfBytes,
+  requireMemoriaContext,
+  SourceByteBudget,
+  uploadGeneratedMemoriaPdf,
+} from "../_shared/memoriaSecurity.ts";
+import { createHttpHandler, HttpError, jsonResponse } from "../_shared/http.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
-
-// Helper function to sanitize filenames for Supabase Storage
-const sanitizeFileName = (name: string) => {
-  return name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9.-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase();
-};
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const { documentUrls, projectName, logoUrl, expiresIn = 3600 } = await req.json();
-    
-    console.log('Starting PDF generation with inputs:', { projectName, logoUrl, documentUrls, expiresIn });
+serve(createHttpHandler(async (req) => {
+    const { documentUrls, logoUrl, projectName, supabase, userId } = await requireMemoriaContext(
+      req,
+      ["material", "weight", "power", "pixel"],
+      "generate-video-memoria-tecnica",
+    );
+    const sourceBudget = new SourceByteBudget();
+    console.log("Generating video memoria", { documentCount: Object.keys(documentUrls).length, userId });
 
     // Create merged PDF
     const mergedPdf = await PDFDocument.create();
@@ -108,57 +97,15 @@ serve(async (req) => {
       nameY -= projectNameSize + 4;
     }
 
-    // Add customer logo if provided
+    // Caller-provided sources were validated as this project's Storage URLs and
+    // are fetched with strict redirect, time, and byte limits.
     if (logoUrl) {
       try {
-        console.log('Fetching customer logo from URL:', logoUrl);
-        
-        const fetchWithRetry = async (url: string, retries = 3, timeout = 5000) => {
-          for (let i = 0; i < retries; i++) {
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), timeout);
-              const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                  'Cache-Control': 'no-cache',
-                  'Pragma': 'no-cache'
-                }
-              });
-              clearTimeout(timeoutId);
-              
-              if (!response.ok) {
-                throw new Error(`Failed to fetch logo: ${response.statusText}`);
-              }
-              return response;
-            } catch (error) {
-              console.error(`Attempt ${i + 1} failed:`, error);
-              if (i === retries - 1) throw error;
-              await new Promise(r => setTimeout(r, 1000));
-            }
-          }
-          throw new Error('Max retries reached');
-        };
-
-        const logoResponse = await fetchWithRetry(logoUrl);
-        const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
-
-        let logoImage;
-        if (logoUrl.toLowerCase().endsWith('.png')) {
-          logoImage = await mergedPdf.embedPng(logoImageBytes);
-        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
-          logoImage = await mergedPdf.embedJpg(logoImageBytes);
-        } else {
-          const header = logoImageBytes.slice(0, 8);
-          const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
-          if (isPng) {
-            logoImage = await mergedPdf.embedPng(logoImageBytes);
-          } else {
-            logoImage = await mergedPdf.embedJpg(logoImageBytes);
-          }
-        }
-
-        console.log('Logo successfully embedded, dimensions:', logoImage.width, 'x', logoImage.height);
+        const logo = await fetchOptionalMemoriaLogo(logoUrl, sourceBudget);
+        if (!logo) throw new Error("Logo is missing");
+        const logoImage = logo.format === "png"
+          ? await mergedPdf.embedPng(logo.bytes)
+          : await mergedPdf.embedJpg(logo.bytes);
         
         const maxLogoHeight = 100;
         const maxLogoWidth = 200;
@@ -178,32 +125,23 @@ serve(async (req) => {
           height: scaledHeight
         });
 
-        console.log('Logo successfully added to cover page');
       } catch (error) {
-        console.error('Error processing customer logo:', error);
+        console.warn("Video memoria logo omitted", error instanceof Error ? error.message : error);
       }
     }
 
-    // Helper to fetch footer logo from public logos first, then fallback
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase configuration');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
+    // Fixed application assets are read through the service client, never a
+    // caller-provided URL.
     const fetchFooterLogo = async (): Promise<Uint8Array | null> => {
       const candidates = [
-        `${supabaseUrl}/storage/v1/object/public/public%20logos/sectorpro.png`,
-        `${supabaseUrl}/storage/v1/object/public/company-assets/sector-pro-logo.png`
+        { bucket: "public logos", path: "sectorpro.png" },
+        { bucket: "company-assets", path: "sector-pro-logo.png" },
       ];
-      for (const url of candidates) {
-        try {
-          const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
-          if (res.ok) return new Uint8Array(await res.arrayBuffer());
-        } catch (_) { /* continue */ }
+      for (const candidate of candidates) {
+        const { data, error } = await supabase.storage.from(candidate.bucket).download(candidate.path);
+        if (!error && data) {
+          return new Uint8Array(await data.arrayBuffer());
+        }
       }
       return null;
     };
@@ -303,23 +241,22 @@ serve(async (req) => {
       if (!url) continue;
 
       try {
-        console.log(`Fetching PDF from URL: ${url}`);
-        const pdfResponse = await fetch(url, {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        if (!pdfResponse.ok) {
-          throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+        const sourceBytes = await fetchMemoriaSource(url, sourceBudget);
+        if (!isPdfBytes(sourceBytes)) {
+          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "invalid"), { code: "invalid_pdf_source" });
         }
-        
-        const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
-        const pdf = await PDFDocument.load(pdfBytes);
+        const pdf = await PDFDocument.load(sourceBytes);
+        if (pdf.getPageCount() > 150) {
+          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "page_limit"), { code: "pdf_page_limit" });
+        }
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach((page) => mergedPdf.addPage(page));
       } catch (error) {
-        console.error(`Error processing PDF for ${key}:`, error);
+        if (error instanceof HttpError) throw error;
+        console.warn("Video memoria rejected PDF", { key });
+        throw new HttpError(422, getMemoriaPdfValidationMessage(key, "unreadable"), {
+          code: "invalid_pdf_source",
+        });
       }
     }
 
@@ -330,10 +267,7 @@ serve(async (req) => {
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const yy = String(now.getFullYear()).slice(-2);
 
-    // Folder-safe project name for storage path
-    const sanitizedProjectName = sanitizeFileName(projectName || 'proyecto');
-    // Display-friendly job name in the file name (allow spaces & parentheses, remove slashes)
-    const displayProjectName = (projectName || 'Proyecto')
+    const displayProjectName = projectName
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[\\/]+/g, '-')
@@ -342,120 +276,7 @@ serve(async (req) => {
 
     // Requested format: Memoria Tecnica Video - Job Name (DDMMYY).pdf
     const fileName = `Memoria Tecnica Video - ${displayProjectName} (${dd}${mm}${yy}).pdf`;
-    const objectPath = `${sanitizedProjectName}/${fileName}`;
-
-    // Choose a bucket and upload using the Supabase client; fall back across candidates
-    const bucketCandidates = ['Memoria Tecnica', 'memoria-tecnica'];
-    let selectedBucket = '';
-    let lastUploadErr: any = null;
-    for (const candidate of bucketCandidates) {
-      try {
-        const encodedBucket = encodeURIComponent(candidate);
-        const encodedPath = encodeURI(objectPath);
-        const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/pdf',
-            'x-upsert': 'true'
-          },
-          body: pdfBytes
-        });
-        if (uploadResp.ok) { selectedBucket = candidate; break; }
-        if (uploadResp.status === 404) {
-          await fetch(`${supabaseUrl}/storage/v1/bucket`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ id: candidate, name: candidate, public: false })
-          });
-          const retryResp = await fetch(`${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/pdf',
-              'x-upsert': 'true'
-            },
-            body: pdfBytes
-          });
-          if (retryResp.ok) { selectedBucket = candidate; break; }
-          lastUploadErr = new Error(`Upload retry failed: ${retryResp.status} ${retryResp.statusText} ${await retryResp.text()}`);
-        } else if (uploadResp.status === 409) {
-          selectedBucket = candidate;
-          break;
-        } else {
-          const bodyTxt = await uploadResp.text();
-          if (bodyTxt.includes('"statusCode"') && bodyTxt.includes('409') && bodyTxt.toLowerCase().includes('duplicate')) {
-            selectedBucket = candidate;
-            break;
-          }
-          lastUploadErr = new Error(`Upload failed: ${uploadResp.status} ${uploadResp.statusText} ${bodyTxt}`);
-        }
-      } catch (e) {
-        lastUploadErr = e;
-      }
-    }
-    if (!selectedBucket) {
-      console.error('Upload failed for all buckets:', lastUploadErr);
-      throw new Error(`Failed to upload merged PDF: ${lastUploadErr?.message || 'unknown error'}`);
-    }
-
-    // Generate signed URL for private access (expires based on expiresIn parameter)
-    console.log('Generating signed URL...');
-    let signedUrl = '';
-    try {
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from(selectedBucket)
-        .createSignedUrl(objectPath, expiresIn);
-      if (signedUrlError) throw signedUrlError;
-      signedUrl = signedUrlData.signedUrl;
-    } catch (e) {
-      // REST fallback
-      const encodedBucket = encodeURIComponent(selectedBucket);
-      const res = await fetch(`${supabaseUrl}/storage/v1/object/sign/${encodedBucket}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ expiresIn, paths: [objectPath] })
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`Failed to sign URL: ${res.status} ${res.statusText} ${txt}`);
-      }
-      const body = await res.json();
-      signedUrl = body[0]?.signedURL || body[0]?.signedUrl || '';
-      if (!signedUrl) throw new Error('Signed URL missing in response');
-    }
-
-    console.log('Signed URL generated successfully');
-
-    return new Response(JSON.stringify({
-      url: signedUrl,
-      fileName: fileName,
-      expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-      expiresIn: expiresIn
-    }), {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
-    });
-
-  } catch (error) {
-    console.error('Error in PDF generation:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-        status: 500,
-      }
-    );
-  }
+    return jsonResponse(await uploadGeneratedMemoriaPdf(supabase, projectName, fileName, pdfBytes));
+}), {
+  onError: (error) => console.error("generate-video-memoria-tecnica failed", error),
 });

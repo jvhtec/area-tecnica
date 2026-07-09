@@ -1,32 +1,25 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  fetchMemoriaSource,
+  fetchOptionalMemoriaLogo,
+  getMemoriaPdfValidationMessage,
+  isPdfBytes,
+  requireMemoriaContext,
+  SourceByteBudget,
+  uploadGeneratedMemoriaPdf,
+} from "../_shared/memoriaSecurity.ts";
+import { createHttpHandler, HttpError, jsonResponse } from "../_shared/http.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
-
-const clampSignedUrlTtl = (value: unknown) => {
-  const numericValue = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(numericValue)) return 3600;
-  return Math.min(3600, Math.max(60, Math.floor(numericValue)));
-};
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const { documentUrls, projectName, logoUrl, expiresIn } = await req.json();
-    const signedUrlTtl = clampSignedUrlTtl(expiresIn);
-    
-    console.log('Starting PDF generation for project:', projectName);
+serve(createHttpHandler(async (req) => {
+    const { documentUrls, logoUrl, projectName, supabase, userId } = await requireMemoriaContext(
+      req,
+      ["material", "weight", "power", "rigging", "memoria_completa"],
+      "generate-lights-memoria-tecnica",
+    );
+    const sourceBudget = new SourceByteBudget();
+    console.log("Generating lights memoria", { documentCount: Object.keys(documentUrls).length, userId });
 
     // Create merged PDF
     const mergedPdf = await PDFDocument.create();
@@ -73,42 +66,15 @@ serve(async (req) => {
       maxWidth: width - 40,
     });
 
-    // Add customer logo if provided
+    // Caller-provided sources were validated as this project's Storage URLs and
+    // are fetched with strict redirect, time, and byte limits.
     if (logoUrl) {
       try {
-        console.log('Fetching customer logo');
-        const logoResponse = await fetch(logoUrl, {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        if (!logoResponse.ok) {
-          throw new Error(`Failed to fetch logo: ${logoResponse.statusText}`);
-        }
-        
-        const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
-        let logoImage;
-        
-        // Try to detect image type
-        if (logoUrl.toLowerCase().endsWith('.png')) {
-          logoImage = await mergedPdf.embedPng(logoImageBytes);
-        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
-          logoImage = await mergedPdf.embedJpg(logoImageBytes);
-        } else {
-          // Try to detect by content
-          const header = logoImageBytes.slice(0, 8);
-          const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
-          
-          if (isPng) {
-            logoImage = await mergedPdf.embedPng(logoImageBytes);
-          } else {
-            // Default to JPG if unknown
-            logoImage = await mergedPdf.embedJpg(logoImageBytes);
-          }
-        }
-        
-        console.log('Logo successfully embedded, dimensions:', logoImage.width, 'x', logoImage.height);
+        const logo = await fetchOptionalMemoriaLogo(logoUrl, sourceBudget);
+        if (!logo) throw new Error("Logo is missing");
+        const logoImage = logo.format === "png"
+          ? await mergedPdf.embedPng(logo.bytes)
+          : await mergedPdf.embedJpg(logo.bytes);
         
         const maxLogoHeight = 100;
         const maxLogoWidth = 200;
@@ -132,26 +98,17 @@ serve(async (req) => {
           height: scaledHeight,
         });
       } catch (error) {
-        console.error('Error processing customer logo:', error);
+        console.warn("Lights memoria logo omitted", error instanceof Error ? error.message : error);
       }
     }
 
-    // Add Sector Pro logo at the bottom
+    // Fixed application asset; do not use fetch on a URL assembled from input.
     try {
-      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
-      console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
-      
-      const logoResponse = await fetch(sectorProLogoUrl, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      if (!logoResponse.ok) {
-        throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
-      }
-      
-      const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
+      const { data: asset, error } = await supabase.storage
+        .from("company-assets")
+        .download("sector-pro-logo.png");
+      if (error || !asset) throw new Error("Footer logo not found");
+      const logoBytes = new Uint8Array(await asset.arrayBuffer());
       const sectorProLogo = await mergedPdf.embedPng(logoBytes);
       
       const targetHeight = 20;
@@ -171,25 +128,23 @@ serve(async (req) => {
       // For memoria completa, just append the complete document after the cover page
       console.log('Appending complete memoria PDF');
       try {
-        const pdfResponse = await fetch(documentUrls.memoria_completa, {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        if (!pdfResponse.ok) {
-          throw new Error(`Failed to fetch complete memoria PDF: ${pdfResponse.statusText}`);
+        const sourceBytes = await fetchMemoriaSource(documentUrls.memoria_completa, sourceBudget);
+        if (!isPdfBytes(sourceBytes)) {
+          throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "invalid"), { code: "invalid_pdf_source" });
         }
-        
-        const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
-        const pdf = await PDFDocument.load(pdfBytes);
-        
+        const pdf = await PDFDocument.load(sourceBytes);
+        if (pdf.getPageCount() > 150) {
+          throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "page_limit"), { code: "pdf_page_limit" });
+        }
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach(page => mergedPdf.addPage(page));
         console.log(`Added ${pages.length} pages from complete memoria`);
       } catch (error) {
-        console.error('Error processing complete memoria PDF:', error);
-        throw error;
+        if (error instanceof HttpError) throw error;
+        console.warn("Lights memoria rejected complete PDF");
+        throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "unreadable"), {
+          code: "invalid_pdf_source",
+        });
       }
     } else {
       // For regular memoria, create table of contents and append individual documents
@@ -237,147 +192,33 @@ serve(async (req) => {
         if (!url) continue;
 
         try {
-          console.log(`Fetching PDF for ${doc.id}`);
-          const pdfResponse = await fetch(url, {
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            }
-          });
-          if (!pdfResponse.ok) {
-            throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+          const sourceBytes = await fetchMemoriaSource(url, sourceBudget);
+          if (!isPdfBytes(sourceBytes)) {
+            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "invalid"), { code: "invalid_pdf_source" });
           }
-          
-          const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
-          const pdf = await PDFDocument.load(pdfBytes);
-          
+          const pdf = await PDFDocument.load(sourceBytes);
+          if (pdf.getPageCount() > 150) {
+            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "page_limit"), { code: "pdf_page_limit" });
+          }
           const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
           pages.forEach(page => mergedPdf.addPage(page));
           console.log(`Added ${pages.length} pages from ${doc.id}`);
         } catch (error) {
-          console.error(`Error processing PDF for ${doc.id}:`, error);
+          if (error instanceof HttpError) throw error;
+          console.warn("Lights memoria rejected PDF", { key: doc.id });
+          throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "unreadable"), {
+            code: "invalid_pdf_source",
+          });
         }
       }
     }
 
     const pdfBytes = await mergedPdf.save();
-    
-    // Create a safe filename
-    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
-    const safeFileName = `memoria_tecnica_${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf`;
-    
-    // Get Supabase configuration
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing Supabase configuration');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const bucket = 'lights-memoria-tecnica';
-    const encodedBucket = encodeURIComponent(bucket);
-    const encodedPath = encodeURIComponent(safeFileName);
-
-    // Upload to Supabase Storage. Allow overwriting (x-upsert) and auto-create the
-    // bucket on first use, mirroring generate-memoria-tecnica/generate-video-memoria-tecnica.
-    let uploadResponse = await fetch(
-      `${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/pdf',
-          'x-upsert': 'true',
-        },
-        body: pdfBytes,
-      }
-    );
-
-    if (uploadResponse.status === 404) {
-      await fetch(`${supabaseUrl}/storage/v1/bucket`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: bucket, name: bucket, public: false }),
-      });
-      uploadResponse = await fetch(
-        `${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/pdf',
-            'x-upsert': 'true',
-          },
-          body: pdfBytes,
-        }
-      );
-    }
-
-    if (!uploadResponse.ok && uploadResponse.status !== 409) {
-      const errorText = await uploadResponse.text();
-      console.error('Upload failed with status:', uploadResponse.status, errorText);
-      throw new Error(`Storage upload failed: ${uploadResponse.status} - ${errorText}`);
-    }
-
-    // Generate a signed URL (bucket is private) rather than assuming a public URL.
-    console.log('Generating signed URL...');
-    let signedUrl = '';
-    try {
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(safeFileName, signedUrlTtl);
-      if (signedUrlError) throw signedUrlError;
-      signedUrl = signedUrlData.signedUrl;
-    } catch (e) {
-      const res = await fetch(`${supabaseUrl}/storage/v1/object/sign/${encodedBucket}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ expiresIn: signedUrlTtl, paths: [safeFileName] }),
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`Failed to sign URL: ${res.status} ${res.statusText} ${txt}`);
-      }
-      const body = await res.json();
-      signedUrl = body[0]?.signedURL || body[0]?.signedUrl || '';
-      if (!signedUrl) throw new Error('Signed URL missing in response');
-    }
-
-    console.log('Successfully generated memoria tecnica:', safeFileName);
-
-    return new Response(
-      JSON.stringify({
-        url: signedUrl,
-        fileName: safeFileName,
-        expiresAt: new Date(Date.now() + signedUrlTtl * 1000).toISOString(),
-        expiresIn: signedUrlTtl,
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-  } catch (error) {
-    console.error('Error in PDF generation:', error);
-    return new Response(
-      JSON.stringify({ error: 'Error al generar la memoria técnica' }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-        status: 500,
-      }
-    );
-  }
+    const safeProjectName = projectName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 80) || "proyecto";
+    const fileName = `memoria_tecnica_${safeProjectName}_${Date.now()}.pdf`;
+    return jsonResponse(await uploadGeneratedMemoriaPdf(supabase, projectName, fileName, pdfBytes, {
+      bucketCandidates: ["lights-memoria-tecnica"],
+    }));
+}), {
+  onError: (error) => console.error("generate-lights-memoria-tecnica failed", error),
 });

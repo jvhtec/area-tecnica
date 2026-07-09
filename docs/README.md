@@ -75,6 +75,7 @@ Detailed deep-dive docs for the full festival subsystem:
   - `SECURITY_AUDIT_LOGGING.md`
 
 ## Plans / Roadmaps
+- **[2026-07 Deep Codebase Audit and Remediation Roadmap](plans/2026-07-codebase-audit-roadmap.md)** — current security, database, quality, reliability, performance, operations, and technical-debt plan. Use this for newly discovered work and measurable closure criteria.
 - **[Codebase Maintenance Roadmap](plans/codebase-maintenance-roadmap.md)** - phased technical-debt, refactor, type-safety, performance, and ops cleanup backlog
   - Phase 0 is complete as of 2026-05-16: `npm run typecheck` is available, rigging pass/fail is disabled for unverified truss constants, and Flex lights/video business-role gaps return diagnostics.
   - Phase 1 is complete as of 2026-05-16: PDF `@ts-nocheck` suppressions are removed, `noImplicitAny` is enabled, dynamic Supabase wrappers are typed, festival gear JSON mapping is centralized, additive transactional RPCs cover tour requirement/logistics replacement writes, and the `src` `as any` count is down to `325`.
