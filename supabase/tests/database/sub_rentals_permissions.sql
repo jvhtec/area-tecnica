@@ -145,7 +145,8 @@ SET email = excluded.email,
 INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
 VALUES
   ('job.created', 'Job created', 'management', 'info', false),
-  ('assignment.created', 'Assignment created', 'management', 'info', false)
+  ('assignment.created', 'Assignment created', 'management', 'info', false),
+  ('assignment.removed', 'Assignment removed', 'management', 'info', false)
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public.equipment (id, name, department)
