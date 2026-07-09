@@ -30,6 +30,14 @@ describe('powerReportReadiness', () => {
         uploaded_at: '2026-04-07T10:02:00.000Z',
       })
     ).toBe('video');
+
+    expect(
+      getTechnicalPowerDepartmentFromDocument({
+        file_name: 'Sound_Power_Report_-_Copied_Show.pdf',
+        file_path: 'job-1/calculators/consumos/Sound_Power_Report_-_Copied_Show.pdf',
+        uploaded_at: '2026-04-07T10:03:00.000Z',
+      })
+    ).toBe('sound');
   });
 
   it('keeps only the newest upload per department', () => {

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import { FlexSelectorDialogHost } from "@/components/jobs/cards/job-card-actions/FlexSelectorDialogHost";
+import { DuplicateSoundDocumentationDialog } from "@/components/jobs/cards/job-card-actions/DuplicateSoundDocumentationDialog";
 import { JobCardActionButtons } from "@/components/jobs/cards/job-card-actions/JobCardActionButtons";
 import { ProductionWhatsappDialog } from "@/components/jobs/cards/job-card-actions/ProductionWhatsappDialog";
 import { WarehouseWhatsappDialog } from "@/components/jobs/cards/job-card-actions/WarehouseWhatsappDialog";
@@ -66,6 +67,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const allowedJobType = ["single", "festival", "ciclo", "tourdate"].includes(job?.job_type);
   const canViewCalculators = isProjectManagementPage && isManagementUser;
   const tourId: string | undefined = job?.tour_id || job?.tour?.id || undefined;
+  const [duplicateSoundDocsOpen, setDuplicateSoundDocsOpen] = React.useState(false);
 
   const productionWhatsapp = useProductionWhatsapp({
     job,
@@ -163,6 +165,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     navigate(`/festival-management/${job.id}?${params.toString()}`);
   }, [job.id, navigate]);
 
+  const openDuplicateSoundDocsDialog = React.useCallback(() => {
+    setDuplicateSoundDocsOpen(true);
+  }, []);
+
   return (
     <>
       <JobCardActionButtons
@@ -216,6 +222,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         isTechnicianUser={isTechnicianUser}
         navigateToCalculator={navigateToCalculator}
         navigateToMemoria={navigateToMemoria}
+        openDuplicateSoundDocsDialog={openDuplicateSoundDocsDialog}
         openProductionWhatsappDialog={productionWhatsapp.openProductionWhatsappDialog}
         openWarehouseWhatsappDialog={warehouseWhatsapp.openWarehouseWhatsappDialog}
         technicalPower={technicalPower}
@@ -227,6 +234,11 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         department={department}
         flexOpening={flexOpening}
         job={job}
+      />
+      <DuplicateSoundDocumentationDialog
+        job={job}
+        open={duplicateSoundDocsOpen}
+        onOpenChange={setDuplicateSoundDocsOpen}
       />
     </>
   );

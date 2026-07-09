@@ -1,6 +1,7 @@
 import type React from "react";
 import {
   Clock,
+  Copy,
   Edit,
   ExternalLink,
   FileStack,
@@ -61,6 +62,7 @@ type JobCardActionButtonsProps = JobCardActionsProps & {
   isTechnicianUser: boolean;
   navigateToCalculator: (e: React.MouseEvent, type: "pesos" | "consumos") => void;
   navigateToMemoria: (e: React.MouseEvent) => void;
+  openDuplicateSoundDocsDialog: () => void;
   openProductionWhatsappDialog: () => void;
   openWarehouseWhatsappDialog: () => void;
   technicalPower: TechnicalPowerPackState;
@@ -143,6 +145,7 @@ export const JobCardActionButtons = ({
   job,
   navigateToCalculator,
   navigateToMemoria,
+  openDuplicateSoundDocsDialog,
   onAddFlexFolders,
   onAssignmentDialogOpen,
   onCreateFlexFolders,
@@ -171,6 +174,12 @@ export const JobCardActionButtons = ({
   whatsappRequest,
 }: JobCardActionButtonsProps) => {
   const isProductionDepartment = department === "production";
+  const canDuplicateSoundDocs =
+    department === "sound" &&
+    isProjectManagementPage &&
+    isManagementUser &&
+    allowedJobType &&
+    job.job_type !== "dryhire";
   const flexReportDepartment = department === "sound" || department === "lights" ? department : null;
   const normalizedJobType = String(job.job_type || "").toLowerCase();
   const canOpenTimesheets = !["dryhire", "dry_hire"].includes(normalizedJobType) && (
@@ -391,6 +400,18 @@ export const JobCardActionButtons = ({
           <FileStack className="h-4 w-4" />
           <span className="hidden sm:inline">Memoria</span>
         </Button>
+        {canDuplicateSoundDocs && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            title="Duplicar documentación de sonido"
+            onClick={openDuplicateSoundDocsDialog}
+          >
+            <Copy className="h-4 w-4" />
+            <span className="hidden sm:inline">Duplicar docs</span>
+          </Button>
+        )}
       </>
     )}
     {flexReportDepartment && isProjectManagementPage && isManagementUser && (
