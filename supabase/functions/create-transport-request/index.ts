@@ -70,6 +70,12 @@ const parseItems = (value: unknown): TransportRequestItem[] => {
   });
 };
 
+const existingSubrentalRequestResponse = (id: string) => jsonResponse({
+  id,
+  message: "Ya existe una solicitud de transporte para este subalquiler",
+  existing: true,
+});
+
 /**
  * Uses the caller's JWT for all business data operations. The service client is
  * retained solely for token verification and the post-commit push invocation;
@@ -123,8 +129,46 @@ serve(createHttpHandler(async (req) => {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
 
+  const findExistingSubrentalRequest = async (id: string, marker: string) => {
+    const { data: linkedRequest, error: linkedRequestError } = await callerClient
+      .from("transport_requests")
+      .select("id")
+      .eq("subrental_id", id)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (linkedRequestError) {
+      console.error("Transport duplicate lookup failed", linkedRequestError.message);
+      throw new HttpError(500, "No se pudo comprobar la solicitud de transporte existente", {
+        code: "duplicate_lookup_failed",
+        exposeDetails: false,
+      });
+    }
+    if (linkedRequest) return linkedRequest;
+
+    // Preserve idempotency for requests created before subrental_id was added.
+    const { data: legacyRequest, error: legacyRequestError } = await callerClient
+      .from("transport_requests")
+      .select("id")
+      .neq("status", "cancelled")
+      .ilike("note", `%${marker}%`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (legacyRequestError) {
+      console.error("Legacy transport duplicate lookup failed", legacyRequestError.message);
+      throw new HttpError(500, "No se pudo comprobar la solicitud de transporte existente", {
+        code: "duplicate_lookup_failed",
+        exposeDetails: false,
+      });
+    }
+    return legacyRequest;
+  };
+
   let description = descriptionInput;
   let note = noteInput;
+  let subrentalMarker: string | null = null;
   if (subrentalId) {
     const { data: subrental, error: subrentalError } = await callerClient
       .from("sub_rentals")
@@ -157,27 +201,10 @@ serve(createHttpHandler(async (req) => {
     }
 
     const marker = `[subrental:${subrentalId}]`;
-    const { data: existingRequest, error: existingRequestError } = await callerClient
-      .from("transport_requests")
-      .select("id")
-      .eq("job_id", jobId)
-      .eq("department", department)
-      .neq("status", "cancelled")
-      .ilike("note", `%${marker}%`)
-      .maybeSingle();
-    if (existingRequestError) {
-      console.error("Transport duplicate lookup failed", existingRequestError.message);
-      throw new HttpError(500, "No se pudo comprobar la solicitud de transporte existente", {
-        code: "duplicate_lookup_failed",
-        exposeDetails: false,
-      });
-    }
+    subrentalMarker = marker;
+    const existingRequest = await findExistingSubrentalRequest(subrentalId, marker);
     if (existingRequest) {
-      return jsonResponse({
-        id: existingRequest.id,
-        message: "Ya existe una solicitud de transporte para este subalquiler",
-        existing: true,
-      });
+      return existingSubrentalRequestResponse(existingRequest.id);
     }
 
     note = note ? `${note} ${marker}` : marker;
@@ -192,9 +219,14 @@ serve(createHttpHandler(async (req) => {
       job_id: jobId,
       note: note || null,
       status: "requested",
+      subrental_id: subrentalId,
     })
     .select("id")
     .single();
+  if (insertError?.code === "23505" && subrentalId && subrentalMarker) {
+    const existingRequest = await findExistingSubrentalRequest(subrentalId, subrentalMarker);
+    if (existingRequest) return existingSubrentalRequestResponse(existingRequest.id);
+  }
   if (insertError || !transportRequest) {
     console.warn("Transport request was denied or failed", insertError?.message);
     throw new HttpError(403, "No tienes permiso para crear una solicitud de transporte para este trabajo", {

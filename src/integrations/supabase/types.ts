@@ -9602,6 +9602,7 @@ export type Database = {
           job_id: string
           note: string | null
           status: string
+          subrental_id: string | null
           transport_type: string | null
           updated_at: string
         }
@@ -9615,6 +9616,7 @@ export type Database = {
           job_id: string
           note?: string | null
           status?: string
+          subrental_id?: string | null
           transport_type?: string | null
           updated_at?: string
         }
@@ -9628,6 +9630,7 @@ export type Database = {
           job_id?: string
           note?: string | null
           status?: string
+          subrental_id?: string | null
           transport_type?: string | null
           updated_at?: string
         }
@@ -9673,6 +9676,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_job_staffing_summary"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "transport_requests_subrental_scope_fkey"
+            columns: ["subrental_id", "job_id", "department"]
+            isOneToOne: false
+            referencedRelation: "sub_rentals"
+            referencedColumns: ["id", "job_id", "department"]
           },
         ]
       }
