@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(31);
+SELECT plan(32);
 
 SELECT has_table('public', 'rack_builder_racks', 'rack builder racks table exists');
 SELECT has_table('public', 'rack_builder_devices', 'rack builder devices table exists');
@@ -360,6 +360,25 @@ SELECT is(
   ),
   ARRAY['82410000-0000-0000-0000-000000000004'::uuid],
   'sound rack builder users only see sound projects'
+);
+
+SELECT throws_ok(
+  $$
+    INSERT INTO public.rack_builder_layout_items (
+      layout_id,
+      device_id,
+      start_u,
+      facing
+    ) VALUES (
+      '82410000-0000-0000-0000-000000000007'::uuid,
+      '82410000-0000-0000-0000-000000000002'::uuid,
+      3,
+      'front'
+    )
+  $$,
+  '42501',
+  NULL,
+  'sound rack builder users cannot place equipment in lights projects'
 );
 
 RESET ROLE;

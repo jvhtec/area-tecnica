@@ -11,7 +11,7 @@ import {
   VIEW_MODE_OPTIONS,
   type RackViewMode,
 } from '../../lib/layoutEditorHelpers'
-import { getRackBuilderProjectsPath } from '../../lib/department'
+import { getRackBuilderProjectsPath } from '@/features/rack-builder/lib/department'
 import type {
   Device,
   DeviceCategory,

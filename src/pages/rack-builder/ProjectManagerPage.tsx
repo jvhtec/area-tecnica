@@ -1,13 +1,10 @@
 import { type FormEvent, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useActiveRackBuilderDepartment } from '@/features/rack-builder/hooks/useActiveRackBuilderDepartment'
 import { useProjects } from '@/features/rack-builder/hooks/useProjects'
 import { useRacks } from '@/features/rack-builder/hooks/useRacks'
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth'
 import { DRAWING_STATE_OPTIONS, formatDrawingState, formatRevisionLabel } from '@/features/rack-builder/lib/drawingState'
-import {
-  formatRackBuilderDepartment,
-  normalizeRackBuilderDepartment,
-} from '@/features/rack-builder/lib/department'
+import { formatRackBuilderDepartment } from '@/features/rack-builder/lib/department'
 import type { DrawingState, ProjectSummary } from '@/features/rack-builder/types'
 import PageHeader from '@/features/rack-builder/components/layout/PageHeader'
 import Button from '@/features/rack-builder/components/ui/Button'
@@ -18,12 +15,7 @@ import Select from '@/features/rack-builder/components/ui/Select'
 
 export default function ProjectManagerPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const { userDepartment } = useOptimizedAuth()
-  const activeDepartment =
-    normalizeRackBuilderDepartment(searchParams.get('department'))
-    ?? normalizeRackBuilderDepartment(userDepartment)
-    ?? 'sound'
+  const activeDepartment = useActiveRackBuilderDepartment()
   const { projects, loading: projectsLoading, createProjectWithInitialLayout, updateProject, deleteProject } = useProjects(activeDepartment)
   const { racks, loading: racksLoading } = useRacks()
 
@@ -109,7 +101,7 @@ export default function ProjectManagerPage() {
   return (
     <div>
       <PageHeader
-        title={`Project Manager - ${formatRackBuilderDepartment(activeDepartment)}`}
+        title={`Gestor de proyectos - ${formatRackBuilderDepartment(activeDepartment)}`}
         action={
           <Button onClick={openCreateModal} disabled={racks.length === 0}>
             New Project

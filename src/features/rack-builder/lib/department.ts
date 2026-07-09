@@ -1,12 +1,13 @@
-export const RACK_BUILDER_DEPARTMENTS = ['sound', 'lights'] as const
-
-export type RackBuilderDepartment = (typeof RACK_BUILDER_DEPARTMENTS)[number]
+import { RACK_BUILDER_DEPARTMENTS, type RackBuilderDepartment } from '../types'
 
 export const normalizeRackBuilderDepartment = (
   value: string | null | undefined,
 ): RackBuilderDepartment | null => {
   const normalized = value?.trim().toLowerCase()
-  return normalized === 'sound' || normalized === 'lights' ? normalized : null
+  if (!normalized) return null
+  return RACK_BUILDER_DEPARTMENTS.includes(normalized as RackBuilderDepartment)
+    ? normalized as RackBuilderDepartment
+    : null
 }
 
 export const getRackBuilderProjectsPath = (department: string | null | undefined) => {
@@ -15,4 +16,4 @@ export const getRackBuilderProjectsPath = (department: string | null | undefined
 }
 
 export const formatRackBuilderDepartment = (department: RackBuilderDepartment) =>
-  department === 'lights' ? 'Lights' : 'Sound'
+  department === 'lights' ? 'Luces' : 'Sonido'

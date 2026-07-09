@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
-import type { RackBuilderDepartment } from '../lib/department'
-import type { DrawingState, Project, ProjectSummary } from '../types'
+import type { DrawingState, Project, ProjectSummary, RackBuilderDepartment } from '../types'
 
 interface ProjectWithLayoutsRow extends Project {
   layouts?: Array<{ id: string }>

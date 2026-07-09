@@ -13,7 +13,7 @@ import {
   MAX_ZOOM_PERCENT,
   type RackViewMode,
 } from '../../lib/layoutEditorHelpers'
-import { getRackBuilderProjectsPath } from '../../lib/department'
+import { getRackBuilderProjectsPath } from '@/features/rack-builder/lib/department'
 import type {
   ConnectorDefinition,
   Device,

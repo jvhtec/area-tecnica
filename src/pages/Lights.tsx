@@ -43,7 +43,7 @@ const Lights = () => {
       { label: "Pesos", to: "/lights-pesos-tool", icon: Scale },
       { label: "Consumos", to: "/lights-consumos-tool", icon: Calculator },
       { label: "Memoria técnica", to: "/lights-memoria-tecnica", icon: FileText },
-      { label: "Rack Builder", to: "/rack-builder?department=lights", icon: Server },
+      { label: "Constructor de racks", to: "/rack-builder?department=lights", icon: Server },
     ],
     [],
   );
@@ -247,7 +247,7 @@ const Lights = () => {
                   className="flex items-center gap-2"
                 >
                   <Server className="h-4 w-4" />
-                  Rack Builder
+                  Constructor de racks
                 </Button>
               </div>
             </div>

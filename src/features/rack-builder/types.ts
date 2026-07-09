@@ -1,7 +1,8 @@
 export type RackWidth = 'single' | 'dual'
 export type DeviceFacing = 'front' | 'rear'
 export type DrawingState = 'preliminary' | 'rev' | 'as_built'
-export type RackBuilderDepartment = 'sound' | 'lights'
+export const RACK_BUILDER_DEPARTMENTS = ['sound', 'lights'] as const
+export type RackBuilderDepartment = (typeof RACK_BUILDER_DEPARTMENTS)[number]
 export type ConnectorMounting = 'front' | 'rear' | 'both'
 export type ConnectorCategory = 'audio' | 'data' | 'power' | 'multipin' | 'other'
 
