@@ -132,6 +132,17 @@ describe("duplicate sound documentation helpers", () => {
         targetJobId: "target-job",
       })
     ).toBe("calculators/consumos/target-job/stage-2-main/copy-id-Sound_Power_Report_-_Target_Show.pdf");
+
+    expect(
+      buildCopiedSoundDocumentPath({
+        idFactory: () => "copy-id",
+        jobScopedStorage: true,
+        sourceFilePath: "calculators/consumos/source-job/stage-2-main/source.pdf",
+        sourceJobId: "source-job",
+        targetFileName: "Sound Power Report - Target Show.pdf",
+        targetJobId: "target-job",
+      })
+    ).toBe("target-job/calculators/consumos/stage-2-main/copy-id-Sound_Power_Report_-_Target_Show.pdf");
   });
 
   it("selects generic sound docs and only the latest generated sound docs per category scope", () => {
@@ -159,6 +170,12 @@ describe("duplicate sound documentation helpers", () => {
         file_name: "Sound Power Report - Source.pdf",
         file_path: "calculators/consumos/source-job/report-new.pdf",
         uploaded_at: "2026-01-02T00:00:00Z",
+      },
+      {
+        id: "job-scoped-power",
+        file_name: "Sound Power Report - Source.pdf",
+        file_path: "source-job/calculators/consumos/report-copy.pdf",
+        uploaded_at: "2026-01-06T00:00:00Z",
       },
       {
         id: "video-power",
@@ -199,8 +216,8 @@ describe("duplicate sound documentation helpers", () => {
 
     expect(selected.map((item) => item.doc.id).sort()).toEqual([
       "generic-doc",
+      "job-scoped-power",
       "material",
-      "new-power",
       "template",
     ]);
   });
@@ -338,10 +355,10 @@ describe("duplicateSoundDocumentation", () => {
     });
 
     expect(uploads.map((upload) => `${upload.bucket}:${upload.path}`).sort()).toEqual([
-      "job-documents:calculators/consumos/target-job/copy-a-Sound_Power_Report_-_Target_Show.pdf",
+      "job-documents:target-job/calculators/consumos/copy-a-Sound_Power_Report_-_Target_Show.pdf",
       "job_documents:sound/target-job/copy-b-Patch_Target_Show.pdf",
     ]);
-    const powerUpload = uploads.find((upload) => upload.path.includes("calculators/consumos/target-job"));
+    const powerUpload = uploads.find((upload) => upload.path.includes("target-job/calculators/consumos"));
     expect(powerUpload?.blob.size).toBeGreaterThan(sourcePdfSize);
     await expect(PDFDocument.load(await powerUpload!.blob.arrayBuffer())).resolves.toBeTruthy();
 
@@ -355,7 +372,7 @@ describe("duplicateSoundDocumentation", () => {
         }),
         expect.objectContaining({
           file_name: "Sound Power Report - Target Show.pdf",
-          file_path: "calculators/consumos/target-job/copy-a-Sound_Power_Report_-_Target_Show.pdf",
+          file_path: "target-job/calculators/consumos/copy-a-Sound_Power_Report_-_Target_Show.pdf",
           uploaded_by: "user-1",
         }),
         expect.objectContaining({

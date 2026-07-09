@@ -2,8 +2,9 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckSquare, Copy, Loader2, Search } from "lucide-react";
 import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 
-import type { JobCardJob } from "@/components/jobs/cards/job-card-actions/types";
+import { MADRID_TIME_ZONE, type JobCardJob } from "@/components/jobs/cards/job-card-actions/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -40,28 +41,28 @@ const COPY_SCOPE_OPTIONS: Array<{
 }> = [
   {
     scope: "soundDocuments",
-    label: "Sound docs",
-    description: "Uploaded sound department files",
+    label: "Documentos de sonido",
+    description: "Archivos subidos del departamento de sonido",
   },
   {
     scope: "power",
-    label: "Power / Consumos",
-    description: "Editable tables and latest generated report",
+    label: "Consumos",
+    description: "Tablas editables y último informe generado",
   },
   {
     scope: "soundvision",
     label: "SoundVision",
-    description: "Venue template and latest generated SV report",
+    description: "Plantilla de venue y último informe SV generado",
   },
   {
     scope: "material",
     label: "Lista de material",
-    description: "Latest Flex material-list PDF",
+    description: "Último PDF de lista de material Flex",
   },
   {
     scope: "memoria",
     label: "Memoria",
-    description: "Stage records for regenerating Memoria Técnica",
+    description: "Registros para regenerar Memoria Técnica",
   },
 ];
 
@@ -69,7 +70,7 @@ const formatJobDate = (value: string | null) => {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return format(parsed, "dd MMM yyyy");
+  return format(toZonedTime(parsed, MADRID_TIME_ZONE), "dd MMM yyyy");
 };
 
 const normalizeSearch = (value: string) =>

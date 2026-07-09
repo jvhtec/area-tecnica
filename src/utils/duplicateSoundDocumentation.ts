@@ -223,32 +223,34 @@ export const renameCopiedSoundDocumentFile = ({
 
 export const buildCopiedSoundDocumentPath = ({
   idFactory,
+  jobScopedStorage = false,
   sourceFilePath,
   sourceJobId,
   targetFileName,
   targetJobId,
 }: {
   idFactory?: () => string;
+  jobScopedStorage?: boolean;
   sourceFilePath: string;
   sourceJobId: string;
   targetFileName: string;
   targetJobId: string;
 }) => {
   const normalized = normalizePath(sourceFilePath);
-  const sourceSegment = `/${sourceJobId}/`;
-  const sourceIndex = normalized.indexOf(sourceSegment);
+  const segments = normalized.split("/").filter(Boolean);
+  const sourceIndex = segments.indexOf(sourceJobId);
 
   if (sourceIndex < 0) {
     throw new Error(`Document path does not include source job id: ${sourceFilePath}`);
   }
 
-  const beforeJob = normalized.slice(0, sourceIndex + 1);
-  const afterJob = normalized.slice(sourceIndex + sourceSegment.length);
-  const afterSegments = afterJob.split("/").filter(Boolean);
+  const beforeJobSegments = segments.slice(0, sourceIndex);
+  const afterSegments = segments.slice(sourceIndex + 1);
   const scopeSegments = afterSegments.slice(0, -1);
-  const destinationFolder = [beforeJob.replace(/\/$/, ""), targetJobId, ...scopeSegments]
-    .filter(Boolean)
-    .join("/");
+  const destinationSegments = jobScopedStorage
+    ? [targetJobId, ...beforeJobSegments, ...scopeSegments]
+    : [...beforeJobSegments, targetJobId, ...scopeSegments];
+  const destinationFolder = destinationSegments.filter(Boolean).join("/");
   const version = createDocumentVersionSegment(idFactory);
 
   return `${destinationFolder}/${version}-${sanitizeFileName(targetFileName)}`;
@@ -262,10 +264,16 @@ const incrementScope = (
 };
 
 const parseGeneratedScope = (filePath: string, sourceJobId: string, prefix: string) => {
-  const fullPrefix = `${prefix}/${sourceJobId}/`;
-  if (!filePath.startsWith(fullPrefix)) return null;
+  const legacyPrefix = `${prefix}/${sourceJobId}/`;
+  const jobScopedPrefix = `${sourceJobId}/${prefix}/`;
+  const matchedPrefix = filePath.startsWith(legacyPrefix)
+    ? legacyPrefix
+    : filePath.startsWith(jobScopedPrefix)
+      ? jobScopedPrefix
+      : null;
+  if (!matchedPrefix) return null;
 
-  const rest = filePath.slice(fullPrefix.length);
+  const rest = filePath.slice(matchedPrefix.length);
   const segments = rest.split("/").filter(Boolean);
   return segments.length > 1 ? segments[0] : "unscoped";
 };
@@ -416,6 +424,7 @@ const copyJobDocumentFile = async ({
   });
   const targetPath = buildCopiedSoundDocumentPath({
     idFactory,
+    jobScopedStorage: ["power", "soundvision", "material"].includes(scope),
     sourceFilePath: doc.file_path,
     sourceJobId,
     targetFileName,

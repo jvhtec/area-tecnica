@@ -14,18 +14,25 @@ export interface StageAwareJobDocument {
 export type StageAwareJobDocumentFilter = (document: StageAwareJobDocument) => boolean;
 
 /**
- * uploadJobPdfWithCleanup writes to `${category}/${jobId}[/${scope}]/${uuid}-${name}`.
- * Given a full file_path known to start with `${category}/${jobId}/`, return the
- * scope segment (e.g. "stage-2-mainstage") if present, or null for an unscoped upload.
+ * Generated PDFs may use the legacy `${category}/${jobId}/...` layout or the
+ * RLS-compatible `${jobId}/${category}/...` layout. Return the scope segment
+ * (e.g. "stage-2-mainstage") if present, or null for an unscoped upload.
  */
 export const parseStageScopeSegment = (
   filePath: string,
   jobId: string,
   category: string
 ): string | null => {
-  const prefix = `${category}/${jobId}/`;
-  if (!filePath.startsWith(prefix)) return null;
-  const rest = filePath.slice(prefix.length);
+  const legacyPrefix = `${category}/${jobId}/`;
+  const jobScopedPrefix = `${jobId}/${category}/`;
+  const matchedPrefix = filePath.startsWith(legacyPrefix)
+    ? legacyPrefix
+    : filePath.startsWith(jobScopedPrefix)
+      ? jobScopedPrefix
+      : null;
+  if (!matchedPrefix) return null;
+
+  const rest = filePath.slice(matchedPrefix.length);
   const segments = rest.split("/");
   // The last segment is always the `${uuid}-${name}` file itself; anything before
   // it is the stage-scope folder written by getTechnicalStageStorageScope().
@@ -46,7 +53,7 @@ export const findLatestJobDocumentForStage = async (
     .from("job_documents")
     .select("id, file_name, file_path, uploaded_at")
     .eq("job_id", jobId)
-    .like("file_path", `${category}/${jobId}/%`)
+    .or(`file_path.like.${category}/${jobId}/%,file_path.like.${jobId}/${category}/%`)
     .order("uploaded_at", { ascending: false });
 
   if (error) throw error;

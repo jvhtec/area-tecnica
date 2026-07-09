@@ -14,6 +14,11 @@ const normalizeValue = (value: string | null | undefined) =>
     .toLowerCase()
     .replace(/\\/g, '/');
 
+const stripJobScopedStoragePrefix = (path: string) => {
+  const segments = path.split('/').filter(Boolean);
+  return segments[1] === 'calculators' ? segments.slice(1).join('/') : path;
+};
+
 const parseUploadedAtTimestamp = (value: string | null) => {
   if (!value) return 0;
   const parsed = Date.parse(value);
@@ -23,7 +28,7 @@ const parseUploadedAtTimestamp = (value: string | null) => {
 export const getTechnicalPowerDepartmentFromDocument = (
   document: PowerReportDocument
 ): TechnicalPowerDepartment | null => {
-  const normalizedPath = normalizeValue(document.file_path);
+  const normalizedPath = stripJobScopedStoragePrefix(normalizeValue(document.file_path));
   const normalizedName = normalizeValue(document.file_name).replace(/[\s-]+/g, '_');
 
   if (normalizedPath.startsWith(LIGHTS_REPORT_PREFIX)) {
