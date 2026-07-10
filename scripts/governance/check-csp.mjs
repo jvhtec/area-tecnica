@@ -44,7 +44,10 @@ for (const file of await htmlFiles(publicDir)) {
   for (const [, attributes, content] of scripts) {
     if (/\bsrc\s*=/.test(attributes) || !content.trim()) continue;
     inlineScriptCount += 1;
-    const digest = createHash("sha256").update(content).digest("base64");
+    // Git stores these text assets with LF and Cloudflare serves those bytes.
+    // Normalize Windows checkouts so the expected browser hash is portable.
+    const canonicalContent = content.replace(/\r\n/g, "\n");
+    const digest = createHash("sha256").update(canonicalContent).digest("base64");
     const source = `'sha256-${digest}'`;
     if (!scriptDirective.includes(source)) {
       missing.push(`${path.relative(root, file)}: ${source}`);
