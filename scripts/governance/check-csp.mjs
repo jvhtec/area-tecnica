@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { JSDOM } from "jsdom";
 
 const root = process.cwd();
 const publicDir = path.join(root, "public");
@@ -40,9 +41,10 @@ const missing = [];
 let inlineScriptCount = 0;
 for (const file of await htmlFiles(publicDir)) {
   const html = await readFile(file, "utf8");
-  const scripts = html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi);
-  for (const [, attributes, content] of scripts) {
-    if (/\bsrc\s*=/.test(attributes) || !content.trim()) continue;
+  const document = new JSDOM(html).window.document;
+  for (const script of document.querySelectorAll("script:not([src])")) {
+    const content = script.textContent ?? "";
+    if (!content.trim()) continue;
     inlineScriptCount += 1;
     // Git stores these text assets with LF and Cloudflare serves those bytes.
     // Normalize Windows checkouts so the expected browser hash is portable.
