@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Euro, Users, Calendar, AlertCircle, Send } from "lucide-react";
 import { format, isValid } from "date-fns";
+import { es } from "date-fns/locale";
 import { useTourJobRateQuotes } from "@/hooks/useTourJobRateQuotes";
 import { useTourJobRateQuotesForManager } from "@/hooks/useTourJobRateQuotesForManager";
 import { useManagerJobQuotes } from "@/hooks/useManagerJobQuotes";
@@ -29,7 +30,7 @@ const formatQuoteDate = (value: string | null | undefined): string => {
   if (!value) return 'Fecha sin definir';
 
   const date = new Date(value);
-  return isValid(date) ? format(date, 'MMM d, yyyy') : 'Fecha sin definir';
+  return isValid(date) ? format(date, 'MMM d, yyyy', { locale: es }) : 'Fecha sin definir';
 };
 
 interface TourRatesPanelProps {
