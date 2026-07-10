@@ -46,6 +46,7 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
     if (normalized === 'festival') return 'Festival';
     if (normalized === 'single') return 'Trabajo';
     if (normalized === 'tour') return 'Gira';
+    if (normalized === 'tourdate') return 'Fecha de gira';
     if (!jobType) return 'Trabajo';
     return jobType;
   }, []);
