@@ -51,6 +51,10 @@ vi.mock("@/services/dataLayerClient", () => ({
   dataLayerClient: mockSupabase,
 }));
 
+vi.mock("@/services/hourlyTourDateTimesheets", () => ({
+  fetchHourlyTourDateRateModes: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("@/components/technician/DashboardScreen", () => ({
   DashboardScreen: ({ assignments }: { assignments: any[] }) => (
     <div data-testid="dashboard-screen">Dashboard assignments: {assignments.length}</div>

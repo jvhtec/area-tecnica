@@ -6,6 +6,10 @@ import { toast } from "sonner";
 import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
 import { isManagementRole } from "@/utils/permissions";
 import { getTimesheetAutoCreateDatesForAssignment, isPrepDayBreakdown } from "@/utils/timesheetPrepDays";
+import {
+  filterEligibleTourDateTimesheets,
+  fetchHourlyTourDateRateModes,
+} from "@/services/hourlyTourDateTimesheets";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -51,23 +55,22 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
           .map((row) => row.date as string),
       );
       const isTourDateJob = String(jobMeta?.job_type || "").toLowerCase() === "tourdate";
+      const hourlyRateModes = isTourDateJob
+        ? await fetchHourlyTourDateRateModes({ jobIds: [jobId] })
+        : [];
 
-      let timesheetQuery = supabase
+      if (isTourDateJob && prepDayDates.size === 0 && hourlyRateModes.length === 0) {
+        setTimesheets([]);
+        return;
+      }
+
+      const timesheetQuery = supabase
         .from("timesheets")
         .select("*")
         .eq("job_id", jobId)
         .eq("is_active", true)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
-
-      if (isTourDateJob) {
-        if (prepDayDates.size === 0) {
-          setTimesheets([]);
-          return;
-        }
-
-        timesheetQuery = timesheetQuery.in("date", Array.from(prepDayDates));
-      }
 
       const { data: timesheetRows, error } = await timesheetQuery;
 
@@ -78,7 +81,9 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         return;
       }
 
-      const data = timesheetRows || [];
+      const data = isTourDateJob
+        ? filterEligibleTourDateTimesheets(timesheetRows || [], prepDayDates, hourlyRateModes)
+        : (timesheetRows || []);
 
       if (!data || data.length === 0) {
         setTimesheets([]);

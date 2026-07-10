@@ -28,6 +28,7 @@ export interface TechnicianJobData {
   created_at?: string;
   artist_count?: number;
   has_prep_day_timesheet?: boolean;
+  has_hourly_timesheet?: boolean;
   job_date_types?: Array<{ date?: string | null; type?: string | null }> | null;
   preventive_resource_technician_id?: string | null;
   location?: { name: string } | null;

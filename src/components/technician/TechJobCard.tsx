@@ -68,7 +68,8 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
     const hasPrepDayTimesheets =
         jobData?.has_prep_day_timesheet === true ||
         hasPrepDayDateType(jobData?.job_date_types);
-    const showTimesheetButton = !isDryhire && (!isTourdate || hasPrepDayTimesheets);
+    const hasEligibleTimesheets = hasPrepDayTimesheets || jobData?.has_hourly_timesheet === true;
+    const showTimesheetButton = !isDryhire && (!isTourdate || hasEligibleTimesheets);
     const showIncidentReport = !isDryhire;
     const artistCountFromJob = Number(jobData?.artist_count || 0);
     const shouldFetchArtistCountFallback = jobData?.artist_count == null && Boolean(jobData?.id);

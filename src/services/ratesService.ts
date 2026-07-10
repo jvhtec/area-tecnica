@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { RateExtraRow } from '@/hooks/useRateExtrasCatalog';
 import { TourBaseRateRow } from '@/hooks/useTourBaseRates';
 import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
+import { fetchHourlyTourDateRateModes } from '@/services/hourlyTourDateTimesheets';
 
 type Nullable<T> = T | null | undefined;
 
@@ -260,17 +261,12 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
   let hourlyTourDateJobs: NonNullable<typeof nonTourDateJobs> = [];
 
   if (jobReviewIds.size > 0) {
-    const { data: hourlyOverrides, error: hourlyOverridesError } = await supabase
-      .from('job_technician_rate_mode_dates')
-      .select('job_id')
-      // rate_mode exists in the live schema but generated Supabase types lag behind the migration.
-      .filter('rate_mode' as never, 'eq', 'hourly')
-      .in('job_id', Array.from(jobReviewIds));
-
-    if (hourlyOverridesError) throw hourlyOverridesError;
+    const hourlyOverrides = await fetchHourlyTourDateRateModes({
+      jobIds: Array.from(jobReviewIds),
+    });
 
     const hourlyTourDateJobIds = Array.from(
-      new Set((hourlyOverrides || []).map((row) => row.job_id).filter(Boolean) as string[]),
+      new Set(hourlyOverrides.map((row) => row.job_id).filter(Boolean)),
     );
 
     if (hourlyTourDateJobIds.length > 0) {

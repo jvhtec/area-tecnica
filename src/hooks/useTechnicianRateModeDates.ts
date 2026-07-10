@@ -84,15 +84,22 @@ async function ensureTimesheetForDate(
 ): Promise<string[]> {
   const { data: existing, error: existingError } = await supabase
     .from('timesheets')
-    .select('id')
+    .select('id, is_active')
     .eq('job_id', jobId)
     .eq('technician_id', technicianId)
-    .eq('date', date)
-    .eq('is_active', true);
+    .eq('date', date);
 
   if (existingError) throw existingError;
 
   if (existing && existing.length > 0) {
+    const inactiveIds = existing.filter((row) => !row.is_active).map((row) => row.id);
+    if (inactiveIds.length > 0) {
+      const { error: reactivateError } = await supabase
+        .from('timesheets')
+        .update({ is_active: true, source: 'hourly_rate_override' })
+        .in('id', inactiveIds);
+      if (reactivateError) throw reactivateError;
+    }
     return existing.map((row) => row.id);
   }
 
@@ -103,6 +110,7 @@ async function ensureTimesheetForDate(
       technician_id: technicianId,
       date,
       created_by: (await supabase.auth.getUser()).data.user?.id,
+      source: 'hourly_rate_override',
     })
     .select('id')
     .single();
