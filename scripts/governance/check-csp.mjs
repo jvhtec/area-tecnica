@@ -40,7 +40,7 @@ const missing = [];
 let inlineScriptCount = 0;
 for (const file of await htmlFiles(publicDir)) {
   const html = await readFile(file, "utf8");
-  const scripts = html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi);
+  const scripts = html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi);
   for (const [, attributes, content] of scripts) {
     if (/\bsrc\s*=/.test(attributes) || !content.trim()) continue;
     inlineScriptCount += 1;

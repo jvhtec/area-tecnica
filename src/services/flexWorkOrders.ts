@@ -30,9 +30,6 @@ async function createWorkOrderElement(options: {
 }): Promise<{ documentId: string; raw: any }>
 {
   const { parentElementId, job, technicianName, vendorId } = options;
-  const timezone = job.timezone || MADRID_TIMEZONE;
-  const plannedStartDate = formatFlexWorkOrderDate(job.start_time, timezone) ?? formatFlexWorkOrderDate(new Date().toISOString(), timezone)!;
-  const plannedEndDate = formatFlexWorkOrderDate(job.end_time, timezone) ?? plannedStartDate;
 
   const payload = {
     definitionId: WORK_ORDER_DEFINITION_ID,
