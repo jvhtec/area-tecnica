@@ -216,7 +216,6 @@ const TechnicianDashboard = () => {
                 file_name,
                 file_path,
                 visible_to_tech,
-                visible_to_tech,
                 uploaded_at,
                 read_only,
                 template_type
