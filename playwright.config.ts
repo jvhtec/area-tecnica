@@ -6,8 +6,10 @@ const baseURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 1,
+  // The shared mocked Supabase state and Vite dev server are intentionally
+  // process-global; parallel files race and overload the local server.
+  workers: 1,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
@@ -16,7 +18,7 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   webServer: {
-    command: `VITE_SUPABASE_URL=${baseURL}/supabase VITE_SUPABASE_ANON_KEY=test-anon-key npm run dev -- --host 127.0.0.1 --port ${port}`,
+    command: "node scripts/e2e/start-test-server.mjs",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

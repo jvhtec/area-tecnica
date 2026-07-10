@@ -755,7 +755,7 @@ export const Profile = () => {
                 >
                   <div>
                     <span className="text-sm font-medium block">Eliminar mi cuenta</span>
-                    <span className="text-xs opacity-80">Solicita la eliminacion permanente de tus datos</span>
+                    <span className="text-xs opacity-80">Solicita la revisión, eliminación o anonimización de tus datos</span>
                   </div>
                   <ExternalLink className="h-4 w-4" />
                 </a>

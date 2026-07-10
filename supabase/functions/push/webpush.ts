@@ -40,13 +40,11 @@ export async function sendPushNotification(
   }
 
   if (!subscription.p256dh || !subscription.auth) {
-    console.warn("⚠️ Push missing keys for endpoint", subscription.endpoint);
+    console.warn("⚠️ Push subscription is missing encryption keys");
     return { ok: false, skipped: true };
   }
 
   console.log('📤 Sending push notification:', {
-    endpoint: subscription.endpoint.substring(0, 50) + '...',
-    title: payload.title,
     hasBody: !!payload.body
   });
 
@@ -70,10 +68,7 @@ export async function sendPushNotification(
     const status = numberFromUnknown(errorInfo.statusCode) ?? numberFromUnknown(errorInfo.status) ?? 500;
     console.error('❌ Push send error:', {
       status,
-      message: typeof errorInfo.message === 'string' ? errorInfo.message : undefined,
-      body: errorInfo.body,
-      endpoint: subscription.endpoint.substring(0, 50) + '...',
-      error: err
+      errorType: err instanceof Error ? err.name : "unknown",
     });
 
     // Clean up expired/invalid subscriptions (410 Gone, 404 Not Found)

@@ -136,7 +136,7 @@ describe("useOptimizedAuth audit logging", () => {
         "user-1",
         "login",
         true,
-        { email: "user@example.com" },
+        {},
         { accessToken: "access-token-1" },
       );
     });
@@ -160,8 +160,7 @@ describe("useOptimizedAuth audit logging", () => {
         "login",
         false,
         {
-          email: "user@example.com",
-          error: "Invalid login credentials",
+          error_code: "invalid_credentials",
         },
       );
     });

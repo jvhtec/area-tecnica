@@ -19,7 +19,10 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    return await handleSecurityAuditRequest(req, { supabase });
+    return await handleSecurityAuditRequest(req, {
+      supabase,
+      rateLimitSalt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
+    });
   } catch (error) {
     console.error("Error persisting security audit event:", error);
     return jsonResponse(

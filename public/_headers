@@ -3,7 +3,7 @@
 
 /*
   Reporting-Endpoints: csp-endpoint="https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/csp-report"
-  Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' https: wss:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; manifest-src 'self'; report-uri https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/csp-report; report-to csp-endpoint
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' https: wss:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; script-src 'self' blob: 'sha256-A5gHsoGxvbfCjOcblTAITVQl0VquNk+t4ary1OgYnpk=' 'sha256-oYJjBbGqIRt1DVL1ZG3Y0YBowbPQcOl/X4bYsuN3L5s=' 'sha256-0nTldwDME0OvQrS/NXebHlv6pW2hkSnUSQiIA9gKIrU=' 'sha256-AHMcwoKXDXOqgZfmtyxA+Z+SN1S26d7JIru9SmF8AMI=' 'sha256-wqCHLkBAbhaXFTpDeo/3nN9ojIOPmdc+R66rrPZTT/g=' 'sha256-4mycnOPWerFQpxpjll5xmvec1i4ZAMjYFoexmtIbGtE=' 'sha256-GLQIMS+jQPNEgOXES32Xe8LcYdaOiym9PjHApk3QzUU='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; manifest-src 'self'; report-uri https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/csp-report; report-to csp-endpoint
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY

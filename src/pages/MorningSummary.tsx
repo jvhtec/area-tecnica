@@ -7,6 +7,7 @@ import { Loader2, Calendar, ArrowLeft, Users, Briefcase, Home, Plane, Heart, Sun
 import { Loading } from '@/components/ui/loading';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatMadridDateKey } from '@/utils/timezoneUtils';
 
 type TimesheetWithRelations = {
   technician_id: string;
@@ -68,7 +69,7 @@ export default function MorningSummary() {
   const [data, setData] = useState<MorningSummaryData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+  const date = searchParams.get('date') || formatMadridDateKey(new Date());
   const departmentsParam = searchParams.get('departments');
   const departments = departmentsParam ? departmentsParam.split(',') : [];
 

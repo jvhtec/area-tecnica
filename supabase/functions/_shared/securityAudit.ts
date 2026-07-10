@@ -170,6 +170,34 @@ export async function persistSecurityAuditLog(
   }
 }
 
+/** Persists a deliberately minimal, short-retention record for pre-auth events. */
+export async function persistAnonymousSecurityAuditLog(
+  req: Request,
+  client: AuditInsertClient,
+  event: SecurityAuditEventInput,
+): Promise<void> {
+  const metadata = sanitizeSecurityAuditMetadata(event.metadata);
+  const payload = {
+    action: event.action.trim(),
+    resource: event.resource.trim(),
+    severity: event.severity,
+    ip_address: getRequestIpAddress(req),
+    user_agent: getRequestUserAgent(req),
+    metadata: {
+      success: typeof metadata.success === "boolean" ? metadata.success : null,
+      error_code: typeof metadata.error_code === "string"
+        ? metadata.error_code.slice(0, 80)
+        : null,
+    },
+  };
+
+  const { error } = await client.from("anonymous_security_audit_log").insert(payload);
+
+  if (error) {
+    throw new Error(`Failed to persist anonymous security audit log: ${String(error)}`);
+  }
+}
+
 export function validateSecurityAuditEvent(
   input: unknown,
 ): { event: SecurityAuditEventInput | null; errorResponse: Response | null } {

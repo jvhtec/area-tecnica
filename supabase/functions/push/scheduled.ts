@@ -5,6 +5,7 @@ import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
 import { handleFestivalFeedTick } from "./festivalFeed.ts";
 import { handleProgramaFeedTick } from "./programaFeed.ts";
+import { pushTargetFingerprint } from "./targetId.ts";
 import type {
   CheckScheduledBody,
   NativePushTokenRow,
@@ -729,7 +730,7 @@ export async function handleCheckScheduled(
             payload
           );
           allResults.push({
-            endpoint: pushSub.endpoint,
+            endpoint: await pushTargetFingerprint("webpush", pushSub.endpoint),
             ok: result.ok,
             ...getPushSendMetadata(result),
             user_id: userId,
@@ -742,7 +743,7 @@ export async function handleCheckScheduled(
         sendPromises.push((async () => {
           const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
           allResults.push({
-            endpoint: `apns:${tokenRow.device_token}`,
+            endpoint: await pushTargetFingerprint("apns", tokenRow.device_token),
             ok: result.ok,
             ...getPushSendMetadata(result),
             user_id: userId,

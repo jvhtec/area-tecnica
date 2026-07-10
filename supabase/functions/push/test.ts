@@ -3,6 +3,7 @@ import { jsonResponse } from "./http.ts";
 import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
 import type { NativePushTokenRow, PushSubscriptionRow, TestBody } from "./types.ts";
+import { pushTargetFingerprint } from "./targetId.ts";
 
 export async function handleTest(
   client: ReturnType<typeof createClient>,
@@ -48,7 +49,7 @@ export async function handleTest(
       data.map(async (sub) => {
         const result = await sendPushNotification(client, sub, payload);
         results.push({
-          endpoint: sub.endpoint,
+          endpoint: await pushTargetFingerprint("webpush", sub.endpoint),
           ok: result.ok,
           status: "status" in result ? result.status : undefined,
           skipped: "skipped" in result ? result.skipped : undefined,
@@ -62,7 +63,7 @@ export async function handleTest(
       nativeTokens.map(async (tokenRow) => {
         const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
         results.push({
-          endpoint: `apns:${tokenRow.device_token}`,
+          endpoint: await pushTargetFingerprint("apns", tokenRow.device_token),
           ok: result.ok,
           status: "status" in result ? result.status : undefined,
           skipped: "skipped" in result ? result.skipped : undefined,

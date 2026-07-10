@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
 import { isManagementRole } from "@/utils/permissions";
 import { getTimesheetAutoCreateDatesForAssignment, isPrepDayBreakdown } from "@/utils/timesheetPrepDays";
+import { getDateKeyRange } from "@/utils/assignmentWorkDates";
 import {
   filterEligibleTourDateTimesheets,
   fetchHourlyTourDateRateModes,
@@ -162,6 +163,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         .select(`
           start_time, 
           end_time,
+          timezone,
           job_type,
           job_date_types(type, date)
         `)
@@ -197,15 +199,9 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       }
 
       // Generate dates between start and end
-      const startDate = new Date(job.start_time);
-      const endDate = new Date(job.end_time);
-      const allDates = [];
-      
-      console.log("Job dates:", { start_time: job.start_time, end_time: job.end_time, startDate, endDate });
-      
-      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        allDates.push(d.toISOString().split('T')[0]);
-      }
+      const allDates = getDateKeyRange(job.start_time, job.end_time, job.timezone || undefined);
+
+      console.log("Job dates:", { start_time: job.start_time, end_time: job.end_time, timezone: job.timezone, allDates });
 
       // Filter out dates that are marked as "off" or "travel"
       const regularDates = allDates.filter(date => {

@@ -2,6 +2,7 @@ import type { createClient } from "../deps.ts";
 import { sendNativePushNotification } from "../apns.ts";
 import { sendPushNotification } from "../webpush.ts";
 import type { NativePushTokenRow, PushPayload } from "../types.ts";
+import { pushTargetFingerprint } from "../targetId.ts";
 
 type BroadcastClient = ReturnType<typeof createClient>;
 
@@ -71,36 +72,38 @@ export async function sendPayloadToTargets(
 
   await Promise.all([
     ...subscriptions.map(async (sub) => {
+      const targetId = await pushTargetFingerprint("webpush", sub.endpoint);
       try {
         const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
         results.push({
-          endpoint: sub.endpoint,
+          endpoint: targetId,
           ok: result.ok,
           status: 'status' in result ? result.status : undefined,
           skipped: 'skipped' in result ? result.skipped : undefined,
         });
       } catch (error) {
-        console.error('push broadcast web delivery error', { endpoint: sub.endpoint, error });
+        console.error('push broadcast web delivery error', { targetId, error });
         results.push({
-          endpoint: sub.endpoint,
+          endpoint: targetId,
           ok: false,
           error: error instanceof Error ? error.message : String(error),
         });
       }
     }),
     ...nativeTokens.map(async (tokenRow) => {
+      const targetId = await pushTargetFingerprint("apns", tokenRow.device_token);
       try {
         const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
         results.push({
-          endpoint: `apns:${tokenRow.device_token}`,
+          endpoint: targetId,
           ok: result.ok,
           status: 'status' in result ? result.status : undefined,
           skipped: 'skipped' in result ? result.skipped : undefined,
         });
       } catch (error) {
-        console.error('push broadcast native delivery error', { token: tokenRow.device_token, error });
+        console.error('push broadcast native delivery error', { targetId, error });
         results.push({
-          endpoint: `apns:${tokenRow.device_token}`,
+          endpoint: targetId,
           ok: false,
           error: error instanceof Error ? error.message : String(error),
         });

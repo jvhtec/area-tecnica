@@ -2,6 +2,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { flexApiFetch } from '@/lib/flex-api-client';
 import { FLEX_FOLDER_IDS, RESPONSIBLE_PERSON_IDS, DEPARTMENT_SUFFIXES } from '@/utils/flex-folders/constants';
 import { resourceIdForRole, EXTRA_RESOURCE_IDS } from '@/utils/flex-labor-resources';
+import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
+import { formatFlexWorkOrderDate } from '@/services/flexWorkOrderDates';
 
 const WORK_ORDER_DEFINITION_ID = FLEX_FOLDER_IDS.ordenTrabajo;
 const DEFAULT_LOCATION_ID = FLEX_FOLDER_IDS.location;
@@ -9,13 +11,6 @@ const PERSONNEL_RESPONSIBLE_ID = RESPONSIBLE_PERSON_IDS.personnel;
 const CURRENCY_EUR_ID = 'd3d53320-6926-11ea-9bb5-2a0a4490a7fb';
 const PRICING_MODEL_BASE_2025_ID = 'a4307bf9-cd39-4df1-9d6d-48932120c4bd';
 const PRICING_MODEL_DIA_TOUR_ID = '04c62780-c51d-11ea-a087-2a0a4490a7fb';
-
-function formatDate(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
-}
 
 function technicianDisplayName(profile?: {
   first_name?: string | null;
@@ -29,14 +24,15 @@ function technicianDisplayName(profile?: {
 
 async function createWorkOrderElement(options: {
   parentElementId: string;
-  job: { id: string; title: string; start_time: string; end_time: string; location_id: string | null };
+  job: { id: string; title: string; start_time: string; end_time: string; location_id: string | null; timezone?: string | null };
   technicianName: string;
   vendorId: string;
 }): Promise<{ documentId: string; raw: any }>
 {
   const { parentElementId, job, technicianName, vendorId } = options;
-  const plannedStartDate = formatDate(job.start_time) ?? new Date().toISOString().slice(0, 10);
-  const plannedEndDate = formatDate(job.end_time) ?? plannedStartDate;
+  const timezone = job.timezone || MADRID_TIMEZONE;
+  const plannedStartDate = formatFlexWorkOrderDate(job.start_time, timezone) ?? formatFlexWorkOrderDate(new Date().toISOString(), timezone)!;
+  const plannedEndDate = formatFlexWorkOrderDate(job.end_time, timezone) ?? plannedStartDate;
 
   const payload = {
     definitionId: WORK_ORDER_DEFINITION_ID,
@@ -485,7 +481,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   const [{ data: job, error: jobError }] = await Promise.all([
     supabase
       .from('jobs')
-      .select('id, title, start_time, end_time, location_id, job_type, tour_date_id')
+      .select('id, title, start_time, end_time, timezone, location_id, job_type, tour_date_id')
       .eq('id', jobId)
       .maybeSingle(),
   ]);
@@ -564,8 +560,9 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     }
     
     // Create the work orders subfolder in Flex
-    const plannedStartDate = formatDate(job.start_time) ?? new Date().toISOString().slice(0, 10);
-    const plannedEndDate = formatDate(job.end_time) ?? plannedStartDate;
+    const timezone = job.timezone || MADRID_TIMEZONE;
+    const plannedStartDate = formatFlexWorkOrderDate(job.start_time, timezone) ?? formatFlexWorkOrderDate(new Date().toISOString(), timezone)!;
+    const plannedEndDate = formatFlexWorkOrderDate(job.end_time, timezone) ?? plannedStartDate;
     const workOrderPayload = {
       definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: personnelFolder.element_id,

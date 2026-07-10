@@ -67,7 +67,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
     enabled: open && !!jobId,
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('jobs')
-        .select('id, start_time, end_time, job_date_types(date, type)')
+        .select('id, start_time, end_time, timezone, job_date_types(date, type)')
         .eq('id', jobId)
         .single();
       if (error) throw error;
@@ -128,6 +128,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
     jobId: jobId || '',
     jobStartTime: jobMeta?.start_time || job?.start_time || '',
     jobEndTime: jobMeta?.end_time || job?.end_time || '',
+    jobTimezone: jobMeta?.timezone || job?.timezone,
     assignmentDate: singleDay && selectedJobDate ? format(selectedJobDate, 'yyyy-MM-dd') : null,
     enabled: open && !!jobId,
   });

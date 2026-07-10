@@ -153,7 +153,7 @@ serve(async (req) => {
 
     console.log('Timesheet found, status:', timesheet.status);
     console.log('Job found:', job.title);
-    console.log('Technician found:', technician.email);
+    console.log('Technician recipient resolved');
 
     // Only send reminders for draft or submitted timesheets
     if (timesheet.status === 'approved') {

@@ -246,13 +246,11 @@ serve(createHttpHandler(async (req) => {
   const body = await readBoundedJsonObject<JobPayoutRequestBody>(req, {
     maxBytes: MAX_PAYOUT_EMAIL_BODY_BYTES,
   });
-  const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
-
     // Avoid dumping base64 PDFs / PII into logs.
     console.log('[send-job-payout-email] Incoming payload', JSON.stringify(redactSensitiveValues({
       correlationId,
       actor_id: caller.userId,
-      job: { id: body.job?.id, title: body.job?.title },
+      job_id: body.job?.id,
       technicians: body.technicians?.map(t => ({
         technician_id: t.technician_id,
         has_pdf: Boolean(t.pdf_base64),
@@ -260,13 +258,6 @@ serve(createHttpHandler(async (req) => {
       })),
       technicians_count: body.technicians?.length ?? 0,
     })));
-
-    if (DEBUG) {
-      console.log('[send-job-payout-email][debug] Incoming payload (full)', {
-        job: body.job,
-        technicians_count: body.technicians?.length ?? 0,
-      });
-    }
 
     if (!body || !body.job || !body.job.id) {
       return respond({ success: false, error: 'Missing job metadata' }, 400);

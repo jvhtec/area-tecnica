@@ -1,11 +1,39 @@
 import { describe, expect, it } from 'vitest';
 
-import { getScheduledWorkDateKeys, normalizeDateKey, resolveAssignmentWorkDateKeys } from '@/utils/assignmentWorkDates';
+import {
+  getDateKeyRange,
+  getScheduledWorkDateKeys,
+  normalizeDateKey,
+  resolveAssignmentWorkDateKeys,
+} from '@/utils/assignmentWorkDates';
 
 describe('assignment work date resolution', () => {
   it('normalizes timestamp values using the Madrid calendar day', () => {
     expect(normalizeDateKey('2026-06-01T22:30:00Z')).toBe('2026-06-02');
     expect(normalizeDateKey('2026-06-01')).toBe('2026-06-01');
+  });
+
+  it('normalizes timestamps using the configured job timezone', () => {
+    const instant = '2026-06-02T00:30:00Z';
+
+    expect(normalizeDateKey(instant, 'Europe/Madrid')).toBe('2026-06-02');
+    expect(normalizeDateKey(instant, 'America/New_York')).toBe('2026-06-01');
+  });
+
+  it('builds Madrid date ranges across midnight and DST without UTC drift', () => {
+    expect(getDateKeyRange(
+      '2026-03-28T23:30:00Z',
+      '2026-03-30T21:30:00Z',
+      'Europe/Madrid',
+    )).toEqual(['2026-03-29', '2026-03-30']);
+  });
+
+  it('uses the job timezone when falling back to its timestamp span', () => {
+    expect(getScheduledWorkDateKeys({
+      start_time: '2026-06-02T00:30:00Z',
+      end_time: '2026-06-02T03:00:00Z',
+      timezone: 'America/New_York',
+    })).toEqual(['2026-06-01']);
   });
 
   it('uses working job date types as the scheduled job span', () => {

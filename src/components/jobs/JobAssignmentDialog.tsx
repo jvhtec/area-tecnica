@@ -215,7 +215,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     department: currentDepartment,
     jobId: jobId,
     jobStartTime: jobData?.start_time || "",
-    jobEndTime: jobData?.end_time || "",
+    jobEndTime: jobData?.end_time || "", jobTimezone: jobData?.timezone,
     assignmentDate: singleDay ? (selectedJobDate ? formatMadridDateKey(selectedJobDate) : null) : null,
     enabled: isOpen && !!jobData && !!jobId
   });

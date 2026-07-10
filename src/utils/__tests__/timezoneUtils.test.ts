@@ -4,6 +4,7 @@ import {
   addMadridCalendarDays,
   formatMadridDateKey,
   fromMadridDateKey,
+  getCalendarPeriodDateKeys,
   getMadridMonthGrid,
 } from "@/utils/timezoneUtils";
 
@@ -36,5 +37,20 @@ describe("timezoneUtils Madrid calendar helpers", () => {
     expect(grid.gridStartKey).toBe("2026-02-23");
     expect(grid.gridEndKey).toBe("2026-04-05");
     expect(grid.dateKeys).toHaveLength(42);
+  });
+
+  it("returns Madrid month and year SQL boundaries near UTC midnight", () => {
+    expect(getCalendarPeriodDateKeys(new Date("2026-05-31T22:30:00Z"))).toEqual({
+      monthStart: "2026-06-01",
+      monthEnd: "2026-06-30",
+      yearStart: "2026-01-01",
+      yearEnd: "2026-12-31",
+      previousYearStart: "2025-01-01",
+      previousYearEnd: "2025-12-31",
+    });
+  });
+
+  it("handles leap-year month boundaries", () => {
+    expect(getCalendarPeriodDateKeys(new Date("2024-02-15T12:00:00Z")).monthEnd).toBe("2024-02-29");
   });
 });
