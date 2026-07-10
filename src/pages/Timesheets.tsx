@@ -15,6 +15,9 @@ import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { isManagementRole } from '@/utils/permissions';
 import { hasPrepDayDateType } from '@/utils/timesheetPrepDays';
+import { useQuery } from '@tanstack/react-query';
+import { fetchHourlyTourDateRateModes } from '@/services/hourlyTourDateTimesheets';
+import { queryKeys } from '@/lib/react-query';
 
 export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,6 +30,16 @@ export default function Timesheets() {
 
   const canManage = isManagementRole(userRole);
   const canDownloadPDF = canManage;
+  const { data: hourlyRateModes = [], isLoading: hourlyRateModesLoading } = useQuery({
+    queryKey: queryKeys.scope('hourly-tourdate-rate-modes', user?.id ?? 'anonymous'),
+    queryFn: () => fetchHourlyTourDateRateModes(),
+    enabled: Boolean(user?.id),
+    staleTime: 30_000,
+  });
+  const hourlyTourDateJobIds = useMemo(
+    () => new Set(hourlyRateModes.map((row) => row.job_id)),
+    [hourlyRateModes],
+  );
 
   // Initialize department filter with user's department if available
   const [filterDepartment, setFilterDepartment] = useState<string>("all");
@@ -54,7 +67,9 @@ export default function Timesheets() {
         const isDryHire = type === 'dryhire' || type === 'dry_hire';
         const isTourDate = type === 'tourdate';
         if (isDryHire) return false;
-        if (isTourDate) return hasPrepDayDateType(job.job_date_types);
+        if (isTourDate) {
+          return hasPrepDayDateType(job.job_date_types) || hourlyTourDateJobIds.has(job.id);
+        }
         if (Array.isArray(job.job_date_types) && job.job_date_types.length > 0) {
           return job.job_date_types.some(
             (dt: { type?: string } | null | undefined) => dt?.type !== 'off' && dt?.type !== 'travel'
@@ -64,14 +79,19 @@ export default function Timesheets() {
       })
       .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
     return filtered;
-  }, [jobs]);
+  }, [hourlyTourDateJobIds, jobs]);
 
   const selectedJob = jobs.find(job => job.id === selectedJobId);
   const selectedJobType = String(selectedJob?.job_type || '').toLowerCase();
   const timesheetsDisabled = selectedJob && (
     selectedJobType === 'dryhire' ||
     selectedJobType === 'dry_hire' ||
-    (selectedJobType === 'tourdate' && !hasPrepDayDateType(selectedJob.job_date_types))
+    (
+      selectedJobType === 'tourdate' &&
+      !hourlyRateModesLoading &&
+      !hasPrepDayDateType(selectedJob.job_date_types) &&
+      !hourlyTourDateJobIds.has(selectedJob.id)
+    )
   );
 
 

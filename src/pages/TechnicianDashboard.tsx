@@ -17,6 +17,10 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { hasPrepDayDateTypeForDate, isPrepDayBreakdown } from '@/utils/timesheetPrepDays';
 import { persistExplicitThemePreference } from '@/lib/theme';
+import {
+  fetchHourlyTourDateRateModes,
+  type HourlyTourDateRateMode,
+} from '@/services/hourlyTourDateTimesheets';
 
 import { DashboardScreen } from '@/components/technician/DashboardScreen';
 import { JobsView } from '@/components/technician/JobsView';
@@ -48,6 +52,7 @@ interface TechnicianJobData {
   created_at?: string;
   artist_count?: number;
   has_prep_day_timesheet?: boolean;
+  has_hourly_timesheet?: boolean;
   job_date_types?: Array<{ date?: string | null; type?: string | null }> | null;
   preventive_resource_technician_id?: string | null;
   location?: { name: string } | null;
@@ -184,45 +189,52 @@ const TechnicianDashboard = () => {
       );
       const jobIds = Array.from(new Set(assignmentsData.map((assignment) => assignment.job_id)));
 
-      // Step 2: Fetch timesheets (with jobs) for those assignments
-      const { data: timesheetData, error } = await dataLayerClient.from('timesheets')
-        .select(`
-          job_id,
-          technician_id,
-          date,
-          amount_breakdown,
-          jobs!inner (
-            id,
-            title,
-            description,
-            start_time,
-            end_time,
-            timezone,
-            location_id,
-            job_type,
-            color,
-            status,
-            preventive_resource_technician_id,
-            location:locations(name),
-            job_date_types(date, type),
-            job_documents(
+      // Step 2: Fetch timesheets and exact hourly tour-date eligibility together.
+      const [timesheetResult, hourlyRateModes] = await Promise.all([
+        dataLayerClient.from('timesheets')
+          .select(`
+            job_id,
+            technician_id,
+            date,
+            amount_breakdown,
+            jobs!inner (
               id,
-              file_name,
-              file_path,
-              visible_to_tech,
-              visible_to_tech,
-              uploaded_at,
-              read_only,
-              template_type
+              title,
+              description,
+              start_time,
+              end_time,
+              timezone,
+              location_id,
+              job_type,
+              color,
+              status,
+              preventive_resource_technician_id,
+              location:locations(name),
+              job_date_types(date, type),
+              job_documents(
+                id,
+                file_name,
+                file_path,
+                visible_to_tech,
+                uploaded_at,
+                read_only,
+                template_type
+              )
             )
-          )
-        `)
-        .eq('technician_id', user.id)
-        .eq('is_active', true)
-        .in('job_id', jobIds)
-        .gte('jobs.start_time', startDate.toISOString())
-        .lte('jobs.start_time', endDate.toISOString())
-        .order('start_time', { referencedTable: 'jobs' });
+          `)
+          .eq('technician_id', user.id)
+          .eq('is_active', true)
+          .in('job_id', jobIds)
+          .gte('jobs.start_time', startDate.toISOString())
+          .lte('jobs.start_time', endDate.toISOString())
+          .order('start_time', { referencedTable: 'jobs' }),
+        fetchHourlyTourDateRateModes({ jobIds, technicianId: user.id }).catch((hourlyRateModeError) => {
+          console.warn('Could not load hourly tour-date eligibility:', hourlyRateModeError);
+          return [] as HourlyTourDateRateMode[];
+        }),
+      ]);
+      const { data: timesheetData, error } = timesheetResult;
+      const hourlyTourDateJobIds = new Set(hourlyRateModes.map((row) => row.job_id));
 
       if (error) {
         console.error('Error fetching assignments:', error);
@@ -306,6 +318,7 @@ const TechnicianDashboard = () => {
               location,
               artist_count: artistCountByJob.get(row.job_id) || 0,
               has_prep_day_timesheet: prepTimesheetByJobId.get(row.job_id) === true,
+              has_hourly_timesheet: hourlyTourDateJobIds.has(row.job_id),
             } as unknown as TechnicianJobData
           };
         })

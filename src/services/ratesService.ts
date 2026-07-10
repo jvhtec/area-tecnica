@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { RateExtraRow } from '@/hooks/useRateExtrasCatalog';
 import { TourBaseRateRow } from '@/hooks/useTourBaseRates';
 import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
+import { fetchHourlyTourDateRateModes } from '@/services/hourlyTourDateTimesheets';
 
 type Nullable<T> = T | null | undefined;
 
@@ -242,10 +243,12 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     }
   }
 
-  // 2) Fetch jobs that follow the timesheet approval flow
-  //    Include standalone jobs and also tour-linked jobs that are not tour dates (e.g. 'single', 'festival').
-  //    Always exclude dry hire and tour dates from this list.
-  const { data: jobsList, error: jobsError2 } = await supabase
+  // 2) Fetch jobs that follow the timesheet approval flow.
+  //    Include standalone jobs and tour-linked jobs that are not tour dates (e.g. 'single', 'festival').
+  //    Tour dates normally roll up into the tour approval row, but an explicit per-tech/date
+  //    hourly override requires a real timesheet, so those tour-date jobs need their own
+  //    review row with the timesheet approval interface.
+  const { data: nonTourDateJobs, error: jobsError2 } = await supabase
     .from('jobs')
     .select('id, title, start_time, end_time, job_type, status, rates_approved, tour_id')
     .neq('job_type', 'tourdate')
@@ -255,9 +258,34 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
 
   if (jobsError2) throw jobsError2;
 
+  let hourlyTourDateJobs: NonNullable<typeof nonTourDateJobs> = [];
+
+  if (jobReviewIds.size > 0) {
+    const hourlyOverrides = await fetchHourlyTourDateRateModes({
+      jobIds: Array.from(jobReviewIds),
+    });
+
+    const hourlyTourDateJobIds = Array.from(
+      new Set(hourlyOverrides.map((row) => row.job_id).filter(Boolean)),
+    );
+
+    if (hourlyTourDateJobIds.length > 0) {
+      const { data: tourDateJobs, error: tourDateJobsError } = await supabase
+        .from('jobs')
+        .select('id, title, start_time, end_time, job_type, status, rates_approved, tour_id')
+        .in('id', hourlyTourDateJobIds)
+        .eq('job_type', 'tourdate')
+        .in('status', ['Confirmado', 'Completado'])
+        .order('start_time', { ascending: true });
+
+      if (tourDateJobsError) throw tourDateJobsError;
+      hourlyTourDateJobs = tourDateJobs || [];
+    }
+  }
+
   // Keep jobs even if they belong to a tour, as long as they are not 'tourdate'.
   // This ensures tour-linked 'single' jobs appear in the approvals table as individual jobs.
-  const jobsNeedingTimesheetApproval = (jobsList || []).filter(
+  const jobsNeedingTimesheetApproval = [...(nonTourDateJobs || []), ...hourlyTourDateJobs].filter(
     (j) => (j.job_type ?? '').toLowerCase() !== 'tour'
   );
   const jobIds = jobsNeedingTimesheetApproval.map((j) => j.id);

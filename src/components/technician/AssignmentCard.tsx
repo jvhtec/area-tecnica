@@ -95,7 +95,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
     jobData.has_prep_day_timesheet === true ||
     hasPrepDayDateType(jobData.job_date_types);
   const showTimesheetButton = !['dryhire', 'dry_hire'].includes(normalizedJobType) && (
-    normalizedJobType !== 'tourdate' || hasPrepDayTimesheets
+    normalizedJobType !== 'tourdate' || hasPrepDayTimesheets || jobData.has_hourly_timesheet === true
   );
 
   const jobTimezone = jobData.timezone || 'Europe/Madrid';

@@ -8,6 +8,10 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
+import { fetchHourlyTourDateRateModes } from '@/services/hourlyTourDateTimesheets';
+import { queryKeys } from '@/lib/react-query';
+import { hasPrepDayDateType } from '@/utils/timesheetPrepDays';
 
 interface TimesheetSidebarProps {
   isOpen: boolean;
@@ -18,17 +22,30 @@ const JOBS_PER_PAGE = 5;
 
 export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => {
   const { data: allJobs = [], isLoading } = useOptimizedJobs();
-  const { userRole, user } = useOptimizedAuth();
+  const { user } = useOptimizedAuth();
   const navigate = useNavigate();
+  const { data: hourlyRateModes = [] } = useQuery({
+    queryKey: queryKeys.scope('hourly-tourdate-rate-modes', user?.id ?? 'anonymous'),
+    queryFn: () => fetchHourlyTourDateRateModes(),
+    enabled: Boolean(user?.id),
+    staleTime: 30_000,
+  });
+  const hourlyTourDateJobIds = useMemo(
+    () => new Set(hourlyRateModes.map((row) => row.job_id)),
+    [hourlyRateModes],
+  );
 
   // Filter jobs and exclude dry hire and tourdate jobs and jobs with only off/travel date types
   const relevantJobs = useMemo(() => {
     return allJobs
       .filter(job => {
-        // Filter out dry hire and tourdate jobs since they don't have timesheets
+        // Tour dates only use timesheets for prep days or explicit hourly overrides.
         const isDryHire = job.job_type === 'dry_hire' || job.job_type === 'dryhire';
         const isTourDate = job.job_type === 'tourdate';
-        if (isDryHire || isTourDate) return false;
+        if (isDryHire) return false;
+        if (isTourDate) {
+          return hasPrepDayDateType(job.job_date_types) || hourlyTourDateJobIds.has(job.id);
+        }
 
         // Check if job has any work date types (not just "off" or "travel")
         if (job.job_date_types && job.job_date_types.length > 0) {
@@ -43,7 +60,7 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
         return true;
       })
       .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()); // Most recent first
-  }, [allJobs]);
+  }, [allJobs, hourlyTourDateJobIds]);
 
   // Find the current page based on today's date
   const getCurrentPageIndex = useMemo(() => {
