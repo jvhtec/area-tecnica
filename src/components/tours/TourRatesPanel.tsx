@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Euro, Users, Calendar, AlertCircle, Send } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { useTourJobRateQuotes } from "@/hooks/useTourJobRateQuotes";
 import { useTourJobRateQuotesForManager } from "@/hooks/useTourJobRateQuotesForManager";
 import { useManagerJobQuotes } from "@/hooks/useManagerJobQuotes";
@@ -24,6 +24,14 @@ import { labelForJobExtraType } from "@/types/jobExtras";
 
 
 import { queryKeys } from "@/lib/react-query";
+
+const formatQuoteDate = (value: string | null | undefined): string => {
+  if (!value) return 'Fecha sin definir';
+
+  const date = new Date(value);
+  return isValid(date) ? format(date, 'MMM d, yyyy') : 'Fecha sin definir';
+};
+
 interface TourRatesPanelProps {
   jobId: string;
   jobType?: string | null;
@@ -375,7 +383,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {format(new Date(quote.start_time), 'MMM d, yyyy')} • {quote.title}
+                          {formatQuoteDate(quote.start_time)} • {quote.title || 'Sin título'}
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-2">
