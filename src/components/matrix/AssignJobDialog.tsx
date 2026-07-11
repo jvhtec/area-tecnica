@@ -49,6 +49,7 @@ import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment'
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { normalizeDateKey, uniqueSortedDateKeys } from '@/utils/assignmentWorkDates';
 import { addMadridCalendarDays, formatMadridDateKey, fromMadridDateKey } from '@/utils/timezoneUtils';
+import { AssignmentWorkloadWarning } from '@/components/matrix/lenses/AssignmentWorkloadWarning';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -856,6 +857,19 @@ export const AssignJobDialog = ({
   const targetJobRange = selectedJob ? formatJobRange(selectedJob.start_time, selectedJob.end_time) : null;
   const conflictTargetDateLabel = formatDateLabel(conflictWarning?.targetDate);
 
+  // Latest date this assignment would cover, used as the workload-streak projection point.
+  const warningDateIso = useMemo(() => {
+    if (coverageMode === 'multi') {
+      if (!multiDates.length) return null;
+      return sortDateKeys(multiDates.map(formatDateKey)).slice(-1)[0] ?? null;
+    }
+    if (coverageMode === 'single') return assignmentDate || null;
+    if (coverageMode === 'full' && selectedJob?.end_time) {
+      return normalizeDateKey(selectedJob.end_time);
+    }
+    return null;
+  }, [coverageMode, multiDates, assignmentDate, selectedJob]);
+
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
@@ -1045,6 +1059,14 @@ export const AssignJobDialog = ({
                     </div>
                   </TabsContent>
                 </Tabs>
+
+                {technician && warningDateIso && (
+                  <AssignmentWorkloadWarning
+                    technicianId={technicianId}
+                    technicianName={`${technician.first_name} ${technician.last_name}`}
+                    dateIso={warningDateIso}
+                  />
+                )}
 
                 <div className="flex items-center space-x-2 pt-2 border-t">
                   <Checkbox

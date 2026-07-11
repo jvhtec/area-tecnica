@@ -13,6 +13,9 @@ import {
   formatLabel,
   type Department,
 } from '@/pages/job-assignment-matrix/utils';
+import { MATRIX_LENS_LABELS, type MatrixLens } from '@/components/matrix/lenses/types';
+
+const LENS_OPTIONS: MatrixLens[] = ['default', 'coverage', 'workload', 'cost'];
 
 type MatrixPageControlsProps = {
   selectedDepartment: Department;
@@ -56,6 +59,9 @@ type MatrixPageControlsProps = {
   handleReminderOpenChange: (open: boolean) => void;
   outstandingJobsCount: number | null;
   outstandingJobsDescription: string;
+  lens: MatrixLens;
+  setLens: (value: MatrixLens) => void;
+  canUseCostLens: boolean;
 };
 
 export const MatrixPageControls = ({
@@ -100,6 +106,9 @@ export const MatrixPageControls = ({
   handleReminderOpenChange,
   outstandingJobsCount,
   outstandingJobsDescription,
+  lens,
+  setLens,
+  canUseCostLens,
 }: MatrixPageControlsProps) => (
   <>
     <div className="flex-shrink-0 border-b bg-card p-2 md:p-4">
@@ -139,6 +148,19 @@ export const MatrixPageControls = ({
             <span className="hidden sm:inline">Refrescar</span>
           </Button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium text-muted-foreground">Vista:</span>
+        <Tabs value={lens} onValueChange={(value) => setLens(value as MatrixLens)}>
+          <TabsList className="h-8">
+            {LENS_OPTIONS.filter((option) => option !== 'cost' || canUseCostLens).map((option) => (
+              <TabsTrigger key={option} value={option} className="text-xs px-2 py-1">
+                {MATRIX_LENS_LABELS[option]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="hidden md:block">

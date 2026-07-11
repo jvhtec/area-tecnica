@@ -15,6 +15,9 @@ import { OptimizedMatrixCellTooltip } from '@/components/matrix/optimized-matrix
 import { assignmentStatusLabel, EMPTY_PROFILE_NAMES_MAP, normalizeStatus } from '@/components/matrix/optimized-matrix-cell/helpers';
 import type { OptimizedMatrixCellProps } from '@/components/matrix/optimized-matrix-cell/types';
 import { useMatrixCellAssignmentRemoval } from '@/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval';
+import { CellLensBadge } from '@/components/matrix/lenses/CellLensBadge';
+import { isValidDrop, DROP_VALIDITY_MESSAGES } from '@/components/matrix/dnd/dropValidity';
+import { MATRIX_JOB_DRAG_MIME } from '@/components/matrix/dnd/constants';
 
 export const OptimizedMatrixCell = memo(({
   technician,
@@ -41,6 +44,16 @@ export const OptimizedMatrixCell = memo(({
   staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
+  lensBadge = null,
+  dragEnabled = false,
+  isDragSource = false,
+  dropValidity = null,
+  onDragStartCell,
+  onDragOverCell,
+  onDragLeaveCell,
+  onDropCell,
+  onDragEndCell,
+  onDropJobCell,
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
@@ -237,15 +250,23 @@ export const OptimizedMatrixCell = memo(({
   const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
   const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
   const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
+  const isDraggableSource = dragEnabled && hasAssignment && !isFridge;
+  const isValidDropTarget = dropValidity != null && isValidDrop(dropValidity);
+  const isInvalidDropTarget = dropValidity != null && dropValidity !== 'valid';
+  const dropTitle = dropValidity ? DROP_VALIDITY_MESSAGES[dropValidity] : undefined;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div
           className={cn(
-            'border-r border-b cursor-pointer transition-colors duration-150',
+            'border-r border-b transition-colors duration-150',
             'flex flex-col justify-between p-1 text-xs relative',
+            isDraggableSource ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
             getCellBackground(),
-            getBorderColor()
+            getBorderColor(),
+            isDragSource && 'opacity-40',
+            isValidDropTarget && 'ring-2 ring-inset ring-emerald-500',
+            isInvalidDropTarget && 'ring-2 ring-inset ring-rose-400',
           )}
           style={{
             width: `${width}px`,
@@ -260,6 +281,35 @@ export const OptimizedMatrixCell = memo(({
           onClick={handleCellClick}
           onContextMenu={handleRightClick}
           onMouseEnter={handleMouseEnter}
+          draggable={isDraggableSource}
+          title={dropTitle}
+          onDragStart={(e) => {
+            if (!isDraggableSource) return;
+            e.dataTransfer.effectAllowed = 'move';
+            onDragStartCell?.();
+          }}
+          onDragEnd={() => onDragEndCell?.()}
+          onDragOver={(e) => {
+            if (!dragEnabled) return;
+            e.preventDefault();
+            if (e.dataTransfer.types.includes(MATRIX_JOB_DRAG_MIME)) {
+              e.dataTransfer.dropEffect = 'copy';
+              return;
+            }
+            e.dataTransfer.dropEffect = 'move';
+            onDragOverCell?.();
+          }}
+          onDragLeave={() => onDragLeaveCell?.()}
+          onDrop={(e) => {
+            if (!dragEnabled) return;
+            e.preventDefault();
+            const jobId = e.dataTransfer.getData(MATRIX_JOB_DRAG_MIME);
+            if (jobId) {
+              onDropJobCell?.(jobId);
+              return;
+            }
+            onDropCell?.();
+          }}
         >
           {/* Selection indicator */}
           {isSelected && (
@@ -269,6 +319,9 @@ export const OptimizedMatrixCell = memo(({
               </div>
             </div>
           )}
+
+          {/* Lens badge (workload streak / cost amount) */}
+          {lensBadge && <CellLensBadge data={lensBadge} />}
 
           {/* Fridge indicator */}
           {isFridge && (

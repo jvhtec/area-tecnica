@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { queryKeys } from "@/lib/react-query";
+import { MATRIX_JOB_DRAG_MIME } from '@/components/matrix/dnd/constants';
 interface DateHeaderProps {
   date: Date;
   width: number;
@@ -23,6 +24,7 @@ interface DateHeaderProps {
   }>;
   technicianIds?: string[];
   onJobClick?: (jobId: string) => void;
+  dragEnabled?: boolean;
 }
 
 // Lightweight per-job engagement counts scoped to current filtered technicians
@@ -117,7 +119,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
   });
 }
 
-const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: DateHeaderProps) => {
+const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick, dragEnabled = false }: DateHeaderProps) => {
   const isTodayHeader = isToday(date);
   const isWeekendHeader = isWeekend(date);
   const hasJobs = jobs.length > 0;
@@ -292,6 +294,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
                   job={job}
                   technicianIds={technicianIds}
                   onJobClick={onJobClick}
+                  dragEnabled={dragEnabled}
                 />
               ))}
             </div>
@@ -302,14 +305,21 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
   );
 };
 
-function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: string; title: string; start_time: string; end_time: string; color?: string; status: string }, technicianIds?: string[], onJobClick?: (jobId: string) => void }) {
+function JobRowWithCounts({ job, technicianIds, onJobClick, dragEnabled = false }: { job: { id: string; title: string; start_time: string; end_time: string; color?: string; status: string }, technicianIds?: string[], onJobClick?: (jobId: string) => void, dragEnabled?: boolean }) {
   const { data: counts } = useJobEngagementCounts(job.id, technicianIds);
   return (
     <div
-      className="p-2 border rounded-lg bg-card hover:bg-accent/30 cursor-pointer"
+      className={`p-2 border rounded-lg bg-card hover:bg-accent/30 cursor-pointer ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : ''}`}
       style={{ borderLeftColor: job.color || '#7E69AB', borderLeftWidth: '3px' }}
       onClick={(e) => { e.stopPropagation(); onJobClick?.(job.id); }}
-      title="Haz clic para ordenar técnicos por compromiso para este trabajo"
+      title={dragEnabled ? 'Haz clic para ordenar técnicos, o arrastra a una celda para asignar' : 'Haz clic para ordenar técnicos por compromiso para este trabajo'}
+      draggable={dragEnabled}
+      onDragStart={(e) => {
+        if (!dragEnabled) return;
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData(MATRIX_JOB_DRAG_MIME, job.id);
+      }}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">

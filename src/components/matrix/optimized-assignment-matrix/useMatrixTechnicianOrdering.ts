@@ -6,6 +6,7 @@ import { queryKeys } from "@/lib/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { MatrixTimesheetAssignment } from "@/hooks/useOptimizedMatrixData";
 import type { OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from "@/components/matrix/optimized-assignment-matrix/types";
+import type { TechWorkloadSummary } from "@/components/matrix/lenses/workload";
 
 type MatrixTechnician = OptimizedAssignmentMatrixExtendedProps["technicians"][number];
 
@@ -113,12 +114,14 @@ type UseMatrixTechnicianOrderingArgs = {
   technicians: MatrixTechnician[];
   allAssignments: MatrixTimesheetAssignment[];
   mobile: boolean;
+  workloadByTech?: Map<string, TechWorkloadSummary>;
 };
 
 export const useMatrixTechnicianOrdering = ({
   technicians,
   allAssignments,
   mobile,
+  workloadByTech,
 }: UseMatrixTechnicianOrderingArgs) => {
   const [sortJobId, setSortJobId] = useState<string | null>(null);
   const [techSortMethod, setTechSortMethod] = useState<TechSortMethod>("default");
@@ -279,6 +282,14 @@ export const useMatrixTechnicianOrdering = ({
       case "surname-desc":
         techs.sort((a, b) => b.last_name.localeCompare(a.last_name));
         break;
+      case "workload-desc":
+        techs.sort((a, b) => {
+          const streakA = workloadByTech?.get(a.id)?.streakEndingToday ?? 0;
+          const streakB = workloadByTech?.get(b.id)?.streakEndingToday ?? 0;
+          if (streakB !== streakA) return streakB - streakA;
+          return a.first_name.localeCompare(b.first_name);
+        });
+        break;
       case "default":
       default:
         techs.sort((a, b) => {
@@ -299,7 +310,7 @@ export const useMatrixTechnicianOrdering = ({
     }
 
     return techs;
-  }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
+  }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts, workloadByTech]);
 
   const techMedalRankings = useMemo(
     () => buildMedalRankings(techConfirmedCounts, techSortMethod, sortJobId),
@@ -312,14 +323,16 @@ export const useMatrixTechnicianOrdering = ({
   );
 
   const cycleTechSort = useCallback(() => {
-    const methods: TechSortMethod[] = ["default", "location", "name-asc", "name-desc", "surname-asc", "surname-desc"];
+    const methods: TechSortMethod[] = workloadByTech && workloadByTech.size > 0
+      ? ["default", "location", "name-asc", "name-desc", "surname-asc", "surname-desc", "workload-desc"]
+      : ["default", "location", "name-asc", "name-desc", "surname-asc", "surname-desc"];
     const currentIndex = methods.indexOf(techSortMethod);
     const nextIndex = (currentIndex + 1) % methods.length;
     setTechSortMethod(methods[nextIndex]);
     if (sortJobId) {
       setSortJobId(null);
     }
-  }, [techSortMethod, sortJobId]);
+  }, [techSortMethod, sortJobId, workloadByTech]);
 
   const getSortLabel = useCallback(() => {
     switch (techSortMethod) {
@@ -328,6 +341,7 @@ export const useMatrixTechnicianOrdering = ({
       case "name-desc": return mobile ? "Z→A" : "Z→A Nombre";
       case "surname-asc": return mobile ? "A→Z Ape." : "A→Z Apellido";
       case "surname-desc": return mobile ? "Z→A Ape." : "Z→A Apellido";
+      case "workload-desc": return mobile ? "↯ Carga" : "↯ Más carga primero";
       case "default": return "";
       default: return "";
     }

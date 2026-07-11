@@ -444,6 +444,50 @@ export function formatLabel(value: string) {
     .join(" ");
 }
 
+export const MATRIX_STAFFING_SUMMARY_QUERY_SCOPE = "matrix-staffing-summary";
+
+/**
+ * Required-roles + actual assignments for a set of jobs, across every
+ * department (not just the currently selected matrix tab). Shared by the
+ * staffing reminder computation and the coverage heatmap lens so both read
+ * from the same React Query cache entry instead of double-fetching.
+ */
+export async function fetchStaffingSummaryForJobs(
+  jobIds: string[],
+): Promise<{ summaries: StaffingSummaryRow[]; assignments: StaffingAssignmentRow[] }> {
+  if (!jobIds.length) {
+    return { summaries: [], assignments: [] };
+  }
+
+  const [summaryRes, assignmentsRes] = await Promise.all([
+    dataLayerClient.from("job_required_roles_summary")
+      .select("job_id, department, roles")
+      .in("job_id", jobIds),
+    dataLayerClient.from("job_assignments")
+      .select("job_id, sound_role, lights_role, video_role, production_role, status")
+      .in("job_id", jobIds),
+  ]);
+
+  if (summaryRes.error) throw summaryRes.error;
+  if (assignmentsRes.error) throw assignmentsRes.error;
+
+  const summaries = (summaryRes.data || [])
+    .map(parseSummaryRow)
+    .filter((row): row is StaffingSummaryRow => Boolean(row));
+
+  const assignments = ((assignmentsRes.data || []) as StaffingAssignmentRow[])
+    .filter((row): row is StaffingAssignmentRow => Boolean(row && row.job_id))
+    .map((row) => ({
+      ...row,
+      sound_role: row.sound_role ? String(row.sound_role) : null,
+      lights_role: row.lights_role ? String(row.lights_role) : null,
+      video_role: row.video_role ? String(row.video_role) : null,
+      status: row.status ? String(row.status) : null,
+    }));
+
+  return { summaries, assignments };
+}
+
 export function parseSummaryRow(row: unknown): StaffingSummaryRow | null {
   const record = (row ?? null) as { job_id?: unknown; department?: unknown; roles?: unknown } | null;
   if (!record || typeof record.job_id !== "string" || typeof record.department !== "string") return null;
