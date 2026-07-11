@@ -52,9 +52,10 @@ import { isDepartmentManagementRole, isManagementRole } from '@/utils/permission
 import { useDirectJobAssignments } from '@/hooks/useDirectJobAssignments';
 
 import { queryKeys } from "@/lib/react-query";
-const MADRID_TIME_ZONE = 'Europe/Madrid';
-const formatMadridDateKey = (date: Date) => formatInTimeZone(date, MADRID_TIME_ZONE, "yyyy-MM-dd");
-const parseMadridDateKey = (dateKey: string) => fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE);
+const DEFAULT_JOB_TIME_ZONE = 'Europe/Madrid';
+const MADRID_TIME_ZONE = DEFAULT_JOB_TIME_ZONE;
+const formatJobDateKey = (date: Date, timeZone = DEFAULT_JOB_TIME_ZONE) => formatInTimeZone(date, timeZone, "yyyy-MM-dd");
+const parseJobDateKey = (dateKey: string, timeZone = DEFAULT_JOB_TIME_ZONE) => fromZonedTime(`${dateKey}T00:00:00`, timeZone);
 const addDaysToDateKey = (dateKey: string, days: number) => {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
@@ -216,7 +217,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     jobId: jobId,
     jobStartTime: jobData?.start_time || "",
     jobEndTime: jobData?.end_time || "", jobTimezone: jobData?.timezone,
-    assignmentDate: singleDay ? (selectedJobDate ? formatMadridDateKey(selectedJobDate) : null) : null,
+    assignmentDate: singleDay ? (selectedJobDate ? formatJobDateKey(selectedJobDate, jobData?.timezone || undefined) : null) : null,
     enabled: isOpen && !!jobData && !!jobId
   });
 
@@ -232,6 +233,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   const jobDates = useMemo(() => {
     if (!jobData) return [] as Date[];
+    const jobTimeZone = jobData.timezone || DEFAULT_JOB_TIME_ZONE;
 
     const dateTypeRows = (jobData as unknown as JobWithDateTypes).job_date_types;
     const typedDates: Date[] = Array.isArray(dateTypeRows)
@@ -241,7 +243,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           const type = (dt?.type || '').toLowerCase();
           return type !== 'off' && type !== 'travel';
         })
-        .map((dt) => parseMadridDateKey(dt.date))
+        .map((dt) => parseJobDateKey(dt.date, jobTimeZone))
       : [];
 
     if (typedDates.length > 0) {
@@ -249,26 +251,26 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     }
 
     if (jobData.start_time) {
-      const startKey = formatMadridDateKey(new Date(jobData.start_time));
+      const startKey = formatJobDateKey(new Date(jobData.start_time), jobTimeZone);
       if (jobData.end_time) {
-        const endKey = formatMadridDateKey(new Date(jobData.end_time));
+        const endKey = formatJobDateKey(new Date(jobData.end_time), jobTimeZone);
         const result: Date[] = [];
         let cursorKey = startKey;
         while (cursorKey <= endKey) {
-          result.push(parseMadridDateKey(cursorKey));
+          result.push(parseJobDateKey(cursorKey, jobTimeZone));
           cursorKey = addDaysToDateKey(cursorKey, 1);
         }
         return result;
       }
-      return [parseMadridDateKey(startKey)];
+      return [parseJobDateKey(startKey, jobTimeZone)];
     }
 
     return [] as Date[];
   }, [jobData]);
 
   const allowedJobDateSet = useMemo(() => {
-    return new Set(jobDates.map(formatMadridDateKey));
-  }, [jobDates]);
+    return new Set(jobDates.map((date) => formatJobDateKey(date, jobData?.timezone || undefined)));
+  }, [jobDates, jobData?.timezone]);
 
   useEffect(() => {
     if (!singleDay) return;
@@ -278,7 +280,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       return;
     }
 
-    const currentKey = selectedJobDate ? formatMadridDateKey(selectedJobDate) : null;
+    const currentKey = selectedJobDate ? formatJobDateKey(selectedJobDate, jobData?.timezone || undefined) : null;
     if (!currentKey || !allowedJobDateSet.has(currentKey)) {
       setSelectedJobDate(jobDates[0]);
     }
@@ -335,7 +337,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       return;
     }
 
-    const singleDayDateKey = selectedJobDate ? formatMadridDateKey(selectedJobDate) : null;
+    const singleDayDateKey = selectedJobDate ? formatJobDateKey(selectedJobDate, jobData?.timezone || undefined) : null;
     if (singleDay && !singleDayDateKey) {
       toast({
         title: "Selecciona una fecha",

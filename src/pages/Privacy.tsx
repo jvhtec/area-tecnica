@@ -85,7 +85,7 @@ const Privacy = () => {
               Proveedores y transferencias
             </h2>
             <p className="text-slate-600 dark:text-slate-300">
-              Utilizamos proveedores necesarios para alojamiento y base de datos (Supabase), entrega web (Cloudflare), correo (Brevo), operaciones técnicas (Flex), mensajería (WAHA/WhatsApp), mapas (Google Maps o Mapbox) y notificaciones móviles (Apple o Web Push). El acceso se limita a la finalidad del servicio y las transferencias internacionales se someten a las garantías ofrecidas por cada proveedor y a la normativa aplicable.
+              Utilizamos Supabase para base de datos, Cloudflare para entrega web, Brevo para correo, Flex para operaciones técnicas, WAHA/WhatsApp para mensajería, Google Maps o Mapbox para mapas y Apple o Web Push para notificaciones. Supabase opera el proyecto en región de la UE; Cloudflare puede tratar datos de conexión en su red global. Para los demás proveedores, cualquier transferencia fuera del EEE se documenta en el contrato/DPA aplicable y se limita a la finalidad del servicio. Puedes solicitar a info@sector-pro.com el proveedor, la ubicación y el mecanismo de transferencia aplicable a tu tratamiento.
             </p>
           </section>
 
@@ -108,6 +108,7 @@ const Privacy = () => {
             <ul className="list-disc pl-6 text-slate-600 dark:text-slate-300 space-y-2">
               <li><strong>Usuarios activos:</strong> Conservados mientras trabajes con nosotros</li>
               <li><strong>Solicitudes de eliminación:</strong> Tras verificar y aprobar la solicitud, eliminamos o anonimizamos los datos que ya no sean necesarios. Los registros fiscales, laborales o de pago se conservan durante los plazos legales aplicables (habitualmente hasta 7 años).</li>
+              <li><strong>Auditoría y correo corporativo:</strong> Los eventos de auditoría anónimos se eliminan a los 30 días. Los nuevos registros de correo corporativo conservan un hash de contenido y no el cuerpo del mensaje.</li>
               <li><strong>Copias de seguridad y proveedores:</strong> Los datos residuales desaparecen conforme a los ciclos de retención y borrado de cada sistema; no se usan para nuevas finalidades.</li>
             </ul>
           </section>
@@ -117,7 +118,7 @@ const Privacy = () => {
               Decisiones automatizadas
             </h2>
             <p className="text-slate-600 dark:text-slate-300">
-              Sector Pro puede ordenar o recomendar candidatos para facilitar la planificación, pero una persona responsable decide las asignaciones. No se adoptan decisiones con efectos jurídicos basadas únicamente en tratamiento automatizado.
+              Sector Pro puede ordenar o recomendar candidatos para facilitar la planificación, pero una persona responsable revisa de forma significativa cada caso antes de finalizar una asignación y puede cambiar el resultado. No se adoptan decisiones basadas únicamente en tratamiento automatizado que produzcan efectos jurídicos o afecten de modo similar y significativo a una persona.
             </p>
           </section>
 

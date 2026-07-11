@@ -34,11 +34,14 @@ group, retention period, and written approval in the operational register.
    dedicated secret in the linked Supabase project, readable only by the
    security-audit service role; never export it, include it in source control,
    or reuse it for authentication. Rotate it at least annually or after a
-   suspected disclosure, record the rotation/change ticket, and delete or
-   re-fingerprint retained correlation records under the applicable retention
-   deadline. The security audit log or related change ticket must identify the
-   approved correlation purpose and key version without storing the identifier
-   or the key material.
+   suspected disclosure, record the rotation/change ticket, and expire/delete
+   fingerprints carrying the retired key version. Re-fingerprinting is allowed
+   only from the approved source system through an access-controlled, documented
+   task that records the operator, purpose, record count, old/new key versions,
+   and deletion deadline; it must not retain a source-to-fingerprint mapping.
+   The security audit log or related change ticket must identify the approved
+   correlation purpose and key version without storing the identifier or key
+   material.
 3. Record the operator, purpose, source query/hash, approved destination,
    classification, creation time, and deletion deadline in the security audit
    log or the related change ticket. Never record credentials in that entry.

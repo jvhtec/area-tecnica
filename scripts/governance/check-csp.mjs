@@ -7,23 +7,27 @@ import { JSDOM } from "jsdom";
 const root = process.cwd();
 const publicDir = path.join(root, "public");
 const headers = await readFile(path.join(publicDir, "_headers"), "utf8");
-const policyMatch = headers.match(/^\s*Content-Security-Policy:\s*(.+)$/m);
+const policyMatches = [...headers.matchAll(/^\s*Content-Security-Policy:\s*(.+)$/mg)];
 
-if (!policyMatch) {
+if (policyMatches.length === 0) {
   throw new Error("public/_headers must define an enforced Content-Security-Policy");
 }
 
-const policy = policyMatch[1];
-const scriptDirective = policy.match(/(?:^|;)\s*script-src\s+([^;]+)/)?.[1] ?? "";
+const scriptDirectives = [];
 
-for (const forbidden of ["'unsafe-inline'", "'unsafe-eval'"]) {
-  if (scriptDirective.includes(forbidden)) {
-    throw new Error(`script-src must not contain ${forbidden}`);
+for (const [, policy] of policyMatches) {
+  const scriptDirective = policy.match(/(?:^|;)\s*script-src\s+([^;]+)/)?.[1] ?? "";
+  scriptDirectives.push(scriptDirective);
+
+  for (const forbidden of ["'unsafe-inline'", "'unsafe-eval'"]) {
+    if (scriptDirective.includes(forbidden)) {
+      throw new Error(`script-src must not contain ${forbidden}`);
+    }
   }
-}
 
-if (!/(?:^|;)\s*script-src-attr\s+'none'(?:;|$)/.test(policy)) {
-  throw new Error("CSP must disable inline event handlers with script-src-attr 'none'");
+  if (!/(?:^|;)\s*script-src-attr\s+'none'(?:;|$)/.test(policy)) {
+    throw new Error("CSP must disable inline event handlers with script-src-attr 'none'");
+  }
 }
 
 async function htmlFiles(directory) {
@@ -51,7 +55,7 @@ for (const file of await htmlFiles(publicDir)) {
     const canonicalContent = content.replace(/\r\n/g, "\n");
     const digest = createHash("sha256").update(canonicalContent).digest("base64");
     const source = `'sha256-${digest}'`;
-    if (!scriptDirective.includes(source)) {
+    if (!scriptDirectives.some((directive) => directive.includes(source))) {
       missing.push(`${path.relative(root, file)}: ${source}`);
     }
   }
