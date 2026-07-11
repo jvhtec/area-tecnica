@@ -224,8 +224,8 @@ or hosted-dashboard cron jobs.
 - **Severity:** High
 - **Status:** In progress on this branch
 - **Evidence:** 1,885 lint warnings are non-blocking; 93 are
-  `react-hooks/exhaustive-deps`, and `react-hooks/rules-of-hooks` remains a
-  warning. The app uses `strict: false` and `strictNullChecks: false`.
+  `react-hooks/exhaustive-deps`; `react-hooks/rules-of-hooks` is configured as
+  an error. The app uses `strict: false` and `strictNullChecks: false`.
 - **Action:** Check in warning counts by rule/file, fail new warnings, eliminate
   hook warnings first, then ratchet `any` debt. Introduce strict subprojects in
   this order: unknown catches, null checks, indexed access, full strict.
