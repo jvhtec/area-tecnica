@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { dataLayerClient } from '@/services/dataLayerClient';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,7 +32,10 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
   const context = useOptionalDepartment();
   const department: Department | undefined = context?.department;
 
-  const categories = department ? getCategoriesForDepartment(department) : [...SOUND_CATEGORIES, ...LIGHTS_CATEGORIES];
+  const categories = useMemo(
+    () => department ? getCategoriesForDepartment(department) : [...SOUND_CATEGORIES, ...LIGHTS_CATEGORIES],
+    [department],
+  );
   const [name, setName] = useState(equipment?.name || '');
   const [category, setCategory] = useState<string>((equipment?.category as string) || categories[0]);
   const [manufacturer, setManufacturer] = useState(equipment?.manufacturer || '');
@@ -51,7 +54,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
       setImageId(equipment.image_id || '');
       setShowFlexSection(!!(equipment.resource_id || equipment.manufacturer || equipment.image_id));
     }
-  }, [equipment?.id]);
+  }, [categories, equipment]);
 
   const extractUuidFromUrl = (url: string): string | null => {
     const match = url.match(UUID_REGEX);
