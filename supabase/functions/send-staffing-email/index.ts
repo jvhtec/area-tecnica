@@ -1610,10 +1610,7 @@ serve(createHttpHandler(async (req) => {
 
         const requestId = crypto.randomUUID();
         try {
-          console.log('[send-staffing-email] WA context', {
-            requestId,
-            hasApiKey: Boolean(apiKey),
-          });
+          console.log('[send-staffing-email] WA request started', { requestId });
         } catch {}
 
         // Normalize phone → JID
