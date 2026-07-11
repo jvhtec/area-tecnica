@@ -126,7 +126,7 @@ export const ArtistFormLinksDialog = ({
     } finally {
       setIsLoading(false);
     }
-  }, [jobId, selectedDate, toast]);
+  }, [jobId, toast]);
 
   useEffect(() => {
     if (open) {

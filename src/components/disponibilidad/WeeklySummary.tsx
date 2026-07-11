@@ -63,6 +63,7 @@ function FlexImage({
 
   useEffect(() => {
     let isMounted = true;
+    let objectUrl: string | null = null;
 
     const fetchImage = async () => {
       try {
@@ -88,8 +89,8 @@ function FlexImage({
 
         const blob = await response.blob();
         if (isMounted) {
-          const url = URL.createObjectURL(blob);
-          setImageSrc(url);
+          objectUrl = URL.createObjectURL(blob);
+          setImageSrc(objectUrl);
         }
       } catch {
         if (isMounted) {
@@ -102,8 +103,8 @@ function FlexImage({
 
     return () => {
       isMounted = false;
-      if (imageSrc) {
-        URL.revokeObjectURL(imageSrc);
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
       }
     };
   }, [imageId]);
@@ -138,7 +139,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     if (newStart.getTime() !== currentWeekStart.getTime()) {
       setCurrentWeekStart(newStart);
     }
-  }, [selectedDate]);
+  }, [currentWeekStart, selectedDate]);
   const [isOpen, setIsOpen] = useState(() => safeGetJSON('weeklySummaryOpen', true));
 
   const departmentCategories = getCategoriesForDepartment(department);
