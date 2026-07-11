@@ -508,6 +508,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             dragEnabled={dragEnabled}
                             isDragSource={isDragSourceCell}
                             dropValidity={dropValidity}
+                            pickupActive={!!dragSource}
                             onDragStartCell={() => beginDrag(technician, date, assignment)}
                             onDragOverCell={() => dragOverCell(technician.id, date)}
                             onDragLeaveCell={() => clearDragOver()}

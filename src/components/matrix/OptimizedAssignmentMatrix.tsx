@@ -23,10 +23,12 @@ import { LENS_HEADER_ROW_HEIGHT, type MatrixLens } from '@/components/matrix/len
 import { useMatrixCoverage } from '@/hooks/matrix/useMatrixCoverage';
 import { useMatrixWorkload } from '@/hooks/matrix/useMatrixWorkload';
 import { computeDepartmentPercentiles } from '@/components/matrix/lenses/workload';
-import { aggregateCost, formatEuro } from '@/components/matrix/lenses/cost';
+import { aggregateCost, formatEuro, formatEuroRange } from '@/components/matrix/lenses/cost';
 import type { CellLensBadgeData, TechnicianLensSummaryData } from '@/components/matrix/lenses/types';
 import { useMatrixDrag } from '@/components/matrix/dnd/useMatrixDrag';
 import { useMoveAssignment } from '@/components/matrix/dnd/useMoveAssignment';
+import { useMatrixTourRateQuotes, type TourRateQuotePair } from '@/hooks/matrix/useMatrixTourRateQuotes';
+import { useMatrixRateEstimates } from '@/hooks/matrix/useMatrixRateEstimates';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -157,9 +159,44 @@ export const OptimizedAssignmentMatrix = ({
     workloadByTech,
   });
 
+  // Tour-date pay is a flat day/tour rate, knowable the moment the assignment
+  // exists — the timesheet itself stays schedule-only/hours-empty for tour
+  // dates by design, so it never gets an amount_eur. Fetch the real rate via
+  // the same RPC the payout/quote UI already uses for every (tour-date job,
+  // technician) pair currently on screen.
+  const tourDateJobIds = useMemo(
+    () => new Set(jobs.filter((job) => job.job_type === 'tourdate').map((job) => job.id)),
+    [jobs],
+  );
+  const tourQuotePairs = useMemo<TourRateQuotePair[]>(() => {
+    if (effectiveLens !== 'cost' || tourDateJobIds.size === 0) return [];
+    const seen = new Set<string>();
+    const pairs: TourRateQuotePair[] = [];
+    allAssignments.forEach((assignment) => {
+      if (!tourDateJobIds.has(assignment.job_id)) return;
+      const key = `${assignment.job_id}:${assignment.technician_id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      pairs.push({ jobId: assignment.job_id, technicianId: assignment.technician_id });
+    });
+    return pairs;
+  }, [effectiveLens, tourDateJobIds, allAssignments]);
+  const tourQuoteAmountByPair = useMatrixTourRateQuotes({
+    pairs: tourQuotePairs,
+    enabled: effectiveLens === 'cost',
+  });
+
+  // Rough day-rate preview for cells with no real amount_eur yet (hours not
+  // logged). See useMatrixRateEstimates for what this deliberately does and
+  // doesn't account for.
+  const rateEstimateByTechCategory = useMatrixRateEstimates({
+    technicianIds,
+    enabled: effectiveLens === 'cost',
+  });
+
   const costAggregation = useMemo(
-    () => (effectiveLens === 'cost' ? aggregateCost(allAssignments) : null),
-    [effectiveLens, allAssignments],
+    () => (effectiveLens === 'cost' ? aggregateCost(allAssignments, tourQuoteAmountByPair, rateEstimateByTechCategory) : null),
+    [effectiveLens, allAssignments, tourQuoteAmountByPair, rateEstimateByTechCategory],
   );
 
   const lensBadgeByCell = useMemo(() => {
@@ -174,10 +211,21 @@ export const OptimizedAssignmentMatrix = ({
       });
     } else if (effectiveLens === 'cost' && costAggregation) {
       costAggregation.byCell.forEach((cell, key) => {
+        if (cell.amount === null) {
+          map.set(key, cell.estimate
+            ? {
+              label: `~${formatEuroRange(cell.estimate)}`,
+              tone: 'muted',
+              title: 'Estimación aproximada (tarifa base, sin horas registradas todavía): no incluye nocturnidad, festivos ni horas extra reales',
+            }
+            : { label: '—', tone: 'warn', title: 'Sin tarifa asignada' });
+          return;
+        }
+        const title = cell.source === 'tour_quote' ? 'Tarifa de gira' : cell.approved ? 'Aprobado' : 'Pendiente de aprobación';
         map.set(key, {
-          label: cell.amount === null ? '—' : formatEuro(cell.amount),
-          tone: cell.amount === null ? 'warn' : cell.approved ? 'ok' : 'neutral',
-          title: cell.amount === null ? 'Sin tarifa asignada' : cell.approved ? 'Aprobado' : 'Pendiente de aprobación',
+          label: formatEuro(cell.amount),
+          tone: cell.source === 'tour_quote' ? 'neutral' : cell.approved ? 'ok' : 'neutral',
+          title,
         });
       });
     }
@@ -276,8 +324,11 @@ export const OptimizedAssignmentMatrix = ({
     return map;
   }, [allAssignments]);
 
-  // Drag-and-drop: same-date assignment moves. Desktop + management + direct-assign mode only.
-  const dragEnabled = !mobile && allowDirectAssign && isManagementUser;
+  // Drag-and-drop: same-date assignment moves. Management + direct-assign mode
+  // only; on mobile this becomes tap-to-pick-up/tap-to-drop instead of native
+  // HTML5 drag, which doesn't work on touch — see OptimizedMatrixCell's
+  // handleCellClick for the tap-mode interception.
+  const dragEnabled = allowDirectAssign && isManagementUser;
   const { pendingMove, isMoving, requestMove, cancelMove, commitMove } = useMoveAssignment();
   const {
     dragSource,
@@ -289,6 +340,7 @@ export const OptimizedAssignmentMatrix = ({
     endDrag,
   } = useMatrixDrag({
     enabled: dragEnabled,
+    mobile,
     fridgeSet,
     declinedJobsByTech,
     getAssignmentForCell,

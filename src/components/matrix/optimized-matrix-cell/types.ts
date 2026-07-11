@@ -82,6 +82,8 @@ export interface OptimizedMatrixCellProps {
   dragEnabled?: boolean;
   isDragSource?: boolean;
   dropValidity?: DropValidity | null;
+  /** True while any cell is picked up for a mobile tap-to-move (not just this cell). */
+  pickupActive?: boolean;
   onDragStartCell?: () => void;
   onDragOverCell?: () => void;
   onDragLeaveCell?: () => void;

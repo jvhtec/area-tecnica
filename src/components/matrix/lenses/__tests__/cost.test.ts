@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateCost, formatEuro } from '../cost';
+import { aggregateCost, formatEuro, formatEuroRange, rateEstimateKey, tourQuotePairKey } from '../cost';
 import type { MatrixTimesheetAssignment } from '@/hooks/useOptimizedMatrixData';
 
 const baseAssignment = (overrides: Partial<MatrixTimesheetAssignment>): MatrixTimesheetAssignment => ({
@@ -55,6 +55,89 @@ describe('aggregateCost', () => {
     expect(agg.byTech.get('tech-1')?.missingRateCount).toBe(1);
     expect(agg.byTech.get('tech-1')?.amount).toBe(100);
     expect(agg.byCell.get('tech-1-2026-07-15')?.amount).toBeNull();
+  });
+});
+
+describe('aggregateCost with tour-date quotes', () => {
+  it('uses the quote amount for a schedule-only tour-date row, tagged as tour_quote and counted as approved', () => {
+    const rows = [
+      baseAssignment({
+        job_id: 'tour-job-1',
+        technician_id: 'tech-1',
+        date: '2026-07-15',
+        is_schedule_only: true,
+        amount_eur: null,
+        timesheet_status: null,
+      }),
+    ];
+    const quotes = new Map([[tourQuotePairKey('tour-job-1', 'tech-1'), 200]]);
+
+    const agg = aggregateCost(rows, quotes);
+    const cell = agg.byCell.get('tech-1-2026-07-15');
+    expect(cell?.amount).toBe(200);
+    expect(cell?.source).toBe('tour_quote');
+    expect(cell?.approved).toBe(true);
+    expect(agg.window.amount).toBe(200);
+    expect(agg.window.approved).toBe(200);
+  });
+
+  it('still excludes schedule-only rows with no resolvable quote', () => {
+    const rows = [
+      baseAssignment({ job_id: 'dryhire-job', is_schedule_only: true, amount_eur: null }),
+    ];
+    const agg = aggregateCost(rows, new Map());
+    expect(agg.byCell.size).toBe(0);
+    expect(agg.byTech.get('tech-1')?.missingRateCount ?? 0).toBe(0);
+  });
+
+  it('does not apply a tour quote to a non-schedule-only row even if a pair happens to match', () => {
+    const rows = [
+      baseAssignment({ job_id: 'tour-job-1', technician_id: 'tech-1', is_schedule_only: false, amount_eur: 50 }),
+    ];
+    const quotes = new Map([[tourQuotePairKey('tour-job-1', 'tech-1'), 200]]);
+    const agg = aggregateCost(rows, quotes);
+    expect(agg.byCell.get('tech-1-2026-07-15')?.amount).toBe(50);
+    expect(agg.byCell.get('tech-1-2026-07-15')?.source).toBe('timesheet');
+  });
+});
+
+describe('aggregateCost with rate estimates', () => {
+  it('attaches an estimate range to a missing-rate cell when the technician/category resolves', () => {
+    const rows = [
+      baseAssignment({ technician_id: 'tech-1', amount_eur: null, sound_role: 'SND-FOH-T' }),
+    ];
+    const estimates = new Map([[rateEstimateKey('tech-1', 'tecnico'), { low: 100, high: 220 }]]);
+
+    const agg = aggregateCost(rows, new Map(), estimates);
+    const cell = agg.byCell.get('tech-1-2026-07-15');
+    expect(cell?.amount).toBeNull();
+    expect(cell?.estimate).toEqual({ low: 100, high: 220 });
+  });
+
+  it('never rolls estimate amounts into any total', () => {
+    const rows = [
+      baseAssignment({ technician_id: 'tech-1', amount_eur: null, sound_role: 'SND-FOH-T' }),
+    ];
+    const estimates = new Map([[rateEstimateKey('tech-1', 'tecnico'), { low: 100, high: 220 }]]);
+
+    const agg = aggregateCost(rows, new Map(), estimates);
+    expect(agg.window.amount).toBe(0);
+    expect(agg.byTech.get('tech-1')?.amount).toBe(0);
+    expect(agg.byTech.get('tech-1')?.missingRateCount).toBe(1);
+  });
+
+  it('leaves estimate null when no role code resolves a category', () => {
+    const rows = [baseAssignment({ technician_id: 'tech-1', amount_eur: null, sound_role: null })];
+    const estimates = new Map([[rateEstimateKey('tech-1', 'tecnico'), { low: 100, high: 220 }]]);
+
+    const agg = aggregateCost(rows, new Map(), estimates);
+    expect(agg.byCell.get('tech-1-2026-07-15')?.estimate).toBeNull();
+  });
+});
+
+describe('formatEuroRange', () => {
+  it('renders a rounded low-high range with a single currency symbol', () => {
+    expect(formatEuroRange({ low: 100.4, high: 219.6 })).toBe('100–220 €');
   });
 });
 

@@ -48,6 +48,7 @@ export const OptimizedMatrixCell = memo(({
   dragEnabled = false,
   isDragSource = false,
   dropValidity = null,
+  pickupActive = false,
   onDragStartCell,
   onDragOverCell,
   onDragLeaveCell,
@@ -155,6 +156,21 @@ export const OptimizedMatrixCell = memo(({
       return;
     }
 
+    // Mobile tap-to-move: native HTML5 drag doesn't work on touch, so on
+    // mobile a tap on an assigned cell "picks it up" and a subsequent tap on
+    // another cell attempts the move — same underlying move logic as desktop
+    // drag, just driven by taps. See useMatrixDrag for the pick-up/drop state.
+    if (mobile && dragEnabled) {
+      if (pickupActive) {
+        onDropCell?.();
+        return;
+      }
+      if (hasAssignment && !isFridge) {
+        onDragStartCell?.();
+        return;
+      }
+    }
+
     // Mark unavailable toggle mode: left-click directly toggles unavailability (no dialog)
     if (allowMarkUnavailable && !hasAssignment) {
       onClick('toggle-unavailable');
@@ -174,7 +190,7 @@ export const OptimizedMatrixCell = memo(({
       } else {
       }
     }
-  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, technician, date, assignment, allowDirectAssign, allowMarkUnavailable]);
+  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, technician, date, assignment, allowDirectAssign, allowMarkUnavailable, mobile, dragEnabled, pickupActive, isFridge, onDropCell, onDragStartCell]);
 
   const handleRightClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -250,10 +266,13 @@ export const OptimizedMatrixCell = memo(({
   const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
   const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
   const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
-  const isDraggableSource = dragEnabled && hasAssignment && !isFridge;
+  // Native HTML5 drag doesn't work on touch — mobile uses tap-to-pick-up
+  // instead (handleCellClick), so the draggable attribute stays desktop-only.
+  const isDraggableSource = dragEnabled && !mobile && hasAssignment && !isFridge;
   const isValidDropTarget = dropValidity != null && isValidDrop(dropValidity);
   const isInvalidDropTarget = dropValidity != null && dropValidity !== 'valid';
   const dropTitle = dropValidity ? DROP_VALIDITY_MESSAGES[dropValidity] : undefined;
+  const isTapPickable = mobile && dragEnabled && !pickupActive && hasAssignment && !isFridge;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -264,9 +283,10 @@ export const OptimizedMatrixCell = memo(({
             isDraggableSource ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
             getCellBackground(),
             getBorderColor(),
-            isDragSource && 'opacity-40',
+            isDragSource && 'opacity-40 ring-2 ring-inset ring-blue-500',
             isValidDropTarget && 'ring-2 ring-inset ring-emerald-500',
             isInvalidDropTarget && 'ring-2 ring-inset ring-rose-400',
+            isTapPickable && 'ring-1 ring-inset ring-blue-300/60',
           )}
           style={{
             width: `${width}px`,

@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
+import { toast } from 'sonner';
 
-import { evaluateDropValidity, type DropValidity } from '@/components/matrix/dnd/dropValidity';
+import { evaluateDropValidity, DROP_VALIDITY_MESSAGES, type DropValidity } from '@/components/matrix/dnd/dropValidity';
 
 const MADRID_TIMEZONE = 'Europe/Madrid';
 
@@ -27,6 +28,8 @@ interface DragTechnician {
 
 interface UseMatrixDragArgs {
   enabled: boolean;
+  /** Switches from native-drag semantics to tap-to-pick-up/tap-to-drop, since HTML5 drag doesn't work on touch. */
+  mobile?: boolean;
   fridgeSet?: Set<string>;
   declinedJobsByTech: Map<string, Set<string>>;
   getAssignmentForCell: (technicianId: string, date: Date) => any;
@@ -49,6 +52,7 @@ const roleFieldFor = (assignment: any): DragSource['roleField'] | null => {
  */
 export const useMatrixDrag = ({
   enabled,
+  mobile = false,
   fridgeSet,
   declinedJobsByTech,
   getAssignmentForCell,
@@ -74,7 +78,13 @@ export const useMatrixDrag = ({
       status: assignment.status || 'invited',
       department: technician.department,
     });
-  }, [enabled]);
+
+    if (mobile) {
+      toast.message('Asignación seleccionada', {
+        description: 'Toca una celda vacía en la misma fecha para moverla, o toca de nuevo esta celda para cancelar.',
+      });
+    }
+  }, [enabled, mobile]);
 
   const evaluateTarget = useCallback((technicianId: string, date: Date): DropValidity => {
     if (!dragSource) return 'invalid-no-source';
@@ -111,11 +121,15 @@ export const useMatrixDrag = ({
   const dropOnCell = useCallback((technician: DragTechnician, date: Date) => {
     if (!dragSource) return;
     const validity = evaluateTarget(technician.id, date);
+    const isSourceCellTappedAgain = technician.id === dragSource.technicianId;
+
     if (validity === 'valid') {
       onDrop(dragSource, technician.id, `${technician.first_name} ${technician.last_name}`.trim());
+    } else if (mobile && !isSourceCellTappedAgain) {
+      toast.error(DROP_VALIDITY_MESSAGES[validity] || 'No se puede mover aquí');
     }
     endDrag();
-  }, [dragSource, evaluateTarget, onDrop, endDrag]);
+  }, [dragSource, evaluateTarget, onDrop, endDrag, mobile]);
 
-  return { dragSource, dropTarget, beginDrag, dragOverCell, clearDragOver, dropOnCell, endDrag };
+  return { dragSource, dropTarget, beginDrag, dragOverCell, evaluateTarget, clearDragOver, dropOnCell, endDrag };
 };
