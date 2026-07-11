@@ -284,7 +284,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     if (!currentKey || !allowedJobDateSet.has(currentKey)) {
       setSelectedJobDate(jobDates[0]);
     }
-  }, [jobDates, singleDay, allowedJobDateSet, selectedJobDate]);
+  }, [jobDates, singleDay, allowedJobDateSet, selectedJobDate, jobData?.timezone]);
 
 
   useEffect(() => {
