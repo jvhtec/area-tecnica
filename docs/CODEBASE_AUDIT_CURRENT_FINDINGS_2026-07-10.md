@@ -79,14 +79,14 @@ or hosted-dashboard cron jobs.
 
 - **Severity:** High
 - **Status:** Implemented on this branch; production deployment pending
-- **Evidence:** `src/utils/technicianAvailability.ts:99-103,180,229-230,289-290`
-  still derives SQL date keys with `toISOString()`. Timesheet dates are derived
-  in the job timezone in the database.
+- **Historical evidence (pre-fix):** `src/utils/technicianAvailability.ts:99-103,180,229-230,289-290`
+  derived SQL date keys with `toISOString()`. Timesheet dates are derived in
+  the job timezone in the database.
 - **Impact:** Jobs around Madrid midnight can query the preceding UTC day,
   allowing a booked technician to appear available or a free technician to
   appear unavailable.
-- **Action:** Make the availability API accept/retain the job timezone and use
-  the shared Madrid/job-calendar helpers for every date key and range step.
+- **Action:** Deploy the implemented availability date-key change and verify the
+  regression suite against the production release candidate.
 - **Closure:** Unit/integration tests cover 00:30 CEST and 00:30 CET jobs,
   multi-day jobs, and single-day assignments; client results match database
   timesheet dates.
@@ -135,13 +135,12 @@ or hosted-dashboard cron jobs.
 
 - **Severity:** High
 - **Status:** Implemented on this branch; migration/deployment pending
-- **Evidence:** `supabase/functions/security-audit/handler.ts` parses the body
-  without the shared bounded-body/rate-limit primitives and falls back to
-  `event.user_id` when no authenticated user resolves. Gateway JWT validation
-  can still admit an anonymous project token.
-- **Action:** Require verified identity for authenticated events, ignore
-  caller-supplied user IDs, split intentionally anonymous reports into a bounded
-  schema/retention path, and apply durable rate limiting/deduplication.
+- **Historical evidence (pre-fix):** `supabase/functions/security-audit/handler.ts`
+  parsed the body without the shared bounded-body/rate-limit primitives and
+  fell back to `event.user_id` when no authenticated user resolved. Gateway JWT
+  validation can still admit an anonymous project token.
+- **Action:** Deploy the function and migration, configure the dedicated
+  rate-limit hash secret, and verify rate limiting and retention in production.
 - **Closure:** Forged IDs are ignored, oversized/high-rate submissions are
   rejected, retention is defined, and tests cover authenticated and anonymous
   paths.
@@ -150,11 +149,11 @@ or hosted-dashboard cron jobs.
 
 - **Severity:** High
 - **Status:** Implemented on this branch; deployment pending
-- **Evidence:** `supabase/functions/image-proxy/index.ts` blocks textual private
-  IPs/host suffixes but performs no DNS resolution or resolved-address class
-  check before `fetch`.
-- **Action:** Resolve and validate all A/AAAA results, reject private/link-local/
-  loopback/CGNAT ranges, keep redirects disabled, and test rebinding and IPv6.
+- **Historical evidence (pre-fix):** `supabase/functions/image-proxy/index.ts`
+  blocked textual private IPs/host suffixes but performed no DNS resolution or
+  resolved-address class check before `fetch`.
+- **Action:** Verify that the deployed retirement response remains HTTP 410 and
+  that no supported caller depends on the retired proxy.
 - **Closure:** Automated tests cover private IPv4/IPv6, redirect chains, DNS
   rebinding simulation, content type, byte limit, and timeout.
 
@@ -260,13 +259,12 @@ or hosted-dashboard cron jobs.
 #### CUR-14 — CSP is monitoring-only and still permits unsafe execution
 
 - **Severity:** Medium/High
-- **Status:** Confirmed
-- **Evidence:** `public/_headers` sets only
-  `Content-Security-Policy-Report-Only` and allows `unsafe-inline` and
+- **Status:** Implemented on this branch; production header verification pending
+- **Historical evidence (pre-fix):** `public/_headers` set only
+  `Content-Security-Policy-Report-Only` and allowed `unsafe-inline` and
   `unsafe-eval` for scripts.
-- **Action:** Inventory violations/eval requirements, remove avoidable inline/eval
-  dependencies, introduce hashes/nonces where needed, and stage an enforced
-  policy with rollback telemetry.
+- **Action:** Verify the deployed Cloudflare response header, including the
+  path-specific wallboard embedding exception, after every CSP change.
 - **Closure:** Enforced CSP runs for seven days without critical flow regressions
   and report volume has an owner.
 

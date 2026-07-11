@@ -1,6 +1,6 @@
 const SENSITIVE_KEY = /(?:authorization|body|content|cookie|device|email|endpoint|html|message|password|payload|phone|secret|token|url)/i;
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
-const URL_QUERY = /([?&](?:key|sig|signature|token|code|secret)=)[^&#\s]+/gi;
+const URL_QUERY = /([?&](?:access_token|api_key|authorization|auth|client_secret|code|key|password|refresh_token|secret|session|sig|signature|token)=)[^&#\s]+/gi;
 
 export type SafeLogValue = string | number | boolean | null | undefined;
 export type SafeLogFields = Record<string, SafeLogValue>;

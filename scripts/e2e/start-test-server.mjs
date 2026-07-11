@@ -4,7 +4,7 @@ const port = process.env.PLAYWRIGHT_TEST_PORT || "4173";
 const baseUrl = `http://127.0.0.1:${port}`;
 const child = spawn(
   process.execPath,
-  ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", port],
+  ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", port, "--strictPort"],
   {
     env: {
       ...process.env,

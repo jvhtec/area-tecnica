@@ -59,12 +59,13 @@ vi.mock("@/lib/security-audit", () => ({
 import { OptimizedAuthProvider, useOptimizedAuth } from "../useOptimizedAuth";
 
 function TestHarness() {
-  const { login, logout } = useOptimizedAuth();
+  const { login, logout, requestPasswordReset } = useOptimizedAuth();
 
   return (
     <div>
       <button onClick={() => void login("User@Example.com", "password-1")}>login</button>
       <button onClick={() => void logout()}>logout</button>
+      <button onClick={() => { void requestPasswordReset("User@Example.com").catch((): void => {}); }}>password-reset</button>
     </div>
   );
 }
@@ -163,6 +164,56 @@ describe("useOptimizedAuth audit logging", () => {
           error_code: "invalid_credentials",
         },
       );
+    });
+  });
+
+  it("logs login exceptions", async () => {
+    (mockSupabase.auth as unknown as { signInWithPassword: ReturnType<typeof vi.fn> }).signInWithPassword.mockRejectedValue(
+      new Error("Network failure"),
+    );
+
+    renderAuthProvider(<TestHarness />);
+    fireEvent.click(screen.getByText("login"));
+
+    await waitFor(() => {
+      expect(logAuthEventMock).toHaveBeenCalledWith(
+        null,
+        "login",
+        false,
+        { error_code: "login_exception" },
+      );
+    });
+  });
+
+  it("logs successful password-reset requests without exposing the email", async () => {
+    mockSupabase.functions.invoke.mockResolvedValue({ data: { success: true }, error: null });
+
+    renderAuthProvider(<TestHarness />);
+    fireEvent.click(screen.getByText("password-reset"));
+
+    await waitFor(() => {
+      expect(logSecurityEventMock).toHaveBeenCalledWith({
+        action: "password_reset_request",
+        resource: "authentication",
+        severity: "low",
+        metadata: { success: true },
+      });
+    });
+  });
+
+  it("logs rejected password-reset requests", async () => {
+    mockSupabase.functions.invoke.mockResolvedValue({ data: null, error: new Error("Function unavailable") });
+
+    renderAuthProvider(<TestHarness />);
+    fireEvent.click(screen.getByText("password-reset"));
+
+    await waitFor(() => {
+      expect(logSecurityEventMock).toHaveBeenCalledWith({
+        action: "password_reset_request",
+        resource: "authentication",
+        severity: "high",
+        metadata: { success: false, error_code: "password_reset_request_failed" },
+      });
     });
   });
 

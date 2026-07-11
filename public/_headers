@@ -3,17 +3,18 @@
 
 /*
   Reporting-Endpoints: csp-endpoint="https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/csp-report"
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' https: wss:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; script-src 'self' blob: 'sha256-M0Z37aeFwHhykU2CzcPp2EDURk8D33F85zdgyAV/qU8=' 'sha256-k1ZLiQxuDM/MC7fw2i/q5RD2S81l4el1v6xFRyA+/Ao=' 'sha256-gwvxIV+ZAFnLP5jc2/qNCfsPAfKN92NA0nLhaSpK4IM=' 'sha256-D8OSrRmU7egzgHMSJsT9yfpuNzxvHzYHtJ7T9kdOm8c=' 'sha256-LrzZ6y6Wej8uAFji0APen7LACgYEDbspYEQJbjFnaSA=' 'sha256-Vz0NBRgSyNHUeG5iADzNKO/i+xhYOFAdcbDRtbT6jE8=' 'sha256-GH2pRXhVSjhomr4gOunhvCl16ICs1SMK9YvYX1zlPNA='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; manifest-src 'self'; report-uri https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/csp-report; report-to csp-endpoint
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' https://syldobdcdsgfgjtbuwxm.supabase.co wss://syldobdcdsgfgjtbuwxm.supabase.co https://api.mapbox.com https://api.open-meteo.com https://sectorpro.flexrentalsolutions.com https://waha.sector-pro.work https://waha2.sector-pro.work https://waha3.sector-pro.work https://waha4.sector-pro.work https://waha5.sector-pro.work https://waha6.sector-pro.work ws://localhost:3001; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; script-src 'self' blob: 'sha256-M0Z37aeFwHhykU2CzcPp2EDURk8D33F85zdgyAV/qU8=' 'sha256-k1ZLiQxuDM/MC7fw2i/q5RD2S81l4el1v6xFRyA+/Ao=' 'sha256-gwvxIV+ZAFnLP5jc2/qNCfsPAfKN92NA0nLhaSpK4IM=' 'sha256-D8OSrRmU7egzgHMSJsT9yfpuNzxvHzYHtJ7T9kdOm8c=' 'sha256-LrzZ6y6Wej8uAFji0APen7LACgYEDbspYEQJbjFnaSA=' 'sha256-Vz0NBRgSyNHUeG5iADzNKO/i+xhYOFAdcbDRtbT6jE8=' 'sha256-GH2pRXhVSjhomr4gOunhvCl16ICs1SMK9YvYX1zlPNA='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; manifest-src 'self'; report-uri https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/csp-report; report-to csp-endpoint
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), fullscreen=(self), payment=()
 
-# The LG webOS wallboard launcher embeds the public wallboard URL in an iframe.
-# Keep X-Frame-Options locked down globally, but detach it for this read-only
-# tokenized signage route so already-installed TV launchers can load it.
+# The LG webOS wallboard launcher embeds this read-only, tokenized route. The
+# path-specific CSP replaces the global frame-ancestors 'none'; all other CSP
+# restrictions and X-Frame-Options remain unchanged for the rest of the app.
 /wallboard/public/*
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors *; form-action 'self'; connect-src 'self' https://syldobdcdsgfgjtbuwxm.supabase.co wss://syldobdcdsgfgjtbuwxm.supabase.co https://api.mapbox.com https://api.open-meteo.com https://sectorpro.flexrentalsolutions.com https://waha.sector-pro.work https://waha2.sector-pro.work https://waha3.sector-pro.work https://waha4.sector-pro.work https://waha5.sector-pro.work https://waha6.sector-pro.work ws://localhost:3001; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; script-src 'self' blob: 'sha256-M0Z37aeFwHhykU2CzcPp2EDURk8D33F85zdgyAV/qU8=' 'sha256-k1ZLiQxuDM/MC7fw2i/q5RD2S81l4el1v6xFRyA+/Ao=' 'sha256-gwvxIV+ZAFnLP5jc2/qNCfsPAfKN92NA0nLhaSpK4IM=' 'sha256-D8OSrRmU7egzgHMSJsT9yfpuNzxvHzYHtJ7T9kdOm8c=' 'sha256-LrzZ6y6Wej8uAFji0APen7LACgYEDbspYEQJbjFnaSA=' 'sha256-Vz0NBRgSyNHUeG5iADzNKO/i+xhYOFAdcbDRtbT6jE8=' 'sha256-GH2pRXhVSjhomr4gOunhvCl16ICs1SMK9YvYX1zlPNA='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; manifest-src 'self'; report-uri https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/csp-report; report-to csp-endpoint
   ! X-Frame-Options
 
 # Prevent service worker caching to ensure users always get the latest version

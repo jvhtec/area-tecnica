@@ -372,7 +372,7 @@ export async function getTechnicianConflicts(
     const unavailabilityConflicts = unavailabilityData?.map(availability => ({
       type: 'unavailable' as const,
       date: String(availability.date),
-      reason: availability.source === 'vacation' ? 'Vacation' : 'Unavailable',
+      reason: availability.source === 'vacation' ? 'Vacaciones' : 'No disponible',
       notes: typeof availability.notes === 'string' ? availability.notes : null,
     })) || [];
 

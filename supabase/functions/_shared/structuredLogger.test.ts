@@ -19,4 +19,12 @@ describe("structuredLogger", () => {
   it("bounds untrusted strings", () => {
     expect(String(redactLogFields({ detail: "x".repeat(800) }).detail)).toHaveLength(500);
   });
+
+  it("redacts common credential aliases in URL query strings", () => {
+    expect(redactLogFields({
+      detail: "https://example.test/callback?access_token=a&api_key=b&password=c&refresh_token=d&client_secret=e&auth=f&session=g",
+    }).detail).toBe(
+      "https://example.test/callback?access_token=[REDACTED]&api_key=[REDACTED]&password=[REDACTED]&refresh_token=[REDACTED]&client_secret=[REDACTED]&auth=[REDACTED]&session=[REDACTED]",
+    );
+  });
 });

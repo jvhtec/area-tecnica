@@ -29,7 +29,16 @@ group, retention period, and written approval in the operational register.
 
 1. Minimize the export to the fields and rows required for the task.
 2. Remove names, emails, phone numbers, addresses, tokens, signed URLs, document
-   bodies, and provider payloads. Use salted hashes when correlation is needed.
+   bodies, and provider payloads. When correlation is required, use an approved
+   keyed HMAC fingerprint rather than a generic salted hash. The HMAC key is a
+   dedicated secret in the linked Supabase project, readable only by the
+   security-audit service role; never export it, include it in source control,
+   or reuse it for authentication. Rotate it at least annually or after a
+   suspected disclosure, record the rotation/change ticket, and delete or
+   re-fingerprint retained correlation records under the applicable retention
+   deadline. The security audit log or related change ticket must identify the
+   approved correlation purpose and key version without storing the identifier
+   or the key material.
 3. Record the operator, purpose, source query/hash, approved destination,
    classification, creation time, and deletion deadline in the security audit
    log or the related change ticket. Never record credentials in that entry.
