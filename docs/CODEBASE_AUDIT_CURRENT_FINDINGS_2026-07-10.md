@@ -59,17 +59,22 @@ or hosted-dashboard cron jobs.
 
 | Finding | Branch status | Validation |
 | --- | --- | --- |
-| CUR-01 | Implemented on `codex/consolidate-current-audit` | Availability and conflict date keys now use the job timezone; covered by Madrid/DST/non-Madrid range tests and assignment critical-path tests. |
-| CUR-02 | Implemented on `codex/consolidate-current-audit` | Timesheet auto-creation now uses the shared timezone-aware inclusive date range; timesheet critical-path tests pass. |
-| CUR-05 | Implemented on `codex/consolidate-current-audit` | Bounded ingestion, verified identity, durable rate limits, a separate 30-day anonymous auth-event table, and spoofing/rate/size tests. Database migration/deployment remains pending. |
-| CUR-06 | Implemented on `codex/consolidate-current-audit` | The unreferenced arbitrary-URL proxy now fails closed with HTTP 410 and performs no outbound fetch. |
-| CUR-07 | Implemented on `codex/consolidate-current-audit` | Server allowlist sanitization, approved inline-image origins, a 500KB HTML cap, malicious fixtures, and content-hash-only new audit rows. Database migration/deployment remains pending. |
-| CUR-08 | Partially implemented on `codex/consolidate-current-audit` | Removed direct email, uploaded URL, WAHA URL, web-push endpoint, and APNs token logging; push results use opaque fingerprints; shared client and Edge redactors now have fixtures. Migrating every legacy console call remains a separately reviewable follow-up. |
-| CUR-09 | Implemented on `codex/consolidate-current-audit` | The privacy notice and storage policy now describe the actual providers, purposes, legal bases, transfers, deletion/retention process, safeguards, and escalation path. Final controller identity wording still requires the data owner's legal approval. |
-| CUR-10 | Implemented on `codex/consolidate-current-audit` | Cross-platform Node/Vite launcher, serialized workers, and one local retry; all 20 Chromium E2E tests pass from PowerShell without a prestarted server. |
-| CUR-11 | In progress on `codex/consolidate-current-audit` | `rules-of-hooks` is now an error and a 1,901-warning rule/file baseline fails every new warning while allowing reductions. Existing hook/type warning debt and strict-mode rollout remain. |
-| CUR-14 | Implemented on `codex/consolidate-current-audit` | Cloudflare now enforces CSP without `unsafe-eval` or script `unsafe-inline`; seven legacy inline scripts are SHA-256 allowlisted and a governance gate detects policy drift. Preview-header verification remains part of PR validation. |
-| CUR-15 | Implemented on `codex/consolidate-current-audit` | Flex work-order dates, matrix period boundaries, morning summary, festival proximity, and the unreachable assignment-date branch are fixed; boundary utility tests pass. |
+| CUR-01 | Released in #834 | Availability and conflict date keys now use the job timezone; covered by Madrid/DST/non-Madrid range tests and assignment critical-path tests. |
+| CUR-02 | Released in #834 | Timesheet auto-creation now uses the shared timezone-aware inclusive date range; timesheet critical-path tests pass. |
+| CUR-05 | Released and deployed in #834 | Bounded ingestion, verified identity, durable rate limits, a separate 30-day anonymous auth-event table, and spoofing/rate/size tests; the migration and `security-audit` function are active in production. |
+| CUR-06 | Released and deployed in #834 | The unreferenced arbitrary-URL proxy fails closed with HTTP 410 and performs no outbound fetch. |
+| CUR-07 | Released and deployed in #834 | Server allowlist sanitization, approved inline-image origins, a 500KB HTML cap, malicious fixtures, and content-hash-only new audit rows; the migration and email functions are active in production. |
+| CUR-08 | Partially released in #834 | Removed direct email, uploaded URL, WAHA URL, web-push endpoint, and APNs token logging; push results use opaque fingerprints; shared client and Edge redactors have fixtures. Migrating every legacy console call remains a separately reviewable follow-up. |
+| CUR-09 | Partially released in #834 | The privacy notice and storage policy cover providers, purposes, legal bases, transfers, deletion/retention, safeguards, and escalation. Final controller identity and operational deletion workflow still require data-owner/legal approval. |
+| CUR-10 | Released in #834 | Cross-platform Node/Vite launcher, serialized workers, and one local retry; Chromium E2E passes on PowerShell and Linux CI. |
+| CUR-11 | In progress | `rules-of-hooks` is an error and the warning baseline blocks regressions; existing hook/type warning debt and strict-mode rollout remain. |
+| CUR-12 | Released in #835 | Critical-module coverage thresholds are part of `test:critical`; focused security/assignment coverage now blocks regressions. |
+| CUR-14 | Released and production-verified in #834 | Cloudflare enforces CSP without `unsafe-eval` or script `unsafe-inline`; all configured path-specific policies are governed and the production header was verified. |
+| CUR-15 | Released in #834 | Flex work-order dates, matrix period boundaries, morning summary, festival proximity, and the unreachable assignment-date branch are fixed; boundary utility tests pass. |
+| CUR-17 | Partially released in #835 | Seven verified-unreferenced legacy modules were removed; externally configured schedules/functions still require owner inventory. |
+| CUR-20 | Partially released in #835 | Axe and keyboard smoke checks now cover public sign-in and technician mobile flows; high-traffic responsive and manual UX debt remains. |
+| CUR-21 | Released in #835 | Architecture documentation now avoids volatile static inventories and points to verification commands. |
+| CUR-22 | Released in #835 | Dependency exceptions now require an owner and non-expired review date; production high/critical advisories fail the gate. |
 
 ## Action register
 
