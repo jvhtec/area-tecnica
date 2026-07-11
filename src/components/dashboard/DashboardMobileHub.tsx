@@ -70,7 +70,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   onEmailClick,
 }) => {
   const isMobile = useIsMobile();
-  const selectedDate = date ?? new Date();
+  const selectedDate = useMemo(() => date ?? new Date(), [date]);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);

@@ -71,8 +71,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   const isPrintableJobType = (value: string | undefined): value is PrintableJobType =>
     Boolean(value && value in printSettings.jobTypes);
 
-  const currentMonth = date || new Date();
-  const currentMonthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
+  const currentMonth = useMemo(() => date ?? new Date(), [date]);
 
   const allDays = useMemo(() => {
     const firstDayOfMonth = startOfMonth(currentMonth);
@@ -95,7 +94,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     });
 
     return [...prefixDays, ...daysInMonth, ...suffixDays];
-  }, [currentMonthKey]);
+  }, [currentMonth]);
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
   const distinctJobStatuses = jobs ? Array.from(new Set(jobs.map((job) => job.status).filter(Boolean))) : [];
 
