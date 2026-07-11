@@ -31,7 +31,7 @@ const Privacy = () => {
               Responsable y contacto
             </h2>
             <p className="text-slate-600 dark:text-slate-300">
-              El responsable del tratamiento es la entidad de Sector Pro identificada en tu relación contractual o documentación de pago. Para ejercer tus derechos o consultar cualquier tratamiento, escribe a info@sector-pro.com.
+              El responsable del tratamiento es Production Sector S.L., CIF B86964673, con domicilio en Calle Puerto Rico, 6, Griñón, 28971, Madrid. Para ejercer tus derechos o consultar cualquier tratamiento, escribe a info@sector-pro.com.
             </p>
           </section>
 

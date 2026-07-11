@@ -569,7 +569,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                         <div className="p-2 bg-red-500/10 rounded-lg text-red-400"><UserX size={18} /></div>
                         <div>
                             <div className="font-bold text-sm text-red-500">Eliminar mi cuenta</div>
-                            <div className={`text-xs ${theme.textMuted}`}>Solicita la eliminación permanente de tus datos</div>
+                            <div className={`text-xs ${theme.textMuted}`}>Solicita la revisión, eliminación o anonimización de tus datos</div>
                         </div>
                     </div>
                     <ExternalLink size={18} className="text-red-400" />

@@ -126,7 +126,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
     jobId: jobId || '',
     jobStartTime: jobMeta?.start_time || job?.start_time || '',
     jobEndTime: jobMeta?.end_time || job?.end_time || '',
-    jobTimezone: jobMeta?.timezone || job?.timezone,
+    jobTimezone: jobMeta?.timezone || job?.timezone || undefined,
     assignmentDate: singleDay && selectedJobDate ? format(selectedJobDate, 'yyyy-MM-dd') : null,
     enabled: open && !!jobId,
   });
