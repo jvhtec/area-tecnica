@@ -274,12 +274,13 @@ const Auth = () => {
 
               {/* Email input */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">
+                <label htmlFor="auth-email" className="text-sm font-medium text-slate-300">
                   Email
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                   <input
+                    id="auth-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -292,12 +293,13 @@ const Auth = () => {
 
               {/* Password input */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">
+                <label htmlFor="auth-password" className="text-sm font-medium text-slate-300">
                   Contraseña
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                   <input
+                    id="auth-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
