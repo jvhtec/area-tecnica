@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Area Tecnica (Sector Pro)
 
-> **Last updated**: 2026-05-16
+> **Last updated**: 2026-07-11
 > **Repository**: github.com/jvhtec/area-tecnica
 > **Team**: Sector Pro Engineering
 > **Platform**: sector-pro.work
@@ -86,10 +86,10 @@ area-tecnica/
 ├── supabase/                         # Supabase backend
 │   ├── config.toml                   # Local Supabase config
 │   ├── seed.sql                      # Database seed data
-│   ├── migrations/                   # 98 SQL migration files
+│   ├── migrations/                   # Ordered SQL migrations (count changes frequently)
 │   │   ├── 00000000000000_production_schema.sql  # Initial schema (10,500 lines)
-│   │   └── 20260305120000_*.sql      # Latest migration
-│   └── functions/                    # 61 Edge Functions (Deno/TypeScript)
+│   │   └── <timestamp>_*.sql         # Verify the latest file before release
+│   └── functions/                    # Edge Functions (Deno/TypeScript; count changes frequently)
 │       ├── push/                     # Push notification service and broadcast event families
 │       ├── send-*-email/             # Email services (11 functions)
 │       ├── create-flex-folders/      # Flex ERP integration
@@ -442,9 +442,9 @@ under `src/utils/hoja-de-ruta/pdf/` for route-sheet-specific composition.
 | Attribute | Detail |
 |-----------|--------|
 | **Type** | PostgreSQL (Supabase-hosted) |
-| **Tables** | ~145 tables across `public` and `dreamlit` schemas (as-of 2026-03-18) |
-| **Enums** | ~36 custom enum types (as-of 2026-03-18) |
-| **Migrations** | ~98 migration files (as-of 2026-03-18) |
+| **Tables** | Inspect the generated Supabase types and current schema before making inventory decisions. |
+| **Enums** | Inspect the generated Supabase types and current schema before making inventory decisions. |
+| **Migrations** | Ordered SQL files under `supabase/migrations/`; verify the current count and latest timestamp before release. |
 | **RLS** | Enabled on all tables with role-based policies |
 | **Functions** | `compute_timesheet_hours()`, `check_technician_conflicts()`, and others |
 
@@ -818,9 +818,9 @@ npm run dev
 
 | Framework | Purpose | Config |
 |-----------|---------|--------|
-| **Vitest 2.1** | Unit & component tests | `vitest.config.ts` |
+| **Vitest 3.2** | Unit & component tests | `vitest.config.ts` |
 | **Testing Library** | React component testing | `@testing-library/react` + `jest-dom` |
-| **Playwright 1.58** | End-to-end tests | `playwright.config.ts` (Chromium) |
+| **Playwright 1.61** | End-to-end tests | `playwright.config.ts` (Chromium) |
 | **jsdom 27** | DOM simulation | Configured via Vitest `environmentMatchGlobs` |
 
 ### 8.3 Test Commands
@@ -977,11 +977,11 @@ Based on the [Tech Debt Audit (2026-02-01)](/.claude/notes/2026-02-01-tech-debt-
 | **Primary Contact** | Sector Pro Engineering Team |
 | **Stack** | React 18 + TypeScript, Vite 6, Supabase, Tailwind CSS + shadcn/ui |
 | **License** | Private |
-| **Last Updated** | 2026-03-18 |
-| **Database Tables** | ~145 (as-of 2026-03-18) |
-| **Edge Functions** | ~61 (as-of 2026-03-18) |
-| **Custom Hooks** | 100+ (as-of 2026-03-18) |
-| **Page Components** | ~42 (as-of 2026-03-18) |
-| **Dependencies** | ~139 npm packages (as-of 2026-03-18) |
-| **Migrations** | ~98 SQL files (as-of 2026-03-18) |
-| **Documentation** | 60+ markdown files (as-of 2026-03-18) |
+| **Last Updated** | 2026-07-11 |
+| **Database Tables** | Verify against generated types/current schema before decisions. |
+| **Edge Functions** | Verify with `Get-ChildItem supabase/functions -Directory` before decisions. |
+| **Custom Hooks** | Verify with `rg --files src/hooks` before decisions. |
+| **Page Components** | Verify with `rg --files src/pages` before decisions. |
+| **Dependencies** | Verify from `package.json`/`package-lock.json` before decisions. |
+| **Migrations** | Verify with `Get-ChildItem supabase/migrations -Filter *.sql` before release. |
+| **Documentation** | Search `docs/` directly; its index is intentionally curated. |

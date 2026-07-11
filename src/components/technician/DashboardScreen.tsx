@@ -102,7 +102,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
 
     return (
         <div className="space-y-6 animate-in fade-in">
-            <div className="flex justify-between items-center">
+            <header className="flex justify-between items-center">
                 <div>
                     <h1 className={`text-2xl font-bold ${theme.textMain}`}>Panel</h1>
                     <p className={`text-xs ${theme.textMuted}`}>Bienvenido, {userName}</p>
@@ -115,10 +115,10 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         {userInitials}
                     </AvatarFallback>
                 </Avatar>
-            </div>
+            </header>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-2">
+            <section className="grid grid-cols-3 gap-2" aria-label="Resumen de trabajo">
                 <div className={`p-2 rounded-xl border ${theme.card}`}>
                     <div className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1`}>Próximo turno</div>
                     <div className={`text-lg font-bold ${theme.textMain}`}>{nextShift}</div>
@@ -132,11 +132,11 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                     <div className="text-[10px] font-bold uppercase text-blue-400 mb-1">Tours</div>
                     <div className="text-lg font-bold text-blue-400">{activeTours.length}</div>
                 </div>
-            </div>
+            </section>
 
             {/* Quick Tools */}
-            <div>
-                <h2 className={`text-xs font-bold uppercase ${theme.textMuted} mb-3`}>Herramientas</h2>
+            <section aria-labelledby="tech-tools-heading">
+                <h2 id="tech-tools-heading" className={`text-xs font-bold uppercase ${theme.textMuted} mb-3`}>Herramientas</h2>
                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                     {hasSoundVisionAccess && (
                         <button
@@ -175,13 +175,13 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         </button>
                     )}
                 </div>
-            </div>
+            </section>
 
             {/* My Tours Section */}
             {activeTours.length > 0 && (
-                <div>
+                <section aria-labelledby="my-tours-heading">
                     <div className="flex justify-between items-center mb-3">
-                        <h2 className={`text-sm font-bold uppercase tracking-wider ${theme.textMuted}`}>Mis giras</h2>
+                        <h2 id="my-tours-heading" className={`text-sm font-bold uppercase tracking-wider ${theme.textMuted}`}>Mis giras</h2>
                         <Badge variant="outline">{activeTours.length}</Badge>
                     </div>
                     <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 -mx-2 px-2">
@@ -196,17 +196,17 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
             )}
 
             {/* Pending Expenses Summary */}
             <PendingExpensesSummary />
 
             {/* Today's Assignment */}
-            <div>
+            <section aria-labelledby="today-assignment-heading">
                 <div className="flex justify-between items-center mb-3">
-                    <h2 className={`text-sm font-bold uppercase tracking-wider ${theme.textMuted}`}>Asignación de hoy</h2>
-                    <span className="text-[10px] text-blue-500 font-bold">{format(new Date(), 'dd MMM', { locale: es })}</span>
+                    <h2 id="today-assignment-heading" className={`text-sm font-bold uppercase tracking-wider ${theme.textMuted}`}>Asignación de hoy</h2>
+                    <span className={`text-[10px] font-bold ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>{format(new Date(), 'dd MMM', { locale: es })}</span>
                 </div>
                 {isLoading ? (
                     <div className={`p-8 rounded-xl border ${theme.card} flex items-center justify-center`}>
@@ -228,7 +228,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         <p className={`text-sm ${theme.textMuted}`}>Sin asignaciones para hoy</p>
                     </div>
                 )}
-            </div>
+            </section>
         </div>
     );
 };

@@ -232,10 +232,10 @@ const Auth = () => {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <main className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div className="w-full max-w-md">
           {/* Logo and branding */}
-          <div className="text-center mb-8">
+          <header className="text-center mb-8">
             <img
               src={BRAND_CONFIG.logo}
               alt={BRAND_CONFIG.name}
@@ -253,7 +253,7 @@ const Auth = () => {
             <p className="text-slate-400 text-sm">
               {BRAND_CONFIG.tagline}
             </p>
-          </div>
+          </header>
 
           {/* Glass panel */}
           <div
@@ -274,12 +274,13 @@ const Auth = () => {
 
               {/* Email input */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">
+                <label htmlFor="auth-email" className="text-sm font-medium text-slate-300">
                   Email
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                   <input
+                    id="auth-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -292,12 +293,13 @@ const Auth = () => {
 
               {/* Password input */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">
+                <label htmlFor="auth-password" className="text-sm font-medium text-slate-300">
                   Contraseña
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                   <input
+                    id="auth-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -404,7 +406,7 @@ const Auth = () => {
           </div>
 
           {/* Footer */}
-          <div className="text-center text-slate-500 text-xs mt-6 space-y-2">
+          <footer className="text-center text-slate-500 text-xs mt-6 space-y-2">
             <a
               href="/privacy"
               target="_blank"
@@ -416,9 +418,9 @@ const Auth = () => {
             <p>
               © {new Date().getFullYear()} {BRAND_CONFIG.name}. Todos los derechos reservados.
             </p>
-          </div>
+          </footer>
         </div>
-      </div>
+      </main>
 
       {/* Transition overlay */}
       {isTransitioning && (
