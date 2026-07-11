@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { StockEntry, Equipment, getCategoriesForDepartment, allCategoryLabels, AllCategories, EquipmentCategory } from '@/types/equipment';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { StockEntry, Equipment, getCategoriesForDepartment, allCategoryLabels, AllCategories, EquipmentCategory, Department } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -71,14 +71,13 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
   const [showAdvFlexSection, setShowAdvFlexSection] = useState(false);
   const [isFetchingAdvFlex, setIsFetchingAdvFlex] = useState(false);
 
-  const categories = getCategoriesForDepartment(department as any);
-
+  const categories = useMemo(() => getCategoriesForDepartment(department as Department), [department]);
   // Initialize default category
   useEffect(() => {
     if (categories.length > 0 && !newCategory) {
       setNewCategory(categories[0]);
     }
-  }, [categories]);
+  }, [categories, newCategory]);
 
   // Flex integration helpers
   const extractUuidFromUrl = (url: string): string | null => {
@@ -220,35 +219,36 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
   });
 
   // Combine equipment with stock quantities
-  const equipmentWithStock: EquipmentWithStock[] = equipmentList.map(equipment => {
+  const equipmentWithStock = useMemo<EquipmentWithStock[]>(() => equipmentList.map(equipment => {
     const stockLevel = currentStockLevels.find(s => s.equipment_id === equipment.id);
     return {
       ...equipment,
-      quantity: stockLevel?.current_quantity || 0
+      quantity: stockLevel?.current_quantity || 0,
     };
-  });
+  }), [currentStockLevels, equipmentList]);
 
   // Filter by search
-  const filteredEquipment = equipmentWithStock.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredEquipment = useMemo(
+    () => equipmentWithStock.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [equipmentWithStock, searchQuery],
   );
 
   // Group by category
-  const groupedEquipment: GroupedEquipment = filteredEquipment.reduce((acc, item) => {
+  const groupedEquipment = useMemo<GroupedEquipment>(() => filteredEquipment.reduce((acc, item) => {
     const category = item.category || 'uncategorized';
     if (!acc[category]) {
       acc[category] = [];
     }
     acc[category].push(item);
     return acc;
-  }, {} as GroupedEquipment);
+  }, {} as GroupedEquipment), [filteredEquipment]);
 
   // Auto-expand categories with search matches
   useEffect(() => {
     if (searchQuery) {
       setExpandedCategories(new Set(Object.keys(groupedEquipment)));
     }
-  }, [searchQuery]);
+  }, [groupedEquipment, searchQuery]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => {
