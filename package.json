@@ -17,7 +17,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:critical": "vitest run src/components/ProtectedRoute.test.tsx src/pages/__tests__/ProjectManagement.test.tsx src/pages/__tests__/EquipmentManagement.test.tsx src/components/matrix/__tests__/AssignJobDialog.test.tsx src/components/jobs/__tests__/JobPayoutTotalsPanel.autonomo.test.tsx src/components/jobs/__tests__/JobPayoutTotalsPanel.tourdate.test.tsx src/services/taskCompletion.test.ts src/services/deleteJobAssignments.test.ts src/services/jobDeletionService.test.ts src/utils/__tests__/micListTransform.test.ts tests/assignments/critical-paths.test.ts tests/timesheets/critical-paths.test.ts src/routes/__tests__/AuthenticatedShell.test.tsx src/pages/__tests__/TechnicianSuperApp.test.tsx src/pages/__tests__/TechnicianUnavailability.test.tsx src/lib/__tests__/vacation-requests.test.ts src/pages/__tests__/TourManagement.test.tsx src/pages/__tests__/Settings.test.tsx src/hooks/__tests__/useIncidentReports.test.tsx src/pages/__tests__/SoundVisionFiles.test.tsx supabase/functions/staffing-orchestrator/__tests__/policyUtils.test.ts supabase/functions/staffing-orchestrator/__tests__/orchestrationUtils.test.ts",
+    "test:critical": "vitest run src/components/ProtectedRoute.test.tsx src/pages/__tests__/ProjectManagement.test.tsx src/pages/__tests__/EquipmentManagement.test.tsx src/components/matrix/__tests__/AssignJobDialog.test.tsx src/components/jobs/__tests__/JobPayoutTotalsPanel.autonomo.test.tsx src/components/jobs/__tests__/JobPayoutTotalsPanel.tourdate.test.tsx src/services/taskCompletion.test.ts src/services/deleteJobAssignments.test.ts src/services/jobDeletionService.test.ts src/utils/__tests__/micListTransform.test.ts tests/assignments/critical-paths.test.ts tests/timesheets/critical-paths.test.ts src/routes/__tests__/AuthenticatedShell.test.tsx src/pages/__tests__/TechnicianSuperApp.test.tsx src/pages/__tests__/TechnicianUnavailability.test.tsx src/lib/__tests__/vacation-requests.test.ts src/pages/__tests__/TourManagement.test.tsx src/pages/__tests__/Settings.test.tsx src/hooks/__tests__/useIncidentReports.test.tsx src/pages/__tests__/SoundVisionFiles.test.tsx supabase/functions/staffing-orchestrator/__tests__/policyUtils.test.ts supabase/functions/staffing-orchestrator/__tests__/orchestrationUtils.test.ts && npm run test:critical:coverage",
+    "test:critical:coverage": "vitest run --coverage src/services/deleteJobAssignments.test.ts src/services/jobDeletionService.test.ts supabase/functions/staffing-orchestrator/__tests__/policyUtils.test.ts supabase/functions/_shared/flexFetch.test.ts supabase/functions/_shared/whatsappQuota.test.ts",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:mobile": "playwright test --project=mobile-chromium",
     "perf:baseline": "node scripts/performance/collect-phase4-baseline.mjs",
@@ -131,6 +132,7 @@
     "zustand": "^5.0.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.9.0",
     "@playwright/test": "^1.58.2",

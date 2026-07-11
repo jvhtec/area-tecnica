@@ -522,7 +522,7 @@ export default function TechnicianSuperApp() {
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
 
       {/* Content */}
-      <div className={`flex-1 overflow-y-auto ${t.bg} px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+1.5rem))] pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
+      <main className={`flex-1 overflow-y-auto ${t.bg} px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+1.5rem))] pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
         {tab === 'dashboard' && (
           <DashboardScreen
             theme={t}
@@ -564,7 +564,7 @@ export default function TechnicianSuperApp() {
             toggleTheme={toggleTheme}
           />
         )}
-      </div>
+      </main>
 
       {/* Navigation */}
       <div className={`min-h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-safe-3`}>
@@ -577,7 +577,7 @@ export default function TechnicianSuperApp() {
           <button
             key={item.id}
             onClick={() => setTab(item.id)}
-            className={`flex flex-col items-center justify-center gap-1 ${tab === item.id ? 'text-blue-500' : isDark ? 'text-gray-500' : 'text-slate-400'
+            className={`flex flex-col items-center justify-center gap-1 ${tab === item.id ? (isDark ? 'text-blue-400' : 'text-blue-700') : isDark ? 'text-gray-500' : 'text-slate-600'
               }`}
           >
             <item.icon size={22} strokeWidth={tab === item.id ? 2.5 : 2} />

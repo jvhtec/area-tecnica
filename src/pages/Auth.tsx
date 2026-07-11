@@ -232,10 +232,10 @@ const Auth = () => {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <main className="relative z-10 min-h-screen flex items-center justify-center px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div className="w-full max-w-md">
           {/* Logo and branding */}
-          <div className="text-center mb-8">
+          <header className="text-center mb-8">
             <img
               src={BRAND_CONFIG.logo}
               alt={BRAND_CONFIG.name}
@@ -253,7 +253,7 @@ const Auth = () => {
             <p className="text-slate-400 text-sm">
               {BRAND_CONFIG.tagline}
             </p>
-          </div>
+          </header>
 
           {/* Glass panel */}
           <div
@@ -404,7 +404,7 @@ const Auth = () => {
           </div>
 
           {/* Footer */}
-          <div className="text-center text-slate-500 text-xs mt-6 space-y-2">
+          <footer className="text-center text-slate-500 text-xs mt-6 space-y-2">
             <a
               href="/privacy"
               target="_blank"
@@ -416,9 +416,9 @@ const Auth = () => {
             <p>
               © {new Date().getFullYear()} {BRAND_CONFIG.name}. Todos los derechos reservados.
             </p>
-          </div>
+          </footer>
         </div>
-      </div>
+      </main>
 
       {/* Transition overlay */}
       {isTransitioning && (

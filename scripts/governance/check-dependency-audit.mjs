@@ -23,9 +23,9 @@ function toPosix(path) {
   return path.split("\\").join("/");
 }
 
-function runAudit() {
+function runAudit(args = []) {
   const isWindows = process.platform === "win32";
-  const result = spawnSync("npm", ["audit", "--json"], {
+  const result = spawnSync("npm", ["audit", "--json", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
@@ -81,12 +81,13 @@ function collectAuditSnapshot(report) {
   };
 }
 
-function buildBaseline(snapshot) {
+function buildBaseline(snapshot, existingBaseline = {}) {
   return {
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
-    note: "Current npm audit advisories are grandfathered. CI fails on new advisory IDs or increased severity counts.",
+    note: "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities.",
     advisoryIds: snapshot.advisoryIds,
+    exceptions: existingBaseline.exceptions ?? [],
     vulnerabilityCounts: snapshot.vulnerabilityCounts,
     total: snapshot.total,
   };
@@ -126,6 +127,46 @@ function compareToBaseline(snapshot, baseline) {
   };
 }
 
+function validateExceptions(snapshot, baseline) {
+  const exceptions = Array.isArray(baseline.exceptions) ? baseline.exceptions : [];
+  const byAdvisory = new Map();
+  const errors = [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const exception of exceptions) {
+    const advisoryId = String(exception?.advisoryId ?? "");
+    if (!advisoryId || byAdvisory.has(advisoryId)) {
+      errors.push(`duplicate or missing exception advisory ID: ${advisoryId || "(missing)"}`);
+      continue;
+    }
+    byAdvisory.set(advisoryId, exception);
+
+    if (typeof exception.owner !== "string" || !exception.owner.trim()) {
+      errors.push(`advisory ${advisoryId} has no remediation owner`);
+    }
+    if (typeof exception.reviewBy !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(exception.reviewBy)) {
+      errors.push(`advisory ${advisoryId} has an invalid reviewBy date`);
+    } else if (exception.reviewBy < today) {
+      errors.push(`advisory ${advisoryId} review expired on ${exception.reviewBy}`);
+    }
+  }
+
+  for (const advisoryId of snapshot.advisoryIds) {
+    if (!byAdvisory.has(advisoryId)) {
+      errors.push(`known advisory ${advisoryId} has no time-bound exception`);
+    }
+  }
+
+  return errors;
+}
+
+function productionExposureFailures(snapshot) {
+  return ["high", "critical"].flatMap((severity) => {
+    const count = Number(snapshot.vulnerabilityCounts[severity] ?? 0);
+    return count > 0 ? [`production dependency audit has ${count} ${severity} vulnerabilities`] : [];
+  });
+}
+
 function writeSummary(snapshot, failures = { newAdvisoryIds: [], increasedSeverityCounts: [] }) {
   const lines = [
     "## Dependency Audit",
@@ -163,16 +204,25 @@ const snapshot = collectAuditSnapshot(runAudit());
 
 if (shouldWriteBaseline) {
   mkdirSync(dirname(baselinePath), { recursive: true });
-  writeFileSync(baselinePath, `${JSON.stringify(buildBaseline(snapshot), null, 2)}\n`);
+  const existingBaseline = existsSync(baselinePath) ? readBaseline() : {};
+  writeFileSync(baselinePath, `${JSON.stringify(buildBaseline(snapshot, existingBaseline), null, 2)}\n`);
   console.log(`Wrote ${toPosix(relative(repoRoot, baselinePath))}`);
   writeSummary(snapshot);
   process.exit(0);
 }
 
-const failures = compareToBaseline(snapshot, readBaseline());
+const baseline = readBaseline();
+const failures = compareToBaseline(snapshot, baseline);
+const exceptionFailures = validateExceptions(snapshot, baseline);
+const productionSnapshot = collectAuditSnapshot(runAudit(["--omit=dev"]));
+const productionFailures = productionExposureFailures(productionSnapshot);
 writeSummary(snapshot, failures);
 
-if (failures.newAdvisoryIds.length > 0 || failures.increasedSeverityCounts.length > 0) {
+if (exceptionFailures.length > 0 || productionFailures.length > 0) {
+  console.error([...exceptionFailures, ...productionFailures].join("\n"));
+}
+
+if (failures.newAdvisoryIds.length > 0 || failures.increasedSeverityCounts.length > 0 || exceptionFailures.length > 0 || productionFailures.length > 0) {
   console.error("Dependency audit found new or increased security debt.");
   process.exit(1);
 }

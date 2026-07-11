@@ -35,6 +35,20 @@ describe("fetchWithRetry", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
+  it("uses the default sleep implementation between retries", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(503))
+      .mockResolvedValueOnce(jsonResponse(200));
+
+    const res = await fetchWithRetry("https://flex.example/element", {}, {
+      backoffMs: 0,
+      fetchImpl,
+    });
+
+    expect(res.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it("does not retry deterministic 4xx responses", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(404));
 

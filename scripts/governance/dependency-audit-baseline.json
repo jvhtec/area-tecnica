@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "generatedAt": "2026-07-01T21:13:42Z",
-  "note": "Current npm audit advisories are grandfathered. CI fails on new advisory IDs or increased severity counts.",
+  "note": "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities.",
   "advisoryIds": [
     "1112659",
     "1113300",
@@ -20,61 +20,85 @@
     {
       "advisoryId": "1112659",
       "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar. Capacitor asset generation is local/build tooling on controlled project assets, and npm audit reports no compatible fix for @capacitor/assets; remove this exception when that toolchain no longer depends on the vulnerable tar range."
     },
     {
       "advisoryId": "1113300",
       "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar. Capacitor asset generation is local/build tooling on controlled project assets, and npm audit reports no compatible fix for @capacitor/assets; remove this exception when that toolchain no longer depends on the vulnerable tar range."
     },
     {
       "advisoryId": "1113375",
       "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar. Capacitor asset generation is local/build tooling on controlled project assets, and npm audit reports no compatible fix for @capacitor/assets; remove this exception when that toolchain no longer depends on the vulnerable tar range."
     },
     {
       "advisoryId": "1113459",
       "package": "minimatch",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @trapezedev/project -> replace -> minimatch. It is used only by local/build tooling on controlled project inputs; remove this exception when @capacitor/assets or @trapezedev/project publishes a compatible release without the vulnerable minimatch range."
     },
     {
       "advisoryId": "1113538",
       "package": "minimatch",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @trapezedev/project -> replace -> minimatch. It is used only by local/build tooling on controlled project inputs; remove this exception when @capacitor/assets or @trapezedev/project publishes a compatible release without the vulnerable minimatch range."
     },
     {
       "advisoryId": "1113546",
       "package": "minimatch",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @trapezedev/project -> replace -> minimatch. It is used only by local/build tooling on controlled project inputs; remove this exception when @capacitor/assets or @trapezedev/project publishes a compatible release without the vulnerable minimatch range."
     },
     {
       "advisoryId": "1114200",
       "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar. Capacitor asset generation is local/build tooling on controlled project assets, and npm audit reports no compatible fix for @capacitor/assets; remove this exception when that toolchain no longer depends on the vulnerable tar range."
     },
     {
       "advisoryId": "1114302",
       "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar. Capacitor asset generation is local/build tooling on controlled project assets, and npm audit reports no compatible fix for @capacitor/assets; remove this exception when that toolchain no longer depends on the vulnerable tar range."
     },
     {
       "advisoryId": "1114680",
       "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar. Capacitor asset generation is local/build tooling on controlled project assets, and npm audit reports no compatible fix for @capacitor/assets; remove this exception when that toolchain no longer depends on the vulnerable tar range."
     },
     {
       "advisoryId": "1116451",
       "package": "quill",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "The direct editor dependency is quill@2.0.3. ReactQuill and its nested quill@1.3.7 copy have been removed. Corporate email sanitizes editor HTML with DOMPurify before send; remove this exception when Quill publishes a patched 2.x release or a tested downgrade to 2.0.2 is approved."
     },
     {
       "advisoryId": "1119441",
       "package": "uuid",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through both exceljs@4.4.0 -> uuid@8.3.2 and @capacitor/assets 3.0.5 -> @trapezedev/project -> xcode -> uuid@7.0.3. The app does not pass caller-controlled buffers to uuid v3/v5/v6 through these libraries, and npm audit's ExcelJS fix path downgrades to 3.4.0; remove this exception only after both dependency paths resolve to a non-vulnerable uuid range."
     },
     {
       "advisoryId": "1120782",
       "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x. @capacitor/assets is already at its latest release and npm audit reports no fixAvailable path for that nested CLI; remove this exception when @capacitor/assets publishes a compatible release that no longer depends on the vulnerable tar range."
     }
   ],

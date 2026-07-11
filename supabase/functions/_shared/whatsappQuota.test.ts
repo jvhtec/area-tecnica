@@ -82,6 +82,19 @@ describe("checkAndRecordWhatsappQuota", () => {
     expect(result).toEqual({ allowed: false, usedToday: 20, dailyLimit: 20 });
   });
 
+  it("fails open when the RPC returns no usable quota row", async () => {
+    const { client } = makeClient({ data: null });
+
+    const result = await checkAndRecordWhatsappQuota({
+      supabase: client,
+      actorId: "actor-1",
+      kind: "job_message",
+      dailyLimit: 500,
+    });
+
+    expect(result).toEqual({ allowed: true, usedToday: 0, dailyLimit: 500 });
+  });
+
   it("fails open when the RPC errors (e.g. migration not applied yet)", async () => {
     const { client } = makeClient({ error: { message: "function attempt_whatsapp_send does not exist" } });
 
