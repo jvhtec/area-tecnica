@@ -38,7 +38,7 @@ historical schema states and must not be used as current schema inventories.
 | Check | Result on 2026-07-10 | Interpretation |
 | --- | --- | --- |
 | `npm run typecheck` | Pass | Useful, but the app compiles with `strict: false`. |
-| `npm run lint` | Pass with 1,901 warnings | 1,640 `no-explicit-any`, 96 hook dependency, 65 useless escape, 62 React-refresh, and 38 other warnings. |
+| `npm run lint` | Pass with 1,885 warnings | 1,628 `no-explicit-any`, 93 hook dependency, 65 useless escape, 61 React-refresh, and 38 other warnings. |
 | `npm run governance` | Pass | It prevents new debt but intentionally allowlists substantial existing debt. |
 | Source-boundary gate | 200 UI `dataLayerClient` matches | Down from baseline 213; still a large migration queue. |
 | File-size gate | 43 source files over 800 lines | Down from baseline 45. Generated Supabase types are excluded from remediation priority. |
@@ -223,9 +223,9 @@ or hosted-dashboard cron jobs.
 
 - **Severity:** High
 - **Status:** In progress on this branch
-- **Evidence:** 1,901 lint warnings are non-blocking; 96 are
-  `react-hooks/exhaustive-deps`, and `react-hooks/rules-of-hooks` remains a
-  warning. The app uses `strict: false` and `strictNullChecks: false`.
+- **Evidence:** 1,885 lint warnings are non-blocking; 93 are
+  `react-hooks/exhaustive-deps`; `react-hooks/rules-of-hooks` is configured as
+  an error. The app uses `strict: false` and `strictNullChecks: false`.
 - **Action:** Check in warning counts by rule/file, fail new warnings, eliminate
   hook warnings first, then ratchet `any` debt. Introduce strict subprojects in
   this order: unknown catches, null checks, indexed access, full strict.

@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { FileText, Loader2, Trash2, Upload, Eye, X } from "lucide-react";
@@ -31,7 +31,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
   const [viewingFile, setViewingFile] = useState<any>(null);
   const [viewFileUrl, setViewFileUrl] = useState<string>("");
 
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     try {
       const { data, error } = await dataLayerClient.from("festival_artist_files")
         .select("*")
@@ -56,13 +56,13 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
         variant: "destructive",
       });
     }
-  };
+  }, [artistId, toast]);
 
   useEffect(() => {
     if (open && artistId) {
       fetchFiles();
     }
-  }, [open, artistId]);
+  }, [open, artistId, fetchFiles]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
