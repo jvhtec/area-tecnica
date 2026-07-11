@@ -22,6 +22,7 @@ export interface JobScheduleLike {
   job_date_types?: JobDateTypeLike[] | null;
   start_time?: DateValue;
   end_time?: DateValue;
+  timezone?: string | null;
   tour_date?: TourDateLike | TourDateLike[] | null;
 }
 
@@ -38,17 +39,20 @@ export interface ResolveAssignmentWorkDateOptions {
   scheduledDateKeys?: Iterable<DateValue> | null;
 }
 
-const MADRID_TIME_ZONE = "Europe/Madrid";
+export const DEFAULT_JOB_TIME_ZONE = "Europe/Madrid";
 const DATE_KEY_PATTERN = /^(\d{4}-\d{2}-\d{2})$/;
 const TIME_ZONE_PATTERN = /(Z|[+-]\d{2}:?\d{2})$/;
 
 /** Normalizes date-like values to the Madrid calendar date key used by job scheduling. */
-export function normalizeDateKey(value: DateValue): string | null {
+export function normalizeDateKey(
+  value: DateValue,
+  timeZone: string = DEFAULT_JOB_TIME_ZONE,
+): string | null {
   if (!value) return null;
 
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
-    return formatInTimeZone(value, MADRID_TIME_ZONE, "yyyy-MM-dd");
+    return formatInTimeZone(value, timeZone, "yyyy-MM-dd");
   }
 
   const trimmed = String(value).trim();
@@ -61,10 +65,10 @@ export function normalizeDateKey(value: DateValue): string | null {
 
   const parsed = TIME_ZONE_PATTERN.test(trimmed)
     ? parseISO(trimmed)
-    : fromZonedTime(trimmed, MADRID_TIME_ZONE);
+    : fromZonedTime(trimmed, timeZone);
   if (!isValid(parsed)) return null;
 
-  return formatInTimeZone(parsed, MADRID_TIME_ZONE, "yyyy-MM-dd");
+  return formatInTimeZone(parsed, timeZone, "yyyy-MM-dd");
 }
 
 /** Deduplicates and sorts date-like values after normalizing them to date keys. */
@@ -99,6 +103,19 @@ function buildDateRange(startKey: string, endKey: string): string[] {
   return dates;
 }
 
+/** Builds an inclusive range of calendar keys in the job's configured timezone. */
+export function getDateKeyRange(
+  start: DateValue,
+  end: DateValue,
+  timeZone: string = DEFAULT_JOB_TIME_ZONE,
+): string[] {
+  const startKey = normalizeDateKey(start, timeZone);
+  if (!startKey) return [];
+
+  const endKey = normalizeDateKey(end, timeZone) ?? startKey;
+  return buildDateRange(startKey, endKey);
+}
+
 function normalizeTourDateRows(tourDate: JobScheduleLike["tour_date"]): TourDateLike[] {
   if (!tourDate) return [];
   return (Array.isArray(tourDate) ? tourDate : [tourDate]).filter(Boolean);
@@ -125,6 +142,8 @@ function getTourDateWorkDateKeys(tourDate: JobScheduleLike["tour_date"]): string
 export function getScheduledWorkDateKeys(job: JobScheduleLike | null | undefined): string[] {
   if (!job) return [];
 
+  const timeZone = job.timezone || DEFAULT_JOB_TIME_ZONE;
+
   const dateTypeRows = Array.isArray(job.job_date_types) ? job.job_date_types : [];
   const typedRowsWithDates = dateTypeRows.filter((row) => Boolean(normalizeDateKey(row?.date)));
   const tourDateWorkDates = getTourDateWorkDateKeys(job.tour_date);
@@ -150,11 +169,7 @@ export function getScheduledWorkDateKeys(job: JobScheduleLike | null | undefined
     return tourDateWorkDates;
   }
 
-  const startKey = normalizeDateKey(job.start_time);
-  if (!startKey) return [];
-
-  const endKey = normalizeDateKey(job.end_time) ?? startKey;
-  return buildDateRange(startKey, endKey);
+  return getDateKeyRange(job.start_time, job.end_time, timeZone);
 }
 
 /** Resolves the exact work dates that should be displayed for a personnel assignment. */
@@ -185,10 +200,6 @@ export function resolveAssignmentWorkDateKeys(
 
   if (scheduledDates.length > 0) {
     return scheduledDates;
-  }
-
-  if (timesheetDates.length > 0) {
-    return timesheetDates;
   }
 
   return assignmentDate ? [assignmentDate] : [];

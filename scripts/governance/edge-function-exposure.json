@@ -50,7 +50,7 @@
     "get-google-maps-key": { "class": "privileged-role", "verifyJwt": false, "internalGuard": "Verifies the caller JWT with auth.getUser, enforces GOOGLE_MAPS_ALLOWED_ROLES, and consumes a per-user/global daily quota before returning a restricted key." },
     "get-mapbox-token": { "class": "public-token", "verifyJwt": false, "internalGuard": "Applies a durable client-bucket rate limit and returns only the publishable MAPBOX_PUBLIC_TOKEN, which is URL-restricted at Mapbox; no secret material is exposed." },
     "get-secret": { "class": "authenticated-user", "verifyJwt": true, "internalGuard": "Direct secret delivery is disabled: valid authenticated callers are audited and receive HTTP 410, while missing/invalid auth receives 401." },
-    "image-proxy": { "class": "authenticated-user", "verifyJwt": true },
+    "image-proxy": { "class": "authenticated-user", "verifyJwt": true, "internalGuard": "Retired endpoint: shared HTTP wrapper returns 410 without parsing or fetching caller-controlled URLs." },
     "import-users": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before accepting the CSV upload or creating/updating users with the auth admin API." },
     "job-hoja-de-ruta-link": {
       "class": "public-token",

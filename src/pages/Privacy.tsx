@@ -20,12 +20,21 @@ const Privacy = () => {
             Politica de Privacidad
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Ultima actualizacion: Enero 2026
+            Última actualización: Julio 2026
           </p>
         </header>
 
         {/* Content */}
         <main className="prose prose-slate dark:prose-invert max-w-none">
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
+              Responsable y contacto
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300">
+              El responsable del tratamiento es la entidad de Sector Pro identificada en tu relación contractual o documentación de pago. Para ejercer tus derechos o consultar cualquier tratamiento, escribe a info@sector-pro.com.
+            </p>
+          </section>
+
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
               Como recopilamos tus datos
@@ -66,6 +75,18 @@ const Privacy = () => {
               <li>Para procesar pagos</li>
               <li>Para mantener el historial de trabajo</li>
             </ul>
+            <p className="text-slate-600 dark:text-slate-300 mt-4">
+              Tratamos estos datos para gestionar medidas precontractuales y contratos, cumplir obligaciones fiscales y laborales, y proteger la plataforma frente a fraude o uso indebido. Cuando el tratamiento se base en interés legítimo, puedes solicitar información u oponerte.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
+              Proveedores y transferencias
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300">
+              Utilizamos Supabase para base de datos, Cloudflare para entrega web, Brevo para correo, Flex para operaciones técnicas, WAHA/WhatsApp para mensajería, Google Maps o Mapbox para mapas y Apple o Web Push para notificaciones. Supabase opera el proyecto en región de la UE; Cloudflare puede tratar datos de conexión en su red global. Para los demás proveedores, cualquier transferencia fuera del EEE se documenta en el contrato/DPA aplicable y se limita a la finalidad del servicio. Puedes solicitar a info@sector-pro.com el proveedor, la ubicación y el mecanismo de transferencia aplicable a tu tratamiento.
+            </p>
           </section>
 
           <section className="mb-8">
@@ -75,8 +96,8 @@ const Privacy = () => {
             <ul className="list-disc pl-6 text-slate-600 dark:text-slate-300 space-y-2">
               <li><strong>Ver tus datos:</strong> Inicia sesion en tu perfil</li>
               <li><strong>Actualizar tus datos:</strong> Edita tu perfil en cualquier momento</li>
-              <li><strong>Eliminar tu cuenta:</strong> Perfil → Eliminar cuenta</li>
-              <li><strong>Preguntas:</strong> Contacta con nosotros</li>
+              <li><strong>Eliminar u oponerte al tratamiento:</strong> Solicítalo desde Perfil → Eliminar mi cuenta o escribe a info@sector-pro.com. Verificaremos tu identidad y confirmaremos el alcance antes de ejecutar la solicitud.</li>
+              <li><strong>Reclamar:</strong> Puedes acudir a la Agencia Española de Protección de Datos (AEPD).</li>
             </ul>
           </section>
 
@@ -86,8 +107,19 @@ const Privacy = () => {
             </h2>
             <ul className="list-disc pl-6 text-slate-600 dark:text-slate-300 space-y-2">
               <li><strong>Usuarios activos:</strong> Conservados mientras trabajes con nosotros</li>
-              <li><strong>Cuentas eliminadas:</strong> Datos personales eliminados inmediatamente, registros de pago conservados 7 años por cumplimiento fiscal/legal</li>
+              <li><strong>Solicitudes de eliminación:</strong> Tras verificar y aprobar la solicitud, eliminamos o anonimizamos los datos que ya no sean necesarios. Los registros fiscales, laborales o de pago se conservan durante los plazos legales aplicables (habitualmente hasta 7 años).</li>
+              <li><strong>Auditoría y correo corporativo:</strong> Los eventos de auditoría anónimos se eliminan a los 30 días. Los nuevos registros de correo corporativo conservan un hash de contenido y no el cuerpo del mensaje.</li>
+              <li><strong>Copias de seguridad y proveedores:</strong> Los datos residuales desaparecen conforme a los ciclos de retención y borrado de cada sistema; no se usan para nuevas finalidades.</li>
             </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
+              Decisiones automatizadas
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300">
+              Sector Pro puede ordenar o recomendar candidatos para facilitar la planificación, pero una persona responsable revisa de forma significativa cada caso antes de finalizar una asignación y puede cambiar el resultado. No se adoptan decisiones basadas únicamente en tratamiento automatizado que produzcan efectos jurídicos o afecten de modo similar y significativo a una persona.
+            </p>
           </section>
 
           <section>

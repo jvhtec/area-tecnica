@@ -9,12 +9,13 @@ import { useJobAssignmentsRealtime } from '@/hooks/useJobAssignmentsRealtime';
 import { useAvailableTechnicians } from '@/hooks/useAvailableTechnicians';
 import { useToast } from '@/hooks/use-toast';
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
-import { format, eachDayOfInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 import { canManageJobAssignments } from '@/utils/permissions';
+import { getDateKeyRange } from '@/utils/assignmentWorkDates';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -67,7 +68,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
     enabled: open && !!jobId,
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('jobs')
-        .select('id, start_time, end_time, job_date_types(date, type)')
+        .select('id, start_time, end_time, timezone, job_date_types(date, type)')
         .eq('id', jobId)
         .single();
       if (error) throw error;
@@ -97,14 +98,11 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
     }
 
     if (jobMeta.start_time) {
-      const start = new Date(jobMeta.start_time);
-      start.setHours(0, 0, 0, 0);
-      if (jobMeta.end_time) {
-        const end = new Date(jobMeta.end_time);
-        end.setHours(0, 0, 0, 0);
-        return eachDayOfInterval({ start, end });
-      }
-      return [start];
+      return getDateKeyRange(
+        jobMeta.start_time,
+        jobMeta.end_time,
+        jobMeta.timezone || undefined,
+      ).map((dateKey) => new Date(`${dateKey}T00:00:00`));
     }
 
     return [];
@@ -128,6 +126,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
     jobId: jobId || '',
     jobStartTime: jobMeta?.start_time || job?.start_time || '',
     jobEndTime: jobMeta?.end_time || job?.end_time || '',
+    jobTimezone: jobMeta?.timezone || job?.timezone || undefined,
     assignmentDate: singleDay && selectedJobDate ? format(selectedJobDate, 'yyyy-MM-dd') : null,
     enabled: open && !!jobId,
   });

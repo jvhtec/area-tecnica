@@ -457,8 +457,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
       if (error) {
         void logAuthEvent(null, "login", false, {
-          email: email.toLowerCase(),
-          error: error.message,
+          error_code: "invalid_credentials",
         });
         setError(error.message);
         toast({
@@ -474,7 +473,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           data.user.id,
           "login",
           true,
-          { email: data.user.email ?? email.toLowerCase() },
+          {},
           { accessToken: data.session?.access_token },
         );
         const profile = await fetchUserProfile(data.user.id, false); // Fresh fetch on login
@@ -495,8 +494,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       void logAuthEvent(null, "login", false, {
-        email: email.toLowerCase(),
-        error: errorMessage,
+        error_code: "login_exception",
       });
       setError(errorMessage);
       toast({
@@ -695,7 +693,6 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         severity: "low",
         metadata: {
           success: true,
-          email: email.toLowerCase(),
         },
       });
 
@@ -711,8 +708,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         severity: "high",
         metadata: {
           success: false,
-          email: email.toLowerCase(),
-          error: errorMessage,
+          error_code: "password_reset_request_failed",
         },
       });
       setError(errorMessage);

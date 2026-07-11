@@ -13,12 +13,13 @@ import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
-import { startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
 import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
 import { isAdminRole, isManagementRole } from '@/utils/permissions';
 import type { UserRole } from '@/types/user';
+import { getCalendarPeriodDateKeys } from '@/utils/timezoneUtils';
+import { subYears } from 'date-fns';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -91,15 +92,13 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const loadMetrics = React.useCallback(async () => {
     try {
       setMetricsLoading(true);
-      const now = new Date();
-      const lastYear = subYears(now, 1);
-
-      const mStart = startOfMonth(now).toISOString().split('T')[0];
-      const mEnd = endOfMonth(now).toISOString().split('T')[0];
-      const yStart = startOfYear(now).toISOString().split('T')[0];
-      const yEnd = endOfYear(now).toISOString().split('T')[0];
-      const lyStart = startOfYear(lastYear).toISOString().split('T')[0];
-      const lyEnd = endOfYear(lastYear).toISOString().split('T')[0];
+      const period = getCalendarPeriodDateKeys();
+      const mStart = period.monthStart;
+      const mEnd = period.monthEnd;
+      const yStart = period.yearStart;
+      const yEnd = period.yearEnd;
+      const lyStart = period.previousYearStart;
+      const lyEnd = period.previousYearEnd;
 
       // Count all active timesheets (individual work dates)
       const countTotalInRange = async (fromDate: string, toDate: string) => {

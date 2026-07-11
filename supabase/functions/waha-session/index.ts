@@ -97,8 +97,8 @@ function pushEndpointOption(options: Map<string, WahaEndpointOption>, endpoint: 
       label: getWahaEndpointLabel(normalized),
       value: normalized,
     });
-  } catch (error) {
-    console.warn("Ignoring invalid WAHA endpoint option", { endpoint, error });
+  } catch {
+    console.warn("Ignoring invalid WAHA endpoint option");
   }
 }
 

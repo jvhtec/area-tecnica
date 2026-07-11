@@ -29,6 +29,17 @@ describe("typed utility regressions", () => {
     expect(calculatePageForFestival(festivals, festivals[2], 2)).toBe(2);
   });
 
+  it("compares festival calendar days in Madrid for viewers in any timezone", () => {
+    const festivals = [
+      { id: "previous", start_time: "2026-06-01T21:30:00Z" },
+      { id: "today", start_time: "2026-06-01T22:30:00Z" },
+    ];
+
+    const closest = findClosestFestival(festivals, new Date("2026-06-02T12:00:00Z"));
+
+    expect(closest?.id).toBe("today");
+  });
+
   it("checks auto-completion against the job closure window", () => {
     vi.useFakeTimers().setSystemTime(new Date("2026-06-20T12:00:00Z"));
 

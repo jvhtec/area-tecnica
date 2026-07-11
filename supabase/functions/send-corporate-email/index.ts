@@ -3,6 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { wrapInCorporateTemplate } from "../_shared/corporateEmailTemplate.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { normalizeRecipientCriteria, type RecipientCriteria } from "./recipientFilters.ts";
+import sanitizeHtml from "npm:sanitize-html@2.17.6";
+import { sanitizeCorporateEmailHtml } from "../_shared/emailHtmlPolicy.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -42,6 +44,7 @@ const INLINE_IMAGE_RETENTION_MS = INLINE_IMAGE_RETENTION_HOURS * 60 * 60 * 1000;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_TOTAL_ATTACHMENTS = 20 * 1024 * 1024; // 20MB total
+const MAX_BODY_HTML_SIZE = 500 * 1024; // 500KB
 
 interface InlineImage {
   cid: string;
@@ -186,7 +189,7 @@ async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string
       const trimmed = String(email).trim();
       if (!trimmed) return;
       if (!isValidEmail(trimmed)) {
-        console.warn('[fetchRecipientEmails] Invalid explicit email:', trimmed);
+        console.warn('[fetchRecipientEmails] Ignoring an invalid explicit email address');
         return;
       }
       emails.add(trimmed);
@@ -331,7 +334,7 @@ function validateAttachments(
 async function logEmailSend(
   actorId: string,
   subject: string,
-  bodyHtml: string,
+  bodyHash: string,
   recipients: string[],
   sentCount: number,
   totalRecipients: number,
@@ -352,7 +355,8 @@ async function logEmailSend(
   const logPayload: Record<string, unknown> = {
     actor_id: actorId,
     subject,
-    body_html: bodyHtml,
+    body_html: null,
+    body_hash: bodyHash,
     recipients,
     status,
     sent_count: sentCount,
@@ -373,6 +377,13 @@ async function logEmailSend(
   }
 
   await supabase.from("corporate_email_logs").insert(logPayload);
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /**
@@ -457,7 +468,7 @@ serve(async (req) => {
 
     // Get sender name based on department
     let senderName = getSenderName(department);
-    console.log(`[send-corporate-email] Sender name: ${senderName}`);
+    console.log("[send-corporate-email] Sender identity resolved");
 
     // Step 3: Validate environment variables
     if (!BREVO_KEY || !BREVO_FROM) {
@@ -491,6 +502,13 @@ serve(async (req) => {
       );
     }
 
+    if (new TextEncoder().encode(body.bodyHtml).byteLength > MAX_BODY_HTML_SIZE) {
+      return new Response(
+        JSON.stringify({ error: "Invalid body", details: "Email HTML exceeds 500KB" }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (body.senderNameOverride && body.senderNameOverride.trim()) {
       const sanitizedSenderName = body.senderNameOverride
         .trim()
@@ -509,7 +527,7 @@ serve(async (req) => {
       if (sanitizedSenderName) {
         senderName = sanitizedSenderName;
       }
-      console.log(`[send-corporate-email] Sender name override applied: ${senderName}`);
+      console.log("[send-corporate-email] Sender name override applied");
     }
 
     // Step 5: Validate attachments
@@ -637,7 +655,7 @@ serve(async (req) => {
           const cidPattern = new RegExp(`cid:${img.cid}`, "g");
           processedBodyHtml = processedBodyHtml.replace(cidPattern, urlData.publicUrl);
 
-          console.log(`[send-corporate-email] Uploaded image: ${filePath} -> ${urlData.publicUrl}`);
+          console.log("[send-corporate-email] Uploaded inline image", { filePath });
         } catch (error) {
           console.error("[send-corporate-email] Error processing image:", error);
           // Clean up any uploaded images before throwing
@@ -646,6 +664,14 @@ serve(async (req) => {
         }
       }
     }
+
+    const approvedInlineImagePrefix = `${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/public/corporate-emails-temp/`;
+    processedBodyHtml = sanitizeCorporateEmailHtml(
+      processedBodyHtml,
+      sanitizeHtml,
+      approvedInlineImagePrefix,
+    );
+    const bodyHash = await sha256Hex(processedBodyHtml);
 
     // Step 8: Wrap body in corporate template
     const htmlContent = wrapInCorporateTemplate({
@@ -659,9 +685,7 @@ serve(async (req) => {
     console.log(
       `[send-corporate-email] Sending ${validRecipients.length} recipients via Brevo in batches of ${BREVO_MAX_BATCH_SIZE} using BCC for privacy...`
     );
-    if (user.email) {
-      console.log(`[send-corporate-email] Sender (${user.email}) will be BCC'd for quality control`);
-    }
+    if (user.email) console.log("[send-corporate-email] Sender BCC enabled");
     const recipientStatuses: RecipientStatus[] = [...invalidRecipientStatuses];
     const deliveredRecipients: string[] = [];
     const failedValidRecipients: RecipientStatus[] = [];
@@ -794,7 +818,7 @@ serve(async (req) => {
     await logEmailSend(
       user.id,
       body.subject,
-      body.bodyHtml,
+      bodyHash,
       normalizedRecipients,
       totalDelivered,
       normalizedRecipients.length,

@@ -1612,11 +1612,7 @@ serve(createHttpHandler(async (req) => {
         try {
           console.log('[send-staffing-email] WA context', {
             requestId,
-            actorId,
-            base,
-            session,
             hasApiKey: Boolean(apiKey),
-            chatIdSuffix: (tech.phone || '').slice(-4),
           });
         } catch {}
 
@@ -1718,18 +1714,18 @@ serve(createHttpHandler(async (req) => {
             if (!res.ok) {
               const bodyStr = parsed ? JSON.stringify(parsed) : textBody || '';
               const cf = res.status === 524 && bodyStr ? parseCF524(bodyStr) : null;
-              console.warn('[send-staffing-email] WAHA non-OK', { url: attempt.url, status: res.status, rayId: cf?.rayId || null });
+              console.warn('[send-staffing-email] WAHA non-OK', { status: res.status, rayId: cf?.rayId || null });
               attemptErrors.push({ url: attempt.url, step: 'http', status: res.status, body: truncate(bodyStr), cloudflareRayId: cf?.rayId || null });
               continue;
             }
             const interpretation = interpretResponse(parsed);
             if (interpretation.ok) { waOk = true; break; }
             const serialized = parsed ? JSON.stringify(parsed) : textBody || '';
-            console.warn('[send-staffing-email] WAHA reported failure', { url: attempt.url, reason: interpretation.reason || null });
+            console.warn('[send-staffing-email] WAHA reported failure', { reason: interpretation.reason || null });
             attemptErrors.push({ url: attempt.url, step: 'api', status: res.status, json: parsed, body: truncate(serialized), message: interpretation.reason });
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
-            console.warn('[send-staffing-email] WAHA fetch error', { url: attempt.url, message });
+            console.warn('[send-staffing-email] WAHA fetch error', { message });
             attemptErrors.push({ url: attempt.url, step: 'fetch', message });
           }
         }
@@ -1795,7 +1791,7 @@ serve(createHttpHandler(async (req) => {
           subject,
           htmlContent: html
         };
-        console.log('📤 EMAIL PAYLOAD:', { sender: emailPayload.sender, to: [{ email: '***@***.***' }], subject: emailPayload.subject });
+        console.log('📤 EMAIL PAYLOAD READY');
         const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
         console.log('📤 BREVO RESPONSE:', { status: sendRes.status, statusText: sendRes.statusText, ok: sendRes.ok });
         await supabase.from("staffing_events").insert({

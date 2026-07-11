@@ -1,6 +1,11 @@
 
 import { supabase } from "@/lib/supabase";
 import { hasTechnicianSelfServiceAccess } from "@/utils/permissions";
+import {
+  DEFAULT_JOB_TIME_ZONE,
+  getDateKeyRange,
+  normalizeDateKey,
+} from "@/utils/assignmentWorkDates";
 
 export interface TechnicianJobConflict {
   id: string;
@@ -22,6 +27,19 @@ export interface ConflictCheckResult {
     reason: string;
     source: string;
     notes?: string;
+  }>;
+}
+
+export interface TechnicianConflicts {
+  jobConflicts: Array<{
+    job_id: string;
+    jobs: TechnicianJobConflict;
+  }>;
+  unavailabilityConflicts: Array<{
+    type: "unavailable";
+    date: string;
+    reason: string;
+    notes: string | null;
   }>;
 }
 
@@ -67,7 +85,8 @@ export async function getAvailableTechnicians(
   jobId: string,
   jobStartTime: string,
   jobEndTime: string,
-  assignmentDate?: string | null
+  assignmentDate?: string | null,
+  jobTimezone: string = DEFAULT_JOB_TIME_ZONE,
 ) {
   try {
     // First, get all technicians from the specified department
@@ -96,11 +115,18 @@ export async function getAvailableTechnicians(
 
     // OPTIMIZED: Query timesheets directly to see which days technicians are actually working
     const normalizedTargetDate = assignmentDate
-      ? new Date(assignmentDate).toISOString().split('T')[0]
+      ? normalizeDateKey(assignmentDate, jobTimezone)
       : null;
 
-    const jobStartDate = normalizedTargetDate || new Date(jobStartTime).toISOString().split('T')[0];
-    const jobEndDate = normalizedTargetDate || new Date(jobEndTime).toISOString().split('T')[0];
+    const jobDateKeys = normalizedTargetDate
+      ? [normalizedTargetDate]
+      : getDateKeyRange(jobStartTime, jobEndTime, jobTimezone);
+    const jobStartDate = jobDateKeys[0];
+    const jobEndDate = jobDateKeys[jobDateKeys.length - 1];
+
+    if (!jobStartDate || !jobEndDate) {
+      throw new Error("Invalid job date range");
+    }
 
     // Get all ACTIVE timesheets for these technicians in the relevant date range
     // Filter by is_active to exclude voided timesheets (day-off/travel dates)
@@ -174,11 +200,7 @@ export async function getAvailableTechnicians(
         targetDates.push(normalizedTargetDate);
       } else {
         // Whole job - check all dates in range
-        const start = new Date(jobStartDate);
-        const end = new Date(jobEndDate);
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          targetDates.push(d.toISOString().split('T')[0]);
-        }
+        targetDates.push(...jobDateKeys);
       }
 
       // Check if any target date conflicts with existing work dates
@@ -217,7 +239,7 @@ export async function checkTimeConflict(
   try {
     const { data: targetJob, error: jobError } = await supabase
       .from("jobs")
-      .select("id,title,start_time,end_time")
+      .select("id,title,start_time,end_time,timezone")
       .eq("id", targetJobId)
       .maybeSingle();
 
@@ -226,8 +248,13 @@ export async function checkTimeConflict(
     }
 
     // Determine date range to check
-    const startDate = targetDateIso || (targetJob.start_time ? new Date(targetJob.start_time).toISOString().split('T')[0] : null);
-    const endDate = targetDateIso || (targetJob.end_time ? new Date(targetJob.end_time).toISOString().split('T')[0] : null);
+    const jobTimezone = targetJob.timezone || DEFAULT_JOB_TIME_ZONE;
+    const targetDate = normalizeDateKey(targetDateIso, jobTimezone);
+    const targetDateKeys = targetDate
+      ? [targetDate]
+      : getDateKeyRange(targetJob.start_time, targetJob.end_time, jobTimezone);
+    const startDate = targetDateKeys[0] ?? null;
+    const endDate = targetDateKeys[targetDateKeys.length - 1] ?? null;
 
     if (!startDate || !endDate) {
       return null;
@@ -283,11 +310,17 @@ export async function checkTimeConflict(
 export async function getTechnicianConflicts(
   technicianId: string,
   jobStartTime: string,
-  jobEndTime: string
-) {
+  jobEndTime: string,
+  jobTimezone: string = DEFAULT_JOB_TIME_ZONE,
+): Promise<TechnicianConflicts> {
   try {
-    const jobStartDate = new Date(jobStartTime).toISOString().split('T')[0];
-    const jobEndDate = new Date(jobEndTime).toISOString().split('T')[0];
+    const targetDateKeys = getDateKeyRange(jobStartTime, jobEndTime, jobTimezone);
+    const jobStartDate = targetDateKeys[0];
+    const jobEndDate = targetDateKeys[targetDateKeys.length - 1];
+
+    if (!jobStartDate || !jobEndDate) {
+      return { jobConflicts: [], unavailabilityConflicts: [] };
+    }
 
     // OPTIMIZED: Query ACTIVE timesheets to see which days technician is working
     // Filter by is_active to exclude voided timesheets (day-off/travel dates)
@@ -337,10 +370,10 @@ export async function getTechnicianConflicts(
 
     // Convert unavailability data
     const unavailabilityConflicts = unavailabilityData?.map(availability => ({
-      type: 'unavailable',
-      date: availability.date,
-      reason: availability.source === 'vacation' ? 'Vacation' : 'Unavailable',
-      notes: availability.notes
+      type: 'unavailable' as const,
+      date: String(availability.date),
+      reason: availability.source === 'vacation' ? 'Vacaciones' : 'No disponible',
+      notes: typeof availability.notes === 'string' ? availability.notes : null,
     })) || [];
 
     return {

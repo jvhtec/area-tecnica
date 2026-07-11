@@ -44,7 +44,7 @@ async function resolveActorName(supabase: ReturnType<typeof createClient>, actor
 }
 
 async function createFlexFolder(payload: FlexFolderPayload, authToken: string): Promise<FlexFolderResponse> {
-  console.log("Creating Flex folder with payload:", payload);
+  console.log("Creating Flex folder", { hasParent: Boolean(payload.parent_id) });
   
   try {
     // Folder creation is not idempotent on the Flex side, so a timed-out

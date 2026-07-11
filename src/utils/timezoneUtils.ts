@@ -101,6 +101,35 @@ export const addMadridCalendarDays = (dateKey: string, amount: number): string =
   return formatMadridDateKey(addDays(madridNoon, amount));
 };
 
+export type CalendarPeriodDateKeys = {
+  monthStart: string;
+  monthEnd: string;
+  yearStart: string;
+  yearEnd: string;
+  previousYearStart: string;
+  previousYearEnd: string;
+};
+
+/** Returns SQL date-key boundaries without serializing local midnight through UTC. */
+export const getCalendarPeriodDateKeys = (
+  reference: Date = new Date(),
+  timezone: string = MADRID_TIMEZONE,
+): CalendarPeriodDateKeys => {
+  const year = Number(formatInTimeZone(reference, timezone, "yyyy"));
+  const month = Number(formatInTimeZone(reference, timezone, "M"));
+  const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+  const monthEndDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  return {
+    monthStart: `${monthKey}-01`,
+    monthEnd: `${monthKey}-${String(monthEndDay).padStart(2, "0")}`,
+    yearStart: `${year}-01-01`,
+    yearEnd: `${year}-12-31`,
+    previousYearStart: `${year - 1}-01-01`,
+    previousYearEnd: `${year - 1}-12-31`,
+  };
+};
+
 export type MadridMonthGrid = {
   todayKey: string;
   monthStartKey: string;

@@ -43,7 +43,7 @@ serve(createHttpHandler(async (req) => {
   internalErrorMessage: "Failed to load Mapbox token",
   onError: (error) => {
     if (!(error instanceof HttpError)) {
-      console.error("Error fetching Mapbox token:", error);
+      console.error("Error fetching Mapbox publishable token");
     }
   },
 }));

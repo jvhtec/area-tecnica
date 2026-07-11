@@ -3,6 +3,8 @@
  * Utility functions for date operations
  */
 
+import { formatMadridDateKey, fromMadridDateKey } from '@/utils/timezoneUtils';
+
 export type FestivalDateCandidate = {
   id: string;
   start_time: string | number | Date;
@@ -13,21 +15,21 @@ export type FestivalDateCandidate = {
  * @param festivals Array of festival jobs
  * @returns The festival closest to today or null if no festivals
  */
-export const findClosestFestival = <T extends FestivalDateCandidate>(festivals: T[] | null | undefined): T | null => {
+export const findClosestFestival = <T extends FestivalDateCandidate>(
+  festivals: T[] | null | undefined,
+  reference: Date = new Date(),
+): T | null => {
   if (!festivals || festivals.length === 0) return null;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+  const today = fromMadridDateKey(formatMadridDateKey(reference)).getTime();
 
   let closestFestival = festivals[0];
-  const initialFestivalDate = new Date(festivals[0].start_time);
-  initialFestivalDate.setHours(0, 0, 0, 0);
-  let smallestDifference = Math.abs(initialFestivalDate.getTime() - today.getTime());
+  const initialFestivalDate = fromMadridDateKey(formatMadridDateKey(new Date(festivals[0].start_time))).getTime();
+  let smallestDifference = Math.abs(initialFestivalDate - today);
 
   festivals.forEach(festival => {
-    const festivalDate = new Date(festival.start_time);
-    festivalDate.setHours(0, 0, 0, 0);
-    const difference = Math.abs(festivalDate.getTime() - today.getTime());
+    const festivalDate = fromMadridDateKey(formatMadridDateKey(new Date(festival.start_time))).getTime();
+    const difference = Math.abs(festivalDate - today);
     
     if (difference < smallestDifference) {
       smallestDifference = difference;

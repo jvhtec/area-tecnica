@@ -21,6 +21,7 @@ interface UseAvailableTechniciansOptions {
   jobId: string;
   jobStartTime: string;
   jobEndTime: string;
+  jobTimezone?: string | null;
   assignmentDate?: string | null;
   enabled?: boolean;
 }
@@ -30,6 +31,7 @@ export function useAvailableTechnicians({
   jobId,
   jobStartTime,
   jobEndTime,
+  jobTimezone,
   assignmentDate,
   enabled = true
 }: UseAvailableTechniciansOptions) {
@@ -40,6 +42,7 @@ export function useAvailableTechnicians({
     jobId,
     jobStartTime,
     jobEndTime,
+    jobTimezone ?? null,
     assignmentDate ?? null,
   );
 
@@ -56,7 +59,8 @@ export function useAvailableTechnicians({
           jobId,
           jobStartTime,
           jobEndTime,
-          assignmentDate
+          assignmentDate,
+          jobTimezone || undefined,
         );
         
         console.log(`Found ${technicians.length} available ${department} technicians for job ${jobId}`);
