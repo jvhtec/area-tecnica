@@ -50,10 +50,8 @@ import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
 import { useDirectJobAssignments } from '@/hooks/useDirectJobAssignments';
-
 import { queryKeys } from "@/lib/react-query";
 const DEFAULT_JOB_TIME_ZONE = 'Europe/Madrid';
-const MADRID_TIME_ZONE = DEFAULT_JOB_TIME_ZONE;
 const formatJobDateKey = (date: Date, timeZone = DEFAULT_JOB_TIME_ZONE) => formatInTimeZone(date, timeZone, "yyyy-MM-dd");
 const parseJobDateKey = (dateKey: string, timeZone = DEFAULT_JOB_TIME_ZONE) => fromZonedTime(`${dateKey}T00:00:00`, timeZone);
 const addDaysToDateKey = (dateKey: string, days: number) => {
@@ -136,12 +134,12 @@ const formatJobDateLabel = (date: string | null | undefined) => {
   if (!date) return '';
   try {
     const dateKey = date.includes('T')
-      ? formatInTimeZone(new Date(date), MADRID_TIME_ZONE, "yyyy-MM-dd")
+      ? formatInTimeZone(new Date(date), DEFAULT_JOB_TIME_ZONE, "yyyy-MM-dd")
       : date;
-    const madridDate = fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE);
+    const madridDate = fromZonedTime(`${dateKey}T00:00:00`, DEFAULT_JOB_TIME_ZONE);
     return new Intl.DateTimeFormat('es-ES', {
       dateStyle: 'full',
-      timeZone: MADRID_TIME_ZONE,
+      timeZone: DEFAULT_JOB_TIME_ZONE,
     }).format(madridDate);
   } catch (error) {
     console.warn('Failed to format job date', error);
