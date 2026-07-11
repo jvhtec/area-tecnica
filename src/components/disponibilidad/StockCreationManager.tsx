@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { StockEntry, Equipment, getCategoriesForDepartment, allCategoryLabels, AllCategories, EquipmentCategory, Department } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
