@@ -42,9 +42,9 @@ A PR is **high-risk** when it touches either of:
 1. **Database:** anything under `supabase/migrations/`, or any RLS policy, grant, or RPC/SQL function change.
 2. **Money:** timesheet calculation (`compute_timesheet_hours` and callers), rates/rate overrides, payroll/payout logic or notifications.
 
-High-risk consequences you must surface in the PR description: it needs **two independent approvals** and CODEOWNER review; migrations additionally need pgTAP coverage (or documented manual verification) and a human-run production `supabase db push --linked --dry-run` before merge. You flag and prepare all of this; the production push itself is human.
+This is a solo-maintainer repo, so high-risk cannot mean "more approvers" — it means **compensating scrutiny**, and you must surface all of it in the PR description: CodeRabbit review fully resolved (it is the de facto second reviewer here), pgTAP coverage for migrations (or documented manual verification), a human-run production `supabase db push --linked --dry-run` before merge, and a note telling the maintainer this diff warrants a deliberate second read before merging. You flag and prepare all of this; the production push and the final read are human.
 
-Everything else (including plain UI work, edge-function tweaks without DB impact) follows the standard single-approval path.
+Everything else (including plain UI work, edge-function tweaks without DB impact) follows the standard path: CI green, CodeRabbit resolved, maintainer's own diff review at merge time.
 
 ### 4. Shepherd to mergeable
 
@@ -56,7 +56,7 @@ Everything else (including plain UI work, edge-function tweaks without DB impact
 
 ### 5. Hand off
 
-When every required check is green, every thread resolved, and the branch is current with `main`, report: a short summary of the final state (checks, approvals still needed, high-risk steps outstanding such as the prod migration dry-run) and a clear "ready for your merge." (Claude: `/release-readiness` produces the exhaustive audit for production-bound PRs.)
+When every required check is green, every thread resolved, and the branch is current with `main`, report: a short summary of the final state (checks, and any high-risk steps outstanding such as the prod migration dry-run or the deliberate second read) and a clear "ready for your merge." (Claude: `/release-readiness` produces the exhaustive audit for production-bound PRs.)
 
 After the human merges: branches auto-delete on GitHub; clean up any local branch/worktree you created.
 
@@ -88,6 +88,6 @@ Each of these has actually bitten this repo or is structurally likely to:
 
 1. Would the reviewer find anything in the diff that isn't the task?
 2. Could someone reproduce my test evidence from the description alone?
-3. If this is high-risk (DB or money), does the description say so, and are the extra gates (two approvals, pgTAP, prod dry-run) explicitly listed as outstanding?
+3. If this is high-risk (DB or money), does the description say so, and are the extra gates (pgTAP coverage, prod dry-run, the maintainer's deliberate second read) explicitly listed as outstanding?
 4. Is every review thread either fixed-and-resolved or answered-and-resolved?
 5. Is the branch current with `main`, and are all three workflows green *right now* — not "were green before my last push"?

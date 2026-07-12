@@ -4,9 +4,8 @@ Use this checklist for production-bound PRs targeting `main`.
 
 ## Before merge
 
-- [ ] PR has at least one independent approval.
-- [ ] High-risk PRs have two independent approvals.
-- [ ] CODEOWNER review is complete for high-risk paths.
+- [ ] The full diff has been deliberately reviewed by the maintainer in the GitHub PR UI (solo project: you are the reviewer of record — read the diff there, not just in your editor).
+- [ ] High-risk PRs (Supabase migrations/RLS/RPC, or timesheet/rates/payroll logic) get compensating scrutiny instead of extra approvers: CodeRabbit review complete with every comment resolved, plus a second deliberate pass over the diff after time away from it.
 - [ ] All required checks are passing:
   - [ ] `npm run lint`
   - [ ] `npm run typecheck`
