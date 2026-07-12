@@ -2,6 +2,11 @@
 
 This file provides working guidance for coding agents operating in this repository.
 
+Two companion documents in `docs/agents/` apply to every agent regardless of harness:
+
+- `docs/agents/operating-manual.md` — the working method expected here: how to read requests, decompose and verify work, label known vs. guessed, and communicate results. Read it once in full; run its five-question self-test on every answer.
+- `docs/agents/pr-workflow.md` — the standard PR workflow: agent authority boundary (prepare + shepherd; humans merge), high-risk classification, CodeRabbit protocol, quality bar, and pre-handoff self-check.
+
 ## Project identity
 
 - Product: Area Tecnica (Sector Pro)
@@ -143,12 +148,12 @@ Use this workflow for production-bound work unless the user explicitly requests 
 4. Commit, push the branch, and open a PR to `main`.
 5. Wait for all GitHub CI checks and CodeRabbit to finish. Inspect CodeRabbit summary, inline comments, and pre-merge checks. CI spans three workflows: `.github/workflows/tests.yml` (11 jobs: lint, typecheck, governance, test_critical, test_run, build, e2e_smoke, migration_ordering, migration_apply, db_lint, rls_rpc_security_tests), `.github/workflows/codeql.yml` (CodeQL analysis), and `.github/workflows/security.yml` (dependency review + SBOM generation) — all must be green.
 6. Address every actionable CI or CodeRabbit issue with follow-up commits, rerun relevant local validation, push, and wait again until clean.
-7. Before merging:
-   - If the PR includes Supabase migrations, run a production `supabase db push --linked --dry-run`, apply the pending migrations to the linked production project, and confirm a follow-up dry run reports the remote database is up to date.
+7. Before merge:
+   - If the PR includes Supabase migrations, flag in the PR description that a production `supabase db push --linked --dry-run` and migration apply are required — these production steps are run by a human, not by an agent.
    - If the PR has no database migration, no Supabase production push is required; merging `main` is the production deploy path.
-8. Merge only after CI, CodeRabbit, and any required production migration/deploy steps are clean. Verify the PR is merged and the local worktree is clean.
+8. Agents stop at *mergeable*: all CI green, CodeRabbit and review threads resolved, branch current with `main`. Report that state and hand off — **the final merge is always performed by a human.** Do not merge or approve PRs yourself.
 
-For the full production release checklist, use `docs/release/production-release-checklist.md`.
+For the full production release checklist, use `docs/release/production-release-checklist.md`. For the agent-facing workflow detail (authority boundary, high-risk classification, CodeRabbit protocol, quality bar), use `docs/agents/pr-workflow.md`.
 
 ## Operational notes
 

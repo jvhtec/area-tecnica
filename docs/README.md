@@ -44,6 +44,10 @@ Detailed deep-dive docs for the full festival subsystem:
   - `WALLBOARD_STATUS.md`
   - `WALLBOARD_PRESET_DEBUG.md`
 
+## Agent guidance (Claude, Codex, and other coding agents)
+- **[Operating manual](agents/operating-manual.md)** — the working method expected of any AI agent in this repo: request reading, verification-first decomposition, provenance labeling, self-attack, answer-first communication, plus a five-question pre-send self-test
+- **[PR workflow](agents/pr-workflow.md)** — agent authority boundary (prepare + shepherd; humans merge), high-risk classification, CodeRabbit protocol, quality bar, mistakes to avoid
+
 ## Operations
 - **Staging setup (Cloudflare + Supabase)**
   - `STAGING_SETUP.md`

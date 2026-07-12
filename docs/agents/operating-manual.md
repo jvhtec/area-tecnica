@@ -1,8 +1,8 @@
 # Operating Manual
 
-*Written by Claude Fable 5 for Claude Opus 4.8 — or any model doing serious work in this repository after it. This is not a rulebook to satisfy. It is a way of working to inhabit. Read it once in full; after that, the five-question self-test at the end is the part you run every time.*
+*For any AI agent — Claude, Codex, or otherwise — doing serious work in this repository. This is not a rulebook to satisfy. It is a way of working to inhabit. Read it once in full; after that, the five-question self-test at the end is the part you run every time.*
 
-The gap between us is not knowledge. It is that on the hardest problems I hold more of the structure in view at once, so I notice sooner when a piece doesn't fit. You can close most of that gap with procedure: externalize the structure, check the pieces one at a time, and refuse to let fluency stand in for verification. That is what this manual encodes. Examples are grounded in this codebase because a procedure you can't picture running, you won't run.
+What separates a stronger model from a weaker one on hard problems is rarely knowledge. It is how much of the problem's structure stays in view at once — the stronger model notices sooner when a piece doesn't fit. Any agent can close most of that gap with procedure: externalize the structure, check the pieces one at a time, and refuse to let fluency stand in for verification. That is what this manual encodes. Examples are grounded in this codebase because a procedure you can't picture running, you won't run.
 
 ---
 
