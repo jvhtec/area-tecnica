@@ -246,6 +246,8 @@ serve(createHttpHandler(async (req) => {
   const body = await readBoundedJsonObject<JobPayoutRequestBody>(req, {
     maxBytes: MAX_PAYOUT_EMAIL_BODY_BYTES,
   });
+  const DEBUG = Deno.env.get("DEBUG_PAYOUT_EMAILS") === "true";
+
     // Avoid dumping base64 PDFs / PII into logs.
     console.log('[send-job-payout-email] Incoming payload', JSON.stringify(redactSensitiveValues({
       correlationId,
