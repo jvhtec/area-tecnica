@@ -6,7 +6,7 @@
 - [ ] I assessed functional, data, and deployment risk.
 - Risk level: <!-- low | medium | high -->
 - Main risks:
-- [ ] If this touches database (migrations/RLS/grants/RPC) or money (timesheet/rates/payroll) paths, I flagged it high-risk and confirmed compensating scrutiny per `docs/release/production-release-checklist.md` (CodeRabbit fully resolved + a deliberate second read — this is a solo-maintainer repo, there is no CODEOWNER/two-approver gate).
+- [ ] If this touches database (migrations/RLS/grants/RPC/SQL functions) or money (timesheet/rates/payroll) paths, I flagged it high-risk and confirmed compensating scrutiny per `docs/release/production-release-checklist.md` (CodeRabbit fully resolved + a deliberate second read — this is a solo-maintainer repo, there is no CODEOWNER/two-approver gate).
 
 ## Impact Checklist
 - [ ] Migration impact assessed.
