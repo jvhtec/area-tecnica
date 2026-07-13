@@ -84,7 +84,7 @@ Only 13/49 pages use viewport hooks; the rest rely on Tailwind `md:` tweaks at b
 
 `src/components/ui/button.tsx:23–26`: `default h-10` (40px), `sm h-9` (36px), `icon h-10 w-10` (40px). Unchanged since flagged. Compounded by dense icon rows (F3) and matrix cells (F5). iOS HIG minimum is 44px, Material 48px.
 
-Fix at the primitive: keep visual sizes, add mobile hit-area — e.g. `min-h-[44px] min-w-[44px]` on `icon`/`sm` variants under a `@media (pointer: coarse)` rule (or Tailwind `pointer-coarse:` plugin/arbitrary variant), rather than sweeping every call site.
+Fix through the button primitive and a shared hit-area utility: keep the rendered `default`/`sm`/`icon` button dimensions, but place compact controls in a 44×44px interaction wrapper (or use an equivalent non-overlapping pseudo-element) under `@media (pointer: coarse)`. Do not apply `min-h`/`min-w` directly to the compact button, because that changes its visual box and can break dense toolbars. Fine-pointer layouts remain unchanged.
 
 ### F7 🟠 Sub-12px text is growing
 
@@ -124,11 +124,11 @@ Four phases, ordered so each ships user-visible value and later phases get cheap
 | M0.1 | **i18n sweep of mobile-first surfaces** | M | Translate every user-facing string in: `DashboardMobileHub`, `MobileDayCalendar`, `MobileJobCard`, `DepartmentMobileHub`, `ProjectManagement` (+ its filter/card children), Tours page components (incl. demoting/renaming the "Legacy Tours Detected" panel), `Settings` cards, `connection-status.tsx`, refresh toasts. Run `/i18n-check` per file; also localize `date-fns` `format()` calls (pass `{ locale: es }` — "Mon"/"Jul 15, 26" leaks come from unlocalized format calls). |
 | M0.2 | **`ResponsiveDialog` primitive** | M | `src/components/ui/responsive-dialog.tsx`: Dialog ≥md, vaul Drawer <md, single API (`Root/Trigger/Content/Header/Footer/Title/Description`). Unit test + doc in `docs/mobile-guidelines.md`. Don't migrate call sites yet — new code adopts it immediately. |
 | M0.3 | **`MobileActionSheet` primitive** | M | Grouped, labeled action list in a bottom drawer (icon + label + optional destructive styling), built on M0.2. This is the F3 fix vehicle. |
-| M0.4 | **Touch-target floor** | S | `button.tsx`: coarse-pointer `min-h`/`min-w` 44px on `sm`/`icon`/`default`; verify no layout breakage in dense toolbars (desktop unaffected — fine pointer). |
+| M0.4 | **Touch-target floor** | S | Add a shared coarse-pointer hit-area wrapper (or equivalent non-overlapping pseudo-element) for `button.tsx` `sm`/`icon`/`default` variants so the interaction area reaches 44×44px without changing the rendered button dimensions; verify spacing and hit-area overlap in dense toolbars. Fine-pointer layouts remain unchanged. |
 | M0.5 | **Type floor guardrail** | S | ESLint `no-restricted-syntax` (same mechanism as the existing native-confirm ban) erroring on new `text-[8px]`–`text-[11px]` in `className`; baseline-ratchet existing 266. |
 | M0.6 | **Fix `mobile-chromium` Playwright project** | S | Force `browserName: "chromium"`; add a 3-route mobile smoke spec (dashboard, project-management, department hub) asserting no horizontal overflow (`document.documentElement.scrollWidth <= innerWidth`) and nav visibility. Wire into CI as a non-blocking job first. |
 
-**Exit:** every screenshot in §3 renders 100% Spanish; primitives exist and are documented; CI can see mobile.
+**Exit:** every in-scope management screenshot in §3 renders 100% Spanish; `/tech-app` remains excluded from the localization gate as documented under “Noted, not findings.” Primitives exist and are documented; CI can see mobile.
 
 ### Phase M1 — Flagship flow redesigns (sprint 2)
 
@@ -185,8 +185,9 @@ Dependencies: M1.1 needs M0.3 needs M0.2. M2.3 benefits from M1.4 patterns. Ever
 
 The screenshots behind §3 were captured with a throwaway spec (deliberately not committed, per `/ui-check` policy):
 
-1. Create `tests/e2e/_manual-ui-check.spec.ts` importing `bootstrapApp` from `./support/app`; seed `auth: { role: "management", department: "sound" }` plus minimal `jobs`/`tours`/`profiles` rows (copy shapes from `project-management.spec.ts` / `tour-management.spec.ts`), `page.goto()` each route, `page.screenshot({ fullPage: true })`.
-2. Force iPhone metrics onto Chromium (see the `mobile-chromium`/WebKit bug in §3 "Noted"): `test.use({ ...devices["iPhone 13"], but with browserName/executable pinned to chromium })`.
-3. Run `npx playwright test tests/e2e/_manual-ui-check.spec.ts --project=chromium`, read the PNGs, delete the spec.
+1. Create `tests/e2e/_manual-ui-check.spec.ts` importing `bootstrapApp` from `./support/app`. In the management tests, seed `auth: { role: "management", department: "sound" }` plus minimal `jobs`/`tours`/`profiles` rows using the shapes in `project-management.spec.ts` and `tour-management.spec.ts`. Give the tour a stable ID such as `tour-1`, store it as `tourId`, and navigate to ``/tour-management/${tourId}`` rather than a placeholder route. Capture each route with `page.screenshot({ fullPage: true })`.
+2. Put `/tech-app` in a separate test (or `test.describe`) that calls `bootstrapApp` with `auth: { role: "technician", department: "sound" }` and technician-shaped `profiles` data, following `technician-app.spec.ts`. Do not reuse the management-authenticated page for this route.
+3. Force iPhone metrics onto Chromium with valid Playwright test options (see the `mobile-chromium`/WebKit bug in §3 “Noted”): `test.use({ ...devices["iPhone 13"], browserName: "chromium" })`. If a local executable must be pinned, put it under `launchOptions`, for example `test.use({ ...devices["iPhone 13"], browserName: "chromium", launchOptions: { executablePath } })`; `browserName` is not a launch option.
+4. Run `npx playwright test tests/e2e/_manual-ui-check.spec.ts --project=chromium`, read the PNGs, then delete the throwaway spec.
 
 Routes audited: `/dashboard`, `/sound`, `/project-management`, `/tour-management/:id`, `/job-assignment-matrix`, `/timesheets`, `/festivals`, `/tours`, `/profile`, `/settings` (management persona) and `/tech-app` (technician persona).
