@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { transformWithEsbuild } from "vite";
 
 const buildTimestamp = `${Math.floor(Date.now() / 1000)}`;
 const swFile = "dist/sw.js";
@@ -45,10 +46,16 @@ if (!currentContents.includes(placeholder)) {
 }
 
 const nextContents = currentContents.replaceAll(placeholder, buildTimestamp);
+const { code: minifiedServiceWorker } = await transformWithEsbuild(nextContents, swFile, {
+  drop: ["console"],
+  loader: "js",
+  minify: true,
+  target: "es2020",
+});
 
-await writeFile(swFile, nextContents, "utf8");
+await writeFile(swFile, minifiedServiceWorker, "utf8");
 
-console.log(`Injected build timestamp into service worker: ${buildTimestamp}`);
+console.log(`Injected build timestamp and minified service worker: ${buildTimestamp}`);
 
 try {
   const indexContents = await readFile(indexFile, "utf8");

@@ -12,8 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEffect, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -34,16 +33,16 @@ interface TransportRequestDialogProps {
 }
 
 const vehicleItemSchema = z.object({
-  transport_type: z.string().min(1, "Selecciona un tipo de vehículo"),
+  transport_type: z.string().min(1),
   leftover_space_meters: z.union([
-    z.number().finite().min(0, "El espacio libre no puede ser negativo"),
+    z.number().min(0),
     z.literal(""),
   ]),
 });
 
 const transportRequestFormSchema = z.object({
   description: z.string(),
-  items: z.array(vehicleItemSchema).min(1, "Añade al menos un vehículo"),
+  items: z.array(vehicleItemSchema).min(1),
   needed_date: z.string(),
   note: z.string(),
   is_hoja_relevant: z.boolean(),
@@ -51,11 +50,6 @@ const transportRequestFormSchema = z.object({
 
 type TransportRequestFormValues = z.infer<typeof transportRequestFormSchema>;
 type VehicleItem = TransportRequestFormValues["items"][number];
-
-const formatNeededDate = (isoDate: string) => {
-  const [year, month, day] = isoDate.split("-");
-  return `${day}/${month}/${year}`;
-};
 
 const emptyItems = (): VehicleItem[] => [{ transport_type: "trailer", leftover_space_meters: "" }];
 
@@ -88,23 +82,14 @@ export function TransportRequestDialog({
     invalidateRequests,
   } = useJobTransportRequests(jobId, department, false);
   const {
-    control,
-    formState: { errors },
     handleSubmit: handleValidatedSubmit,
     register,
     reset,
     setValue,
     watch,
   } = useForm<TransportRequestFormValues>({
-    resolver: zodResolver(transportRequestFormSchema),
     defaultValues: emptyFormValues(),
   });
-  const {
-    append: appendItem,
-    fields: itemFields,
-    remove: removeItem,
-    replace: replaceItems,
-  } = useFieldArray({ control, name: "items" });
   const items = watch("items");
   const isHojaRelevant = watch("is_hoja_relevant");
 
@@ -172,14 +157,14 @@ export function TransportRequestDialog({
     onSubmitted?.();
   };
 
-  const saveRequest = async (values: TransportRequestFormValues) => {
+  const saveRequest = async (formValues: TransportRequestFormValues) => {
     try {
+      const values = transportRequestFormSchema.parse(formValues);
       const { data: { user: authUser } } = await dataLayerClient.auth.getUser();
       if (!authUser) throw new Error("No autenticado");
 
       const toInsertItems = (requestId: string) =>
         values.items
-          .filter((it) => !!it.transport_type)
           .map((it) => ({
             request_id: requestId,
             transport_type: it.transport_type,
@@ -204,18 +189,16 @@ export function TransportRequestDialog({
           .find((request) => request.id === editingRequestId)
           ?.items.map((item) => item.id) ?? [];
         const toInsert = toInsertItems(editingRequestId);
-        if (toInsert.length > 0) {
-          const { error: itemsErr } = await dataLayerClient.from("transport_request_items").insert(toInsert);
-          if (itemsErr) throw itemsErr;
+        const { error: itemsErr } = await dataLayerClient.from("transport_request_items").insert(toInsert);
+        if (itemsErr) throw itemsErr;
 
-          if (existingItemIds.length > 0) {
-            const { error: deleteItemsError } = await dataLayerClient
-              .from("transport_request_items")
-              .delete()
-              .eq("request_id", editingRequestId)
-              .in("id", existingItemIds);
-            if (deleteItemsError) throw deleteItemsError;
-          }
+        if (existingItemIds.length > 0) {
+          const { error: deleteItemsError } = await dataLayerClient
+            .from("transport_request_items")
+            .delete()
+            .eq("request_id", editingRequestId)
+            .in("id", existingItemIds);
+          if (deleteItemsError) throw deleteItemsError;
         }
       } else {
         const { data: inserted, error } = await dataLayerClient
@@ -235,10 +218,8 @@ export function TransportRequestDialog({
         if (error) throw error;
         const requestId = (inserted as { id: string }).id;
         const toInsert = toInsertItems(requestId);
-        if (toInsert.length > 0) {
-          const { error: itemsErr } = await dataLayerClient.from("transport_request_items").insert(toInsert);
-          if (itemsErr) throw itemsErr;
-        }
+        const { error: itemsErr } = await dataLayerClient.from("transport_request_items").insert(toInsert);
+        if (itemsErr) throw itemsErr;
         try {
           const { error: pushError } = await dataLayerClient.functions.invoke("push", {
             body: {
@@ -250,11 +231,9 @@ export function TransportRequestDialog({
               description: values.description || undefined,
             },
           });
-          if (pushError) {
-            console.error("Failed to invoke push notification for transport request", pushError);
-          }
+          if (pushError) throw pushError;
         } catch (pushError) {
-          console.error("Unexpected error invoking push notification for transport request", pushError);
+          console.error("Failed to invoke transport request push", pushError);
         }
       }
 
@@ -293,7 +272,7 @@ export function TransportRequestDialog({
               </div>
               {request.needed_date && (
                 <div className="text-xs text-muted-foreground">
-                  Fecha necesaria: {formatNeededDate(request.needed_date)}
+                  Fecha necesaria: {request.needed_date.split("-").reverse().join("/")}
                 </div>
               )}
               {request.note && <div className="text-xs text-muted-foreground italic">{request.note}</div>}
@@ -332,15 +311,14 @@ export function TransportRequestDialog({
       <div className="space-y-2">
         <Label>Vehículos</Label>
         <div className="space-y-2">
-          {itemFields.map((field, idx) => {
-            const item = items[idx] ?? { transport_type: "trailer", leftover_space_meters: "" };
+          {items.map((item, idx) => {
             return (
-              <div key={field.id} className="space-y-1">
+              <div key={idx} className="space-y-1">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Select
                     value={item.transport_type}
                     onValueChange={(val) => {
-                      setValue(`items.${idx}.transport_type`, val, { shouldValidate: true });
+                      setValue(`items.${idx}.transport_type`, val);
                     }}
                   >
                     <SelectTrigger className="w-full sm:w-40">
@@ -365,28 +343,20 @@ export function TransportRequestDialog({
                       const val = e.target.value;
                       const parsed = Number(val);
                       const nextValue = val === "" || !Number.isFinite(parsed) ? "" : Math.max(0, parsed);
-                      setValue(`items.${idx}.leftover_space_meters`, nextValue, { shouldValidate: true });
+                      setValue(`items.${idx}.leftover_space_meters`, nextValue);
                     }}
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      if (itemFields.length === 1) {
-                        replaceItems(emptyItems());
-                      } else {
-                        removeItem(idx);
-                      }
+                      const nextItems = items.filter((_, itemIndex) => itemIndex !== idx);
+                      setValue("items", nextItems.length ? nextItems : emptyItems());
                     }}
                   >
                     Eliminar
                   </Button>
                 </div>
-                {errors.items?.[idx]?.leftover_space_meters?.message && (
-                  <p className="text-xs text-destructive">
-                    {errors.items[idx]?.leftover_space_meters?.message}
-                  </p>
-                )}
               </div>
             );
           })}
@@ -394,7 +364,7 @@ export function TransportRequestDialog({
             <Button
               type="button"
               variant="secondary"
-              onClick={() => appendItem({ transport_type: "trailer", leftover_space_meters: "" })}
+              onClick={() => setValue("items", [...items, ...emptyItems()])}
             >
               Añadir vehículo
             </Button>
