@@ -22,7 +22,11 @@ const kindBudgets = {
 };
 
 const absoluteKindBudgets = {
-  js: 3_150_000,
+  // 2026-07-13: raised 3_150_000 -> 3_250_000 with maintainer approval (PR #849).
+  // main had drifted to within ~3 kB of the old cap across prior merges
+  // (+274 kB over the phase-4 baseline), so any JS-touching PR tripped it.
+  // Recapture the phase-4 baseline to restore the percent ratchet's headroom.
+  js: 3_250_000,
   css: 80_000,
   font: 2_950_000,
   image: 8_500_000,
