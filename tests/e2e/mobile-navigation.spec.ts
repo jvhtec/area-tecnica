@@ -82,7 +82,7 @@ const expectMobileShell = async (page: Page) => {
 };
 
 test.describe("mobile navigation smoke", () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach(({ page: _page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-chromium",
       "This suite targets the explicit mobile viewport project.",
