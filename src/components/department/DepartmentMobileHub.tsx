@@ -304,6 +304,10 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agendaJobs, selectedDate, programaWindows]);
 
+  const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+  const jobDateTypeForDay = (job: { job_date_types?: Array<{ date: string; type: string }> | null }): string | null =>
+    job.job_date_types?.find((dt) => dt.date === selectedDateKey)?.type ?? null;
+
   const jobTimelineState = (job: { id: string; start_time: string; end_time: string }): MobileTimelineState => {
     if (!isToday(selectedDate)) return "none";
     const now = Date.now();
@@ -575,6 +579,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                   trucksCount={trucksCount}
                   accent={accentKey}
                   live={jobTimelineState(job) === "live"}
+                  dateType={jobDateTypeForDay(job)}
                   secondaryLabel="Ver detalles"
                   onSecondary={() => onViewDetails?.(job)}
                   primaryLabel="Gestionar"

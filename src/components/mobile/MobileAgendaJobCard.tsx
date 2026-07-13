@@ -1,6 +1,7 @@
 import React from "react";
 import { MapPin, Truck, Users } from "lucide-react";
 
+import { getDateTypeMeta } from "@/constants/dateTypes";
 import { cn } from "@/lib/utils";
 import {
   getMobileAccent,
@@ -31,6 +32,8 @@ interface MobileAgendaJobCardProps {
   live?: boolean;
   /** Where the displayed times come from; "programa" marks hoja de ruta times. */
   timesSource?: "job" | "programa";
+  /** The job_date_types value for the viewed day (travel/setup/show/...). */
+  dateType?: string | null;
 }
 
 /**
@@ -57,8 +60,10 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
   menu,
   live = false,
   timesSource = "job",
+  dateType,
 }) => {
   const a = getMobileAccent(accent);
+  const dateTypeMeta = getDateTypeMeta(dateType);
   const railColor = jobColor || "#6366f1";
   const showMeter = typeof assignedCount === "number" && (neededCount ?? 0) > 0;
   const meterPct = showMeter
@@ -102,6 +107,17 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {dateTypeMeta && (
+              <span
+                className={cn(
+                  "flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
+                  dateTypeMeta.badgeClassName,
+                )}
+              >
+                <dateTypeMeta.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                {dateTypeMeta.labelEs}
+              </span>
+            )}
             {live && (
               <span
                 className={cn(
