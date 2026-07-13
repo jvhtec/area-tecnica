@@ -276,6 +276,9 @@ export function JobCardNewView({
   const reducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
   const canManageTransportRequests = userDepartment === "logistics" || isManagementRole(userRole);
+  // Managers who also belong to a tech department reach the request creator
+  // through the manager dialog ("Solicitar transporte")
+  const [requestCreatorOpen, setRequestCreatorOpen] = React.useState(false);
   const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
   const [celebrateOrigin, setCelebrateOrigin] = React.useState<{ xPct: number; yPct: number } | null>(null);
@@ -691,10 +694,15 @@ export function JobCardNewView({
             </>
           )}
 
-          {transportDialogOpen && !canManageTransportRequests && isTechDept && userDepartment && (
+          {((transportDialogOpen && !canManageTransportRequests) || requestCreatorOpen) && isTechDept && userDepartment && (
             <TransportRequestDialog
-              open={transportDialogOpen}
-              onOpenChange={setTransportDialogOpen}
+              open
+              onOpenChange={(open) => {
+                if (!open) {
+                  setRequestCreatorOpen(false);
+                  setTransportDialogOpen(false);
+                }
+              }}
               jobId={job.id}
               department={userDepartment}
               onSubmitted={() => {
@@ -716,6 +724,14 @@ export function JobCardNewView({
                 setTransportDialogOpen(false);
                 setLogisticsDialogOpen(true);
               }}
+              onRequestTransport={
+                isTechDept && userDepartment
+                  ? () => {
+                      setTransportDialogOpen(false);
+                      setRequestCreatorOpen(true);
+                    }
+                  : undefined
+              }
             />
           )}
 

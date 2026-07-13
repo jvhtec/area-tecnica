@@ -510,8 +510,10 @@ function JobCardNewFull({
   const handleTransportClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (canManageTransportRequests) {
-      // If there are no pending requests, allow creating a logistics event directly.
-      if (!isAllRequestsLoading && allRequests.length === 0) {
+      // Direct event creation shortcut only for users without a tech
+      // department (logistics, production): managers who belong to a tech
+      // department still need the manager dialog to file their own requests.
+      if (!isTechDept && !isAllRequestsLoading && allRequests.length === 0) {
         setSelectedTransportRequest(null);
         setLogisticsInitialEventType("load");
         setTransportDialogOpen(false);

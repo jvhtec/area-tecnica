@@ -11,6 +11,9 @@ interface TransportRequestsManagerDialogProps {
   // request is null when creating an event with no originating request
   onCreateEvent: (request: TransportRequestSummary | null, item?: RequestItem) => void;
   onCancelRequest: (requestId: string) => Promise<{ error: string | null }>;
+  // Present when the manager also belongs to a tech department and can file
+  // transport requests of their own
+  onRequestTransport?: () => void;
 }
 
 /**
@@ -23,6 +26,7 @@ export function TransportRequestsManagerDialog({
   requests,
   onCreateEvent,
   onCancelRequest,
+  onRequestTransport,
 }: TransportRequestsManagerDialogProps) {
   const { toast } = useToast();
 
@@ -45,15 +49,28 @@ export function TransportRequestsManagerDialog({
           {requests.length === 0 ? (
             <div className="space-y-3">
               <div className="text-muted-foreground">No hay solicitudes pendientes para este trabajo.</div>
-              <button
-                className="px-3 py-1 text-sm rounded border hover:bg-accent w-fit"
-                onClick={(ev) => {
-                  ev.stopPropagation();
-                  onCreateEvent(null);
-                }}
-              >
-                Crear evento
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className="px-3 py-1 text-sm rounded border hover:bg-accent w-fit"
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    onCreateEvent(null);
+                  }}
+                >
+                  Crear evento
+                </button>
+                {onRequestTransport && (
+                  <button
+                    className="px-3 py-1 text-sm rounded border hover:bg-accent w-fit"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      onRequestTransport();
+                    }}
+                  >
+                    Solicitar transporte
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
@@ -105,6 +122,19 @@ export function TransportRequestsManagerDialog({
                   </div>
                 </div>
               ))}
+              {onRequestTransport && (
+                <div className="flex justify-end pt-1">
+                  <button
+                    className="px-3 py-1 text-sm rounded border hover:bg-accent"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      onRequestTransport();
+                    }}
+                  >
+                    Solicitar transporte
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
