@@ -128,7 +128,6 @@ const mockDateRange = [
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
-  Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1024 });
 
   useOptimizedAuthMock.mockReturnValue({
     user: { id: 'user-1' },
