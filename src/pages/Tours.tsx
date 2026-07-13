@@ -72,7 +72,7 @@ const Tours = () => {
               variant="ghost"
               size="sm"
               onClick={handleToggleTours}
-              className="h-10 w-10 rounded-full p-0 text-white hover:bg-white/15 hover:text-white"
+              className="h-10 w-10 rounded-full p-0"
               aria-label={showTours ? "Contraer giras" : "Expandir giras"}
             >
               {showTours ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}

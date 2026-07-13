@@ -228,11 +228,11 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
           subtitle={format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
           accent="default"
           right={
-            <Avatar className="h-12 w-12 shadow-lg ring-2 ring-white/25">
+            <Avatar className="h-12 w-12 ring-2 ring-border">
               {profilePictureUrl && (
                 <AvatarImage src={profilePictureUrl} alt={userName} />
               )}
-              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold">
+              <AvatarFallback className="bg-indigo-600 font-bold text-white">
                 {userInitials}
               </AvatarFallback>
             </Avatar>

@@ -554,27 +554,27 @@ const ProjectManagement = () => {
           >
             <div className="flex gap-2">
               <div className="relative min-w-0 flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar proyectos..."
-                  className="h-11 w-full rounded-full border-white/10 bg-white/10 pl-9 text-white placeholder:text-white/50 focus-visible:ring-white/40 focus-visible:ring-offset-0"
+                  className="h-11 w-full rounded-full bg-card pl-9"
                 />
                 {(jobsLoading) && (
-                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/50" />
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                 )}
               </div>
               <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-11 shrink-0 gap-2 rounded-full border-white/10 bg-white/10 font-bold text-white hover:bg-white/20 hover:text-white"
+                    className="h-11 shrink-0 gap-2 rounded-full bg-card font-semibold"
                   >
                     <Filter className="h-4 w-4" />
                     Filtros
                     {(selectedJobTypes.length > 0 || selectedJobStatuses.length > 0) && (
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-900">
+                      <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
                         {selectedJobTypes.length + selectedJobStatuses.length}
                       </span>
                     )}
