@@ -60,14 +60,14 @@ const Tours = () => {
       <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
         <CardHeader className="flex flex-row items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl">
-            Tours {new Date().getFullYear()}
+            Giras {new Date().getFullYear()}
           </CardTitle>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleToggleTours}
             className="h-8 w-8 p-0 shrink-0 touch-manipulation"
-            aria-label={showTours ? "Collapse tours" : "Expand tours"}
+            aria-label={showTours ? "Contraer giras" : "Expandir giras"}
           >
             {showTours ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>

@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image, HardDrive, XCircle, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
 import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -154,8 +155,8 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
 
     if (tour.flex_folders_created) {
       toast({
-        title: "Root folders already exist",
-        description: "Tour root folders have already been created for this tour.",
+        title: "Las carpetas raíz ya existen",
+        description: "Las carpetas raíz de esta gira ya están creadas.",
         variant: "destructive"
       });
       return;
@@ -167,17 +168,17 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       const result = await createTourRootFoldersManual(tour.id);
 
       if (!result.success) {
-        throw new Error(result.error || "Failed to create tour root folders");
+        throw new Error(result.error || "No se pudieron crear las carpetas raíz de la gira");
       }
 
       toast({
-        title: "Success",
-        description: "Tour root folders have been created successfully using secure-flex-api."
+        title: "Carpetas creadas",
+        description: "Las carpetas raíz de la gira se han creado correctamente."
       });
     } catch (error: any) {
       console.error("Error creating tour root folders manually:", error);
       toast({
-        title: "Error creating tour root folders",
+        title: "Error al crear las carpetas raíz de la gira",
         description: error.message,
         variant: "destructive"
       });
@@ -191,8 +192,8 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
     // Check if root folders exist first
     if (!tour.flex_folders_created) {
       toast({
-        title: "Root folders required",
-        description: "Please create tour root folders first before creating date folders.",
+        title: "Se necesitan las carpetas raíz",
+        description: "Crea primero las carpetas raíz de la gira antes de crear las carpetas de fechas.",
         variant: "destructive"
       });
       return;
@@ -204,17 +205,17 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       const result = await createTourDateFolders(tour.id);
 
       if (!result.success) {
-        throw new Error(result.error || "Failed to create tour date folders");
+        throw new Error(result.error || "No se pudieron crear las carpetas de fechas de la gira");
       }
 
       toast({
-        title: "Success",
-        description: "Tour date folders have been created successfully."
+        title: "Carpetas creadas",
+        description: "Las carpetas de fechas de la gira se han creado correctamente."
       });
     } catch (error: any) {
       console.error("Error creating tour date folders:", error);
       toast({
-        title: "Error creating tour date folders",
+        title: "Error al crear las carpetas de fechas",
         description: error.message,
         variant: "destructive"
       });
@@ -233,8 +234,8 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
     // Check if File System Access API is supported
     if (!('showDirectoryPicker' in window)) {
       toast({
-        title: "Not supported",
-        description: "Your browser doesn't support local folder creation. Please use Chrome, Edge, or another Chromium-based browser.",
+        title: "Navegador no compatible",
+        description: "Tu navegador no permite crear carpetas locales. Usa Chrome, Edge u otro navegador basado en Chromium.",
         variant: "destructive"
       });
       return;
@@ -395,8 +396,8 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
 
       const isCustom = user && folderStructure !== null;
       toast({
-        title: "Success!",
-        description: `${isCustom ? 'Custom' : 'Default'} tour folder structure created at "${rootFolderName}"`
+        title: "Carpetas locales creadas",
+        description: `Se creó la estructura ${isCustom ? 'personalizada' : 'predeterminada'} de la gira en "${rootFolderName}"`
       });
 
     } catch (error: any) {
@@ -406,11 +407,11 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         return;
       }
 
-      let errorMessage = "Failed to create folders";
+      let errorMessage = "No se pudieron crear las carpetas";
       if (error.message?.includes("Name is not allowed")) {
-        errorMessage = "Invalid folder name detected. Please try again or contact support.";
+        errorMessage = "Se detectó un nombre de carpeta no válido. Inténtalo de nuevo o contacta con soporte.";
       } else if (error.message?.includes("getDirectoryHandle")) {
-        errorMessage = "Unable to create folder structure. Check for special characters in folder names.";
+        errorMessage = "No se pudo crear la estructura. Comprueba los caracteres especiales de los nombres.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -458,14 +459,14 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
 
       toast({
-        title: "Success",
-        description: `Tour ${actionWord}ed successfully`,
+        title: newStatus === "cancelled" ? "Gira cancelada" : "Gira reactivada",
+        description: newStatus === "cancelled" ? "La gira se ha marcado como cancelada." : "La gira se ha reactivado.",
       });
     } catch (error: any) {
       console.error(`Error ${actionWord}ing tour:`, error);
       toast({
         title: "Error",
-        description: `Failed to ${actionWord} tour: ${error.message}`,
+        description: `No se pudo actualizar la gira: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -480,14 +481,14 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         onClick={handleManageTour}
       >
         <Settings className="h-4 w-4 mr-3" />
-        <span>Manage Tour</span>
+        <span>Gestionar gira</span>
       </div>
       <div
         className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
         onClick={handleManageDatesClick}
       >
         <Calendar className="h-4 w-4 mr-3" />
-        <span>Manage Dates</span>
+        <span>Gestionar fechas</span>
       </div>
       {tour.status === 'active' ? (
         <div
@@ -495,7 +496,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
           onClick={handleToggleTourStatus}
         >
           <XCircle className="h-4 w-4 mr-3" />
-          <span>Mark as Not Happening</span>
+          <span>Marcar como cancelada</span>
         </div>
       ) : (
         <div
@@ -503,7 +504,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
           onClick={handleToggleTourStatus}
         >
           <CheckCircle className="h-4 w-4 mr-3" />
-          <span>Reactivate Tour</span>
+          <span>Reactivar gira</span>
         </div>
       )}
       {!tour.flex_folders_created && (
@@ -512,7 +513,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
           onClick={handleCreateTourRootFolders}
         >
           <FolderPlus className="h-4 w-4 mr-3" />
-          <span>Create Tour Root Folders</span>
+          <span>Crear carpetas raíz de gira</span>
         </div>
       )}
       <div
@@ -523,8 +524,8 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         <FolderPlus className="h-4 w-4 mr-3" />
         <span>
           {!tour.flex_folders_created
-            ? "Create Root Folders First"
-            : "Create Date Folders"
+            ? "Crear primero las carpetas raíz"
+            : "Crear carpetas de fechas"
           }
         </span>
       </div>
@@ -535,7 +536,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       >
         <HardDrive className="h-4 w-4 mr-3" />
         <span>
-          {isCreatingLocalFolders ? "Creating Local Folders..." : "Create Local Folders"}
+          {isCreatingLocalFolders ? "Creando carpetas locales..." : "Crear carpetas locales"}
         </span>
       </div>
       <div
@@ -543,7 +544,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         onClick={handlePrintClick}
       >
         <Printer className="h-4 w-4 mr-3" />
-        <span>Print Schedule</span>
+        <span>Imprimir calendario</span>
       </div>
     </>
   );
@@ -562,7 +563,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                   <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
                     <img
                       src={logoUrl}
-                      alt="Tour logo"
+                      alt="Logo de la gira"
                       width={48}
                       height={48}
                       loading="lazy"
@@ -601,7 +602,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                 </SheetTrigger>
                 <SheetContent side="bottom" className="h-auto max-h-[50vh]">
                   <SheetHeader>
-                    <SheetTitle>{tour.name} - Options</SheetTitle>
+                    <SheetTitle>{tour.name} · Opciones</SheetTitle>
                   </SheetHeader>
                   <div className="grid gap-2 pt-4">
                     <MenuItems />
@@ -628,11 +629,11 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                 >
                   <DropdownMenuItem onClick={handleManageTour}>
                     <Settings className="h-4 w-4 mr-2" />
-                    Manage Tour
+                    Gestionar gira
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleManageDatesClick}>
                     <Calendar className="h-4 w-4 mr-2" />
-                    Manage Dates
+                    Gestionar fechas
                   </DropdownMenuItem>
                   {tour.status === 'active' ? (
                     <DropdownMenuItem
@@ -640,7 +641,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                       className="text-red-600 hover:text-red-700"
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      Mark as Not Happening
+                      Marcar como cancelada
                     </DropdownMenuItem>
                   ) : (
                     <DropdownMenuItem
@@ -648,13 +649,13 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                       className="text-green-600 hover:text-green-700"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Reactivate Tour
+                      Reactivar gira
                     </DropdownMenuItem>
                   )}
                   {!tour.flex_folders_created && (
                     <DropdownMenuItem onClick={handleCreateTourRootFolders}>
                       <FolderPlus className="h-4 w-4 mr-2" />
-                      Create Tour Root Folders
+                      Crear carpetas raíz de gira
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem
@@ -663,8 +664,8 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                   >
                     <FolderPlus className="h-4 w-4 mr-2" />
                     {!tour.flex_folders_created
-                      ? "Create Root Folders First"
-                      : "Create Date Folders"
+                      ? "Crear primero las carpetas raíz"
+                      : "Crear carpetas de fechas"
                     }
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -672,11 +673,11 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                     disabled={isCreatingLocalFolders}
                   >
                     <HardDrive className="h-4 w-4 mr-2" />
-                    {isCreatingLocalFolders ? "Creating Local Folders..." : "Create Local Folders"}
+                    {isCreatingLocalFolders ? "Creando carpetas locales..." : "Crear carpetas locales"}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handlePrintClick}>
                     <Printer className="h-4 w-4 mr-2" />
-                    Print Schedule
+                    Imprimir calendario
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -691,12 +692,12 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground">
-                  {tour.tour_dates?.length || 0} dates
+                  {tour.tour_dates?.length || 0} fechas
                 </span>
               </div>
               {tour.start_date && tour.end_date && (
                 <span className="text-xs text-muted-foreground">
-                  {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
+                  {format(new Date(tour.start_date), "d MMM", { locale: es })} - {format(new Date(tour.end_date), "d MMM yyyy", { locale: es })}
                 </span>
               )}
             </div>
@@ -704,11 +705,11 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
             {/* Upcoming dates preview */}
             {upcomingDates.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs md:text-sm font-medium">Upcoming:</h4>
+                <h4 className="text-xs md:text-sm font-medium">Próximas:</h4>
                 {upcomingDates.map((date: any) => (
                   <div key={date.id} className="flex flex-wrap items-center gap-1 md:gap-2 text-xs">
                     <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                    <span className="whitespace-nowrap">{format(new Date(date.start_date || date.date), 'MMM d, yyyy')}</span>
+                    <span className="whitespace-nowrap">{format(new Date(date.start_date || date.date), "d MMM yyyy", { locale: es })}</span>
                     {date.location?.name && (
                       <>
                         <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0 ml-1" />
@@ -725,18 +726,18 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
               {tour.status === 'cancelled' && (
                 <Badge variant="destructive" className="text-xs">
                   <XCircle className="h-3 w-3 mr-1" />
-                  Cancelled
+                  Cancelada
                 </Badge>
               )}
               {tour.flex_folders_created ? (
                 <Badge variant="secondary" className="text-xs">
                   <FileText className="h-3 w-3 mr-1" />
-                  Flex Ready
+                  Flex preparado
                 </Badge>
               ) : (
                 <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
                   <FolderPlus className="h-3 w-3 mr-1" />
-                  Needs Root Folders
+                  Faltan carpetas raíz
                 </Badge>
               )}
               {logoUrl && (
@@ -753,7 +754,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                   color: tour.color
                 }}
               >
-                {tour.tour_dates?.length || 0} dates
+                  {tour.tour_dates?.length || 0} fechas
               </Badge>
             </div>
           </div>

@@ -232,6 +232,7 @@ const Dashboard = () => {
             onJobClick={handleJobClick}
             onMessagesClick={canManage ? openMessages : undefined}
             onEmailClick={canManage ? openEmailComposer : undefined}
+            isLoading={isLoading}
           />
         </Suspense>
 

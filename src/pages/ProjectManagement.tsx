@@ -316,8 +316,8 @@ const ProjectManagement = () => {
         });
       } else {
         toast({
-          title: "No Updates Needed",
-          description: "All past jobs are already completed or cancelled",
+          title: "No hay actualizaciones pendientes",
+          description: "Los trabajos anteriores ya están completados o cancelados",
         });
       }
     } catch (error) {
@@ -526,7 +526,7 @@ const ProjectManagement = () => {
               ) : (
                 <CheckCircle className="h-4 w-4" />
               )}
-              Auto-Complete Past Jobs
+              Completar trabajos anteriores
             </Button>
           )}
         </>
@@ -536,11 +536,16 @@ const ProjectManagement = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className={cn("w-full max-w-full mx-auto space-y-4", isMobile ? "px-3 py-4" : "px-6 py-6")}>
+      <div className={cn(
+        "w-full max-w-full mx-auto space-y-4",
+        isMobile
+          ? "px-3 pt-4 pb-[calc(9rem+env(safe-area-inset-bottom))]"
+          : "px-6 py-6",
+      )}>
         <Card>
           <CardHeader className={cn("flex flex-col space-y-4", isMobile ? "p-4 pb-3" : "p-6 pb-4")}>
           <div className="flex items-center justify-between">
-            <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Project Management</CardTitle>
+            <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Gestión de proyectos</CardTitle>
             {isMobile && (
               <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
                 <SheetTrigger asChild>
@@ -578,7 +583,7 @@ const ProjectManagement = () => {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects..."
+                placeholder="Buscar proyectos..."
                 className={cn("pl-8 h-9", isMobile && "w-full")}
               />
               {(jobsLoading) && (
@@ -615,14 +620,14 @@ const ProjectManagement = () => {
           department: selectedDepartment,
           date: currentDate
         })}
-        className="fixed bottom-20 right-6 md:bottom-8 md:right-8
+        className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-8 md:right-8
                    w-12 h-12 md:w-14 md:h-14
                    bg-blue-600 hover:bg-blue-500
                    text-white rounded-full shadow-lg
                    flex items-center justify-center
                    transition-all hover:scale-110
                    z-50"
-        aria-label="Create new job"
+        aria-label="Crear trabajo"
       >
         <Plus className="h-6 w-6" />
       </button>

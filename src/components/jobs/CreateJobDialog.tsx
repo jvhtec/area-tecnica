@@ -2,7 +2,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -172,7 +172,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
       if (!values.location.name || !values.location.address) {
         toast({
           title: "Error",
-          description: "Please select a valid location",
+          description: "Selecciona una ubicación válida",
           variant: "destructive",
         });
         setIsSubmitting(false);
@@ -251,8 +251,8 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
       await queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.all });
 
       toast({
-        title: "Success",
-        description: "Job created successfully",
+        title: "Trabajo creado",
+        description: "El trabajo se ha creado correctamente",
       });
 
       // Broadcast push notification (fire-and-forget)
@@ -283,7 +283,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
       console.error("CreateJobDialog: Error creating job:", error);
       toast({
         title: "Error",
-        description: "Failed to create job",
+        description: "No se pudo crear el trabajo",
         variant: "destructive",
       });
     } finally {
@@ -301,11 +301,11 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
   }, [selectedDepartments, setValue]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Crear Nuevo Trabajo</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Crear Nuevo Trabajo</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Título</Label>
@@ -415,12 +415,12 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                 <SelectValue placeholder="Seleccionar tipo de trabajo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="single">Single</SelectItem>
-                <SelectItem value="tour">Tour</SelectItem>
+                <SelectItem value="single">Sencillo</SelectItem>
+                <SelectItem value="tour">Gira</SelectItem>
                 <SelectItem value="festival">Festival</SelectItem>
                 <SelectItem value="ciclo">Ciclo</SelectItem>
                 <SelectItem value="dryhire">Dry Hire</SelectItem>
-                <SelectItem value="tourdate">Tour Date</SelectItem>
+                <SelectItem value="tourdate">Fecha de gira</SelectItem>
                 <SelectItem value="evento">Evento</SelectItem>
               </SelectContent>
             </Select>
@@ -558,7 +558,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

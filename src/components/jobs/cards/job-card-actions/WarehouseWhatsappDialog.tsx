@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import type { WarehouseWhatsappState } from "@/components/jobs/cards/job-card-actions/useWarehouseWhatsapp";
 
@@ -19,12 +19,12 @@ export const WarehouseWhatsappDialog = ({ state }: WarehouseWhatsappDialogProps)
   if (!state.waAlmacenOpen) return null;
 
   return (
-    <Dialog open={state.waAlmacenOpen} onOpenChange={state.setWaAlmacenOpen}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Enviar a Almacén sonido</DialogTitle>
-          <DialogDescription>Este mensaje se enviará al grupo de WhatsApp "Almacén sonido" desde tu endpoint WAHA.</DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={state.waAlmacenOpen} onOpenChange={state.setWaAlmacenOpen}>
+      <ResponsiveDialogContent>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Enviar a Almacén sonido</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>Este mensaje se enviará al grupo de WhatsApp "Almacén sonido" desde tu endpoint WAHA.</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="space-y-2">
           <Label htmlFor="wa-almacen-message">Mensaje</Label>
           <Textarea
@@ -35,13 +35,13 @@ export const WarehouseWhatsappDialog = ({ state }: WarehouseWhatsappDialogProps)
             className="min-h-[100px]"
           />
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" onClick={() => state.setWaAlmacenOpen(false)} disabled={state.isSendingWa}>Cancelar</Button>
           <Button onClick={state.handleWarehouseSend} disabled={state.isSendingWa}>
             {state.isSendingWa ? "Enviando…" : "Enviar"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

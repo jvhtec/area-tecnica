@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -173,8 +173,8 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
   }, [job]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 border-none bg-transparent shadow-none">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="p-0 border-none bg-transparent shadow-none">
         <div className={`${theme.bg} ${theme.textMain} rounded-2xl border ${theme.card} w-[95vw] max-w-xl max-h-[85vh] overflow-hidden flex flex-col`}>
           <div className={`flex items-center justify-between p-4 border-b ${theme.divider}`}>
             <div>
@@ -368,7 +368,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
             )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

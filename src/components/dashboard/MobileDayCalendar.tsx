@@ -28,6 +28,7 @@ import {
   isToday,
   parseISO,
 } from "date-fns";
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -266,13 +267,13 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 
           <div className="text-center flex-1">
             <div className="text-lg font-semibold">
-              {format(currentDate, 'EEEE')}
+              {format(currentDate, 'EEEE', { locale: es })}
             </div>
             <div className={cn(
               "text-sm",
               isToday(currentDate) ? "text-primary font-medium" : "text-muted-foreground"
             )}>
-              {format(currentDate, 'MMM d, yyyy')}
+              {format(currentDate, "d MMM yyyy", { locale: es })}
             </div>
           </div>
 
@@ -298,6 +299,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                     }
                   }}
                   initialFocus
+                  locale={es}
                   className="pointer-events-auto"
                 />
               </PopoverContent>
@@ -317,7 +319,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Filter className="h-4 w-4 mr-1" />
-                    Types
+                    Tipos
                     {selectedJobTypes.length > 0 && selectedJobTypes.length < distinctJobTypes.length && (
                       <Badge variant="secondary" className="ml-1 text-xs">
                         {selectedJobTypes.length}
@@ -349,7 +351,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Filter className="h-4 w-4 mr-1" />
-                    Status
+                    Estados
                     {selectedJobStatuses.length > 0 && selectedJobStatuses.length < distinctJobStatuses.length && (
                       <Badge variant="secondary" className="ml-1 text-xs">
                         {selectedJobStatuses.length}
@@ -379,7 +381,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 
           <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
             <Printer className="h-4 w-4 mr-1" />
-            Print
+            Imprimir
           </Button>
         </div>
 
@@ -392,7 +394,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           ) : (
             <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
               <Calendar className="h-8 w-8 mb-2" />
-              <p className="text-sm">No jobs scheduled</p>
+              <p className="text-sm">No hay trabajos programados</p>
             </div>
           )}
         </div>

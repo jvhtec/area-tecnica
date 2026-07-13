@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Calendar } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -199,27 +199,27 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   if (isJobLoading) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] flex flex-col overflow-y-auto">
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <ResponsiveDialogContent className="w-[95vw] max-w-4xl max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] flex flex-col overflow-y-auto">
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     );
   }
 
   const gridColsClass = isDryhire ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-4 md:grid-cols-8";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] max-h-[calc(92vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] flex flex-col overflow-y-auto overflow-x-hidden px-3 sm:px-6">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] max-h-[calc(92vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] flex flex-col overflow-y-auto overflow-x-hidden px-3 sm:px-6">
+        <ResponsiveDialogHeader className="flex-shrink-0">
+          <ResponsiveDialogTitle className="flex items-center gap-2 text-base md:text-lg">
             <Calendar className="h-4 w-4 md:h-5 md:w-5" />
             <span className="truncate">{jobDetails?.title || "Detalles del trabajo"}</span>
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
         <div className="min-h-0 overflow-y-auto overflow-x-hidden max-h-[75vh]">
           <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col min-w-0">
@@ -365,8 +365,8 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
             </div>
           </Tabs>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };
 

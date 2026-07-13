@@ -105,7 +105,7 @@ const getThemeStyles = (isDark: boolean) => ({
   nav: isDark ? "bg-[#0f1219] border-t border-[#1f232e]" : "bg-white border-t border-slate-200",
   card: isDark ? "bg-[#0f1219] border-[#1f232e]" : "bg-white border-slate-200 shadow-sm",
   textMain: isDark ? "text-white" : "text-slate-900",
-  textMuted: isDark ? "text-[#94a3b8]" : "text-slate-500",
+  textMuted: isDark ? "text-[#94a3b8]" : "text-slate-600",
   accent: "bg-blue-600 hover:bg-blue-500 text-white",
   input: isDark ? "bg-[#0a0c10] border-[#2a2e3b] text-white focus:border-blue-500" : "bg-white border-slate-300 text-slate-900 focus:border-blue-500",
   modalOverlay: isDark ? "bg-black/90 backdrop-blur-md" : "bg-slate-900/40 backdrop-blur-md",

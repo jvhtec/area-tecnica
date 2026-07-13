@@ -104,7 +104,7 @@ test.describe("tour management smoke", () => {
 
     await page.goto("/tours");
 
-    await expect(page.getByText(new RegExp(`tours ${smokeTourYear}`, "i"))).toBeVisible();
+    await expect(page.getByText(new RegExp(`giras ${smokeTourYear}`, "i"))).toBeVisible();
     await page.getByRole("heading", { name: "World Tour" }).click();
     await expect(page).toHaveURL(/\/tours$/);
   });
@@ -131,7 +131,7 @@ test.describe("tour management smoke", () => {
 
     await page.goto("/tours");
 
-    await expect(page.getByText(new RegExp(`tours ${smokeTourYear}`, "i"))).toBeVisible();
+    await expect(page.getByText(new RegExp(`giras ${smokeTourYear}`, "i"))).toBeVisible();
 
     const navbar = page.locator("[data-mobile-navbar]");
     await expect(navbar).toHaveCount(1);

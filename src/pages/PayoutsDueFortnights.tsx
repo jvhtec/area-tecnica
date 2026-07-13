@@ -11,14 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { createQueryKey } from "@/lib/optimized-react-query";
 import { canManagePayouts } from "@/utils/permissions";
+import { PayoutDueResponsiveList } from "@/components/payouts/PayoutDueMobileList";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -1078,143 +1077,31 @@ export default function PayoutsDueFortnights() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Table className="table-fixed">
-                  <colgroup>
-                    <col className="w-[16%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[22%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[8%]" />
-                  </colgroup>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="-ml-2 h-8 px-2"
-                          onClick={() => handleSort("technicianName")}
-                        >
-                          Técnico {getSortIndicator("technicianName")}
-                        </Button>
-                      </TableHead>
-                      <TableHead>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="-ml-2 h-8 px-2"
-                          onClick={() => handleSort("department")}
-                        >
-                          Departamento {getSortIndicator("department")}
-                        </Button>
-                      </TableHead>
-                      <TableHead>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="-ml-2 h-8 px-2"
-                          onClick={() => handleSort("jobDate")}
-                        >
-                          Fecha del evento {getSortIndicator("jobDate")}
-                        </Button>
-                      </TableHead>
-                      <TableHead>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="-ml-2 h-8 px-2"
-                          onClick={() => handleSort("jobTitle")}
-                        >
-                          Evento {getSortIndicator("jobTitle")}
-                        </Button>
-                      </TableHead>
-                      <TableHead>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="-ml-2 h-8 px-2"
-                          onClick={() => handleSort("estimate")}
-                        >
-                          Estimación {getSortIndicator("estimate")}
-                        </Button>
-                      </TableHead>
-                      <TableHead>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="-ml-2 h-8 px-2"
-                          onClick={() => handleSort("autonomo")}
-                        >
-                          Autónomo {getSortIndicator("autonomo")}
-                        </Button>
-                      </TableHead>
-                      <TableHead>Factura recibida</TableHead>
-                      <TableHead className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => handleSort("totalEur")}
-                        >
-                          Total {getSortIndicator("totalEur")}
-                        </Button>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {group.items.map((item) => {
-                      const estimateText = formatEstimateText(item.fromDate, item.toDate);
-                      const invoiceApplicable = isInvoiceApplicable(item.isHouseTech, item.isAutonomo);
-                      const invoiceReceived = Boolean(item.invoiceReceivedAt);
-                      const invoiceUpdatedAtText = item.invoiceReceivedAt
-                        ? formatInTimeZone(new Date(item.invoiceReceivedAt), MADRID_TIMEZONE, "dd/MM/yyyy")
-                        : "";
-                      const isUpdatingInvoice = Boolean(updatingInvoiceKeys[item.key]);
-                      return (
-                        <TableRow key={item.key}>
-                          <TableCell className="font-medium">{item.technicianName}</TableCell>
-                          <TableCell>{item.department || "—"}</TableCell>
-                          <TableCell>{item.jobDate ? formatLongDate(item.jobDate) : "Fecha desconocida"}</TableCell>
-                          <TableCell>{item.jobTitle}</TableCell>
-                          <TableCell>{estimateText}</TableCell>
-                          <TableCell>{formatAutonomoCellValue(item.isHouseTech, item.isAutonomo)}</TableCell>
-                          <TableCell>
-                            {!invoiceApplicable ? (
-                              null
-                            ) : canManageInvoice ? (
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={invoiceReceived}
-                                  disabled={isUpdatingInvoice}
-                                  onCheckedChange={(checked) =>
-                                    handleToggleInvoice(item, checked === true)
-                                  }
-                                  aria-label={`Factura recibida para ${item.technicianName}`}
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                  {invoiceReceived ? invoiceUpdatedAtText : ""}
-                                </span>
-                              </div>
-                            ) : (
-                              invoiceReceived ? `Sí (${invoiceUpdatedAtText})` : "No"
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.totalEur)}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <PayoutDueResponsiveList
+                  canManageInvoice={canManageInvoice}
+                  getSortIndicator={getSortIndicator}
+                  items={group.items.map((item) => ({
+                    autonomoText: formatAutonomoCellValue(item.isHouseTech, item.isAutonomo),
+                    department: item.department,
+                    estimateText: formatEstimateText(item.fromDate, item.toDate),
+                    invoiceApplicable: isInvoiceApplicable(item.isHouseTech, item.isAutonomo),
+                    invoiceReceived: Boolean(item.invoiceReceivedAt),
+                    invoiceUpdatedAtText: item.invoiceReceivedAt
+                      ? formatInTimeZone(new Date(item.invoiceReceivedAt), MADRID_TIMEZONE, "dd/MM/yyyy")
+                      : "",
+                    isUpdatingInvoice: Boolean(updatingInvoiceKeys[item.key]),
+                    jobDateText: item.jobDate ? formatLongDate(item.jobDate) : "Fecha desconocida",
+                    jobTitle: item.jobTitle,
+                    key: item.key,
+                    technicianName: item.technicianName,
+                    totalText: formatCurrency(item.totalEur),
+                  }))}
+                  onSort={handleSort}
+                  onToggleInvoice={(itemKey, received) => {
+                    const item = group.items.find((candidate) => candidate.key === itemKey);
+                    if (item) void handleToggleInvoice(item, received);
+                  }}
+                />
               </CardContent>
             </Card>
           );

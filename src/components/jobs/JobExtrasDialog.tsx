@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/ui/responsive-dialog';
 import { JobExtrasManagement } from './JobExtrasManagement';
 
 interface JobExtrasDialogProps {
@@ -17,14 +17,14 @@ export const JobExtrasDialog = ({
   isManager = false 
 }: JobExtrasDialogProps) => {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
-        <DialogHeader>
-          <DialogTitle className="text-base md:text-lg">Job Extras - {jobTitle}</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-4xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="text-base md:text-lg">Job Extras - {jobTitle}</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         
         <JobExtrasManagement jobId={jobId} isManager={isManager} />
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

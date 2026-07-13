@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -1674,11 +1674,11 @@ export const TourDefaultsManager = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[calc(95vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base md:text-lg truncate">Valores por Defecto de Gira: {tour?.name}</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[calc(95vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[80vh] overflow-y-auto">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="text-base md:text-lg truncate">Valores por Defecto de Gira: {tour?.name}</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:h-10 sm:grid-cols-4 sm:gap-0">
@@ -1716,7 +1716,7 @@ export const TourDefaultsManager = ({
             {renderTourDatesTab()}
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

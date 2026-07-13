@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTechnicianTheme } from "@/hooks/useTechnicianTheme";
 import { cn } from "@/lib/utils";
 import { addDays, endOfDay, format, isToday, isWithinInterval, startOfDay, subDays } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { Badge } from "@/components/ui/badge";
 import { isManagementRole } from "@/utils/permissions";
 import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ToolDefinition {
   label: string;
@@ -53,6 +55,7 @@ interface DepartmentMobileHubProps {
     off: number;
   };
   onStaffClick?: () => void;
+  isLoading?: boolean;
 }
 
 const themeTokens = {
@@ -96,6 +99,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   onManageAssignments,
   staffData,
   onStaffClick,
+  isLoading = false,
 }) => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -267,32 +271,40 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
         <div>
           <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
             <Icon className="h-5 w-5" />
-            <span>Department</span>
+            <span>Departamento</span>
           </div>
           <h2 className={cn("text-2xl font-bold", t.textMain)}>{title}</h2>
         </div>
 
         {/* Quick Tools */}
         <div>
-          <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", t.textMuted)}>Quick Tools</h3>
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+          <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", t.textMuted)}>Herramientas rápidas</h3>
+          <div className="relative -mr-1">
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto no-scrollbar pb-2 pr-10">
             {tools.map((tool, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={tool.onClick || (tool.to ? () => navigate(tool.to!) : undefined)}
                 className={cn(
-                  "flex flex-col items-center justify-center p-3 rounded-xl border min-w-[80px] h-[80px] flex-shrink-0 transition-all",
+                  "flex h-[80px] min-w-[80px] snap-start flex-shrink-0 flex-col items-center justify-center rounded-xl border p-3 transition-all",
                   t.toolBg,
                   "hover:border-blue-500 hover:scale-105 active:scale-95"
                 )}
               >
                 <tool.icon size={24} className={cn("mb-2", tool.color || "text-blue-500")} />
-                <span className={cn("text-[10px] font-bold text-center leading-tight", t.textMain)}>
+                <span className={cn("text-xs font-bold text-center leading-tight", t.textMain)}>
                   {tool.label}
                 </span>
               </button>
             ))}
+            </div>
+            {tools.length > 3 && (
+              <div
+                className={cn("pointer-events-none absolute inset-y-0 right-0 w-9 bg-gradient-to-l", isDark ? "from-[#05070a]" : "from-[#f8fafc]", "to-transparent")}
+                aria-hidden="true"
+              />
+            )}
           </div>
         </div>
 
@@ -312,16 +324,16 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
           >
             <div>
               <div className={cn("text-xs font-bold uppercase tracking-wider mb-1", t.textMuted)}>
-                Staff Availability
+                Disponibilidad del personal
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-slate-500" />
-                  <span className={cn("text-sm font-bold", t.textMain)}>{staffData.warehouse} Warehouse</span>
+                  <span className={cn("text-sm font-bold", t.textMain)}>{staffData.warehouse} en almacén</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className={cn("text-sm font-bold", t.textMain)}>{staffData.onJob} On Job</span>
+                  <span className={cn("text-sm font-bold", t.textMain)}>{staffData.onJob} trabajando</span>
                 </div>
               </div>
             </div>
@@ -338,7 +350,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn("flex-1", t.card)}>
                     <Filter className="h-4 w-4 mr-2" />
-                    <span className={t.textMain}>Type</span>
+                    <span className={t.textMain}>Tipo</span>
                     {selectedJobTypes.length > 0 && (
                       <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
                         {selectedJobTypes.length}
@@ -377,7 +389,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn("flex-1", t.card)}>
                     <Filter className="h-4 w-4 mr-2" />
-                    <span className={t.textMain}>Status</span>
+                    <span className={t.textMain}>Estado</span>
                     {selectedJobStatuses.length > 0 && (
                       <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
                         {selectedJobStatuses.length}
@@ -423,10 +435,10 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
             </button>
             <button type="button" className="text-center cursor-pointer" onClick={handleToday}>
               <div className={cn("text-lg font-bold", t.textMain)}>
-                {isToday(selectedDate) ? "Today" : format(selectedDate, "MMM d")}
+                {isToday(selectedDate) ? "Hoy" : format(selectedDate, "d MMM", { locale: es })}
               </div>
               <div className={cn("text-xs", t.textMuted)}>
-                {format(selectedDate, "EEE")}
+                {format(selectedDate, "EEE", { locale: es })}
               </div>
             </button>
             <button
@@ -443,7 +455,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
               className={cn("rounded-lg px-3", t.card, t.textMain)}
               onClick={handleToday}
             >
-              Today
+              Hoy
             </Button>
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
@@ -462,6 +474,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                     }
                   }}
                   initialFocus
+                  locale={es}
                 />
               </PopoverContent>
             </Popover>
@@ -476,14 +489,25 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
               className={cn("w-full rounded-xl text-base font-semibold", t.accent)}
             >
               <Plus className="h-5 w-5 mr-2" />
-              Create New Job
+              Crear trabajo
             </Button>
           )}
 
-          {selectedDateJobs.length === 0 ? (
+          {isLoading ? (
+            Array.from({ length: 3 }, (_, index) => (
+              <Card key={index} className={cn("space-y-3 rounded-2xl p-4", t.card)}>
+                <div className="flex items-center justify-between gap-4">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-10 w-full rounded-lg" />
+              </Card>
+            ))
+          ) : selectedDateJobs.length === 0 ? (
             <Card className={cn("p-4 rounded-2xl", t.card)}>
               <div className={cn("text-sm text-center", t.textMuted)}>
-                No jobs scheduled for this date.
+                No hay trabajos programados para esta fecha.
               </div>
             </Card>
           ) : (
@@ -524,7 +548,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                         const colorClass = statusColorMap[statusLower] || "bg-slate-500/10 text-slate-500";
 
                         return (
-                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase", colorClass)}>
+                          <span className={cn("px-2 py-0.5 rounded text-xs font-bold uppercase", colorClass)}>
                             {job.status || "Sin estado"}
                           </span>
                         );
@@ -539,14 +563,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                           <DropdownMenuContent align="end" className={cn("min-w-[140px]", t.card, t.textMain)}>
                             <DropdownMenuItem onClick={() => onEditJob(job)}>
                               <Edit size={14} className="mr-2" />
-                              Edit
+                              Editar
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => onDeleteJob(job.id)}
                               className="text-red-600"
                             >
                               <Trash2 size={14} className="mr-2" />
-                              Delete
+                              Eliminar
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -559,15 +583,15 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                       <Clock size={14} />
                       {job.start_time && job.end_time
                         ? `${format(new Date(job.start_time), "HH:mm")} - ${format(new Date(job.end_time), "HH:mm")}`
-                        : 'Time TBD'}
+                        : 'Horario pendiente'}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Users size={14} />
-                      {techniciansCount} Techs
+                      {techniciansCount} técnicos
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Truck size={14} />
-                      {trucksCount} Trucks
+                      {trucksCount} camiones
                     </div>
                   </div>
 
@@ -577,7 +601,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                       className="flex-1"
                       onClick={() => onViewDetails?.(job)}
                     >
-                      View Details
+                      Ver detalles
                     </Button>
                     <Button
                       className={cn("flex-1", t.accent)}
@@ -589,7 +613,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                         onJobClick?.(job.id);
                       }}
                     >
-                      Manage
+                      Gestionar
                     </Button>
                   </div>
                 </Card>

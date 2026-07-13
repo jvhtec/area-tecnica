@@ -1,5 +1,5 @@
 import React from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/ui/responsive-dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -200,13 +200,13 @@ export const JobRequirementsEditor: React.FC<JobRequirementsEditorProps> = ({ op
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl space-y-4">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-2xl space-y-4">
         <div className="flex items-start justify-between gap-4">
-          <DialogHeader>
-            <DialogTitle>Required Crew</DialogTitle>
-            {isLoading && <p className="text-sm text-muted-foreground">Loading requirements…</p>}
-          </DialogHeader>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>Personal necesario</ResponsiveDialogTitle>
+            {isLoading && <p className="text-sm text-muted-foreground">Cargando necesidades…</p>}
+          </ResponsiveDialogHeader>
           <div className="flex items-center gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={handleCancel} disabled={saving}>
               Cancel
@@ -232,10 +232,10 @@ export const JobRequirementsEditor: React.FC<JobRequirementsEditorProps> = ({ op
                   {deptRows.map((row) => (
                     <div key={row.localId} className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-7">
-                        <Label className="sr-only">Role</Label>
+                        <Label className="sr-only">Rol</Label>
                         <Select value={row.role_code} onValueChange={(value) => handleRoleChange(row.localId, value)}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
+                            <SelectValue placeholder="Seleccionar rol" />
                           </SelectTrigger>
                           <SelectContent>
                             {roleOptionsForDiscipline(dept).map((opt) => (
@@ -247,7 +247,7 @@ export const JobRequirementsEditor: React.FC<JobRequirementsEditorProps> = ({ op
                         </Select>
                       </div>
                       <div className="col-span-3">
-                        <Label className="sr-only">Qty</Label>
+                        <Label className="sr-only">Cantidad</Label>
                         <Input
                           type="number"
                           min={0}
@@ -264,15 +264,14 @@ export const JobRequirementsEditor: React.FC<JobRequirementsEditorProps> = ({ op
                     </div>
                   ))}
                   {deptRows.length === 0 && (
-                    <div className="text-sm text-muted-foreground">No roles configured</div>
+                    <div className="text-sm text-muted-foreground">No hay roles configurados</div>
                   )}
                 </div>
               </div>
             )
           })}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   )
 }
-

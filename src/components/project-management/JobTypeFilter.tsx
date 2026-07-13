@@ -19,11 +19,11 @@ interface JobTypeFilterProps {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  single: "Single",
+  single: "Sencillo",
   festival: "Festival",
   ciclo: "Ciclo",
-  tour: "Tour",
-  tourdate: "Tour Date",
+  tour: "Gira",
+  tourdate: "Fecha de gira",
   dryhire: "Dry Hire",
   evento: "Evento",
 };
@@ -69,7 +69,7 @@ export const JobTypeFilter = ({
           }}
           className="font-medium"
         >
-          {selectedJobTypes.length === allJobTypes.length ? "Clear All" : "Select All"}
+          {selectedJobTypes.length === allJobTypes.length ? "Limpiar todo" : "Seleccionar todo"}
         </DropdownMenuItem>
 
         {allJobTypes.length > 0 && <DropdownMenuSeparator />}

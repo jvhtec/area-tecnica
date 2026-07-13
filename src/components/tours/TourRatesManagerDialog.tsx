@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/ui/responsive-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -270,14 +270,14 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[calc(95dvh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
-        <DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-5xl max-h-[calc(95dvh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
+        <ResponsiveDialogHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+            <ResponsiveDialogTitle className="flex items-center gap-2 text-base md:text-lg">
               <Euro className="h-4 w-4 md:h-5 md:w-5" />
               Gestor de Tarifas y Extras
-            </DialogTitle>
+            </ResponsiveDialogTitle>
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <Badge variant={approved ? 'default' : 'secondary'} className="hidden sm:inline-flex">
                 {approved ? 'Tarifas base liberadas' : 'Aprobación base pendiente'}
@@ -378,7 +378,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             La aprobación de la gira libera las tarifas base para todo el equipo. Cada fecha también puede liberar el pago final
             (base + extras) para que los responsables finalicen importes desde un único lugar.
           </p>
-        </DialogHeader>
+        </ResponsiveDialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0 space-y-4">
           <TabsList className="w-full justify-start overflow-x-auto sm:w-auto sm:justify-center sm:overflow-visible">
@@ -717,7 +717,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             <BaseRatesEditor />
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

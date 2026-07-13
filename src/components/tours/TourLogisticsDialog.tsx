@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/ui/responsive-dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -169,18 +169,18 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base md:text-lg">Logística de Gira – Transporte</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="text-base md:text-lg">Logística de Gira – Transporte</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
         {/* Department + Note */}
-        <div className="flex flex-wrap gap-4 items-end">
-          <div>
+        <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full sm:w-auto">
             <Label>Departamento</Label>
             <Select value={department} onValueChange={(v) => setDepartment(v as Department)}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="sound">Sonido</SelectItem>
                 <SelectItem value="lights">Luces</SelectItem>
@@ -188,12 +188,12 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
               </SelectContent>
             </Select>
           </div>
-          <div className="flex-1 min-w-[240px]">
+          <div className="w-full min-w-0 flex-1 sm:min-w-[240px]">
             <Label>Nota (se aplica a todas a menos que se anule en los elementos)</Label>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota opcional" />
           </div>
-          <div className="ml-auto">
-            <Button onClick={saveAll}>Guardar en todas las fechas</Button>
+          <div className="w-full sm:ml-auto sm:w-auto">
+            <Button onClick={saveAll} className="w-full sm:w-auto">Guardar en todas las fechas</Button>
           </div>
         </div>
 
@@ -202,7 +202,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
           <Label>Vehículos por defecto para la gira</Label>
           <div className="space-y-2">
             {defaultItems.map((it, idx) => (
-              <div key={idx} className="flex items-center gap-2">
+              <div key={idx} className="grid grid-cols-1 gap-2 rounded-lg border p-2 sm:flex sm:items-center sm:border-0 sm:p-0">
                 <Select
                   value={it.transport_type}
                   onValueChange={(val) => {
@@ -211,7 +211,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                     setDefaultItems(next)
                   }}
                 >
-                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {REQUEST_TRANSPORT_OPTIONS.map(opt => (
                       <SelectItem key={opt} value={opt}>{opt.replace('_',' ')}</SelectItem>
@@ -222,7 +222,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                   type="number"
                   min={0}
                   step={0.1}
-                  className="w-52"
+                  className="w-full sm:w-52"
                   placeholder="Espacio sobrante (m) - opcional"
                   value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                   onChange={(e) => {
@@ -261,12 +261,12 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
               const items = overrides[job.id]
               return (
                 <div key={job.id} className="p-3 border rounded-md">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                  <div className="mb-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-2">
                       <Badge variant="outline">{format(new Date(job.start_time), 'EEE, MMM d')}</Badge>
-                      <span className="text-sm text-muted-foreground">{job.title}</span>
+                      <span className="min-w-0 break-words text-sm text-muted-foreground">{job.title}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {job.status === 'Cancelado' && (
                         <Badge variant="destructive" className="text-[10px]">Cancelado</Badge>
                       )}
@@ -280,7 +280,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                   {items && (
                     <div className="space-y-2">
                       {items.map((it, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+                        <div key={idx} className="grid grid-cols-1 gap-2 rounded-lg border p-2 sm:flex sm:items-center sm:border-0 sm:p-0">
                           <Select
                             value={it.transport_type}
                             onValueChange={(val) => {
@@ -289,7 +289,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                               setOverrideFor(job.id, next)
                             }}
                           >
-                            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {REQUEST_TRANSPORT_OPTIONS.map(opt => (
                                 <SelectItem key={opt} value={opt}>{opt.replace('_',' ')}</SelectItem>
@@ -300,7 +300,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                             type="number"
                             min={0}
                             step={0.1}
-                            className="w-52"
+                            className="w-full sm:w-52"
                             placeholder="Espacio sobrante (m) - opcional"
                             value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                             onChange={(e) => {
@@ -335,7 +335,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
             })}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   )
 }

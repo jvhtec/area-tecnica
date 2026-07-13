@@ -62,7 +62,7 @@ const Sound = () => {
   const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
   const currentDepartment = "sound";
-  const { data: jobs } = useJobs();
+  const { data: jobs, isLoading: jobsLoading } = useJobs();
   const { toast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -139,15 +139,15 @@ const Sound = () => {
   const allTools = [
     { label: "Pesos", to: "/pesos-tool", icon: Box, color: "text-pink-500" },
     { label: "Consumos", to: "/consumos-tool", icon: Calculator, color: "text-purple-500" },
-    { label: "SV Report", onClick: () => setShowReportGenerator(true), icon: FileText, color: "text-blue-500" },
-    { label: "Amplifier", onClick: () => setShowAmplifierTool(true), icon: Zap, color: "text-orange-500" },
+    { label: "Informe SV", onClick: () => setShowReportGenerator(true), icon: FileText, color: "text-blue-500" },
+    { label: "Amplificador", onClick: () => setShowAmplifierTool(true), icon: Zap, color: "text-orange-500" },
     { label: "Memoria", onClick: () => setShowMemoriaTecnica(true), icon: FileStack, color: "text-cyan-500" },
-    { label: "Incident", onClick: () => setShowIncidentReport(true), icon: AlertTriangle, color: "text-red-500" },
-    { label: "Plano Escenario", to: "/stage-plot", icon: Layout, color: "text-green-500" },
+    { label: "Incidencia", onClick: () => setShowIncidentReport(true), icon: AlertTriangle, color: "text-red-500" },
+    { label: "Plano de escenario", to: "/stage-plot", icon: Layout, color: "text-green-500" },
     { label: "SysCalc", to: "/syscalc", icon: Binary, color: "text-teal-500" },
-    { label: "Rack Builder", to: "/rack-builder?department=sound", icon: Server, color: "text-amber-500" },
+    { label: "Constructor de racks", to: "/rack-builder?department=sound", icon: Server, color: "text-amber-500" },
     {
-      label: hasSoundVisionAccess ? "SoundVision" : "Request Access",
+      label: hasSoundVisionAccess ? "SoundVision" : "Solicitar acceso",
       to: hasSoundVisionAccess ? "/soundvision-files" : undefined,
       onClick: !hasSoundVisionAccess ? () => setShowAccessRequestDialog(true) : undefined,
       icon: hasSoundVisionAccess ? Database : Lock,
@@ -299,6 +299,7 @@ const Sound = () => {
               setShowMobileAssignments(true);
             }}
             onStaffClick={() => navigate('/personal')}
+            isLoading={jobsLoading}
           />
           <MobileNavBar
             primaryItems={primaryItems}

@@ -38,6 +38,7 @@ import { TourAssignmentDialog } from "@/components/tours/TourAssignmentDialog";
 import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
 import { TourPresetManagerDialog } from "@/components/tours/TourPresetManagerDialog";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
@@ -48,11 +49,14 @@ import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
+import { TourManagementHeader } from "@/components/tours/TourManagementHeader";
+import { TourManagementMobileActions } from "@/components/tours/TourManagementMobileActions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { openFlexElement } from "@/utils/flex-folders";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { TourSchedulingDialog } from "@/components/tours/TourSchedulingDialog";
 import { useQuery } from "@tanstack/react-query";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -82,6 +86,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isTechnicianView = mode === 'technician' || isTechnicianRole(userRole);
+  const isMobile = useIsMobile();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDatesOpen, setIsDatesOpen] = useState(false);
@@ -559,7 +564,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     <span className="text-xs md:text-sm">
-                      {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
+                      {format(new Date(tour.start_date), "d MMM", { locale: es })} - {format(new Date(tour.end_date), "d MMM yyyy", { locale: es })}
                     </span>
                   </div>
                 )}
@@ -670,65 +675,28 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
     <div className="max-w-[1920px] mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header Section */}
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row items-start gap-4">
-          {/* Tour Logo */}
-          {tourLogoUrl && (
-            <div className="flex-shrink-0 mx-auto md:mx-0">
-              <img 
-                src={tourLogoUrl} 
-                alt={`${tour.name} logo`}
-                width={64}
-                height={64}
-                loading="lazy"
-                decoding="async"
-                className="w-16 h-16 object-contain rounded-lg border border-border"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-          
-          <div className="flex-1 text-center md:text-left">
-            {isTechnicianView && (
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
-                <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  Volver al Panel
-                </Button>
-                <Badge variant="outline">
-                  <Eye className="h-3 w-3 mr-1" />
-                  Vista de Técnico
-                </Badge>
-              </div>
-            )}
-            <h1 className="text-2xl md:text-3xl font-bold">{tour.name}</h1>
-            {tour.description && (
-              <p className="text-muted-foreground mt-1 text-sm md:text-base">{tour.description}</p>
-            )}
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-4 mt-2">
-              {tour.start_date && tour.end_date && (
-                <div className="flex items-center gap-2 text-xs md:text-sm">
-                  <Calendar className="h-4 w-4" />
-                  <span>
-                    {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
-                  </span>
-                </div>
-              )}
-              <Badge variant="outline" style={{ borderColor: tour.color, color: tour.color }}>
-                {totalDates} fechas
-              </Badge>
-              {totalAssignments > 0 && (
-                <Badge variant="outline">
-                  {totalAssignments} crew asignado
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
+        <TourManagementHeader
+          isTechnicianView={isTechnicianView}
+          onBackToTechnicianDashboard={handleBackToTechnicianDashboard}
+          tour={tour}
+          tourLogoUrl={tourLogoUrl}
+          totalAssignments={totalAssignments}
+          totalDates={totalDates}
+        />
         
-        {!isTechnicianView && (
+        {!isTechnicianView && (isMobile ? (
+          <TourManagementMobileActions
+            flexUuid={flexUuid}
+            folderExists={folderExists}
+            isFlexLoading={isFlexLoading}
+            isManagementUser={isManagementUser}
+            isPrintingSchedule={isPrintingSchedule}
+            onFlexClick={handleFlexClick}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenWhatsapp={openWaDialog}
+            onPrintSchedule={handlePrintSchedule}
+          />
+        ) : (
           <div className="flex flex-col sm:flex-row flex-wrap gap-2">
             <Button
               onClick={handlePrintSchedule}
@@ -775,7 +743,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               Configuración de Gira
             </Button>
           </div>
-        )}
+        ))}
       </div>
 
       {/* Auto-sync info for management users */}
@@ -822,7 +790,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium">Crew Asignado</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Personal asignado</CardTitle>
             <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
@@ -839,14 +807,14 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">
           {isTechnicianView ? 'Información de Gira' : 'Áreas de Gestión'}
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 md:gap-4">
           {quickActions.map((action, index) => (
             <Card
               key={index}
               className={`hover:shadow-md transition-shadow cursor-pointer ${action.disabled ? 'opacity-60' : ''}`}
               onClick={action.onClick}
             >
-              <CardHeader className="pb-3 px-3 md:px-6 pt-3 md:pt-6">
+              <CardHeader className="px-3 pb-2 pt-3 md:px-6 md:pb-3 md:pt-6">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -857,7 +825,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                         </Badge>
                       )}
                     </div>
-                    <Badge variant={action.badge === "Coming Soon" ? "secondary" : tourRatesApproved && action.id === 'rates-manager' ? 'default' : 'outline'} className="text-xs">
+                    <Badge variant={action.badge === "Coming Soon" ? "secondary" : tourRatesApproved && action.id === 'rates-manager' ? 'default' : 'outline'} className="max-w-[7rem] truncate text-xs">
                       {action.badge}
                     </Badge>
                   </div>
@@ -898,10 +866,10 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                     </div>
                   )}
                 </div>
-                <CardTitle className="text-sm md:text-base mt-2">{action.title}</CardTitle>
+                <CardTitle className="mt-1 line-clamp-2 text-sm md:mt-2 md:text-base">{action.title}</CardTitle>
               </CardHeader>
-              <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-                <p className="text-xs text-muted-foreground line-clamp-2">{action.description}</p>
+              <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
+                <p className="hidden text-xs text-muted-foreground md:line-clamp-2">{action.description}</p>
                 {action.viewOnly && isTechnicianView && (
                   <Badge variant="secondary" className="mt-2 text-xs">
                     Solo Lectura
@@ -924,11 +892,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                   <div className="flex items-center justify-between">
                     <Calendar className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground flex-shrink-0" />
                     <Badge variant="outline" className="text-xs">
-                      {format(new Date(date.date), 'MMM d')}
+                      {format(new Date(date.date), "d MMM", { locale: es })}
                     </Badge>
                   </div>
                   <CardTitle className="text-sm md:text-base mt-2">
-                    {format(new Date(date.date), 'EEEE, MMMM d, yyyy')}
+                    {format(new Date(date.date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
@@ -1051,7 +1019,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               >
                 {sortedTourDates.map((d: any) => (
                   <option key={d.id} value={d.id}>
-                    {format(new Date(d.date), 'PPPP')}{d.location?.name ? ` · ${d.location.name}` : ''}
+                    {format(new Date(d.date), "PPPP", { locale: es })}{d.location?.name ? ` · ${d.location.name}` : ''}
                   </option>
                 ))}
               </select>

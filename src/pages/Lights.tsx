@@ -143,7 +143,7 @@ const Lights = () => {
           // Invalidate queries to refresh the list
           await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
         } else {
-          throw new Error(result.error || "Unknown deletion error");
+          throw new Error(result.error || "Error desconocido al eliminar");
         }
       } catch (error: any) {
         console.error("Lights page: Error in optimistic job deletion:", error);
@@ -197,6 +197,7 @@ const Lights = () => {
             onEditJob={handleEditClick}
             onDeleteJob={handleDeleteClick}
             onJobClick={handleJobClick}
+            isLoading={isLoading}
           />
         )}
         {!isMobile && (

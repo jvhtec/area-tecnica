@@ -22,10 +22,10 @@ interface StatusFilterProps {
 }
 
 const STATUS_LABELS: Record<JobStatus, string> = {
-  "Tentativa": "Tentative",
-  "Confirmado": "Confirmed", 
-  "Completado": "Completed",
-  "Cancelado": "Cancelled"
+  "Tentativa": "Tentativa",
+  "Confirmado": "Confirmado",
+  "Completado": "Completado",
+  "Cancelado": "Cancelado"
 };
 
 export const StatusFilter = ({
@@ -73,7 +73,7 @@ export const StatusFilter = ({
           }}
           className="font-medium"
         >
-          {selectedJobStatuses.length === allJobStatuses.length ? "Clear All" : "Select All"}
+          {selectedJobStatuses.length === allJobStatuses.length ? "Limpiar todo" : "Seleccionar todo"}
         </DropdownMenuItem>
         
         {allJobStatuses.length > 0 && <DropdownMenuSeparator />}

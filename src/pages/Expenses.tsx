@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { ExpenseStatus } from '@/components/jobs/JobExpensesPanel';
+import { ExpenseManagementMobileList } from '@/components/expenses/ExpenseManagementMobileList';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -521,7 +522,50 @@ const ExpensesPage: React.FC = () => {
               <AlertCircle className="h-4 w-4" /> No hay gastos que coincidan con los filtros.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <ExpenseManagementMobileList
+              items={expenses.map((expense) => ({
+                amountText: formatCurrency(expense.amount_eur),
+                canDelete: canDeleteExpenses,
+                categoryLabel: expense.category?.label_es || expense.category_slug,
+                dateText: format(new Date(expense.expense_date), 'PPP', { locale: es }),
+                description: expense.description,
+                id: expense.id,
+                jobTitle: expense.job?.title || `Trabajo ${expense.job_id.substring(0, 8)}…`,
+                originalAmountText: `${expense.amount_original.toFixed(2)} ${expense.currency_code}`,
+                selectable: expense.status === 'submitted',
+                selected: selectedExpenseIds.has(expense.id),
+                status: expense.status,
+                statusLabel: statusOptions.find((status) => status.value === expense.status)?.label || expense.status,
+                technicianName: [expense.technician?.first_name, expense.technician?.last_name]
+                  .filter(Boolean).join(' ').trim() || expense.technician_id,
+              }))}
+              onApprove={(expenseId) => {
+                void (async () => {
+                  try {
+                    await approveExpense(expenseId, true);
+                    toast.success('Gasto aprobado');
+                    await invalidateExpenseContext();
+                    refetch();
+                  } catch (error) {
+                    console.error('[ExpensesPage] Failed to approve expense', error);
+                    toast.error('No se pudo aprobar el gasto');
+                  }
+                })();
+              }}
+              onDelete={(expenseId, technicianName) => {
+                const expense = expenses.find((candidate) => candidate.id === expenseId);
+                if (expense) setDeleteDialog({ expenseId, technicianName, amount: expense.amount_eur });
+              }}
+              onReject={(expenseId, technicianName) => setRejectDialog({ expenseId, technicianName, reason: '' })}
+              onToggle={toggleSelection}
+              onViewReceipt={(expenseId) => {
+                const expense = expenses.find((candidate) => candidate.id === expenseId);
+                if (expense) void handleViewReceipt(expense);
+              }}
+              viewingReceiptId={viewReceiptState?.loading ? viewReceiptState.expenseId : undefined}
+            />
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase text-muted-foreground">
                   <tr>
@@ -670,6 +714,7 @@ const ExpensesPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

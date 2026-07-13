@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { format, addDays, subDays, isWithinInterval, startOfDay, endOfDay, isToday } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getOptimizedProfilePictureUrl } from "@/utils/imageOptimization";
 import { isManagementRole } from "@/utils/permissions";
 import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DashboardMobileHubProps {
   jobs: any[];
@@ -34,6 +36,7 @@ interface DashboardMobileHubProps {
   onJobClick: (jobId: string) => void;
   onMessagesClick?: () => void;
   onEmailClick?: () => void;
+  isLoading?: boolean;
 }
 
 const themeTokens = {
@@ -68,6 +71,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   onJobClick,
   onMessagesClick,
   onEmailClick,
+  isLoading = false,
 }) => {
   const isMobile = useIsMobile();
   const selectedDate = useMemo(() => date ?? new Date(), [date]);
@@ -230,7 +234,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
         <div className="flex justify-between items-center">
           <div>
             <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
-              <span>Dashboard</span>
+              <span>Panel</span>
             </div>
             <h2 className={cn("text-2xl font-bold", themeTokens.textMain)}>Agenda</h2>
           </div>
@@ -247,7 +251,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
         {/* Quick Actions */}
         {canEdit && (onMessagesClick || onEmailClick) && (
           <div>
-            <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", themeTokens.textMuted)}>Quick Actions</h3>
+            <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", themeTokens.textMuted)}>Acciones rápidas</h3>
             <div className="flex gap-3">
               {onMessagesClick && (
                 <button
@@ -259,7 +263,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                   )}
                 >
                   <MessageSquare size={24} className="mb-2 text-blue-500" />
-                  <span className={cn("text-[10px] font-bold text-center leading-tight", themeTokens.textMain)}>
+                  <span className={cn("text-xs font-bold text-center leading-tight", themeTokens.textMain)}>
                     Mensajes
                   </span>
                 </button>
@@ -274,7 +278,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                   )}
                 >
                   <Mail size={24} className="mb-2 text-emerald-500" />
-                  <span className={cn("text-[10px] font-bold text-center leading-tight", themeTokens.textMain)}>
+                  <span className={cn("text-xs font-bold text-center leading-tight", themeTokens.textMain)}>
                     Email
                   </span>
                 </button>
@@ -292,7 +296,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn("flex-1", themeTokens.card)}>
                     <Filter className="h-4 w-4 mr-2" />
-                    <span className={themeTokens.textMain}>Type</span>
+                    <span className={themeTokens.textMain}>Tipo</span>
                     {selectedJobTypes.length > 0 && (
                       <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
                         {selectedJobTypes.length}
@@ -331,7 +335,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn("flex-1", themeTokens.card)}>
                     <Filter className="h-4 w-4 mr-2" />
-                    <span className={themeTokens.textMain}>Status</span>
+                    <span className={themeTokens.textMain}>Estado</span>
                     {selectedJobStatuses.length > 0 && (
                       <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
                         {selectedJobStatuses.length}
@@ -377,10 +381,10 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
             </button>
             <button type="button" className="text-center cursor-pointer" onClick={handleToday}>
               <div className={cn("text-lg font-bold", themeTokens.textMain)}>
-                {isToday(selectedDate) ? "Today" : format(selectedDate, "MMM d")}
+                {isToday(selectedDate) ? "Hoy" : format(selectedDate, "d MMM", { locale: es })}
               </div>
               <div className={cn("text-xs", themeTokens.textMuted)}>
-                {format(selectedDate, "EEE")}
+                {format(selectedDate, "EEE", { locale: es })}
               </div>
             </button>
             <button
@@ -397,7 +401,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
               className={cn("rounded-lg px-3", themeTokens.card, themeTokens.textMain)}
               onClick={handleToday}
             >
-              Today
+              Hoy
             </Button>
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
@@ -416,6 +420,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                     }
                   }}
                   initialFocus
+                  locale={es}
                 />
               </PopoverContent>
             </Popover>
@@ -424,7 +429,18 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
 
         {/* Job List */}
         <div className="space-y-3">
-          {selectedDateJobs.length === 0 ? (
+          {isLoading ? (
+            Array.from({ length: 3 }, (_, index) => (
+              <Card key={index} className={cn("space-y-3 rounded-2xl p-4", themeTokens.card)}>
+                <div className="flex items-center justify-between gap-4">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-9 w-full rounded-lg" />
+              </Card>
+            ))
+          ) : selectedDateJobs.length === 0 ? (
             <Card className={cn("p-6 rounded-2xl", themeTokens.card)}>
               <div className={cn("text-sm text-center", themeTokens.textMuted)}>
                 No hay trabajos programados para esta fecha
@@ -475,7 +491,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                           {departments.map((dept: string) => (
                             <span
                               key={dept}
-                              className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted", themeTokens.textMuted)}
+                              className={cn("px-2 py-0.5 rounded text-xs font-bold uppercase bg-muted", themeTokens.textMuted)}
                             >
                               {dept}
                             </span>
@@ -486,7 +502,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                     <div className="flex items-center gap-2">
                       {job.status && (
                         <span className={cn(
-                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                          "px-2 py-0.5 rounded text-xs font-bold uppercase",
                           job.status.toLowerCase() === 'confirmado' ? "bg-cyan-500/10 text-cyan-500" :
                           job.status.toLowerCase() === 'tentativa' ? "bg-blue-500/10 text-blue-500" :
                           job.status.toLowerCase() === 'completado' ? "bg-purple-500/10 text-purple-500" :
@@ -506,14 +522,14 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                           <DropdownMenuContent align="end" className={cn("min-w-[140px]", themeTokens.card, themeTokens.textMain)}>
                             <DropdownMenuItem onClick={() => onEditClick(job)}>
                               <Edit size={14} className="mr-2" />
-                              Edit
+                              Editar
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => onDeleteClick(job.id)}
                               className="text-red-600"
                             >
                               <Trash2 size={14} className="mr-2" />
-                              Delete
+                              Eliminar
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -526,7 +542,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                       {formatInJobTimezone(job.start_time, "HH:mm", jobTimezone)} - {formatInJobTimezone(job.end_time, "HH:mm", jobTimezone)}
                     </div>
                     <div>
-                      {assignedCount}/{totalNeeded || assignedCount} Crew
+                      {assignedCount}/{totalNeeded || assignedCount} técnicos
                     </div>
                   </div>
 

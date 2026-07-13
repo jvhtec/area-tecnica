@@ -106,14 +106,16 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
   return (
     <div className="space-y-3">
       {documents.map((document) => (
-        <Card key={document.id}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-muted-foreground" />
-                <div className="min-w-0">
+        <Card key={document.id} className="min-w-0 overflow-hidden">
+          <CardHeader className="p-3 pb-3 md:p-6 md:pb-3">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="font-medium truncate">{document.file_name}</h4>
+                    <h4 className="min-w-0 max-w-full break-words font-medium sm:truncate">
+                      {document.file_name}
+                    </h4>
                     {document.visible_to_tech ? (
                       <Badge variant="secondary">Visible para técnicos</Badge>
                     ) : (
@@ -126,7 +128,7 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
                       <Badge variant="secondary">Visible externo</Badge>
                     ) : null}
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       {format(new Date(document.uploaded_at), 'MMM d, yyyy')}
@@ -138,7 +140,7 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
                 </div>
               </div>
 
-              <div className="flex gap-2 items-center">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
                 {canManageVisibility ? (
                   <div className="flex flex-col gap-2 mr-2">
                     <label className="flex items-center justify-end gap-2">

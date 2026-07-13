@@ -64,7 +64,7 @@ export const DepartmentTabs = ({
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           ) : jobs.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No jobs found</p>
+            <p className="text-center text-muted-foreground py-8">No se encontraron trabajos</p>
           ) : (
             <div className={cn("space-y-4", isMobile && "space-y-3")}>
               {jobs.map((job) => {

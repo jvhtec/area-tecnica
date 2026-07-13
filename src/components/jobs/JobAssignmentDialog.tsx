@@ -11,14 +11,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from "@/components/ui/responsive-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -514,8 +514,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-[625px] max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] flex flex-col overflow-hidden">
+    <ResponsiveDialog open={isOpen} onOpenChange={onClose}>
+      <ResponsiveDialogContent className="w-[95vw] max-w-[625px] max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] flex flex-col overflow-hidden">
         {isClosureLocked && (
           <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50">
             <AlertCircle className="h-4 w-4" />
@@ -525,8 +525,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             </AlertDescription>
           </Alert>
         )}
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <ResponsiveDialogHeader className="flex-shrink-0">
+          <ResponsiveDialogTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-base md:text-lg">Gestión de Personal - {formatDepartmentName(currentDepartment)}</span>
             <div className="flex flex-wrap items-center gap-2">
               {crewCallData?.flex_element_id && (
@@ -553,8 +553,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                 </Button>
               )}
             </div>
-          </DialogTitle>
-          <DialogDescription className="text-xs md:text-sm">
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="text-xs md:text-sm">
             Gestiona las asignaciones existentes para {formatDepartmentName(currentDepartment)}. Puedes modificar roles/categorías o eliminar personal. Para nuevas asignaciones, usa la Matriz de Asignaciones.
             {crewCallData?.flex_element_id && (
               <span className="block text-xs md:text-sm text-muted-foreground mt-1">
@@ -566,8 +566,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                 Cobertura: {(Array.from(assignedByRole.values()).reduce((a, b) => a + b, 0))}/{reqForDept.total_required} requeridos
               </span>
             )}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="flex-1 overflow-y-auto px-1">
           <div className="py-3 md:py-4">
@@ -799,12 +799,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           </div>
         </div>
 
-        <DialogFooter className="flex-shrink-0">
+        <ResponsiveDialogFooter className="flex-shrink-0">
           <Button type="button" onClick={onClose} size="sm" className="w-full sm:w-auto">
             Cerrar
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };
