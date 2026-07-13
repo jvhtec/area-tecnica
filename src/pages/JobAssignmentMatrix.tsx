@@ -9,7 +9,6 @@ import { MatrixPageControls } from '@/pages/job-assignment-matrix/MatrixPageCont
 import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingReminderDialogs';
 import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
 import { useStaffingButtonPreferences } from '@/pages/job-assignment-matrix/useStaffingButtonPreferences';
-import { MobileAssignmentDayList } from '@/pages/job-assignment-matrix/MobileAssignmentDayList';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -61,7 +60,6 @@ export default function JobAssignmentMatrix() {
     jobTitle: string;
   }>(null);
   const [lastAcknowledgedHash, setLastAcknowledgedHash] = useState<string | null>(null);
-  const [mobileDate, setMobileDate] = useState(() => new Date());
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -396,13 +394,6 @@ export default function JobAssignmentMatrix() {
 
   const jobIds = React.useMemo(() => yearJobs.map((j: any) => j.id).filter(Boolean), [yearJobs]);
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
-  const mobileAssignmentsQuery = useQuery({
-    queryKey: queryKeys.scope('mobile-matrix-assignments', jobIdsKey, filteredTechnicianIdsKey),
-    queryFn: () => fetchAssignmentsForWindow(jobIds, filteredTechnicianIds, yearJobs),
-    enabled: isMobile && jobIds.length > 0 && filteredTechnicianIds.length > 0,
-    staleTime: 30 * 1000,
-    gcTime: 2 * 60 * 1000,
-  });
 
   const staffingReminderQuery = useQuery({
     queryKey: queryKeys.scope('matrix-staffing-summary', jobIdsKey),
@@ -684,16 +675,6 @@ export default function JobAssignmentMatrix() {
               <p className="text-muted-foreground">Cargando la matriz de asignaciones...</p>
             </div>
           </div>
-        ) : isMobile ? (
-          <MobileAssignmentDayList
-            assignments={mobileAssignmentsQuery.data ?? []}
-            date={mobileDate}
-            department={selectedDepartment}
-            isLoading={mobileAssignmentsQuery.isLoading}
-            jobs={yearJobs}
-            onDateChange={setMobileDate}
-            technicians={filteredTechnicians}
-          />
         ) : (
           <OptimizedAssignmentMatrix
             technicians={filteredTechnicians}
