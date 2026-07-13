@@ -31,6 +31,8 @@ export interface MobileAccentTokens {
   chipText: string;
   /** Thin progress bar fill (staffing meter). */
   meter: string;
+  /** Focus/emphasis ring for the live (in-progress) agenda card. */
+  ring: string;
 }
 
 const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
@@ -41,6 +43,7 @@ const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
     chipBg: "bg-sky-500/15",
     chipText: "text-sky-600 dark:text-sky-400",
     meter: "bg-sky-500",
+    ring: "ring-sky-500/50",
   },
   lights: {
     kicker: "text-amber-600 dark:text-amber-400",
@@ -49,6 +52,7 @@ const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
     chipBg: "bg-amber-500/15",
     chipText: "text-amber-600 dark:text-amber-400",
     meter: "bg-amber-500",
+    ring: "ring-amber-500/50",
   },
   video: {
     kicker: "text-violet-600 dark:text-violet-400",
@@ -57,6 +61,7 @@ const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
     chipBg: "bg-violet-500/15",
     chipText: "text-violet-600 dark:text-violet-400",
     meter: "bg-violet-500",
+    ring: "ring-violet-500/50",
   },
   production: {
     kicker: "text-emerald-600 dark:text-emerald-400",
@@ -65,6 +70,7 @@ const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
     chipBg: "bg-emerald-500/15",
     chipText: "text-emerald-600 dark:text-emerald-400",
     meter: "bg-emerald-500",
+    ring: "ring-emerald-500/50",
   },
   logistics: {
     kicker: "text-orange-600 dark:text-orange-400",
@@ -73,6 +79,7 @@ const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
     chipBg: "bg-orange-500/15",
     chipText: "text-orange-600 dark:text-orange-400",
     meter: "bg-orange-500",
+    ring: "ring-orange-500/50",
   },
   administrative: {
     kicker: "text-slate-600 dark:text-slate-400",
@@ -81,6 +88,7 @@ const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
     chipBg: "bg-slate-500/15",
     chipText: "text-slate-600 dark:text-slate-400",
     meter: "bg-slate-500",
+    ring: "ring-slate-500/50",
   },
   default: {
     kicker: "text-indigo-600 dark:text-indigo-400",
@@ -89,6 +97,7 @@ const ACCENTS: Record<MobileAccentKey, MobileAccentTokens> = {
     chipBg: "bg-indigo-500/15",
     chipText: "text-indigo-600 dark:text-indigo-400",
     meter: "bg-indigo-500",
+    ring: "ring-indigo-500/50",
   },
 };
 

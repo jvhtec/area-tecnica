@@ -16,6 +16,7 @@ import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
 import { MobileTile } from "@/components/mobile/MobileTile";
 import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
 import { MobileNowDivider } from "@/components/mobile/MobileNowDivider";
+import { MobileTimelineItem, type MobileTimelineState } from "@/components/mobile/MobileTimelineItem";
 import { getJobLocationName } from "@/components/mobile/job-location";
 import { getMobileAccent, type MobileAccentKey } from "@/components/mobile/mobile-accents";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
@@ -279,6 +280,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
     return idx === -1 ? selectedDateJobs.length : idx;
   }, [selectedDateJobs, selectedDate]);
 
+  const jobTimelineState = (job: { start_time: string; end_time: string }): MobileTimelineState => {
+    if (!isToday(selectedDate)) return "none";
+    const now = Date.now();
+    if (new Date(job.end_time).getTime() < now) return "past";
+    if (new Date(job.start_time).getTime() <= now) return "live";
+    return "upcoming";
+  };
+
   const accentKey = department as MobileAccentKey;
   const accent = getMobileAccent(accentKey);
 
@@ -518,7 +527,13 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
 
               return (
                 <React.Fragment key={job.id}>
-                {jobIndex === nowDividerIndex && <MobileNowDivider accent={accentKey} />}
+                {jobIndex === nowDividerIndex && <MobileNowDivider accent={accentKey} inTimeline />}
+                <MobileTimelineItem
+                  accent={accentKey}
+                  state={jobTimelineState(job)}
+                  isFirst={jobIndex === 0 && nowDividerIndex !== 0}
+                  isLast={jobIndex === selectedDateJobs.length - 1 && nowDividerIndex !== selectedDateJobs.length}
+                >
                 <div
                   className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300"
                   style={{ animationDelay: `${Math.min(jobIndex, 8) * 45}ms` }}
@@ -533,6 +548,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                   assignedCount={techniciansCount}
                   trucksCount={trucksCount}
                   accent={accentKey}
+                  live={jobTimelineState(job) === "live"}
                   secondaryLabel="Ver detalles"
                   onSecondary={() => onViewDetails?.(job)}
                   primaryLabel="Gestionar"
@@ -569,11 +585,12 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                   }
                 />
                 </div>
+                </MobileTimelineItem>
                 </React.Fragment>
               );
             })}
             {selectedDateJobs.length > 0 && nowDividerIndex === selectedDateJobs.length && (
-              <MobileNowDivider accent={accentKey} />
+              <MobileNowDivider accent={accentKey} inTimeline />
             )}
             </>
           )}

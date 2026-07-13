@@ -14,6 +14,7 @@ import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
 import { MobileTile } from "@/components/mobile/MobileTile";
 import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
 import { MobileNowDivider } from "@/components/mobile/MobileNowDivider";
+import { MobileTimelineItem, type MobileTimelineState } from "@/components/mobile/MobileTimelineItem";
 import { getJobLocationName } from "@/components/mobile/job-location";
 import {
   DropdownMenu,
@@ -217,6 +218,14 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
     );
     return idx === -1 ? selectedDateJobs.length : idx;
   }, [selectedDateJobs, selectedDate]);
+
+  const jobTimelineState = (job: { start_time: string; end_time: string }): MobileTimelineState => {
+    if (!isToday(selectedDate)) return "none";
+    const now = Date.now();
+    if (new Date(job.end_time).getTime() < now) return "past";
+    if (new Date(job.start_time).getTime() <= now) return "live";
+    return "upcoming";
+  };
 
   // User display name and initials
   const userName = userProfile?.first_name && userProfile?.last_name
@@ -441,7 +450,13 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
 
               return (
                 <React.Fragment key={job.id}>
-                {jobIndex === nowDividerIndex && <MobileNowDivider accent="default" />}
+                {jobIndex === nowDividerIndex && <MobileNowDivider accent="default" inTimeline />}
+                <MobileTimelineItem
+                  accent="default"
+                  state={jobTimelineState(job)}
+                  isFirst={jobIndex === 0 && nowDividerIndex !== 0}
+                  isLast={jobIndex === selectedDateJobs.length - 1 && nowDividerIndex !== selectedDateJobs.length}
+                >
                 <div
                   className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300"
                   style={{ animationDelay: `${Math.min(jobIndex, 8) * 45}ms` }}
@@ -457,6 +472,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                   assignedCount={assignedCount}
                   neededCount={totalNeeded || undefined}
                   accent="default"
+                  live={jobTimelineState(job) === "live"}
                   primaryLabel="Ver detalles"
                   onPrimary={() => onJobClick(job.id)}
                   menu={
@@ -485,11 +501,12 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                   }
                 />
                 </div>
+                </MobileTimelineItem>
                 </React.Fragment>
               );
             })}
             {selectedDateJobs.length > 0 && nowDividerIndex === selectedDateJobs.length && (
-              <MobileNowDivider accent="default" />
+              <MobileNowDivider accent="default" inTimeline />
             )}
             </>
           )}

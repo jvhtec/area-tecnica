@@ -27,6 +27,8 @@ interface MobileAgendaJobCardProps {
   onSecondary?: () => void;
   /** Slot for the edit/delete dropdown trigger. */
   menu?: React.ReactNode;
+  /** The job is underway right now: accent ring + "EN CURSO" chip. */
+  live?: boolean;
 }
 
 /**
@@ -51,6 +53,7 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
   secondaryLabel,
   onSecondary,
   menu,
+  live = false,
 }) => {
   const a = getMobileAccent(accent);
   const railColor = jobColor || "#6366f1";
@@ -60,7 +63,12 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
     : 0;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md">
+    <article
+      className={cn(
+        "overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md",
+        live && cn("ring-2", a.ring),
+      )}
+    >
       <div className="flex items-stretch">
         {/* Time rail */}
         <div
@@ -88,6 +96,18 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {live && (
+              <span
+                className={cn(
+                  "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
+                  a.chipBg,
+                  a.chipText,
+                )}
+              >
+                <span className={cn("h-1.5 w-1.5 animate-pulse rounded-full", a.meter)} />
+                En curso
+              </span>
+            )}
             {status && (
               <span
                 className={cn(
