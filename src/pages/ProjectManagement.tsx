@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Search, Filter, Plus, Check } from "lucide-react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Department } from "@/types/department";
-import { startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { startOfMonth, endOfMonth, addMonths, format } from "date-fns";
+import { es } from "date-fns/locale";
+import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
+import { getMobileAccent, type MobileAccentKey } from "@/components/mobile/mobile-accents";
 import { MonthNavigation } from "@/components/project-management/MonthNavigation";
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { StatusFilter } from "@/components/project-management/StatusFilter";
@@ -542,18 +545,36 @@ const ProjectManagement = () => {
           ? "px-3 pt-4 pb-[calc(9rem+env(safe-area-inset-bottom))]"
           : "px-6 py-6",
       )}>
-        <Card>
-          <CardHeader className={cn("flex flex-col space-y-4", isMobile ? "p-4 pb-3" : "p-6 pb-4")}>
-          <div className="flex items-center justify-between">
-            <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Gestión de proyectos</CardTitle>
-            {isMobile && (
+        {isMobile && (
+          <MobileScreenHeader
+            kicker="Gestión"
+            title="Proyectos"
+            subtitle={format(currentDate, "LLLL yyyy", { locale: es })}
+            accent={selectedDepartment as MobileAccentKey}
+          >
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar proyectos..."
+                  className="h-11 w-full rounded-full border-white/10 bg-white/10 pl-9 text-white placeholder:text-white/50 focus-visible:ring-white/40 focus-visible:ring-offset-0"
+                />
+                {(jobsLoading) && (
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/50" />
+                )}
+              </div>
               <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button
+                    variant="outline"
+                    className="h-11 shrink-0 gap-2 rounded-full border-white/10 bg-white/10 font-bold text-white hover:bg-white/20 hover:text-white"
+                  >
                     <Filter className="h-4 w-4" />
                     Filtros
                     {(selectedJobTypes.length > 0 || selectedJobStatuses.length > 0) && (
-                      <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-900">
                         {selectedJobTypes.length + selectedJobStatuses.length}
                       </span>
                     )}
@@ -573,26 +594,35 @@ const ProjectManagement = () => {
                   <FilterContent />
                 </SheetContent>
               </Sheet>
-            )}
-          </div>
-          
-          <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row flex-wrap items-center")}>
-            {!isMobile && <FilterContent />}
-            <div className={cn("relative", isMobile ? "w-full" : "flex-1 min-w-[220px] max-w-[280px]")}>
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar proyectos..."
-                className={cn("pl-8 h-9", isMobile && "w-full")}
-              />
-              {(jobsLoading) && (
-                <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-              )}
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className={cn(isMobile ? "p-4 pt-2" : "p-6 pt-2")}>
+          </MobileScreenHeader>
+        )}
+
+        <Card className={cn(isMobile && "border-border/60 rounded-2xl")}>
+          {!isMobile && (
+            <CardHeader className="flex flex-col space-y-4 p-6 pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl">Gestión de proyectos</CardTitle>
+            </div>
+
+            <div className="flex flex-row flex-wrap items-center gap-2">
+              <FilterContent />
+              <div className="relative flex-1 min-w-[220px] max-w-[280px]">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar proyectos..."
+                  className="pl-8 h-9"
+                />
+                {(jobsLoading) && (
+                  <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          )}
+        <CardContent className={cn(isMobile ? "p-4" : "p-6 pt-2")}>
           <MonthNavigation
             currentDate={currentDate}
             onPreviousMonth={() => setCurrentDate(prev => addMonths(prev, -1))}
@@ -620,13 +650,12 @@ const ProjectManagement = () => {
           department: selectedDepartment,
           date: currentDate
         })}
-        className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-8 md:right-8
-                   w-12 h-12 md:w-14 md:h-14
-                   bg-blue-600 hover:bg-blue-500
-                   text-white rounded-full shadow-lg
-                   flex items-center justify-center
-                   transition-all hover:scale-110
-                   z-50"
+        className={cn(
+          "fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-8 md:right-8",
+          "w-12 h-12 md:w-14 md:h-14 rounded-full shadow-xl",
+          "flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-50",
+          getMobileAccent(selectedDepartment as MobileAccentKey).fill,
+        )}
         aria-label="Crear trabajo"
       >
         <Plus className="h-6 w-6" />
