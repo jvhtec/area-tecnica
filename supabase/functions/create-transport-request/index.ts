@@ -22,6 +22,7 @@ interface CreateTransportRequestBody extends Record<string, unknown> {
   note?: unknown;
   items?: unknown;
   requested_by?: unknown;
+  is_hoja_relevant?: unknown;
 }
 
 type TransportRequestItem = {
@@ -122,6 +123,13 @@ serve(createHttpHandler(async (req) => {
   const noteInput = readOptionalText(body.note, "note", 4_000);
   const items = parseItems(body.items);
 
+  if (body.is_hoja_relevant !== undefined && body.is_hoja_relevant !== null && typeof body.is_hoja_relevant !== "boolean") {
+    throw new HttpError(400, "El campo is_hoja_relevant debe ser booleano", { code: "invalid_is_hoja_relevant" });
+  }
+  const isHojaRelevant = body.is_hoja_relevant === undefined || body.is_hoja_relevant === null
+    ? true
+    : body.is_hoja_relevant;
+
   // The anon API key plus the caller JWT keeps these data operations entirely
   // inside PostgREST's authenticated RLS boundary.
   const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -216,6 +224,7 @@ serve(createHttpHandler(async (req) => {
       created_by: user.id,
       department,
       description: description || null,
+      is_hoja_relevant: isHojaRelevant,
       job_id: jobId,
       note: note || null,
       status: "requested",

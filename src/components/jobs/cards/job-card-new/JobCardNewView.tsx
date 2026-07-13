@@ -20,12 +20,12 @@ import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
 import { ProjectNotesDialog } from "@/components/project-management/ProjectNotesDialog";
 import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
+import { TransportRequestsManagerDialog } from "@/components/logistics/TransportRequestsManagerDialog";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { cn } from "@/lib/utils";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Department } from "@/types/department";
 
 import { JobCardActions } from "../JobCardActions";
@@ -148,10 +148,11 @@ export interface JobCardNewViewProps {
 
   isTechDept: boolean;
   userDepartment: string | null;
-  myTransportRequest: any | null;
+  myTransportRequests: any[];
   allRequests: any[];
   queryClient: any;
   checkAndFulfillRequest: (requestId: string, dept: string) => Promise<void>;
+  cancelTransportRequest: (requestId: string) => Promise<{ error: string | null }>;
 
   requirementsDialogOpen: boolean;
 
@@ -261,8 +262,9 @@ export function JobCardNewView({
   setLogisticsInitialEventType,
   isTechDept,
   userDepartment,
-  myTransportRequest,
+  myTransportRequests,
   allRequests,
+  cancelTransportRequest,
   queryClient,
   checkAndFulfillRequest,
   requirementsDialogOpen,
@@ -695,7 +697,6 @@ export function JobCardNewView({
               onOpenChange={setTransportDialogOpen}
               jobId={job.id}
               department={userDepartment}
-              requestId={myTransportRequest?.id || null}
               onSubmitted={() => {
                 queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request", job.id, userDepartment) });
                 queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
@@ -703,81 +704,20 @@ export function JobCardNewView({
             />
           )}
 
-          {transportDialogOpen &&
-            canManageTransportRequests && (
-              <Dialog open={transportDialogOpen} onOpenChange={setTransportDialogOpen}>
-                <DialogContent className="max-w-xl">
-                  <div className="space-y-4">
-                    <div className="text-lg font-semibold">Transport Requests</div>
-                    {allRequests.length === 0 ? (
-                      <div className="space-y-3">
-                        <div className="text-muted-foreground">No pending requests for this job.</div>
-                        <button
-                          className="px-3 py-1 text-sm rounded border hover:bg-accent w-fit"
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            setSelectedTransportRequest(null);
-                            setLogisticsInitialEventType("load");
-                            setTransportDialogOpen(false);
-                            setLogisticsDialogOpen(true);
-                          }}
-                        >
-                          Create Event
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {allRequests.map((req: any) => (
-                          <div key={req.id} className="border rounded p-2 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-medium capitalize">{req.department}</div>
-                                {req.description && <div className="text-sm">{req.description}</div>}
-                                {req.note && <div className="text-xs text-muted-foreground italic">{req.note}</div>}
-                              </div>
-                              <button
-                                className="px-3 py-1 text-sm rounded border hover:bg-accent"
-                                onClick={async (ev) => {
-                                  ev.stopPropagation();
-                                  await dataLayerClient.from("transport_requests").update({ status: "cancelled" }).eq("id", req.id);
-                                  queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
-                                }}
-                              >
-                                Cancel Request
-                              </button>
-                            </div>
-                            <div className="space-y-1">
-                              {(req.items || []).map((it: any) => (
-                                <div key={it.id} className="flex items-center justify-between pl-2">
-                                  <div className="text-sm text-muted-foreground">
-                                    {it.transport_type.replace("_", " ")}
-                                    {typeof it.leftover_space_meters === "number" && (
-                                      <span className="ml-2">· Leftover: {it.leftover_space_meters} m</span>
-                                    )}
-                                  </div>
-                                  <button
-                                    className="px-3 py-1 text-sm rounded border hover:bg-accent"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      setSelectedTransportRequest({ ...req, selectedItem: it });
-                                      setLogisticsInitialEventType("load");
-                                      setTransportDialogOpen(false);
-                                      setLogisticsDialogOpen(true);
-                                    }}
-                                  >
-                                    Create Event
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
+          {transportDialogOpen && canManageTransportRequests && (
+            <TransportRequestsManagerDialog
+              open={transportDialogOpen}
+              onOpenChange={setTransportDialogOpen}
+              requests={allRequests}
+              onCancelRequest={cancelTransportRequest}
+              onCreateEvent={(req, item) => {
+                setSelectedTransportRequest(req ? { ...req, selectedItem: item } : null);
+                setLogisticsInitialEventType("load");
+                setTransportDialogOpen(false);
+                setLogisticsDialogOpen(true);
+              }}
+            />
+          )}
 
           {logisticsDialogOpen && (
             <LogisticsEventDialog
@@ -795,6 +735,8 @@ export function JobCardNewView({
               initialDepartments={selectedTransportRequest?.department ? [selectedTransportRequest.department] : []}
               initialTransportType={selectedTransportRequest?.selectedItem?.transport_type}
               initialEventType={logisticsInitialEventType}
+              initialTransportRequestId={selectedTransportRequest?.id || null}
+              initialIsHojaRelevant={selectedTransportRequest ? selectedTransportRequest.is_hoja_relevant !== false : undefined}
               onCreated={(_details) => {
                 if (selectedTransportRequest?.id && selectedTransportRequest?.department) {
                   void checkAndFulfillRequest(selectedTransportRequest.id, selectedTransportRequest.department);

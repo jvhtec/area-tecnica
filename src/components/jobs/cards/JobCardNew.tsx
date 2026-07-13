@@ -11,6 +11,7 @@ declare global {
 import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
+import { useJobTransportRequests } from '@/hooks/useJobTransportRequests';
 import { useDeletionState } from '@/hooks/useDeletionState';
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
@@ -78,12 +79,6 @@ type ClearWhatsappGroupResult = {
   error?: string;
   message?: string;
   can_retry?: boolean;
-};
-
-type LogisticsEventWithDepartments = {
-  id?: string;
-  event_type?: string | null;
-  logistics_event_departments?: Array<{ department?: string | null }> | null;
 };
 
 type FlexFolderRow = {
@@ -474,37 +469,11 @@ function JobCardNewFull({
     });
   }
 
-  // Queries for transport requests and logistics events
-  const { data: myTransportRequest } = useQuery({
-    queryKey: queryKeys.scope('transport-request', job.id, currentUserDepartment),
-    queryFn: async () => {
-      if (!currentUserDepartment || !['sound', 'lights', 'video'].includes(currentUserDepartment)) return null;
-      const { data, error } = await dataLayerClient.from('transport_requests')
-        .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
-        .eq('job_id', job.id)
-        .eq('department', currentUserDepartment)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) return null;
-      return data;
-    },
-    enabled: !!job?.id && !!currentUserDepartment,
-  });
+  const isTechDept = !!currentUserDepartment && ['sound', 'lights', 'video'].includes(currentUserDepartment);
+  const canManageTransportRequests = (currentUserDepartment === 'logistics') || isManagementUser;
 
-  const { data: allRequests = [], isLoading: isAllRequestsLoading } = useQuery({
-    queryKey: queryKeys.scope('transport-requests-all', job.id),
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('transport_requests')
-        .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
-        .eq('job_id', job.id)
-        .eq('status', 'requested')
-        .order('created_at', { ascending: false });
-      if (error) return [];
-      return data || [];
-    },
-    enabled: !!job?.id && ((currentUserDepartment === 'logistics') || isManagementUser),
-  });
+  const { myTransportRequests, allRequests, isAllRequestsLoading, checkAndFulfillRequest, cancelRequest } =
+    useJobTransportRequests(job?.id, currentUserDepartment, canManageTransportRequests);
 
   const { data: jobEvents = [] } = useQuery({
     queryKey: queryKeys.scope('logistics-events-for-job', job.id),
@@ -519,41 +488,20 @@ function JobCardNewFull({
   });
 
   const isScheduled = (jobEvents?.length || 0) > 0;
-  const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
-  const isTechDept = !!currentUserDepartment && ['sound', 'lights', 'video'].includes(currentUserDepartment);
-  const canManageTransportRequests = (currentUserDepartment === 'logistics') || isManagementUser;
-
-  const handleCancelTransportRequest = React.useCallback(
-    async (requestId: string) => {
-      if (!requestId) return;
-      const { error } = await dataLayerClient.from("transport_requests").update({ status: "cancelled" }).eq("id", requestId);
-      if (error) {
-        console.error("[JobCardNew] Failed to cancel transport request:", error);
-        toast({
-          title: "No se pudo cancelar",
-          description: error.message || "Error cancelando la solicitud de transporte",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "Solicitud cancelada",
-        description: "La solicitud de transporte se ha cancelado correctamente",
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
-    },
-    [job.id, queryClient, toast]
-  );
+  const hasRequest = myTransportRequests.length > 0 || (Array.isArray(allRequests) && allRequests.length > 0);
 
   const transportButtonLabel = (() => {
-    if (isScheduled) return 'Transport Scheduled';
+    // Pending requests take precedence over "scheduled": new requests can
+    // arrive after the first transport has already been booked.
     if (canManageTransportRequests) {
-      return allRequests.length > 0 ? `Requests (${allRequests.length})` : 'Logistics';
+      if (allRequests.length > 0) return `Solicitudes (${allRequests.length})`;
+      return isScheduled ? 'Transporte programado' : 'Logística';
     }
     if (isTechDept) {
-      return myTransportRequest ? 'Transport Requested' : 'Request Transport';
+      if (myTransportRequests.length > 0) return `Transporte (${myTransportRequests.length})`;
+      return isScheduled ? 'Transporte programado' : 'Solicitar transporte';
     }
+    if (isScheduled) return 'Transporte programado';
     return undefined;
   })();
 
@@ -769,26 +717,6 @@ function JobCardNewFull({
         variant: 'destructive'
       });
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-    }
-  };
-
-  // Auto-fulfill request when both load and unload exist for the request's department
-  const checkAndFulfillRequest = async (requestId: string, departmentForReq: string) => {
-    try {
-      const { data: events } = await dataLayerClient.from('logistics_events')
-        .select('id, event_type, logistics_event_departments(department)')
-        .eq('job_id', job.id)
-        .eq('logistics_event_departments.department', departmentForReq);
-      const logisticsEvents = (events || []) as LogisticsEventWithDepartments[];
-      const hasLoad = logisticsEvents.some((e) => e.event_type === 'load');
-      const hasUnload = logisticsEvents.some((e) => e.event_type === 'unload');
-      if (hasLoad && hasUnload) {
-        await dataLayerClient.from('transport_requests').update({ status: 'fulfilled' }).eq('id', requestId);
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-request', job.id, departmentForReq) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-requests-all', job.id) });
-      }
-    } catch (err) {
-      console.error('checkAndFulfillRequest failed', err);
     }
   };
 
@@ -1413,10 +1341,11 @@ function JobCardNewFull({
       setLogisticsInitialEventType={setLogisticsInitialEventType}
       isTechDept={isTechDept}
       userDepartment={currentUserDepartment}
-      myTransportRequest={myTransportRequest}
+      myTransportRequests={myTransportRequests}
       allRequests={allRequests}
       queryClient={queryClient}
       checkAndFulfillRequest={checkAndFulfillRequest}
+      cancelTransportRequest={cancelRequest}
       requirementsDialogOpen={requirementsDialogOpen}
       flexPickerOpen={flexPickerOpen}
       setFlexPickerOpen={setFlexPickerOpen}
