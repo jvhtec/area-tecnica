@@ -120,6 +120,8 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
 }
 
 const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick, dragEnabled = false }: DateHeaderProps) => {
+  const [popoverOpen, setPopoverOpen] = React.useState(false);
+  const [jobDragActive, setJobDragActive] = React.useState(false);
   const isTodayHeader = isToday(date);
   const isWeekendHeader = isWeekend(date);
   const hasJobs = jobs.length > 0;
@@ -200,7 +202,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick, dra
   });
 
   return (
-    <Popover>
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger asChild>
         <div
           className={cn(
@@ -273,7 +275,11 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick, dra
       </PopoverTrigger>
 
       {hasJobs && (
-        <PopoverContent className="w-80" side="bottom" align="center">
+        <PopoverContent
+          className={cn('w-80 transition-opacity', jobDragActive && 'pointer-events-none opacity-0')}
+          side="bottom"
+          align="center"
+        >
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
@@ -295,6 +301,11 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick, dra
                   technicianIds={technicianIds}
                   onJobClick={onJobClick}
                   dragEnabled={dragEnabled}
+                  onJobDragStart={() => setJobDragActive(true)}
+                  onJobDragEnd={() => {
+                    setJobDragActive(false);
+                    setPopoverOpen(false);
+                  }}
                 />
               ))}
             </div>
@@ -305,7 +316,21 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick, dra
   );
 };
 
-function JobRowWithCounts({ job, technicianIds, onJobClick, dragEnabled = false }: { job: { id: string; title: string; start_time: string; end_time: string; color?: string; status: string }, technicianIds?: string[], onJobClick?: (jobId: string) => void, dragEnabled?: boolean }) {
+function JobRowWithCounts({
+  job,
+  technicianIds,
+  onJobClick,
+  dragEnabled = false,
+  onJobDragStart,
+  onJobDragEnd,
+}: {
+  job: { id: string; title: string; start_time: string; end_time: string; color?: string; status: string };
+  technicianIds?: string[];
+  onJobClick?: (jobId: string) => void;
+  dragEnabled?: boolean;
+  onJobDragStart?: () => void;
+  onJobDragEnd?: () => void;
+}) {
   const { data: counts } = useJobEngagementCounts(job.id, technicianIds);
   return (
     <div
@@ -319,7 +344,10 @@ function JobRowWithCounts({ job, technicianIds, onJobClick, dragEnabled = false 
         e.stopPropagation();
         e.dataTransfer.effectAllowed = 'copy';
         e.dataTransfer.setData(MATRIX_JOB_DRAG_MIME, job.id);
+        e.dataTransfer.setData('text/plain', job.title);
+        onJobDragStart?.();
       }}
+      onDragEnd={() => onJobDragEnd?.()}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">

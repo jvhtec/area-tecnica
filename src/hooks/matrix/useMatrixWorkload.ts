@@ -60,26 +60,33 @@ export const useMatrixWorkload = ({ technicianIds, dates, enabled }: UseMatrixWo
       if (!technicianIds.length || !lookbackStartKey || !windowEndKey) return map;
 
       const batchSize = 100;
+      const pageSize = 1000;
       for (let i = 0; i < technicianIds.length; i += batchSize) {
         const batch = technicianIds.slice(i, i + batchSize);
-        const { data, error } = await supabase
-          .from('timesheets')
-          .select('technician_id, date')
-          .eq('is_active', true)
-          .in('technician_id', batch)
-          .gte('date', lookbackStartKey)
-          .lte('date', windowEndKey)
-          .limit(5000);
+        for (let from = 0; ; from += pageSize) {
+          const { data, error } = await supabase
+            .from('timesheets')
+            .select('technician_id, date')
+            .eq('is_active', true)
+            .in('technician_id', batch)
+            .gte('date', lookbackStartKey)
+            .lte('date', windowEndKey)
+            .order('technician_id', { ascending: true })
+            .order('date', { ascending: true })
+            .range(from, from + pageSize - 1);
 
-        if (error) {
-          console.warn('Workload lens query error', error);
-          continue;
+          if (error) {
+            console.warn('Workload lens query error', error);
+            break;
+          }
+
+          const page = (data as WorkloadDateRow[] | null) || [];
+          page.forEach((row) => {
+            if (!map.has(row.technician_id)) map.set(row.technician_id, new Set());
+            map.get(row.technician_id)!.add(row.date);
+          });
+          if (page.length < pageSize) break;
         }
-
-        (data as WorkloadDateRow[] | null || []).forEach((row) => {
-          if (!map.has(row.technician_id)) map.set(row.technician_id, new Set());
-          map.get(row.technician_id)!.add(row.date);
-        });
       }
 
       return map;

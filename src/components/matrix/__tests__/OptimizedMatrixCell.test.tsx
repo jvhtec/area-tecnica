@@ -181,6 +181,37 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.getByText(/FOH/i)).toBeInTheDocument();
   });
 
+  it('forwards the native data transfer object for assignment drags and payloads for drops', () => {
+    const onDragStartCell = vi.fn();
+    const onDropCell = vi.fn();
+    const dataTransfer = {
+      getData: vi.fn((type: string) => type === 'application/x-matrix-assignment' ? '{"jobId":"job-1"}' : ''),
+      types: ['application/x-matrix-assignment'],
+    } as unknown as DataTransfer;
+    const { container } = render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        assignment={mockAssignment}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        dragEnabled={true}
+        onDragStartCell={onDragStartCell}
+        onDropCell={onDropCell}
+      />
+    );
+    const cell = container.querySelector('[draggable="true"]') as HTMLElement;
+
+    fireEvent.dragStart(cell, { dataTransfer });
+    fireEvent.drop(cell, { dataTransfer });
+
+    expect(onDragStartCell).toHaveBeenCalledWith(dataTransfer);
+    expect(onDropCell).toHaveBeenCalledWith('{"jobId":"job-1"}');
+  });
+
   it('does not render a redundant confirmed status badge', () => {
     render(
       <OptimizedMatrixCell

@@ -84,10 +84,10 @@ export interface OptimizedMatrixCellProps {
   dropValidity?: DropValidity | null;
   /** True while any cell is picked up for a mobile tap-to-move (not just this cell). */
   pickupActive?: boolean;
-  onDragStartCell?: () => void;
+  onDragStartCell?: (dataTransfer?: DataTransfer) => void;
   onDragOverCell?: () => void;
   onDragLeaveCell?: () => void;
-  onDropCell?: () => void;
+  onDropCell?: (serializedSource?: string) => void;
   onDragEndCell?: () => void;
   /** Fired instead of onDropCell when the drop payload is a job chip dragged from the date header. */
   onDropJobCell?: (jobId: string) => void;

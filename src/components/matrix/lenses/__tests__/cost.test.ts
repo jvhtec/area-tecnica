@@ -90,6 +90,22 @@ describe('aggregateCost with tour-date quotes', () => {
     expect(agg.byTech.get('tech-1')?.missingRateCount ?? 0).toBe(0);
   });
 
+  it('surfaces tour-date assignments whose quote cannot be resolved', () => {
+    const rows = [
+      baseAssignment({
+        job_id: 'tour-job-missing-rate',
+        is_schedule_only: true,
+        amount_eur: null,
+        job: { ...baseAssignment({}).job, job_type: 'tourdate' },
+      }),
+    ];
+    const agg = aggregateCost(rows, new Map());
+
+    expect(agg.byCell.get('tech-1-2026-07-15')?.amount).toBeNull();
+    expect(agg.byCell.get('tech-1-2026-07-15')?.source).toBe('tour_quote');
+    expect(agg.byTech.get('tech-1')?.missingRateCount).toBe(1);
+  });
+
   it('does not apply a tour quote to a non-schedule-only row even if a pair happens to match', () => {
     const rows = [
       baseAssignment({ job_id: 'tour-job-1', technician_id: 'tech-1', is_schedule_only: false, amount_eur: 50 }),

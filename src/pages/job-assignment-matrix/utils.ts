@@ -403,11 +403,18 @@ export type StaffingSummaryRow = {
 
 export type StaffingAssignmentRow = {
   job_id: string;
+  technician_id: string;
   sound_role: string | null;
   lights_role: string | null;
   video_role: string | null;
   production_role: string | null;
   status: string | null;
+};
+
+export type StaffingScheduledRow = {
+  job_id: string;
+  technician_id: string;
+  date: string;
 };
 
 export type OutstandingRoleInfo = {
@@ -454,18 +461,39 @@ export const MATRIX_STAFFING_SUMMARY_QUERY_SCOPE = "matrix-staffing-summary";
  */
 export async function fetchStaffingSummaryForJobs(
   jobIds: string[],
-): Promise<{ summaries: StaffingSummaryRow[]; assignments: StaffingAssignmentRow[] }> {
+): Promise<{ summaries: StaffingSummaryRow[]; assignments: StaffingAssignmentRow[]; scheduled: StaffingScheduledRow[] }> {
   if (!jobIds.length) {
-    return { summaries: [], assignments: [] };
+    return { summaries: [], assignments: [], scheduled: [] };
   }
 
-  const [summaryRes, assignmentsRes] = await Promise.all([
+  const fetchScheduledRows = async (): Promise<StaffingScheduledRow[]> => {
+    const rows: StaffingScheduledRow[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await dataLayerClient.from("timesheets")
+        .select("job_id, technician_id, date")
+        .in("job_id", jobIds)
+        .eq("is_active", true)
+        .order("job_id", { ascending: true })
+        .order("technician_id", { ascending: true })
+        .order("date", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data || []) as StaffingScheduledRow[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
+  };
+
+  const [summaryRes, assignmentsRes, scheduled] = await Promise.all([
     dataLayerClient.from("job_required_roles_summary")
       .select("job_id, department, roles")
       .in("job_id", jobIds),
     dataLayerClient.from("job_assignments")
-      .select("job_id, sound_role, lights_role, video_role, production_role, status")
+      .select("job_id, technician_id, sound_role, lights_role, video_role, production_role, status")
       .in("job_id", jobIds),
+    fetchScheduledRows(),
   ]);
 
   if (summaryRes.error) throw summaryRes.error;
@@ -485,7 +513,7 @@ export async function fetchStaffingSummaryForJobs(
       status: row.status ? String(row.status) : null,
     }));
 
-  return { summaries, assignments };
+  return { summaries, assignments, scheduled };
 }
 
 export function parseSummaryRow(row: unknown): StaffingSummaryRow | null {

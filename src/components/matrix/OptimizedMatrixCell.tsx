@@ -17,7 +17,7 @@ import type { OptimizedMatrixCellProps } from '@/components/matrix/optimized-mat
 import { useMatrixCellAssignmentRemoval } from '@/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval';
 import { CellLensBadge } from '@/components/matrix/lenses/CellLensBadge';
 import { isValidDrop, DROP_VALIDITY_MESSAGES } from '@/components/matrix/dnd/dropValidity';
-import { MATRIX_JOB_DRAG_MIME } from '@/components/matrix/dnd/constants';
+import { MATRIX_ASSIGNMENT_DRAG_MIME, MATRIX_JOB_DRAG_MIME } from '@/components/matrix/dnd/constants';
 
 export const OptimizedMatrixCell = memo(({
   technician,
@@ -305,8 +305,7 @@ export const OptimizedMatrixCell = memo(({
           title={dropTitle}
           onDragStart={(e) => {
             if (!isDraggableSource) return;
-            e.dataTransfer.effectAllowed = 'move';
-            onDragStartCell?.();
+            onDragStartCell?.(e.dataTransfer);
           }}
           onDragEnd={() => onDragEndCell?.()}
           onDragOver={(e) => {
@@ -328,7 +327,7 @@ export const OptimizedMatrixCell = memo(({
               onDropJobCell?.(jobId);
               return;
             }
-            onDropCell?.();
+            onDropCell?.(e.dataTransfer.getData(MATRIX_ASSIGNMENT_DRAG_MIME));
           }}
         >
           {/* Selection indicator */}

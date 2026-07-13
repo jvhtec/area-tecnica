@@ -1,4 +1,8 @@
-import type { StaffingSummaryRow, StaffingAssignmentRow } from '@/pages/job-assignment-matrix/utils';
+import type {
+  StaffingAssignmentRow,
+  StaffingScheduledRow,
+  StaffingSummaryRow,
+} from '@/pages/job-assignment-matrix/utils';
 
 export interface CoverageCell {
   required: number;
@@ -13,47 +17,46 @@ export interface JobDepartmentCoverage extends CoverageCell {
   roles: CoverageRoleBreakdown[];
 }
 
-// job_id -> department -> coverage (with per-role breakdown for the drill-down popover)
 export type CoverageByJobDept = Map<string, Map<string, JobDepartmentCoverage>>;
-
-// dateKey (yyyy-MM-dd) -> department -> aggregated coverage across every job that spans that date
 export type CoverageByDateDept = Map<string, Map<string, CoverageCell>>;
+export type CoverageByDateJobDept = Map<string, CoverageByJobDept>;
 
-const ROLE_FIELD_BY_DEPARTMENT: Record<string, keyof StaffingAssignmentRow> = {
+const ROLE_FIELD_BY_DEPARTMENT = {
   sound: 'sound_role',
   lights: 'lights_role',
   video: 'video_role',
   production: 'production_role',
-};
+} as const satisfies Record<string, keyof StaffingAssignmentRow>;
 
-/**
- * Combines required-roles summaries with actual job_assignments into a
- * per-job, per-department, per-role required/filled breakdown. Declined
- * assignments never count as filled.
- */
+const assignmentPairKey = (jobId: string, technicianId: string) => `${jobId}:${technicianId}`;
+
+/** Required roles versus technicians with an active scheduled timesheet. */
 export function aggregateJobDepartmentCoverage(
   summaries: StaffingSummaryRow[],
   assignments: StaffingAssignmentRow[],
+  scheduledPairs?: Set<string>,
 ): CoverageByJobDept {
-  const filledCounts = new Map<string, number>(); // `${jobId}:${department}:${roleCode}` -> count
+  const filledCounts = new Map<string, number>();
+  const filledTotals = new Map<string, number>();
 
   assignments.forEach((row) => {
-    if (!row?.job_id) return;
+    if (!row?.job_id || !row.technician_id) return;
+    if (scheduledPairs && !scheduledPairs.has(assignmentPairKey(row.job_id, row.technician_id))) return;
     const status = (row.status || '').toLowerCase();
     if (status === 'declined') return;
 
-    (Object.keys(ROLE_FIELD_BY_DEPARTMENT) as Array<keyof typeof ROLE_FIELD_BY_DEPARTMENT>).forEach((department) => {
-      const roleField = ROLE_FIELD_BY_DEPARTMENT[department];
+    Object.entries(ROLE_FIELD_BY_DEPARTMENT).forEach(([department, roleField]) => {
       const roleValue = row[roleField];
       const roleCode = typeof roleValue === 'string' ? roleValue.trim() : '';
       if (!roleCode || roleCode.toLowerCase() === 'none') return;
+      const departmentKey = `${row.job_id}:${department}`;
       const key = `${row.job_id}:${department}:${roleCode}`;
+      filledTotals.set(departmentKey, (filledTotals.get(departmentKey) || 0) + 1);
       filledCounts.set(key, (filledCounts.get(key) || 0) + 1);
     });
   });
 
   const result: CoverageByJobDept = new Map();
-
   summaries.forEach((summary) => {
     if (!summary?.job_id || !summary?.department) return;
     const roles: CoverageRoleBreakdown[] = summary.roles.map((role) => {
@@ -63,38 +66,73 @@ export function aggregateJobDepartmentCoverage(
     });
 
     const required = roles.reduce((sum, role) => sum + role.required, 0);
-    const filled = roles.reduce((sum, role) => sum + Math.min(role.filled, role.required || role.filled), 0);
-
+    // The headline numerator is scheduled headcount, not only technicians
+    // whose role happens to match a configured requirement. Role-level
+    // matching remains available in the breakdown for staffing decisions.
+    const filled = filledTotals.get(`${summary.job_id}:${summary.department}`) || 0;
     if (!result.has(summary.job_id)) result.set(summary.job_id, new Map());
     result.get(summary.job_id)!.set(summary.department, { required, filled, roles });
+  });
+
+  // Keep scheduled assignments visible even when a job has no required-role
+  // configuration. Otherwise the lens silently undercounts actual crew.
+  filledTotals.forEach((filled, key) => {
+    const separator = key.lastIndexOf(':');
+    const jobId = key.slice(0, separator);
+    const department = key.slice(separator + 1);
+    if (!result.has(jobId)) result.set(jobId, new Map());
+    const departments = result.get(jobId)!;
+    if (!departments.has(department)) {
+      departments.set(department, { required: 0, filled, roles: [] });
+    }
   });
 
   return result;
 }
 
-/**
- * Buckets per-job coverage onto every date a job spans, summing required and
- * filled counts across jobs that share a date + department. A job's
- * requirement counts once per date it spans by design (this answers "what's
- * open *that day*", not a job-lifetime total).
- */
+/** Builds date-specific job coverage, intersected with active timesheets on that exact date. */
+export function aggregateCoverageByDateJob(
+  dateKeys: string[],
+  jobsForDateKey: (dateKey: string) => Array<{ id: string }>,
+  summaries: StaffingSummaryRow[],
+  assignments: StaffingAssignmentRow[],
+  scheduled: StaffingScheduledRow[],
+): CoverageByDateJobDept {
+  const result: CoverageByDateJobDept = new Map();
+
+  dateKeys.forEach((dateKey) => {
+    const jobIds = new Set(jobsForDateKey(dateKey).map((job) => job.id));
+    if (jobIds.size === 0) return;
+    const scheduledPairs = new Set(
+      scheduled
+        .filter((row) => row.date === dateKey && jobIds.has(row.job_id))
+        .map((row) => assignmentPairKey(row.job_id, row.technician_id)),
+    );
+    const dateSummaries = summaries.filter((row) => jobIds.has(row.job_id));
+    const dateAssignments = assignments.filter((row) => jobIds.has(row.job_id));
+    result.set(dateKey, aggregateJobDepartmentCoverage(dateSummaries, dateAssignments, scheduledPairs));
+  });
+
+  return result;
+}
+
+/** Aggregates date-specific job coverage into the compact date header cells. */
 export function aggregateCoverageByDate(
   dateKeys: string[],
   jobsForDateKey: (dateKey: string) => Array<{ id: string }>,
-  coverageByJob: CoverageByJobDept,
+  coverageByDateJob: CoverageByDateJobDept,
 ): CoverageByDateDept {
   const result: CoverageByDateDept = new Map();
 
   dateKeys.forEach((dateKey) => {
-    const jobs = jobsForDateKey(dateKey);
-    if (!jobs.length) return;
-
+    const jobCoverageForDate = coverageByDateJob.get(dateKey);
+    if (!jobCoverageForDate) return;
     const deptMap = new Map<string, CoverageCell>();
-    jobs.forEach((job) => {
-      const jobCoverage = coverageByJob.get(job.id);
+
+    jobsForDateKey(dateKey).forEach((job) => {
+      const jobCoverage = jobCoverageForDate.get(job.id);
       if (!jobCoverage) return;
       jobCoverage.forEach((cell, department) => {
-        if (cell.required === 0) return;
         const existing = deptMap.get(department) || { required: 0, filled: 0 };
         deptMap.set(department, {
           required: existing.required + cell.required,

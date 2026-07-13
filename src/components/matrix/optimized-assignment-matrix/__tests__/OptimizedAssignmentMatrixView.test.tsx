@@ -18,12 +18,15 @@ vi.mock('../../DateHeader', () => ({
 }));
 
 vi.mock('../../OptimizedMatrixCell', () => ({
-  OptimizedMatrixCell: ({ technician, date, allowMarkUnavailable }: any) => (
+  OptimizedMatrixCell: ({ technician, date, allowMarkUnavailable, onDropJobCell }: any) => (
     <div
       data-testid={`cell-${technician.id}-${date.toISOString()}`}
       data-allow-mark-unavailable={String(allowMarkUnavailable)}
     >
       Cell
+      <button data-testid={`drop-job-${technician.id}-${date.toISOString()}`} onClick={() => onDropJobCell?.('job-1')}>
+        Drop job
+      </button>
     </div>
   ),
 }));
@@ -153,7 +156,7 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   lens: 'default',
   onOpenStaffingOrchestrator: vi.fn(),
   coverageByDate: new Map(),
-  coverageByJob: new Map(),
+  coverageByDateJob: new Map(),
   costWindowTotal: null,
   costByDate: new Map(),
   lensBadgeByCell: new Map(),
@@ -223,6 +226,35 @@ describe('OptimizedAssignmentMatrixView', () => {
 
     const cells = screen.getAllByTestId(/cell-tech-/);
     expect(cells[0]).toHaveAttribute('data-allow-mark-unavailable', 'true');
+  });
+
+  it('opens assignment with the dropped job when the cell date belongs to that job', async () => {
+    const user = userEvent.setup();
+    const handleCellClick = vi.fn();
+    render(<OptimizedAssignmentMatrixView {...createMockProps({ handleCellClick })} />);
+
+    await user.click(screen.getAllByTestId(/drop-job-/)[0]);
+
+    expect(handleCellClick).toHaveBeenCalledWith('tech-1', mockDates[0], 'assign', 'job-1');
+  });
+
+  it('rejects a dropped job when the target date is outside its schedule', async () => {
+    const user = userEvent.setup();
+    const handleCellClick = vi.fn();
+    const toast = vi.fn();
+    render(<OptimizedAssignmentMatrixView {...createMockProps({
+      handleCellClick,
+      toast,
+      getJobsForDate: () => [],
+    })} />);
+
+    await user.click(screen.getAllByTestId(/drop-job-/)[0]);
+
+    expect(handleCellClick).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Fecha fuera del trabajo',
+      variant: 'destructive',
+    }));
   });
 
   it('shows Add User button for management users', () => {

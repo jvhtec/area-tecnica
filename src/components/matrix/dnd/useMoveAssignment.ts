@@ -16,19 +16,22 @@ export interface PendingMove {
   conflict: ConflictCheckResult | null;
 }
 
-const roleColumns = (source: DragSource) => ({
-  sound_role: source.roleField === 'sound_role' ? source.roleValue : null,
-  lights_role: source.roleField === 'lights_role' ? source.roleValue : null,
-  video_role: source.roleField === 'video_role' ? source.roleValue : null,
-});
+const removeWholeAssignment = async (jobId: string, technicianId: string): Promise<void> => {
+  const { deleted_assignment } = await removeTimesheetAssignment({ jobId, technicianId });
+  if (deleted_assignment) return;
+
+  const { error } = await supabase.from('job_assignments')
+    .delete()
+    .eq('job_id', jobId)
+    .eq('technician_id', technicianId);
+  if (error) throw error;
+};
 
 /**
- * Same-date assignment move (drag-and-drop v1). Never writes to `timesheets`
- * directly for creation — the assignment cascade (job_assignments ->
- * timesheets) is a documented invariant, so every write here goes through
- * the same RPCs/services AssignJobDialog and the cell removal flow already
- * use. Detach-then-attach is not atomic; a failure between the two steps
- * surfaces loudly rather than silently losing the assignment.
+ * Same-date assignment move. The target is attached before the source is
+ * detached so a failed target write can never erase the original assignment.
+ * If detaching the source fails, the target is intentionally retained and the
+ * user is warned about the possible duplicate rather than losing both copies.
  */
 export const useMoveAssignment = () => {
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
@@ -52,53 +55,27 @@ export const useMoveAssignment = () => {
   const commitMove = useCallback(async () => {
     if (!pendingMove) return;
     const { source, targetTechnicianId, targetTechnicianName } = pendingMove;
+    const flexDepartments = determineFlexDepartmentsForAssignment(source.roles, source.department);
+    let targetRowCreated = false;
+    let targetDayAttached = false;
+    let detachStarted = false;
     setIsMoving(true);
 
     try {
-      const { data: otherDateRows, error: otherDatesError } = await supabase.from('timesheets')
-        .select('date')
-        .eq('job_id', source.jobId)
-        .eq('technician_id', source.technicianId)
-        .eq('is_active', true)
-        .neq('date', source.dateKey);
-      if (otherDatesError) throw otherDatesError;
-
-      const isOnlyDate = (otherDateRows?.length ?? 0) === 0;
-      const flexDepartments = determineFlexDepartmentsForAssignment(roleColumns(source), source.department);
-
-      if (isOnlyDate) {
-        const { deleted_assignment } = await removeTimesheetAssignment({
-          jobId: source.jobId,
-          technicianId: source.technicianId,
-        });
-        if (!deleted_assignment) {
-          const { error } = await supabase.from('job_assignments')
-            .delete()
-            .eq('job_id', source.jobId)
-            .eq('technician_id', source.technicianId);
-          if (error) throw error;
-        }
-        if (flexDepartments.length > 0) {
-          await Promise.allSettled(flexDepartments.map((department) =>
-            supabase.functions.invoke('manage-flex-crew-assignments', {
-              body: { job_id: source.jobId, technician_id: source.technicianId, department, action: 'remove' },
-            }),
-          ));
-        }
-      } else {
-        const { error } = await supabase.from('timesheets')
-          .delete()
+      const [{ data: otherDateRows, error: otherDatesError }, { data: existingTargetRow, error: existingTargetError }] = await Promise.all([
+        supabase.from('timesheets')
+          .select('date')
           .eq('job_id', source.jobId)
           .eq('technician_id', source.technicianId)
-          .eq('date', source.dateKey);
-        if (error) throw error;
-      }
-
-      const { data: existingTargetRow, error: existingTargetError } = await supabase.from('job_assignments')
-        .select('job_id, technician_id')
-        .eq('job_id', source.jobId)
-        .eq('technician_id', targetTechnicianId)
-        .maybeSingle();
+          .eq('is_active', true)
+          .neq('date', source.dateKey),
+        supabase.from('job_assignments')
+          .select('job_id, technician_id')
+          .eq('job_id', source.jobId)
+          .eq('technician_id', targetTechnicianId)
+          .maybeSingle(),
+      ]);
+      if (otherDatesError) throw otherDatesError;
       if (existingTargetError) throw existingTargetError;
 
       if (!existingTargetRow) {
@@ -107,18 +84,17 @@ export const useMoveAssignment = () => {
         const { error: insertError } = await supabase.from('job_assignments').insert({
           job_id: source.jobId,
           technician_id: targetTechnicianId,
-          ...roleColumns(source),
+          ...source.roles,
           assigned_by: currentUserId,
           assigned_at: nowIso,
-          status: source.status === 'confirmed' ? 'confirmed' : 'invited',
+          status: source.status || 'invited',
           response_time: source.status === 'confirmed' ? nowIso : null,
           single_day: true,
           assignment_date: source.dateKey,
           assignment_source: 'direct',
         });
-        // A concurrent write may have created the row between our check and
-        // insert; that's fine, toggleTimesheetDay below still adds the date.
         if (insertError && insertError.code !== '23505') throw insertError;
+        targetRowCreated = !insertError;
       }
 
       await toggleTimesheetDay({
@@ -128,26 +104,43 @@ export const useMoveAssignment = () => {
         present: true,
         source: 'matrix-drag',
       });
+      targetDayAttached = true;
 
       try {
         await syncTimesheetCategoriesForAssignment({
           jobId: source.jobId,
           technicianId: targetTechnicianId,
-          ...(() => {
-            const cols = roleColumns(source);
-            return { soundRole: cols.sound_role, lightsRole: cols.lights_role, videoRole: cols.video_role };
-          })(),
+          soundRole: source.roles.sound_role,
+          lightsRole: source.roles.lights_role,
+          videoRole: source.roles.video_role,
         });
       } catch (syncError) {
         console.error('Error syncing timesheet category after move:', syncError);
       }
 
+      detachStarted = true;
+      const isOnlyDate = (otherDateRows?.length ?? 0) === 0;
+      if (isOnlyDate) {
+        await removeWholeAssignment(source.jobId, source.technicianId);
+      } else {
+        await toggleTimesheetDay({
+          jobId: source.jobId,
+          technicianId: source.technicianId,
+          dateIso: source.dateKey,
+          present: false,
+          source: 'matrix-drag',
+        });
+      }
+
       if (flexDepartments.length > 0) {
-        await Promise.allSettled(flexDepartments.map((department) =>
+        await Promise.allSettled(flexDepartments.flatMap((department) => [
           supabase.functions.invoke('manage-flex-crew-assignments', {
             body: { job_id: source.jobId, technician_id: targetTechnicianId, department, action: 'add' },
           }),
-        ));
+          ...(isOnlyDate ? [supabase.functions.invoke('manage-flex-crew-assignments', {
+            body: { job_id: source.jobId, technician_id: source.technicianId, department, action: 'remove' },
+          })] : []),
+        ]));
       }
 
       toast.success(`Asignación de "${source.jobTitle}" movida a ${targetTechnicianName}`);
@@ -157,11 +150,32 @@ export const useMoveAssignment = () => {
       setPendingMove(null);
     } catch (error) {
       console.error('Error moving assignment:', error);
+
+      if (!detachStarted) {
+        try {
+          if (targetRowCreated) {
+            await removeWholeAssignment(source.jobId, targetTechnicianId);
+          } else if (targetDayAttached) {
+            await toggleTimesheetDay({
+              jobId: source.jobId,
+              technicianId: targetTechnicianId,
+              dateIso: source.dateKey,
+              present: false,
+              source: 'matrix-drag-rollback',
+            });
+          }
+        } catch (rollbackError) {
+          console.error('Error rolling back target assignment after failed move:', rollbackError);
+        }
+      }
+
+      const detail = error instanceof Error ? `: ${error.message}` : '';
       toast.error(
-        error instanceof Error
-          ? `No se pudo completar el movimiento: ${error.message}`
-          : 'No se pudo mover la asignación. Verifica el estado de ambos técnicos.',
+        detachStarted
+          ? `No se pudo retirar la asignación original${detail}. Se mantuvo la copia de destino para evitar perderla; revisa ambas celdas.`
+          : `No se pudo completar el movimiento${detail}. La asignación original se mantiene.`,
       );
+      window.dispatchEvent(new CustomEvent('assignment-updated'));
     } finally {
       setIsMoving(false);
     }

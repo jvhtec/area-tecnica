@@ -90,7 +90,18 @@ export function aggregateCost(
   assignments.forEach((assignment) => {
     if (assignment.is_schedule_only) {
       const quoteAmount = tourQuoteAmountByPair.get(tourQuotePairKey(assignment.job_id, assignment.technician_id));
-      if (quoteAmount === undefined) return;
+      if (quoteAmount === undefined) {
+        if (assignment.job?.job_type !== 'tourdate') return;
+        byCell.set(cellKey(assignment.technician_id, assignment.date), {
+          amount: null,
+          approved: false,
+          source: 'tour_quote',
+        });
+        const techTotal = byTech.get(assignment.technician_id) || { amount: 0, approved: 0, missingRateCount: 0 };
+        techTotal.missingRateCount += 1;
+        byTech.set(assignment.technician_id, techTotal);
+        return;
+      }
       addAmount(assignment.technician_id, assignment.date, quoteAmount, true, 'tour_quote');
       return;
     }

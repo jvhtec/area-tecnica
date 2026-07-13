@@ -11,10 +11,10 @@ import { DateHeader } from "../DateHeader";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
 import { CoverageDateCell } from "@/components/matrix/lenses/CoverageDateCell";
 import { LENS_HEADER_ROW_HEIGHT, type CellLensBadgeData, type MatrixLens, type TechnicianLensSummaryData } from "@/components/matrix/lenses/types";
-import type { CoverageByDateDept, CoverageByJobDept } from "@/components/matrix/lenses/coverage";
+import type { CoverageByDateDept, CoverageByDateJobDept } from "@/components/matrix/lenses/coverage";
 import { formatEuro, type CostTotal } from "@/components/matrix/lenses/cost";
 import { formatInTimeZone } from "date-fns-tz";
-import type { DragSource } from "@/components/matrix/dnd/useMatrixDrag";
+import type { DragSource, DragTechnician, MatrixDragAssignment } from "@/components/matrix/dnd/useMatrixDrag";
 import type { DropValidity } from "@/components/matrix/dnd/dropValidity";
 import type { PendingMove } from "@/components/matrix/dnd/useMoveAssignment";
 import { MoveAssignmentConfirmDialog } from "@/components/matrix/dnd/MoveAssignmentConfirmDialog";
@@ -103,7 +103,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   lens: MatrixLens;
   onOpenStaffingOrchestrator?: (jobId: string, department: string, jobTitle: string) => void;
   coverageByDate: CoverageByDateDept;
-  coverageByJob: CoverageByJobDept;
+  coverageByDateJob: CoverageByDateJobDept;
   costWindowTotal: CostTotal | null;
   costByDate: Map<string, CostTotal>;
   lensBadgeByCell: Map<string, CellLensBadgeData>;
@@ -111,10 +111,10 @@ export interface OptimizedAssignmentMatrixViewProps {
   dragEnabled: boolean;
   dragSource: DragSource | null;
   dropTarget: { key: string; validity: DropValidity } | null;
-  beginDrag: (technician: any, date: Date, assignment: any) => void;
+  beginDrag: (technician: DragTechnician, date: Date, assignment: MatrixDragAssignment, dataTransfer?: DataTransfer) => void;
   dragOverCell: (technicianId: string, date: Date) => void;
   clearDragOver: () => void;
-  dropOnCell: (technician: any, date: Date) => void;
+  dropOnCell: (technician: DragTechnician, date: Date, serializedSource?: string) => void;
   endDrag: () => void;
   pendingMove: PendingMove | null;
   isMoving: boolean;
@@ -221,7 +221,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   lens,
   onOpenStaffingOrchestrator,
   coverageByDate,
-  coverageByJob,
+  coverageByDateJob,
   costWindowTotal,
   costByDate,
   lensBadgeByCell,
@@ -376,7 +376,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                     date={date}
                     width={CELL_WIDTH}
                     coverageByDate={coverageByDate}
-                    coverageByJob={coverageByJob}
+                    coverageByDateJob={coverageByDateJob}
                     getJobsForDate={getJobsForDate}
                     onOpenStaffing={(jobId, department, jobTitle) => onOpenStaffingOrchestrator?.(jobId, department, jobTitle)}
                   />
@@ -509,12 +509,23 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             isDragSource={isDragSourceCell}
                             dropValidity={dropValidity}
                             pickupActive={!!dragSource}
-                            onDragStartCell={() => beginDrag(technician, date, assignment)}
+                            onDragStartCell={(dataTransfer) => beginDrag(technician, date, assignment, dataTransfer)}
                             onDragOverCell={() => dragOverCell(technician.id, date)}
                             onDragLeaveCell={() => clearDragOver()}
-                            onDropCell={() => dropOnCell(technician, date)}
+                            onDropCell={(serializedSource) => dropOnCell(technician, date, serializedSource)}
                             onDragEndCell={() => endDrag()}
-                            onDropJobCell={(jobId) => handleCellClick(technician.id, date, "assign", jobId)}
+                            onDropJobCell={(jobId) => {
+                              const jobMatchesDate = getJobsForDate(date).some((job) => job.id === jobId);
+                              if (!jobMatchesDate) {
+                                toast({
+                                  title: "Fecha fuera del trabajo",
+                                  description: "Suelta el trabajo en una fecha incluida en su programación.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              handleCellClick(technician.id, date, "assign", jobId);
+                            }}
                           />
                         </div>
                       );

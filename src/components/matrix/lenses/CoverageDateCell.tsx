@@ -6,7 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { DEPARTMENT_LABELS, formatLabel } from '@/pages/job-assignment-matrix/utils';
-import { coverageStatus, type CoverageByDateDept, type CoverageByJobDept } from '@/components/matrix/lenses/coverage';
+import { coverageStatus, type CoverageByDateDept, type CoverageByDateJobDept } from '@/components/matrix/lenses/coverage';
 import { LENS_HEADER_ROW_HEIGHT } from '@/components/matrix/lenses/types';
 
 const MADRID_TIMEZONE = 'Europe/Madrid';
@@ -22,7 +22,7 @@ interface CoverageDateCellProps {
   date: Date;
   width: number;
   coverageByDate: CoverageByDateDept;
-  coverageByJob: CoverageByJobDept;
+  coverageByDateJob: CoverageByDateJobDept;
   getJobsForDate: (date: Date) => Array<{ id: string; title: string }>;
   onOpenStaffing: (jobId: string, department: string, jobTitle: string) => void;
 }
@@ -31,12 +31,13 @@ const CoverageDateCellComp = ({
   date,
   width,
   coverageByDate,
-  coverageByJob,
+  coverageByDateJob,
   getJobsForDate,
   onOpenStaffing,
 }: CoverageDateCellProps) => {
   const dateKey = formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy-MM-dd');
   const deptMap = coverageByDate.get(dateKey);
+  const coverageByJob = coverageByDateJob.get(dateKey);
 
   if (!deptMap || deptMap.size === 0) {
     return <div className="border-r flex-shrink-0" style={{ width, height: LENS_HEADER_ROW_HEIGHT }} />;
@@ -77,7 +78,7 @@ const CoverageDateCellComp = ({
         <div className="space-y-3">
           <div className="text-sm font-medium">Cobertura del {format(date, "EEEE d 'de' MMMM", { locale: es })}</div>
           {getJobsForDate(date).map((job) => {
-            const jobCoverage = coverageByJob.get(job.id);
+            const jobCoverage = coverageByJob?.get(job.id);
             if (!jobCoverage || jobCoverage.size === 0) return null;
             return (
               <div key={job.id} className="border rounded-md p-2 space-y-1">

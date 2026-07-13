@@ -210,12 +210,9 @@ export const AssignJobDialog = ({
   );
   const existingTimesheetDateSet = useMemo(() => new Set(existingTimesheetDateKeys), [existingTimesheetDateKeys]);
 
-  // Set initial role if reassigning
   React.useEffect(() => {
     if (existingAssignment && technician) {
-      const currentRole = existingAssignment.sound_role ||
-        existingAssignment.lights_role ||
-        existingAssignment.video_role;
+      const currentRole = existingAssignment.sound_role || existingAssignment.lights_role || existingAssignment.video_role || existingAssignment.production_role;
       if (currentRole) {
         if (isRoleCode(currentRole)) {
           setSelectedRole(currentRole);
@@ -331,9 +328,7 @@ export const AssignJobDialog = ({
     try {
       const soundRole = technician.department === 'sound' ? selectedRole : 'none';
       const lightsRole = technician.department === 'lights' ? selectedRole : 'none';
-      const videoRole = technician.department === 'video' ? selectedRole : 'none';
-
-      console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
+      const videoRole = technician.department === 'video' ? selectedRole : 'none', productionRole = technician.department === 'production' ? selectedRole : 'none';
 
       if (isReassignment && !isModifyingSameJobByContext) {
         const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
@@ -379,6 +374,7 @@ export const AssignJobDialog = ({
         sound_role: soundRole !== 'none' ? soundRole : null,
         lights_role: lightsRole !== 'none' ? lightsRole : null,
         video_role: videoRole !== 'none' ? videoRole : null,
+        production_role: productionRole !== 'none' ? productionRole : null,
         assigned_by: (await dataLayerClient.auth.getUser()).data.user?.id,
         assigned_at: new Date().toISOString(),
         status: assignAsConfirmed ? 'confirmed' : 'invited',
@@ -448,6 +444,7 @@ export const AssignJobDialog = ({
           sound_role: basePayload.sound_role,
           lights_role: basePayload.lights_role,
           video_role: basePayload.video_role,
+          production_role: basePayload.production_role,
           assigned_by: basePayload.assigned_by,
           assigned_at: basePayload.assigned_at,
           // Do not downgrade a confirmed assignment to invited
@@ -476,6 +473,7 @@ export const AssignJobDialog = ({
                 sound_role: row.sound_role,
                 lights_role: row.lights_role,
                 video_role: row.video_role,
+                production_role: row.production_role,
                 assigned_by: row.assigned_by,
                 assigned_at: row.assigned_at,
                 status: row.status,

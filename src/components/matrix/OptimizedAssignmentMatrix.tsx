@@ -132,7 +132,7 @@ export const OptimizedAssignmentMatrix = ({
     [technicians],
   );
 
-  const { coverageByDate, coverageByJob } = useMatrixCoverage({
+  const { coverageByDate, coverageByDateJob } = useMatrixCoverage({
     dates,
     jobIds,
     getJobsForDate,
@@ -757,7 +757,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
     lens: effectiveLens, onOpenStaffingOrchestrator,
-    coverageByDate, coverageByJob,
+    coverageByDate, coverageByDateJob,
     costWindowTotal: costAggregation?.window ?? null, costByDate: costAggregation?.byDate ?? EMPTY_COST_BY_DATE,
     lensBadgeByCell, technicianLensSummaryByTech,
     dragEnabled, dragSource, dropTarget, beginDrag, dragOverCell, clearDragOver, dropOnCell, endDrag,
