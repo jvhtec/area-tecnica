@@ -73,22 +73,22 @@ export const BulkTourFolderActions = ({
 
       if (updatedCount > 0) {
         toast({
-          title: "Verification Complete",
-          description: `Updated ${updatedCount} tour(s) with correct folder status.`,
+          title: "Comprobación completada",
+          description: `Se actualizó el estado de carpetas de ${updatedCount} gira(s).`,
         });
         onRefresh();
       } else {
         toast({
-          title: "Verification Complete",
-          description: "No tours needed status updates.",
+          title: "Comprobación completada",
+          description: "No era necesario actualizar ninguna gira.",
         });
       }
 
     } catch (error: any) {
       console.error("Verification error:", error);
       toast({
-        title: "Verification Failed",
-        description: error.message || "Failed to verify folder status",
+        title: "No se pudo comprobar",
+        description: error.message || "No se pudo comprobar el estado de las carpetas",
         variant: "destructive"
       });
     } finally {
@@ -123,8 +123,8 @@ export const BulkTourFolderActions = ({
 
       if (successCount > 0) {
         toast({
-          title: "Bulk Creation Complete",
-          description: `Successfully created root folders for ${successCount} tour(s).${errorCount > 0 ? ` ${errorCount} failed.` : ''}`,
+          title: "Creación completada",
+          description: `Se crearon las carpetas raíz de ${successCount} gira(s).${errorCount > 0 ? ` ${errorCount} fallaron.` : ''}`,
         });
         onRefresh();
       }
@@ -132,16 +132,16 @@ export const BulkTourFolderActions = ({
       if (errorCount > 0) {
         console.error("Bulk creation errors:", errors);
         toast({
-          title: "Some Tours Failed",
-          description: `${errorCount} tour(s) failed to create root folders. Check console for details.`,
+          title: "Algunas giras fallaron",
+          description: `No se pudieron crear las carpetas raíz de ${errorCount} gira(s).`,
           variant: "destructive"
         });
       }
     } catch (error: any) {
       console.error("Bulk creation error:", error);
       toast({
-        title: "Bulk Creation Failed",
-        description: error.message || "Failed to create root folders",
+        title: "No se pudieron crear las carpetas",
+        description: error.message || "No se pudieron crear las carpetas raíz",
         variant: "destructive"
       });
     } finally {
@@ -159,7 +159,7 @@ export const BulkTourFolderActions = ({
         <CardTitle className="text-base md:text-lg flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FolderPlus className="h-4 w-4 md:h-5 md:w-5 text-orange-600 flex-shrink-0" />
-            <span className="text-sm md:text-base">Legacy Tours Detected</span>
+            <span className="text-sm md:text-base">Carpetas de gira pendientes</span>
           </div>
           {isCollapsible && (
             <Button
@@ -177,7 +177,7 @@ export const BulkTourFolderActions = ({
         <CardContent className="px-4 pb-4 md:px-6 md:pb-6">
           <div className="space-y-3">
             <p className="text-xs md:text-sm text-muted-foreground">
-              {toursNeedingRootFolders.length} tour(s) appear to need root folders. This might be a display issue if folders already exist.
+              {toursNeedingRootFolders.length} gira(s) necesitan preparar o comprobar sus carpetas raíz de Flex.
             </p>
 
             <div className="flex flex-wrap gap-1.5 md:gap-2">
@@ -185,7 +185,7 @@ export const BulkTourFolderActions = ({
                 <Badge key={tour.id} variant="outline" className="border-orange-300 text-orange-700 text-xs">
                   {tour.name}
                   {tour.flex_main_folder_id && (
-                    <span className="ml-1 text-xs text-green-600">(Has Folder ID)</span>
+                    <span className="ml-1 text-xs text-green-600">(carpeta detectada)</span>
                   )}
                 </Badge>
               ))}
@@ -201,14 +201,12 @@ export const BulkTourFolderActions = ({
                 {isVerifying ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    <span className="hidden sm:inline">Verifying...</span>
-                    <span className="sm:hidden">Verifying...</span>
+                    <span>Comprobando...</span>
                   </>
                 ) : (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Verify Status</span>
-                    <span className="sm:hidden">Verify</span>
+                    <span>Comprobar estado</span>
                   </>
                 )}
               </Button>
@@ -220,14 +218,12 @@ export const BulkTourFolderActions = ({
                 className="flex-1 touch-manipulation"
                 loadingText={
                   <>
-                    <span className="hidden sm:inline">Creating Root Folders...</span>
-                    <span className="sm:hidden">Creating...</span>
+                    <span>Creando carpetas raíz...</span>
                   </>
                 }
               >
                 <FolderPlus className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Create Root Folders</span>
-                <span className="sm:hidden">Create</span>
+                <span>Crear carpetas raíz</span>
               </SubmitButton>
             </div>
           </div>

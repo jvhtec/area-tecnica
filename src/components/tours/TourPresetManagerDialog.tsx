@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -179,11 +179,11 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-base md:text-lg">Presets de Gira</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <ResponsiveDialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle className="text-base md:text-lg">Presets de Gira</ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
           {isCreating || editingPreset || copyingPreset ? (
             <DepartmentProvider department={department}>
@@ -198,22 +198,22 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
           ) : (
             <Manager />
           )}
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
-      <Dialog open={showCalculator} onOpenChange={setShowCalculator}>
-        <DialogContent className="max-w-6xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Calculadora de Amplificadores - Crear Preset</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog open={showCalculator} onOpenChange={setShowCalculator}>
+        <ResponsiveDialogContent className="max-w-6xl max-h-[90vh]">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>Calculadora de Amplificadores - Crear Preset</ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
           <div className="text-sm text-muted-foreground mb-4">
             Configura los altavoces y calcula los amplificadores. Los resultados se guardarán como un nuevo preset para esta gira.
           </div>
           <DepartmentProvider department={department}>
             <AmplifierTool tourId={tourId} />
           </DepartmentProvider>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </>
   );
 }

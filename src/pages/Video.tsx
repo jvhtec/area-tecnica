@@ -139,13 +139,13 @@ const Video = () => {
       if (error) throw error;
 
       toast({
-        title: "Job deleted",
-        description: "The job has been successfully deleted.",
+        title: "Trabajo eliminado",
+        description: "El trabajo se ha eliminado correctamente.",
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
     } catch (error: any) {
       toast({
-        title: "Error deleting job",
+        title: "Error al eliminar el trabajo",
         description: error.message,
         variant: "destructive",
       });
@@ -168,8 +168,8 @@ const Video = () => {
   const handleCreateJob = useCallback((preset?: JobType) => {
     if (!canManageJobs) {
       toast({
-        title: "Permission denied",
-        description: "Only admin and management users can create jobs",
+        title: "Permiso denegado",
+        description: "Solo administradores y usuarios de gestión pueden crear trabajos",
         variant: "destructive",
       });
       return;
@@ -195,6 +195,7 @@ const Video = () => {
             onEditJob={handleEditClick}
             onDeleteJob={handleDeleteClick}
             onJobClick={handleJobClick}
+            isLoading={isLoading}
           />
         )}
         {!isMobile && (

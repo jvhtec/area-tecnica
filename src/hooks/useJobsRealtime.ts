@@ -197,7 +197,7 @@ export function useJobsRealtime() {
       setIsPaused(false);
       setRetryCount(0);
       await refetch();
-      toast.success("Data refreshed successfully");
+      toast.success("Datos actualizados correctamente");
     } catch (error) {
       console.error("Error in manual refresh:", error);
       toast.error("Failed to refresh data");

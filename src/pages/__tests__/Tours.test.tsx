@@ -83,10 +83,10 @@ describe("Tours", () => {
 
     renderWithProviders(<Tours />);
 
-    expect(await screen.findByRole("button", { name: /expand tours/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /expandir giras/i })).toBeInTheDocument();
     expect(screen.queryByText("Tour chips")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /expand tours/i }));
+    await user.click(screen.getByRole("button", { name: /expandir giras/i }));
 
     expect(screen.getByText("Tour chips")).toBeInTheDocument();
     expect(updateMock).toHaveBeenCalledWith({ tours_expanded: true });

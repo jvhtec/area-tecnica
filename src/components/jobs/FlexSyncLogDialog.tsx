@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -49,11 +49,11 @@ export const FlexSyncLogDialog: React.FC<FlexSyncLogDialogProps> = ({ jobId, ope
   }, [open, jobId]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-base md:text-lg">Flex Sync Logs</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+        <ResponsiveDialogHeader className="flex-shrink-0">
+          <ResponsiveDialogTitle className="text-base md:text-lg">Flex Sync Logs</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 flex-shrink-0">
           <div className="text-xs md:text-sm text-muted-foreground">
             {folderIds.length} folder(s) • {logs.length} entries
@@ -112,8 +112,8 @@ export const FlexSyncLogDialog: React.FC<FlexSyncLogDialogProps> = ({ jobId, ope
             </div>
           )}
         </ScrollArea>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };
 

@@ -77,10 +77,10 @@ const CollapsibleCard = ({
               <CollapsibleTrigger asChild>
                 <button
                   className="shrink-0 rounded-md border px-2 py-1 text-xs md:text-sm text-muted-foreground hover:bg-muted flex items-center gap-1 [&[data-state=open]>svg]:rotate-180"
-                  aria-label={open ? "Collapse section" : "Expand section"}
+                  aria-label={open ? "Contraer sección" : "Expandir sección"}
                 >
                   <ChevronDown className="h-3.5 w-3.5 md:h-4 md:w-4 transition-transform duration-200" />
-                  <span className="hidden sm:inline">Toggle</span>
+                  <span className="hidden sm:inline">Alternar</span>
                 </button>
               </CollapsibleTrigger>
             </div>
@@ -134,10 +134,10 @@ const Settings = () => {
 
   const permissionLabel =
     permission === 'granted'
-      ? 'Granted'
+      ? 'Concedido'
       : permission === 'denied'
-        ? 'Blocked'
-        : 'Not requested';
+        ? 'Bloqueado'
+        : 'No solicitado';
   const hasSubscription = Boolean(subscription);
   const showEnableButton = canEnable && !isInitializing;
   const isBlocked = permission === 'denied';
@@ -162,28 +162,28 @@ const Settings = () => {
         const allSkipped = result.results?.every(r => r.skipped);
         if (allSkipped) {
           toast({
-            title: "Test notification skipped",
-            description: "Push notifications are configured but the server doesn't have VAPID keys set up yet.",
+            title: "Notificación de prueba omitida",
+            description: "Las notificaciones están configuradas, pero el servidor todavía no dispone de claves VAPID.",
             variant: "destructive"
           });
         } else {
           toast({
-            title: "Test notification sent",
-            description: "Check your device for the notification!"
+            title: "Notificación de prueba enviada",
+            description: "Comprueba la notificación en tu dispositivo."
           });
         }
       } else {
         toast({
-          title: "No subscriptions found",
-          description: "Enable push notifications first before testing.",
+          title: "No hay suscripciones",
+          description: "Activa primero las notificaciones push para poder probarlas.",
           variant: "destructive"
         });
       }
     } catch (err) {
       console.error('Test notification error:', err);
       toast({
-        title: "Failed to send test",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: "No se pudo enviar la prueba",
+        description: err instanceof Error ? err.message : "Error desconocido",
         variant: "destructive"
       });
     }
@@ -192,8 +192,8 @@ const Settings = () => {
   const handleBackgroundTest = async () => {
     try {
       toast({
-        title: 'Background test scheduled',
-        description: 'Press Home now. A test push will be sent in 5 seconds.',
+        title: 'Prueba en segundo plano programada',
+        description: 'Pulsa Inicio ahora. Se enviará una notificación de prueba en 5 segundos.',
       })
       setTimeout(async () => {
         try {
@@ -239,7 +239,7 @@ const Settings = () => {
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto w-full max-w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 space-y-3 md:space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-          <h1 className="text-xl md:text-2xl font-semibold">Settings</h1>
+          <h1 className="text-xl md:text-2xl font-semibold">Ajustes</h1>
           <div className="flex flex-row gap-2">
             <Button
               onClick={() => setImportUsersOpen(true)}
@@ -248,8 +248,8 @@ const Settings = () => {
               size="sm"
             >
               <Upload className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Import Users</span>
-              <span className="xs:hidden">Import</span>
+              <span className="hidden xs:inline">Importar usuarios</span>
+              <span className="xs:hidden">Importar</span>
             </Button>
             <Button
               onClick={() => setCreateUserOpen(true)}
@@ -257,8 +257,8 @@ const Settings = () => {
               size="sm"
             >
               <UserPlus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Add User</span>
-              <span className="xs:hidden">Add</span>
+              <span className="hidden xs:inline">Añadir usuario</span>
+              <span className="xs:hidden">Añadir</span>
             </Button>
           </div>
         </div>
@@ -267,48 +267,48 @@ const Settings = () => {
           <div className="space-y-4 md:space-y-6 w-full min-w-0">
             <CollapsibleCard
               id="push-notifications"
-              title="Push notifications"
-              description="Get real-time updates about jobs, assignments, and documents directly on your device."
+              title="Notificaciones push"
+              description="Recibe en tu dispositivo actualizaciones de trabajos, asignaciones y documentos en tiempo real."
               isOpen={collapsibleStates['push-notifications']}
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-notifications': open }))}
             >
               {!isSupported ? (
                 <Alert variant="info">
-                  <AlertTitle>Unsupported browser</AlertTitle>
+                  <AlertTitle>Navegador no compatible</AlertTitle>
                   <AlertDescription>
-                    Your current browser does not support web push. Try using the latest version of Chrome, Edge, or Safari.
+                    Tu navegador no admite notificaciones web push. Prueba la última versión de Chrome, Edge o Safari.
                   </AlertDescription>
                 </Alert>
               ) : (
                 <>
                   <div className="space-y-1 text-sm">
                     <p>
-                      <span className="font-medium">Permission:</span> {permissionLabel}
+                      <span className="font-medium">Permiso:</span> {permissionLabel}
                     </p>
                     <p>
-                      <span className="font-medium">Subscription:</span>{" "}
-                      {hasSubscription ? 'Active on this device' : 'Not active yet'}
+                      <span className="font-medium">Suscripción:</span>{" "}
+                      {hasSubscription ? 'Activa en este dispositivo' : 'Aún no activa'}
                     </p>
                   </div>
 
                   {isInitializing && (
                     <p className="text-sm text-muted-foreground">
-                      Checking your device for an existing subscription…
+                      Comprobando si este dispositivo ya tiene una suscripción…
                     </p>
                   )}
 
                   {error && (
                     <Alert variant="destructive">
-                      <AlertTitle>Notification error</AlertTitle>
+                      <AlertTitle>Error de notificaciones</AlertTitle>
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
 
                   {isBlocked && (
                     <Alert variant="info">
-                      <AlertTitle>Notifications blocked</AlertTitle>
+                      <AlertTitle>Notificaciones bloqueadas</AlertTitle>
                       <AlertDescription>
-                        Enable notifications from your browser settings and reload the page to subscribe.
+                        Activa las notificaciones en los ajustes del navegador y recarga la página para suscribirte.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -322,7 +322,7 @@ const Settings = () => {
                       className="w-full text-xs sm:text-sm"
                       size="sm"
                     >
-                      {isEnabling ? 'Enabling…' : 'Enable'}
+                      {isEnabling ? 'Activando…' : 'Activar'}
                     </Button>
                     <Button
                       variant="outline"
@@ -333,7 +333,7 @@ const Settings = () => {
                       className="w-full text-xs sm:text-sm"
                       size="sm"
                     >
-                      {isDisabling ? 'Disabling…' : 'Disable'}
+                      {isDisabling ? 'Desactivando…' : 'Desactivar'}
                     </Button>
                     <Button
                       variant="secondary"
@@ -343,17 +343,17 @@ const Settings = () => {
                       size="sm"
                     >
                       <Bell className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="hidden xs:inline">Send </span>Test
+                      <span className="hidden xs:inline">Enviar </span>prueba
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={handleBackgroundTest}
                       disabled={!hasSubscription || isInitializing}
-                      title="Schedules a test push in 5s so you can background the app"
+                      title="Programa una notificación en 5 segundos para probar la aplicación en segundo plano"
                       className="w-full text-xs sm:text-sm"
                       size="sm"
                     >
-                      BG test (5s)
+                      Prueba 2.º plano (5 s)
                     </Button>
                   </div>
                 </>
@@ -363,16 +363,16 @@ const Settings = () => {
             {isSupported && (
               <CollapsibleCard
                 id="push-diagnostics"
-                title="Push diagnostics"
-                description="Useful when you can't access Safari's Web Inspector."
+                title="Diagnóstico push"
+                description="Útil cuando no puedes acceder al inspector web de Safari."
                 isOpen={collapsibleStates['push-diagnostics']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-diagnostics': open }))}
               >
                 <div className="text-sm space-y-1">
-                  <p><span className="font-medium">Permission:</span> {permissionLabel}</p>
-                  <p><span className="font-medium">Has subscription:</span> {hasSubscription ? 'Yes' : 'No'}</p>
+                  <p><span className="font-medium">Permiso:</span> {permissionLabel}</p>
+                  <p><span className="font-medium">Tiene suscripción:</span> {hasSubscription ? 'Sí' : 'No'}</p>
                   {subInfo?.endpoint && (
-                    <p className="break-words"><span className="font-medium">Endpoint:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
+                    <p className="break-words"><span className="font-medium">Punto de conexión:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-3">
@@ -383,7 +383,7 @@ const Settings = () => {
                     className="w-full text-xs sm:text-sm"
                     size="sm"
                   >
-                    <span className="hidden xs:inline">Show </span>Local test
+                    <span className="hidden xs:inline">Mostrar </span>prueba local
                   </Button>
                   <Button
                     variant="outline"
@@ -391,13 +391,13 @@ const Settings = () => {
                     className="w-full text-xs sm:text-sm"
                     size="sm"
                   >
-                    Refresh<span className="hidden xs:inline"> info</span>
+                    Actualizar<span className="hidden xs:inline"> información</span>
                   </Button>
                 </div>
                 <div className="text-xs text-muted-foreground mt-3">
-                  <p className="font-medium mb-1">Recent SW events</p>
+                  <p className="font-medium mb-1">Eventos recientes del service worker</p>
                   {events.length === 0 ? (
-                    <p>No events yet. Try Send Test or Local SW test.</p>
+                    <p>Aún no hay eventos. Prueba el envío o la prueba local.</p>
                   ) : (
                     <ul className="space-y-1 max-h-40 overflow-auto border rounded p-2 bg-muted/30">
                       {events.slice().reverse().map((e, idx) => (
@@ -414,7 +414,7 @@ const Settings = () => {
             {isManagementUser && (
               <CollapsibleCard
                 id="push-matrix"
-                title="Push notification matrix"
+                title="Matriz de notificaciones push"
                 isOpen={collapsibleStates['push-matrix']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-matrix': open }))}
               >
@@ -425,7 +425,7 @@ const Settings = () => {
             {isManagementUser && (
               <CollapsibleCard
                 id="push-schedule"
-                title="Push notification schedule"
+                title="Programación de notificaciones push"
                 isOpen={collapsibleStates['push-schedule']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-schedule': open }))}
               >
@@ -435,8 +435,8 @@ const Settings = () => {
 
             <CollapsibleCard
               id="shortcuts"
-              title="Keyboard shortcuts & Stream Deck"
-              description="Manage keyboard shortcuts and Stream Deck button integration"
+              title="Atajos de teclado y Stream Deck"
+              description="Gestiona los atajos de teclado y la integración de botones de Stream Deck"
               isOpen={collapsibleStates['shortcuts']}
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'shortcuts': open }))}
             >
@@ -447,7 +447,7 @@ const Settings = () => {
           <div className="space-y-4 md:space-y-6 w-full min-w-0">
             <CollapsibleCard
               id="morning-summary"
-              title="Morning summary"
+              title="Resumen matinal"
               isOpen={collapsibleStates['morning-summary']}
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'morning-summary': open }))}
             >
@@ -456,7 +456,7 @@ const Settings = () => {
 
             <CollapsibleCard
               id="users"
-              title="Users"
+              title="Usuarios"
               isOpen={collapsibleStates['users']}
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'users': open }))}
             >
@@ -503,14 +503,14 @@ const Settings = () => {
 
             <CollapsibleCard
               id="company-settings"
-              title="Company settings"
+              title="Ajustes de empresa"
               isOpen={collapsibleStates['company-settings']}
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'company-settings': open }))}
             >
               <div className="space-y-4">
-                <h3 className="text-sm font-medium">Company Logo</h3>
+                <h3 className="text-sm font-medium">Logotipo de la empresa</h3>
                 <p className="text-sm text-muted-foreground">
-                  Upload your company logo. This will be used in the Memoria Técnica PDFs and other documents.
+                  Sube el logotipo de la empresa. Se usará en los PDF de memoria técnica y otros documentos.
                 </p>
                 <CompanyLogoUploader />
               </div>
@@ -533,8 +533,8 @@ const Settings = () => {
             {isManagementUser && (
               <CollapsibleCard
                 id="dryhire-folders"
-                title="Dry hire folders"
-                description="Manage Flex folder structure for dry hire jobs"
+                title="Carpetas de dry hire"
+                description="Gestiona la estructura de carpetas de Flex para trabajos de dry hire"
                 isOpen={collapsibleStates['dryhire-folders']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'dryhire-folders': open }))}
               >
@@ -545,8 +545,8 @@ const Settings = () => {
             {/* Version Display for testing iOS PWA updates */}
             <CollapsibleCard
               id="version-info"
-              title="Version info"
-              description="Build and service worker version details for testing updates."
+              title="Información de versión"
+              description="Detalles de la compilación y del service worker para comprobar actualizaciones."
               isOpen={collapsibleStates['version-info']}
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'version-info': open }))}
             >

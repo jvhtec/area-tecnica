@@ -1,4 +1,3 @@
-import type React from "react";
 import {
   Clock,
   Copy,
@@ -23,6 +22,9 @@ import {
 
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
+import { ArchiveToFlexAction } from "@/components/jobs/cards/job-card-actions/ArchiveToFlexAction";
+import { BackfillDocTecnicaAction } from "@/components/jobs/cards/job-card-actions/BackfillDocTecnicaAction";
+import { MobileJobCardActions } from "@/components/jobs/cards/job-card-actions/MobileJobCardActions";
 import { PrintFlexReportAction } from "@/components/jobs/cards/job-card-actions/PrintFlexReportAction";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,11 +33,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArchiveToFlexAction } from "@/components/jobs/cards/job-card-actions/ArchiveToFlexAction";
-import { BackfillDocTecnicaAction } from "@/components/jobs/cards/job-card-actions/BackfillDocTecnicaAction";
 import type {
-  FlexOpeningState,
-  JobCardActionsProps,
+  JobCardActionButtonsProps,
   TechnicalPowerPackState,
 } from "@/components/jobs/cards/job-card-actions/types";
 import { cn } from "@/lib/utils";
@@ -48,34 +47,16 @@ import {
   type TechnicalPowerDepartment,
 } from "@/utils/technicalPowerTypes";
 
-type JobCardActionButtonsProps = JobCardActionsProps & {
-  allowedJobType: boolean;
-  canSendProductionWhatsapp: boolean;
-  canViewCalculators: boolean;
-  defaultsInfo?: { weight: boolean; power: boolean };
-  flexOpening: FlexOpeningState;
-  handleManageJob: (e: React.MouseEvent) => void;
-  handleTimesheetClick: (e: React.MouseEvent) => void;
-  isFestivalLike: boolean;
-  isManagementUser: boolean;
-  isMobile: boolean;
-  isTechnicianUser: boolean;
-  navigateToCalculator: (e: React.MouseEvent, type: "pesos" | "consumos") => void;
-  navigateToMemoria: (e: React.MouseEvent) => void;
-  openDuplicateSoundDocsDialog: () => void;
-  openProductionWhatsappDialog: () => void;
-  openWarehouseWhatsappDialog: () => void;
-  technicalPower: TechnicalPowerPackState;
-};
-
-const WAREHOUSE_LABEL_BY_DEPARTMENT: Partial<Record<NonNullable<JobCardActionsProps["department"]>, string>> = {
+const WAREHOUSE_LABEL_BY_DEPARTMENT: Partial<
+  Record<NonNullable<JobCardActionButtonsProps["department"]>, string>
+> = {
   sound: "sonido",
   lights: "iluminación",
   video: "video",
   production: "producción",
 };
 
-const getWarehouseDepartmentLabel = (department: JobCardActionsProps["department"]) => (
+const getWarehouseDepartmentLabel = (department: JobCardActionButtonsProps["department"]) => (
   department ? WAREHOUSE_LABEL_BY_DEPARTMENT[department] ?? department : "sonido"
 );
 
@@ -117,7 +98,8 @@ const TechnicalPowerStatusDots = ({ technicalPower }: { technicalPower: Technica
   </span>
 );
 
-export const JobCardActionButtons = ({
+export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
+  const {
   allowedJobType,
   canCreateFlexFolders,
   canEditJobs,
@@ -172,7 +154,12 @@ export const JobCardActionButtons = ({
   whatsappDisabled,
   whatsappGroup,
   whatsappRequest,
-}: JobCardActionButtonsProps) => {
+  } = props;
+
+  if (isMobile && isProjectManagementPage) {
+    return <MobileJobCardActions {...props} />;
+  }
+
   const isProductionDepartment = department === "production";
   const canDuplicateSoundDocs =
     department === "sound" &&
@@ -191,6 +178,7 @@ export const JobCardActionButtons = ({
     isManagementUser &&
     job.job_type !== "dryhire" &&
     Boolean(onTransportClick);
+
 
   return (
   <div className={cn("flex flex-wrap", isMobile ? "gap-1" : "gap-1.5")} onClick={(e) => e.stopPropagation()}>

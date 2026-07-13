@@ -8,6 +8,11 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    watch: {
+      // Test artifacts can contain thousands of HTML files. Watching them causes
+      // full-page reload storms when local coverage runs beside the dev server.
+      ignored: ["**/coverage/**", "**/test-results/**", "**/playwright-report/**"],
+    },
   },
   plugins: [
     react(),

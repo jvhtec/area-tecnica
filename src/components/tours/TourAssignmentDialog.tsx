@@ -1,5 +1,5 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -246,10 +246,10 @@ export const TourAssignmentDialog = ({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <DialogHeader>
-          <DialogTitle className="flex flex-wrap items-center gap-2 text-base md:text-lg">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex flex-wrap items-center gap-2 text-base md:text-lg">
             <Users className="h-4 w-4 md:h-5 md:w-5" />
             {readOnly ? 'Tour Team Members' : 'Tour Team Assignments'}
             {readOnly && (
@@ -258,8 +258,8 @@ export const TourAssignmentDialog = ({
                 View Only
               </Badge>
             )}
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-6">
           {/* Auto-sync info */}
@@ -319,10 +319,10 @@ export const TourAssignmentDialog = ({
                             : [{ value: assignment.role, label: labelForCode(assignment.role) || assignment.role }, ...opts];
 
                           return (
-                            <div key={assignment.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">
+                            <div key={assignment.id} className="flex min-w-0 flex-col gap-2 rounded bg-muted p-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                  <span className="min-w-0 break-words font-medium">
                                     {assignment.profiles
                                       ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
                                       : assignment.external_technician_name
@@ -342,7 +342,7 @@ export const TourAssignmentDialog = ({
                                       }}
                                       disabled={updateRoleMutation.isPending}
                                     >
-                                      <SelectTrigger className="h-7 w-auto min-w-[160px] text-xs">
+                                      <SelectTrigger className="h-8 w-full min-w-0 text-xs sm:w-auto sm:min-w-[160px]">
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -499,8 +499,8 @@ export const TourAssignmentDialog = ({
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
     {/* Tour-wide Personnel Requirements */}
     {!readOnly && (
       <TourRequirementsDialog open={reqOpen} onOpenChange={setReqOpen} tourId={tourId} />

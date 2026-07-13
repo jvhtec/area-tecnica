@@ -26,6 +26,12 @@ import {
   canViewAchievements,
   canViewProfilePushControls,
 } from "@/utils/permissions";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
+import {
+  ProfileMobileSectionNav,
+  type ProfileSection,
+} from "@/components/profile/ProfileMobileSectionNav";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -35,6 +41,8 @@ export const Profile = () => {
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [folderStructure, setFolderStructure] = useState<FolderStructure | null>(null);
   const [tourFolderStructure, setTourFolderStructure] = useState<FolderStructure | null>(null);
+  const [activeSection, setActiveSection] = useState<ProfileSection>("profile");
+  const isMobile = useIsMobile();
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -257,9 +265,14 @@ export const Profile = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="w-full max-w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
+        <ProfileMobileSectionNav
+          activeSection={activeSection}
+          canUseFolders={canUseCustomFolderStructure(profile.role)}
+          onSectionChange={setActiveSection}
+        />
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 auto-rows-fr">
           {/* Profile edit - spans two columns to give form breathing room */}
-          <div className="xl:col-span-2 space-y-6">
+          <div className={cn("xl:col-span-2 space-y-6", isMobile && activeSection !== "profile" && "hidden")}>
             {needsPasswordChange && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
@@ -432,7 +445,7 @@ export const Profile = () => {
           </div>
 
           {/* Folder structure */}
-          {canUseCustomFolderStructure(profile.role) && (
+          {canUseCustomFolderStructure(profile.role) && (!isMobile || activeSection === "folders") && (
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>Personalización de estructura de carpetas</CardTitle>
@@ -492,7 +505,7 @@ export const Profile = () => {
 
           {/* Achievements */}
           {canViewAchievements(profile?.role) && (
-            <Card>
+            <Card className={cn(isMobile && activeSection !== "tools" && "hidden")}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Trophy className="h-5 w-5" />
@@ -515,7 +528,7 @@ export const Profile = () => {
 
           {/* Technician self tools (assignable admin/management) */}
           {showTechnicianSelfTools && (
-            <Card>
+            <Card className={cn(isMobile && activeSection !== "tools" && "hidden")}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarCheck className="h-5 w-5" />
@@ -541,7 +554,7 @@ export const Profile = () => {
 
           {/* Push notifications */}
           {showPushControls && (
-            <Card>
+            <Card className={cn(isMobile && activeSection !== "notifications" && "hidden")}>
               <CardHeader>
                 <CardTitle>Notificaciones push</CardTitle>
                 <CardDescription>
@@ -625,7 +638,7 @@ export const Profile = () => {
 
           {/* ICS card */}
           {showIcsCard && (
-            <Card>
+            <Card className={cn(isMobile && activeSection !== "notifications" && "hidden")}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5" />
@@ -658,11 +671,13 @@ export const Profile = () => {
 
           {/* Morning summary */}
           {canReceiveMorningSummary(profile?.role) && (
-            <MorningSummarySubscription />
+            <div className={cn(isMobile && activeSection !== "notifications" && "hidden")}>
+              <MorningSummarySubscription />
+            </div>
           )}
 
           {/* Password */}
-          <Card>
+          <Card className={cn(isMobile && activeSection !== "security" && "hidden")}>
             <CardHeader>
               <CardTitle>Cambiar contraseña</CardTitle>
             </CardHeader>
@@ -717,7 +732,7 @@ export const Profile = () => {
           </Card>
 
           {/* Data & Privacy */}
-          <Card>
+          <Card className={cn(isMobile && activeSection !== "security" && "hidden")}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />

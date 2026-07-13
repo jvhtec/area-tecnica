@@ -1,5 +1,5 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -180,14 +180,14 @@ export const TourManagementDialog = ({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
-          <DialogHeader>
-            <DialogTitle className="text-base md:text-lg">
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <ResponsiveDialogContent className="max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle className="text-base md:text-lg">
               Gestionar Gira: {tour.name}
               {tourDateId && <span className="text-sm text-muted-foreground ml-2">(Modo Anulación)</span>}
-            </DialogTitle>
-          </DialogHeader>
+            </ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
           <div className="space-y-4 md:space-y-6">
             <div className="border-b pb-4">
@@ -303,7 +303,7 @@ export const TourManagementDialog = ({
                 </Button>
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground font-medium">Sonido</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Button
                       variant="outline"
                       onClick={handlePowerDefaults}
@@ -322,7 +322,7 @@ export const TourManagementDialog = ({
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground font-medium">Luces</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Button
                       variant="outline"
                       onClick={handleLightsPowerDefaults}
@@ -346,8 +346,8 @@ export const TourManagementDialog = ({
 
             <TourDeleteSection onDelete={handleDelete} />
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <TourDefaultsManager
         open={defaultsManagerOpen}

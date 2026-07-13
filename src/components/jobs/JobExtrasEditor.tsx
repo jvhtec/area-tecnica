@@ -135,10 +135,10 @@ export function JobExtrasEditor({
     return (
       <Card className="bg-card border-border text-card-foreground">
         <CardHeader>
-          <CardTitle className="text-sm">Job Extras</CardTitle>
+          <CardTitle className="text-sm">Extras del trabajo</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground">Loading...</div>
+          <div className="text-sm text-muted-foreground">Cargando...</div>
         </CardContent>
       </Card>
     );
@@ -274,7 +274,7 @@ export function JobExtrasEditor({
           <>
             <Separator />
             <div className="flex items-center justify-between font-medium">
-              <span>Total Extras:</span>
+              <span>Total de extras:</span>
               <Badge variant="default" className="text-sm">
                 {formatCurrency(totalExtrasAmount)}
               </Badge>

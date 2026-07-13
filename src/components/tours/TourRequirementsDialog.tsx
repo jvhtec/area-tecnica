@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/ui/responsive-dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -111,11 +111,11 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Tour‑wide Personnel Requirements</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-3xl">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Tour‑wide Personnel Requirements</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <div className="space-y-6">
           <p className="text-sm text-muted-foreground">
             Configure required crew for this tour. These requirements will be applied to every job in the tour and replace existing per‑job requirements for the selected departments.
@@ -129,8 +129,8 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
               </div>
               <div className="space-y-2">
                 {byDept[dept].map((r, idx) => (
-                  <div key={`${dept}-${idx}`} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-7">
+                  <div key={`${dept}-${idx}`} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-12">
+                    <div className="sm:col-span-7">
                       <Label className="sr-only">Role</Label>
                       <Select value={r.role_code} onValueChange={(v) => updateRow(dept, idx, { role_code: v })}>
                         <SelectTrigger>
@@ -143,13 +143,13 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-3">
+                    <div className="sm:col-span-3">
                       <Label className="sr-only">Qty</Label>
                       <Input type="number" min={0} step={1} value={r.quantity}
                         onChange={(e) => updateRow(dept, idx, { quantity: Number(e.target.value) })} />
                     </div>
-                    <div className="col-span-2 flex justify-end">
-                      <Button variant="destructive" size="sm" onClick={() => removeRow(dept, idx)}>Delete</Button>
+                    <div className="flex justify-end sm:col-span-2">
+                      <Button className="w-full sm:w-auto" variant="destructive" size="sm" onClick={() => removeRow(dept, idx)}>Delete</Button>
                     </div>
                   </div>
                 ))}
@@ -161,12 +161,12 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
           ))}
 
           <Separator />
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
             <Button onClick={handleApply} disabled={saving || totalRows === 0}>{saving ? 'Applying…' : 'Apply to All Tour Jobs'}</Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   )
 }

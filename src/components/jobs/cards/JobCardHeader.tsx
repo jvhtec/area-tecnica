@@ -60,7 +60,7 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
       case "tour":
         return <Badge variant="secondary" className={cn("ml-2", isMobile && "text-xs")}>Tour</Badge>;
       case "single":
-        return <Badge variant="secondary" className={cn("ml-2", isMobile && "text-xs")}>Single</Badge>;
+        return <Badge variant="secondary" className={cn("ml-2", isMobile && "text-xs")}>Sencillo</Badge>;
       case "festival":
         return <Badge variant="secondary" className={cn("ml-2", isMobile && "text-xs")}>Festival</Badge>;
       case "ciclo":
@@ -112,7 +112,7 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
           variant="ghost"
           size="icon"
           onClick={onToggleCollapse}
-          title="Toggle Details"
+          title="Mostrar u ocultar detalles"
           className={cn("hover:bg-accent/50 shrink-0", isMobile && "h-8 w-8")}
         >
           {collapsed ? (

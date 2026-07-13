@@ -181,4 +181,24 @@ export type FlexOpeningState = {
   setTourdateSelectorInfo: React.Dispatch<React.SetStateAction<TourdateSelectorInfo>>;
 };
 
+export type JobCardActionButtonsProps = JobCardActionsProps & {
+  allowedJobType: boolean;
+  canSendProductionWhatsapp: boolean;
+  canViewCalculators: boolean;
+  defaultsInfo?: { weight: boolean; power: boolean };
+  flexOpening: FlexOpeningState;
+  handleManageJob: (event: React.MouseEvent) => void;
+  handleTimesheetClick: (event: React.MouseEvent) => void;
+  isFestivalLike: boolean;
+  isManagementUser: boolean;
+  isMobile: boolean;
+  isTechnicianUser: boolean;
+  navigateToCalculator: (event: React.MouseEvent, type: "pesos" | "consumos") => void;
+  navigateToMemoria: (event: React.MouseEvent) => void;
+  openDuplicateSoundDocsDialog: () => void;
+  openProductionWhatsappDialog: () => void;
+  openWarehouseWhatsappDialog: () => void;
+  technicalPower: TechnicalPowerPackState;
+};
+
 export const MADRID_TIME_ZONE = "Europe/Madrid" as const;

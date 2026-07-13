@@ -179,7 +179,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={() => onDeleteDocument(doc)}
-                  title="Delete"
+                  title="Eliminar"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

@@ -43,7 +43,7 @@ test("loads project management with the department default and mocked jobs", asy
 
   await page.goto("/project-management");
 
-  await expect(page.getByRole("heading", { name: /project management/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /gestión de proyectos/i })).toBeVisible();
   await expect(page.getByText("Smoke PM Job")).toBeVisible();
   await expect(page.getByRole("tab", { name: "Sonido" })).toHaveAttribute("data-state", "active");
 });

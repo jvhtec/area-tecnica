@@ -1,5 +1,5 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { FileText, Upload, X } from "lucide-react";
 import { useState } from "react";
@@ -24,20 +24,20 @@ export const TourDocumentsDialog = ({
   const { documents, isLoading, canUpload } = useTourDocuments(tourId);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-h-[90vh] w-full max-w-4xl overflow-y-auto">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2 text-base md:text-lg">
             <FileText className="h-4 w-4 md:h-5 md:w-5" />
             <span className="truncate">Documentos de gira — {tourName}</span>
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-4 md:space-y-6">
           {/* Upload Section */}
           {canUpload ? (
-            <div className="border rounded-lg p-4">
-              <div className="flex items-center justify-between mb-4">
+            <div className="min-w-0 rounded-lg border p-3 md:p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-medium">Subir documentos</h3>
                 <Button
                   onClick={() => setIsUploading(!isUploading)}
@@ -68,7 +68,7 @@ export const TourDocumentsDialog = ({
           ) : null}
 
           {/* Documents List */}
-          <div className="border rounded-lg p-4">
+          <div className="min-w-0 rounded-lg border p-3 md:p-4">
             <h3 className="text-lg font-medium mb-4">
               Documentos ({documents.length})
             </h3>
@@ -83,7 +83,7 @@ export const TourDocumentsDialog = ({
             )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

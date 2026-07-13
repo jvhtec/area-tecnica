@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TourPowerDefaultsSection } from "./TourPowerDefaultsSection";
 import { TourWeightDefaultsSection } from "./TourWeightDefaultsSection";
@@ -19,11 +19,11 @@ export const TourPowerWeightDefaultsDialog: React.FC<TourPowerWeightDefaultsDial
   if (!tour) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Power & Weight Defaults: {tour.name}</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Power & Weight Defaults: {tour.name}</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         
         <Tabs defaultValue="power" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -39,7 +39,7 @@ export const TourPowerWeightDefaultsDialog: React.FC<TourPowerWeightDefaultsDial
             <TourWeightDefaultsSection tourId={tour.id} />
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,7 +146,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   // Force refresh parent component data when dialog opens
   useEffect(() => {
     if (open && tourId) {
-      console.log('Dialog opened, refreshing tour data');
+      console.log('ResponsiveDialog opened, refreshing tour data');
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour', tourId) });
     }
   }, [open, tourId, queryClient]);
@@ -1064,13 +1064,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col gap-0 p-0">
-          <DialogHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4 border-b">
-            <DialogTitle className="text-base md:text-lg">
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <ResponsiveDialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col gap-0 p-0">
+          <ResponsiveDialogHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4 border-b">
+            <ResponsiveDialogTitle className="text-base md:text-lg">
               {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
-            </DialogTitle>
-          </DialogHeader>
+            </ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
           <ScrollArea className="flex-1 overflow-auto px-4 md:px-6">
             <div className="space-y-3 md:space-y-4 py-4 pb-6">
@@ -1335,8 +1335,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               )}
             </div>
           </ScrollArea>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </>
   );
 };

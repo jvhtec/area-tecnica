@@ -3,13 +3,13 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -25,14 +25,14 @@ export const ProductionWhatsappDialog = ({ state }: ProductionWhatsappDialogProp
   if (!state.waProdOpen) return null;
 
   return (
-    <Dialog open={state.waProdOpen} onOpenChange={state.handleProductionDialogOpenChange}>
-      <DialogContent className="sm:max-w-[640px]">
-        <DialogHeader>
-          <DialogTitle>Enviar WhatsApp</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={state.waProdOpen} onOpenChange={state.handleProductionDialogOpenChange}>
+      <ResponsiveDialogContent className="sm:max-w-[640px]">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Enviar WhatsApp</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             Mensaje pre-rellenado (editable). La <b>hora de citación</b> se sugiere desde el inicio del trabajo y está marcada como <b>REVISAR</b>.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -194,7 +194,7 @@ export const ProductionWhatsappDialog = ({ state }: ProductionWhatsappDialogProp
           </div>
         </div>
 
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" onClick={() => state.setWaProdOpen(false)} disabled={state.waProdSending}>Cancelar</Button>
           <Button
             onClick={state.handleWaProdSend}
@@ -202,8 +202,8 @@ export const ProductionWhatsappDialog = ({ state }: ProductionWhatsappDialogProp
           >
             {state.waProdSending ? "Enviando…" : "Enviar"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

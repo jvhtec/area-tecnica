@@ -152,7 +152,7 @@ describe("Settings", () => {
     const heading = screen.getByText(title);
     const card = heading.closest(".border");
     expect(card).not.toBeNull();
-    await user.click(within(card as HTMLElement).getByRole("button", { name: /expand section/i }));
+    await user.click(within(card as HTMLElement).getByRole("button", { name: /expandir sección/i }));
     return card as HTMLElement;
   };
 
@@ -174,13 +174,13 @@ describe("Settings", () => {
 
     renderWithProviders(<Settings />);
 
-    await user.click(screen.getByRole("button", { name: /add user/i }));
-    await user.click(screen.getByRole("button", { name: /import users/i }));
+    await user.click(screen.getByRole("button", { name: /añadir usuario/i }));
+    await user.click(screen.getByRole("button", { name: /importar usuarios/i }));
 
     expect(screen.getByText("Create User Dialog")).toBeInTheDocument();
     expect(screen.getByText("Import Users Dialog")).toBeInTheDocument();
 
-    const usersCard = await openSection("Users", user);
+    const usersCard = await openSection("Usuarios", user);
 
     await user.click(within(usersCard).getByRole("button", { name: /set search/i }));
     await user.click(within(usersCard).getByRole("button", { name: /set role/i }));
@@ -199,15 +199,15 @@ describe("Settings", () => {
     const user = userEvent.setup();
 
     renderWithProviders(<Settings />);
-    const pushCard = await openSection("Push notifications", user);
+    const pushCard = await openSection("Notificaciones push", user);
 
-    expect(within(pushCard).getByText((_, element) => element?.textContent === "Permission: Granted")).toBeInTheDocument();
-    expect(within(pushCard).getByText((_, element) => element?.textContent === "Subscription: Active on this device")).toBeInTheDocument();
+    expect(within(pushCard).getByText((_, element) => element?.textContent === "Permiso: Concedido")).toBeInTheDocument();
+    expect(within(pushCard).getByText((_, element) => element?.textContent === "Suscripción: Activa en este dispositivo")).toBeInTheDocument();
 
-    await user.click(within(pushCard).getByRole("button", { name: /send\s*test/i }));
+    await user.click(within(pushCard).getByRole("button", { name: /enviar\s*prueba/i }));
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "Test notification sent",
+        title: "Notificación de prueba enviada",
       }),
     );
 
@@ -216,19 +216,19 @@ describe("Settings", () => {
       error: null,
     });
 
-    await user.click(within(pushCard).getByRole("button", { name: /send\s*test/i }));
+    await user.click(within(pushCard).getByRole("button", { name: /enviar\s*prueba/i }));
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "Test notification skipped",
+        title: "Notificación de prueba omitida",
       }),
     );
 
     mockSupabase.functions.invoke.mockRejectedValueOnce(new Error("push failed"));
 
-    await user.click(within(pushCard).getByRole("button", { name: /send\s*test/i }));
+    await user.click(within(pushCard).getByRole("button", { name: /enviar\s*prueba/i }));
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "Failed to send test",
+        title: "No se pudo enviar la prueba",
         variant: "destructive",
       }),
     );
@@ -238,14 +238,14 @@ describe("Settings", () => {
     const user = userEvent.setup();
 
     renderWithProviders(<Settings />);
-    const pushCard = await openSection("Push notifications", user);
+    const pushCard = await openSection("Notificaciones push", user);
 
     vi.useFakeTimers();
-    fireEvent.click(within(pushCard).getByRole("button", { name: /bg test/i }));
+    fireEvent.click(within(pushCard).getByRole("button", { name: /prueba 2.º plano/i }));
 
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "Background test scheduled",
+        title: "Prueba en segundo plano programada",
       }),
     );
 

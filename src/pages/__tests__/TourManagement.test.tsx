@@ -302,7 +302,7 @@ describe("TourManagement", () => {
     expect(screen.getByText("Fechas Totales")).toBeInTheDocument();
     expect(screen.getByText("Completadas")).toBeInTheDocument();
     expect(screen.getByText("Próximas")).toBeInTheDocument();
-    expect(screen.getByText("Crew Asignado")).toBeInTheDocument();
+    expect(screen.getByText("Personal asignado")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /configuración de gira/i }));
     expect(await screen.findByText("Tour Settings Dialog")).toBeInTheDocument();
@@ -327,7 +327,7 @@ describe("TourManagement", () => {
       data: { rates_approved: false },
       refetch: approvalRefetch,
     });
-    useFlexUuidMock.mockReturnValueOnce({
+    useFlexUuidMock.mockReturnValue({
       flexUuid: null,
       isLoading: true,
       error: null,

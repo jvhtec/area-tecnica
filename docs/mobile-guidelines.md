@@ -98,4 +98,32 @@ Leverage them in custom CSS when required, or prefer the utilities above.
 - For mobile-only UI, rely on `isMobile` (md breakpoint) or `atMost('md')`
 - Use `pt-safe-*` for sticky headers and `pb-safe-*` for bottom navs
 - Avoid hard-coded `64px` header/footer paddings — safe-area sizes vary per device
+
+## Responsive dialogs and action sheets
+
+Use `ResponsiveDialog` from `@/components/ui/responsive-dialog` for new modal flows. It keeps the Radix dialog behavior at `md` and above, and renders the same content in a safe-area-aware vaul bottom drawer below `md`.
+
+- Build with `ResponsiveDialog`, `ResponsiveDialogTrigger`, `ResponsiveDialogContent`, `ResponsiveDialogHeader`, `ResponsiveDialogTitle`, `ResponsiveDialogDescription`, and `ResponsiveDialogFooter`.
+- Keep controlled state on the root exactly as with `Dialog` (`open` and `onOpenChange`).
+- Use `MobileActionSheet` for a grouped list of labeled actions. Icon-only toolbars are not acceptable on touch-only screens because hover tooltips are unavailable.
+- Prefer a short title, optional one-line description, and groups named for the user’s task (for example, Documentos, Flex, Personal, and Peligro).
+
+## Touch targets
+
+Compact `Button` variants preserve their visual dimensions. On coarse pointers, the shared `coarse-hit-target` utility reserves spacing and extends their interaction area to at least 44×44px without overlapping adjacent targets. Do not counteract that reserved space with negative margins or clipped overflow.
+
+For custom controls that do not use `Button`, provide the same 44×44px interaction floor with a wrapper that reserves layout space. A pseudo-element is acceptable only when its footprint cannot overlap another control.
+
+## Mobile typography guardrail
+
+Arbitrary `text-[8px]` through `text-[11px]` classes are tracked per file by `npm run governance:type-floor`. Existing debt is baselined and may decrease, but any per-file increase fails governance. Use `text-xs` or a larger semantic token for new UI.
+
+## Responsive data views
+
+Choose the pattern based on the task:
+
+- Card reflow: use for actionable rows such as timesheets, expenses, and payouts. Put the primary identity and status first, then secondary values, with actions at the bottom.
+- Scroll-wrap: use for dense reference data where cross-column comparison is essential. Keep the first identifying column sticky and provide a visible horizontal-scroll affordance.
+
+Do not rely on an unlabelled overflowing desktop table as the mobile fallback.
 - Keep layouts fluid and use the extended breakpoints to progressively enhance beyond md

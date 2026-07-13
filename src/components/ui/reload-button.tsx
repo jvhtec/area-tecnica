@@ -29,7 +29,7 @@ export const ReloadButton = ({
       await onReload()
       toast({
         title: "Reloaded",
-        description: "Data has been refreshed successfully",
+        description: "Los datos se han actualizado correctamente",
       })
     } catch (error) {
       console.error("Error reloading data:", error)

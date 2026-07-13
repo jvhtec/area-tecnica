@@ -86,7 +86,7 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
       if (!tour.tour_dates || tour.tour_dates.length === 0) {
         toast({
           title: "Error",
-          description: "No tour dates available to print",
+          description: "No hay fechas de gira disponibles para imprimir",
           variant: "destructive"
         });
         return;
@@ -95,14 +95,14 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
       await exportTourPDF(tour);
 
       toast({
-        title: "Success",
-        description: "Tour schedule exported successfully"
+        title: "Calendario exportado",
+        description: "El calendario de la gira se ha exportado correctamente"
       });
     } catch (error: any) {
       console.error("Error exporting PDF:", error);
       toast({
         title: "Error",
-        description: "Failed to export PDF: " + (error.message || "Unknown error"),
+        description: "No se pudo exportar el PDF: " + (error.message || "Error desconocido"),
         variant: "destructive"
       });
     }
@@ -160,14 +160,14 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
           size={isMobile ? "default" : "default"}
         >
           <Plus className="h-4 w-4" />
-          Create Tour
+          Crear gira
         </Button>
         
         {/* Desktop: Show completed tours filter inline */}
         {!isMobile && completedTours.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
-              {completedTours.length} completed
+              {completedTours.length} completadas
             </span>
             <Button
               variant="outline"
@@ -178,12 +178,12 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
               {showCompletedTours ? (
                 <>
                   <EyeOff className="h-4 w-4" />
-                  <span className="hidden sm:inline">Hide Completed</span>
+                  <span className="hidden sm:inline">Ocultar completadas</span>
                 </>
               ) : (
                 <>
                   <Eye className="h-4 w-4" />
-                  <span className="hidden sm:inline">Show Completed ({completedTours.length})</span>
+                  <span className="hidden sm:inline">Mostrar completadas ({completedTours.length})</span>
                 </>
               )}
             </Button>
@@ -199,12 +199,12 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
                 className="flex items-center gap-2 w-full touch-manipulation"
               >
                 <MoreVertical className="h-4 w-4" />
-                View Options ({completedTours.length} completed)
+                Opciones ({completedTours.length} completadas)
               </Button>
             </SheetTrigger>
             <SheetContent side="bottom" className="h-auto max-h-[40vh]">
               <SheetHeader>
-                <SheetTitle>Tour Options</SheetTitle>
+                <SheetTitle>Opciones de giras</SheetTitle>
               </SheetHeader>
               <div className="grid gap-3 pt-4">
                 <div
@@ -218,12 +218,12 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
                     {showCompletedTours ? (
                       <>
                         <EyeOff className="h-5 w-5" />
-                        <span>Hide Completed Tours</span>
+                        <span>Ocultar giras completadas</span>
                       </>
                     ) : (
                       <>
                         <Eye className="h-5 w-5" />
-                        <span>Show Completed Tours</span>
+                        <span>Mostrar giras completadas</span>
                       </>
                     )}
                   </div>
@@ -275,6 +275,8 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
         <BulkTourFolderActions 
           tours={toursNeedingRootFolders} 
           onRefresh={() => refetchTours()}
+          isCollapsible
+          defaultCollapsed
         />
       )}
     </div>
