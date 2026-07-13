@@ -959,8 +959,9 @@ Custom slash commands live in `.claude/commands/`. Use them frequently:
 - `techdebt-scan` -- Deep tech debt scan, forked into an `Explore` subagent (read-only)
 - `release-readiness` -- Cross-checks the current branch/PR against `docs/release/production-release-checklist.md` (migrations, local validation, CI status across all 3 workflows, CodeRabbit), forked into `general-purpose` (needs GitHub MCP tools)
 - `critical-invariant-check` -- Checks a change against this app's 5 documented "don't bypass" invariants (assignment cascade, staffing state machine, Flex folder hierarchy, server-side timesheet calc, Edge Function exposure classification), forked into `Explore` (read-only)
+- `pr-workflow` -- Thin wrapper over `docs/agents/pr-workflow.md` (the canonical, agent-agnostic PR process: prepare + shepherd, humans merge) plus Claude-specific tool mappings. Unlike the others it is auto-invocable, so it loads whenever a session works a PR.
 
-All four skills set `disable-model-invocation: true`, so they only run when explicitly invoked (e.g. `/release-readiness`), never auto-triggered. `plan-review`/`techdebt-scan` overlap in purpose with the `/plan` + `/review-plan` and `/techdebt` commands — prefer the commands for quick, inline work in the current session; reach for a skill when the investigation is large enough that you want it isolated in its own subagent context instead of bloating the main conversation, or when it needs tools (like GitHub MCP) that a simple inline command wouldn't reach for.
+The four skills above `pr-workflow` set `disable-model-invocation: true`, so they only run when explicitly invoked (e.g. `/release-readiness`), never auto-triggered. `plan-review`/`techdebt-scan` overlap in purpose with the `/plan` + `/review-plan` and `/techdebt` commands — prefer the commands for quick, inline work in the current session; reach for a skill when the investigation is large enough that you want it isolated in its own subagent context instead of bloating the main conversation, or when it needs tools (like GitHub MCP) that a simple inline command wouldn't reach for.
 
 ### Subagents
 

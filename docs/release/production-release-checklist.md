@@ -4,9 +4,8 @@ Use this checklist for production-bound PRs targeting `main`.
 
 ## Before merge
 
-- [ ] PR has at least one independent approval.
-- [ ] High-risk PRs have two independent approvals.
-- [ ] CODEOWNER review is complete for high-risk paths.
+- [ ] The full diff has been deliberately reviewed by the maintainer in the GitHub PR UI (solo project: you are the reviewer of record — read the diff there, not just in your editor).
+- [ ] High-risk PRs (Supabase migrations, RLS policies, grants, or RPC/SQL functions — or timesheet/rates/payroll logic) get compensating scrutiny instead of extra approvers: CodeRabbit review complete with every comment resolved, plus a second deliberate pass over the diff after time away from it. Database-touching PRs additionally need pgTAP coverage (or documented manual verification) and the production dry-run below — a money-only PR with no schema/RLS/RPC change needs neither.
 - [ ] All required checks are passing:
   - [ ] `npm run lint`
   - [ ] `npm run typecheck`
@@ -22,7 +21,7 @@ Use this checklist for production-bound PRs targeting `main`.
   - [ ] `CodeQL analysis`
   - [ ] `Dependency review`
   - [ ] `SBOM generation`
-- [ ] CodeRabbit and inline review comments are resolved or explicitly deferred.
+- [ ] CodeRabbit and inline review comments are resolved — no deferral; a comment that doesn't warrant a code change gets a written reason and the thread is resolved, not left open.
 - [ ] The PR description includes test evidence and rollback steps.
 - [ ] Release artifacts are retained by CI:
   - [ ] Build artifact from `npm run build`
