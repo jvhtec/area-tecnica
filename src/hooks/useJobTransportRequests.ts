@@ -12,11 +12,12 @@ export type TransportRequestSummary = {
   created_by?: string | null;
   created_at: string;
   is_hoja_relevant: boolean;
+  needed_date: string | null;
   items: { id: string; transport_type: string; leftover_space_meters: number | null }[];
 };
 
 const REQUEST_SELECT =
-  'id, department, status, note, description, created_by, created_at, is_hoja_relevant, items:transport_request_items(id, transport_type, leftover_space_meters)';
+  'id, department, status, note, description, created_by, created_at, is_hoja_relevant, needed_date, items:transport_request_items(id, transport_type, leftover_space_meters)';
 
 const TECH_DEPARTMENTS = ['sound', 'lights', 'video'];
 

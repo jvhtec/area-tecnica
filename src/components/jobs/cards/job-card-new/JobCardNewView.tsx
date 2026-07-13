@@ -746,7 +746,11 @@ export function JobCardNewView({
                   queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
                 }
               }}
-              selectedDate={new Date(job.start_time)}
+              selectedDate={
+                selectedTransportRequest?.needed_date
+                  ? new Date(`${selectedTransportRequest.needed_date}T00:00:00`)
+                  : new Date(job.start_time)
+              }
               initialJobId={job.id}
               initialDepartments={selectedTransportRequest?.department ? [selectedTransportRequest.department] : []}
               initialTransportType={selectedTransportRequest?.selectedItem?.transport_type}

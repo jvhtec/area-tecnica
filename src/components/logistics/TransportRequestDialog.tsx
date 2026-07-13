@@ -40,8 +40,14 @@ interface ActiveRequest {
   created_by: string | null;
   created_at: string;
   is_hoja_relevant: boolean;
+  needed_date: string | null;
   items: { id: string; transport_type: string; leftover_space_meters: number | null }[];
 }
+
+const formatNeededDate = (isoDate: string) => {
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+};
 
 const emptyItems = (): VehicleItem[] => [{ transport_type: "trailer", leftover_space_meters: "" }];
 
@@ -58,6 +64,7 @@ export function TransportRequestDialog({
   const [note, setNote] = useState("");
   const [description, setDescription] = useState("");
   const [isHojaRelevant, setIsHojaRelevant] = useState(true);
+  const [neededDate, setNeededDate] = useState("");
   const { toast } = useToast();
   const { user } = useOptimizedAuth();
   const queryClient = useQueryClient();
@@ -69,7 +76,7 @@ export function TransportRequestDialog({
       const { data, error } = await dataLayerClient
         .from("transport_requests")
         .select(
-          "id, status, note, description, created_by, created_at, is_hoja_relevant, items:transport_request_items(id, transport_type, leftover_space_meters)"
+          "id, status, note, description, created_by, created_at, is_hoja_relevant, needed_date, items:transport_request_items(id, transport_type, leftover_space_meters)"
         )
         .eq("job_id", jobId)
         .eq("department", department)
@@ -102,6 +109,7 @@ export function TransportRequestDialog({
     setNote("");
     setDescription("");
     setIsHojaRelevant(true);
+    setNeededDate("");
     setView("form");
   };
 
@@ -110,6 +118,7 @@ export function TransportRequestDialog({
     setNote(request.note || "");
     setDescription(request.description || "");
     setIsHojaRelevant(request.is_hoja_relevant ?? true);
+    setNeededDate(request.needed_date || "");
     setItems(
       request.items.length > 0
         ? request.items.map((it) => ({
@@ -170,6 +179,7 @@ export function TransportRequestDialog({
             note: note || null,
             description: description || null,
             is_hoja_relevant: isHojaRelevant,
+            needed_date: neededDate || null,
           } as never)
           .eq("id", editingRequestId);
         if (error) throw error;
@@ -196,6 +206,7 @@ export function TransportRequestDialog({
             status: "requested",
             created_by: authUser.id,
             is_hoja_relevant: isHojaRelevant,
+            needed_date: neededDate || null,
           } as never)
           .select("id")
           .single();
@@ -258,6 +269,11 @@ export function TransportRequestDialog({
                   )
                   .join(", ") || "Sin vehículos"}
               </div>
+              {request.needed_date && (
+                <div className="text-xs text-muted-foreground">
+                  Fecha necesaria: {formatNeededDate(request.needed_date)}
+                </div>
+              )}
               {request.note && <div className="text-xs text-muted-foreground italic">{request.note}</div>}
             </div>
             {request.is_hoja_relevant === false && (
@@ -352,6 +368,17 @@ export function TransportRequestDialog({
             </Button>
           </div>
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Fecha necesaria</Label>
+        <Input
+          type="date"
+          value={neededDate}
+          onChange={(e) => setNeededDate(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Día en que se necesita el transporte (opcional). Se usará como fecha inicial del evento de logística.
+        </p>
       </div>
       <div className="space-y-2">
         <Label>Nota</Label>

@@ -35,6 +35,7 @@ import {
   LOGISTICS_HOJA_CATEGORY_LABELS,
   LOGISTICS_HOJA_CATEGORY_MAX_SELECTION,
   LOGISTICS_HOJA_CATEGORY_OPTIONS,
+  normalizeLogisticsHojaCategories,
   type LogisticsHojaCategory,
 } from "@/constants/logisticsHojaCategories";
 import type { Database } from "@/integrations/supabase/types";
@@ -117,13 +118,6 @@ export const LogisticsEventDialog = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const normalizeCategories = (categories: unknown): LogisticsHojaCategory[] => {
-    if (!Array.isArray(categories)) return [];
-    return categories.filter((category): category is LogisticsHojaCategory =>
-      LOGISTICS_HOJA_CATEGORY_OPTIONS.includes(category as LogisticsHojaCategory)
-    );
-  };
-
   const toggleHojaCategory = (category: LogisticsHojaCategory) => {
     setHojaCategories((prev) => {
       if (prev.includes(category)) {
@@ -165,7 +159,7 @@ export const LogisticsEventDialog = ({
       setSelectedDepartments((selectedEvent.departments || []).map((d) => d.department));
       setColor(selectedEvent.color || "#7E69AB");
       setIsHojaRelevant((selectedEvent as any).is_hoja_relevant ?? true);
-      setHojaCategories(normalizeCategories((selectedEvent as any).hoja_categories));
+      setHojaCategories(normalizeLogisticsHojaCategories((selectedEvent as any).hoja_categories));
     } else {
       setEventType(initialEventType || "load");
       setTransportType(initialTransportType || "trailer");
@@ -347,8 +341,13 @@ export const LogisticsEventDialog = ({
       };
 
       if (selectedEvent) {
+        // Moving the event to another job invalidates any transport request
+        // link (the FK is job-scoped), so clear it alongside the job change.
+        const updateData = (selectedEvent.job_id || null) !== (selectedJob || null)
+          ? { ...eventData, transport_request_id: null } as LogisticsEventPayload
+          : eventData;
         const { error: updateError } = await dataLayerClient.from("logistics_events")
-          .update(eventData)
+          .update(updateData)
           .eq("id", selectedEvent.id);
 
         if (updateError) throw updateError;
@@ -401,8 +400,8 @@ export const LogisticsEventDialog = ({
         if (previousHojaRelevant !== eventData.is_hoja_relevant) {
           changes.is_hoja_relevant = { from: previousHojaRelevant, to: eventData.is_hoja_relevant };
         }
-        const previousCategories = normalizeCategories((selectedEvent as any).hoja_categories).slice().sort();
-        const nextCategories = normalizeCategories(eventData.hoja_categories).slice().sort();
+        const previousCategories = normalizeLogisticsHojaCategories((selectedEvent as any).hoja_categories).slice().sort();
+        const nextCategories = normalizeLogisticsHojaCategories(eventData.hoja_categories).slice().sort();
         if (JSON.stringify(previousCategories) !== JSON.stringify(nextCategories)) {
           changes.hoja_categories = { from: previousCategories, to: nextCategories };
         }

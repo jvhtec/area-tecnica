@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(6);
+SELECT plan(7);
 
 SELECT ok(
   EXISTS (
@@ -54,6 +54,18 @@ SELECT ok(
       AND column_default = 'true'
   ),
   'transport requests carry a non-null hoja de ruta relevance flag defaulting to true'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'transport_requests'
+      AND column_name = 'needed_date'
+      AND data_type = 'date'
+  ),
+  'transport requests can state the date the transport is needed on'
 );
 
 SELECT ok(

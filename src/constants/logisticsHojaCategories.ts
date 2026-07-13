@@ -20,6 +20,13 @@ export const LOGISTICS_HOJA_CATEGORY_LABELS: Record<LogisticsHojaCategory, strin
   rigging_motores: "Rigging (Motores)",
 };
 
+export const normalizeLogisticsHojaCategories = (categories: unknown): LogisticsHojaCategory[] => {
+  if (!Array.isArray(categories)) return [];
+  return categories.filter((category): category is LogisticsHojaCategory =>
+    LOGISTICS_HOJA_CATEGORY_OPTIONS.includes(category as LogisticsHojaCategory)
+  );
+};
+
 export const formatLogisticsHojaCategories = (categories?: string[] | null): string =>
   (categories || [])
     .map((category) =>

@@ -35,7 +35,7 @@ export function TransportRequestsManagerDialog({
     if (error) {
       toast({
         title: "No se pudo cancelar",
-        description: error || "Error cancelando la solicitud de transporte",
+        description: error,
         variant: "destructive",
       });
     }
@@ -87,6 +87,11 @@ export function TransportRequestsManagerDialog({
                         )}
                       </div>
                       {req.description && <div className="text-sm">{req.description}</div>}
+                      {req.needed_date && (
+                        <div className="text-xs text-muted-foreground">
+                          Fecha necesaria: {req.needed_date.split("-").reverse().join("/")}
+                        </div>
+                      )}
                       {req.note && <div className="text-xs text-muted-foreground italic">{req.note}</div>}
                     </div>
                     <button
