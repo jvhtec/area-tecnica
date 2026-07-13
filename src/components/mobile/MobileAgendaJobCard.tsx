@@ -67,10 +67,10 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
           className="flex w-[76px] shrink-0 flex-col items-center justify-center gap-0.5 border-r border-border/50 px-2 py-4"
           style={{ backgroundColor: `${railColor}1a` }}
         >
-          <span className="text-lg font-extrabold leading-none tracking-tight text-foreground">
+          <span className="text-lg font-extrabold leading-none tracking-tight tabular-nums text-foreground">
             {startLabel}
           </span>
-          <span className="text-xs font-semibold text-muted-foreground">{endLabel}</span>
+          <span className="text-xs font-semibold tabular-nums text-muted-foreground">{endLabel}</span>
         </div>
 
         {/* Body */}

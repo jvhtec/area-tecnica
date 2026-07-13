@@ -13,6 +13,7 @@ import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
 import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
 import { MobileTile } from "@/components/mobile/MobileTile";
 import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
+import { MobileNowDivider } from "@/components/mobile/MobileNowDivider";
 import { getJobLocationName } from "@/components/mobile/job-location";
 import {
   DropdownMenu,
@@ -205,6 +206,17 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   }, [jobs, selectedDate, selectedJobTypes, selectedJobStatuses]);
 
   const handleToday = () => onDateSelect(new Date());
+
+  // Where today's "Ahora" divider slots into the ordered job list: before the
+  // first job that hasn't started yet (list end if everything is underway).
+  const nowDividerIndex = useMemo(() => {
+    if (!isToday(selectedDate)) return -1;
+    const now = Date.now();
+    const idx = selectedDateJobs.findIndex(
+      (job) => new Date(job.start_time).getTime() > now,
+    );
+    return idx === -1 ? selectedDateJobs.length : idx;
+  }, [selectedDateJobs, selectedDate]);
 
   // User display name and initials
   const userName = userProfile?.first_name && userProfile?.last_name
@@ -404,7 +416,8 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
               </div>
             </Card>
           ) : (
-            selectedDateJobs.map((job) => {
+            <>
+            {selectedDateJobs.map((job, jobIndex) => {
               const jobColor = job.color || "#3b82f6";
               const jobTimezone = job.timezone || 'Europe/Madrid';
               const assignedCount = job.job_assignments?.length || 0;
@@ -427,8 +440,13 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
               const departments = job.job_departments?.map((d: any) => d.department) || [];
 
               return (
+                <React.Fragment key={job.id}>
+                {jobIndex === nowDividerIndex && <MobileNowDivider accent="default" />}
+                <div
+                  className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300"
+                  style={{ animationDelay: `${Math.min(jobIndex, 8) * 45}ms` }}
+                >
                 <MobileAgendaJobCard
-                  key={job.id}
                   title={getCalendarJobDisplayTitle(job, selectedDate)}
                   locationName={getJobLocationName(job)}
                   status={job.status}
@@ -466,8 +484,14 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                     ) : undefined
                   }
                 />
+                </div>
+                </React.Fragment>
               );
-            })
+            })}
+            {selectedDateJobs.length > 0 && nowDividerIndex === selectedDateJobs.length && (
+              <MobileNowDivider accent="default" />
+            )}
+            </>
           )}
         </div>
       </div>

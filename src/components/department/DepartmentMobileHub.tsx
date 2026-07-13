@@ -15,6 +15,7 @@ import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
 import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
 import { MobileTile } from "@/components/mobile/MobileTile";
 import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
+import { MobileNowDivider } from "@/components/mobile/MobileNowDivider";
 import { getJobLocationName } from "@/components/mobile/job-location";
 import { getMobileAccent, type MobileAccentKey } from "@/components/mobile/mobile-accents";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
@@ -267,6 +268,17 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   const handleToday = () => onDateSelect(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
+  // Where today's "Ahora" divider slots into the ordered job list: before the
+  // first job that hasn't started yet (list end if everything is underway).
+  const nowDividerIndex = useMemo(() => {
+    if (!isToday(selectedDate)) return -1;
+    const now = Date.now();
+    const idx = selectedDateJobs.findIndex(
+      (job) => new Date(job.start_time).getTime() > now,
+    );
+    return idx === -1 ? selectedDateJobs.length : idx;
+  }, [selectedDateJobs, selectedDate]);
+
   const accentKey = department as MobileAccentKey;
   const accent = getMobileAccent(accentKey);
 
@@ -496,7 +508,8 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
               </div>
             </Card>
           ) : (
-            selectedDateJobs.map((job) => {
+            <>
+            {selectedDateJobs.map((job, jobIndex) => {
               const techniciansCount = job.job_assignments?.length ?? job.assignments_count ?? job.crew_size ?? 0;
               const trucksCount = job.logistics_events?.length ?? job.trucks_count ?? 0;
               const isProduction = job.status === "production";
@@ -504,8 +517,13 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
               const hasSchedule = Boolean(job.start_time && job.end_time);
 
               return (
+                <React.Fragment key={job.id}>
+                {jobIndex === nowDividerIndex && <MobileNowDivider accent={accentKey} />}
+                <div
+                  className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300"
+                  style={{ animationDelay: `${Math.min(jobIndex, 8) * 45}ms` }}
+                >
                 <MobileAgendaJobCard
-                  key={job.id}
                   title={getCalendarJobDisplayTitle(job, selectedDate)}
                   locationName={getJobLocationName(job)}
                   status={job.status || "Sin estado"}
@@ -550,8 +568,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                     ) : undefined
                   }
                 />
+                </div>
+                </React.Fragment>
               );
-            })
+            })}
+            {selectedDateJobs.length > 0 && nowDividerIndex === selectedDateJobs.length && (
+              <MobileNowDivider accent={accentKey} />
+            )}
+            </>
           )}
         </div>
       </div>
