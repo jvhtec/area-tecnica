@@ -163,7 +163,7 @@ export function TransportRequestDialog({
     if (error) {
       toast({
         title: "Error",
-        description: error || "No se pudo cancelar la solicitud",
+        description: error,
         variant: "destructive",
       });
       return;
