@@ -15,7 +15,9 @@ import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
 import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
 import { MobileTile } from "@/components/mobile/MobileTile";
 import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
+import { getJobLocationName } from "@/components/mobile/job-location";
 import { getMobileAccent, type MobileAccentKey } from "@/components/mobile/mobile-accents";
+import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -505,11 +507,11 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                 <MobileAgendaJobCard
                   key={job.id}
                   title={getCalendarJobDisplayTitle(job, selectedDate)}
-                  locationName={job.location?.name || "Sin ubicación"}
+                  locationName={getJobLocationName(job)}
                   status={job.status || "Sin estado"}
                   jobColor={jobColor}
-                  startLabel={hasSchedule ? format(new Date(job.start_time), "HH:mm") : "--:--"}
-                  endLabel={hasSchedule ? format(new Date(job.end_time), "HH:mm") : "--:--"}
+                  startLabel={hasSchedule ? formatInJobTimezone(job.start_time, "HH:mm", job.timezone || "Europe/Madrid") : "--:--"}
+                  endLabel={hasSchedule ? formatInJobTimezone(job.end_time, "HH:mm", job.timezone || "Europe/Madrid") : "--:--"}
                   assignedCount={techniciansCount}
                   trucksCount={trucksCount}
                   accent={accentKey}

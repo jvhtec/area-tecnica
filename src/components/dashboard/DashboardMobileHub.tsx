@@ -13,6 +13,7 @@ import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
 import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
 import { MobileTile } from "@/components/mobile/MobileTile";
 import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
+import { getJobLocationName } from "@/components/mobile/job-location";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,17 +54,6 @@ const themeTokens = {
   accent: "bg-primary text-primary-foreground",
   hover: "hover:bg-accent",
 };
-
-const getJobLocationName = (job: any) =>
-  (typeof job.location === "string" && job.location) ||
-  job.location?.name ||
-  job.location?.formatted_address ||
-  job.location_data?.name ||
-  job.location_data?.formatted_address ||
-  job.locations?.name ||
-  job.venue_name ||
-  job.venue ||
-  "Sin ubicación";
 
 export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   jobs,

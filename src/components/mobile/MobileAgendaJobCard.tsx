@@ -108,7 +108,7 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
             ))}
           </div>
 
-          {(showMeter || typeof trucksCount === "number") && (
+          {(typeof assignedCount === "number" || typeof trucksCount === "number") && (
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
                 {typeof assignedCount === "number" && (
