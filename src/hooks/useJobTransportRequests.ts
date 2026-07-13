@@ -32,7 +32,12 @@ export function useJobTransportRequests(
 ) {
   const queryClient = useQueryClient();
 
-  const { data: myTransportRequests = [] } = useQuery({
+  const {
+    data: myTransportRequests = [],
+    isLoading: isMyTransportRequestsLoading,
+    isError: isMyTransportRequestsError,
+    refetch: refetchMyTransportRequests,
+  } = useQuery({
     queryKey: queryKeys.scope('transport-request', jobId, currentUserDepartment),
     queryFn: async () => {
       if (!currentUserDepartment || !TECH_DEPARTMENTS.includes(currentUserDepartment)) return [];
@@ -42,7 +47,10 @@ export function useJobTransportRequests(
         .eq('department', currentUserDepartment)
         .eq('status', 'requested')
         .order('created_at', { ascending: true });
-      if (error) return [];
+      if (error) {
+        console.error('Failed to fetch department transport requests', error);
+        throw error;
+      }
       return (data || []) as unknown as TransportRequestSummary[];
     },
     enabled: !!jobId && !!currentUserDepartment,
@@ -56,7 +64,10 @@ export function useJobTransportRequests(
         .eq('job_id', jobId!)
         .eq('status', 'requested')
         .order('created_at', { ascending: false });
-      if (error) return [];
+      if (error) {
+        console.error('Failed to fetch job transport requests', error);
+        throw error;
+      }
       return (data || []) as unknown as TransportRequestSummary[];
     },
     enabled: !!jobId && canManageTransportRequests,
@@ -86,17 +97,32 @@ export function useJobTransportRequests(
     [jobId, queryClient],
   );
 
+  const invalidateRequests = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-request', jobId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-requests-all', jobId) });
+  }, [jobId, queryClient]);
+
   const cancelRequest = useCallback(
     async (requestId: string): Promise<{ error: string | null }> => {
       const { error } = await dataLayerClient.from('transport_requests')
         .update({ status: 'cancelled' })
         .eq('id', requestId);
       if (error) return { error: error.message };
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-requests-all', jobId) });
+      invalidateRequests();
       return { error: null };
     },
-    [jobId, queryClient],
+    [invalidateRequests],
   );
 
-  return { myTransportRequests, allRequests, isAllRequestsLoading, checkAndFulfillRequest, cancelRequest };
+  return {
+    myTransportRequests,
+    isMyTransportRequestsLoading,
+    isMyTransportRequestsError,
+    refetchMyTransportRequests,
+    allRequests,
+    isAllRequestsLoading,
+    checkAndFulfillRequest,
+    cancelRequest,
+    invalidateRequests,
+  };
 }

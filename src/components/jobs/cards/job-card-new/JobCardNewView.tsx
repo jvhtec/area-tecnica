@@ -1,4 +1,5 @@
 import React from "react";
+import type { QueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { useReducedMotion } from "framer-motion";
@@ -21,6 +22,7 @@ import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialo
 import { ProjectNotesDialog } from "@/components/project-management/ProjectNotesDialog";
 import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
 import { TransportRequestsManagerDialog } from "@/components/logistics/TransportRequestsManagerDialog";
+import type { TransportRequestSummary } from "@/hooks/useJobTransportRequests";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
@@ -34,8 +36,6 @@ import { JobCardDocuments } from "../JobCardDocuments";
 import { JobCardHeader } from "../JobCardHeader";
 import { JobCardProgress } from "../JobCardProgress";
 import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
-import { isManagementRole } from "@/utils/permissions";
-
 import { queryKeys } from "@/lib/react-query";
 export interface JobCardNewViewProps {
   job: any;
@@ -147,10 +147,11 @@ export interface JobCardNewViewProps {
   setLogisticsInitialEventType: (value: "load" | "unload" | undefined) => void;
 
   isTechDept: boolean;
+  canManageTransportRequests: boolean;
   userDepartment: string | null;
-  myTransportRequests: any[];
-  allRequests: any[];
-  queryClient: any;
+  myTransportRequests: TransportRequestSummary[];
+  allRequests: TransportRequestSummary[];
+  queryClient: QueryClient;
   checkAndFulfillRequest: (requestId: string, dept: string) => Promise<void>;
   cancelTransportRequest: (requestId: string) => Promise<{ error: string | null }>;
 
@@ -261,6 +262,7 @@ export function JobCardNewView({
   logisticsInitialEventType,
   setLogisticsInitialEventType,
   isTechDept,
+  canManageTransportRequests,
   userDepartment,
   myTransportRequests,
   allRequests,
@@ -275,7 +277,6 @@ export function JobCardNewView({
 }: JobCardNewViewProps) {
   const reducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
-  const canManageTransportRequests = userDepartment === "logistics" || isManagementRole(userRole);
   // Managers who also belong to a tech department reach the request creator
   // through the manager dialog ("Solicitar transporte")
   const [requestCreatorOpen, setRequestCreatorOpen] = React.useState(false);
@@ -705,10 +706,6 @@ export function JobCardNewView({
               }}
               jobId={job.id}
               department={userDepartment}
-              onSubmitted={() => {
-                queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request", job.id, userDepartment) });
-                queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
-              }}
             />
           )}
 

@@ -1342,6 +1342,7 @@ function JobCardNewFull({
       logisticsInitialEventType={logisticsInitialEventType}
       setLogisticsInitialEventType={setLogisticsInitialEventType}
       isTechDept={isTechDept}
+      canManageTransportRequests={canManageTransportRequests}
       userDepartment={currentUserDepartment}
       myTransportRequests={myTransportRequests}
       allRequests={allRequests}

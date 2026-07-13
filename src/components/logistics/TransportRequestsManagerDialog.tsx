@@ -1,4 +1,5 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import type { TransportRequestSummary } from "@/hooks/useJobTransportRequests";
 
@@ -43,32 +44,38 @@ export function TransportRequestsManagerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto sm:max-h-[85vh]">
         <div className="space-y-4">
           <div className="text-lg font-semibold">Solicitudes de transporte</div>
           {requests.length === 0 ? (
             <div className="space-y-3">
               <div className="text-muted-foreground">No hay solicitudes pendientes para este trabajo.</div>
-              <div className="flex gap-2">
-                <button
-                  className="px-3 py-1 text-sm rounded border hover:bg-accent w-fit"
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-fit"
                   onClick={(ev) => {
                     ev.stopPropagation();
                     onCreateEvent(null);
                   }}
                 >
                   Crear evento
-                </button>
+                </Button>
                 {onRequestTransport && (
-                  <button
-                    className="px-3 py-1 text-sm rounded border hover:bg-accent w-fit"
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-fit"
                     onClick={(ev) => {
                       ev.stopPropagation();
                       onRequestTransport();
                     }}
                   >
                     Solicitar transporte
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -76,8 +83,8 @@ export function TransportRequestsManagerDialog({
             <div className="space-y-2">
               {requests.map((req) => (
                 <div key={req.id} className="border rounded p-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <div className="font-medium capitalize">{req.department}</div>
                         {req.is_hoja_relevant === false && (
@@ -94,34 +101,41 @@ export function TransportRequestsManagerDialog({
                       )}
                       {req.note && <div className="text-xs text-muted-foreground italic">{req.note}</div>}
                     </div>
-                    <button
-                      className="px-3 py-1 text-sm rounded border hover:bg-accent"
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
                       onClick={(ev) => {
                         ev.stopPropagation();
                         void handleCancelRequest(req.id);
                       }}
                     >
                       Cancelar solicitud
-                    </button>
+                    </Button>
                   </div>
                   <div className="space-y-1">
                     {(req.items || []).map((it) => (
-                      <div key={it.id} className="flex items-center justify-between pl-2">
+                      <div
+                        key={it.id}
+                        className="flex flex-col items-start gap-2 pl-2 sm:flex-row sm:items-center sm:justify-between"
+                      >
                         <div className="text-sm text-muted-foreground">
                           {it.transport_type.replace("_", " ")}
                           {typeof it.leftover_space_meters === "number" && (
                             <span className="ml-2">· Espacio libre: {it.leftover_space_meters} m</span>
                           )}
                         </div>
-                        <button
-                          className="px-3 py-1 text-sm rounded border hover:bg-accent"
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
                           onClick={(ev) => {
                             ev.stopPropagation();
                             onCreateEvent(req, it);
                           }}
                         >
                           Crear evento
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -129,15 +143,17 @@ export function TransportRequestsManagerDialog({
               ))}
               {onRequestTransport && (
                 <div className="flex justify-end pt-1">
-                  <button
-                    className="px-3 py-1 text-sm rounded border hover:bg-accent"
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
                     onClick={(ev) => {
                       ev.stopPropagation();
                       onRequestTransport();
                     }}
                   >
                     Solicitar transporte
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
