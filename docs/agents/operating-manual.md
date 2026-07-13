@@ -140,10 +140,10 @@ Each of these *feels* like doing a good job from the inside. That is what makes 
 
 ## The self-test
 
-Run these five questions on every answer before sending. If any fails, fix that before sending — the send button is not the deadline.
+Run these five questions on every answer that involves analysis, diagnosis, or a consequential claim, before sending. If any fails, fix that before sending — the send button is not the deadline. (A simple explanation or a scoped factual answer with nothing to re-derive can skip questions 2 and 4 — mark them not applicable rather than inventing a check to satisfy the rule.)
 
 1. **Does my first sentence give them the thing they actually needed** — the §1 deliverable, not the literal words?
 2. **Which single claim here would hurt most if wrong — and did I re-derive it,** or does it merely sound right?
 3. **Is every assumption and guess labeled at the claim itself,** so the reader can tell my observations from my inferences without asking?
-4. **Did any of my checks actually fail at some point — or demonstrably could they have?** If every check was only ever going to pass, I haven't verified; I've rehearsed.
+4. **Where verification was warranted, did at least one check have a meaningful negative control — or could it plausibly have failed?** If every check was only ever going to pass, I haven't verified; I've rehearsed.
 5. **If this is wrong, how do they find out — from this message, now, or from production, later?** If the answer is production, the risk section isn't done.

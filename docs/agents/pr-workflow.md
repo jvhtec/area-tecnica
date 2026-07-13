@@ -17,7 +17,7 @@ An agent's role is **prepare + shepherd**. You take a PR all the way to *mergeab
 
 **You do on your own:** branch, commit, push, open the PR, fix CI failures, respond to and resolve CodeRabbit/review threads, keep the branch rebased, re-run validation after every round of fixes.
 
-**You never do:** merge the PR, approve it, run the production `supabase db push` steps, or perform post-merge deployment verification unless explicitly asked. The final merge is always human.
+**You never do:** merge the PR or approve it — no exception, ever. Running the production `supabase db push` steps and post-merge deployment verification are also human by default; an agent may run those specific steps only if a human explicitly asks for that run. The final merge is always human.
 
 ## The workflow
 
@@ -42,7 +42,12 @@ A PR is **high-risk** when it touches either of:
 1. **Database:** anything under `supabase/migrations/`, or any RLS policy, grant, or RPC/SQL function change.
 2. **Money:** timesheet calculation (`compute_timesheet_hours` and callers), rates/rate overrides, payroll/payout logic or notifications.
 
-This is a solo-maintainer repo, so high-risk cannot mean "more approvers" — it means **compensating scrutiny**, and you must surface all of it in the PR description: CodeRabbit review fully resolved (it is the de facto second reviewer here), pgTAP coverage for migrations (or documented manual verification), a human-run production `supabase db push --linked --dry-run` before merge, and a note telling the maintainer this diff warrants a deliberate second read before merging. You flag and prepare all of this; the production push and the final read are human.
+This is a solo-maintainer repo, so high-risk cannot mean "more approvers" — it means **compensating scrutiny**, scoped to what's actually at risk:
+
+- **Both categories, always:** CodeRabbit review fully resolved (it is the de facto second reviewer here), and a note in the PR description telling the maintainer this diff warrants a deliberate second read before merging.
+- **Database changes only, additionally:** pgTAP coverage for the change (or documented manual verification), and a human-run production `supabase db push --linked --dry-run` before merge. A money-only PR that touches no schema/RLS/RPC needs neither of these — don't demand a migration dry-run for a rate-table constant change.
+
+You flag and prepare all of this in the PR description; the production push and the final read are human.
 
 Everything else (including plain UI work, edge-function tweaks without DB impact) follows the standard path: CI green, CodeRabbit resolved, maintainer's own diff review at merge time.
 
@@ -88,6 +93,6 @@ Each of these has actually bitten this repo or is structurally likely to:
 
 1. Would the reviewer find anything in the diff that isn't the task?
 2. Could someone reproduce my test evidence from the description alone?
-3. If this is high-risk (DB or money), does the description say so, and are the extra gates (pgTAP coverage, prod dry-run, the maintainer's deliberate second read) explicitly listed as outstanding?
+3. If this is high-risk (DB or money), does the description say so — with pgTAP coverage and the prod dry-run listed as outstanding *only if it's a database change* — and is the deliberate second read flagged either way?
 4. Is every review thread either fixed-and-resolved or answered-and-resolved?
 5. Is the branch current with `main`, and are all three workflows green *right now* — not "were green before my last push"?
