@@ -29,6 +29,8 @@ interface MobileAgendaJobCardProps {
   menu?: React.ReactNode;
   /** The job is underway right now: accent ring + "EN CURSO" chip. */
   live?: boolean;
+  /** Where the displayed times come from; "programa" marks hoja de ruta times. */
+  timesSource?: "job" | "programa";
 }
 
 /**
@@ -54,6 +56,7 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
   onSecondary,
   menu,
   live = false,
+  timesSource = "job",
 }) => {
   const a = getMobileAccent(accent);
   const railColor = jobColor || "#6366f1";
@@ -79,6 +82,9 @@ export const MobileAgendaJobCard: React.FC<MobileAgendaJobCardProps> = ({
             {startLabel}
           </span>
           <span className="text-xs font-semibold tabular-nums text-muted-foreground">{endLabel}</span>
+          {timesSource === "programa" && (
+            <span className={cn("mt-1 text-xs font-bold", a.chipText)}>Programa</span>
+          )}
         </div>
 
         {/* Body */}

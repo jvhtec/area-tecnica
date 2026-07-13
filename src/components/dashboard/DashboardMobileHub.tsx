@@ -16,6 +16,7 @@ import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
 import { MobileNowDivider } from "@/components/mobile/MobileNowDivider";
 import { MobileTimelineItem, type MobileTimelineState } from "@/components/mobile/MobileTimelineItem";
 import { getJobLocationName } from "@/components/mobile/job-location";
+import { useProgramaWindows } from "@/hooks/useProgramaWindows";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -208,22 +209,46 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
 
   const handleToday = () => onDateSelect(new Date());
 
+  // Job start/end are preliminary values from creation; the hoja de ruta
+  // programa holds the real schedule when production has filled it in.
+  const programaWindows = useProgramaWindows(
+    selectedDateJobs.map((job) => job.id),
+    selectedDate,
+  );
+
+  const effectiveTimes = (job: { id: string; start_time: string; end_time: string }) => {
+    const window = programaWindows[job.id];
+    return window
+      ? { start: window.start.getTime(), end: window.end.getTime() }
+      : { start: new Date(job.start_time).getTime(), end: new Date(job.end_time).getTime() };
+  };
+
+  // Programa times can reorder the day relative to the preliminary job times.
+  const agendaJobs = useMemo(
+    () =>
+      [...selectedDateJobs].sort(
+        (a, b) => effectiveTimes(a).start - effectiveTimes(b).start,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedDateJobs, programaWindows],
+  );
+
   // Where today's "Ahora" divider slots into the ordered job list: before the
   // first job that hasn't started yet (list end if everything is underway).
   const nowDividerIndex = useMemo(() => {
     if (!isToday(selectedDate)) return -1;
     const now = Date.now();
-    const idx = selectedDateJobs.findIndex(
-      (job) => new Date(job.start_time).getTime() > now,
-    );
-    return idx === -1 ? selectedDateJobs.length : idx;
-  }, [selectedDateJobs, selectedDate]);
+    const idx = agendaJobs.findIndex((job) => effectiveTimes(job).start > now);
+    return idx === -1 ? agendaJobs.length : idx;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendaJobs, selectedDate, programaWindows]);
 
-  const jobTimelineState = (job: { start_time: string; end_time: string }): MobileTimelineState => {
+  const jobTimelineState = (job: { id: string; start_time: string; end_time: string }): MobileTimelineState => {
     if (!isToday(selectedDate)) return "none";
     const now = Date.now();
-    if (new Date(job.end_time).getTime() < now) return "past";
-    if (new Date(job.start_time).getTime() <= now) return "live";
+    const { start, end } = effectiveTimes(job);
+    if (end < now) return "past";
+    if (start <= now) return "live";
     return "upcoming";
   };
 
@@ -426,7 +451,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
             </Card>
           ) : (
             <>
-            {selectedDateJobs.map((job, jobIndex) => {
+            {agendaJobs.map((job, jobIndex) => {
               const jobColor = job.color || "#3b82f6";
               const jobTimezone = job.timezone || 'Europe/Madrid';
               const assignedCount = job.job_assignments?.length || 0;
@@ -455,7 +480,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                   accent="default"
                   state={jobTimelineState(job)}
                   isFirst={jobIndex === 0 && nowDividerIndex !== 0}
-                  isLast={jobIndex === selectedDateJobs.length - 1 && nowDividerIndex !== selectedDateJobs.length}
+                  isLast={jobIndex === agendaJobs.length - 1 && nowDividerIndex !== agendaJobs.length}
                 >
                 <div
                   className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300"
@@ -466,8 +491,9 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                   locationName={getJobLocationName(job)}
                   status={job.status}
                   jobColor={jobColor}
-                  startLabel={formatInJobTimezone(job.start_time, "HH:mm", jobTimezone)}
-                  endLabel={formatInJobTimezone(job.end_time, "HH:mm", jobTimezone)}
+                  startLabel={programaWindows[job.id]?.startLabel ?? formatInJobTimezone(job.start_time, "HH:mm", jobTimezone)}
+                  endLabel={programaWindows[job.id]?.endLabel ?? formatInJobTimezone(job.end_time, "HH:mm", jobTimezone)}
+                  timesSource={programaWindows[job.id] ? "programa" : "job"}
                   departments={departments}
                   assignedCount={assignedCount}
                   neededCount={totalNeeded || undefined}
@@ -505,7 +531,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                 </React.Fragment>
               );
             })}
-            {selectedDateJobs.length > 0 && nowDividerIndex === selectedDateJobs.length && (
+            {agendaJobs.length > 0 && nowDividerIndex === agendaJobs.length && (
               <MobileNowDivider accent="default" inTimeline />
             )}
             </>

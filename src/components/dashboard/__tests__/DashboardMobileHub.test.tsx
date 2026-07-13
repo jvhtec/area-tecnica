@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { render, screen } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { DashboardMobileHub } from "@/components/dashboard/DashboardMobileHub";
+import { createTestQueryClient } from "@/test/createTestQueryClient";
 
 vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: () => true,
@@ -24,6 +26,7 @@ vi.mock("@/utils/imageOptimization", () => ({
 describe("DashboardMobileHub", () => {
   it("shows the job location from the optimized jobs location relation", async () => {
     render(
+      <QueryClientProvider client={createTestQueryClient()}>
       <DashboardMobileHub
         jobs={[
           {
@@ -46,6 +49,7 @@ describe("DashboardMobileHub", () => {
         onDeleteClick={vi.fn()}
         onJobClick={vi.fn()}
       />
+      </QueryClientProvider>
     );
 
     expect(await screen.findByText("Madrid Arena")).toBeInTheDocument();
@@ -54,6 +58,7 @@ describe("DashboardMobileHub", () => {
 
   it("preserves legacy string location values", async () => {
     render(
+      <QueryClientProvider client={createTestQueryClient()}>
       <DashboardMobileHub
         jobs={[
           {
@@ -76,6 +81,7 @@ describe("DashboardMobileHub", () => {
         onDeleteClick={vi.fn()}
         onJobClick={vi.fn()}
       />
+      </QueryClientProvider>
     );
 
     expect(await screen.findByText("WiZink Center")).toBeInTheDocument();
