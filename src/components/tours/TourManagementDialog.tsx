@@ -15,6 +15,7 @@ import { useState } from "react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -114,6 +115,32 @@ export const TourManagementDialog = ({
       // Refresh tour data
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tour.id) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
+
+      // The bulk update rewrites every date's package/default-set resolution,
+      // so the auto-generated per-date PDFs must be regenerated or they keep
+      // reflecting the previous configuration.
+      try {
+        const syncResult = await syncTourDefaultDocuments({ tourId: tour.id });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tour.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") }),
+        ]);
+        if (syncResult.errors.length > 0) {
+          toast({
+            title: "Aviso de sincronización de PDF",
+            description: `${syncResult.errors.length} documento(s) automáticos no se pudieron actualizar.`,
+            variant: "destructive",
+          });
+        }
+      } catch (syncError) {
+        console.error("Error syncing tour default documents after bulk tour pack update:", syncError);
+        toast({
+          title: "Aviso de sincronización de PDF",
+          description: "No se pudieron actualizar los PDF automáticos de las fechas de gira.",
+          variant: "destructive",
+        });
+      }
 
       toast({
         title: "Éxito",

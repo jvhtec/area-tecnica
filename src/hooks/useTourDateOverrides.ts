@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { scheduleTourDateDefaultDocumentSync } from "@/utils/tourDateDocumentSync";
 export interface TourDatePowerOverride {
   id: string;
   tour_date_id: string;
@@ -40,6 +41,46 @@ export interface TourDateWeightOverride {
 export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight') => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // The auto-generated per-date power/weight PDFs (tour_documents) embed
+  // override data, so every override mutation must regenerate them or job
+  // cards keep serving a stale document. Uses the mutated row's tour_date_id
+  // because job-based override mode mounts this hook without one.
+  const refreshDefaultDocuments = (affectedTourDateId?: string | null) => {
+    const targetTourDateId = affectedTourDateId || tourDateId;
+    if (!targetTourDateId) return;
+
+    scheduleTourDateDefaultDocumentSync({
+      tourDateId: targetTourDateId,
+      onComplete: ({ tourId, result }) => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tourId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") });
+
+        if (result.errors.length > 0) {
+          toast({
+            title: "Aviso de sincronización de PDF",
+            description: `${result.errors.length} documento(s) automáticos no se pudieron actualizar.`,
+            variant: "destructive",
+          });
+        }
+      },
+      onError: () => {
+        toast({
+          title: "Aviso de sincronización de PDF",
+          description: "No se pudieron actualizar los PDF automáticos de la fecha de gira.",
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  const invalidateOverrideQueries = (table: 'power' | 'weight', affectedTourDateId?: string | null) => {
+    const targetTourDateId = affectedTourDateId || tourDateId;
+    if (!targetTourDateId) return;
+    const scope = table === 'power' ? "tour-date-power-overrides" : "tour-date-weight-overrides";
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope(scope, targetTourDateId) });
+  };
 
   // Fetch power overrides
   const { data: powerOverrides = [], isLoading: powerLoading } = useQuery({
@@ -85,8 +126,9 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
+    onSuccess: (data) => {
+      invalidateOverrideQueries('power', data?.tour_date_id);
+      refreshDefaultDocuments(data?.tour_date_id);
     },
   });
 
@@ -102,8 +144,9 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-weight-overrides", tourDateId) });
+    onSuccess: (data) => {
+      invalidateOverrideQueries('weight', data?.tour_date_id);
+      refreshDefaultDocuments(data?.tour_date_id);
     },
   });
 
@@ -120,8 +163,9 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       if (error) throw error;
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
+    onSuccess: (result) => {
+      invalidateOverrideQueries('power', result?.tour_date_id);
+      refreshDefaultDocuments(result?.tour_date_id);
     },
   });
 
@@ -129,20 +173,18 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   const deleteOverrideMutation = useMutation({
     mutationFn: async ({ id, table }: { id: string; table: 'power' | 'weight' }) => {
       const tableName = table === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from(tableName)
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .select("tour_date_id");
 
       if (error) throw error;
-      return { id, table };
+      return { id, table, tourDateId: data?.[0]?.tour_date_id ?? null };
     },
-    onSuccess: ({ table }) => {
-      if (table === 'power') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-weight-overrides", tourDateId) });
-      }
+    onSuccess: ({ table, tourDateId: affectedTourDateId }) => {
+      invalidateOverrideQueries(table, affectedTourDateId);
+      refreshDefaultDocuments(affectedTourDateId);
     },
   });
 

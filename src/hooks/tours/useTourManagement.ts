@@ -4,6 +4,7 @@ import { InvoicingCompany } from "@/types/job";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { queryKeys } from "@/lib/react-query";
 import { useMutationFeedback } from "@/hooks/useMutationFeedback";
+import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 
 const TOUR_WITH_DATES_KEY = queryKeys.scope("tours-with-dates");
 const TOUR_LIST_KEY = queryKeys.scope("tours");
@@ -79,6 +80,15 @@ export const useTourManagement = (tour: TourManagementTarget, onClose: () => voi
           .eq("id", tour.id);
 
         if (tourError) throw tourError;
+
+        // The auto-generated per-date power/weight PDFs embed the tour name in
+        // their title and file name, so they must be regenerated on rename.
+        // Best-effort: a sync failure must not roll back the rename itself.
+        try {
+          await syncTourDefaultDocuments({ tourId: tour.id });
+        } catch (syncError) {
+          console.error("Error refreshing tour default documents after rename:", syncError);
+        }
       },
       success: { title: "Tour name updated successfully" },
       error: {
@@ -86,7 +96,12 @@ export const useTourManagement = (tour: TourManagementTarget, onClose: () => voi
         fallbackDescription: "The tour name could not be updated.",
       },
       queryClient,
-      invalidate: [TOUR_WITH_DATES_KEY],
+      invalidate: [
+        TOUR_WITH_DATES_KEY,
+        queryKeys.scope("tour-documents", tour.id),
+        queryKeys.scope("jobcard-tour-documents"),
+        queryKeys.scope("tour-documents-for-job"),
+      ],
     });
   };
 

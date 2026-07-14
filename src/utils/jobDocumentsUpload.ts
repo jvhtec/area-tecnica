@@ -1,7 +1,20 @@
 import { supabase } from "@/lib/supabase";
 
+export type JobPdfCleanupCandidate = {
+  fileName: string;
+  filePath: string;
+};
+
 export type JobPdfUploadOptions = {
   cleanupScope?: string;
+  /**
+   * Limits which previous documents are removed before the new upload. Every
+   * direct child of the job/category folder (in both storage layouts) is
+   * offered; return false to keep it. Needed for shared category folders
+   * (sound and video Consumos both live under calculators/consumos) so one
+   * department's regeneration doesn't delete the other department's latest PDF.
+   */
+  cleanupFilter?: (candidate: JobPdfCleanupCandidate) => boolean;
 };
 
 const sanitizeFileName = (fileName: string) =>
@@ -18,9 +31,23 @@ const sanitizePathSegment = (value: string) =>
 const createDocumentVersionSegment = () =>
   globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+// Only direct children of the slot folder belong to it: deeper paths are
+// sibling stage scopes (e.g. an unscoped upload must not touch
+// `${baseFolder}/stage-2-main/...`, which has its own slot).
+const isDirectChildPath = (filePath: string, baseFolder: string) => {
+  const prefix = `${baseFolder}/`;
+  return filePath.startsWith(prefix) && !filePath.slice(prefix.length).includes("/");
+};
+
 /**
  * Upload a job-related PDF to the job-documents bucket under a category folder,
  * first cleaning up any previous versions for that job and category.
+ *
+ * Cleanup covers both storage layouts a generated PDF can live under: the
+ * legacy `${category}/${jobId}` layout written by the calculators and the
+ * job-scoped `${jobId}/${category}` layout written when documentation is
+ * duplicated from another job — otherwise superseded copies linger next to the
+ * regenerated report.
  *
  * Example category: "calculators/pesos" or "calculators/consumos"
  */
@@ -38,34 +65,81 @@ export const uploadJobPdfWithCleanup = async (
     ? `/${sanitizePathSegment(options.cleanupScope)}`
     : "";
   const baseFolder = `${category}/${jobId}${scopeFolder}`; // e.g. calculators/pesos/<jobId>/<stage>
+  const jobScopedFolder = `${jobId}/${category}${scopeFolder}`; // copies land here (RLS-compatible layout)
+  const cleanupFolders = [baseFolder, jobScopedFolder];
+  const matchesCleanupFilter = (candidate: JobPdfCleanupCandidate) =>
+    !options.cleanupFilter || options.cleanupFilter(candidate);
   const objectPath = `${baseFolder}/${createDocumentVersionSegment()}-${sanitizedFileName}`;
 
   try {
-    // 1) Remove any existing files for this job/category
+    // 1) Remove any existing files for this job/category (both layouts)
     try {
-      const { data: existing, error: listError } = await supabase.storage
-        .from("job-documents")
-        .list(baseFolder);
+      const pathsToRemove = new Set<string>();
+      const rowIdsToRemove: string[] = [];
 
-      if (listError) {
-        console.warn("[uploadJobPdfWithCleanup] list warning:", listError);
-      } else if (existing && existing.length > 0) {
-        const toRemove = existing.map(f => `${baseFolder}/${f.name}`);
+      const { data: existingRows, error: rowsError } = await supabase
+        .from("job_documents")
+        .select("id, file_name, file_path")
+        .eq("job_id", jobId)
+        .or(cleanupFolders.map((folder) => `file_path.like.${folder}/%`).join(","));
+
+      if (rowsError) {
+        console.warn("[uploadJobPdfWithCleanup] row lookup warning:", rowsError);
+      } else {
+        for (const row of existingRows || []) {
+          if (!row.file_path) continue;
+          const isDirectChild = cleanupFolders.some((folder) =>
+            isDirectChildPath(row.file_path, folder)
+          );
+          if (!isDirectChild) continue;
+          if (!matchesCleanupFilter({ fileName: row.file_name || "", filePath: row.file_path })) {
+            continue;
+          }
+          pathsToRemove.add(row.file_path);
+          rowIdsToRemove.push(row.id);
+        }
+      }
+
+      // Also list storage directly so orphaned files (uploads whose DB insert
+      // failed) still get cleaned up.
+      for (const folder of cleanupFolders) {
+        const { data: existing, error: listError } = await supabase.storage
+          .from("job-documents")
+          .list(folder);
+
+        if (listError) {
+          console.warn("[uploadJobPdfWithCleanup] list warning:", listError);
+          continue;
+        }
+
+        for (const entry of existing || []) {
+          // Subfolder placeholders come back with a null id — those are
+          // sibling stage scopes, not files of this slot.
+          if ("id" in entry && entry.id === null) continue;
+          const candidatePath = `${folder}/${entry.name}`;
+          if (!matchesCleanupFilter({ fileName: entry.name, filePath: candidatePath })) continue;
+          pathsToRemove.add(candidatePath);
+        }
+      }
+
+      if (pathsToRemove.size > 0) {
         const { error: removeError } = await supabase.storage
           .from("job-documents")
-          .remove(toRemove);
+          .remove([...pathsToRemove]);
         if (removeError) {
           console.warn("[uploadJobPdfWithCleanup] remove warning:", removeError);
         }
       }
 
-      const { error: dbDelError } = await supabase
-        .from("job_documents")
-        .delete()
-        .like("file_path", `${baseFolder}/%`)
-        .eq("job_id", jobId);
-      if (dbDelError) {
-        console.warn("[uploadJobPdfWithCleanup] DB delete warning:", dbDelError);
+      if (rowIdsToRemove.length > 0) {
+        const { error: dbDelError } = await supabase
+          .from("job_documents")
+          .delete()
+          .in("id", rowIdsToRemove)
+          .eq("job_id", jobId);
+        if (dbDelError) {
+          console.warn("[uploadJobPdfWithCleanup] DB delete warning:", dbDelError);
+        }
       }
     } catch (cleanupErr) {
       console.warn("[uploadJobPdfWithCleanup] cleanup non-fatal error:", cleanupErr);
