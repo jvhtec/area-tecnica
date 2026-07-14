@@ -54,6 +54,11 @@ export const syncTourDefaultDocumentsForTourDate = async ({
 // once with the final state instead of once per mutation.
 const pendingTourDateDocumentSyncs = new Map<string, ReturnType<typeof setTimeout>>();
 
+// A sync rewrites the date's tour_documents slots (cleanup then upload), so
+// two overlapping runs for the same date could clobber each other; each run
+// is chained on the previous one for that date.
+const inFlightTourDateDocumentSyncs = new Map<string, Promise<void>>();
+
 export const scheduleTourDateDefaultDocumentSync = ({
   tourDateId,
   client = supabase,
@@ -72,7 +77,9 @@ export const scheduleTourDateDefaultDocumentSync = ({
 
   const timer = setTimeout(() => {
     pendingTourDateDocumentSyncs.delete(tourDateId);
-    syncTourDefaultDocumentsForTourDate({ tourDateId, client })
+    const previous = inFlightTourDateDocumentSyncs.get(tourDateId) ?? Promise.resolve();
+    const run = previous
+      .then(() => syncTourDefaultDocumentsForTourDate({ tourDateId, client }))
       .then((outcome) => {
         if (outcome) onComplete?.(outcome);
       })
@@ -80,6 +87,12 @@ export const scheduleTourDateDefaultDocumentSync = ({
         console.error("Error syncing tour default documents for tour date:", error);
         onError?.(error);
       });
+    inFlightTourDateDocumentSyncs.set(tourDateId, run);
+    void run.finally(() => {
+      if (inFlightTourDateDocumentSyncs.get(tourDateId) === run) {
+        inFlightTourDateDocumentSyncs.delete(tourDateId);
+      }
+    });
   }, delayMs);
 
   pendingTourDateDocumentSyncs.set(tourDateId, timer);

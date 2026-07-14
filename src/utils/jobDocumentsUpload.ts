@@ -84,7 +84,13 @@ export const uploadJobPdfWithCleanup = async (
         .or(cleanupFolders.map((folder) => `file_path.like.${folder}/%`).join(","));
 
       if (rowsError) {
-        console.warn("[uploadJobPdfWithCleanup] row lookup warning:", rowsError);
+        // Without the row list we can't pair storage deletions with their DB
+        // rows: removing files anyway would orphan job_documents rows that
+        // point at missing objects (a broad pattern delete instead would hit
+        // stage-scoped sibling rows and bypass the cleanup filter). Skip
+        // cleanup for this run — the new upload still becomes the latest
+        // version and the next successful regeneration cleans up.
+        console.warn("[uploadJobPdfWithCleanup] skipping cleanup, row lookup failed:", rowsError);
       } else {
         for (const row of existingRows || []) {
           if (!row.file_path) continue;
@@ -98,47 +104,47 @@ export const uploadJobPdfWithCleanup = async (
           pathsToRemove.add(row.file_path);
           rowIdsToRemove.push(row.id);
         }
-      }
 
-      // Also list storage directly so orphaned files (uploads whose DB insert
-      // failed) still get cleaned up.
-      for (const folder of cleanupFolders) {
-        const { data: existing, error: listError } = await supabase.storage
-          .from("job-documents")
-          .list(folder);
+        // Also list storage directly so orphaned files (uploads whose DB
+        // insert failed) still get cleaned up.
+        for (const folder of cleanupFolders) {
+          const { data: existing, error: listError } = await supabase.storage
+            .from("job-documents")
+            .list(folder);
 
-        if (listError) {
-          console.warn("[uploadJobPdfWithCleanup] list warning:", listError);
-          continue;
+          if (listError) {
+            console.warn("[uploadJobPdfWithCleanup] list warning:", listError);
+            continue;
+          }
+
+          for (const entry of existing || []) {
+            // Subfolder placeholders come back with a null id — those are
+            // sibling stage scopes, not files of this slot.
+            if ("id" in entry && entry.id === null) continue;
+            const candidatePath = `${folder}/${entry.name}`;
+            if (!matchesCleanupFilter({ fileName: entry.name, filePath: candidatePath })) continue;
+            pathsToRemove.add(candidatePath);
+          }
         }
 
-        for (const entry of existing || []) {
-          // Subfolder placeholders come back with a null id — those are
-          // sibling stage scopes, not files of this slot.
-          if ("id" in entry && entry.id === null) continue;
-          const candidatePath = `${folder}/${entry.name}`;
-          if (!matchesCleanupFilter({ fileName: entry.name, filePath: candidatePath })) continue;
-          pathsToRemove.add(candidatePath);
+        if (pathsToRemove.size > 0) {
+          const { error: removeError } = await supabase.storage
+            .from("job-documents")
+            .remove([...pathsToRemove]);
+          if (removeError) {
+            console.warn("[uploadJobPdfWithCleanup] remove warning:", removeError);
+          }
         }
-      }
 
-      if (pathsToRemove.size > 0) {
-        const { error: removeError } = await supabase.storage
-          .from("job-documents")
-          .remove([...pathsToRemove]);
-        if (removeError) {
-          console.warn("[uploadJobPdfWithCleanup] remove warning:", removeError);
-        }
-      }
-
-      if (rowIdsToRemove.length > 0) {
-        const { error: dbDelError } = await supabase
-          .from("job_documents")
-          .delete()
-          .in("id", rowIdsToRemove)
-          .eq("job_id", jobId);
-        if (dbDelError) {
-          console.warn("[uploadJobPdfWithCleanup] DB delete warning:", dbDelError);
+        if (rowIdsToRemove.length > 0) {
+          const { error: dbDelError } = await supabase
+            .from("job_documents")
+            .delete()
+            .in("id", rowIdsToRemove)
+            .eq("job_id", jobId);
+          if (dbDelError) {
+            console.warn("[uploadJobPdfWithCleanup] DB delete warning:", dbDelError);
+          }
         }
       }
     } catch (cleanupErr) {

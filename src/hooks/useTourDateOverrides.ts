@@ -42,12 +42,16 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Job-based override mode mounts this hook without a tourDateId, so the
+  // mutated row's tour_date_id takes priority over the hook argument.
+  const resolveTargetTourDateId = (affectedTourDateId?: string | null) =>
+    affectedTourDateId || tourDateId || null;
+
   // The auto-generated per-date power/weight PDFs (tour_documents) embed
   // override data, so every override mutation must regenerate them or job
-  // cards keep serving a stale document. Uses the mutated row's tour_date_id
-  // because job-based override mode mounts this hook without one.
+  // cards keep serving a stale document.
   const refreshDefaultDocuments = (affectedTourDateId?: string | null) => {
-    const targetTourDateId = affectedTourDateId || tourDateId;
+    const targetTourDateId = resolveTargetTourDateId(affectedTourDateId);
     if (!targetTourDateId) return;
 
     scheduleTourDateDefaultDocumentSync({
@@ -76,7 +80,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   };
 
   const invalidateOverrideQueries = (table: 'power' | 'weight', affectedTourDateId?: string | null) => {
-    const targetTourDateId = affectedTourDateId || tourDateId;
+    const targetTourDateId = resolveTargetTourDateId(affectedTourDateId);
     if (!targetTourDateId) return;
     const scope = table === 'power' ? "tour-date-power-overrides" : "tour-date-weight-overrides";
     queryClient.invalidateQueries({ queryKey: queryKeys.scope(scope, targetTourDateId) });

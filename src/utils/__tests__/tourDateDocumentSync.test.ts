@@ -213,6 +213,41 @@ describe("per-tour-date default document sync", () => {
     ).toBe(true);
   });
 
+  it("serializes overlapping syncs for the same tour date", async () => {
+    vi.useFakeTimers();
+    let resolveFirstLookup!: (value: QueryResult) => void;
+    const firstLookup = new Promise<QueryResult>((resolve) => {
+      resolveFirstLookup = resolve;
+    });
+    let lookupCount = 0;
+    const from = vi.fn(() => {
+      const stub: Record<string, unknown> = {};
+      stub.select = vi.fn(() => stub);
+      stub.eq = vi.fn(() => stub);
+      stub.maybeSingle = vi.fn(() => {
+        lookupCount += 1;
+        return lookupCount === 1 ? firstLookup : Promise.resolve({ data: null, error: null });
+      });
+      return stub;
+    });
+    const client = { from } as never;
+
+    scheduleTourDateDefaultDocumentSync({ tourDateId: "date-x", client, delayMs: 50 });
+    await vi.advanceTimersByTimeAsync(60);
+    expect(lookupCount).toBe(1); // first run in flight, blocked on the lookup
+
+    scheduleTourDateDefaultDocumentSync({ tourDateId: "date-x", client, delayMs: 50 });
+    await vi.advanceTimersByTimeAsync(60);
+    // Second timer fired, but its run must wait for the in-flight sync.
+    expect(lookupCount).toBe(1);
+
+    resolveFirstLookup({ data: null, error: null });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lookupCount).toBe(2); // second run started only after the first settled
+
+    vi.useRealTimers();
+  });
+
   it("coalesces rapid schedule calls into a single sync per tour date", async () => {
     vi.useFakeTimers();
     const { client, from } = createFakeClient();

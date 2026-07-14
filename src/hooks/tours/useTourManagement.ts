@@ -4,6 +4,7 @@ import { InvoicingCompany } from "@/types/job";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { queryKeys } from "@/lib/react-query";
 import { useMutationFeedback } from "@/hooks/useMutationFeedback";
+import { useToast } from "@/hooks/use-toast";
 import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 
 const TOUR_WITH_DATES_KEY = queryKeys.scope("tours-with-dates");
@@ -30,6 +31,7 @@ const throwIfSupabaseError = (results: Array<{ error: unknown }>) => {
 export const useTourManagement = (tour: TourManagementTarget, onClose: () => void) => {
   const queryClient = useQueryClient();
   const runMutation = useMutationFeedback();
+  const { toast } = useToast();
 
   const handleColorChange = async (color: string) => {
     await runMutation({
@@ -83,11 +85,24 @@ export const useTourManagement = (tour: TourManagementTarget, onClose: () => voi
 
         // The auto-generated per-date power/weight PDFs embed the tour name in
         // their title and file name, so they must be regenerated on rename.
-        // Best-effort: a sync failure must not roll back the rename itself.
+        // Best-effort: a sync failure must not roll back the rename itself,
+        // but the user has to know the per-date PDFs still carry the old name.
         try {
-          await syncTourDefaultDocuments({ tourId: tour.id });
+          const syncResult = await syncTourDefaultDocuments({ tourId: tour.id });
+          if (syncResult.errors.length > 0) {
+            toast({
+              title: "Aviso de sincronización de PDF",
+              description: `${syncResult.errors.length} documento(s) automáticos no se pudieron actualizar con el nuevo nombre.`,
+              variant: "destructive",
+            });
+          }
         } catch (syncError) {
           console.error("Error refreshing tour default documents after rename:", syncError);
+          toast({
+            title: "Aviso de sincronización de PDF",
+            description: "No se pudieron actualizar los PDF automáticos con el nuevo nombre de la gira.",
+            variant: "destructive",
+          });
         }
       },
       success: { title: "Tour name updated successfully" },

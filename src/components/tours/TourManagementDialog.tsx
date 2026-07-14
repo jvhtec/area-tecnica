@@ -119,6 +119,7 @@ export const TourManagementDialog = ({
       // The bulk update rewrites every date's package/default-set resolution,
       // so the auto-generated per-date PDFs must be regenerated or they keep
       // reflecting the previous configuration.
+      let syncHadErrors = false;
       try {
         const syncResult = await syncTourDefaultDocuments({ tourId: tour.id });
         await Promise.all([
@@ -127,25 +128,29 @@ export const TourManagementDialog = ({
           queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") }),
         ]);
         if (syncResult.errors.length > 0) {
+          syncHadErrors = true;
           toast({
             title: "Aviso de sincronización de PDF",
-            description: `${syncResult.errors.length} documento(s) automáticos no se pudieron actualizar.`,
+            description: `Fechas actualizadas, pero ${syncResult.errors.length} documento(s) automáticos no se pudieron regenerar.`,
             variant: "destructive",
           });
         }
       } catch (syncError) {
+        syncHadErrors = true;
         console.error("Error syncing tour default documents after bulk tour pack update:", syncError);
         toast({
           title: "Aviso de sincronización de PDF",
-          description: "No se pudieron actualizar los PDF automáticos de las fechas de gira.",
+          description: "Fechas actualizadas, pero no se pudieron regenerar los PDF automáticos.",
           variant: "destructive",
         });
       }
 
-      toast({
-        title: "Éxito",
-        description: `Todas las fechas de gira ${tourPackOnly ? 'configuradas en' : 'eliminadas de'} modo Solo Tour Pack.`,
-      });
+      if (!syncHadErrors) {
+        toast({
+          title: "Éxito",
+          description: `Todas las fechas de gira ${tourPackOnly ? 'configuradas en' : 'eliminadas de'} modo Solo Tour Pack.`,
+        });
+      }
     } catch (error: any) {
       console.error("Error updating tour dates:", error);
       toast({

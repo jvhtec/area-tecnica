@@ -181,6 +181,28 @@ describe("job document PDF upload", () => {
     expect(mocks.dbDeleteIn).toHaveBeenCalledWith("id", ["row-sound"]);
   });
 
+  it("skips cleanup entirely when the row lookup fails, so storage and DB stay consistent", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mocks.dbSelectOr.mockResolvedValue({ data: null, error: { message: "boom" } });
+
+    await uploadJobPdfWithCleanup(
+      "job-1",
+      new Blob(["pdf"]),
+      "Pesos Report - Show.pdf",
+      "calculators/pesos"
+    );
+
+    // No storage files may be deleted without their matching DB rows.
+    expect(mocks.storageList).not.toHaveBeenCalled();
+    expect(mocks.storageRemove).not.toHaveBeenCalled();
+    expect(mocks.dbDeleteIn).not.toHaveBeenCalled();
+
+    // The new version still gets uploaded and recorded.
+    expect(mocks.storageUpload).toHaveBeenCalledTimes(1);
+    expect(mocks.dbInsert).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
   it("scopes cleanup to the stage folder when a cleanup scope is provided", async () => {
     await uploadJobPdfWithCleanup(
       "job-1",
