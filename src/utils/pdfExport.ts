@@ -2,6 +2,17 @@ import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getResolvedPowerPosition } from '@/utils/powerPositions';
 import { buildPowerStagePlot } from '@/utils/powerStagePlot';
 import { drawPowerStagePlot } from '@/utils/pdf/powerStagePlotPdf';
+import {
+  registerPdfUnicodeFont,
+} from '@/utils/pdf/pdfUnicodeFont';
+import { aggregatePowerCalculations } from '@/features/technical-tools/power/powerAggregation';
+import {
+  getPowerPduAmpRating,
+  POWER_PDU_PLANNING_LOAD_FACTOR,
+} from '@/features/technical-tools/power/powerCalculations';
+import type {
+  PowerCalculationSnapshot,
+} from '@/features/technical-tools/power/types';
 
 interface ExportTableRow {
   quantity?: string;
@@ -11,6 +22,7 @@ interface ExportTableRow {
   watts?: string;
   totalWeight?: number;
   totalWatts?: number;
+  pf?: string;
   // rigging-specific
   x?: number; // position in meters
   reactionKg?: number;
@@ -23,9 +35,11 @@ interface ExportTable {
   totalWeight?: number;
   dualMotors?: boolean;
   totalWatts?: number;
+  adjustedWatts?: number;
   totalVa?: number;            // apparent power (VA)
   currentPerPhase?: number;   // line current (per-phase if 3φ, single-line if 1φ)
   phaseMode?: 'single' | 'three';
+  calculation?: PowerCalculationSnapshot;
   toolType?: 'pesos' | 'consumos' | 'rigging';
   pduType?: string;
   customPduType?: string;
@@ -39,6 +53,14 @@ interface ExportTable {
   okMoment?: boolean;
   okDefl?: boolean;
   cablePick?: boolean;
+}
+
+export interface PowerPdfSummary {
+  totalSystemWatts: number;
+  adjustedSystemWatts?: number;
+  totalSystemAmps: number | null;
+  totalSystemKva?: number | null;
+  aggregationReason?: string;
 }
 
 export interface SummaryRow {
@@ -64,14 +86,17 @@ export const exportToPDF = async (
   jobName: string,
   jobDate: string,
   summaryRows?: SummaryRow[],
-  powerSummary?: { totalSystemWatts: number; totalSystemAmps: number; totalSystemKva?: number },
+  powerSummary?: PowerPdfSummary,
   safetyMargin?: number,
   customLogoUrl?: string,
   fohSchukoRequired?: boolean
 ): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
+  const doc = new jsPDF();
+  const unicodeFontFamily =
+    type === 'power' ? await registerPdfUnicodeFont(doc) : null;
+  const reportFontFamily = unicodeFontFamily ?? 'helvetica';
   return new Promise<Blob>((resolve) => {
-    const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     const createdDate = new Date().toLocaleDateString('en-GB');
@@ -117,11 +142,6 @@ export const exportToPDF = async (
       doc.setFontSize(12);
       doc.text(`Fecha del Trabajo: ${jobDateStr}`, pageWidth / 2, 38, { align: 'center' });
 
-      if (safetyMargin !== undefined && type === 'power') {
-        doc.setFontSize(10);
-        doc.setTextColor(51, 51, 51);
-        doc.text(`Margen de Seguridad Aplicado: ${safetyMargin}%`, 14, 50);
-      }
       doc.setFontSize(10);
       doc.text(`Generado: ${new Date().toLocaleDateString('en-GB')}`, 14, 60);
 
@@ -227,6 +247,8 @@ export const exportToPDF = async (
         yPosition += 10;
 
         const hasLineNames = type === 'power' && table.rows.some((row) => row.lineName?.trim());
+        const hasRowPowerFactors =
+          type === 'power' && table.rows.some((row) => row.pf?.trim());
         const tableRows = table.rows.map((row) => {
           const baseCells = [
             row.quantity,
@@ -238,16 +260,20 @@ export const exportToPDF = async (
           ];
 
           if (!hasLineNames) {
-            return baseCells;
+            return hasRowPowerFactors
+              ? [baseCells[0], baseCells[1], baseCells[2], row.pf || '', baseCells[3]]
+              : baseCells;
           }
 
-          return [
+          const namedCells = [
             row.quantity,
             row.lineName || '',
             row.componentName || '',
             row.watts || '',
-            row.totalWatts !== undefined ? row.totalWatts.toFixed(2) : '',
           ];
+          if (hasRowPowerFactors) namedCells.push(row.pf || '');
+          namedCells.push(row.totalWatts !== undefined ? row.totalWatts.toFixed(2) : '');
+          return namedCells;
         });
 
         if (type === 'weight' && table.totalWeight !== undefined) {
@@ -258,8 +284,12 @@ export const exportToPDF = async (
           type === 'weight'
             ? [['Cantidad', 'Componente', 'Peso (por unidad)', 'Peso Total']]
             : hasLineNames
-              ? [['Cantidad', 'Nombre', 'Componente', 'Vatios (por unidad)', 'Vatios Totales']]
-            : [['Cantidad', 'Componente', 'Vatios (por unidad)', 'Vatios Totales']];
+              ? [hasRowPowerFactors
+                  ? ['Cantidad', 'Nombre', 'Componente', 'Vatios (por unidad)', 'PF', 'Vatios Totales']
+                  : ['Cantidad', 'Nombre', 'Componente', 'Vatios (por unidad)', 'Vatios Totales']]
+            : [hasRowPowerFactors
+                ? ['Cantidad', 'Componente', 'Vatios (por unidad)', 'PF', 'Vatios Totales']
+                : ['Cantidad', 'Componente', 'Vatios (por unidad)', 'Vatios Totales']];
 
         autoTable(doc, {
           head: headers,
@@ -267,7 +297,7 @@ export const exportToPDF = async (
           startY: yPosition,
           theme: 'grid',
           styles: { fontSize: 10, cellPadding: 5, lineColor: [220, 220, 230], lineWidth: 0.1 },
-          headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255], fontStyle: 'bold' },
+          headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] },
           bodyStyles: { textColor: [51, 51, 51] },
           alternateRowStyles: { fillColor: [250, 250, 255] },
           didDrawPage: (data) => { yPosition = data.cursor.y + 10; }
@@ -278,45 +308,59 @@ export const exportToPDF = async (
         if (type === 'power') {
           const positionLabel = getResolvedPowerPosition(table.position, table.customPosition);
           if (table.totalWatts !== undefined) {
-            checkPageBreak(positionLabel ? 56 : 49);
+            const calculation = table.calculation;
+            const effectiveMargin = calculation?.safetyMargin ?? safetyMargin;
+            const adjustedWatts =
+              calculation?.adjustedWatts ??
+              table.adjustedWatts ??
+              table.totalWatts * (1 + (effectiveMargin ?? 0) / 100);
+            const selectedPdu = table.customPduType || table.pduType;
+            const pduAmps = getPowerPduAmpRating(selectedPdu || '');
+            const pduLimit = pduAmps === undefined
+              ? undefined
+              : pduAmps * POWER_PDU_PLANNING_LOAD_FACTOR;
+            const apparent = table.totalVa === undefined ? 'N/D' : `${(table.totalVa / 1000).toFixed(2)} kVA`;
+            const current = table.currentPerPhase === undefined ? 'N/D' : `${table.currentPerPhase.toFixed(2)} A`;
+            const phaseLabel = calculation?.phaseMode === 'three'
+              ? unicodeFontFamily ? '3φ equilibrada' : 'trifásica equilibrada'
+              : unicodeFontFamily ? '1φ' : 'monofásica';
+            const pduStatus = pduLimit === undefined
+              ? 'NO VERIFICABLE'
+              : table.currentPerPhase === undefined
+                ? 'SIN ESTADO'
+                : table.currentPerPhase <= pduLimit ? 'OK' : 'SOBRE LIMITE';
+            const detailLines = [
+              `Potencia: ${table.totalWatts.toFixed(2)} W; ajustada (${effectiveMargin ?? 0}%): ${adjustedWatts.toFixed(2)} W`,
+              `Aparente: ${apparent}; corriente de línea: ${current}`,
+              calculation
+                ? `Suministro: ${phaseLabel} ${calculation.voltage} V${calculation.phaseMode === 'three' ? ' LL' : ''}; PF ${calculation.powerFactorSource === 'per-row' ? unicodeFontFamily ? 'ΣP/ΣQ' : 'vectorial' : (calculation.powerFactor?.toFixed(2) ?? 'N/D')}; v${calculation.version}${calculation.isEstimate ? ' estimado' : ''}`
+                : 'Cálculo heredado sin snapshot reproducible',
+              `PDU: ${selectedPdu || 'sin recomendación'}; ${pduLimit === undefined ? 'sin límite verificable' : `límite 80% ${pduLimit.toFixed(1)} A`}; ${pduStatus}`,
+            ];
+            if (positionLabel) detailLines.push(`Posición: ${positionLabel}`);
+            const detailHeight = detailLines.length * 7 + 3;
+            checkPageBreak(detailHeight + 10);
             doc.setFillColor(245, 245, 250);
-            doc.rect(14, yPosition - 6, pageWidth - 28, positionLabel ? 42 : 35, 'F');
+            doc.rect(14, yPosition - 6, pageWidth - 28, detailHeight, 'F');
 
-            doc.setFontSize(11);
+            doc.setFontSize(9);
             doc.setTextColor(125, 1, 1);
-            doc.text(`Potencia Total (sin margen): ${table.totalWatts.toFixed(2)} W`, 14, yPosition);
-            yPosition += 7;
-
-            if (safetyMargin !== undefined) {
-              const adjusted = (table.totalWatts || 0) * (1 + (safetyMargin || 0) / 100);
-              doc.text(`Potencia Ajustada (con ${safetyMargin}%): ${adjusted.toFixed(2)} W`, 14, yPosition);
+            doc.setFont('helvetica', 'normal');
+            detailLines.forEach((line) => {
+              if (line.includes('SOBRE LIMITE') || line.includes('NO VERIFICABLE')) doc.setTextColor(180, 30, 30);
+              else doc.setTextColor(125, 1, 1);
+              doc.text(line, 14, yPosition);
               yPosition += 7;
-            }
-
-            if (table.totalVa !== undefined) {
-              doc.text(`Potencia Aparente: ${(table.totalVa / 1000).toFixed(2)} kVA`, 14, yPosition);
-              yPosition += 7;
-            }
-
-            if (table.currentPerPhase !== undefined) {
-              const currentLabel = table.phaseMode === 'three' ? 'Corriente por Fase' : 'Corriente';
-              doc.text(`${currentLabel}: ${table.currentPerPhase.toFixed(2)} A`, 14, yPosition);
-              yPosition += 7;
-            }
-
-            if (positionLabel) {
-              doc.text(`Posición: ${positionLabel}`, 14, yPosition);
-              yPosition += 10;
-            } else {
-              yPosition += 3;
-            }
+            });
+            doc.setFont(reportFontFamily, 'normal');
+            yPosition += 3;
           }
 
           if (table.includesHoist) {
             checkPageBreak(20);
-            doc.setFontSize(10); doc.setTextColor(51, 51, 51); doc.setFont(undefined, 'italic');
-            doc.text(`Potencia adicional para motores requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
-            yPosition += 10; doc.setFont(undefined, 'normal');
+            doc.setFontSize(10); doc.setTextColor(51, 51, 51); doc.setFont('helvetica', 'italic');
+            doc.text(`Suministro auxiliar de motores para ${table.name}: CEE32A 3P+N+G (excluido de los totales)`, 14, yPosition);
+            yPosition += 10; doc.setFont('helvetica', 'normal');
           }
         }
 
@@ -329,7 +373,7 @@ export const exportToPDF = async (
 
       // Summary data
       let generatedSummaryRows: SummaryRow[] = [];
-      let generatedPowerSummary: { totalSystemWatts: number; totalSystemAmps: number; totalSystemKva?: number } | undefined;
+      let generatedPowerSummary: PowerPdfSummary | undefined;
 
       if (type === 'weight') {
         generatedSummaryRows = tables.map((table) => ({
@@ -350,12 +394,15 @@ export const exportToPDF = async (
       }
 
       if (type === 'power') {
-        const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-        const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-        // Defensive fallback: duplicates the kVA calculation done in each tool's handleExportPDF.
-        // Used when the caller doesn't pass a powerSummary (backward compatibility).
-        const totalSystemKva = tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
-        generatedPowerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
+        const aggregation = aggregatePowerCalculations(tables);
+        generatedPowerSummary = {
+          totalSystemWatts: aggregation.totalWatts,
+          adjustedSystemWatts: aggregation.adjustedWatts,
+          totalSystemAmps: aggregation.currentLine,
+          totalSystemKva:
+            aggregation.totalVa === null ? null : aggregation.totalVa / 1000,
+          aggregationReason: aggregation.reason,
+        };
       }
 
       const finalSummaryRows = summaryRows && summaryRows.length > 0 ? summaryRows : (riggingSummaryRows.length > 0 ? riggingSummaryRows : generatedSummaryRows);
@@ -388,10 +435,6 @@ export const exportToPDF = async (
         doc.setFontSize(12);
         doc.text(`Fecha del Trabajo: ${jobDateStr}`, pageWidth / 2, 38, { align: 'center' });
 
-        if (safetyMargin !== undefined && type === 'power') {
-          doc.setFontSize(10); doc.setTextColor(51, 51, 51);
-          doc.text(`Margen de Seguridad Aplicado: ${safetyMargin}%`, 14, 50);
-        }
         doc.setFontSize(10);
         doc.text(`Generado: ${new Date().toLocaleDateString('en-GB')}`, 14, 60);
 
@@ -407,33 +450,10 @@ export const exportToPDF = async (
           // FOH Schuko global note also on summary page
           if (fohSchukoRequired) {
             checkPageBreak(12);
-            doc.setFontSize(10); doc.setTextColor(80, 80, 80); doc.setFont(undefined, 'italic');
-            doc.text('Se requiere potencia de 16A en formato schuko hembra en posicion FoH', 14, yPosition);
-            yPosition += 10; doc.setFont(undefined, 'normal');
+            doc.setFontSize(10); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'italic');
+            doc.text('Suministro auxiliar FoH: 16A en formato schuko hembra (excluido de los totales)', 14, yPosition);
+            yPosition += 10; doc.setFont('helvetica', 'normal');
           }
-
-          tables.forEach((table) => {
-            const positionLabel = getResolvedPowerPosition(table.position, table.customPosition) || 'N/A';
-            checkPageBreak(37);
-            doc.setFontSize(12); doc.setTextColor(0, 0, 0);
-            const pduText = table.customPduType ? table.customPduType : table.pduType;
-            doc.text(`${table.name} - PDU: ${pduText || 'N/A'}`, 14, yPosition);
-            yPosition += 7;
-
-            const adjusted = safetyMargin !== undefined ? (table.totalWatts || 0) * (1 + (safetyMargin || 0) / 100) : (table.totalWatts || 0);
-            doc.setFontSize(10); doc.setTextColor(60, 60, 60);
-            doc.text(`Potencia (ajustada): ${adjusted.toFixed(2)} W — Corriente: ${(table.currentPerPhase || 0).toFixed(2)} A`, 14, yPosition);
-            yPosition += 7;
-            doc.text(`Posición: ${positionLabel}`, 14, yPosition);
-            yPosition += 7;
-
-            if (table.includesHoist) {
-              doc.setTextColor(80, 80, 80);
-              doc.text(`*Potencia adicional para motor requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
-              yPosition += 7;
-            }
-            yPosition += 3;
-          });
 
           if (finalPowerSummary) {
             checkPageBreak(37);
@@ -441,19 +461,18 @@ export const exportToPDF = async (
             doc.text("Resumen de Potencia Total", 14, yPosition);
             yPosition += 10;
             doc.setFontSize(12); doc.setTextColor(0, 0, 0);
-            doc.text(`Potencia Total del Sistema (sin margen): ${finalPowerSummary.totalSystemWatts.toFixed(2)} W`, 14, yPosition);
-            yPosition += 7;
-            if (safetyMargin !== undefined) {
-              const adjustedSystem = finalPowerSummary.totalSystemWatts * (1 + (safetyMargin || 0) / 100);
-              doc.text(`Potencia Total del Sistema (ajustada): ${adjustedSystem.toFixed(2)} W`, 14, yPosition);
+            const totals = [
+              `Potencia Total del Sistema (sin margen): ${finalPowerSummary.totalSystemWatts.toFixed(2)} W`,
+              finalPowerSummary.adjustedSystemWatts === undefined ? null : `Potencia Total del Sistema (ajustada por tabla): ${finalPowerSummary.adjustedSystemWatts.toFixed(2)} W`,
+              finalPowerSummary.totalSystemKva == null ? null : `Potencia Aparente Total del Sistema: ${finalPowerSummary.totalSystemKva.toFixed(2)} kVA`,
+              finalPowerSummary.totalSystemAmps === null ? 'Corriente y kVA del sistema: no agregables con los datos disponibles.' : `Corriente de Línea Resultante: ${finalPowerSummary.totalSystemAmps.toFixed(2)} A`,
+            ].filter((line): line is string => line !== null);
+            totals.forEach((line) => { doc.text(line, 14, yPosition); yPosition += 7; });
+            if (finalPowerSummary.totalSystemAmps === null && finalPowerSummary.aggregationReason) {
+              doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+              doc.text(finalPowerSummary.aggregationReason, 14, yPosition);
               yPosition += 7;
             }
-            if (finalPowerSummary.totalSystemKva !== undefined) {
-              doc.text(`Potencia Aparente Total del Sistema: ${finalPowerSummary.totalSystemKva.toFixed(2)} kVA`, 14, yPosition);
-              yPosition += 7;
-            }
-            doc.text(`Corriente Total del Sistema: ${finalPowerSummary.totalSystemAmps.toFixed(2)} A`, 14, yPosition);
-            yPosition += 7;
           }
 
           // Stage plot with PDU positions (theater conventions, audience at bottom)
@@ -480,7 +499,7 @@ export const exportToPDF = async (
             startY: yPosition,
             theme: 'grid',
             styles: { fontSize: 10, cellPadding: 5, lineColor: [220, 220, 230], lineWidth: 0.1 },
-            headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255], fontStyle: 'bold' },
+            headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] },
             bodyStyles: { textColor: [51, 51, 51] },
             alternateRowStyles: { fillColor: [250, 250, 255] },
             didDrawPage: (data) => { yPosition = data.cursor.y + 10; }

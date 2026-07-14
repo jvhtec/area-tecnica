@@ -98,7 +98,8 @@ describe('powerSummaryData', () => {
     expect(summary.departments.lights.rows[0].positionLabel).toBe('Custom Left');
     expect(summary.departments.lights.rows[0].notes).toContain('CEE32A');
     expect(summary.totalSystemWatts).toBe(4500);
-    expect(summary.totalSystemAmps).toBe(18);
+    // Compatible 3φ supplies aggregate by ΣP/ΣQ, never by adding row currents.
+    expect(summary.totalSystemAmps).toBeCloseTo(7.1218, 3);
   });
 
   it('keeps only the newest saved job table when a department table was re-saved', async () => {

@@ -56,8 +56,8 @@ export const GeneratedPowerTableCard: React.FC<{
   onUpdateSettings,
 }) => {
   const tableId = table.id ?? table.name;
-  const safetyMargin = table.snapshotSafetyMargin ?? 0;
-  const effectivePhaseMode = table.snapshotPhaseMode ?? phaseMode;
+  const safetyMargin = table.calculation?.safetyMargin ?? 0;
+  const effectivePhaseMode = table.calculation?.phaseMode ?? phaseMode;
 
   return (
     <div className="border rounded-lg overflow-hidden mt-6 first:mt-0">
@@ -165,20 +165,28 @@ export const GeneratedPowerTableCard: React.FC<{
                       {labels.apparentPower}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
+                      {table.totalVa !== undefined
+                        ? `${(table.totalVa / 1000).toFixed(2)} kVA`
+                        : labels.notAvailable}
                     </td>
                   </tr>
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={labelSpan} className="px-4 py-3 text-right text-sm">
                       {effectivePhaseMode === "three" ? labels.currentPerPhase : labels.current}
                     </td>
-                    <td className="px-4 py-3 text-sm">{table.currentPerPhase?.toFixed(2)} A</td>
+                    <td className="px-4 py-3 text-sm">
+                      {table.currentPerPhase !== undefined
+                        ? `${table.currentPerPhase.toFixed(2)} A`
+                        : labels.notAvailable}
+                    </td>
                   </tr>
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={labelSpan} className="px-4 py-3 text-right text-sm">
                       {labels.pduTypeLabel}
                     </td>
-                    <td className="px-4 py-3 text-sm">{table.customPduType || table.pduType}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {table.customPduType || table.pduType || labels.notAvailable}
+                    </td>
                   </tr>
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={labelSpan} className="px-4 py-3 text-right text-sm">

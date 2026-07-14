@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { EventData } from '@/types/hoja-de-ruta';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { formatPowerRequirementsText } from '@/utils/powerSummaryData';
+import { formatPowerRequirementsText } from '@/utils/powerRequirementSelection';
 import {
   mergeStaffWithAssignments,
   remapAccommodationStaffReferences,

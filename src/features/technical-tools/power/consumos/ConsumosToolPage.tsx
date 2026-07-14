@@ -20,57 +20,20 @@ import {
   NO_POWER_POSITION_VALUE,
   POWER_POSITION_PRESETS,
 } from "@/utils/powerPositions";
-import type { PowerTable } from "@/features/technical-tools/power/types";
 import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "./config";
 import { useConsumosTool } from "./useConsumosTool";
 import { CustomComponentDialog } from "./CustomComponentDialog";
 import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerStagePlot";
 import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyToStageMenu";
 import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/QuickPresetsMenu";
+import type { PowerTable } from "@/features/technical-tools/power/types";
 import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
+import { PowerTableSummary } from "./PowerTableSummary";
 import {
   TOUR_PACKAGE_LABELS,
   TOUR_PACKAGE_SIZES,
   type TourPackageSize,
 } from "@/utils/tourPackages";
-
-const PowerTableSummary: React.FC<{
-  table: PowerTable;
-  labels: ConsumosDepartmentConfig["labels"];
-  phaseMode: "single" | "three";
-  showPosition?: boolean;
-}> = ({ table, labels, phaseMode, showPosition = true }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-    <div>
-      {labels.totalWattsLabel} <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span>
-    </div>
-    <div>
-      {labels.apparentPower}{" "}
-      <span className="font-medium">
-        {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
-      </span>
-    </div>
-    <div>
-      {phaseMode === "three" ? labels.currentPerPhase : labels.current}{" "}
-      <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span>
-    </div>
-    <div>
-      {labels.pduTypeLabel}{" "}
-      <span className="font-medium">{table.customPduType || table.pduType}</span>
-    </div>
-    {showPosition && (
-      <div>
-        {labels.positionLabel}{" "}
-        <span className="font-medium">
-          {table.customPosition || table.position || labels.notAvailable}
-        </span>
-      </div>
-    )}
-    {table.includesHoist && (
-      <div className="col-span-1 sm:col-span-2 text-green-700">✓ {labels.hoistNote}</div>
-    )}
-  </div>
-);
 
 export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = ({
   config,
@@ -522,7 +485,9 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                                       {table.name}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
-                                      {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
+                                      {table.totalVa !== undefined
+                                        ? `${(table.totalVa / 1000).toFixed(2)} kVA`
+                                        : labels.notAvailable}
                                     </span>
                                   </span>
                                 </label>
@@ -579,6 +544,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                     <Label>{labels.voltage}</Label>
                     <Input
                       type="number"
+                      min="1"
                       value={voltage}
                       onChange={(event) => setVoltage(Number(event.target.value) || 0)}
                     />

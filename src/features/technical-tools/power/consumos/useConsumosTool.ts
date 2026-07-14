@@ -28,7 +28,15 @@ import {
   createCalculatedPowerTable,
   getPowerPduOptions,
   getVoltageForPhase,
+  PowerCalculationValidationError,
 } from "@/features/technical-tools/power/powerCalculations";
+import { parsePowerCalculationSnapshot } from "@/features/technical-tools/power/powerSnapshots";
+import {
+  hydratePowerTable,
+  mergeStoredPowerSnapshot,
+  type ReadOnlyPowerDefault,
+} from "@/features/technical-tools/power/powerTableHydration";
+import { aggregatePowerCalculations } from "@/features/technical-tools/power/powerAggregation";
 import {
   buildPowerOverridePayload,
   buildPowerTableData,
@@ -69,51 +77,14 @@ import {
   useCustomPowerComponents,
 } from "./useCustomPowerComponents";
 import { useConsumosComponents } from "./useConsumosComponents";
+import { downloadPdfBlob, type ConsumosJob } from "./consumosUtils";
 
 const DEFAULT_PDU_SELECT_VALUE = "default";
 const CUSTOM_PDU_SELECT_VALUE = "Custom";
 
-type EditingTarget =
-  | { kind: "table"; id: number | string }
+type EditingTarget = { kind: "table"; id: number | string }
   | { kind: "default"; id: string }
   | { kind: "override"; id: string };
-
-type ConsumosJob = {
-  id: string;
-  title?: string;
-  start_time?: string;
-  end_time?: string;
-  date?: string;
-  tour_date_id?: string | null;
-  tour_date?: {
-    date?: string;
-    tour?: { name?: string } | null;
-    location?: { name?: string } | null;
-  } | null;
-  location?: { name?: string } | null;
-};
-
-type ReadOnlyPowerDefault = {
-  id: string;
-  table_type: string;
-  table_name: string;
-  total_value?: number;
-  table_data?: {
-    rows?: PowerTableRow[];
-    pf?: number;
-    safetyMargin?: number;
-  };
-  metadata?: {
-    pf?: number;
-    safetyMargin?: number;
-    current_per_phase?: number;
-    pdu_type?: string;
-    custom_pdu_type?: string;
-    position?: string;
-    custom_position?: string;
-    includes_hoist?: boolean;
-  };
-};
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "unknown error";
@@ -121,17 +92,6 @@ const getErrorMessage = (error: unknown) =>
 const getRecommendedFixturePf = (fixtureType?: string) =>
   FIXTURE_PF[(fixtureType as FixtureType) || DEFAULT_FIXTURE_TYPE]?.pf ??
   FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf;
-
-const downloadPdfBlob = (pdfBlob: Blob, fileName: string) => {
-  const url = window.URL.createObjectURL(pdfBlob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(anchor);
-};
 
 export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const navigate = useNavigate();
@@ -422,14 +382,15 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
   // Electrical settings
   const [safetyMargin, setSafetyMargin] = useState(config.defaultSafetyMargin);
-  const [phaseMode, setPhaseMode] = useState<PhaseMode>("three");
+  const [phaseMode, setPhaseModeState] = useState<PhaseMode>("three");
   const [voltage, setVoltage] = useState<number>(getVoltageForPhase("three"));
   const [pf, setPf] = useState<number>(config.defaultPowerFactor ?? 0.9);
   const [fohSchukoRequired, setFohSchukoRequired] = useState<boolean>(true);
 
-  useEffect(() => {
-    setVoltage(getVoltageForPhase(phaseMode));
-  }, [phaseMode]);
+  const setPhaseMode = (nextPhaseMode: PhaseMode) => {
+    setPhaseModeState(nextPhaseMode);
+    setVoltage(getVoltageForPhase(nextPhaseMode));
+  };
 
   const pduOptions = getPowerPduOptions(department, phaseMode);
 
@@ -515,6 +476,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
     const savedTables = savedTablesQuery.data.map((row) =>
       mapPowerRequirementRowToTable(row, {
+        fallbackPowerFactor: config.defaultPowerFactor ?? 0.9,
         fallbackSafetyMargin: config.defaultSafetyMargin,
         perRowPf,
       }),
@@ -524,7 +486,15 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
     // Keep any tables the user built before picking the job
     setTables((prev) => [...savedTables, ...prev.filter((table) => !table.powerRequirementId)]);
-  }, [savedTablesQuery.data, selectedJobId, isNormalMode, department, perRowPf, config.defaultSafetyMargin]);
+  }, [
+    savedTablesQuery.data,
+    selectedJobId,
+    isNormalMode,
+    department,
+    perRowPf,
+    config.defaultPowerFactor,
+    config.defaultSafetyMargin,
+  ]);
 
   const activeTables = selectedStage
     ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
@@ -538,12 +508,14 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   });
 
   const getTableSnapshotSettings = (table: PowerTable): PowerElectricalSettings => ({
-    safetyMargin: table.snapshotSafetyMargin ?? safetyMargin,
-    phaseMode: table.snapshotPhaseMode ?? phaseMode,
-    voltage: table.snapshotVoltage ?? voltage,
+    safetyMargin: table.calculation?.safetyMargin ?? safetyMargin,
+    phaseMode: table.calculation?.phaseMode ?? phaseMode,
+    voltage: table.calculation?.voltage ?? voltage,
     ...(perRowPf
       ? {}
-      : { powerFactor: table.snapshotPowerFactor ?? pf }),
+      : {
+          powerFactor: table.calculation?.powerFactor ?? pf,
+        }),
   });
 
   // Builder row handlers
@@ -639,6 +611,12 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   };
 
   const loadPowerTableIntoBuilder = (table: PowerTable) => {
+    const tableSettings = getTableSnapshotSettings(table);
+    const tablePduOptions = getPowerPduOptions(department, tableSettings.phaseMode);
+    setSafetyMargin(tableSettings.safetyMargin);
+    setPhaseModeState(tableSettings.phaseMode);
+    setVoltage(tableSettings.voltage);
+    if (tableSettings.powerFactor !== undefined) setPf(tableSettings.powerFactor);
     setTableName(table.name);
     setCurrentRows(
       table.rows.length > 0
@@ -656,7 +634,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       setCustomPosition("");
     }
     if (table.customPduType) {
-      if (pduOptions.includes(table.customPduType)) {
+      if (tablePduOptions.includes(table.customPduType)) {
         setSelectedPduType(table.customPduType);
         setCustomPduType("");
       } else {
@@ -690,9 +668,37 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     position?: string | null;
     custom_position?: string | null;
     custom_pdu_type?: string | null;
+    pdu_type?: string | null;
     includes_hoist?: boolean;
-    override_data?: { rows?: PowerTableRow[] };
+    override_data?: {
+      rows?: PowerTableRow[];
+      safetyMargin?: number;
+      phaseMode?: PhaseMode;
+      voltage?: number;
+      pf?: number;
+      calculation?: unknown;
+    };
   }) => {
+    const storedCalculation = parsePowerCalculationSnapshot(
+      override.override_data?.calculation,
+    );
+    const restoredPhase =
+      storedCalculation?.phaseMode ?? override.override_data?.phaseMode ?? phaseMode;
+    const restoredPduOptions = getPowerPduOptions(department, restoredPhase);
+    setSafetyMargin(
+      storedCalculation?.safetyMargin ??
+        override.override_data?.safetyMargin ??
+        safetyMargin,
+    );
+    setPhaseModeState(restoredPhase);
+    setVoltage(
+      storedCalculation?.voltage ??
+        override.override_data?.voltage ??
+        getVoltageForPhase(restoredPhase),
+    );
+    if (!perRowPf) {
+      setPf(storedCalculation?.powerFactor ?? override.override_data?.pf ?? pf);
+    }
     setTableName(override.table_name);
     setCurrentRows(
       override.override_data?.rows?.length
@@ -716,7 +722,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       setCustomPosition("");
     }
     if (override.custom_pdu_type) {
-      if (pduOptions.includes(override.custom_pdu_type)) {
+      if (restoredPduOptions.includes(override.custom_pdu_type)) {
         setSelectedPduType(override.custom_pdu_type);
         setCustomPduType("");
       } else {
@@ -758,12 +764,10 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         );
         const fixtureType =
           row.fixtureType || component?.fixtureType || DEFAULT_FIXTURE_TYPE;
-        const rawPf = Number(row.pf);
-        const pfValue =
-          Number.isFinite(rawPf) && rawPf > 0
-            ? Math.min(Math.max(rawPf, 0.1), 1)
-            : getRecommendedFixturePf(fixtureType);
-        return { ...row, fixtureType, pf: pfValue.toFixed(2) };
+        const resolvedPf = row.pf?.trim()
+          ? row.pf
+          : getRecommendedFixturePf(fixtureType).toFixed(2);
+        return { ...row, fixtureType, pf: resolvedPf };
       });
       const rowsWithTotals = preparedRows.map((row) => ({
         ...row,
@@ -793,10 +797,6 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         includesHoist,
         stageName: selectedStage?.name ?? null,
         stageNumber: selectedStage?.number ?? null,
-        snapshotSafetyMargin: settings.safetyMargin,
-        snapshotPhaseMode: settings.phaseMode,
-        snapshotVoltage: settings.voltage,
-        snapshotPowerFactor: settings.powerFactor,
       },
     }) as PowerTable;
   };
@@ -851,9 +851,8 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       return;
     }
 
-    const builtTable = buildTableFromBuilder();
-
     try {
+      const builtTable = buildTableFromBuilder();
       if (editing?.kind === "override") {
         await persistOverrideUpdate(builtTable, editing.id);
         toast({ title: labels.toastSuccess, description: labels.toastOverrideUpdated });
@@ -929,7 +928,9 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       toast({
         title: labels.toastError,
         description:
-          editing?.kind === "override" || isOverrideMode
+          error instanceof PowerCalculationValidationError
+            ? labels.toastInvalidCalculation
+            : editing?.kind === "override" || isOverrideMode
             ? labels.toastOverrideSaveError
             : getErrorMessage(error),
         variant: "destructive",
@@ -1167,62 +1168,43 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     }
   };
 
-  const computeDisplayTotals = (
-    totalWatts: number,
-    rows: PowerTableRow[],
-    snapshot: { pf?: number; safetyMargin?: number },
-  ) => {
-    const margin = snapshot.safetyMargin ?? safetyMargin;
-    const adjustedWatts = totalWatts * (1 + margin / 100);
-    const snapshotPf = snapshot.pf ?? (perRowPf ? undefined : pf);
-    let totalVa = adjustedWatts;
-    if (snapshotPf && snapshotPf > 0) {
-      totalVa = adjustedWatts / snapshotPf;
-    } else if (perRowPf && rows.length > 0) {
-      const rawVa = calculateMixedLoadApparentPower(rows, (row) => {
-        const rowPf = Number(row.pf);
-        return Number.isFinite(rowPf) && rowPf > 0 ? rowPf : 0.9;
-      });
-      totalVa = rawVa * (1 + margin / 100);
-    } else if (perRowPf) {
-      totalVa = adjustedWatts / 0.9;
-    }
-    return { adjustedWatts, totalVa };
-  };
+  const hydrateDisplayPowerTable = (
+    input: Omit<Parameters<typeof hydratePowerTable>[0], "defaults">,
+  ) =>
+    hydratePowerTable({
+      ...input,
+      defaults: {
+        fallbackPowerFactor: config.defaultPowerFactor ?? 0.9,
+        fallbackSafetyMargin: safetyMargin,
+        phaseMode,
+        powerFactor: pf,
+        perRowPowerFactor: perRowPf,
+      },
+    });
 
   const mapTourDefaultTableToPowerTable = (
     table: TourDefaultTable,
   ): PowerTable => {
     const rows: PowerTableRow[] = table.table_data?.rows || [];
-    const snapshot = {
-      pf: table.metadata?.pf ?? table.table_data?.pf,
-      safetyMargin: table.metadata?.safetyMargin ?? table.table_data?.safetyMargin,
-    };
-    const { adjustedWatts, totalVa } = computeDisplayTotals(
-      table.total_value || 0,
-      rows,
-      snapshot,
-    );
-    return {
+    const snapshot = mergeStoredPowerSnapshot(table.metadata, table.table_data);
+    const pduType = table.metadata?.pdu_type || "";
+    const customPduType = table.metadata?.custom_pdu_type || undefined;
+    return hydrateDisplayPowerTable({
       id: `new-default-${table.id}`,
       name: table.table_name,
       rows,
-      totalWatts: table.total_value,
-      adjustedWatts,
-      totalVa,
-      currentPerPhase: table.metadata?.current_per_phase || 0,
-      pduType: table.metadata?.pdu_type || "",
-      customPduType: table.metadata?.custom_pdu_type || undefined,
-      position: table.metadata?.position || undefined,
-      customPosition: table.metadata?.custom_position || undefined,
-      includesHoist: table.metadata?.includes_hoist || false,
-      snapshotSafetyMargin: table.metadata?.safetyMargin ?? table.table_data?.safetyMargin,
-      snapshotPhaseMode: table.metadata?.phaseMode ?? table.table_data?.phaseMode,
-      snapshotVoltage: table.metadata?.voltage ?? table.table_data?.voltage,
-      snapshotPowerFactor: table.metadata?.pf ?? table.table_data?.pf,
-      isDefault: true,
-      defaultTableId: table.id,
-    } as PowerTable;
+      totalWatts: table.total_value || 0,
+      snapshot,
+      pduType,
+      customPduType,
+      patch: {
+        position: table.metadata?.position || undefined,
+        customPosition: table.metadata?.custom_position || undefined,
+        includesHoist: table.metadata?.includes_hoist || false,
+        isDefault: true,
+        defaultTableId: table.id,
+      },
+    });
   };
 
   const copySourceTables = (defaultTables || [])
@@ -1309,29 +1291,29 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
     return legacyTourDefaults.map((legacyDefault) => {
       const snapshot = {
+        calculation: legacyDefault.metadata?.calculation,
         pf: legacyDefault.metadata?.pf ?? legacyDefault.pf,
         safetyMargin: legacyDefault.metadata?.safetyMargin ?? legacyDefault.safetyMargin,
+        phaseMode: legacyDefault.metadata?.phaseMode,
+        voltage: legacyDefault.metadata?.voltage,
       };
-      const { adjustedWatts, totalVa } = computeDisplayTotals(
-        legacyDefault.total_watts || 0,
-        [],
-        snapshot,
-      );
-      return {
+      const pduType = legacyDefault.pdu_type || "";
+      const customPduType = legacyDefault.custom_pdu_type || undefined;
+      return hydrateDisplayPowerTable({
         id: `legacy-default-${legacyDefault.id}`,
         name: legacyDefault.table_name,
-        rows: [] as PowerTableRow[],
-        totalWatts: legacyDefault.total_watts,
-        adjustedWatts,
-        totalVa,
-        currentPerPhase: legacyDefault.current_per_phase,
-        pduType: legacyDefault.pdu_type,
-        customPduType: legacyDefault.custom_pdu_type,
-        position: legacyDefault.position ?? undefined,
-        customPosition: legacyDefault.custom_position ?? undefined,
-        includesHoist: legacyDefault.includes_hoist,
-        isDefault: true,
-      } as PowerTable;
+        rows: [],
+        totalWatts: legacyDefault.total_watts || 0,
+        snapshot,
+        pduType,
+        customPduType,
+        patch: {
+          position: legacyDefault.position ?? undefined,
+          customPosition: legacyDefault.custom_position ?? undefined,
+          includesHoist: legacyDefault.includes_hoist,
+          isDefault: true,
+        },
+      });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultSets.length, defaultTables, selectedDefaultSetId, legacyTourDefaults, features.legacyTourDefaultsFallback, safetyMargin, pf]);
@@ -1343,30 +1325,24 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       .filter((table) => table.table_type === "power")
       .map((table) => {
         const rows: PowerTableRow[] = table.table_data?.rows || [];
-        const snapshot = {
-          pf: table.metadata?.pf ?? table.table_data?.pf,
-          safetyMargin: table.metadata?.safetyMargin ?? table.table_data?.safetyMargin,
-        };
-        const { adjustedWatts, totalVa } = computeDisplayTotals(
-          table.total_value || 0,
-          rows,
-          snapshot,
-        );
-        return {
+        const snapshot = mergeStoredPowerSnapshot(table.metadata, table.table_data);
+        const pduType = table.metadata?.pdu_type || "";
+        const customPduType = table.metadata?.custom_pdu_type;
+        return hydrateDisplayPowerTable({
           id: `default-${table.id}`,
           name: `${table.table_name} (Default)`,
           rows,
-          totalWatts: table.total_value,
-          adjustedWatts,
-          totalVa,
-          currentPerPhase: table.metadata?.current_per_phase,
-          pduType: table.metadata?.pdu_type,
-          customPduType: table.metadata?.custom_pdu_type,
-          position: table.metadata?.position,
-          customPosition: table.metadata?.custom_position,
-          includesHoist: table.metadata?.includes_hoist || false,
-          isDefault: true,
-        } as PowerTable;
+          totalWatts: table.total_value || 0,
+          snapshot,
+          pduType,
+          customPduType,
+          patch: {
+            position: table.metadata?.position,
+            customPosition: table.metadata?.custom_position,
+            includesHoist: table.metadata?.includes_hoist || false,
+            isDefault: true,
+          },
+        });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUrlOverrideMode, overrideData, safetyMargin, pf]);
@@ -1379,30 +1355,30 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         .map((override) => {
           const rows: PowerTableRow[] = override.override_data?.rows || [];
           const snapshot = {
+            calculation: override.override_data?.calculation,
             pf: override.override_data?.pf,
             safetyMargin: override.override_data?.safetyMargin,
+            phaseMode: override.override_data?.phaseMode,
+            voltage: override.override_data?.voltage,
           };
-          const { adjustedWatts, totalVa } = computeDisplayTotals(
-            override.total_watts || 0,
-            rows,
-            snapshot,
-          );
-          return {
+          const pduType = override.pdu_type || "";
+          const customPduType = override.custom_pdu_type || undefined;
+          return hydrateDisplayPowerTable({
             id: `override-${override.id}`,
             name: override.table_name,
             rows,
-            totalWatts: override.total_watts,
-            adjustedWatts,
-            totalVa,
-            currentPerPhase: override.current_per_phase,
-            pduType: override.pdu_type,
-            customPduType: override.custom_pdu_type,
-            position: override.position ?? undefined,
-            customPosition: override.custom_position ?? undefined,
-            includesHoist: override.includes_hoist,
-            isOverride: true,
-            overrideId: override.id,
-          } as PowerTable;
+            totalWatts: override.total_watts || 0,
+            snapshot,
+            pduType,
+            customPduType,
+            patch: {
+              position: override.position ?? undefined,
+              customPosition: override.custom_position ?? undefined,
+              includesHoist: override.includes_hoist,
+              isOverride: true,
+              overrideId: override.id,
+            },
+          });
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [powerOverrides, department, safetyMargin, pf],
@@ -1480,19 +1456,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     }
 
     try {
-      const totalSystemWatts = exportTables.reduce(
-        (sum, table) => sum + (table.totalWatts || 0),
-        0,
-      );
-      const totalSystemAmps = exportTables.reduce(
-        (sum, table) => sum + (table.currentPerPhase || 0),
-        0,
-      );
-      const totalSystemKva =
-        exportTables.reduce(
-          (sum, table) => sum + (table.totalVa || table.totalWatts || 0),
-          0,
-        ) / 1000;
+      const aggregation = aggregatePowerCalculations(exportTables);
 
       let logoUrl: string | undefined;
       try {
@@ -1512,14 +1476,21 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         exportTables.map((table) => ({
           ...table,
           toolType: "consumos" as const,
-          phaseMode: table.snapshotPhaseMode ?? phaseMode,
+          phaseMode: table.calculation?.phaseMode ?? phaseMode,
         })),
         "power",
         headerTitle,
         pdfDate,
         undefined,
-        { totalSystemWatts, totalSystemAmps, totalSystemKva },
-        safetyMargin,
+        {
+          totalSystemWatts: aggregation.totalWatts,
+          adjustedSystemWatts: aggregation.adjustedWatts,
+          totalSystemAmps: aggregation.currentLine,
+          totalSystemKva:
+            aggregation.totalVa === null ? null : aggregation.totalVa / 1000,
+          aggregationReason: aggregation.reason,
+        },
+        undefined,
         logoUrl,
         features.fohSchuko ? fohSchukoRequired : undefined,
       );

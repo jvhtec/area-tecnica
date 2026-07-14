@@ -256,6 +256,13 @@ area-tecnica/
 └── vitest.config.ts                  # Vitest test config
 ```
 
+The Consumos calculators use one versioned electrical-calculation snapshot
+across UI, JSON persistence, tour normalization, and PDF summaries. Canonical
+equations, aggregation rules, PDU planning policy, and limitations are defined
+in [`docs/technical-tools/power-calculations.md`](docs/technical-tools/power-calculations.md).
+New report paths must consume the saved snapshot rather than recomputing from
+current UI controls or scalar-adding currents.
+
 ---
 
 ## 2. High-Level System Diagram

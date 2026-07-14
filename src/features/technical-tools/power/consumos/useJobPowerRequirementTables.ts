@@ -7,10 +7,11 @@ import type {
   PowerTableRow,
   TechnicalDepartment,
 } from "@/features/technical-tools/power/types";
+import { getVoltageForPhase } from "@/features/technical-tools/power/powerCalculations";
 import {
-  calculateMixedLoadApparentPower,
-  getVoltageForPhase,
-} from "@/features/technical-tools/power/powerCalculations";
+  buildLegacyPowerCalculationSnapshot,
+  parsePowerCalculationSnapshot,
+} from "@/features/technical-tools/power/powerSnapshots";
 
 type PowerRequirementTableData = {
   rows?: PowerTableRow[];
@@ -21,6 +22,7 @@ type PowerRequirementTableData = {
   generationTimestamp?: string;
   stageNumber?: number;
   stageName?: string;
+  calculation?: unknown;
   [key: string]: unknown;
 };
 
@@ -54,7 +56,11 @@ export const jobPowerRequirementTablesQueryKey = (
  */
 export const mapPowerRequirementRowToTable = (
   row: PowerRequirementTableRow,
-  options: { fallbackSafetyMargin: number; perRowPf: boolean },
+  options: {
+    fallbackPowerFactor?: number;
+    fallbackSafetyMargin: number;
+    perRowPf: boolean;
+  },
 ): PowerTable => {
   const data = row.table_data ?? {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
@@ -68,19 +74,17 @@ export const mapPowerRequirementRowToTable = (
     typeof data.voltage === "number" ? data.voltage : getVoltageForPhase(phaseMode);
   const powerFactor = typeof data.pf === "number" ? data.pf : undefined;
 
-  const totalWatts = row.total_watts || 0;
-  const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
-  let totalVa = adjustedWatts;
-  if (powerFactor && powerFactor > 0) {
-    totalVa = adjustedWatts / powerFactor;
-  } else if (options.perRowPf && rows.length > 0) {
-    const rawVa = calculateMixedLoadApparentPower(rows, (tableRow) => {
-      const rowPf = Number(tableRow.pf);
-      return Number.isFinite(rowPf) && rowPf > 0 ? rowPf : 0.9;
+  const storedCalculation = parsePowerCalculationSnapshot(data.calculation);
+  const calculation =
+    storedCalculation ??
+    buildLegacyPowerCalculationSnapshot({
+      fallbackPowerFactor:
+        options.fallbackPowerFactor ?? (options.perRowPf ? 0.9 : powerFactor ?? 0.9),
+      perRowPowerFactor: options.perRowPf,
+      rows,
+      settings: { safetyMargin, phaseMode, voltage, powerFactor },
+      totalWatts: row.total_watts || 0,
     });
-    totalVa = rawVa * (1 + safetyMargin / 100);
-  }
-
   return {
     id: row.id,
     powerRequirementId: row.id,
@@ -92,19 +96,16 @@ export const mapPowerRequirementRowToTable = (
     rows,
     stageNumber: row.stage_number ?? data.stageNumber ?? null,
     stageName: row.stage_name ?? data.stageName ?? null,
-    totalWatts,
-    adjustedWatts,
-    totalVa,
-    currentPerPhase: row.current_per_phase || 0,
+    totalWatts: calculation.totalWatts,
+    adjustedWatts: calculation.adjustedWatts,
+    totalVa: calculation.totalVa,
+    currentPerPhase: calculation.currentLine,
+    calculation,
     pduType: row.pdu_type || "",
     customPduType: row.custom_pdu_type ?? undefined,
     position: row.position ?? undefined,
     customPosition: row.custom_position ?? undefined,
     includesHoist: row.includes_hoist || false,
-    snapshotSafetyMargin: safetyMargin,
-    snapshotPhaseMode: phaseMode,
-    snapshotVoltage: voltage,
-    snapshotPowerFactor: powerFactor,
   };
 };
 

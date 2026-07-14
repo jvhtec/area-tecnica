@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pdfMocks = vi.hoisted(() => {
   const autoTable = vi.fn();
@@ -16,6 +16,7 @@ vi.mock('@/utils/pdf/powerStagePlotPdf', () => ({
 }));
 
 import { exportToPDF } from '@/utils/pdfExport';
+import { buildPowerCalculationSnapshot } from '@/features/technical-tools/power/powerCalculations';
 
 type MockPdf = ReturnType<typeof makePdf>;
 
@@ -29,6 +30,8 @@ const makePdf = () => {
       pages: [null, {}],
     },
     addImage: vi.fn(),
+    addFileToVFS: vi.fn(),
+    addFont: vi.fn(),
     addPage: vi.fn(() => {
       pdf.internal.pages.push({});
     }),
@@ -75,6 +78,10 @@ describe('exportToPDF', () => {
       doc.lastAutoTable = { finalY: (options.startY || 70) + 20 };
       options.didDrawPage?.({ cursor: { y: doc.lastAutoTable.finalY } });
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('labels weight summary rigging points as motors', async () => {
@@ -138,6 +145,83 @@ describe('exportToPDF', () => {
       expect.stringContaining('formato schuko hembra'),
       14,
       expect.any(Number)
+    );
+  });
+
+  it('uses each table snapshot and withholds invalid single-phase aggregate totals', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([0, 1, 2, 3]).buffer,
+    }));
+    const makeCalculation = (safetyMargin: number) =>
+      buildPowerCalculationSnapshot({
+        powerFactorSource: 'per-row',
+        rawApparentPowerVa: 100,
+        settings: { phaseMode: 'single', safetyMargin, voltage: 230 },
+        totalWatts: 100,
+      });
+    const first = makeCalculation(10);
+    const second = makeCalculation(20);
+
+    await exportToPDF(
+      'Potencia',
+      [
+        {
+          name: 'A',
+          rows: [{ quantity: '1', componentName: 'LED', watts: '100', totalWatts: 100, pf: '1.00' }],
+          totalWatts: 100,
+          adjustedWatts: first.adjustedWatts,
+          totalVa: first.totalVa,
+          currentPerPhase: first.currentLine,
+          calculation: first,
+          toolType: 'consumos',
+        },
+        {
+          name: 'B',
+          rows: [{ quantity: '1', componentName: 'LED', watts: '100', totalWatts: 100, pf: '1.00' }],
+          totalWatts: 100,
+          adjustedWatts: second.adjustedWatts,
+          totalVa: second.totalVa,
+          currentPerPhase: second.currentLine,
+          calculation: second,
+          toolType: 'consumos',
+        },
+      ],
+      'power',
+      'Tour',
+      '2026-07-10',
+    );
+
+    expect(pdf.text).toHaveBeenCalledWith(
+      'Potencia: 100.00 W; ajustada (10%): 110.00 W',
+      14,
+      expect.any(Number),
+    );
+    expect(pdf.text).toHaveBeenCalledWith(
+      'Potencia: 100.00 W; ajustada (20%): 120.00 W',
+      14,
+      expect.any(Number),
+    );
+    expect(pdf.text).toHaveBeenCalledWith(
+      expect.stringContaining('no agregables'),
+      14,
+      expect.any(Number),
+    );
+    expect(pdf.text).toHaveBeenCalledWith(
+      expect.stringContaining('1φ'),
+      14,
+      expect.any(Number),
+    );
+    expect(pdf.text).toHaveBeenCalledWith(
+      expect.stringContaining('ΣP/ΣQ'),
+      14,
+      expect.any(Number),
+    );
+    expect(pdfMocks.autoTable).toHaveBeenCalledWith(
+      pdf,
+      expect.objectContaining({
+        head: [['Cantidad', 'Componente', 'Vatios (por unidad)', 'PF', 'Vatios Totales']],
+      }),
     );
   });
 });

@@ -134,6 +134,7 @@ export type ConsumosLabels = {
   toastError: string;
   toastMissingNameTitle: string;
   toastMissingNameBody: string;
+  toastInvalidCalculation: string;
   toastNoJobTitle: string;
   toastNoJobBody: string;
   toastNoTourDataTitle: string;

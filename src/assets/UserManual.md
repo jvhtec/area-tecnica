@@ -52,11 +52,11 @@ This application is designed to streamline various aspects of event management, 
     3. Upon successful authentication or registration, the user is redirected to the Dashboard.
 
 ### ConsumosTool
-- **Purpose**: Allows users to input and manage consumption data.
+- **Purpose**: Calculates W, VA, line current, and PDU load.
 - **Workflow**:
     1. Navigate to the ConsumosTool page.
-    2. Enter consumption details (e.g., item, quantity, cost).
-    3. Save the consumption data.
+    2. Set supply, margin, and PF; 3φ uses balanced line voltage.
+    3. Review the PDF; auxiliary supplies are excluded from totals.
 
 ### Dashboard
 - **Purpose**: Provides an overview of key information and quick access to various features.
@@ -142,10 +142,10 @@ This application is designed to streamline various aspects of event management, 
     2. View and manage lighting equipment.
 
 ### LightsConsumosTool
-- **Purpose**: Manages consumption data specifically for lighting equipment.
+- **Purpose**: Calculates lighting W, VA, and line current from per-row PF.
 - **Workflow**:
     1. Go to the LightsConsumosTool page.
-    2. Input consumption details for lighting equipment.
+    2. Enter fixture PF values and review the PDF.
 
 ### LightsDisponibilidad
 - **Purpose**: Manages the availability of lighting equipment.
@@ -244,10 +244,10 @@ This application is designed to streamline various aspects of event management, 
     2. View and manage video equipment.
 
 ### VideoConsumosTool
-- **Purpose**: Manages consumption data specifically for video equipment.
+- **Purpose**: Calculates Video W, VA, and line current.
 - **Workflow**:
     1. Go to the VideoConsumosTool page.
-    2. Input consumption details for video equipment.
+    2. Set supply, margin, and PF; FoH Schuko is auxiliary.
 
 ### VideoMemoriaTecnica
 - **Purpose**: Manages technical memory or specifications for video equipment.

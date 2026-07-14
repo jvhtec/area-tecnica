@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { EventData, TravelArrangement, Accommodation } from '@/types/hoja-de-ruta';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { formatPowerRequirementsText } from '@/utils/powerSummaryData';
+import { formatPowerRequirementsText } from '@/utils/powerRequirementSelection';
 
 type SaveHojaDeRutaFn = (args: { eventData: EventData; userId: string }) => Promise<unknown>;
 type SaveTravelArrangementsFn = (travel: TravelArrangement[]) => Promise<unknown>;

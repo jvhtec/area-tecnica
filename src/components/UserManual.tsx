@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, BookOpen, Printer } from "lucide-react";
-import manualContent from "@/assets/UserManual.md?raw";
+import manualUrl from "@/assets/UserManual.md?url";
 
 interface TOCItem {
   id: string;
@@ -17,8 +17,21 @@ interface TOCItem {
 
 export const UserManual = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredContent, setFilteredContent] = useState(manualContent);
+  const [manualContent, setManualContent] = useState("");
+  const [filteredContent, setFilteredContent] = useState("");
   const [tocItems, setTocItems] = useState<TOCItem[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch(manualUrl)
+      .then((response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        return response.text();
+      })
+      .then((content) => { if (active) setManualContent(content); })
+      .catch(() => { if (active) setManualContent("# User Manual\n\nUnable to load the manual."); });
+    return () => { active = false; };
+  }, []);
 
   // Extract table of contents from markdown
   useEffect(() => {
@@ -36,7 +49,7 @@ export const UserManual = () => {
     });
     
     setTocItems(toc);
-  }, []);
+  }, [manualContent]);
 
   // Filter content based on search
   useEffect(() => {
@@ -71,7 +84,7 @@ export const UserManual = () => {
     });
 
     setFilteredContent(filteredLines.join('\n'));
-  }, [searchTerm]);
+  }, [manualContent, searchTerm]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);

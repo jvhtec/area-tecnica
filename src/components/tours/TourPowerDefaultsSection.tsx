@@ -65,6 +65,16 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
     if (!formData.table_name || !formData.total_watts || !formData.current_per_phase) {
       return;
     }
+    const totalWatts = Number(formData.total_watts);
+    const currentPerPhase = Number(formData.current_per_phase);
+    if (
+      !Number.isFinite(totalWatts) ||
+      totalWatts <= 0 ||
+      !Number.isFinite(currentPerPhase) ||
+      currentPerPhase <= 0
+    ) {
+      return;
+    }
 
     const powerData = {
       tour_id: tourId,
@@ -73,8 +83,8 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
       custom_pdu_type: formData.pdu_type === "Custom" ? formData.custom_pdu_type : null,
       position: formData.custom_position ? null : formData.position || null,
       custom_position: formData.custom_position || null,
-      total_watts: parseFloat(formData.total_watts),
-      current_per_phase: parseFloat(formData.current_per_phase),
+      total_watts: totalWatts,
+      current_per_phase: currentPerPhase,
       includes_hoist: formData.includes_hoist,
       department: formData.department === "all" ? null : formData.department,
     };
@@ -169,6 +179,11 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            Legacy manual entry: watts and current are stored independently without voltage,
+            phase, margin, or power-factor assumptions. Reports label these records as estimates.
+            Use the department Consumos calculator for reproducible calculations.
+          </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -281,6 +296,7 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
                 <Input
                   id="total_watts"
                   type="number"
+                  min="0.01"
                   value={formData.total_watts}
                   onChange={(e) => setFormData({ ...formData, total_watts: e.target.value })}
                   placeholder="e.g., 5000"
@@ -293,6 +309,7 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
                   id="current_per_phase"
                   type="number"
                   step="0.1"
+                  min="0.1"
                   value={formData.current_per_phase}
                   onChange={(e) => setFormData({ ...formData, current_per_phase: e.target.value })}
                   placeholder="e.g., 7.2"

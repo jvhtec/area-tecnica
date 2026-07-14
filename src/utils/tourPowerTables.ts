@@ -1,4 +1,13 @@
 import type { Database } from '@/integrations/supabase/types';
+import {
+  buildLegacyPowerCalculationSnapshot,
+  parsePowerCalculationSnapshot,
+} from '@/features/technical-tools/power/powerSnapshots';
+import type {
+  PhaseMode,
+  PowerCalculationSnapshot,
+  PowerTableRow,
+} from '@/features/technical-tools/power/types';
 import type { TechnicalPowerDepartment } from '@/utils/technicalPowerTypes';
 
 type TourDefaultTableRow = Database['public']['Tables']['tour_default_tables']['Row'];
@@ -20,6 +29,7 @@ export interface NormalizedTourPowerTable {
   totalWatts: number;
   totalVa: number;
   currentPerPhase: number;
+  calculation: PowerCalculationSnapshot;
   pduType: string;
   customPduType?: string;
   position?: string;
@@ -48,6 +58,43 @@ const getRows = (value: unknown): unknown[] => {
   return Array.isArray(rows) ? rows : [];
 };
 
+const getPowerTableRows = (value: unknown): PowerTableRow[] =>
+  getRows(value).filter(isRecord) as unknown as PowerTableRow[];
+
+const getPhaseMode = (metadata: unknown): PhaseMode =>
+  isRecord(metadata) && metadata.phaseMode === 'single' ? 'single' : 'three';
+
+const getPowerCalculation = (
+  watts: number,
+  metadata: unknown,
+  department: TechnicalPowerDepartment,
+  rows: PowerTableRow[]
+) => {
+  const record = isRecord(metadata) ? metadata : {};
+  const storedCalculation = parsePowerCalculationSnapshot(record.calculation);
+  if (storedCalculation) return storedCalculation;
+
+  const phaseMode = getPhaseMode(record);
+  const candidatePf = getNumber(record.pf);
+  const powerFactor =
+    candidatePf !== undefined && candidatePf > 0 && candidatePf <= 1
+      ? candidatePf
+      : DEFAULT_POWER_FACTOR[department];
+  return buildLegacyPowerCalculationSnapshot({
+    fallbackPowerFactor: DEFAULT_POWER_FACTOR[department],
+    perRowPowerFactor: department === 'lights' && rows.length > 0,
+    rows,
+    settings: {
+      safetyMargin: clampSafetyMargin(getNumber(record.safetyMargin) ?? 0),
+      phaseMode,
+      voltage:
+        getNumber(record.voltage) ?? (phaseMode === 'single' ? 230 : 400),
+      powerFactor,
+    },
+    totalWatts: watts,
+  });
+};
+
 const getMetadataValue = <T>(
   value: unknown,
   key: string,
@@ -60,24 +107,11 @@ const getMetadataValue = <T>(
 export const computePowerTotalVa = (
   watts: number,
   metadata: unknown,
-  department: TechnicalPowerDepartment
+  department: TechnicalPowerDepartment,
+  rows: PowerTableRow[] = []
 ): number => {
   if (!watts) return 0;
-
-  const candidatePf = getNumber(isRecord(metadata) ? metadata.pf : undefined);
-  const storedPf =
-    candidatePf !== undefined &&
-    Number.isFinite(candidatePf) &&
-    candidatePf > 0 &&
-    candidatePf <= 1
-      ? candidatePf
-      : DEFAULT_POWER_FACTOR[department];
-  const safetyMargin = clampSafetyMargin(
-    getNumber(isRecord(metadata) ? metadata.safetyMargin : undefined) ?? 0
-  );
-  const adjustedWatts = watts * (1 + safetyMargin / 100);
-
-  return adjustedWatts / storedPf;
+  return getPowerCalculation(watts, metadata, department, rows).totalVa;
 };
 
 export const sortTourPowerDefaultTables = (tables: TourDefaultTableRow[]) =>
@@ -118,24 +152,32 @@ export const normalizeTourDefaultPowerTable = (
   department: TechnicalPowerDepartment
 ): NormalizedTourPowerTable => {
   const tableData = isRecord(table.table_data) ? table.table_data : {};
+  const storedMetadata = isRecord(table.metadata) ? table.metadata : {};
   const metadata: JsonRecord = {
-    ...(isRecord(table.metadata) ? table.metadata : {}),
-    safetyMargin: isRecord(table.metadata) && table.metadata.safetyMargin !== undefined
-      ? table.metadata.safetyMargin
-      : tableData.safetyMargin,
+    ...tableData,
+    ...storedMetadata,
+    calculation:
+      storedMetadata.calculation ?? tableData.calculation,
+    safetyMargin: storedMetadata.safetyMargin ?? tableData.safetyMargin,
+    phaseMode: storedMetadata.phaseMode ?? tableData.phaseMode,
+    voltage: storedMetadata.voltage ?? tableData.voltage,
+    pf: storedMetadata.pf ?? tableData.pf,
   };
   const pduType = String(getMetadataValue(metadata, 'pdu_type', ''));
   const customPduType = String(getMetadataValue(metadata, 'custom_pdu_type', ''));
   const position = String(getMetadataValue(metadata, 'position', ''));
   const customPosition = String(getMetadataValue(metadata, 'custom_position', ''));
+  const rows = getPowerTableRows(table.table_data);
+  const calculation = getPowerCalculation(table.total_value || 0, metadata, department, rows);
 
   return {
     id: table.id,
     name: table.table_name || 'Unnamed',
-    rows: getRows(table.table_data),
-    totalWatts: table.total_value || 0,
-    totalVa: computePowerTotalVa(table.total_value || 0, metadata, department),
-    currentPerPhase: getNumber(metadata.current_per_phase) ?? 0,
+    rows,
+    totalWatts: calculation.totalWatts,
+    totalVa: calculation.totalVa,
+    currentPerPhase: calculation.currentLine,
+    calculation,
     pduType,
     customPduType: customPduType || undefined,
     position: position || undefined,
@@ -150,20 +192,25 @@ export const normalizeTourDefaultPowerTable = (
 export const normalizeLegacyTourPowerDefault = (
   table: TourPowerDefaultRow,
   department: TechnicalPowerDepartment
-): NormalizedTourPowerTable => ({
-  id: table.id,
-  name: table.table_name || 'Unnamed',
-  rows: [
+): NormalizedTourPowerTable => {
+  const rows: PowerTableRow[] = [
     {
       quantity: '1',
+      componentId: '',
       componentName: table.table_name || 'Unnamed',
       watts: String(table.total_watts || 0),
       totalWatts: table.total_watts || 0,
     },
-  ],
-  totalWatts: table.total_watts || 0,
-  totalVa: computePowerTotalVa(table.total_watts || 0, null, department),
-  currentPerPhase: table.current_per_phase || 0,
+  ];
+  const calculation = getPowerCalculation(table.total_watts || 0, null, department, rows);
+  return {
+  id: table.id,
+  name: table.table_name || 'Unnamed',
+  rows,
+  totalWatts: calculation.totalWatts,
+  totalVa: calculation.totalVa,
+  currentPerPhase: calculation.currentLine,
+  calculation,
   pduType: table.pdu_type || '',
   customPduType: table.custom_pdu_type || undefined,
   position: table.position || undefined,
@@ -172,22 +219,29 @@ export const normalizeLegacyTourPowerDefault = (
   fohSchukoRequired: false,
   toolType: 'consumos',
   source: 'legacy-tour-default',
-});
+  };
+};
 
 export const normalizeTourPowerOverride = (
   override: TourDatePowerOverrideRow,
   department: TechnicalPowerDepartment
-): NormalizedTourPowerTable => ({
+): NormalizedTourPowerTable => {
+  const overrideData = isRecord(override.override_data) ? override.override_data : {};
+  const rows = getPowerTableRows(override.override_data);
+  const calculation = getPowerCalculation(
+    override.total_watts || 0,
+    overrideData,
+    department,
+    rows,
+  );
+  return {
   id: override.id,
   name: override.table_name || 'Override',
-  rows: getRows(override.override_data),
-  totalWatts: override.total_watts || 0,
-  totalVa: computePowerTotalVa(
-    override.total_watts || 0,
-    override.override_data,
-    department
-  ),
-  currentPerPhase: override.current_per_phase || 0,
+  rows,
+  totalWatts: calculation.totalWatts,
+  totalVa: calculation.totalVa,
+  currentPerPhase: calculation.currentLine,
+  calculation,
   pduType: override.pdu_type || '',
   customPduType: override.custom_pdu_type || undefined,
   position: override.position || undefined,
@@ -196,7 +250,8 @@ export const normalizeTourPowerOverride = (
   fohSchukoRequired: false,
   toolType: 'consumos',
   source: 'tour-override',
-});
+  };
+};
 
 export const buildNormalizedTourPowerTables = ({
   department,

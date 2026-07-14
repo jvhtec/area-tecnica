@@ -13,6 +13,7 @@ import {
 import { buildNormalizedTourPowerTables } from "@/utils/tourPowerTables";
 import { withTourDefaultDocumentMutationLock } from "@/utils/tourDefaultDocumentMutationQueue";
 import { getTourDateTechnicalPdfFileName } from "@/utils/technicalPdfNames";
+import { aggregatePowerCalculations } from "@/features/technical-tools/power/powerAggregation";
 import {
   createTourDefaultDocumentVersionKey,
   getTourDefaultDocumentObjectPath,
@@ -253,7 +254,7 @@ const buildWeightSafetyMargin = (
   return metadataMargin ?? getSafetyMarginFromJson(firstDefault.table_data);
 };
 
-const buildPowerPdfPayload = (
+export const buildPowerPdfPayload = (
   item: Extract<TourDefaultDocumentPlanItem, { action: "upload" }>
 ) => {
   const { tables, safetyMargin } = buildNormalizedTourPowerTables({
@@ -262,16 +263,18 @@ const buildPowerPdfPayload = (
     defaultTables: item.defaultTables,
   });
 
+  const aggregation = aggregatePowerCalculations(tables);
   const powerSummary = {
-    totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
-    totalSystemAmps: tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0),
+    totalSystemWatts: aggregation.totalWatts,
+    adjustedSystemWatts: aggregation.adjustedWatts,
+    totalSystemAmps: aggregation.currentLine,
     totalSystemKva:
-      tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) /
-      1000,
+      aggregation.totalVa === null ? null : aggregation.totalVa / 1000,
+    aggregationReason: aggregation.reason,
   };
 
   const fohSchukoRequired =
-    (item.department === "sound" || item.department === "lights") &&
+    (item.department === "sound" || item.department === "video") &&
     (tables.some((table) => table.fohSchukoRequired) ||
       item.defaultTables.some((table) => getBoolean(getRecord(table.metadata).foh_schuko) ?? false));
 

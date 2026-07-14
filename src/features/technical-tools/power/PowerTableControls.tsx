@@ -36,7 +36,10 @@ export const ENGLISH_POWER_TABLE_CONTROL_LABELS: PowerTableControlLabels = {
   pduPlaceholder: "Use recommended PDU type",
   position: "Position:",
   positionPlaceholder: "No position",
-  recommendedPdu: (pduType) => `Use recommended (${pduType || ""})`,
+  recommendedPdu: (pduType) =>
+    pduType
+      ? `Use recommended (${pduType})`
+      : "No listed PDU within planning limit",
 };
 
 export const SPANISH_POWER_TABLE_CONTROL_LABELS: PowerTableControlLabels = {
@@ -50,7 +53,10 @@ export const SPANISH_POWER_TABLE_CONTROL_LABELS: PowerTableControlLabels = {
   pduPlaceholder: "Usar PDU sugerido",
   position: "Posición:",
   positionPlaceholder: "Sin posición",
-  recommendedPdu: () => "Usar PDU sugerido",
+  recommendedPdu: (pduType) =>
+    pduType
+      ? `Usar PDU sugerida (${pduType})`
+      : "Sin PDU listada dentro del límite",
 };
 
 type PowerTableControlsProps<Table extends PowerTable> = {

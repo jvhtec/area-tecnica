@@ -1,14 +1,19 @@
 import type {
   PhaseMode,
   PowerComponent,
+  PowerCalculationSnapshot,
   PowerElectricalSettings,
+  PowerFactorSource,
   PowerTable,
   PowerTableRow,
   TechnicalDepartment,
 } from "@/features/technical-tools/power/types";
+import { POWER_CALCULATION_VERSION } from "@/features/technical-tools/power/types";
 
 const SQRT3 = Math.sqrt(3);
-const PLANNING_LOAD_FACTOR = 0.8;
+export const POWER_PDU_PLANNING_LOAD_FACTOR = 0.8;
+
+export class PowerCalculationValidationError extends Error {}
 
 export const POWER_PDU_OPTIONS: Record<TechnicalDepartment, Record<PhaseMode, string[]>> = {
   sound: {
@@ -36,9 +41,11 @@ export const calculatePowerRows = <Row extends PowerTableRow, Component extends 
 ): Row[] =>
   rows.map((row) => {
     const component = components.find((candidate) => candidate.id.toString() === row.componentId);
-    const quantity = Number.parseFloat(row.quantity || "0");
-    const watts = Number.parseFloat(row.watts || "0");
-    const totalWatts = quantity && watts ? quantity * watts : 0;
+    const parsedQuantity = Number.parseFloat(row.quantity || "0");
+    const parsedWatts = Number.parseFloat(row.watts || "0");
+    const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 0;
+    const watts = Number.isFinite(parsedWatts) && parsedWatts > 0 ? parsedWatts : 0;
+    const totalWatts = quantity * watts;
 
     return {
       ...row,
@@ -48,7 +55,14 @@ export const calculatePowerRows = <Row extends PowerTableRow, Component extends 
   });
 
 export const sumPowerRows = (rows: Pick<PowerTableRow, "totalWatts">[]) =>
-  rows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
+  rows.reduce(
+    (sum, row) =>
+      sum +
+      (Number.isFinite(row.totalWatts) && (row.totalWatts ?? 0) > 0
+        ? row.totalWatts ?? 0
+        : 0),
+    0,
+  );
 
 export const calculateMixedLoadApparentPower = <Row extends PowerTableRow>(
   rows: Row[],
@@ -57,11 +71,12 @@ export const calculateMixedLoadApparentPower = <Row extends PowerTableRow>(
   const totalWatts = sumPowerRows(rows);
   const totalVar = rows.reduce((sum, row) => {
     const powerFactor = resolvePowerFactor(row);
-    if (!powerFactor || powerFactor >= 1) return sum;
+    if (!Number.isFinite(powerFactor) || powerFactor <= 0 || powerFactor > 1) return sum;
+    if (powerFactor === 1) return sum;
     return sum + (row.totalWatts || 0) * Math.tan(Math.acos(powerFactor));
   }, 0);
 
-  return Math.sqrt(totalWatts * totalWatts + totalVar * totalVar);
+  return Math.hypot(totalWatts, totalVar);
 };
 
 export const calculateElectricalTotals = ({
@@ -73,45 +88,104 @@ export const calculateElectricalTotals = ({
   settings: PowerElectricalSettings;
   totalWatts: number;
 }) => {
-  const adjustedWatts = totalWatts * (1 + settings.safetyMargin / 100);
+  const loadMultiplier = 1 + settings.safetyMargin / 100;
+  const adjustedWatts = totalWatts * loadMultiplier;
   const powerFactor = settings.powerFactor ?? 1;
-  const hasValidVoltage = settings.voltage > 0;
-
-  if (rawApparentPowerVa !== undefined) {
-    const adjustedVa = rawApparentPowerVa * (1 + settings.safetyMargin / 100);
-    if (!hasValidVoltage) {
-      return { adjustedWatts, adjustedVa, currentLine: 0, totalVa: adjustedVa };
-    }
-
-    const currentLine =
-      settings.phaseMode === "single"
-        ? adjustedVa / settings.voltage
-        : adjustedVa / (SQRT3 * settings.voltage);
-
-    return { adjustedWatts, adjustedVa, currentLine, totalVa: adjustedVa };
-  }
-
-  const totalVa = powerFactor > 0 ? adjustedWatts / powerFactor : adjustedWatts;
-  if (!hasValidVoltage || powerFactor <= 0) {
-    return { adjustedWatts, adjustedVa: totalVa, currentLine: 0, totalVa };
-  }
-
-  const currentLine =
-    settings.phaseMode === "single"
-      ? adjustedWatts / (settings.voltage * powerFactor)
-      : adjustedWatts / (SQRT3 * settings.voltage * powerFactor);
-
-  return { adjustedWatts, adjustedVa: totalVa, currentLine, totalVa };
+  const totalVa = rawApparentPowerVa === undefined
+    ? powerFactor > 0 ? adjustedWatts / powerFactor : adjustedWatts
+    : rawApparentPowerVa * loadMultiplier;
+  const canCalculateCurrent =
+    settings.voltage > 0 && (rawApparentPowerVa !== undefined || powerFactor > 0);
+  const phaseDivisor = settings.phaseMode === "single" ? 1 : SQRT3;
+  return {
+    adjustedWatts,
+    totalVa,
+    currentLine: canCalculateCurrent
+      ? totalVa / (phaseDivisor * settings.voltage)
+      : 0,
+  };
 };
 
-const getAmpRating = (pduType: string) => {
+export const getPowerPduAmpRating = (pduType: string) => {
   const match = pduType.match(/(\d+)A/);
-  return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
+  return match ? Number.parseInt(match[1], 10) : undefined;
 };
 
-export const recommendPowerPdu = (currentLine: number, pduOptions: string[]) => {
-  const matchingOption = pduOptions.find((option) => currentLine <= getAmpRating(option) * PLANNING_LOAD_FACTOR);
-  return matchingOption ?? pduOptions[pduOptions.length - 1] ?? "";
+export const recommendPowerPdu = (currentLine: number, pduOptions: string[]) =>
+  Number.isFinite(currentLine) && currentLine >= 0
+    ? pduOptions.find((option) => {
+    const amps = getPowerPduAmpRating(option);
+    return amps !== undefined && currentLine <= amps * POWER_PDU_PLANNING_LOAD_FACTOR;
+      }) ?? ""
+    : "";
+
+const isBlankPowerRow = (row: PowerTableRow) =>
+  !row.componentId && !row.quantity.trim() && !row.watts.trim();
+
+export const validatePowerCalculationInput = ({
+  perRowPowerFactor,
+  rows,
+  settings,
+}: {
+  perRowPowerFactor: boolean;
+  rows: PowerTableRow[];
+  settings: PowerElectricalSettings;
+}) => {
+  const activeRows = rows.filter((row) => !isBlankPowerRow(row));
+  const invalidSettings =
+    !Number.isFinite(settings.voltage) ||
+    settings.voltage <= 0 ||
+    !Number.isFinite(settings.safetyMargin) ||
+    settings.safetyMargin < 0 ||
+    settings.safetyMargin > 100 ||
+    (!perRowPowerFactor &&
+      (!Number.isFinite(settings.powerFactor) ||
+        (settings.powerFactor ?? 0) <= 0 ||
+        (settings.powerFactor ?? 0) > 1));
+  const invalidRow = activeRows.some((row) => {
+    const quantity = Number(row.quantity);
+    const watts = Number(row.watts);
+    const powerFactor = Number(row.pf);
+    return !Number.isFinite(quantity) || quantity <= 0 ||
+      !Number.isFinite(watts) || watts <= 0 ||
+      (perRowPowerFactor &&
+        (!Number.isFinite(powerFactor) || powerFactor <= 0 || powerFactor > 1));
+  });
+
+  if (activeRows.length === 0 || invalidSettings || invalidRow) {
+    throw new PowerCalculationValidationError("Invalid power calculation input");
+  }
+  return activeRows;
+};
+
+export const buildPowerCalculationSnapshot = ({
+  powerFactorSource,
+  rawApparentPowerVa,
+  settings,
+  totalWatts,
+  isEstimate = false,
+}: {
+  powerFactorSource: PowerFactorSource;
+  rawApparentPowerVa?: number;
+  settings: PowerElectricalSettings;
+  totalWatts: number;
+  isEstimate?: boolean;
+}): PowerCalculationSnapshot => {
+  const totals = calculateElectricalTotals({ rawApparentPowerVa, settings, totalWatts });
+
+  return {
+    version: POWER_CALCULATION_VERSION,
+    totalWatts,
+    adjustedWatts: totals.adjustedWatts,
+    totalVa: totals.totalVa,
+    currentLine: totals.currentLine,
+    safetyMargin: settings.safetyMargin,
+    phaseMode: settings.phaseMode,
+    voltage: settings.voltage,
+    ...(settings.powerFactor !== undefined ? { powerFactor: settings.powerFactor } : {}),
+    powerFactorSource,
+    isEstimate,
+  };
 };
 
 export const createCalculatedPowerTable = <Row extends PowerTableRow, Component extends PowerComponent>({
@@ -133,22 +207,31 @@ export const createCalculatedPowerTable = <Row extends PowerTableRow, Component 
   settings: PowerElectricalSettings;
   tablePatch?: Partial<PowerTable>;
 }) => {
-  const rows = calculatePowerRows(currentTable.rows as Row[], components);
+  const perRowPowerFactor = rawApparentPowerVa !== undefined;
+  const activeRows = validatePowerCalculationInput({
+    perRowPowerFactor,
+    rows: currentTable.rows,
+    settings,
+  });
+  const rows = calculatePowerRows(activeRows as Row[], components);
   const totalWatts = sumPowerRows(rows);
-  const { adjustedWatts, currentLine, totalVa } = calculateElectricalTotals({
+  const calculation = buildPowerCalculationSnapshot({
+    powerFactorSource: perRowPowerFactor ? "per-row" : "global",
     rawApparentPowerVa,
     settings,
     totalWatts,
   });
+  const selectedPdu = tablePatch?.customPduType;
 
   return {
     name,
     rows,
     totalWatts,
-    adjustedWatts,
-    totalVa,
-    currentPerPhase: currentLine,
-    pduType: recommendPowerPdu(currentLine, pduOptions),
+    adjustedWatts: calculation.adjustedWatts,
+    totalVa: calculation.totalVa,
+    currentPerPhase: calculation.currentLine,
+    calculation,
+    pduType: selectedPdu || recommendPowerPdu(calculation.currentLine, pduOptions),
     customPduType: "",
     position: currentTable.position,
     customPosition: currentTable.customPosition,

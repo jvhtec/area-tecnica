@@ -143,7 +143,15 @@ describe('technicalPowerSummaryPack', () => {
     expect(autoTableMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        head: [['Stage', 'Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
+        head: [[
+          'Stage',
+          'Nombre Cuadro',
+          'PDU',
+          'Posición',
+          'Potencia',
+          'Corriente de línea',
+          'Notas',
+        ]],
       })
     );
     expect(autoTableMock).toHaveBeenCalledWith(
@@ -268,12 +276,12 @@ describe('technicalPowerSummaryPack', () => {
     });
 
     expect(docMock.text).toHaveBeenCalledWith(
-      'Distribución en Escenario — Main Stage',
+      'Distribución en Escenario - Main Stage',
       expect.any(Number),
       expect.any(Number)
     );
     expect(docMock.text).toHaveBeenCalledWith(
-      'Distribución en Escenario — Main-Stage',
+      'Distribución en Escenario - Main-Stage',
       expect.any(Number),
       expect.any(Number)
     );
