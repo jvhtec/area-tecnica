@@ -753,13 +753,26 @@ describe('powerSummaryData', () => {
     expect(summary.totalSystemWatts).toBe(4300);
   });
 
-  it('uses only the resolved package default set for tourdate summaries', async () => {
+  it('uses resolved package defaults instead of stale job snapshots for tourdate summaries', async () => {
     const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'stale-sound-job-table',
+          job_id: 'job-tour',
+          department: 'sound',
+          table_name: 'Stale Job FoH',
+          total_watts: 4000,
+          current_per_phase: 16,
+          pdu_type: '63A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+        },
+      ],
       tour_dates: [
         {
           id: 'tour-date-1',
           tour_id: 'tour-1',
-          sound_package_size: 'xl',
+          sound_package_size: 'l',
           is_tour_pack_only: false,
           sound_default_set_id: null,
           lights_default_set_id: null,
@@ -770,10 +783,10 @@ describe('powerSummaryData', () => {
       tour_power_defaults: [],
       tour_default_sets: [
         {
-          id: 'set-sound-xl',
+          id: 'set-sound-l',
           tour_id: 'tour-1',
           department: 'sound',
-          package_size: 'xl',
+          package_size: 'l',
         },
         {
           id: 'set-sound-s',
@@ -784,9 +797,9 @@ describe('powerSummaryData', () => {
       ],
       tour_default_tables: [
         {
-          id: 'default-sound-xl',
-          set_id: 'set-sound-xl',
-          table_name: 'XL FoH',
+          id: 'default-sound-l',
+          set_id: 'set-sound-l',
+          table_name: 'L FoH',
           table_type: 'power',
           total_value: 3000,
           metadata: { current_per_phase: 12, pdu_type: '63A', pf: 0.95 },
@@ -816,7 +829,8 @@ describe('powerSummaryData', () => {
       supabase,
     });
 
-    expect(summary.departments.sound.rows.map((row) => row.name)).toEqual(['XL FoH']);
+    expect(summary.departments.sound.rows.map((row) => row.name)).toEqual(['L FoH']);
+    expect(summary.departments.sound.rows[0].source).toBe('tour-default');
     expect(summary.departments.sound.totalWatts).toBe(3000);
   });
 

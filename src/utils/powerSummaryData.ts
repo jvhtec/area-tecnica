@@ -517,15 +517,22 @@ const loadTourdatePowerData = async ({
         ];
       }
 
-      const jobSpecificSummary = jobSpecificDepartments[department];
-      if (jobSpecificSummary.rows.length > 0) {
-        return [department, jobSpecificSummary];
-      }
-
       const hasPackageIntent =
         tourDate && isPackageDepartment(department)
           ? Boolean(getDepartmentPackageSize(tourDate, department))
           : false;
+      const hasResolvedPackageDefaults =
+        hasPackageIntent && departmentDefaultTables.length > 0;
+      const jobSpecificSummary = jobSpecificDepartments[department];
+
+      // Package-bound tour dates must keep following their resolved defaults.
+      // Intentional date-specific changes are stored as overrides and returned
+      // above; legacy job snapshots are only a fallback when no package default
+      // can currently be resolved.
+      if (jobSpecificSummary.rows.length > 0 && !hasResolvedPackageDefaults) {
+        return [department, jobSpecificSummary];
+      }
+
       const canUseLegacyDefaults =
         departmentDefaultTables.length === 0 &&
         !hasPackageIntent &&
