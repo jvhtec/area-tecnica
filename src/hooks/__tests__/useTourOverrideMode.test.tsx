@@ -4,8 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
 
-const { toastMock } = vi.hoisted(() => ({
+const { invalidateQueriesMock, scheduleDocumentSyncMock, toastMock } = vi.hoisted(() => ({
+  invalidateQueriesMock: vi.fn(),
+  scheduleDocumentSyncMock: vi.fn(),
   toastMock: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-query")>()),
+  useQueryClient: () => ({ invalidateQueries: invalidateQueriesMock }),
 }));
 
 vi.mock("@/lib/supabase", () => ({
@@ -14,6 +21,10 @@ vi.mock("@/lib/supabase", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: toastMock }),
+}));
+
+vi.mock("@/utils/tourDateDocumentSync", () => ({
+  scheduleTourDateDefaultDocumentSync: scheduleDocumentSyncMock,
 }));
 
 import { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
@@ -172,6 +183,9 @@ describe("useTourOverrideMode", () => {
       weight_kg: 42,
       override_data: { rows: [{ quantity: "1", componentId: "case-1", weight: "42" }] },
     });
+    expect(scheduleDocumentSyncMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tourDateId: "tour-date-1" })
+    );
     expect(toastMock).toHaveBeenCalledWith({
       title: "Success",
       description: "Override saved successfully",
@@ -239,6 +253,9 @@ describe("useTourOverrideMode", () => {
       tour_date_id: "tour-date-1",
       department: "sound",
     });
+    expect(scheduleDocumentSyncMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tourDateId: "tour-date-1" })
+    );
     expect(toastMock).toHaveBeenCalledWith({
       title: "Success",
       description: "Override saved successfully",

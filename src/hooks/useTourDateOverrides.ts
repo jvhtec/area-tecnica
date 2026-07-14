@@ -1,10 +1,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
-
-
 import { queryKeys } from "@/lib/react-query";
+import { useTourDateDefaultDocumentRefresh } from "@/hooks/useTourDateDefaultDocumentRefresh";
 export interface TourDatePowerOverride {
   id: string;
   tour_date_id: string;
@@ -38,8 +36,20 @@ export interface TourDateWeightOverride {
 }
 
 export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight') => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
+  const refreshDefaultDocuments = useTourDateDefaultDocumentRefresh(tourDateId);
+
+  // Job-based override mode mounts this hook without a tourDateId, so the
+  // mutated row's tour_date_id takes priority over the hook argument.
+  const resolveTargetTourDateId = (affectedTourDateId?: string | null) =>
+    affectedTourDateId || tourDateId || null;
+
+  const invalidateOverrideQueries = (table: 'power' | 'weight', affectedTourDateId?: string | null) => {
+    const targetTourDateId = resolveTargetTourDateId(affectedTourDateId);
+    if (!targetTourDateId) return;
+    const scope = table === 'power' ? "tour-date-power-overrides" : "tour-date-weight-overrides";
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope(scope, targetTourDateId) });
+  };
 
   // Fetch power overrides
   const { data: powerOverrides = [], isLoading: powerLoading } = useQuery({
@@ -85,8 +95,9 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
+    onSuccess: (data) => {
+      invalidateOverrideQueries('power', data?.tour_date_id);
+      refreshDefaultDocuments(data?.tour_date_id);
     },
   });
 
@@ -102,8 +113,9 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-weight-overrides", tourDateId) });
+    onSuccess: (data) => {
+      invalidateOverrideQueries('weight', data?.tour_date_id);
+      refreshDefaultDocuments(data?.tour_date_id);
     },
   });
 
@@ -120,8 +132,9 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       if (error) throw error;
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
+    onSuccess: (result) => {
+      invalidateOverrideQueries('power', result?.tour_date_id);
+      refreshDefaultDocuments(result?.tour_date_id);
     },
   });
 
@@ -129,20 +142,18 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   const deleteOverrideMutation = useMutation({
     mutationFn: async ({ id, table }: { id: string; table: 'power' | 'weight' }) => {
       const tableName = table === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from(tableName)
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .select("tour_date_id");
 
       if (error) throw error;
-      return { id, table };
+      return { id, table, tourDateId: data?.[0]?.tour_date_id ?? null };
     },
-    onSuccess: ({ table }) => {
-      if (table === 'power') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-weight-overrides", tourDateId) });
-      }
+    onSuccess: ({ table, tourDateId: affectedTourDateId }) => {
+      invalidateOverrideQueries(table, affectedTourDateId);
+      refreshDefaultDocuments(affectedTourDateId);
     },
   });
 

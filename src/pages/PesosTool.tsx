@@ -14,6 +14,7 @@ import {
   sumWeightRows,
 } from '@/features/technical-tools/weights/weightCalculations';
 import { uploadWeightReportAndCompleteTasks } from '@/features/technical-tools/weights/weightPersistence';
+import { getJobTechnicalPdfFileName } from '@/utils/technicalPdfNames';
 import {
   appendTechnicalStageToFilename,
   formatTechnicalStageLabel,
@@ -1014,10 +1015,7 @@ const PesosTool: React.FC = () => {
         logoUrl
       );
 
-      const fileName = appendTechnicalStageToFilename(
-        `Pesos Report - ${selectedJob.title}.pdf`,
-        selectedStage
-      );
+      const fileName = appendTechnicalStageToFilename(getJobTechnicalPdfFileName('sound', selectedJob.title, 'weight'), selectedStage);
       let completedTasksCount = 0;
 
       // Upload PDF first - only auto-complete tasks if upload succeeds

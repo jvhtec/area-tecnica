@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+import { useTourDateDefaultDocumentRefresh } from '@/hooks/useTourDateDefaultDocumentRefresh';
 import {
   getPackageResolutionMessage,
   isPackageDepartment,
@@ -80,6 +81,7 @@ export const useTourOverrideMode = (
   const [overrideData, setOverrideData] = useState<TourOverrideData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const refreshDefaultDocuments = useTourDateDefaultDocumentRefresh(tourDateId);
 
   const isOverrideMode = Boolean(tourId && tourDateId);
 
@@ -234,6 +236,8 @@ export const useTourOverrideMode = (
           } as WeightOverrideInsert);
 
       if (result.error) throw result.error;
+
+      refreshDefaultDocuments();
 
       toast({
         title: 'Success',

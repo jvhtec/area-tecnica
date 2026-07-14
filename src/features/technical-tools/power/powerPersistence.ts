@@ -7,6 +7,7 @@ import type {
 } from "@/features/technical-tools/power/types";
 import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
 import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
+import { getTechnicalPowerDepartmentFromDocument } from "@/utils/powerReportReadiness";
 
 type PowerPersistenceClient = Pick<typeof typedSupabase, "from">;
 type PowerRequirementInsertPayload = ReturnType<typeof buildPowerRequirementInsert>;
@@ -377,6 +378,21 @@ export const buildLegacyPowerOverridePayload = ({
   override_data: buildPowerTableData(table, settings),
 });
 
+/**
+ * Sound and video Consumos PDFs share the calculators/consumos folder, so the
+ * pre-upload cleanup must only delete the current department's previous
+ * report. Reuses the same classifier the readers (Memoria auto-fill, power
+ * report readiness) use, so what gets deleted matches what gets detected.
+ */
+export const buildPowerReportCleanupFilter = (department: TechnicalDepartment) => {
+  return (candidate: { fileName: string; filePath: string }): boolean =>
+    getTechnicalPowerDepartmentFromDocument({
+      file_name: candidate.fileName,
+      file_path: candidate.filePath,
+      uploaded_at: null,
+    }) === department;
+};
+
 export const uploadPowerReportAndCompleteTask = async ({
   department,
   fileName,
@@ -394,11 +410,10 @@ export const uploadPowerReportAndCompleteTask = async ({
   const cleanupScope = getTechnicalStageStorageScope(stage);
   const category = getPowerReportUploadCategory(department);
 
-  if (cleanupScope) {
-    await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, category, { cleanupScope });
-  } else {
-    await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, category);
-  }
+  await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, category, {
+    ...(cleanupScope ? { cleanupScope } : {}),
+    cleanupFilter: buildPowerReportCleanupFilter(department),
+  });
 
   try {
     const { autoCompleteConsumosTasks } = await import("@/utils/taskAutoCompletion");

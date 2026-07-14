@@ -22,6 +22,7 @@ Detailed documentation for each major subsystem — key files, database tables, 
 - **[Activity / Audit Logging](workflows/activity-audit-logging.md)** — 30+ event types, realtime toasts, visibility controls
 - **[Public Artist Form](workflows/public-artist-form.md)** — Tokenized public routes for artist rider submission
 - **[SoundVision Files](workflows/soundvision-files.md)** — File library with access request and review workflow
+- **[Technical PDF Sync](technical-pdf-sync.md)** — How generated technical PDFs (consumos, pesos, memorias, SV reports) stay in sync for jobs and tour dates; required triggers when adding generators/mutations
 
 
 ## Festival architecture (section-specific)

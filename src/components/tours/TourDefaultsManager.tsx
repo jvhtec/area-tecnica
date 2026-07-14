@@ -22,6 +22,7 @@ import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets
 import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tourPowerTables";
 import { getDepartmentLabel } from "@/types/department";
 import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
+import { getTourDateTechnicalPdfFileName as getTourDatePdfFilename, getTourDefaultsPdfFileName as getDefaultsPdfFilename } from "@/utils/technicalPdfNames";
 import { getResolvedPowerPosition } from "@/utils/powerPositions";
 import { getTourDefaultDocumentNoUpdateToast, syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 import {
@@ -145,13 +146,6 @@ const getDefaultsPdfTitle = (
   packageLabel?: string
 ) => `${tourName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados`;
 
-const getDefaultsPdfFilename = (
-  tourName: string,
-  department: string,
-  type: 'power' | 'weight',
-  packageLabel?: string
-) => `${tourName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados.pdf`;
-
 const getTourDatePdfTitle = (
   tourName: string,
   locationName: string,
@@ -159,15 +153,6 @@ const getTourDatePdfTitle = (
   type: 'power' | 'weight',
   packageLabel?: string
 ) => `${tourName} - ${locationName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)}`;
-
-const getTourDatePdfFilename = (
-  tourName: string,
-  dateStr: string,
-  locationName: string,
-  department: string,
-  type: 'power' | 'weight',
-  packageLabel?: string
-) => `${tourName} - ${dateStr} - ${locationName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)}.pdf`;
 
 // Legacy types for backward compatibility
 interface TourPowerDefault {

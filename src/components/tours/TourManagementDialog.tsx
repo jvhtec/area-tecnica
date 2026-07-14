@@ -15,6 +15,7 @@ import { useState } from "react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -115,10 +116,41 @@ export const TourManagementDialog = ({
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tour.id) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
 
-      toast({
-        title: "Éxito",
-        description: `Todas las fechas de gira ${tourPackOnly ? 'configuradas en' : 'eliminadas de'} modo Solo Tour Pack.`,
-      });
+      // The bulk update rewrites every date's package/default-set resolution,
+      // so the auto-generated per-date PDFs must be regenerated or they keep
+      // reflecting the previous configuration.
+      let syncHadErrors = false;
+      try {
+        const syncResult = await syncTourDefaultDocuments({ tourId: tour.id });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tour.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") }),
+        ]);
+        if (syncResult.errors.length > 0) {
+          syncHadErrors = true;
+          toast({
+            title: "Aviso de sincronización de PDF",
+            description: `Fechas actualizadas, pero ${syncResult.errors.length} documento(s) automáticos no se pudieron regenerar.`,
+            variant: "destructive",
+          });
+        }
+      } catch (syncError) {
+        syncHadErrors = true;
+        console.error("Error syncing tour default documents after bulk tour pack update:", syncError);
+        toast({
+          title: "Aviso de sincronización de PDF",
+          description: "Fechas actualizadas, pero no se pudieron regenerar los PDF automáticos.",
+          variant: "destructive",
+        });
+      }
+
+      if (!syncHadErrors) {
+        toast({
+          title: "Éxito",
+          description: `Todas las fechas de gira ${tourPackOnly ? 'configuradas en' : 'eliminadas de'} modo Solo Tour Pack.`,
+        });
+      }
     } catch (error: any) {
       console.error("Error updating tour dates:", error);
       toast({
