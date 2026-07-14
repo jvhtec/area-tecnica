@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
+import { getJobTechnicalPdfFileName } from '@/utils/technicalPdfNames';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -323,7 +324,7 @@ const VideoPesosTool: React.FC = () => {
         logoUrl
       );
 
-      const fileName = `Video Weight Report - ${jobToUse.title}.pdf`;
+      const fileName = getJobTechnicalPdfFileName('video', jobToUse.title, 'weight');
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;

@@ -1,11 +1,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
-
-
 import { queryKeys } from "@/lib/react-query";
-import { scheduleTourDateDefaultDocumentSync } from "@/utils/tourDateDocumentSync";
+import { useTourDateDefaultDocumentRefresh } from "@/hooks/useTourDateDefaultDocumentRefresh";
 export interface TourDatePowerOverride {
   id: string;
   tour_date_id: string;
@@ -39,45 +36,13 @@ export interface TourDateWeightOverride {
 }
 
 export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight') => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
+  const refreshDefaultDocuments = useTourDateDefaultDocumentRefresh(tourDateId);
 
   // Job-based override mode mounts this hook without a tourDateId, so the
   // mutated row's tour_date_id takes priority over the hook argument.
   const resolveTargetTourDateId = (affectedTourDateId?: string | null) =>
     affectedTourDateId || tourDateId || null;
-
-  // The auto-generated per-date power/weight PDFs (tour_documents) embed
-  // override data, so every override mutation must regenerate them or job
-  // cards keep serving a stale document.
-  const refreshDefaultDocuments = (affectedTourDateId?: string | null) => {
-    const targetTourDateId = resolveTargetTourDateId(affectedTourDateId);
-    if (!targetTourDateId) return;
-
-    scheduleTourDateDefaultDocumentSync({
-      tourDateId: targetTourDateId,
-      onComplete: ({ tourId, result }) => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tourId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") });
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") });
-
-        if (result.errors.length > 0) {
-          toast({
-            title: "Aviso de sincronización de PDF",
-            description: `${result.errors.length} documento(s) automáticos no se pudieron actualizar.`,
-            variant: "destructive",
-          });
-        }
-      },
-      onError: () => {
-        toast({
-          title: "Aviso de sincronización de PDF",
-          description: "No se pudieron actualizar los PDF automáticos de la fecha de gira.",
-          variant: "destructive",
-        });
-      },
-    });
-  };
 
   const invalidateOverrideQueries = (table: 'power' | 'weight', affectedTourDateId?: string | null) => {
     const targetTourDateId = resolveTargetTourDateId(affectedTourDateId);

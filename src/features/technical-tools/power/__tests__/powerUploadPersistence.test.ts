@@ -83,11 +83,22 @@ describe("technical power report persistence", () => {
       fileName: "Sound_Power_Report_-_Show.pdf",
       filePath: "job-1/calculators/consumos/abc-Sound_Power_Report_-_Show.pdf",
     };
+    const canonicalSoundDoc = {
+      fileName: "FEID_Madrid_-_Sonido_potencia.pdf",
+      filePath: "calculators/consumos/job-1/abc-FEID_Madrid_-_Sonido_potencia.pdf",
+    };
+    const canonicalVideoDoc = {
+      fileName: "FEID_Madrid_-_Video_potencia.pdf",
+      filePath: "calculators/consumos/job-1/abc-FEID_Madrid_-_Video_potencia.pdf",
+    };
 
     expect(soundFilter(soundDoc)).toBe(true);
     expect(soundFilter(copiedSoundDoc)).toBe(true);
+    expect(soundFilter(canonicalSoundDoc)).toBe(true);
+    expect(soundFilter(canonicalVideoDoc)).toBe(false);
     expect(soundFilter(videoDoc)).toBe(false);
     expect(videoFilter(videoDoc)).toBe(true);
+    expect(videoFilter(canonicalVideoDoc)).toBe(true);
     expect(videoFilter(soundDoc)).toBe(false);
   });
 

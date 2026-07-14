@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildTourDefaultDocumentPlan,
   getTourDefaultDocumentNoUpdateToast,
   getTourDefaultDocumentObjectPath,
+  syncTourDefaultDocuments,
   type TourDefaultDocumentPlanItem,
   type TourDefaultDocumentSyncData,
 } from "@/utils/tourDefaultDocumentSync";
+import { createMockQueryBuilder, createMockSupabaseClient } from "@/test/mockSupabase";
 
 type SyncTourDate = TourDefaultDocumentSyncData["tourDates"][number];
 type SyncDefaultSet = TourDefaultDocumentSyncData["defaultSets"][number];
@@ -137,8 +139,7 @@ describe("tour default document sync planning", () => {
     expect(mUpload?.fileName).toContain("Sound M - Medium");
   });
 
-  it("uses a new object path when resolved table content changes", () => {
-    const firstPlan = buildTourDefaultDocumentPlan(buildData());
+  it("plans the current resolved table content after defaults change", () => {
     const changedPlan = buildTourDefaultDocumentPlan(
       buildData({
         defaultTables: [
@@ -152,11 +153,17 @@ describe("tour default document sync planning", () => {
       })
     );
 
-    const firstUpload = findUploadPlanItem(firstPlan);
     const changedUpload = findUploadPlanItem(changedPlan);
 
-    expect(firstUpload?.objectPath).not.toBe(changedUpload?.objectPath);
+    expect(changedUpload?.defaultTables[0]).toMatchObject({ total_value: 212 });
     expect(changedUpload?.fileName).toContain("Sound S - Small");
+  });
+
+  it("uses a fresh object path when the same source data is regenerated", () => {
+    const firstUpload = findUploadPlanItem(buildTourDefaultDocumentPlan(buildData()));
+    const retryUpload = findUploadPlanItem(buildTourDefaultDocumentPlan(buildData()));
+
+    expect(firstUpload?.objectPath).not.toBe(retryUpload?.objectPath);
   });
 
   it("uses the current package size when a date still has a stale explicit default set id", () => {
@@ -237,6 +244,104 @@ describe("tour default document sync planning", () => {
       reason: "no_tables",
       objectPath: "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight.pdf",
     });
+  });
+});
+
+const createSyncClient = ({
+  uploadError = null,
+  insertError = null,
+}: {
+  uploadError?: Error | null;
+  insertError?: Error | null;
+} = {}) => {
+  const client = createMockSupabaseClient();
+  const events: string[] = [];
+  const oldPath = "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight-old.pdf";
+
+  client.from.mockImplementation((table: string) => {
+    if (table === "tours") {
+      return createMockQueryBuilder({ data: buildData().tour, error: null });
+    }
+    if (table === "tour_dates") {
+      return createMockQueryBuilder({ data: buildData().tourDates, error: null });
+    }
+    if (table === "tour_default_sets") {
+      return createMockQueryBuilder({ data: buildData().defaultSets, error: null });
+    }
+    if (table === "tour_default_tables") {
+      return createMockQueryBuilder({ data: buildData().defaultTables, error: null });
+    }
+    if (table === "tour_date_power_overrides" || table === "tour_date_weight_overrides") {
+      return createMockQueryBuilder({ data: [], error: null });
+    }
+
+    const builder = createMockQueryBuilder({ data: [], error: null });
+    let deleting = false;
+    builder.delete.mockImplementation(() => {
+      deleting = true;
+      return builder;
+    });
+    builder.insert.mockImplementation(() => {
+      events.push("insert");
+      return builder.__setResult({ data: null, error: insertError });
+    });
+    builder.like.mockImplementation((_column: string, pattern: string) => {
+      if (deleting) return builder.__setResult({ data: null, error: null });
+      const data = pattern.includes("/sound-weight") ? [{ file_path: oldPath }] : [];
+      return builder.__setResult({ data, error: null });
+    });
+    return builder;
+  });
+
+  const upload = vi.fn(async () => {
+    events.push("upload");
+    return { data: null, error: uploadError };
+  });
+  const remove = vi.fn(async (paths: string[]) => {
+    events.push(paths.includes(oldPath) ? "remove-old" : "remove-new");
+    return { data: null, error: null };
+  });
+  client.storage.from.mockReturnValue({ upload, remove });
+
+  return { client, events, oldPath, remove };
+};
+
+describe("tour default document replacement safety", () => {
+  const runSync = (client: ReturnType<typeof createMockSupabaseClient>) =>
+    syncTourDefaultDocuments({
+      tourId: "tour-1",
+      client: client as never,
+      logoUrl: "",
+      exportPdf: vi.fn(async () => new Blob(["pdf"], { type: "application/pdf" })),
+    });
+
+  it("publishes the replacement before retiring the previous slot object", async () => {
+    const { client, events } = createSyncClient();
+
+    const result = await runSync(client);
+
+    expect(result.errors).toEqual([]);
+    expect(events.indexOf("upload")).toBeLessThan(events.indexOf("insert"));
+    expect(events.indexOf("insert")).toBeLessThan(events.indexOf("remove-old"));
+  });
+
+  it("keeps the previous object when replacement upload fails", async () => {
+    const { client, oldPath, remove } = createSyncClient({ uploadError: new Error("upload failed") });
+
+    const result = await runSync(client);
+
+    expect(result.errors).toHaveLength(1);
+    expect(remove).not.toHaveBeenCalledWith(expect.arrayContaining([oldPath]));
+  });
+
+  it("removes only the untracked replacement when its DB insert fails", async () => {
+    const { client, events } = createSyncClient({ insertError: new Error("insert failed") });
+
+    const result = await runSync(client);
+
+    expect(result.errors).toHaveLength(1);
+    expect(events).toContain("remove-new");
+    expect(events).not.toContain("remove-old");
   });
 });
 

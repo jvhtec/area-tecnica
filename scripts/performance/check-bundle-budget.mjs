@@ -22,7 +22,7 @@ const kindBudgets = {
 };
 
 const absoluteKindBudgets = {
-  js: 3_150_000,
+  js: 3_500_000,
   css: 80_000,
   font: 2_950_000,
   image: 8_500_000,

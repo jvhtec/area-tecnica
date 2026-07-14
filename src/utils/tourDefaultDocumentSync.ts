@@ -11,8 +11,10 @@ import {
   type PackageDepartment,
 } from "@/utils/tourPackages";
 import { buildNormalizedTourPowerTables } from "@/utils/tourPowerTables";
+import { withTourDefaultDocumentMutationLock } from "@/utils/tourDefaultDocumentMutationQueue";
+import { getTourDateTechnicalPdfFileName } from "@/utils/technicalPdfNames";
 import {
-  buildTourDefaultDocumentVersionKey,
+  createTourDefaultDocumentVersionKey,
   getTourDefaultDocumentObjectPath,
   getTourDefaultDocumentSlotPrefix,
 } from "@/utils/tourDefaultDocumentVersioning";
@@ -38,6 +40,7 @@ type JsonRecord = Record<string, unknown>;
 type PdfTables = Parameters<typeof exportToPDF>[1];
 type PdfTable = PdfTables[number];
 type PdfTableRow = PdfTable["rows"][number];
+type PdfPowerSummary = Parameters<typeof exportToPDF>[6];
 
 type SupabaseClientLike = typeof supabase;
 
@@ -164,9 +167,6 @@ const getTourDateLocationName = (tourDate: TourDateRow): string => {
 const getPdfTypeLabel = (type: TourDefaultDocumentType) =>
   type === "power" ? "potencia" : "peso";
 
-const cleanDisplayFilePart = (value: string): string =>
-  value.replace(/[\\/\r\n]+/g, " ").replace(/\s+/g, " ").trim();
-
 export const getTourDefaultDocumentFileName = ({
   tourName,
   date,
@@ -181,12 +181,14 @@ export const getTourDefaultDocumentFileName = ({
   department: PackageDepartment;
   type: TourDefaultDocumentType;
   packageLabel?: string;
-}) =>
-  cleanDisplayFilePart(
-    `${tourName} - ${date} - ${locationName} - ${
-      packageLabel || getDepartmentLabel(department)
-    } ${getPdfTypeLabel(type)}.pdf`
-  );
+}) => getTourDateTechnicalPdfFileName(
+  tourName,
+  date,
+  locationName,
+  department,
+  type,
+  packageLabel,
+);
 
 const getTourDefaultDocumentTitle = ({
   tourName,
@@ -281,41 +283,20 @@ const buildPowerPdfPayload = (
   };
 };
 
-const buildUploadPlanItem = ({
-  tour,
-  tourDate,
-  department,
-  type,
-  defaultSet,
-  defaultTables,
-  powerOverrides,
-  weightOverrides,
-  packageLabel,
-}: {
-  tour: TourRow;
-  tourDate: TourDateRow;
-  department: PackageDepartment;
-  type: TourDefaultDocumentType;
-  defaultSet: TourDefaultSetRow;
-  defaultTables: TourDefaultTableRow[];
-  powerOverrides: TourDatePowerOverrideRow[];
-  weightOverrides: TourDateWeightOverrideRow[];
-  packageLabel: string;
-}): Extract<TourDefaultDocumentPlanItem, { action: "upload" }> => {
+const buildUploadPlanItem = (
+  tour: TourRow,
+  tourDate: TourDateRow,
+  department: PackageDepartment,
+  type: TourDefaultDocumentType,
+  defaultSet: TourDefaultSetRow,
+  defaultTables: TourDefaultTableRow[],
+  powerOverrides: TourDatePowerOverrideRow[],
+  weightOverrides: TourDateWeightOverrideRow[],
+  packageLabel: string,
+): Extract<TourDefaultDocumentPlanItem, { action: "upload" }> => {
   const locationName = getTourDateLocationName(tourDate);
   const jobDate = tourDate.date || tourDate.start_date;
-  const versionKey = buildTourDefaultDocumentVersionKey({
-    tour,
-    tourDate,
-    locationName,
-    department,
-    type,
-    defaultSet,
-    defaultTables,
-    powerOverrides,
-    weightOverrides,
-    packageLabel,
-  });
+  const versionKey = createTourDefaultDocumentVersionKey();
 
   return {
     action: "upload",
@@ -433,17 +414,17 @@ export const buildTourDefaultDocumentPlan = ({
         }
 
         plan.push(
-          buildUploadPlanItem({
+          buildUploadPlanItem(
             tour,
             tourDate,
             department,
             type,
-            defaultSet: resolution.set,
-            defaultTables: tablesForType,
-            powerOverrides: powerOverridesForDate,
-            weightOverrides: weightOverridesForDate,
-            packageLabel: getPackageSetLabel(department, resolution.packageSize, resolution.set),
-          })
+            resolution.set,
+            tablesForType,
+            powerOverridesForDate,
+            weightOverridesForDate,
+            getPackageSetLabel(department, resolution.packageSize, resolution.set),
+          )
         );
       }
     }
@@ -452,15 +433,11 @@ export const buildTourDefaultDocumentPlan = ({
   return plan;
 };
 
-const loadTourDefaultDocumentSyncData = async ({
-  client,
-  tourId,
-  tourDateIds,
-}: {
-  client: SupabaseClientLike;
-  tourId: string;
-  tourDateIds?: string[];
-}): Promise<TourDefaultDocumentSyncData> => {
+const loadTourDefaultDocumentSyncData = async (
+  client: SupabaseClientLike,
+  tourId: string,
+  tourDateIds?: string[],
+): Promise<TourDefaultDocumentSyncData> => {
   const { data: tour, error: tourError } = await client
     .from("tours")
     .select("id, name")
@@ -549,19 +526,14 @@ const loadTourDefaultDocumentSyncData = async ({
   };
 };
 
-const cleanupTourDefaultDocumentSlot = async ({
-  client,
-  tourId,
-  tourDateId,
-  department,
-  type,
-}: {
-  client: SupabaseClientLike;
-  tourId: string;
-  tourDateId: string;
-  department: PackageDepartment;
-  type: TourDefaultDocumentType;
-}) => {
+const cleanupTourDefaultDocumentSlot = async (
+  client: SupabaseClientLike,
+  tourId: string,
+  tourDateId: string,
+  department: PackageDepartment,
+  type: TourDefaultDocumentType,
+  keepPath?: string,
+) => {
   const slotPrefix = getTourDefaultDocumentSlotPrefix({
     tourId,
     tourDateId,
@@ -571,19 +543,27 @@ const cleanupTourDefaultDocumentSlot = async ({
 
   const { data: existingDocuments, error: loadError } = await client
     .from("tour_documents")
-    .select("file_path")
+    .select("id, file_path")
     .eq("tour_id", tourId)
     .like("file_path", `${slotPrefix}%`);
 
   if (loadError) throw loadError;
 
-  const paths = Array.from(
-    new Set(
-      (existingDocuments || [])
-        .map((document) => document.file_path)
-        .filter((path): path is string => typeof path === "string" && path.length > 0)
-    )
+  const documentsToRemove = (existingDocuments || []).filter(
+    (document) => document.file_path && document.file_path !== keepPath
   );
+  const paths = Array.from(new Set(documentsToRemove.map((document) => document.file_path)));
+  const rowIds = documentsToRemove.map((document) => document.id);
+
+  if (rowIds.length > 0) {
+    const { error: deleteError } = await client
+      .from("tour_documents")
+      .delete()
+      .eq("tour_id", tourId)
+      .in("id", rowIds);
+
+    if (deleteError) throw deleteError;
+  }
 
   if (paths.length > 0) {
     const { error: storageError } = await client.storage
@@ -592,14 +572,6 @@ const cleanupTourDefaultDocumentSlot = async ({
 
     if (storageError) throw storageError;
   }
-
-  const { error } = await client
-    .from("tour_documents")
-    .delete()
-    .eq("tour_id", tourId)
-    .like("file_path", `${slotPrefix}%`);
-
-  if (error) throw error;
 };
 
 export const cleanupTourDefaultDocumentsForDate = async ({
@@ -611,46 +583,31 @@ export const cleanupTourDefaultDocumentsForDate = async ({
   tourDateId: string;
   client?: SupabaseClientLike;
 }) => {
-  for (const department of PACKAGE_DEPARTMENTS) {
-    for (const type of TOUR_DEFAULT_DOCUMENT_TYPES) {
-      await cleanupTourDefaultDocumentSlot({
-        client,
-        tourId,
-        tourDateId,
-        department,
-        type,
-      });
+  await withTourDefaultDocumentMutationLock(tourId, async () => {
+    for (const department of PACKAGE_DEPARTMENTS) {
+      for (const type of TOUR_DEFAULT_DOCUMENT_TYPES) {
+        await cleanupTourDefaultDocumentSlot(
+          client,
+          tourId,
+          tourDateId,
+          department,
+          type,
+        );
+      }
     }
-  }
+  });
 };
 
-const uploadTourDefaultDocument = async ({
-  client,
-  tourId,
-  tourDateId,
-  department,
-  type,
-  objectPath,
-  fileName,
-  pdfBlob,
-}: {
-  client: SupabaseClientLike;
-  tourId: string;
-  tourDateId: string;
-  department: PackageDepartment;
-  type: TourDefaultDocumentType;
-  objectPath: string;
-  fileName: string;
-  pdfBlob: Blob;
-}) => {
-  await cleanupTourDefaultDocumentSlot({
-    client,
-    tourId,
-    tourDateId,
-    department,
-    type,
-  });
-
+const uploadTourDefaultDocument = async (
+  client: SupabaseClientLike,
+  tourId: string,
+  tourDateId: string,
+  department: PackageDepartment,
+  type: TourDefaultDocumentType,
+  objectPath: string,
+  fileName: string,
+  pdfBlob: Blob,
+) => {
   const { error: uploadError } = await client.storage
     .from(TOUR_DOCUMENTS_BUCKET)
     .upload(objectPath, pdfBlob, {
@@ -684,34 +641,36 @@ const uploadTourDefaultDocument = async ({
 
     throw insertError;
   }
+
+  // Publish first, then retire predecessors. A failed upload/insert therefore
+  // leaves the previous valid row and object untouched.
+  await cleanupTourDefaultDocumentSlot(
+    client,
+    tourId,
+    tourDateId,
+    department,
+    type,
+    objectPath,
+  );
 };
 
-const generateTourDefaultDocumentPdf = async ({
-  item,
-  logoUrl,
-  exportPdf,
-}: {
-  item: Extract<TourDefaultDocumentPlanItem, { action: "upload" }>;
-  logoUrl?: string;
-  exportPdf: typeof exportToPDF;
-}) => {
+const generateTourDefaultDocumentPdf = async (
+  item: Extract<TourDefaultDocumentPlanItem, { action: "upload" }>,
+  logoUrl: string | undefined,
+  exportPdf: typeof exportToPDF,
+) => {
+  let tables: PdfTables;
+  let powerSummary: PdfPowerSummary;
+  let safetyMargin: number;
+  let fohSchukoRequired: boolean | undefined;
+
   if (item.type === "power") {
-    const { tables, powerSummary, safetyMargin, fohSchukoRequired } = buildPowerPdfPayload(item);
-    return exportPdf(
-      item.title,
-      tables,
-      item.type,
-      item.jobName,
-      item.jobDate,
-      undefined,
-      powerSummary,
-      safetyMargin,
-      logoUrl,
-      fohSchukoRequired
-    );
+    ({ tables, powerSummary, safetyMargin, fohSchukoRequired } = buildPowerPdfPayload(item));
+  } else {
+    tables = buildWeightPdfTables(item);
+    safetyMargin = buildWeightSafetyMargin(item);
   }
 
-  const tables = buildWeightPdfTables(item);
   return exportPdf(
     item.title,
     tables,
@@ -719,13 +678,14 @@ const generateTourDefaultDocumentPdf = async ({
     item.jobName,
     item.jobDate,
     undefined,
-    undefined,
-    buildWeightSafetyMargin(item),
-    logoUrl
+    powerSummary,
+    safetyMargin,
+    logoUrl,
+    fohSchukoRequired,
   );
 };
 
-export const syncTourDefaultDocuments = async ({
+const runTourDefaultDocumentSync = async ({
   tourId,
   tourDateIds,
   client = supabase,
@@ -733,7 +693,7 @@ export const syncTourDefaultDocuments = async ({
   fetchLogo = fetchTourLogo,
   exportPdf = exportToPDF,
 }: SyncTourDefaultDocumentsOptions): Promise<SyncTourDefaultDocumentsResult> => {
-  const data = await loadTourDefaultDocumentSyncData({ client, tourId, tourDateIds });
+  const data = await loadTourDefaultDocumentSyncData(client, tourId, tourDateIds);
   const plan = buildTourDefaultDocumentPlan(data);
   const result: SyncTourDefaultDocumentsResult = {
     uploaded: 0,
@@ -754,33 +714,33 @@ export const syncTourDefaultDocuments = async ({
   for (const item of plan) {
     try {
       if (item.action === "cleanup") {
-        await cleanupTourDefaultDocumentSlot({
+        await cleanupTourDefaultDocumentSlot(
           client,
           tourId,
-          tourDateId: item.tourDate.id,
-          department: item.department,
-          type: item.type,
-        });
+          item.tourDate.id,
+          item.department,
+          item.type,
+        );
         result.removed += 1;
         if (item.reason !== "no_tables") result.skipped += 1;
         continue;
       }
 
-      const pdfBlob = await generateTourDefaultDocumentPdf({
+      const pdfBlob = await generateTourDefaultDocumentPdf(
         item,
-        logoUrl: resolvedLogoUrl,
+        resolvedLogoUrl,
         exportPdf,
-      });
-      await uploadTourDefaultDocument({
+      );
+      await uploadTourDefaultDocument(
         client,
         tourId,
-        tourDateId: item.tourDate.id,
-        department: item.department,
-        type: item.type,
-        objectPath: item.objectPath,
-        fileName: item.fileName,
+        item.tourDate.id,
+        item.department,
+        item.type,
+        item.objectPath,
+        item.fileName,
         pdfBlob,
-      });
+      );
       result.uploaded += 1;
     } catch (error) {
       result.errors.push({
@@ -792,3 +752,6 @@ export const syncTourDefaultDocuments = async ({
 
   return result;
 };
+
+export const syncTourDefaultDocuments = (options: SyncTourDefaultDocumentsOptions): Promise<SyncTourDefaultDocumentsResult> =>
+  withTourDefaultDocumentMutationLock(options.tourId, () => runTourDefaultDocumentSync(options));

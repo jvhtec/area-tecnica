@@ -54,9 +54,8 @@ export const syncTourDefaultDocumentsForTourDate = async ({
 // once with the final state instead of once per mutation.
 const pendingTourDateDocumentSyncs = new Map<string, ReturnType<typeof setTimeout>>();
 
-// A sync rewrites the date's tour_documents slots (cleanup then upload), so
-// two overlapping runs for the same date could clobber each other; each run
-// is chained on the previous one for that date.
+// Keep scheduled runs ordered even while the first run is still resolving its
+// tour id. The lower-level per-tour lock then also orders all direct syncs.
 const inFlightTourDateDocumentSyncs = new Map<string, Promise<void>>();
 
 export const scheduleTourDateDefaultDocumentSync = ({

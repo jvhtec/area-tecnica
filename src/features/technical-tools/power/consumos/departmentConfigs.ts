@@ -7,6 +7,10 @@ import type {
   ConsumosDepartmentConfig,
   ConsumosLabels,
 } from "./config";
+import {
+  getJobTechnicalPdfFileName,
+  getTourDefaultsPdfFileName,
+} from "@/utils/technicalPdfNames";
 
 const soundComponentDatabase: ConsumosComponent[] = [
   { id: 1, name: "LA12X", watts: 2000 },
@@ -423,8 +427,8 @@ export const SOUND_CONSUMOS_CONFIG: ConsumosDepartmentConfig = {
     lineName: false,
     legacyTourDefaultsFallback: true,
   },
-  pdfFileName: (title) => `Sound Power Report - ${title}.pdf`,
-  defaultsPdfFileName: (tourName) => `${tourName} - Sound Power Defaults.pdf`,
+  pdfFileName: (title) => getJobTechnicalPdfFileName("sound", title, "power"),
+  defaultsPdfFileName: (tourName) => getTourDefaultsPdfFileName(tourName, "sound", "power"),
   defaultsReportTitle: (tourName) => `${tourName} - Sound Power Defaults`,
   defaultsSetName: (tourName) => `${tourName} Sound Defaults`,
   defaultsSetDescription: "Sound department power defaults",
@@ -443,8 +447,8 @@ export const VIDEO_CONSUMOS_CONFIG: ConsumosDepartmentConfig = {
     lineName: true,
     legacyTourDefaultsFallback: false,
   },
-  pdfFileName: (title) => `Video Power Report - ${title}.pdf`,
-  defaultsPdfFileName: (tourName) => `${tourName} - Video Power Defaults.pdf`,
+  pdfFileName: (title) => getJobTechnicalPdfFileName("video", title, "power"),
+  defaultsPdfFileName: (tourName) => getTourDefaultsPdfFileName(tourName, "video", "power"),
   defaultsReportTitle: (tourName) => `${tourName} - Video Power Defaults`,
   defaultsSetName: (tourName) => `${tourName} Video Defaults`,
   defaultsSetDescription: "Video department power defaults",
@@ -462,9 +466,8 @@ export const LIGHTS_CONSUMOS_CONFIG: ConsumosDepartmentConfig = {
     lineName: false,
     legacyTourDefaultsFallback: false,
   },
-  pdfFileName: (title) => `Informe de Potencia - ${title}.pdf`,
-  defaultsPdfFileName: (tourName) =>
-    `${tourName} - Valores por Defecto de Potencia.pdf`,
+  pdfFileName: (title) => getJobTechnicalPdfFileName("lights", title, "power"),
+  defaultsPdfFileName: (tourName) => getTourDefaultsPdfFileName(tourName, "lights", "power"),
   defaultsReportTitle: (tourName) =>
     `${tourName} - Valores por Defecto de Potencia`,
   defaultsSetName: (tourName) => `${tourName} Lights Defaults`,

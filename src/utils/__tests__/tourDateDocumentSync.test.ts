@@ -25,6 +25,7 @@ import {
   scheduleTourDateDefaultDocumentSync,
   syncTourDefaultDocumentsForTourDate,
 } from "@/utils/tourDateDocumentSync";
+import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 
 type QueryResult = { data: unknown; error: unknown };
 type RecordedCall = { table: string; method: string; args: unknown[] };
@@ -246,6 +247,52 @@ describe("per-tour-date default document sync", () => {
     expect(lookupCount).toBe(2); // second run started only after the first settled
 
     vi.useRealTimers();
+  });
+
+  it("serializes direct full-tour and per-date sync entry points for the same tour", async () => {
+    let resolveFirstTourLoad!: (value: QueryResult) => void;
+    const firstTourLoad = new Promise<QueryResult>((resolve) => {
+      resolveFirstTourLoad = resolve;
+    });
+
+    const createFailingLoadClient = (tourLoad: Promise<QueryResult> | QueryResult) => {
+      const from = vi.fn(() => {
+        const stub: Record<string, unknown> = {};
+        stub.select = vi.fn(() => stub);
+        stub.eq = vi.fn(() => stub);
+        stub.single = vi.fn(() => Promise.resolve(tourLoad));
+        return stub;
+      });
+      return { client: { from } as never, from };
+    };
+
+    const firstClient = createFailingLoadClient(firstTourLoad);
+    const secondClient = createFailingLoadClient({
+      data: null,
+      error: { message: "second load stopped" },
+    });
+
+    const firstRun = syncTourDefaultDocuments({
+      tourId: "tour-lock-test",
+      client: firstClient.client,
+    });
+    await Promise.resolve();
+    expect(firstClient.from).toHaveBeenCalledTimes(1);
+
+    const secondRun = syncTourDefaultDocuments({
+      tourId: "tour-lock-test",
+      tourDateIds: ["date-1"],
+      client: secondClient.client,
+    });
+    await Promise.resolve();
+    expect(secondClient.from).not.toHaveBeenCalled();
+
+    resolveFirstTourLoad({ data: null, error: { message: "first load stopped" } });
+    await expect(firstRun).rejects.toEqual({ message: "first load stopped" });
+    await Promise.resolve();
+
+    expect(secondClient.from).toHaveBeenCalledTimes(1);
+    await expect(secondRun).rejects.toEqual({ message: "second load stopped" });
   });
 
   it("coalesces rapid schedule calls into a single sync per tour date", async () => {

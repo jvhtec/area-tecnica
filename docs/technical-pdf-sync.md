@@ -29,6 +29,29 @@ Categories in use:
 | `calculators/sv-report` | SoundVision `ReportGenerator` | sound |
 | `calculators/lista-material/{department}` | `fetch-flex-material-report` edge function | per department |
 
+### Canonical power/weight filenames
+
+All newly generated power and weight filenames come from
+`src/utils/technicalPdfNames.ts`; entrypoints must not assemble these names
+locally. The shared shapes are:
+
+| Scope | Filename |
+|---|---|
+| Job calculator | `<job> - <department> <potencia|peso>.pdf` |
+| Tour defaults export | `<tour> - <department/package> <potencia|peso> predeterminados.pdf` |
+| Tour-date direct, bulk, or synchronized export | `<tour> - <date> - <location> - <department/package> <potencia|peso>.pdf` |
+
+Examples: `FEID Madrid - Sonido potencia.pdf` and
+`FEID Tour L - 2026-07-14 - Madrid - Sonido L potencia.pdf`. Stage-scoped job
+reports append the stage label through `appendTechnicalStageToFilename`.
+
+The filename is a display/download name, **not the replacement identity**.
+Job cleanup targets job + category + stage (and the department filter for the
+shared Consumos category). Tour cleanup targets tour + date + department +
+type from the stable storage slot. Existing English and legacy Spanish names
+remain recognizable by the readers/cleanup classifiers and are retired on the
+next successful regeneration.
+
 ### Consumers (what goes stale if the slot isn't cleaned)
 
 - **Memoria Técnica auto-fill** (`useMemoriaAutoFill` → `findLatestJobDocumentForStage`):
@@ -53,6 +76,12 @@ Categories in use:
    regeneration never deletes the other department's latest PDF. The filter
    reuses the same classifier the readers use, so "what gets deleted" always
    matches "what gets detected".
+4. **A replacement is published before its predecessor is retired.** The new
+   object and `job_documents` row are created before old versions are cleaned,
+   so an upload/insert failure leaves the last valid document available.
+5. **Replacements are serialized per logical slot.** Concurrent regenerations
+   for the same job/category/stage wait for each other, so an older generation
+   cannot finish last and become the document consumers detect as newest.
 
 ## Tour dates (`tour_documents` + `tour-documents` bucket)
 
@@ -64,6 +93,12 @@ and **per-date overrides** (`tour_date_power_overrides` /
 `tour_date_weight_overrides`, which take priority over defaults). Job cards of
 `tourdate` jobs and the tour documents list serve these PDFs.
 
+Each generation receives a unique version key. The replacement object and
+`tour_documents` row are published before older rows in the same
+date/department/type slot are retired. Upload or insert failures therefore
+leave the previous valid PDF available, while the unique path also prevents a
+retry from colliding with a partially cleaned-up prior generation.
+
 **Any mutation of one of those inputs must re-trigger the sync.** Current
 triggers:
 
@@ -73,17 +108,23 @@ triggers:
 | Defaults edits in Tour Defaults Manager | `syncDefaultDocuments` in `TourDefaultsManager` |
 | Tour date create / edit (date, location, type, package sizes, pinned sets) | `syncTourDefaultDocumentsForDate` in `TourDateManagementDialog` |
 | Tour date delete | `cleanupTourDefaultDocumentsForDate` in `TourDateManagementDialog` |
-| **Per-date override create/update/delete** (power & weight, both URL override mode and job-based override mode) | `useTourDateOverrides` → `scheduleTourDateDefaultDocumentSync` (`src/utils/tourDateDocumentSync.ts`), coalesced per tour date |
+| **Per-date override create/update/delete** (power & weight, both URL override mode and job-based override mode) | `useTourDateOverrides` and the legacy `useTourOverrideMode` writer used by Video Pesos → `useTourDateDefaultDocumentRefresh` → `scheduleTourDateDefaultDocumentSync` (`src/utils/tourDateDocumentSync.ts`), coalesced per tour date |
 | **Bulk "Tour Pack only" toggle across all dates** | `handleBulkTourPackUpdate` in `TourManagementDialog` |
 | **Tour rename** (name is embedded in PDF title/filename) | `handleNameChange` in `useTourManagement` |
 
 After a sync, invalidate the `tour-documents`, `jobcard-tour-documents` and
 `tour-documents-for-job` query scopes so job cards refresh.
 
-Overrides are only ever written through `useTourDateOverrides` (plus cascade
+Overrides are written through `useTourDateOverrides` and the legacy
+`useTourOverrideMode.saveOverride` path used by Video Pesos (plus cascade
 deletes when a date/tour is deleted, which run their own document cleanup).
-Keep it that way: a new writer that bypasses the hook must schedule the
-per-date sync itself.
+Both schedule the per-date sync. Keep new writers on one of these paths, or
+schedule the sync explicitly.
+
+All full-tour and per-date syncs are also serialized per tour inside
+`syncTourDefaultDocuments`; local debounce/queues are an optimization, not the
+correctness boundary. This prevents an older concurrent generation from
+finishing last and replacing a newer document.
 
 ## Known gaps (accepted, do not silently rely on them)
 
@@ -95,10 +136,9 @@ per-date sync itself.
   requires department-aware weight categories (mirror the consumos
   `cleanupFilter` approach) before adding uploads, otherwise departments would
   clobber each other.
-- **Tour logo changes don't re-sync tour-date PDFs.** The logo resolves to a
-  short-lived signed URL, so it can't participate in the version key; PDFs
-  regenerated after a logo change pick it up, older ones keep the previous
-  logo until the next sync touches them.
+- **Tour logo changes don't re-sync tour-date PDFs.** PDFs regenerated after a
+  logo change pick it up, but older ones keep the previous logo until another
+  documented trigger runs the sync.
 - **`generate-sv-report` edge function** is currently unused by the SV report
   flow (the client generates the PDF); see the 2026-07-10 audit before
   building on it.
