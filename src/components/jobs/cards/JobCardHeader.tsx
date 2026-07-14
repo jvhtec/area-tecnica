@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,8 +128,8 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
           <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
           <div className="flex flex-col">
             <span className={cn(isMobile && "text-xs")}>
-              {format(new Date(job.start_time), isMobile ? "MMM d, yy" : "MMM d, yyyy")} -{" "}
-              {format(new Date(job.end_time), isMobile ? "MMM d, yy" : "MMM d, yyyy")}
+              {format(new Date(job.start_time), isMobile ? "d MMM yy" : "d MMM yyyy", { locale: es })} -{" "}
+              {format(new Date(job.end_time), isMobile ? "d MMM yy" : "d MMM yyyy", { locale: es })}
             </span>
             <span className={cn("text-muted-foreground", isMobile && "text-xs")}>
               {format(new Date(job.start_time), "HH:mm")}

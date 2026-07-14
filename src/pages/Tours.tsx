@@ -2,17 +2,20 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Map } from "lucide-react";
 import { TourChips } from "@/components/dashboard/TourChips";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
 
 const Tours = () => {
   const [showTours, setShowTours] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const { userRole } = useOptimizedAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   // House techs have view-only access
   const readOnly = userRole === 'house_tech';
@@ -54,6 +57,39 @@ const Tours = () => {
       }
     }
   };
+
+  if (isMobile) {
+    return (
+      <div className="w-full space-y-4 px-3 py-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+        <MobileScreenHeader
+          kicker="Planificación"
+          title="Giras"
+          subtitle={`${new Date().getFullYear()}`}
+          accent="video"
+          icon={Map}
+          right={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleTours}
+              className="h-10 w-10 rounded-full p-0"
+              aria-label={showTours ? "Contraer giras" : "Expandir giras"}
+            >
+              {showTours ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </Button>
+          }
+        />
+        {showTours && (
+          <TourChips
+            readOnly={readOnly}
+            onTourClick={(tourId) => {
+              navigate(`/tour-management/${tourId}`);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-4 px-1 sm:px-6">

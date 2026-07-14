@@ -25,10 +25,10 @@ interface JobStatusSelectorProps {
 }
 
 const JOB_STATUS_OPTIONS: { value: JobStatus; label: string }[] = [
-  { value: "Tentativa", label: "Tentative" },
-  { value: "Confirmado", label: "Confirmed" },
-  { value: "Completado", label: "Completed" },
-  { value: "Cancelado", label: "Cancelled" }
+  { value: "Tentativa", label: "Tentativa" },
+  { value: "Confirmado", label: "Confirmado" },
+  { value: "Completado", label: "Completado" },
+  { value: "Cancelado", label: "Cancelado" }
 ];
 
 export const JobStatusSelector = ({ 

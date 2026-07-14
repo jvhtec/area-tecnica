@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ export const MonthNavigation = ({
         {!isMobile && "Previous"}
       </Button>
       <h2 className={cn("font-semibold", isMobile ? "text-base" : "text-lg")}>
-        {format(currentDate, isMobile ? 'MMM yyyy' : 'MMMM yyyy')}
+        {format(currentDate, isMobile ? 'MMM yyyy' : 'MMMM yyyy', { locale: es })}
       </h2>
       <Button 
         variant="outline" 

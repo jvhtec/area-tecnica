@@ -193,15 +193,20 @@ export const MobileNavBar = ({
     ? { bottom: `${visualViewportBottomOffset}px` }
     : undefined
 
+  const itemBaseClass =
+    "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[20px] px-2 py-2 text-xs font-bold tracking-tight transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+  const itemActiveClass = "bg-primary text-primary-foreground shadow-md"
+  const itemIdleClass = "text-muted-foreground hover:bg-accent hover:text-foreground"
+
   const nav = (
     <nav
       role="navigation"
       aria-label="Navegación principal"
       data-mobile-navbar
-      className="fixed inset-x-0 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-lg md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-6 md:hidden pointer-events-none bg-gradient-to-t from-background via-background/70 to-transparent"
       style={navStyle}
     >
-      <div className="mx-auto flex w-full max-w-3xl items-stretch justify-evenly gap-1">
+      <div className="pointer-events-auto mx-auto flex w-full max-w-md items-stretch justify-evenly gap-1 rounded-[26px] border border-border/60 bg-card/90 p-1.5 shadow-[0_10px_36px_-8px_rgba(2,6,23,0.35)] backdrop-blur-xl">
         {primaryItems.map((item) => {
           const Icon = item.icon
           const isActive = item.isActive(pathname)
@@ -212,14 +217,9 @@ export const MobileNavBar = ({
               to={item.to}
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                isActive
-                  ? "bg-blue-600/20 text-blue-400"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
-              )}
+              className={cn(itemBaseClass, isActive ? itemActiveClass : itemIdleClass)}
             >
-              <Icon className={cn("h-5 w-5", isActive && "text-blue-400")} aria-hidden="true" />
+              <Icon className="h-5 w-5" aria-hidden="true" />
               <span className="max-w-[5rem] truncate">{item.mobileLabel}</span>
             </Link>
           )
@@ -237,8 +237,8 @@ export const MobileNavBar = ({
                 type="button"
                 aria-label="Más opciones"
                 className={cn(
-                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:text-foreground hover:bg-accent",
-                  (open || activeInTray) && "bg-blue-600/20 text-blue-400",
+                  itemBaseClass,
+                  open || activeInTray ? itemActiveClass : itemIdleClass,
                 )}
               >
                 <MoreHorizontal className="h-5 w-5" aria-hidden="true" />

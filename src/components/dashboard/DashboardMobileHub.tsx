@@ -1,14 +1,22 @@
 import React, { useMemo, useState, useEffect } from "react";
 import {
-  Calendar as CalendarIcon, ChevronLeft, ChevronRight, MessageSquare,
+  Calendar as CalendarIcon, MessageSquare,
   Mail, MoreVertical, Edit, Trash2, Filter, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { format, addDays, subDays, isWithinInterval, startOfDay, endOfDay, isToday } from "date-fns";
+import { format, isWithinInterval, startOfDay, endOfDay, isToday } from "date-fns";
 import { es } from "date-fns/locale";
+import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
+import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
+import { MobileTile } from "@/components/mobile/MobileTile";
+import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
+import { MobileNowDivider } from "@/components/mobile/MobileNowDivider";
+import { MobileTimelineItem, type MobileTimelineState } from "@/components/mobile/MobileTimelineItem";
+import { getJobLocationName } from "@/components/mobile/job-location";
+import { useProgramaWindows } from "@/hooks/useProgramaWindows";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,17 +57,6 @@ const themeTokens = {
   accent: "bg-primary text-primary-foreground",
   hover: "hover:bg-accent",
 };
-
-const getJobLocationName = (job: any) =>
-  (typeof job.location === "string" && job.location) ||
-  job.location?.name ||
-  job.location?.formatted_address ||
-  job.location_data?.name ||
-  job.location_data?.formatted_address ||
-  job.locations?.name ||
-  job.venue_name ||
-  job.venue ||
-  "Sin ubicación";
 
 export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   jobs,
@@ -210,9 +207,54 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [jobs, selectedDate, selectedJobTypes, selectedJobStatuses]);
 
-  const handlePrevDay = () => onDateSelect(subDays(selectedDate, 1));
-  const handleNextDay = () => onDateSelect(addDays(selectedDate, 1));
   const handleToday = () => onDateSelect(new Date());
+
+  // Job start/end are preliminary values from creation; the hoja de ruta
+  // programa holds the real schedule when production has filled it in.
+  const programaWindows = useProgramaWindows(
+    selectedDateJobs.map((job) => job.id),
+    selectedDate,
+  );
+
+  const effectiveTimes = (job: { id: string; start_time: string; end_time: string }) => {
+    const window = programaWindows[job.id];
+    return window
+      ? { start: window.start.getTime(), end: window.end.getTime() }
+      : { start: new Date(job.start_time).getTime(), end: new Date(job.end_time).getTime() };
+  };
+
+  // Programa times can reorder the day relative to the preliminary job times.
+  const agendaJobs = useMemo(
+    () =>
+      [...selectedDateJobs].sort(
+        (a, b) => effectiveTimes(a).start - effectiveTimes(b).start,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedDateJobs, programaWindows],
+  );
+
+  // Where today's "Ahora" divider slots into the ordered job list: before the
+  // first job that hasn't started yet (list end if everything is underway).
+  const nowDividerIndex = useMemo(() => {
+    if (!isToday(selectedDate)) return -1;
+    const now = Date.now();
+    const idx = agendaJobs.findIndex((job) => effectiveTimes(job).start > now);
+    return idx === -1 ? agendaJobs.length : idx;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendaJobs, selectedDate, programaWindows]);
+
+  const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+  const jobDateTypeForDay = (job: { job_date_types?: Array<{ date: string; type: string }> | null }): string | null =>
+    job.job_date_types?.find((dt) => dt.date === selectedDateKey)?.type ?? null;
+
+  const jobTimelineState = (job: { id: string; start_time: string; end_time: string }): MobileTimelineState => {
+    if (!isToday(selectedDate)) return "none";
+    const now = Date.now();
+    const { start, end } = effectiveTimes(job);
+    if (end < now) return "past";
+    if (start <= now) return "live";
+    return "upcoming";
+  };
 
   // User display name and initials
   const userName = userProfile?.first_name && userProfile?.last_name
@@ -229,61 +271,45 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
 
   return (
     <div className={cn("min-h-screen", themeTokens.bg, "font-sans pb-24")}>
-      <div className="max-w-md mx-auto space-y-6 p-4">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
-              <span>Panel</span>
-            </div>
-            <h2 className={cn("text-2xl font-bold", themeTokens.textMain)}>Agenda</h2>
-          </div>
-          <Avatar className="h-12 w-12 shadow-lg ring-2 ring-blue-500/20">
-            {profilePictureUrl && (
-              <AvatarImage src={profilePictureUrl} alt={userName} />
-            )}
-            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
-              {userInitials}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+      <div className="max-w-md mx-auto space-y-5 p-4">
+        <MobileScreenHeader
+          kicker="Panel"
+          title="Agenda"
+          subtitle={format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
+          accent="default"
+          right={
+            <Avatar className="h-12 w-12 ring-2 ring-border">
+              {profilePictureUrl && (
+                <AvatarImage src={profilePictureUrl} alt={userName} />
+              )}
+              <AvatarFallback className="bg-indigo-600 font-bold text-white">
+                {userInitials}
+              </AvatarFallback>
+            </Avatar>
+          }
+        />
 
         {/* Quick Actions */}
         {canEdit && (onMessagesClick || onEmailClick) && (
-          <div>
-            <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", themeTokens.textMuted)}>Acciones rápidas</h3>
-            <div className="flex gap-3">
-              {onMessagesClick && (
-                <button
-                  onClick={onMessagesClick}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-xl border flex-1 h-[80px] transition-all",
-                    themeTokens.toolBg,
-                    "hover:border-blue-500 hover:scale-105 active:scale-95"
-                  )}
-                >
-                  <MessageSquare size={24} className="mb-2 text-blue-500" />
-                  <span className={cn("text-xs font-bold text-center leading-tight", themeTokens.textMain)}>
-                    Mensajes
-                  </span>
-                </button>
-              )}
-              {onEmailClick && (
-                <button
-                  onClick={onEmailClick}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-xl border flex-1 h-[80px] transition-all",
-                    themeTokens.toolBg,
-                    "hover:border-blue-500 hover:scale-105 active:scale-95"
-                  )}
-                >
-                  <Mail size={24} className="mb-2 text-emerald-500" />
-                  <span className={cn("text-xs font-bold text-center leading-tight", themeTokens.textMain)}>
-                    Email
-                  </span>
-                </button>
-              )}
-            </div>
+          <div className="flex gap-3">
+            {onMessagesClick && (
+              <MobileTile
+                icon={MessageSquare}
+                label="Mensajes"
+                onClick={onMessagesClick}
+                accent="sound"
+                className="max-w-none flex-1"
+              />
+            )}
+            {onEmailClick && (
+              <MobileTile
+                icon={Mail}
+                label="Email"
+                onClick={onEmailClick}
+                accent="production"
+                className="max-w-none flex-1"
+              />
+            )}
           </div>
         )}
 
@@ -294,7 +320,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
             {distinctJobTypes.length > 0 && (
               <Popover open={isTypeFilterOpen} onOpenChange={setIsTypeFilterOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("flex-1", themeTokens.card)}>
+                  <Button variant="outline" size="sm" className={cn("h-10 flex-1 rounded-full", themeTokens.card)}>
                     <Filter className="h-4 w-4 mr-2" />
                     <span className={themeTokens.textMain}>Tipo</span>
                     {selectedJobTypes.length > 0 && (
@@ -333,7 +359,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
             {distinctJobStatuses.length > 0 && (
               <Popover open={isStatusFilterOpen} onOpenChange={setIsStatusFilterOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("flex-1", themeTokens.card)}>
+                  <Button variant="outline" size="sm" className={cn("h-10 flex-1 rounded-full", themeTokens.card)}>
                     <Filter className="h-4 w-4 mr-2" />
                     <span className={themeTokens.textMain}>Estado</span>
                     {selectedJobStatuses.length > 0 && (
@@ -371,41 +397,22 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
         )}
 
         {/* Date Navigation */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrevDay}
-              className={cn("p-1 rounded", themeTokens.hover, themeTokens.textMain)}
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button type="button" className="text-center cursor-pointer" onClick={handleToday}>
-              <div className={cn("text-lg font-bold", themeTokens.textMain)}>
-                {isToday(selectedDate) ? "Hoy" : format(selectedDate, "d MMM", { locale: es })}
-              </div>
-              <div className={cn("text-xs", themeTokens.textMuted)}>
-                {format(selectedDate, "EEE", { locale: es })}
-              </div>
-            </button>
-            <button
-              onClick={handleNextDay}
-              className={cn("p-1 rounded", themeTokens.hover, themeTokens.textMain)}
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn("rounded-lg px-3", themeTokens.card, themeTokens.textMain)}
-              onClick={handleToday}
-            >
-              Hoy
-            </Button>
+        <div className="space-y-2">
+          <MobileWeekStrip selectedDate={selectedDate} onSelect={onDateSelect} accent="default" />
+          <div className="flex items-center justify-end gap-2">
+            {!isToday(selectedDate) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("h-10 rounded-full px-4 font-bold", themeTokens.card, themeTokens.textMain)}
+                onClick={handleToday}
+              >
+                Hoy
+              </Button>
+            )}
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="icon" className={cn("rounded-lg", themeTokens.card)}>
+                <Button variant="outline" size="icon" className={cn("h-10 w-10 rounded-full", themeTokens.card)}>
                   <CalendarIcon className={cn("h-4 w-4", themeTokens.textMain)} />
                 </Button>
               </PopoverTrigger>
@@ -447,7 +454,8 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
               </div>
             </Card>
           ) : (
-            selectedDateJobs.map((job) => {
+            <>
+            {agendaJobs.map((job, jobIndex) => {
               const jobColor = job.color || "#3b82f6";
               const jobTimezone = job.timezone || 'Europe/Madrid';
               const assignedCount = job.job_assignments?.length || 0;
@@ -470,94 +478,68 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
               const departments = job.job_departments?.map((d: any) => d.department) || [];
 
               return (
-                <Card
-                  key={job.id}
-                  className={cn(
-                    "p-4 rounded-xl border-l-4 transition-all",
-                    themeTokens.card
-                  )}
-                  style={{ borderLeftColor: jobColor }}
+                <React.Fragment key={job.id}>
+                {jobIndex === nowDividerIndex && <MobileNowDivider accent="default" inTimeline />}
+                <MobileTimelineItem
+                  accent="default"
+                  state={jobTimelineState(job)}
+                  isFirst={jobIndex === 0 && nowDividerIndex !== 0}
+                  isLast={jobIndex === agendaJobs.length - 1 && nowDividerIndex !== agendaJobs.length}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <h3 className={cn("font-bold text-lg", themeTokens.textMain)}>
-                        {getCalendarJobDisplayTitle(job, selectedDate)}
-                      </h3>
-                      <div className={cn("text-xs mt-1", themeTokens.textMuted)}>
-                        {getJobLocationName(job)}
-                      </div>
-                      {departments.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {departments.map((dept: string) => (
-                            <span
-                              key={dept}
-                              className={cn("px-2 py-0.5 rounded text-xs font-bold uppercase bg-muted", themeTokens.textMuted)}
-                            >
-                              {dept}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {job.status && (
-                        <span className={cn(
-                          "px-2 py-0.5 rounded text-xs font-bold uppercase",
-                          job.status.toLowerCase() === 'confirmado' ? "bg-cyan-500/10 text-cyan-500" :
-                          job.status.toLowerCase() === 'tentativa' ? "bg-blue-500/10 text-blue-500" :
-                          job.status.toLowerCase() === 'completado' ? "bg-purple-500/10 text-purple-500" :
-                          job.status.toLowerCase() === 'cancelado' ? "bg-red-500/10 text-red-500" :
-                          "bg-slate-500/10 text-slate-500"
-                        )}>
-                          {job.status}
-                        </span>
-                      )}
-                      {canEdit && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical size={16} className={themeTokens.textMuted} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className={cn("min-w-[140px]", themeTokens.card, themeTokens.textMain)}>
-                            <DropdownMenuItem onClick={() => onEditClick(job)}>
-                              <Edit size={14} className="mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onDeleteClick(job.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 size={14} className="mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={cn("flex items-center gap-4 text-xs mt-3 pb-3 border-b border-dashed", themeTokens.textMuted, themeTokens.divider)}>
-                    <div>
-                      {formatInJobTimezone(job.start_time, "HH:mm", jobTimezone)} - {formatInJobTimezone(job.end_time, "HH:mm", jobTimezone)}
-                    </div>
-                    <div>
-                      {assignedCount}/{totalNeeded || assignedCount} técnicos
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <Button
-                      className="w-full"
-                      variant="default"
-                      onClick={() => onJobClick(job.id)}
-                    >
-                      Ver Detalles
-                    </Button>
-                  </div>
-                </Card>
+                <div
+                  className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300"
+                  style={{ animationDelay: `${Math.min(jobIndex, 8) * 45}ms` }}
+                >
+                <MobileAgendaJobCard
+                  title={getCalendarJobDisplayTitle(job, selectedDate)}
+                  locationName={getJobLocationName(job)}
+                  status={job.status}
+                  jobColor={jobColor}
+                  startLabel={programaWindows[job.id]?.startLabel ?? formatInJobTimezone(job.start_time, "HH:mm", jobTimezone)}
+                  endLabel={programaWindows[job.id]?.endLabel ?? formatInJobTimezone(job.end_time, "HH:mm", jobTimezone)}
+                  timesSource={programaWindows[job.id] ? "programa" : "job"}
+                  departments={departments}
+                  assignedCount={assignedCount}
+                  neededCount={totalNeeded || undefined}
+                  accent="default"
+                  live={jobTimelineState(job) === "live"}
+                  dateType={jobDateTypeForDay(job)}
+                  primaryLabel="Ver detalles"
+                  onPrimary={() => onJobClick(job.id)}
+                  menu={
+                    canEdit ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 -mr-1 -mt-1 coarse-hit-target coarse-hit-target-36">
+                            <MoreVertical size={16} className={themeTokens.textMuted} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className={cn("min-w-[140px]", themeTokens.card, themeTokens.textMain)}>
+                          <DropdownMenuItem onClick={() => onEditClick(job)}>
+                            <Edit size={14} className="mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onDeleteClick(job.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 size={14} className="mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : undefined
+                  }
+                />
+                </div>
+                </MobileTimelineItem>
+                </React.Fragment>
               );
-            })
+            })}
+            {agendaJobs.length > 0 && nowDividerIndex === agendaJobs.length && (
+              <MobileNowDivider accent="default" inTimeline />
+            )}
+            </>
           )}
         </div>
       </div>

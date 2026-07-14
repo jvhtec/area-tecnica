@@ -1,16 +1,26 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin,
-  Truck, Users, Plus, MoreVertical, Edit, Trash2, Filter, Check
+  Calendar as CalendarIcon, ChevronRight,
+  Plus, MoreVertical, Edit, Trash2, Filter, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTechnicianTheme } from "@/hooks/useTechnicianTheme";
 import { cn } from "@/lib/utils";
-import { addDays, endOfDay, format, isToday, isWithinInterval, startOfDay, subDays } from "date-fns";
+import { endOfDay, format, isToday, isWithinInterval, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { MobileScreenHeader } from "@/components/mobile/MobileScreenHeader";
+import { MobileWeekStrip } from "@/components/mobile/MobileWeekStrip";
+import { MobileTile } from "@/components/mobile/MobileTile";
+import { MobileAgendaJobCard } from "@/components/mobile/MobileAgendaJobCard";
+import { MobileNowDivider } from "@/components/mobile/MobileNowDivider";
+import { MobileTimelineItem, type MobileTimelineState } from "@/components/mobile/MobileTimelineItem";
+import { getJobLocationName } from "@/components/mobile/job-location";
+import { useProgramaWindows } from "@/hooks/useProgramaWindows";
+import { getMobileAccent, type MobileAccentKey } from "@/components/mobile/mobile-accents";
+import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -257,46 +267,86 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
     });
   }, [filteredJobs, selectedDate]);
 
-  const handlePrevDay = () => onDateSelect(subDays(selectedDate, 1));
-  const handleNextDay = () => onDateSelect(addDays(selectedDate, 1));
   const handleToday = () => onDateSelect(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Job start/end are preliminary values from creation; the hoja de ruta
+  // programa holds the real schedule when production has filled it in.
+  const programaWindows = useProgramaWindows(
+    selectedDateJobs.map((job) => job.id),
+    selectedDate,
+  );
+
+  const effectiveTimes = (job: { id: string; start_time: string; end_time: string }) => {
+    const window = programaWindows[job.id];
+    return window
+      ? { start: window.start.getTime(), end: window.end.getTime() }
+      : { start: new Date(job.start_time).getTime(), end: new Date(job.end_time).getTime() };
+  };
+
+  // Programa times can reorder the day relative to the preliminary job times.
+  const agendaJobs = useMemo(
+    () =>
+      [...selectedDateJobs].sort(
+        (a, b) => effectiveTimes(a).start - effectiveTimes(b).start,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedDateJobs, programaWindows],
+  );
+
+  // Where today's "Ahora" divider slots into the ordered job list: before the
+  // first job that hasn't started yet (list end if everything is underway).
+  const nowDividerIndex = useMemo(() => {
+    if (!isToday(selectedDate)) return -1;
+    const now = Date.now();
+    const idx = agendaJobs.findIndex((job) => effectiveTimes(job).start > now);
+    return idx === -1 ? agendaJobs.length : idx;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendaJobs, selectedDate, programaWindows]);
+
+  const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+  const jobDateTypeForDay = (job: { job_date_types?: Array<{ date: string; type: string }> | null }): string | null =>
+    job.job_date_types?.find((dt) => dt.date === selectedDateKey)?.type ?? null;
+
+  const jobTimelineState = (job: { id: string; start_time: string; end_time: string }): MobileTimelineState => {
+    if (!isToday(selectedDate)) return "none";
+    const now = Date.now();
+    const { start, end } = effectiveTimes(job);
+    if (end < now) return "past";
+    if (start <= now) return "live";
+    return "upcoming";
+  };
+
+  const accentKey = department as MobileAccentKey;
+  const accent = getMobileAccent(accentKey);
 
   if (!isMobile) return null;
 
   return (
     <div className={cn("min-h-screen", t.bg, "font-sans p-1 transition-colors duration-300")}>
-      <div className="max-w-md mx-auto space-y-6">
-        {/* Header */}
-        <div>
-          <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
-            <Icon className="h-5 w-5" />
-            <span>Departamento</span>
-          </div>
-          <h2 className={cn("text-2xl font-bold", t.textMain)}>{title}</h2>
-        </div>
+      <div className="max-w-md mx-auto space-y-5 p-3">
+        <MobileScreenHeader
+          kicker="Departamento"
+          title={title}
+          subtitle={format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
+          accent={accentKey}
+          icon={Icon}
+        />
 
         {/* Quick Tools */}
         <div>
-          <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", t.textMuted)}>Herramientas rápidas</h3>
+          <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-2", t.textMuted)}>Herramientas rápidas</h3>
           <div className="relative -mr-1">
             <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto no-scrollbar pb-2 pr-10">
             {tools.map((tool, idx) => (
-              <button
+              <MobileTile
                 key={idx}
-                type="button"
+                icon={tool.icon}
+                label={tool.label}
+                accent={accentKey}
+                iconClassName={tool.color}
                 onClick={tool.onClick || (tool.to ? () => navigate(tool.to!) : undefined)}
-                className={cn(
-                  "flex h-[80px] min-w-[80px] snap-start flex-shrink-0 flex-col items-center justify-center rounded-xl border p-3 transition-all",
-                  t.toolBg,
-                  "hover:border-blue-500 hover:scale-105 active:scale-95"
-                )}
-              >
-                <tool.icon size={24} className={cn("mb-2", tool.color || "text-blue-500")} />
-                <span className={cn("text-xs font-bold text-center leading-tight", t.textMain)}>
-                  {tool.label}
-                </span>
-              </button>
+              />
             ))}
             </div>
             {tools.length > 3 && (
@@ -348,7 +398,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
             {distinctJobTypes.length > 0 && (
               <Popover open={isTypeFilterOpen} onOpenChange={setIsTypeFilterOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("flex-1", t.card)}>
+                  <Button variant="outline" size="sm" className={cn("h-10 flex-1 rounded-full", t.card)}>
                     <Filter className="h-4 w-4 mr-2" />
                     <span className={t.textMain}>Tipo</span>
                     {selectedJobTypes.length > 0 && (
@@ -387,7 +437,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
             {distinctJobStatuses.length > 0 && (
               <Popover open={isStatusFilterOpen} onOpenChange={setIsStatusFilterOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("flex-1", t.card)}>
+                  <Button variant="outline" size="sm" className={cn("h-10 flex-1 rounded-full", t.card)}>
                     <Filter className="h-4 w-4 mr-2" />
                     <span className={t.textMain}>Estado</span>
                     {selectedJobStatuses.length > 0 && (
@@ -425,41 +475,22 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
         )}
 
         {/* Date Navigation */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrevDay}
-              className={cn("p-1 rounded hover:bg-white/10", t.textMain)}
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button type="button" className="text-center cursor-pointer" onClick={handleToday}>
-              <div className={cn("text-lg font-bold", t.textMain)}>
-                {isToday(selectedDate) ? "Hoy" : format(selectedDate, "d MMM", { locale: es })}
-              </div>
-              <div className={cn("text-xs", t.textMuted)}>
-                {format(selectedDate, "EEE", { locale: es })}
-              </div>
-            </button>
-            <button
-              onClick={handleNextDay}
-              className={cn("p-1 rounded hover:bg-white/10", t.textMain)}
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn("rounded-lg px-3", t.card, t.textMain)}
-              onClick={handleToday}
-            >
-              Hoy
-            </Button>
+        <div className="space-y-2">
+          <MobileWeekStrip selectedDate={selectedDate} onSelect={onDateSelect} accent={accentKey} />
+          <div className="flex items-center justify-end gap-2">
+            {!isToday(selectedDate) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("h-10 rounded-full px-4 font-bold", t.card, t.textMain)}
+                onClick={handleToday}
+              >
+                Hoy
+              </Button>
+            )}
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="icon" className={cn("rounded-lg", t.card)}>
+                <Button variant="outline" size="icon" className={cn("h-10 w-10 rounded-full", t.card)}>
                   <CalendarIcon className={cn("h-4 w-4", t.textMain)} />
                 </Button>
               </PopoverTrigger>
@@ -484,13 +515,17 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
         {/* Job List */}
         <div className="space-y-3">
           {canCreateJob && onCreateJob && (
-            <Button
+            <button
+              type="button"
               onClick={onCreateJob}
-              className={cn("w-full rounded-xl text-base font-semibold", t.accent)}
+              className={cn(
+                "flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-base font-bold shadow-md transition-all active:scale-[0.98]",
+                accent.fill,
+              )}
             >
-              <Plus className="h-5 w-5 mr-2" />
+              <Plus className="h-5 w-5" aria-hidden="true" />
               Crear trabajo
-            </Button>
+            </button>
           )}
 
           {isLoading ? (
@@ -511,114 +546,84 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
               </div>
             </Card>
           ) : (
-            selectedDateJobs.map((job) => {
+            <>
+            {agendaJobs.map((job, jobIndex) => {
               const techniciansCount = job.job_assignments?.length ?? job.assignments_count ?? job.crew_size ?? 0;
               const trucksCount = job.logistics_events?.length ?? job.trucks_count ?? 0;
               const isProduction = job.status === "production";
               const jobColor = job.color || (isProduction ? "#10b981" : "#3b82f6");
+              const hasSchedule = Boolean(job.start_time && job.end_time);
 
               return (
-                <Card
-                  key={job.id}
-                  className={cn(
-                    "p-3 rounded-xl border-l-4 transition-all",
-                    t.card
-                  )}
-                  style={{ borderLeftColor: jobColor }}
+                <React.Fragment key={job.id}>
+                {jobIndex === nowDividerIndex && <MobileNowDivider accent={accentKey} inTimeline />}
+                <MobileTimelineItem
+                  accent={accentKey}
+                  state={jobTimelineState(job)}
+                  isFirst={jobIndex === 0 && nowDividerIndex !== 0}
+                  isLast={jobIndex === agendaJobs.length - 1 && nowDividerIndex !== agendaJobs.length}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <h3 className={cn("font-bold text-lg", t.textMain)}>
-                        {getCalendarJobDisplayTitle(job, selectedDate)}
-                      </h3>
-                      <div className={cn("text-xs flex items-center gap-1 mt-0.5", t.textMuted)}>
-                        <MapPin size={12} />
-                        {job.location?.name || "Sin ubicación"}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {(() => {
-                        const statusLower = (job.status || "").toLowerCase();
-                        const statusColorMap: Record<string, string> = {
-                          tentativa: "bg-blue-500/10 text-blue-500",
-                          confirmado: "bg-cyan-500/10 text-cyan-500",
-                          completado: "bg-purple-500/10 text-purple-500",
-                          cancelado: "bg-red-500/10 text-red-500",
-                        };
-                        const colorClass = statusColorMap[statusLower] || "bg-slate-500/10 text-slate-500";
-
-                        return (
-                          <span className={cn("px-2 py-0.5 rounded text-xs font-bold uppercase", colorClass)}>
-                            {job.status || "Sin estado"}
-                          </span>
-                        );
-                      })()}
-                      {canEdit && onEditJob && onDeleteJob && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical size={16} className={t.textMuted} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className={cn("min-w-[140px]", t.card, t.textMain)}>
-                            <DropdownMenuItem onClick={() => onEditJob(job)}>
-                              <Edit size={14} className="mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onDeleteJob(job.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 size={14} className="mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={cn("flex items-center gap-4 text-xs mt-3 pb-3 border-b border-dashed", t.textMuted, t.divider)}>
-                    <div className="flex items-center gap-1.5">
-                      <Clock size={14} />
-                      {job.start_time && job.end_time
-                        ? `${format(new Date(job.start_time), "HH:mm")} - ${format(new Date(job.end_time), "HH:mm")}`
-                        : 'Horario pendiente'}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Users size={14} />
-                      {techniciansCount} técnicos
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Truck size={14} />
-                      {trucksCount} camiones
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => onViewDetails?.(job)}
-                    >
-                      Ver detalles
-                    </Button>
-                    <Button
-                      className={cn("flex-1", t.accent)}
-                      onClick={() => {
-                        if (onManageAssignments) {
-                          onManageAssignments(job);
-                          return;
-                        }
-                        onJobClick?.(job.id);
-                      }}
-                    >
-                      Gestionar
-                    </Button>
-                  </div>
-                </Card>
+                <div
+                  className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-300"
+                  style={{ animationDelay: `${Math.min(jobIndex, 8) * 45}ms` }}
+                >
+                <MobileAgendaJobCard
+                  title={getCalendarJobDisplayTitle(job, selectedDate)}
+                  locationName={getJobLocationName(job)}
+                  status={job.status || "Sin estado"}
+                  jobColor={jobColor}
+                  startLabel={programaWindows[job.id]?.startLabel ?? (hasSchedule ? formatInJobTimezone(job.start_time, "HH:mm", job.timezone || "Europe/Madrid") : "--:--")}
+                  endLabel={programaWindows[job.id]?.endLabel ?? (hasSchedule ? formatInJobTimezone(job.end_time, "HH:mm", job.timezone || "Europe/Madrid") : "--:--")}
+                  timesSource={programaWindows[job.id] ? "programa" : "job"}
+                  assignedCount={techniciansCount}
+                  trucksCount={trucksCount}
+                  accent={accentKey}
+                  live={jobTimelineState(job) === "live"}
+                  dateType={jobDateTypeForDay(job)}
+                  secondaryLabel="Ver detalles"
+                  onSecondary={() => onViewDetails?.(job)}
+                  primaryLabel="Gestionar"
+                  onPrimary={() => {
+                    if (onManageAssignments) {
+                      onManageAssignments(job);
+                      return;
+                    }
+                    onJobClick?.(job.id);
+                  }}
+                  menu={
+                    canEdit && onEditJob && onDeleteJob ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 -mr-1 -mt-1 coarse-hit-target coarse-hit-target-36">
+                            <MoreVertical size={16} className={t.textMuted} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className={cn("min-w-[140px]", t.card, t.textMain)}>
+                          <DropdownMenuItem onClick={() => onEditJob(job)}>
+                            <Edit size={14} className="mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onDeleteJob(job.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 size={14} className="mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : undefined
+                  }
+                />
+                </div>
+                </MobileTimelineItem>
+                </React.Fragment>
               );
-            })
+            })}
+            {agendaJobs.length > 0 && nowDividerIndex === agendaJobs.length && (
+              <MobileNowDivider accent={accentKey} inTimeline />
+            )}
+            </>
           )}
         </div>
       </div>
