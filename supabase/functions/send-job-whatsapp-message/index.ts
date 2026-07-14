@@ -16,6 +16,7 @@ import {
   signJobHojaLink,
 } from "../_shared/hojaLinkToken.ts";
 import { checkAndRecordWhatsappQuota } from "../_shared/whatsappQuota.ts";
+import { resolveWhatsappSendConcurrency } from "../_shared/whatsappSendPolicy.ts";
 
 /** Request payload for sending a WhatsApp message to multiple assigned users. */
 type SendRequest = {
@@ -366,7 +367,7 @@ serve(createHttpHandler(async (req: Request) => {
     // Concurrency note: Deno JS is single-threaded, so mutating `queue`/`sentCount` is safe
     // as long as we only do it between `await` points (which we do in this loop).
     const queue = [...sendTargets];
-    const concurrency = Math.max(1, Math.min(4, Number(Deno.env.get("WAHA_SEND_CONCURRENCY") || 4)));
+    const concurrency = resolveWhatsappSendConcurrency(Deno.env.get("WAHA_SEND_CONCURRENCY"));
 
     let attachmentSentCount = 0;
     let attachmentLinkFallbackCount = 0;
