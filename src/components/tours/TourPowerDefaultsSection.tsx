@@ -180,9 +180,10 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
         </CardHeader>
         <CardContent>
           <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            Legacy manual entry: watts and current are stored independently without voltage,
-            phase, margin, or power-factor assumptions. Reports label these records as estimates.
-            Use the department Consumos calculator for reproducible calculations.
+            Entrada manual heredada: los vatios y la corriente se guardan por separado, sin
+            hipótesis de tensión, fase, margen ni factor de potencia. Los informes marcan estos
+            registros como estimaciones. Usa la calculadora de Consumos del departamento para
+            obtener cálculos reproducibles.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

@@ -41,7 +41,7 @@ describe("power aggregation", () => {
 
     expect(aggregate.currentLine).toBeNull();
     expect(aggregate.totalVa).toBeNull();
-    expect(aggregate.reason).toContain("asignacion de fase");
+    expect(aggregate.reason).toContain("asignación de fase");
   });
 
   it("does not fabricate totals for mixed supplies", () => {
@@ -51,6 +51,6 @@ describe("power aggregation", () => {
     ]);
 
     expect(aggregate.currentLine).toBeNull();
-    expect(aggregate.reason).toContain("monofasicos y trifasicos");
+    expect(aggregate.reason).toContain("monofásicos y trifásicos");
   });
 });

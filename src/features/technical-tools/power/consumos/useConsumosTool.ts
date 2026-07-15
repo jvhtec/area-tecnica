@@ -77,7 +77,10 @@ import {
   useCustomPowerComponents,
 } from "./useCustomPowerComponents";
 import { useConsumosComponents } from "./useConsumosComponents";
-import { downloadPdfBlob, type ConsumosJob } from "./consumosUtils";
+import {
+  downloadPdfBlob,
+  type ConsumosJob,
+} from "@/features/technical-tools/power/consumos/consumosUtils";
 
 const DEFAULT_PDU_SELECT_VALUE = "default";
 const CUSTOM_PDU_SELECT_VALUE = "Custom";
@@ -641,6 +644,9 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         setSelectedPduType(CUSTOM_PDU_SELECT_VALUE);
         setCustomPduType(table.customPduType);
       }
+    } else if (table.pduType && tablePduOptions.includes(table.pduType)) {
+      setSelectedPduType(table.pduType);
+      setCustomPduType("");
     } else {
       setSelectedPduType(DEFAULT_PDU_SELECT_VALUE);
       setCustomPduType("");
@@ -729,6 +735,9 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         setSelectedPduType(CUSTOM_PDU_SELECT_VALUE);
         setCustomPduType(override.custom_pdu_type);
       }
+    } else if (override.pdu_type && restoredPduOptions.includes(override.pdu_type)) {
+      setSelectedPduType(override.pdu_type);
+      setCustomPduType("");
     } else {
       setSelectedPduType(DEFAULT_PDU_SELECT_VALUE);
       setCustomPduType("");
@@ -1168,44 +1177,46 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     }
   };
 
-  const hydrateDisplayPowerTable = (
-    input: Omit<Parameters<typeof hydratePowerTable>[0], "defaults">,
-  ) =>
-    hydratePowerTable({
-      ...input,
-      defaults: {
-        fallbackPowerFactor: config.defaultPowerFactor ?? 0.9,
-        fallbackSafetyMargin: safetyMargin,
-        phaseMode,
-        powerFactor: pf,
-        perRowPowerFactor: perRowPf,
-      },
-    });
+  const hydrateDisplayPowerTable = useCallback(
+    (input: Omit<Parameters<typeof hydratePowerTable>[0], "defaults">) =>
+      hydratePowerTable({
+        ...input,
+        defaults: {
+          fallbackPowerFactor: config.defaultPowerFactor ?? 0.9,
+          fallbackSafetyMargin: safetyMargin,
+          phaseMode,
+          powerFactor: pf,
+          perRowPowerFactor: perRowPf,
+        },
+      }),
+    [config.defaultPowerFactor, safetyMargin, phaseMode, pf, perRowPf],
+  );
 
-  const mapTourDefaultTableToPowerTable = (
-    table: TourDefaultTable,
-  ): PowerTable => {
-    const rows: PowerTableRow[] = table.table_data?.rows || [];
-    const snapshot = mergeStoredPowerSnapshot(table.metadata, table.table_data);
-    const pduType = table.metadata?.pdu_type || "";
-    const customPduType = table.metadata?.custom_pdu_type || undefined;
-    return hydrateDisplayPowerTable({
-      id: `new-default-${table.id}`,
-      name: table.table_name,
-      rows,
-      totalWatts: table.total_value || 0,
-      snapshot,
-      pduType,
-      customPduType,
-      patch: {
-        position: table.metadata?.position || undefined,
-        customPosition: table.metadata?.custom_position || undefined,
-        includesHoist: table.metadata?.includes_hoist || false,
-        isDefault: true,
-        defaultTableId: table.id,
-      },
-    });
-  };
+  const mapTourDefaultTableToPowerTable = useCallback(
+    (table: TourDefaultTable): PowerTable => {
+      const rows: PowerTableRow[] = table.table_data?.rows || [];
+      const snapshot = mergeStoredPowerSnapshot(table.metadata, table.table_data);
+      const pduType = table.metadata?.pdu_type || "";
+      const customPduType = table.metadata?.custom_pdu_type || undefined;
+      return hydrateDisplayPowerTable({
+        id: `new-default-${table.id}`,
+        name: table.table_name,
+        rows,
+        totalWatts: table.total_value || 0,
+        snapshot,
+        pduType,
+        customPduType,
+        patch: {
+          position: table.metadata?.position || undefined,
+          customPosition: table.metadata?.custom_position || undefined,
+          includesHoist: table.metadata?.includes_hoist || false,
+          isDefault: true,
+          defaultTableId: table.id,
+        },
+      });
+    },
+    [hydrateDisplayPowerTable],
+  );
 
   const copySourceTables = (defaultTables || [])
     .filter(
@@ -1315,8 +1326,15 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         },
       });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultSets.length, defaultTables, selectedDefaultSetId, legacyTourDefaults, features.legacyTourDefaultsFallback, safetyMargin, pf]);
+  }, [
+    defaultSets.length,
+    defaultTables,
+    selectedDefaultSetId,
+    legacyTourDefaults,
+    features.legacyTourDefaultsFallback,
+    hydrateDisplayPowerTable,
+    mapTourDefaultTableToPowerTable,
+  ]);
 
   // Read-only defaults shown in URL override mode
   const readOnlyDefaultTables: PowerTable[] = useMemo(() => {
@@ -1344,8 +1362,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
           },
         });
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isUrlOverrideMode, overrideData, safetyMargin, pf]);
+  }, [isUrlOverrideMode, overrideData, hydrateDisplayPowerTable]);
 
   // Persisted overrides for this tour date (department-scoped)
   const overrideDisplayTables: PowerTable[] = useMemo(
@@ -1380,8 +1397,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
             },
           });
         }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [powerOverrides, department, safetyMargin, pf],
+    [powerOverrides, department, hydrateDisplayPowerTable],
   );
 
   const getTourInfo = () => {

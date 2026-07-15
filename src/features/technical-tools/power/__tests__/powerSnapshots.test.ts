@@ -72,4 +72,27 @@ describe("power calculation snapshots", () => {
     expect(snapshot.totalVa).toBe(1000);
     expect(snapshot.currentLine).toBeCloseTo(1000 / 230);
   });
+
+  it("uses the stored total and fallback PF when legacy per-row data is unusable", () => {
+    const snapshot = buildLegacyPowerCalculationSnapshot({
+      fallbackPowerFactor: 0.9,
+      perRowPowerFactor: true,
+      rows: [
+        {
+          quantity: "0",
+          componentId: "fixture",
+          watts: "1000",
+          pf: "0.8",
+        },
+      ],
+      settings: { phaseMode: "three", safetyMargin: 0, voltage: 400 },
+      totalWatts: 900,
+    });
+
+    expect(snapshot.totalWatts).toBe(900);
+    expect(snapshot.totalVa).toBe(1000);
+    expect(snapshot.powerFactor).toBe(0.9);
+    expect(snapshot.powerFactorSource).toBe("legacy-default");
+    expect(parsePowerCalculationSnapshot(snapshot)).toEqual(snapshot);
+  });
 });

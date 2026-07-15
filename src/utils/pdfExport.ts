@@ -314,21 +314,26 @@ export const exportToPDF = async (
               calculation?.adjustedWatts ??
               table.adjustedWatts ??
               table.totalWatts * (1 + (effectiveMargin ?? 0) / 100);
+            const phaseMode = calculation?.phaseMode ?? table.phaseMode;
+            const totalVa = calculation?.totalVa ?? table.totalVa;
+            const currentLine = calculation?.currentLine ?? table.currentPerPhase;
             const selectedPdu = table.customPduType || table.pduType;
             const pduAmps = getPowerPduAmpRating(selectedPdu || '');
             const pduLimit = pduAmps === undefined
               ? undefined
               : pduAmps * POWER_PDU_PLANNING_LOAD_FACTOR;
-            const apparent = table.totalVa === undefined ? 'N/D' : `${(table.totalVa / 1000).toFixed(2)} kVA`;
-            const current = table.currentPerPhase === undefined ? 'N/D' : `${table.currentPerPhase.toFixed(2)} A`;
-            const phaseLabel = calculation?.phaseMode === 'three'
+            const apparent = totalVa === undefined ? 'N/D' : `${(totalVa / 1000).toFixed(2)} kVA`;
+            const current = currentLine === undefined ? 'N/D' : `${currentLine.toFixed(2)} A`;
+            const phaseLabel = phaseMode === 'three'
               ? unicodeFontFamily ? '3φ equilibrada' : 'trifásica equilibrada'
-              : unicodeFontFamily ? '1φ' : 'monofásica';
+              : phaseMode === 'single'
+                ? unicodeFontFamily ? '1φ' : 'monofásica'
+                : 'suministro no identificado';
             const pduStatus = pduLimit === undefined
               ? 'NO VERIFICABLE'
-              : table.currentPerPhase === undefined
+              : currentLine === undefined
                 ? 'SIN ESTADO'
-                : table.currentPerPhase <= pduLimit ? 'OK' : 'SOBRE LIMITE';
+                : currentLine <= pduLimit ? 'OK' : 'SOBRE LIMITE';
             const detailLines = [
               `Potencia: ${table.totalWatts.toFixed(2)} W; ajustada (${effectiveMargin ?? 0}%): ${adjustedWatts.toFixed(2)} W`,
               `Aparente: ${apparent}; corriente de línea: ${current}`,
@@ -345,14 +350,14 @@ export const exportToPDF = async (
 
             doc.setFontSize(9);
             doc.setTextColor(125, 1, 1);
-            doc.setFont('helvetica', 'normal');
+            doc.setFont(reportFontFamily, 'normal');
             detailLines.forEach((line) => {
               if (line.includes('SOBRE LIMITE') || line.includes('NO VERIFICABLE')) doc.setTextColor(180, 30, 30);
               else doc.setTextColor(125, 1, 1);
               doc.text(line, 14, yPosition);
               yPosition += 7;
             });
-            doc.setFont(reportFontFamily, 'normal');
+            doc.setFont('helvetica', 'normal');
             yPosition += 3;
           }
 

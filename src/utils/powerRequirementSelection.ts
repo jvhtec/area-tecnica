@@ -1,12 +1,10 @@
 import type { Database } from '@/integrations/supabase/types';
 import { getResolvedPowerPosition } from '@/utils/powerPositions';
 import type { TechnicalPowerDepartment } from '@/utils/technicalPowerTypes';
+import { isRecord } from '@/utils/typeGuards';
 
 type PowerRequirementRow = Database['public']['Tables']['power_requirement_tables']['Row'];
 type IndexedRow = { row: PowerRequirementRow; inputIndex: number };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const getPowerRequirementStageNumber = (row: PowerRequirementRow) => {
   if (typeof row.stage_number === 'number') return row.stage_number;

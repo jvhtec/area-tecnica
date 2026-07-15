@@ -171,9 +171,11 @@ describe('exportToPDF', () => {
           rows: [{ quantity: '1', componentName: 'LED', watts: '100', totalWatts: 100, pf: '1.00' }],
           totalWatts: 100,
           adjustedWatts: first.adjustedWatts,
-          totalVa: first.totalVa,
-          currentPerPhase: first.currentLine,
+          totalVa: 9999,
+          currentPerPhase: 99,
+          phaseMode: 'three',
           calculation: first,
+          pduType: 'Schuko 16A',
           toolType: 'consumos',
         },
         {
@@ -216,6 +218,27 @@ describe('exportToPDF', () => {
       expect.stringContaining('ΣP/ΣQ'),
       14,
       expect.any(Number),
+    );
+    expect(pdf.text).toHaveBeenCalledWith(
+      'Aparente: 0.11 kVA; corriente de línea: 0.48 A',
+      14,
+      expect.any(Number),
+    );
+    expect(pdf.text).toHaveBeenCalledWith(
+      'PDU: Schuko 16A; límite 80% 12.8 A; OK',
+      14,
+      expect.any(Number),
+    );
+    const unicodeFontCallIndex = pdf.setFont.mock.calls.findIndex(
+      ([family]) => family === 'NotoSansPdf',
+    );
+    const unicodeTextCallIndex = pdf.text.mock.calls.findIndex(
+      ([text]) => typeof text === 'string' && text.includes('1φ'),
+    );
+    expect(unicodeFontCallIndex).toBeGreaterThanOrEqual(0);
+    expect(unicodeTextCallIndex).toBeGreaterThanOrEqual(0);
+    expect(pdf.setFont.mock.invocationCallOrder[unicodeFontCallIndex]).toBeLessThan(
+      pdf.text.mock.invocationCallOrder[unicodeTextCallIndex],
     );
     expect(pdfMocks.autoTable).toHaveBeenCalledWith(
       pdf,

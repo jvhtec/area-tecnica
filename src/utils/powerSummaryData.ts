@@ -36,6 +36,7 @@ import {
   resolveDefaultSetForTourDate,
   type TourPackageDateLike,
 } from '@/utils/tourPackages';
+import { isRecord } from '@/utils/typeGuards';
 
 type TypedSupabaseClient = SupabaseClient<Database>;
 type PowerRequirementTableRow = Database['public']['Tables']['power_requirement_tables']['Row'];
@@ -89,14 +90,17 @@ const buildDepartmentSummary = ({
   };
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const DEPARTMENT_POWER_FACTOR: Record<TechnicalPowerDepartment, number> = {
   sound: 0.95,
   lights: 0.9,
   video: 0.9,
 };
+
+const isPowerTableRow = (value: unknown): value is PowerTableRow =>
+  isRecord(value) &&
+  typeof value.quantity === 'string' &&
+  typeof value.componentId === 'string' &&
+  typeof value.watts === 'string';
 
 const getJobPowerCalculation = (
   row: PowerRequirementTableRow,
@@ -104,9 +108,7 @@ const getJobPowerCalculation = (
 ) => {
   const data = isRecord(row.table_data) ? row.table_data : {};
   const phaseMode: PhaseMode = data.phaseMode === 'single' ? 'single' : 'three';
-  const rows = Array.isArray(data.rows)
-    ? (data.rows.filter(isRecord) as unknown as PowerTableRow[])
-    : [];
+  const rows = Array.isArray(data.rows) ? data.rows.filter(isPowerTableRow) : [];
   const storedPf =
     typeof data.pf === 'number' && data.pf > 0 && data.pf <= 1
       ? data.pf

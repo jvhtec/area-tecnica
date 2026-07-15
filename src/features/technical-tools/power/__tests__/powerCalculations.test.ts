@@ -84,12 +84,34 @@ describe("technical power calculations", () => {
     expect(totalVa).toBeCloseTo(2057.8, 1);
   });
 
-  it("rejects non-positive row and supply inputs before creating a table", () => {
+  it("rejects a non-positive row input before creating a table", () => {
     expect(() =>
       createCalculatedPowerTable({
         components: [{ id: "amp", name: "Amp", watts: 1000 }],
         currentTable: {
           rows: [{ quantity: "-1", componentId: "amp", watts: "1000" }],
+          position: undefined,
+          customPosition: undefined,
+        },
+        id: "invalid",
+        name: "Invalid",
+        pduOptions: getPowerPduOptions("sound", "single"),
+        settings: {
+          phaseMode: "single",
+          powerFactor: 0.9,
+          safetyMargin: 20,
+          voltage: 230,
+        },
+      }),
+    ).toThrow(PowerCalculationValidationError);
+  });
+
+  it("rejects a non-positive supply voltage before creating a table", () => {
+    expect(() =>
+      createCalculatedPowerTable({
+        components: [{ id: "amp", name: "Amp", watts: 1000 }],
+        currentTable: {
+          rows: [{ quantity: "1", componentId: "amp", watts: "1000" }],
           position: undefined,
           customPosition: undefined,
         },

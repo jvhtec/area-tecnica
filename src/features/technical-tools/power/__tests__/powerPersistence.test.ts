@@ -146,21 +146,23 @@ describe("technical power persistence payloads", () => {
   });
 
   it("builds tour default payloads with table data and metadata in one shape", () => {
-    expect(buildTourPowerDefaultTable({ setId: "set-1", settings, table })).toMatchObject({
+    const payload = buildTourPowerDefaultTable({ setId: "set-1", settings, table });
+
+    expect(payload).toMatchObject({
       set_id: "set-1",
       table_name: "Main",
       table_type: "power",
       total_value: 2000,
       metadata: {
-        calculation: expect.objectContaining({ version: 2 }),
+        calculation: table.calculation,
         current_per_phase: 3.849,
         phaseMode: "three",
         safetyMargin: 20,
         voltage: 400,
       },
-      table_data: expect.objectContaining({
-        calculation: expect.objectContaining({ version: 2 }),
-      }),
+      table_data: {
+        calculation: table.calculation,
+      },
     });
   });
 

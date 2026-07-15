@@ -29,7 +29,7 @@ export const UserManual = () => {
         return response.text();
       })
       .then((content) => { if (active) setManualContent(content); })
-      .catch(() => { if (active) setManualContent("# User Manual\n\nUnable to load the manual."); });
+      .catch(() => { if (active) setManualContent("# Manual de usuario\n\nNo se pudo cargar el manual."); });
     return () => { active = false; };
   }, []);
 

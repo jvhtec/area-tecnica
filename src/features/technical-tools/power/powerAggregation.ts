@@ -55,7 +55,7 @@ export const aggregatePowerCalculations = (
   if (calculations.some((calculation) => !calculation)) {
     return notAggregable(
       items,
-      "Falta un calculo reproducible.",
+      "Falta un cálculo reproducible.",
     );
   }
 
@@ -64,14 +64,14 @@ export const aggregatePowerCalculations = (
   if (phaseModes.size > 1) {
     return notAggregable(
       items,
-      "Mezcla suministros monofasicos y trifasicos.",
+      "Mezcla suministros monofásicos y trifásicos.",
     );
   }
 
   if (resolved.length > 1 && resolved.some((calculation) => calculation.phaseMode === "single")) {
     return notAggregable(
       items,
-      "Falta asignacion de fase para cargas monofasicas.",
+      "Falta asignación de fase para cargas monofásicas.",
     );
   }
 

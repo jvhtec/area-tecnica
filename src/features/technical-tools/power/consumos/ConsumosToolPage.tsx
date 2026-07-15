@@ -20,15 +20,15 @@ import {
   NO_POWER_POSITION_VALUE,
   POWER_POSITION_PRESETS,
 } from "@/utils/powerPositions";
-import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "./config";
-import { useConsumosTool } from "./useConsumosTool";
-import { CustomComponentDialog } from "./CustomComponentDialog";
+import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "@/features/technical-tools/power/consumos/config";
+import { useConsumosTool } from "@/features/technical-tools/power/consumos/useConsumosTool";
+import { CustomComponentDialog } from "@/features/technical-tools/power/consumos/CustomComponentDialog";
 import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerStagePlot";
 import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyToStageMenu";
 import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/QuickPresetsMenu";
 import type { PowerTable } from "@/features/technical-tools/power/types";
-import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
-import { PowerTableSummary } from "./PowerTableSummary";
+import { GeneratedPowerTableCard } from "@/features/technical-tools/power/consumos/GeneratedPowerTableCard";
+import { PowerTableSummary } from "@/features/technical-tools/power/consumos/PowerTableSummary";
 import {
   TOUR_PACKAGE_LABELS,
   TOUR_PACKAGE_SIZES,
@@ -756,8 +756,12 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                                   position: table.position,
                                   custom_position: table.customPosition,
                                   custom_pdu_type: table.customPduType,
+                                  pdu_type: table.pduType,
                                   includes_hoist: table.includesHoist,
-                                  override_data: { rows: table.rows },
+                                  override_data: {
+                                    rows: table.rows,
+                                    calculation: table.calculation,
+                                  },
                                 })
                               }
                               className="gap-2"

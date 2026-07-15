@@ -93,6 +93,9 @@ export const buildLegacyPowerCalculationSnapshot = ({
   settings: PowerElectricalSettings;
   totalWatts: number;
 }): PowerCalculationSnapshot => {
+  const rowsWithTotals = calculatePowerRows(rows, []);
+  const rowTotalWatts = sumPowerRows(rowsWithTotals);
+  const canReconstructPerRowPower = perRowPowerFactor && rowTotalWatts > 0;
   const normalizedSettings: PowerElectricalSettings = {
     safetyMargin:
       Number.isFinite(settings.safetyMargin) && settings.safetyMargin >= 0
@@ -103,25 +106,22 @@ export const buildLegacyPowerCalculationSnapshot = ({
       Number.isFinite(settings.voltage) && settings.voltage > 0
         ? settings.voltage
         : getVoltageForPhase(settings.phaseMode),
-    ...(perRowPowerFactor
+    ...(canReconstructPerRowPower
       ? {}
       : { powerFactor: safePowerFactor(settings.powerFactor, fallbackPowerFactor) }),
   };
-  const rowsWithTotals = calculatePowerRows(rows, []);
-  const rawApparentPowerVa =
-    perRowPowerFactor && rowsWithTotals.length > 0
-      ? calculateMixedLoadApparentPower(rowsWithTotals, (row) =>
-          getLegacyRowPowerFactor(row, fallbackPowerFactor),
-        )
-      : undefined;
-  const rowTotalWatts = sumPowerRows(rowsWithTotals);
+  const rawApparentPowerVa = canReconstructPerRowPower
+    ? calculateMixedLoadApparentPower(rowsWithTotals, (row) =>
+        getLegacyRowPowerFactor(row, fallbackPowerFactor),
+      )
+    : undefined;
   const storedTotalWatts =
     Number.isFinite(totalWatts) && totalWatts > 0 ? totalWatts : 0;
-  const resolvedTotalWatts = perRowPowerFactor
+  const resolvedTotalWatts = canReconstructPerRowPower
     ? rowTotalWatts || storedTotalWatts
     : storedTotalWatts || rowTotalWatts;
   return buildPowerCalculationSnapshot({
-    powerFactorSource: perRowPowerFactor ? "per-row" : "legacy-default",
+    powerFactorSource: canReconstructPerRowPower ? "per-row" : "legacy-default",
     rawApparentPowerVa,
     settings: normalizedSettings,
     totalWatts: resolvedTotalWatts,

@@ -21,6 +21,27 @@ type PersistedPowerFields = StoredPowerSnapshot & {
   rows?: PowerTableRow[];
 };
 
+const validPowerFactor = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 1;
+
+const validSafetyMargin = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+
+const validPhaseMode = (value: unknown): value is PhaseMode =>
+  value === "single" || value === "three";
+
+const validVoltage = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const preferValid = <T>(
+  primary: unknown,
+  fallback: unknown,
+  validate: (value: unknown) => value is T,
+): T | undefined => {
+  if (validate(primary)) return primary;
+  return validate(fallback) ? fallback : undefined;
+};
+
 export type ReadOnlyPowerDefault = {
   id: string;
   table_type: string;
@@ -41,11 +62,17 @@ export const mergeStoredPowerSnapshot = (
   metadata?: PersistedPowerFields,
   data?: PersistedPowerFields,
 ): StoredPowerSnapshot => ({
-  calculation: metadata?.calculation ?? data?.calculation,
-  pf: metadata?.pf ?? data?.pf,
-  safetyMargin: metadata?.safetyMargin ?? data?.safetyMargin,
-  phaseMode: metadata?.phaseMode ?? data?.phaseMode,
-  voltage: metadata?.voltage ?? data?.voltage,
+  calculation:
+    parsePowerCalculationSnapshot(metadata?.calculation) ??
+    parsePowerCalculationSnapshot(data?.calculation),
+  pf: preferValid(metadata?.pf, data?.pf, validPowerFactor),
+  safetyMargin: preferValid(
+    metadata?.safetyMargin,
+    data?.safetyMargin,
+    validSafetyMargin,
+  ),
+  phaseMode: preferValid(metadata?.phaseMode, data?.phaseMode, validPhaseMode),
+  voltage: preferValid(metadata?.voltage, data?.voltage, validVoltage),
 });
 
 type HydrationDefaults = {
