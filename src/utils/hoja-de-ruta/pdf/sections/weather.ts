@@ -1,5 +1,6 @@
 import { PDFDocument } from '../core/pdf-document';
 import { EventData, WeatherData } from '../core/pdf-types';
+import { createWeatherTableIconHooks } from '@/utils/pdf/weatherPdfIcons';
 
 export class WeatherSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -25,6 +26,11 @@ export class WeatherSection {
         weather.precipitationProbability ? `${weather.precipitationProbability}%` : '—'
       ];
     });
+    const weatherIconHooks = createWeatherTableIconHooks(this.pdfDoc.document, eventData.weather, {
+      iconInsetX: 1.2,
+      leftPadding: 8,
+      maxIconSize: 5,
+    });
 
     this.pdfDoc.addTable({
       startY: yPosition,
@@ -45,7 +51,8 @@ export class WeatherSection {
         fillColor: [250, 245, 245]
       },
       margin: { left: 20, right: 20 },
-      tableWidth: 'auto'
+      tableWidth: 'auto',
+      ...weatherIconHooks,
     });
 
     return this.pdfDoc.getLastAutoTableY() + 15;

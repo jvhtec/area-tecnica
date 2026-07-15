@@ -401,7 +401,7 @@ export const formatWeatherForPdf = (weather: WeatherData[]): Array<[string, stri
     
     return [
       formattedDate,
-      `${day.icon} ${day.condition}`,
+      day.condition,
       `${day.maxTemp}°C / ${day.minTemp}°C`,
       `${day.precipitationProbability}%`
     ] as [string, string, string, string];

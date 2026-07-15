@@ -4,6 +4,7 @@ import { es } from 'date-fns/locale';
 import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
+import { createWeatherTableIconHooks } from '@/utils/pdf/weatherPdfIcons';
 import type { AutoTableFn } from '@/utils/pdf/lazyPdf';
 import {
   createPdfExportDocument,
@@ -598,10 +599,11 @@ export const generateEnhancedEventDaySheet = async (
 
         const weatherTableData = weatherData.map((w) => [
           format(new Date(w.date), 'EEE d MMM', { locale: es }),
-          w.icon + ' ' + w.condition,
+          w.condition,
           `${w.maxTemp}°C / ${w.minTemp}°C`,
           `${w.precipitationProbability}%`,
         ]);
+        const weatherIconHooks = createWeatherTableIconHooks(pdf, weatherData);
 
         autoTable(pdf, {
           head: [['Fecha', 'Condición', 'Temperatura', 'Lluvia']],
@@ -619,6 +621,7 @@ export const generateEnhancedEventDaySheet = async (
             fontStyle: 'bold',
           },
           margin: { left: 10, right: 10 },
+          ...weatherIconHooks,
         });
 
         currentY = getLastAutoTableY(pdf, currentY) + 10;

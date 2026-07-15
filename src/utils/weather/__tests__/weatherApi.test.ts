@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getWeatherForJob, parseEventDates } from "@/utils/weather/weatherApi";
+import { formatWeatherForPdf, getWeatherForJob, parseEventDates } from "@/utils/weather/weatherApi";
 
 const dateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -92,5 +92,23 @@ describe("getWeatherForJob", () => {
 
     expect(result).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("formatWeatherForPdf", () => {
+  it("keeps emoji out of PDF text rows so vector hooks can render the icon", () => {
+    const rows = formatWeatherForPdf([
+      {
+        date: "2026-06-03",
+        condition: "Despejado",
+        weatherCode: 0,
+        maxTemp: 28,
+        minTemp: 17,
+        precipitationProbability: 0,
+        icon: "☀️",
+      },
+    ]);
+
+    expect(rows[1][1]).toBe("Despejado");
   });
 });
