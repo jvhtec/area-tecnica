@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DOCUMENT_UPLOAD_ACCEPT,
+  DOCUMENT_UPLOAD_FORMAT_LABEL,
+  getDocumentUploadErrorMessage,
   getDocumentUploadValidationError,
 } from "@/utils/documentUploadValidation";
 import {
@@ -20,6 +22,12 @@ describe("document upload validation", () => {
     for (const extension of technicalExtensions) {
       expect(DOCUMENT_UPLOAD_ACCEPT.split(",")).toContain(extension);
     }
+  });
+
+  it("derives the visible format label from every accepted extension", () => {
+    expect(DOCUMENT_UPLOAD_FORMAT_LABEL.split(", ")).toEqual(
+      DOCUMENT_UPLOAD_ACCEPT.split(",").map((extension) => extension.slice(1).toUpperCase()),
+    );
   });
 
   it("accepts SoundVision and CAD files through the shared document validator", () => {
@@ -41,6 +49,17 @@ describe("document upload validation", () => {
   it("still rejects unsupported extensions", () => {
     expect(getDocumentUploadValidationError([createFile("payload.exe", "application/octet-stream")]))
       .toContain("Tipo de archivo no permitido");
+  });
+
+  it("maps provider upload failures to actionable Spanish messages", () => {
+    expect(getDocumentUploadErrorMessage(new Error("Failed to fetch")))
+      .toBe("No se pudo conectar con el servidor de archivos. Revisa tu conexión e inténtalo de nuevo.");
+    expect(getDocumentUploadErrorMessage(new Error("User not authenticated")))
+      .toContain("Tu sesión no es válida");
+    expect(getDocumentUploadErrorMessage({ message: "new row violates row-level security", code: "42501" }))
+      .toBe("No tienes permiso para subir este documento.");
+    expect(getDocumentUploadErrorMessage(new Error("opaque provider failure")))
+      .toBe("No se pudo completar la subida. Inténtalo de nuevo y, si el problema continúa, contacta con soporte.");
   });
 });
 

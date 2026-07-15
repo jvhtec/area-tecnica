@@ -10,7 +10,7 @@ import {
   canUploadTourDocuments,
   isManagementRole,
 } from "@/utils/permissions";
-import { getErrorMessage } from "@/utils/errorMessage";
+import { getDocumentUploadErrorMessage } from "@/utils/documentUploadValidation";
 import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 
 export interface TourDocument {
@@ -128,7 +128,7 @@ export const useTourDocuments = (tourId: string) => {
       console.error('Upload error:', error);
       if (!variables?.suppressToast) {
         toast.error('No se pudo subir el documento', {
-          description: getErrorMessage(error),
+          description: getDocumentUploadErrorMessage(error),
         });
       }
     }
