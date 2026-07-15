@@ -142,7 +142,13 @@ Verified on current `main`; keep the regression tests, do not reopen:
 #### CUR-04a — Technician self-update of `job_assignments` is not column-scoped
 
 - **Severity:** High (payroll integrity)
-- **Status:** New — found in the 2026-07-15 deep pass
+- **Status:** FIXED on this branch —
+  `20260715161500_guard_job_assignment_self_update.sql` adds the column-scope
+  trigger; behaviorally verified (accept/decline allowed; role and
+  `use_tour_multipliers` self-edits rejected with 42501; admin/management and
+  service role bypass), with a pgTAP deny-path test in
+  `supabase/tests/database/job_assignment_self_update_guard.sql`. Originally
+  found in the 2026-07-15 deep pass.
 - **Evidence:** The `job_assignments_update` policy
   (`20260217233500_advisor_security_hardening_phase2_rls.sql:77-86`) permits an
   update when `technician_id = auth.uid()`, with an identical `WITH CHECK`, and
@@ -360,7 +366,11 @@ Verified on current `main`; keep the regression tests, do not reopen:
 #### CUR-25 — Duplicate cascade triggers on `job_assignments` delete (new, minor)
 
 - **Severity:** Low
-- **Status:** New — found in the 2026-07-15 deep pass
+- **Status:** FIXED on this branch —
+  `20260715161500_guard_job_assignment_self_update.sql` drops the AFTER DELETE
+  duplicate (`trigger_delete_timesheets`) and keeps the BEFORE DELETE variant so
+  a failed cascade still aborts the assignment delete. Originally found in the
+  2026-07-15 deep pass.
 - **Evidence:** `00000000000000_production_schema.sql:8285` and `:8287` both
   attach the same `delete_timesheets_on_assignment_removal()` function to
   `job_assignments` DELETE — one `AFTER DELETE` (`trigger_delete_timesheets`)
