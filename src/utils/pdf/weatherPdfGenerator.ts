@@ -1,6 +1,7 @@
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
 import { WeatherData } from '@/types/hoja-de-ruta';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { createWeatherTableIconHooks } from '@/utils/pdf/weatherPdfIcons';
 
 export interface WeatherPdfData {
   jobTitle: string;
@@ -170,6 +171,7 @@ export const generateWeatherPDF = async (data: WeatherPdfData): Promise<Blob> =>
       
       return [date, weather.condition, temp, precipitation];
     });
+    const weatherIconHooks = createWeatherTableIconHooks(pdf, weatherData);
     
     autoTable(pdf, {
       startY: yPosition,
@@ -197,6 +199,7 @@ export const generateWeatherPDF = async (data: WeatherPdfData): Promise<Blob> =>
       didDrawPage: () => {
         drawRunningHeader();
       },
+      ...weatherIconHooks,
     });
     
     yPosition = (pdf as any).lastAutoTable.finalY + 20;
