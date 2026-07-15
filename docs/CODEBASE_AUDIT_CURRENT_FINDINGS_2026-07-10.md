@@ -1,5 +1,10 @@
 # Current actionable codebase findings — 2026-07-10
 
+> **Status: SUPERSEDED.** This register was replaced by
+> [`CODEBASE_AUDIT_CURRENT_FINDINGS_2026-07-15.md`](CODEBASE_AUDIT_CURRENT_FINDINGS_2026-07-15.md)
+> after a full re-audit of `main` at `e4d10cb`. Use the 2026-07-15 register for
+> current statuses; this file remains as historical evidence only.
+
 ## Purpose
 
 This document is the current action register distilled from the repository's
