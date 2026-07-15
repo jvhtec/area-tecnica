@@ -11,6 +11,7 @@ import {
   DOCUMENT_UPLOAD_ACCEPT,
   getDocumentUploadValidationError,
 } from "@/utils/documentUploadValidation";
+import { getErrorMessage } from "@/utils/errorMessage";
 
 interface TourDocumentUploaderProps {
   tourId: string;
@@ -91,7 +92,9 @@ export const TourDocumentUploader = ({
       setUploadProgress(0);
       console.error('Upload failed:', error);
       if (isBatchUpload) {
-        toast.error('No se pudo completar la cola de subida');
+        toast.error('No se pudo completar la cola de subida', {
+          description: getErrorMessage(error),
+        });
       }
     }
   };
@@ -137,7 +140,7 @@ export const TourDocumentUploader = ({
           <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
           <p className="text-lg font-medium mb-2">Suelta archivos aquí o haz clic para seleccionar</p>
           <p className="text-sm text-muted-foreground">
-            Formatos admitidos: PDF, DOC, DOCX, JPG, PNG, GIF, TXT
+            Formatos admitidos: PDF, DOC, DOCX, imágenes, TXT, DWG, DXF, NWM y MVR
           </p>
         </div>
       ) : (

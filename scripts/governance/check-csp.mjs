@@ -17,7 +17,20 @@ const scriptDirectives = [];
 
 for (const [, policy] of policyMatches) {
   const scriptDirective = policy.match(/(?:^|;)\s*script-src\s+([^;]+)/)?.[1] ?? "";
+  const connectDirective = policy.match(/(?:^|;)\s*connect-src\s+([^;]+)/)?.[1] ?? "";
   scriptDirectives.push(scriptDirective);
+
+  const connectSources = new Set(connectDirective.trim().split(/\s+/).filter(Boolean));
+  const supabaseProjectRef = [...connectSources]
+    .map((source) => source.match(/^https:\/\/([a-z0-9]+)\.supabase\.co$/)?.[1])
+    .find(Boolean);
+
+  if (supabaseProjectRef) {
+    const directStorageOrigin = `https://${supabaseProjectRef}.storage.supabase.co`;
+    if (!connectSources.has(directStorageOrigin)) {
+      throw new Error(`CSP connect-src must allow Supabase resumable uploads via ${directStorageOrigin}`);
+    }
+  }
 
   for (const forbidden of ["'unsafe-inline'", "'unsafe-eval'"]) {
     if (scriptDirective.includes(forbidden)) {

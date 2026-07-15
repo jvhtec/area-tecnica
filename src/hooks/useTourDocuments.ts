@@ -1,6 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { queryKeys } from "@/lib/react-query";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { toast } from "sonner";
 import {
@@ -9,10 +10,9 @@ import {
   canUploadTourDocuments,
   isManagementRole,
 } from "@/utils/permissions";
+import { getErrorMessage } from "@/utils/errorMessage";
 import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 
-
-import { queryKeys } from "@/lib/react-query";
 export interface TourDocument {
   id: string;
   tour_id: string;
@@ -124,10 +124,12 @@ export const useTourDocuments = (tourId: string) => {
         toast.success('Documento subido correctamente');
       }
     },
-    onError: (error: any, variables) => {
+    onError: (error: unknown, variables) => {
       console.error('Upload error:', error);
       if (!variables?.suppressToast) {
-        toast.error('No se pudo subir el documento');
+        toast.error('No se pudo subir el documento', {
+          description: getErrorMessage(error),
+        });
       }
     }
   });
