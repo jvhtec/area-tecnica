@@ -14,6 +14,13 @@ Findings keep their original CUR numbers so issue/PR history stays traceable.
 Closed findings are listed once under "Closed since 2026-07-10" and are not
 action items; do not reopen them from older prose.
 
+A second, deeper line-level pass on 2026-07-15 added the RLS/`SECURITY DEFINER`
+policy inventory, a review of all 14 public-token edge functions, the staffing
+state machine and assignment/timesheet cascade, and full reads of the largest
+new modules. It produced two new defects with file:line evidence — **CUR-04a**
+(High, payroll integrity) and **CUR-25** (Low) — plus a "Fresh-pass results with
+no finding" section recording what was cleared.
+
 ## Validation snapshot (2026-07-15, main @ e4d10cb)
 
 | Check | Result | Interpretation |
@@ -109,16 +116,57 @@ Verified on current `main`; keep the regression tests, do not reopen:
 #### CUR-04 — RLS and privileged RPC review is still baseline-driven
 
 - **Severity:** High
-- **Status:** Unchanged — confirmed process/control gap
+- **Status:** Unchanged as a control gap; the 2026-07-15 deep pass found one
+  concrete instance (CUR-04a below)
 - **Evidence:** Governance still accepts 82 anon/PUBLIC-executable
   `SECURITY DEFINER` functions ("no new exposure" ≠ "least privilege"). pgTAP
   coverage exists (`supabase/tests/database/`, 13 SQL test files) but there is
   no role × action × tenant access matrix or systematic deny-path inventory.
+  The RLS *mutation* posture is otherwise strong: the permissive base-schema
+  `USING (true)` policies on `profiles`/`jobs`/`job_assignments` were tightened
+  to role/owner predicates in
+  `20260217233500_advisor_security_hardening_phase2_rls.sql`; the `anon`
+  realtime-read policies were dropped in
+  `20260609120000_security_hardening_anon_access.sql`; and
+  `20260623160000_phase0_authorization_hardening.sql` adds a thorough
+  `enforce_profile_privilege_changes` BEFORE-UPDATE trigger that blocks
+  self-role-escalation and cross-department management edits. Every
+  `SECURITY DEFINER` function reviewed pins `search_path` and re-checks the
+  caller role/`service_role`.
 - **Action:** Generate the access matrix, inventory `USING (true)`,
   self-equalities, unpinned definers, and broad grants; add negative pgTAP
   cases by table family, one family per PR.
 - **Closure:** Every privileged table/bucket/RPC has an owner, intended
   audience, and at least one deny-path behavior test.
+
+#### CUR-04a — Technician self-update of `job_assignments` is not column-scoped
+
+- **Severity:** High (payroll integrity)
+- **Status:** New — found in the 2026-07-15 deep pass
+- **Evidence:** The `job_assignments_update` policy
+  (`20260217233500_advisor_security_hardening_phase2_rls.sql:77-86`) permits an
+  update when `technician_id = auth.uid()`, with an identical `WITH CHECK`, and
+  there is **no BEFORE-UPDATE trigger on `job_assignments`** restricting which
+  columns the owner may change (unlike `profiles`, which has
+  `enforce_profile_privilege_changes`). The row therefore lets a technician
+  rewrite pay-relevant columns on their own assignment:
+  `sound_role`/`lights_role`/`video_role`/`production_role` (feed the timesheet
+  rate category) and `use_tour_multipliers` — whose own schema comment
+  (`00000000000000_production_schema.sql:5951`) states it "forces tour
+  multiplier calculation." A technician using the authenticated anon key can
+  `update job_assignments set production_role='PROD-RESP-R', use_tour_multipliers=true
+  where technician_id = <self>` and inflate their own payout. The policy
+  correctly prevents reassigning the row to another technician (the
+  `WITH CHECK` pins `technician_id = auth.uid()`), so the gap is column scope,
+  not row ownership.
+- **Action:** Add a BEFORE-UPDATE trigger on `job_assignments` mirroring the
+  profiles pattern: when the actor is the row's technician (not
+  admin/management/logistics and not `service_role`), allow only
+  response/status columns (`status`, `response_time`) to change and reject
+  edits to role and multiplier columns; log privileged changes. Add negative
+  pgTAP coverage.
+- **Closure:** A technician cannot change any rate/role/multiplier column on
+  their own assignment; a deny-path pgTAP test proves it.
 
 #### CUR-08 — Runtime logs still expose personal data
 
@@ -309,7 +357,69 @@ Verified on current `main`; keep the regression tests, do not reopen:
   and fix by route; Spanish is the only supported UI language.
 - **Closure:** No hardcoded English strings in user-facing or printed output.
 
+#### CUR-25 — Duplicate cascade triggers on `job_assignments` delete (new, minor)
+
+- **Severity:** Low
+- **Status:** New — found in the 2026-07-15 deep pass
+- **Evidence:** `00000000000000_production_schema.sql:8285` and `:8287` both
+  attach the same `delete_timesheets_on_assignment_removal()` function to
+  `job_assignments` DELETE — one `AFTER DELETE` (`trigger_delete_timesheets`)
+  and one `BEFORE DELETE` (`trigger_delete_timesheets_on_assignment_removal`).
+  Every assignment deletion runs the timesheet `DELETE` twice (the second is a
+  no-op because the rows are already gone) and emits the `RAISE INFO` cleanup
+  log twice. `20260609204500_harden_user_delete_cascade_triggers.sql` only
+  re-pinned the function's `search_path`; it did not de-duplicate the triggers.
+  Harmless today because the delete is idempotent, but it doubles work per
+  removal and becomes a real bug the moment the function is made
+  non-idempotent (e.g. counters, audit rows, or external calls).
+- **Action:** Drop `trigger_delete_timesheets` (keep the BEFORE-DELETE variant
+  so a failed cascade aborts the assignment delete), in a small migration.
+- **Closure:** Exactly one cascade trigger fires per `job_assignments` delete;
+  regression test asserts a single timesheet cleanup.
+
 ## Fresh-pass results with no finding
+
+Deep line-level review on 2026-07-15 (RLS/definers, all 14 public-token edge
+functions, the staffing state machine, and the largest new code) cleared the
+following:
+
+- **Staffing state machine (`staffing-click`):** the accept/decline transition
+  is a compare-and-swap — the `UPDATE … .eq('status','pending')` in the WHERE
+  clause makes concurrent double-clicks safe (only one update matches; the
+  loser reports "already responded"). No race.
+- **Public-token edge functions:** token checks are sound — `tech-calendar-ics`
+  uses a constant-time hashed compare (`tokensMatch`), and the public-token
+  functions apply dual durable rate limits (ingress + per-token) and validate
+  the token against the resource via the service role before acting. No IDOR
+  or timing leak found.
+- **Cascade/RLS mutation posture:** permissive base-schema policies were
+  superseded and the profile privilege-escalation trigger is comprehensive
+  (see CUR-04). The one gap is the column scope of technician self-update
+  (CUR-04a).
+- **PDF Unicode font (#856):** `registerPdfUnicodeFont` fetches
+  `/fonts/NotoSansPdf-Regular.ttf` (85 KB) lazily and only for `power`-type
+  PDFs (`pdfExport.ts:97`); it is not statically imported, so it does not enter
+  the JS bundle. It counts only against the separate font asset budget.
+- **Technical-document sync (#853):** the department-aware `cleanupFilter`
+  rewrite matches the described fix and is covered by
+  `tourDefaultDocumentSync.test.ts`; no regression found.
+
+- **Secrets:** pattern scan (Google/OpenAI/JWT-shaped) over `src`, `scripts`,
+  `docs`, `supabase` — no hits; no `.env*` files committed.
+- **XSS sinks:** all four `dangerouslySetInnerHTML` sites are safe —
+  `PayoutEmailPreview` goes through DOMPurify, `chart.tsx` renders internally
+  generated CSS, and the rack-builder print SVG escapes all interpolated text
+  via `escapeXml` (verified in `panelThumbnail.ts`).
+- **New migrations (2):** both scoped correctly; the only new grant is
+  `TO service_role`.
+- **New power-calculation engine (#856/#852):** reviewed
+  `powerAggregation.ts`, `powerSnapshots.ts`, `powerTableHydration.ts`,
+  `powerRequirementSelection.ts` — correct vector (ΣP, ΣQ) aggregation, safe
+  refusal of mixed phase modes/voltages and unallocated single-phase loads,
+  Spanish user-facing reasons, and dedicated test files for each module.
+- **WhatsApp send policy (#851):** `whatsappSendPolicy.ts` correctly clamps
+  concurrency to 1–4 with a safe default of 1.
+- **GitHub Actions:** all external actions pinned to full commit SHAs.
 
 - **Secrets:** pattern scan (Google/OpenAI/JWT-shaped) over `src`, `scripts`,
   `docs`, `supabase` — no hits; no `.env*` files committed.
@@ -335,7 +445,10 @@ Verified on current `main`; keep the regression tests, do not reopen:
    re-inventory (CUR-17).
 2. Verify/close the Maps key rotation (CUR-03) — decision + evidence only.
 3. Redact the highest-PII Edge logs (CUR-08): `send-password-reset` first.
-4. Run the CUR-04 access-matrix inventory; one table family per PR.
+4. Ship the CUR-04a column-guard trigger on `job_assignments` (payroll
+   integrity) as a standalone security migration with a deny-path pgTAP test,
+   then run the broader CUR-04 access-matrix inventory one table family per PR.
+   Fold the CUR-25 duplicate-trigger cleanup into the same migration batch.
 5. Triage and fix the five business-date sites (CUR-23) with boundary tests.
 6. Restart the CUR-11 warning ratchet with per-rule counts so progress is
    measurable.
