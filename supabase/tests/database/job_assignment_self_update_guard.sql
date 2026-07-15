@@ -158,6 +158,25 @@ SELECT throws_ok(
 );
 
 RESET ROLE;
+
+-- ---------------------------------------------------------------------------
+-- As a manager: privileged roles may change role/rate columns (bypass)
+-- ---------------------------------------------------------------------------
+
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', 'c9100000-0000-0000-0000-000000000001', false);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$
+    UPDATE public.job_assignments
+    SET sound_role = 'FOH-RESP', use_tour_multipliers = true
+    WHERE id = 'c9300000-0000-0000-0000-000000000001'::uuid
+  $$,
+  'management may change role and multiplier fields on any assignment'
+);
+
+RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
 

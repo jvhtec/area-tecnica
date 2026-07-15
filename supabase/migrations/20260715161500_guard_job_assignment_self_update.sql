@@ -43,25 +43,14 @@ BEGIN
 
   -- Non-privileged actor. The RLS policy only lets them reach their own row
   -- (technician_id = auth.uid()), so restrict WHICH columns they may change:
-  -- only the accept/decline fields. Role, rate-mode, source, scheduling and
-  -- invoice columns feed payroll and must not be self-editable. Fail closed:
-  -- every column except status/response_time must stay unchanged.
-  IF NEW.job_id IS DISTINCT FROM OLD.job_id
-     OR NEW.technician_id IS DISTINCT FROM OLD.technician_id
-     OR NEW.id IS DISTINCT FROM OLD.id
-     OR NEW.assigned_by IS DISTINCT FROM OLD.assigned_by
-     OR NEW.assigned_at IS DISTINCT FROM OLD.assigned_at
-     OR NEW.sound_role IS DISTINCT FROM OLD.sound_role
-     OR NEW.lights_role IS DISTINCT FROM OLD.lights_role
-     OR NEW.video_role IS DISTINCT FROM OLD.video_role
-     OR NEW.production_role IS DISTINCT FROM OLD.production_role
-     OR NEW.assignment_source IS DISTINCT FROM OLD.assignment_source
-     OR NEW.single_day IS DISTINCT FROM OLD.single_day
-     OR NEW.assignment_date IS DISTINCT FROM OLD.assignment_date
-     OR NEW.use_tour_multipliers IS DISTINCT FROM OLD.use_tour_multipliers
-     OR NEW.external_technician_name IS DISTINCT FROM OLD.external_technician_name
-     OR NEW.invoice_received_at IS DISTINCT FROM OLD.invoice_received_at
-     OR NEW.invoice_received_by IS DISTINCT FROM OLD.invoice_received_by
+  -- only the accept/decline fields (status, response_time). Role, rate-mode,
+  -- source, scheduling and invoice columns feed payroll and must not be
+  -- self-editable. Compare the whole row minus those two fields so the guard
+  -- fails closed — any other current or future column change is rejected
+  -- automatically, without maintaining a denylist.
+  IF (to_jsonb(NEW) - ARRAY['status', 'response_time']::text[])
+       IS DISTINCT FROM
+     (to_jsonb(OLD) - ARRAY['status', 'response_time']::text[])
   THEN
     RAISE EXCEPTION 'Technicians may only accept or decline their own assignment; role, rate and administrative fields cannot be self-edited'
       USING ERRCODE = '42501';

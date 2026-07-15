@@ -431,23 +431,6 @@ following:
   concurrency to 1–4 with a safe default of 1.
 - **GitHub Actions:** all external actions pinned to full commit SHAs.
 
-- **Secrets:** pattern scan (Google/OpenAI/JWT-shaped) over `src`, `scripts`,
-  `docs`, `supabase` — no hits; no `.env*` files committed.
-- **XSS sinks:** all four `dangerouslySetInnerHTML` sites are safe —
-  `PayoutEmailPreview` goes through DOMPurify, `chart.tsx` renders internally
-  generated CSS, and the rack-builder print SVG escapes all interpolated text
-  via `escapeXml` (verified in `panelThumbnail.ts`).
-- **New migrations (2):** both scoped correctly; the only new grant is
-  `TO service_role`.
-- **New power-calculation engine (#856/#852):** reviewed
-  `powerAggregation.ts`, `powerSnapshots.ts`, `powerTableHydration.ts`,
-  `powerRequirementSelection.ts` — correct vector (ΣP, ΣQ) aggregation, safe
-  refusal of mixed phase modes/voltages and unallocated single-phase loads,
-  Spanish user-facing reasons, and dedicated test files for each module.
-- **WhatsApp send policy (#851):** `whatsappSendPolicy.ts` correctly clamps
-  concurrency to 1–4 with a safe default of 1.
-- **GitHub Actions:** all external actions pinned to full commit SHAs.
-
 ## Recommended issue/PR sequence
 
 1. Recover bundle headroom (CUR-18) — this now blocks unrelated work; pair
@@ -455,10 +438,9 @@ following:
    re-inventory (CUR-17).
 2. Verify/close the Maps key rotation (CUR-03) — decision + evidence only.
 3. Redact the highest-PII Edge logs (CUR-08): `send-password-reset` first.
-4. Ship the CUR-04a column-guard trigger on `job_assignments` (payroll
-   integrity) as a standalone security migration with a deny-path pgTAP test,
+4. CUR-04a (column-guard trigger) and CUR-25 (duplicate-trigger cleanup) are
+   already implemented on this branch — verify them post-merge in production,
    then run the broader CUR-04 access-matrix inventory one table family per PR.
-   Fold the CUR-25 duplicate-trigger cleanup into the same migration batch.
 5. Triage and fix the five business-date sites (CUR-23) with boundary tests.
 6. Restart the CUR-11 warning ratchet with per-rule counts so progress is
    measurable.
