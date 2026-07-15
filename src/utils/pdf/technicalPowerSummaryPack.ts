@@ -6,6 +6,7 @@ import { getDepartmentLabel } from '@/types/department';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { normalizeTechnicalPowerDepartments } from '@/utils/technicalPowerTypes';
+import { aggregatePowerCalculations } from '@/features/technical-tools/power/powerAggregation';
 import type {
   CombinedTechnicalPowerSummaryData,
   DepartmentPowerSummaryData,
@@ -74,8 +75,10 @@ const formatDisplayDate = (value?: string | null, fallback = new Date()) =>
   formatMadridDate(parseDateValue(value, fallback));
 
 const formatWatts = (value: number) => `${value.toFixed(2)} W`;
-const formatAmps = (value: number) => `${value.toFixed(2)} A`;
-const formatKva = (value: number) => `${value.toFixed(2)} kVA`;
+const formatAmps = (value: number | null) =>
+  value === null ? 'No agregable' : `${value.toFixed(2)} A`;
+const formatKva = (value: number | null) =>
+  value === null ? 'No agregable' : `${value.toFixed(2)} kVA`;
 
 const buildStagePlotGroupKey = (
   stageNumber?: number | null,
@@ -264,18 +267,13 @@ export const generateTechnicalPowerSummaryPack = async ({
   const includedDepartmentLabels = departmentsToInclude.map((department) =>
     getDepartmentLabel(department.department)
   );
-  const totalSystemWatts = departmentsToInclude.reduce(
-    (sum, department) => sum + department.totalWatts,
-    0
+  const systemAggregation = aggregatePowerCalculations(
+    departmentsToInclude.flatMap((department) => department.rows),
   );
-  const totalSystemAmps = departmentsToInclude.reduce(
-    (sum, department) => sum + department.totalAmps,
-    0
-  );
-  const totalSystemKva = departmentsToInclude.reduce(
-    (sum, department) => sum + department.totalKva,
-    0
-  );
+  const totalSystemWatts = systemAggregation.totalWatts;
+  const totalSystemAmps = systemAggregation.currentLine;
+  const totalSystemKva =
+    systemAggregation.totalVa === null ? null : systemAggregation.totalVa / 1000;
 
   drawCorporateHeader({
     doc,
@@ -319,8 +317,9 @@ export const generateTechnicalPowerSummaryPack = async ({
     title: 'Totales globales',
     lines: [
       `Potencia total: ${formatWatts(totalSystemWatts)}`,
-      `Corriente total: ${formatAmps(totalSystemAmps)}`,
+      `Corriente de línea resultante: ${formatAmps(totalSystemAmps)}`,
       `Potencia aparente total: ${formatKva(totalSystemKva)}`,
+      ...(systemAggregation.reason ? [systemAggregation.reason] : []),
     ],
     onPageBreak: () => {
       drawCorporateHeader({
@@ -379,7 +378,7 @@ export const generateTechnicalPowerSummaryPack = async ({
       title: 'Resumen Tecnico de Potencia',
       subtitleLines: [
         jobTitle || 'Trabajo sin titulo',
-        group.label ? `Distribución en Escenario · ${group.label}` : 'Distribución en Escenario',
+        group.label ? `Distribución en Escenario - ${group.label}` : 'Distribución en Escenario',
       ],
       headerLogo,
     });
@@ -389,7 +388,7 @@ export const generateTechnicalPowerSummaryPack = async ({
       pageHeight: getPageHeight(doc),
       footerSpace: FOOTER_SPACE,
       title: group.label
-        ? `Distribución en Escenario — ${group.label}`
+        ? `Distribución en Escenario - ${group.label}`
         : 'Distribución en Escenario',
       entryColorFor,
       legend,
@@ -402,7 +401,7 @@ export const generateTechnicalPowerSummaryPack = async ({
 
     autoTable(doc, {
       startY: CONTENT_START_Y,
-      head: [['Stage', 'Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
+      head: [['Stage', 'Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente de línea', 'Notas']],
       body: departmentTableBody(department),
       theme: 'grid',
       styles: {
@@ -424,9 +423,7 @@ export const generateTechnicalPowerSummaryPack = async ({
       didDrawPage: () => {
         const subtitleLines = [
           jobTitle || 'Trabajo sin titulo',
-          department.safetyMargin !== null
-            ? `${departmentName} · Margen de seguridad ${department.safetyMargin}%`
-            : departmentName,
+          `${departmentName} · Supuestos y márgenes por tabla`,
         ];
 
         drawCorporateHeader({
@@ -445,15 +442,14 @@ export const generateTechnicalPowerSummaryPack = async ({
       title: `Totales ${departmentName.toLowerCase()}`,
       lines: [
         `Potencia total: ${formatWatts(department.totalWatts)}`,
-        `Corriente total: ${formatAmps(department.totalAmps)}`,
+        `Corriente de línea resultante: ${formatAmps(department.totalAmps)}`,
         `Potencia aparente total: ${formatKva(department.totalKva)}`,
+        ...(department.aggregationReason ? [department.aggregationReason] : []),
       ],
       onPageBreak: () => {
         const subtitleLines = [
           jobTitle || 'Trabajo sin titulo',
-          department.safetyMargin !== null
-            ? `${departmentName} · Margen de seguridad ${department.safetyMargin}%`
-            : departmentName,
+          `${departmentName} · Supuestos y márgenes por tabla`,
         ];
 
         drawCorporateHeader({
@@ -469,7 +465,7 @@ export const generateTechnicalPowerSummaryPack = async ({
   doc.addPage();
   autoTable(doc, {
     startY: CONTENT_START_Y,
-    head: [['Departamento', 'Potencia total', 'Corriente total', 'Potencia aparente']],
+    head: [['Departamento', 'Potencia total', 'Corriente de línea resultante', 'Potencia aparente']],
     body: departmentsToInclude.map((department) => [
       getDepartmentLabel(department.department),
       formatWatts(department.totalWatts),
@@ -509,8 +505,9 @@ export const generateTechnicalPowerSummaryPack = async ({
     title: 'Total del sistema',
     lines: [
       `Potencia total: ${formatWatts(totalSystemWatts)}`,
-      `Corriente total: ${formatAmps(totalSystemAmps)}`,
+      `Corriente de línea resultante: ${formatAmps(totalSystemAmps)}`,
       `Potencia aparente total: ${formatKva(totalSystemKva)}`,
+      ...(systemAggregation.reason ? [systemAggregation.reason] : []),
     ],
     onPageBreak: () => {
       drawCorporateHeader({

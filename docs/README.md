@@ -23,6 +23,7 @@ Detailed documentation for each major subsystem — key files, database tables, 
 - **[Public Artist Form](workflows/public-artist-form.md)** — Tokenized public routes for artist rider submission
 - **[SoundVision Files](workflows/soundvision-files.md)** — File library with access request and review workflow
 - **[Technical PDF Sync](technical-pdf-sync.md)** — How generated technical PDFs (consumos, pesos, memorias, SV reports) stay in sync for jobs and tour dates; required triggers when adding generators/mutations
+- **[Consumos power calculations](technical-tools/power-calculations.md)** — canonical equations, assumptions, validation, PDU planning policy, persisted snapshots, report aggregation, and engineering limitations
 
 
 ## Festival architecture (section-specific)

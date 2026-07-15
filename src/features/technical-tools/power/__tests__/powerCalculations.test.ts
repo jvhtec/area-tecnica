@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createCalculatedPowerTable,
   calculateElectricalTotals,
   calculateMixedLoadApparentPower,
   calculatePowerRows,
   getPowerPduOptions,
   recommendPowerPdu,
+  PowerCalculationValidationError,
 } from "@/features/technical-tools/power/powerCalculations";
 
 describe("technical power calculations", () => {
@@ -59,6 +61,12 @@ describe("technical power calculations", () => {
     expect(recommendPowerPdu(130, getPowerPduOptions("video", "three"))).toBe("Powerlock 400A 3P+N+G");
   });
 
+  it("does not present an undersized PDU when every listed option is over capacity", () => {
+    const options = getPowerPduOptions("sound", "single");
+
+    expect(recommendPowerPdu(70, options)).toBe("");
+  });
+
   it("keeps mixed lights apparent power as a vector sum", () => {
     const rows = calculatePowerRows(
       [
@@ -74,5 +82,82 @@ describe("technical power calculations", () => {
     const totalVa = calculateMixedLoadApparentPower(rows, (row) => Number(row.pf));
 
     expect(totalVa).toBeCloseTo(2057.8, 1);
+  });
+
+  it("rejects a non-positive row input before creating a table", () => {
+    expect(() =>
+      createCalculatedPowerTable({
+        components: [{ id: "amp", name: "Amp", watts: 1000 }],
+        currentTable: {
+          rows: [{ quantity: "-1", componentId: "amp", watts: "1000" }],
+          position: undefined,
+          customPosition: undefined,
+        },
+        id: "invalid",
+        name: "Invalid",
+        pduOptions: getPowerPduOptions("sound", "single"),
+        settings: {
+          phaseMode: "single",
+          powerFactor: 0.9,
+          safetyMargin: 20,
+          voltage: 230,
+        },
+      }),
+    ).toThrow(PowerCalculationValidationError);
+  });
+
+  it("rejects a non-positive supply voltage before creating a table", () => {
+    expect(() =>
+      createCalculatedPowerTable({
+        components: [{ id: "amp", name: "Amp", watts: 1000 }],
+        currentTable: {
+          rows: [{ quantity: "1", componentId: "amp", watts: "1000" }],
+          position: undefined,
+          customPosition: undefined,
+        },
+        id: "invalid",
+        name: "Invalid",
+        pduOptions: getPowerPduOptions("sound", "single"),
+        settings: {
+          phaseMode: "single",
+          powerFactor: 0.9,
+          safetyMargin: 20,
+          voltage: 0,
+        },
+      }),
+    ).toThrow(PowerCalculationValidationError);
+  });
+
+  it("stores a reproducible v2 calculation snapshot", () => {
+    const table = createCalculatedPowerTable({
+      components: [{ id: "amp", name: "Amp", watts: 2070 }],
+      currentTable: {
+        rows: [{ quantity: "1", componentId: "amp", watts: "2070" }],
+        position: undefined,
+        customPosition: undefined,
+      },
+      id: "valid",
+      name: "Valid",
+      pduOptions: getPowerPduOptions("sound", "single"),
+      settings: {
+        phaseMode: "single",
+        powerFactor: 0.9,
+        safetyMargin: 20,
+        voltage: 230,
+      },
+    });
+
+    expect(table.calculation).toMatchObject({
+      version: 2,
+      totalWatts: 2070,
+      adjustedWatts: 2484,
+      totalVa: 2760,
+      currentLine: 12,
+      phaseMode: "single",
+      voltage: 230,
+      powerFactor: 0.9,
+      powerFactorSource: "global",
+      isEstimate: false,
+    });
   });
 });

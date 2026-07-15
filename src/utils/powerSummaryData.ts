@@ -1,11 +1,26 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/integrations/supabase/types';
+import { aggregatePowerCalculations } from '@/features/technical-tools/power/powerAggregation';
+import {
+  POWER_CALCULATION_VERSION,
+  type PhaseMode,
+  type PowerTableRow,
+} from '@/features/technical-tools/power/types';
 import {
   buildNormalizedTourPowerTables,
   computePowerTotalVa,
 } from '@/utils/tourPowerTables';
 import { getResolvedPowerPosition } from '@/utils/powerPositions';
+import {
+  getCurrentPowerRequirementTables,
+  getPowerRequirementStageName,
+  getPowerRequirementStageNumber,
+} from '@/utils/powerRequirementSelection';
+export {
+  formatPowerRequirementsText,
+  getCurrentPowerRequirementTables,
+} from '@/utils/powerRequirementSelection';
 import {
   TECHNICAL_POWER_DEPARTMENTS,
   type CombinedTechnicalPowerSummaryData,
@@ -21,6 +36,7 @@ import {
   resolveDefaultSetForTourDate,
   type TourPackageDateLike,
 } from '@/utils/tourPackages';
+import { isRecord } from '@/utils/typeGuards';
 
 type TypedSupabaseClient = SupabaseClient<Database>;
 type PowerRequirementTableRow = Database['public']['Tables']['power_requirement_tables']['Row'];
@@ -29,10 +45,6 @@ type TourDefaultSetRow = Database['public']['Tables']['tour_default_sets']['Row'
 type TourDefaultTableRow = Database['public']['Tables']['tour_default_tables']['Row'];
 type TourPowerDefaultRow = Database['public']['Tables']['tour_power_defaults']['Row'];
 type TourDatePowerOverrideRow = Database['public']['Tables']['tour_date_power_overrides']['Row'];
-type IndexedPowerRequirementTableRow = {
-  row: PowerRequirementTableRow;
-  inputIndex: number;
-};
 
 export interface TechnicalPowerSummaryJob {
   id: string;
@@ -61,256 +73,96 @@ const buildDepartmentSummary = ({
   rows: DepartmentPowerSummaryRow[];
   safetyMargin?: number | null;
 }): DepartmentPowerSummaryData => {
-  const totalWatts = rows.reduce((sum, row) => sum + row.totalWatts, 0);
-  const totalAmps = rows.reduce((sum, row) => sum + row.currentPerPhase, 0);
-  const totalKva = rows.reduce((sum, row) => sum + row.totalVa, 0) / 1000;
+  const aggregation = aggregatePowerCalculations(rows);
+  const rowMargins = [...new Set(rows.map((row) => row.calculation?.safetyMargin))]
+    .filter((margin): margin is number => margin !== undefined);
 
   return {
     department,
     rows,
-    safetyMargin: safetyMargin ?? null,
-    totalWatts,
-    totalAmps,
-    totalKva,
+    safetyMargin: rowMargins.length === 1
+      ? rowMargins[0]
+      : rows.length ? null : safetyMargin ?? null,
+    totalWatts: aggregation.totalWatts,
+    totalAmps: aggregation.currentLine,
+    totalKva: aggregation.totalVa === null ? null : aggregation.totalVa / 1000,
+    aggregationReason: aggregation.reason,
   };
 };
 
+const DEPARTMENT_POWER_FACTOR: Record<TechnicalPowerDepartment, number> = {
+  sound: 0.95,
+  lights: 0.9,
+  video: 0.9,
+};
+
+const isPowerTableRow = (value: unknown): value is PowerTableRow =>
+  isRecord(value) &&
+  typeof value.quantity === 'string' &&
+  typeof value.componentId === 'string' &&
+  typeof value.watts === 'string';
+
+const getJobPowerCalculation = (
+  row: PowerRequirementTableRow,
+  department: TechnicalPowerDepartment,
+) => {
+  const data = isRecord(row.table_data) ? row.table_data : {};
+  const phaseMode: PhaseMode = data.phaseMode === 'single' ? 'single' : 'three';
+  const rows = Array.isArray(data.rows) ? data.rows.filter(isPowerTableRow) : [];
+  const storedPf =
+    typeof data.pf === 'number' && data.pf > 0 && data.pf <= 1
+      ? data.pf
+      : DEPARTMENT_POWER_FACTOR[department];
+  const safetyMargin = typeof data.safetyMargin === 'number'
+    ? Math.min(Math.max(data.safetyMargin, 0), 100)
+    : 0;
+  const voltage = typeof data.voltage === 'number' && data.voltage > 0
+    ? data.voltage
+    : phaseMode === 'single' ? 230 : 400;
+  const totalWatts = row.total_watts || 0;
+  const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
+  const totalVa = computePowerTotalVa(totalWatts, data, department, rows);
+  return {
+    version: POWER_CALCULATION_VERSION,
+    totalWatts,
+    adjustedWatts,
+    totalVa,
+    currentLine: totalVa / ((phaseMode === 'single' ? 1 : Math.sqrt(3)) * voltage),
+    safetyMargin,
+    phaseMode,
+    voltage,
+    ...(department === 'lights' && rows.length ? {} : { powerFactor: storedPf }),
+    powerFactorSource: department === 'lights' && rows.length ? 'per-row' as const : 'legacy-default' as const,
+    isEstimate: true,
+  };
+};
+
+const buildPowerRowNotes = (includesHoist: boolean, isEstimate: boolean) => [
+  includesHoist ? 'Motor auxiliar CEE32A 3P+N+G excluido de totales' : '',
+  isEstimate ? 'Cálculo estimado' : '',
+].filter(Boolean).join(' · ');
+
 const mapPowerRequirementTable = (
   row: PowerRequirementTableRow,
-  department: TechnicalPowerDepartment
-): DepartmentPowerSummaryRow => ({
-  name: row.table_name || 'Unnamed',
-  stageName: getPowerRequirementStageName(row),
-  stageNumber: getPowerRequirementStageNumber(row),
-  pduLabel: row.custom_pdu_type || row.pdu_type || 'N/A',
-  positionLabel: getResolvedPowerPosition(row.position, row.custom_position) || 'N/A',
-  totalWatts: row.total_watts || 0,
-  currentPerPhase: row.current_per_phase || 0,
-  totalVa: computePowerTotalVa(row.total_watts || 0, row.table_data, department),
-  notes: row.includes_hoist ? 'Motor adicional CEE32A 3P+N+G' : '',
-  source: 'job',
-});
+  department: TechnicalPowerDepartment,
+): DepartmentPowerSummaryRow => {
+  const calculation = getJobPowerCalculation(row, department);
+  const pduLabel = row.custom_pdu_type || row.pdu_type || 'N/A';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const getPowerRequirementStageNumber = (row: PowerRequirementTableRow) => {
-  if (typeof row.stage_number === 'number') return row.stage_number;
-  if (!isRecord(row.table_data)) return null;
-
-  const stageNumber = row.table_data.stageNumber;
-  return typeof stageNumber === 'number' && Number.isFinite(stageNumber)
-    ? stageNumber
-    : null;
+  return {
+    name: row.table_name || 'Unnamed',
+    stageName: getPowerRequirementStageName(row),
+    stageNumber: getPowerRequirementStageNumber(row),
+    pduLabel,
+    positionLabel: getResolvedPowerPosition(row.position, row.custom_position) || 'N/A',
+    totalWatts: calculation.totalWatts,
+    currentPerPhase: calculation.currentLine,
+    totalVa: calculation.totalVa,
+    calculation,
+    notes: buildPowerRowNotes(row.includes_hoist, calculation.isEstimate),
+    source: 'job',
+  };
 };
-
-const getPowerRequirementStageName = (row: PowerRequirementTableRow) => {
-  if (row.stage_name?.trim()) return row.stage_name.trim();
-  if (!isRecord(row.table_data)) return null;
-
-  const stageName = row.table_data.stageName;
-  return typeof stageName === 'string' && stageName.trim()
-    ? stageName.trim()
-    : null;
-};
-
-const getPowerRequirementStageLabel = (row: PowerRequirementTableRow) => {
-  const stageName = getPowerRequirementStageName(row);
-  if (stageName) return stageName;
-
-  const stageNumber = getPowerRequirementStageNumber(row);
-  return stageNumber !== null ? `Stage ${stageNumber}` : null;
-};
-
-const getPowerRequirementStageKey = (row: PowerRequirementTableRow) => {
-  const stageNumber = getPowerRequirementStageNumber(row);
-  if (stageNumber !== null) return `stage-${stageNumber}`;
-
-  const stageName = getPowerRequirementStageName(row);
-  return stageName ? `stage-name-${stageName.toLowerCase()}` : 'no-stage';
-};
-
-const getPowerRequirementGenerationTimestamp = (row: PowerRequirementTableRow) => {
-  if (!isRecord(row.table_data)) return null;
-
-  const generationTimestamp = row.table_data.generationTimestamp;
-  return typeof generationTimestamp === 'string' && generationTimestamp.trim()
-    ? generationTimestamp.trim()
-    : null;
-};
-
-const getPowerRequirementSourceTimestamp = (row: PowerRequirementTableRow) => {
-  if (!isRecord(row.table_data)) return null;
-
-  const sourceTableId = row.table_data.sourceTableId;
-  if (typeof sourceTableId === 'number' && Number.isFinite(sourceTableId)) {
-    return sourceTableId;
-  }
-
-  if (typeof sourceTableId === 'string') {
-    const parsed = Number(sourceTableId);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-};
-
-const parseTimestampValue = (timestamp: string | null | undefined) => {
-  if (!timestamp) return 0;
-  const parsed = Date.parse(timestamp);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const comparePowerRequirementTablesByFreshness = (
-  left: IndexedPowerRequirementTableRow,
-  right: IndexedPowerRequirementTableRow
-) => {
-  const leftTimestamp =
-    parseTimestampValue(getPowerRequirementGenerationTimestamp(left.row)) ||
-    getPowerRequirementSourceTimestamp(left.row) ||
-    parseTimestampValue(left.row.created_at);
-  const rightTimestamp =
-    parseTimestampValue(getPowerRequirementGenerationTimestamp(right.row)) ||
-    getPowerRequirementSourceTimestamp(right.row) ||
-    parseTimestampValue(right.row.created_at);
-
-  if (leftTimestamp !== rightTimestamp) {
-    return leftTimestamp - rightTimestamp;
-  }
-
-  const leftCreatedAt = left.row.created_at || '';
-  const rightCreatedAt = right.row.created_at || '';
-  if (leftCreatedAt !== rightCreatedAt) {
-    return leftCreatedAt.localeCompare(rightCreatedAt);
-  }
-
-  return left.inputIndex - right.inputIndex;
-};
-
-const getPowerRequirementScopeKey = (
-  row: PowerRequirementTableRow,
-  department: TechnicalPowerDepartment
-) => `${department}:${getPowerRequirementStageKey(row)}`;
-
-const getLegacyPowerRequirementTableIdentityKey = (
-  row: PowerRequirementTableRow,
-  department: TechnicalPowerDepartment
-) =>
-  [
-    getPowerRequirementScopeKey(row, department),
-    row.table_name?.trim().toLowerCase() || 'unnamed',
-    row.position?.trim().toLowerCase() || '',
-    row.custom_position?.trim().toLowerCase() || '',
-  ].join(':');
-
-const compareGenerationTimestamp = (left: string, right: string) => {
-  const leftTimestamp = parseTimestampValue(left);
-  const rightTimestamp = parseTimestampValue(right);
-
-  if (leftTimestamp !== rightTimestamp) {
-    return leftTimestamp - rightTimestamp;
-  }
-
-  return left.localeCompare(right);
-};
-
-export const getCurrentPowerRequirementTables = (
-  rows: PowerRequirementTableRow[]
-): PowerRequirementTableRow[] => {
-  const rowsByScope = new Map<string, IndexedPowerRequirementTableRow[]>();
-
-  rows.forEach((row, inputIndex) => {
-    const department = row.department as TechnicalPowerDepartment | null;
-    if (!department) return;
-
-    const scopeKey = getPowerRequirementScopeKey(row, department);
-    rowsByScope.set(scopeKey, [...(rowsByScope.get(scopeKey) || []), { row, inputIndex }]);
-  });
-
-  const currentRows: IndexedPowerRequirementTableRow[] = [];
-
-  rowsByScope.forEach((scopeRows) => {
-    const rowsWithGeneration = scopeRows.filter((value) =>
-      getPowerRequirementGenerationTimestamp(value.row)
-    );
-
-    if (rowsWithGeneration.length > 0) {
-      const latestGeneration = rowsWithGeneration.reduce<string | null>(
-        (latest, value) => {
-          const generationTimestamp = getPowerRequirementGenerationTimestamp(value.row);
-          if (!generationTimestamp) return latest;
-          if (!latest || compareGenerationTimestamp(generationTimestamp, latest) > 0) {
-            return generationTimestamp;
-          }
-          return latest;
-        },
-        null
-      );
-
-      currentRows.push(
-        ...rowsWithGeneration.filter(
-          (value) => getPowerRequirementGenerationTimestamp(value.row) === latestGeneration
-        )
-      );
-      return;
-    }
-
-    const latestLegacyRows = new Map<string, IndexedPowerRequirementTableRow>();
-    scopeRows.forEach((indexedRow) => {
-      const department = indexedRow.row.department as TechnicalPowerDepartment | null;
-      if (!department) return;
-
-      const identityKey = getLegacyPowerRequirementTableIdentityKey(indexedRow.row, department);
-      const current = latestLegacyRows.get(identityKey);
-
-      if (
-        !current ||
-        comparePowerRequirementTablesByFreshness(indexedRow, current) >= 0
-      ) {
-        latestLegacyRows.set(identityKey, indexedRow);
-      }
-    });
-
-    currentRows.push(...latestLegacyRows.values());
-  });
-
-  return currentRows
-    .sort(comparePowerRequirementTablesByFreshness)
-    .map((value) => value.row);
-};
-
-const formatPowerRequirementNumber = (value: number | string | null | undefined) => {
-  if (typeof value === 'number') return value.toFixed(2);
-  return value ?? 'N/D';
-};
-
-export const formatPowerRequirementsText = (
-  rows: PowerRequirementTableRow[]
-) =>
-  getCurrentPowerRequirementTables(rows)
-    .map((req) => {
-      const department = (req.department || 'general').toUpperCase();
-      const stageLabel = getPowerRequirementStageLabel(req);
-      const pduType = req.custom_pdu_type || req.pdu_type || 'N/D';
-      const position = getResolvedPowerPosition(req.position, req.custom_position);
-      const lines = [
-        `${[department, stageLabel, req.table_name || 'tabla'].filter(Boolean).join(' - ')}:`,
-        `Potencia Total: ${formatPowerRequirementNumber(req.total_watts)}W`,
-        `Corriente por Fase: ${formatPowerRequirementNumber(req.current_per_phase)}A`,
-        `PDU Recomendado: ${pduType}`,
-      ];
-
-      if (position) {
-        lines.push(`Posición: ${position}`);
-      }
-
-      if (req.includes_hoist) {
-        lines.push('Requiere potencia adicional de motores (CEE32A 3P+N+G)');
-      }
-
-      return `${lines.join('\n')}\n`;
-    })
-    .join('\n');
 
 const mapNormalizedTourPowerTable = (
   table: ReturnType<typeof buildNormalizedTourPowerTables>['tables'][number]
@@ -321,7 +173,8 @@ const mapNormalizedTourPowerTable = (
   totalWatts: table.totalWatts || 0,
   currentPerPhase: table.currentPerPhase || 0,
   totalVa: table.totalVa || 0,
-  notes: table.includesHoist ? 'Motor adicional CEE32A 3P+N+G' : '',
+  calculation: table.calculation,
+  notes: buildPowerRowNotes(table.includesHoist, table.calculation.isEstimate),
   source: table.source,
 });
 
@@ -576,21 +429,18 @@ export const loadTechnicalPowerSummaryData = async ({
       departments[department] || createEmptyDepartmentSummary(department),
     ])
   ) as Record<TechnicalPowerDepartment, DepartmentPowerSummaryData>;
+  const allRows = TECHNICAL_POWER_DEPARTMENTS.flatMap(
+    (department) => safeDepartments[department].rows,
+  );
+  const systemAggregation = aggregatePowerCalculations(allRows);
 
   return {
     departments: safeDepartments,
-    totalSystemWatts: TECHNICAL_POWER_DEPARTMENTS.reduce(
-      (sum, department) => sum + safeDepartments[department].totalWatts,
-      0
-    ),
-    totalSystemAmps: TECHNICAL_POWER_DEPARTMENTS.reduce(
-      (sum, department) => sum + safeDepartments[department].totalAmps,
-      0
-    ),
-    totalSystemKva: TECHNICAL_POWER_DEPARTMENTS.reduce(
-      (sum, department) => sum + safeDepartments[department].totalKva,
-      0
-    ),
+    totalSystemWatts: systemAggregation.totalWatts,
+    totalSystemAmps: systemAggregation.currentLine,
+    totalSystemKva:
+      systemAggregation.totalVa === null ? null : systemAggregation.totalVa / 1000,
+    aggregationReason: systemAggregation.reason,
   };
 };
 

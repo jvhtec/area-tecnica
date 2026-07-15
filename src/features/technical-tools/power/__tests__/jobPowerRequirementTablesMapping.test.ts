@@ -44,10 +44,12 @@ describe("mapPowerRequirementRowToTable", () => {
     expect(table.stageNumber).toBe(2);
     expect(table.stageName).toBe("Stage 2");
     expect(table.generationTimestamp).toBe("2026-06-01T10:00:00.000Z");
-    expect(table.snapshotSafetyMargin).toBe(20);
-    expect(table.snapshotPhaseMode).toBe("three");
-    expect(table.snapshotVoltage).toBe(400);
-    expect(table.snapshotPowerFactor).toBe(0.95);
+    expect(table.calculation).toMatchObject({
+      safetyMargin: 20,
+      phaseMode: "three",
+      voltage: 400,
+      powerFactor: 0.95,
+    });
     // adjusted = 4000 * 1.2; VA = adjusted / 0.95
     expect(table.adjustedWatts).toBeCloseTo(4800);
     expect(table.totalVa).toBeCloseTo(4800 / 0.95);
@@ -74,7 +76,7 @@ describe("mapPowerRequirementRowToTable", () => {
       perRowPf: true,
     });
 
-    expect(table.snapshotPowerFactor).toBeUndefined();
+    expect(table.calculation?.powerFactor).toBeUndefined();
     expect(table.totalWatts).toBe(1520);
     // Mixed-load VA must exceed real power because one row has PF < 1
     expect(table.totalVa!).toBeGreaterThan(1520);
@@ -91,10 +93,10 @@ describe("mapPowerRequirementRowToTable", () => {
       department: "sound",
       jobId: "job-1",
       settings: {
-        safetyMargin: table.snapshotSafetyMargin!,
-        phaseMode: table.snapshotPhaseMode!,
-        voltage: table.snapshotVoltage!,
-        powerFactor: table.snapshotPowerFactor,
+        safetyMargin: table.calculation!.safetyMargin,
+        phaseMode: table.calculation!.phaseMode,
+        voltage: table.calculation!.voltage,
+        powerFactor: table.calculation!.powerFactor,
       },
       table: table as PowerTable,
     });
@@ -121,11 +123,49 @@ describe("mapPowerRequirementRowToTable", () => {
       perRowPf: false,
     });
 
-    expect(table.snapshotSafetyMargin).toBe(20);
-    expect(table.snapshotPhaseMode).toBe("three");
-    expect(table.snapshotVoltage).toBe(400);
+    expect(table.calculation).toMatchObject({
+      safetyMargin: 20,
+      phaseMode: "three",
+      voltage: 400,
+    });
     expect(table.generationTimestamp).toBe(legacyRow.created_at);
-    // no PF stored → VA falls back to adjusted watts
-    expect(table.totalVa).toBeCloseTo(4800);
+    // no PF stored → legacy reconstruction uses the caller's fallback PF
+    expect(table.totalVa).toBeCloseTo(4800 / 0.9);
+    expect(table.calculation?.isEstimate).toBe(true);
+  });
+
+  it("uses the persisted v2 snapshot instead of drifting with legacy columns", () => {
+    const canonicalRow: PowerRequirementTableRow = {
+      ...baseRow,
+      total_watts: 9999,
+      current_per_phase: 99,
+      table_data: {
+        ...baseRow.table_data,
+        calculation: {
+          version: 2,
+          totalWatts: 4000,
+          adjustedWatts: 4800,
+          totalVa: 5052.632,
+          currentLine: 7.292,
+          safetyMargin: 20,
+          phaseMode: "three",
+          voltage: 400,
+          powerFactor: 0.95,
+          powerFactorSource: "global",
+          isEstimate: false,
+        },
+      },
+    };
+
+    const table = mapPowerRequirementRowToTable(canonicalRow, {
+      fallbackPowerFactor: 0.9,
+      fallbackSafetyMargin: 0,
+      perRowPf: false,
+    });
+
+    expect(table.totalWatts).toBe(4000);
+    expect(table.currentPerPhase).toBe(7.292);
+    expect(table.calculation?.safetyMargin).toBe(20);
+    expect(table.calculation?.isEstimate).toBe(false);
   });
 });

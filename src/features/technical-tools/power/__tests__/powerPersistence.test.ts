@@ -9,12 +9,28 @@ import {
   saveJobPowerRequirementTable,
   saveJobPowerRequirementTablesGeneration,
 } from "@/features/technical-tools/power/powerPersistence";
+import type { PowerTable } from "@/features/technical-tools/power/types";
 
-const table = {
+const table: PowerTable = {
   name: "Main",
   rows: [{ quantity: "2", componentId: "1", watts: "1000", totalWatts: 2000 }],
   totalWatts: 2000,
-  currentPerPhase: 12.5,
+  currentPerPhase: 3.849,
+  adjustedWatts: 2400,
+  totalVa: 2666.6667,
+  calculation: {
+    version: 2,
+    totalWatts: 2000,
+    adjustedWatts: 2400,
+    totalVa: 2666.6667,
+    currentLine: 3.849,
+    safetyMargin: 20,
+    phaseMode: "three",
+    voltage: 400,
+    powerFactor: 0.9,
+    powerFactorSource: "global",
+    isEstimate: false,
+  },
   pduType: "CEE16A 3P+N+G",
   position: "FOH",
 };
@@ -100,7 +116,7 @@ describe("technical power persistence payloads", () => {
 
   it("builds normal job inserts with shared power metadata", () => {
     expect(buildPowerRequirementInsert({ department: "sound", jobId: "job-1", settings, table })).toMatchObject({
-      current_per_phase: 12.5,
+      current_per_phase: 3.849,
       department: "sound",
       job_id: "job-1",
       pdu_type: "CEE16A 3P+N+G",
@@ -130,16 +146,22 @@ describe("technical power persistence payloads", () => {
   });
 
   it("builds tour default payloads with table data and metadata in one shape", () => {
-    expect(buildTourPowerDefaultTable({ setId: "set-1", settings, table })).toMatchObject({
+    const payload = buildTourPowerDefaultTable({ setId: "set-1", settings, table });
+
+    expect(payload).toMatchObject({
       set_id: "set-1",
       table_name: "Main",
       table_type: "power",
       total_value: 2000,
       metadata: {
-        current_per_phase: 12.5,
+        calculation: table.calculation,
+        current_per_phase: 3.849,
         phaseMode: "three",
         safetyMargin: 20,
         voltage: 400,
+      },
+      table_data: {
+        calculation: table.calculation,
       },
     });
   });

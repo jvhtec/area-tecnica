@@ -2,6 +2,31 @@ export type TechnicalDepartment = "sound" | "lights" | "video";
 
 export type PhaseMode = "single" | "three";
 
+export const POWER_CALCULATION_VERSION = 2 as const;
+
+export type PowerFactorSource =
+  | "global"
+  | "per-row"
+  | "legacy-default";
+
+/**
+ * Reproducible result of one calculator run. Apparent power is stored after
+ * the planning margin; reactive power is derived from P and S when needed.
+ */
+export type PowerCalculationSnapshot = {
+  version: typeof POWER_CALCULATION_VERSION;
+  totalWatts: number;
+  adjustedWatts: number;
+  totalVa: number;
+  currentLine: number;
+  safetyMargin: number;
+  phaseMode: PhaseMode;
+  voltage: number;
+  powerFactor?: number;
+  powerFactorSource: PowerFactorSource;
+  isEstimate: boolean;
+};
+
 export type PowerComponent = {
   id: number | string;
   name: string;
@@ -31,6 +56,7 @@ export type PowerTable = {
   adjustedWatts?: number;
   totalVa?: number;
   currentPerPhase?: number;
+  calculation?: PowerCalculationSnapshot;
   pduType?: string;
   customPduType?: string;
   position?: string;
@@ -40,12 +66,6 @@ export type PowerTable = {
   isOverride?: boolean;
   overrideId?: string;
   defaultTableId?: string;
-  // snapshot of electrical settings at generation time, used when persisting
-  // and when re-loading saved tables for edition
-  snapshotSafetyMargin?: number;
-  snapshotPhaseMode?: PhaseMode;
-  snapshotVoltage?: number;
-  snapshotPowerFactor?: number;
 };
 
 export type PowerElectricalSettings = {

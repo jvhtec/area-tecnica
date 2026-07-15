@@ -84,6 +84,68 @@ describe('tourPowerTables', () => {
     expect(normalized.totalVa).toBe(1200);
   });
 
+  it('restores supply and global PF assumptions from table data when metadata lacks them', () => {
+    const normalized = normalizeTourDefaultPowerTable(
+      {
+        id: 'default-table-data-settings',
+        set_id: 'set-1',
+        table_name: 'Control',
+        table_type: 'power',
+        total_value: 800,
+        metadata: { pdu_type: 'Schuko 16A' },
+        table_data: {
+          rows: [],
+          phaseMode: 'single',
+          voltage: 230,
+          pf: 0.8,
+          safetyMargin: 25,
+        },
+        created_at: '2026-04-08T10:00:00.000Z',
+        updated_at: '2026-04-08T10:00:00.000Z',
+      } as any,
+      'sound',
+    );
+
+    expect(normalized.calculation).toMatchObject({
+      phaseMode: 'single',
+      powerFactor: 0.8,
+      safetyMargin: 25,
+      totalVa: 1250,
+      voltage: 230,
+    });
+    expect(normalized.currentPerPhase).toBeCloseTo(1250 / 230);
+  });
+
+  it('uses per-row PF for lights instead of replacing it with the department default', () => {
+    const normalized = normalizeTourDefaultPowerTable(
+      {
+        id: 'default-lights',
+        set_id: 'set-1',
+        table_name: 'Tungsten',
+        table_type: 'power',
+        total_value: 1000,
+        metadata: { pdu_type: '32A', safetyMargin: 0 },
+        table_data: {
+          rows: [
+            {
+              quantity: '1',
+              componentId: 'fixture',
+              watts: '1000',
+              totalWatts: 1000,
+              pf: '1.00',
+            },
+          ],
+        },
+        created_at: '2026-04-08T10:00:00.000Z',
+        updated_at: '2026-04-08T10:00:00.000Z',
+      } as unknown as Parameters<typeof normalizeTourDefaultPowerTable>[0],
+      'lights',
+    );
+
+    expect(normalized.totalVa).toBe(1000);
+    expect(normalized.calculation.powerFactorSource).toBe('per-row');
+  });
+
   it('preserves the persisted FOH schuko flag on normalized tour default tables', () => {
     const normalized = normalizeTourDefaultPowerTable(
       {
@@ -100,7 +162,7 @@ describe('tourPowerTables', () => {
         table_data: { rows: [] },
         created_at: '2026-04-08T10:00:00.000Z',
         updated_at: '2026-04-08T10:00:00.000Z',
-      } as any,
+      } as unknown as Parameters<typeof normalizeTourDefaultPowerTable>[0],
       'sound'
     );
 

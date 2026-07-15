@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildPowerPdfPayload,
   buildTourDefaultDocumentPlan,
   getTourDefaultDocumentNoUpdateToast,
   getTourDefaultDocumentObjectPath,
@@ -91,6 +92,48 @@ const buildData = (
 });
 
 describe("tour default document sync planning", () => {
+  it("includes the auxiliary FOH Schuko note for sound and video, but not lights", () => {
+    const plan = buildTourDefaultDocumentPlan(
+      buildData({
+        defaultTables: [
+          buildTable({
+            table_name: "FoH",
+            table_type: "power",
+            total_value: 1000,
+            metadata: {
+              current_per_phase: 5,
+              foh_schuko: true,
+              order_index: 0,
+              pdu_type: "32A",
+            },
+            table_data: {
+              rows: [
+                {
+                  componentId: "console",
+                  componentName: "Console",
+                  pf: "1",
+                  quantity: "1",
+                  totalWatts: 1000,
+                  watts: "1000",
+                },
+              ],
+            },
+          }),
+        ],
+      })
+    );
+    const powerUpload = findUploadPlanItem(plan, "sound", "power");
+
+    expect(powerUpload).toBeDefined();
+    expect(buildPowerPdfPayload(powerUpload!).fohSchukoRequired).toBe(true);
+    expect(
+      buildPowerPdfPayload({ ...powerUpload!, department: "video" }).fohSchukoRequired
+    ).toBe(true);
+    expect(
+      buildPowerPdfPayload({ ...powerUpload!, department: "lights" }).fohSchukoRequired
+    ).toBe(false);
+  });
+
   it("uploads the resolved package PDF and cleans unrelated date/dept/type slots", () => {
     const plan = buildTourDefaultDocumentPlan(buildData());
 

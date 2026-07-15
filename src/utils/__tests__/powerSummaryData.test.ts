@@ -98,7 +98,49 @@ describe('powerSummaryData', () => {
     expect(summary.departments.lights.rows[0].positionLabel).toBe('Custom Left');
     expect(summary.departments.lights.rows[0].notes).toContain('CEE32A');
     expect(summary.totalSystemWatts).toBe(4500);
-    expect(summary.totalSystemAmps).toBe(18);
+    // Compatible 3φ supplies aggregate by ΣP/ΣQ, never by adding row currents.
+    expect(summary.totalSystemAmps).toBeCloseTo(7.1218, 3);
+  });
+
+  it('ignores malformed persisted power rows instead of treating them as typed loads', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'lights-malformed',
+          job_id: 'job-1',
+          department: 'lights',
+          table_name: 'Dimmers',
+          total_watts: 900,
+          current_per_phase: 8,
+          pdu_type: '63A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            phaseMode: 'three',
+            safetyMargin: 0,
+            voltage: 400,
+            rows: [
+              {
+                quantity: '1',
+                componentId: 'fixture',
+                watts: 1000,
+                pf: '0.50',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.lights.totalKva).toBeCloseTo(1);
+    expect(summary.departments.lights.rows[0].calculation?.powerFactorSource).toBe(
+      'legacy-default',
+    );
   });
 
   it('keeps only the newest saved job table when a department table was re-saved', async () => {

@@ -47,6 +47,7 @@ export interface DepartmentPowerSummaryRow {
   totalWatts: number;
   currentPerPhase: number;
   totalVa: number;
+  calculation?: import('@/features/technical-tools/power/types').PowerCalculationSnapshot;
   notes: string;
   source: DepartmentPowerSummarySource;
 }
@@ -56,15 +57,17 @@ export interface DepartmentPowerSummaryData {
   rows: DepartmentPowerSummaryRow[];
   safetyMargin: number | null;
   totalWatts: number;
-  totalAmps: number;
-  totalKva: number;
+  totalAmps: number | null;
+  totalKva: number | null;
+  aggregationReason?: string;
 }
 
 export interface CombinedTechnicalPowerSummaryData {
   departments: Record<TechnicalPowerDepartment, DepartmentPowerSummaryData>;
   totalSystemWatts: number;
-  totalSystemAmps: number;
-  totalSystemKva: number;
+  totalSystemAmps: number | null;
+  totalSystemKva: number | null;
+  aggregationReason?: string;
 }
 
 export interface TechnicalPowerSummaryAvailability {

@@ -20,6 +20,7 @@ import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
 import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets";
 import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tourPowerTables";
+import { aggregatePowerCalculations } from "@/features/technical-tools/power/powerAggregation";
 import { getDepartmentLabel } from "@/types/department";
 import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 import { getTourDateTechnicalPdfFileName as getTourDatePdfFilename, getTourDefaultsPdfFileName as getDefaultsPdfFilename } from "@/utils/technicalPdfNames";
@@ -684,22 +685,21 @@ export const TourDefaultsManager = ({
       }
 
       if (type === 'power') {
-        const { tables, safetyMargin } = buildNormalizedTourPowerTables({
+        const { tables } = buildNormalizedTourPowerTables({
           department: department as 'sound' | 'lights' | 'video',
           defaultTables: relevantDefaults.filter(isNewFormatTable),
           legacyDefaults: toTourPowerDefaultRows(relevantDefaults.filter(isLegacyPowerDefault)),
         });
 
+        const aggregation = aggregatePowerCalculations(tables);
         const powerSummary = {
-          totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
-          totalSystemAmps: tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0),
-          totalSystemKva:
-            tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) /
-            1000,
+          totalSystemWatts: aggregation.totalWatts, adjustedSystemWatts: aggregation.adjustedWatts,
+          totalSystemAmps: aggregation.currentLine, totalSystemKva: aggregation.totalVa === null ? null : aggregation.totalVa / 1000,
+          aggregationReason: aggregation.reason,
         };
 
         const fohSchukoRequired =
-          (department === 'sound' || department === 'lights') &&
+          (department === 'sound' || department === 'video') &&
           relevantDefaults.some(
             (item) => isNewFormatTable(item) && Boolean(item.metadata?.foh_schuko),
           );
@@ -712,7 +712,7 @@ export const TourDefaultsManager = ({
           new Date().toLocaleDateString('en-GB'),
           undefined,
           powerSummary,
-          safetyMargin,
+          undefined,
           logoUrl,
           fohSchukoRequired
         );
@@ -944,7 +944,7 @@ export const TourDefaultsManager = ({
     }
 
     if (type === 'power') {
-      const { tables, safetyMargin } = buildNormalizedTourPowerTables({
+      const { tables } = buildNormalizedTourPowerTables({
         department: department as 'sound' | 'lights' | 'video',
         overrides: (overrides || []) as TourDatePowerOverrideRow[],
         defaultTables: defaultsData.filter(isNewFormatTable),
@@ -953,19 +953,18 @@ export const TourDefaultsManager = ({
 
       if (tables.length === 0) return false;
 
+      const aggregation = aggregatePowerCalculations(tables);
       const powerSummary = {
-        totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
-        totalSystemAmps: tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0),
-        totalSystemKva:
-          tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) /
-          1000,
+        totalSystemWatts: aggregation.totalWatts, adjustedSystemWatts: aggregation.adjustedWatts,
+        totalSystemAmps: aggregation.currentLine, totalSystemKva: aggregation.totalVa === null ? null : aggregation.totalVa / 1000,
+        aggregationReason: aggregation.reason,
       };
 
       const locationName = getTourDateLocationName(tourDate);
       const dateStr = tourDate.date;
 
       const fohSchukoRequired =
-        (department === 'sound' || department === 'lights') &&
+        (department === 'sound' || department === 'video') &&
         defaultsData.some(
           (item) => isNewFormatTable(item) && Boolean(item.metadata?.foh_schuko),
         );
@@ -978,7 +977,7 @@ export const TourDefaultsManager = ({
         dateStr,
         undefined,
         powerSummary,
-        safetyMargin,
+        undefined,
         logoUrl,
         fohSchukoRequired
       );
