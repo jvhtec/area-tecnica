@@ -226,7 +226,11 @@ export const drawWeatherPdfIcon = (
   }
 };
 
-const normalizePadding = (padding: MarginPaddingInput): { top: number; right: number; bottom: number; left: number } => {
+const normalizePadding = (padding?: MarginPaddingInput | null): { top: number; right: number; bottom: number; left: number } => {
+  if (padding == null) {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+
   if (typeof padding === 'number') {
     return { top: padding, right: padding, bottom: padding, left: padding };
   }

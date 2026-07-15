@@ -83,4 +83,25 @@ describe('weather PDF icons', () => {
     expect(pdf.circle).toHaveBeenCalled();
     expect(pdf.line).toHaveBeenCalled();
   });
+
+  it('uses zero defaults when AutoTable omits condition cell padding', () => {
+    const hooks = createWeatherTableIconHooks(
+      createPdfMock() as unknown as jsPDF,
+      [{ weatherCode: 0 }],
+    );
+    const hookData = {
+      section: 'body',
+      column: { index: 1 },
+      row: { index: 0 },
+      cell: { styles: { cellPadding: undefined } },
+    } as unknown as CellHookData;
+
+    expect(() => hooks.didParseCell?.(hookData)).not.toThrow();
+    expect(hookData.cell.styles.cellPadding).toEqual({
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 11,
+    });
+  });
 });
