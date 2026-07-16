@@ -11,6 +11,20 @@ vi.mock("@/services/dataLayerClient", () => ({
 
 const invokeMock = vi.mocked(dataLayerClient.functions.invoke);
 
+const motorUnit = {
+  id: "unit-1",
+  modelId: "model-1",
+  modelName: "LIFTKET STAR 500 kg",
+  manufacturer: "LIFTKET",
+  serial: "L5755TC",
+  barcode: "53658-01",
+  stencil: null,
+  modelNumber: null,
+  currentLocation: null,
+  shippedDate: null,
+  returnDate: null,
+};
+
 describe("fetchFlexMotorUnits", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -19,18 +33,7 @@ describe("fetchFlexMotorUnits", () => {
   it("accepts the sanitized motor-unit response and filters unknown manifest units", async () => {
     invokeMock.mockResolvedValue({
       data: {
-        units: [{
-          id: "unit-1",
-          modelId: "model-1",
-          modelName: "Motor 500 kg",
-          serial: "L5755TC",
-          barcode: "53658-01",
-          stencil: null,
-          modelNumber: null,
-          currentLocation: null,
-          shippedDate: null,
-          returnDate: null,
-        }],
+        units: [motorUnit],
         modelErrors: [],
         manifest: {
           status: "found",
@@ -49,18 +52,7 @@ describe("fetchFlexMotorUnits", () => {
     } as never);
 
     await expect(fetchFlexMotorUnits("job-1")).resolves.toEqual({
-      units: [{
-        id: "unit-1",
-        modelId: "model-1",
-        modelName: "Motor 500 kg",
-        serial: "L5755TC",
-        barcode: "53658-01",
-        stencil: null,
-        modelNumber: null,
-        currentLocation: null,
-        shippedDate: null,
-        returnDate: null,
-      }],
+      units: [motorUnit],
       modelErrors: [],
       manifest: {
         status: "found",
@@ -78,6 +70,20 @@ describe("fetchFlexMotorUnits", () => {
     expect(invokeMock).toHaveBeenCalledWith("fetch-flex-motor-units", {
       body: { jobId: "job-1" },
     });
+  });
+
+  it("rejects a unit without the manufacturer field", async () => {
+    const { manufacturer: _manufacturer, ...malformedUnit } = motorUnit;
+    invokeMock.mockResolvedValue({
+      data: {
+        units: [malformedUnit],
+        modelErrors: [],
+        manifest: { status: "empty", unitIds: [], sources: [], message: "No hay motores.", warnings: [] },
+      },
+      error: null,
+    } as never);
+
+    await expect(fetchFlexMotorUnits("job-1")).rejects.toThrow("respuesta no válida");
   });
 
   it("rejects malformed function responses", async () => {
