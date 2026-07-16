@@ -90,6 +90,13 @@ SET email = excluded.email,
     role = excluded.role,
     department = excluded.department;
 
+INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
+VALUES
+  ('job.created', 'Job created', 'management', 'info', false),
+  ('assignment.created', 'Assignment created', 'management', 'info', false),
+  ('assignment.updated', 'Assignment updated', 'management', 'info', false)
+ON CONFLICT (code) DO NOTHING;
+
 INSERT INTO public.jobs (id, title, start_time, end_time, job_type, status)
 VALUES (
   'c9200000-0000-0000-0000-000000000001'::uuid,
