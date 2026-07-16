@@ -125,7 +125,7 @@ The browser generates one PDF for the complete selection. Each motor contributes
 1. **Individual identity page**
    - manufacturer from Flex,
    - display model from Flex,
-   - supplied brand logo when the manufacturer/model resolves to ChainMaster, LIFTKET or CM,
+   - supplied brand logo in the motor-details panel's upper-right corner when the manufacturer/model resolves to ChainMaster, LIFTKET or CM,
    - serial number,
    - Flex barcode when present,
    - inspection date,
@@ -136,7 +136,7 @@ The browser generates one PDF for the complete selection. Each motor contributes
 2. **Signed maintenance page**
    - copied unchanged from the configured one-page signed master PDF.
 
-If Flex model metadata cannot be read, the configured allowlist name remains available and certificate generation continues without a manufacturer logo. Unknown manufacturers also generate normally without a logo.
+If Flex model metadata cannot be read, the configured allowlist name remains available and certificate generation continues without a manufacturer logo. Unknown manufacturers and unavailable local logo assets also generate normally without a logo. During a staggered deployment, the client treats the previous Edge Function's omitted `manufacturer` field as `null`.
 
 For one selected motor, the filename includes the serial number. For multiple motors, the filename includes the job name.
 
@@ -166,7 +166,9 @@ The client validates the complete Edge Function response again before presenting
 | No outbound prep/ship manifest yet | Show `unavailable`; offer manual selection |
 | Manifest has no matching certified motors | Show `empty`; offer manual selection |
 | Flex manufacturer/model metadata fails | Keep configured model fallback and omit the brand logo |
+| Frontend deploys before the enriched Edge Function | Normalize the omitted manufacturer to `null`; continue unbranded |
 | Manufacturer has no mapped logo | Generate the full certificate without a logo |
+| Bundled logo cannot be loaded or embedded | Log a warning and generate the full certificate without a logo |
 | Some motor models fail to load | Show a partial warning; keep successfully loaded models available |
 | All motor models fail to load | Return an error and block certificate selection |
 | Signed master PDF is missing or invalid | Stop generation and show an error |
@@ -200,7 +202,8 @@ The current hardcoded campaign is intentionally simple. If several certificate c
 | Dialog and operator workflow | `src/components/jobs/cards/job-card-actions/MotorCertificateAction.tsx` |
 | Client service and response validation | `src/services/flexMotorUnits.ts` |
 | PDF generator and campaign configuration | `src/utils/pdf/motorInspectionCertificates.ts` |
-| Supplied local brand assets and aliases | `src/utils/pdf/motorBrandLogos.ts` |
+| Supplied local brand assets | `src/assets/motor-brands/` |
+| Brand aliases, MIME types, and asset loading | `src/utils/pdf/motorBrandLogos.ts` |
 | Signed master page | `public/certificates/revision-motores-2026-pagina-firmada.pdf` |
 | Protected Flex adapter | `supabase/functions/fetch-flex-motor-units/index.ts` |
 | Motor normalization and allowlist | `supabase/functions/fetch-flex-motor-units/motorUnits.ts` |

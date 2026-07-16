@@ -3,7 +3,7 @@ import { format, parseISO } from "date-fns";
 import type { FlexMotorUnit } from "@/services/flexMotorUnits";
 import { buildReadableFilename } from "@/utils/fileName";
 import {
-  decodeBase64Image,
+  loadMotorBrandLogo,
   MOTOR_BRAND_LOGOS,
   resolveMotorBrandKey,
   type MotorBrandKey,
@@ -21,6 +21,7 @@ type GenerateMotorCertificatesOptions = {
   units: FlexMotorUnit[];
   jobName?: string | null;
   signedMaintenancePageBytes?: ArrayBuffer | Uint8Array;
+  loadBrandLogo?: (brand: MotorBrandKey) => Promise<ArrayBuffer | Uint8Array>;
 };
 
 export type GeneratedMotorCertificates = {
@@ -49,15 +50,34 @@ const loadSignedPage = async (
   return response.arrayBuffer();
 };
 
+/** Fits an image within a bounded area without upscaling it. */
 const fitImage = (width: number, height: number, maxWidth: number, maxHeight: number) => {
   const scale = Math.min(maxWidth / width, maxHeight / height, 1);
   return { width: width * scale, height: height * scale };
 };
 
+/** Truncates PDF text to a measured width while keeping the result explicit. */
+const truncateTextToWidth = (
+  value: string,
+  maxWidth: number,
+  measureText: (text: string) => number,
+): string => {
+  if (measureText(value) <= maxWidth) return value;
+
+  const suffix = "...";
+  let end = value.length;
+  while (end > 0 && measureText(`${value.slice(0, end).trimEnd()}${suffix}`) > maxWidth) {
+    end -= 1;
+  }
+  return `${value.slice(0, end).trimEnd()}${suffix}`;
+};
+
+/** Generates one identity page plus the signed maintenance page for every selected motor. */
 export async function generateMotorInspectionCertificates({
   units,
   jobName,
   signedMaintenancePageBytes,
+  loadBrandLogo = loadMotorBrandLogo,
 }: GenerateMotorCertificatesOptions): Promise<GeneratedMotorCertificates> {
   if (units.length === 0) {
     throw new Error("Selecciona al menos un motor para generar certificados.");
@@ -91,11 +111,18 @@ export async function generateMotorInspectionCertificates({
   const embeddedBrandLogos = new Map<MotorBrandKey, Awaited<ReturnType<typeof output.embedPng>>>();
   for (const brand of requiredBrands) {
     const asset = MOTOR_BRAND_LOGOS[brand];
-    const bytes = decodeBase64Image(asset.base64);
-    const embedded = asset.mimeType === "image/png"
-      ? await output.embedPng(bytes)
-      : await output.embedJpg(bytes);
-    embeddedBrandLogos.set(brand, embedded);
+    try {
+      const bytes = await loadBrandLogo(brand);
+      const embedded = asset.mimeType === "image/png"
+        ? await output.embedPng(bytes)
+        : await output.embedJpg(bytes);
+      embeddedBrandLogos.set(brand, embedded);
+    } catch (error) {
+      console.warn("No se pudo incrustar el logotipo del fabricante; se generará sin marca.", {
+        brand,
+        error,
+      });
+    }
   }
 
   for (const unit of units) {
@@ -107,15 +134,6 @@ export async function generateMotorInspectionCertificates({
     page.drawPage(logo, { x: 45, y: 765, width: 140, height: 65 });
     const brand = resolveMotorBrandKey(unit.manufacturer, unit.modelName);
     const brandLogo = brand ? embeddedBrandLogos.get(brand) : undefined;
-    if (brandLogo) {
-      const dimensions = fitImage(brandLogo.width, brandLogo.height, 170, 58);
-      page.drawImage(brandLogo, {
-        x: A4_WIDTH - 45 - dimensions.width,
-        y: 775 + (50 - dimensions.height) / 2,
-        width: dimensions.width,
-        height: dimensions.height,
-      });
-    }
 
     page.drawText("CERTIFICADO INDIVIDUAL DE REVISIÓN", {
       x: 55,
@@ -146,8 +164,25 @@ export async function generateMotorInspectionCertificates({
       borderColor: green,
       color: rgb(0.975, 0.98, 0.976),
     });
+    let manufacturerMaxWidth = A4_WIDTH - 156;
+    if (brandLogo) {
+      const dimensions = fitImage(brandLogo.width, brandLogo.height, 140, 38);
+      const logoX = A4_WIDTH - 78 - dimensions.width;
+      page.drawImage(brandLogo, {
+        x: logoX,
+        y: 530 - dimensions.height,
+        width: dimensions.width,
+        height: dimensions.height,
+      });
+      manufacturerMaxWidth = Math.max(120, logoX - 94);
+    }
     page.drawText("FABRICANTE", { x: 78, y: 510, size: 9, font: bold, color: muted });
-    page.drawText((unit.manufacturer || "No indicado en Flex").slice(0, 48), {
+    const manufacturer = unit.manufacturer || "No indicado en Flex";
+    page.drawText(truncateTextToWidth(
+      manufacturer,
+      manufacturerMaxWidth,
+      (text) => bold.widthOfTextAtSize(text, 13),
+    ), {
       x: 78,
       y: 486,
       size: 13,

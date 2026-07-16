@@ -73,6 +73,7 @@ async function fetchFlexJson(
   return response.json();
 }
 
+/** Loads the current Flex display metadata while preserving the configured allowlist fallback. */
 async function fetchModelDefinition(
   fallback: MotorModelDefinition,
   flexAuthToken: string,
@@ -92,6 +93,7 @@ async function fetchModelDefinition(
   }
 }
 
+/** Loads and normalizes all available serial units for one approved motor model. */
 async function fetchUnitsForModel(
   fallback: MotorModelDefinition,
   flexAuthToken: string,

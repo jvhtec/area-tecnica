@@ -45,20 +45,40 @@ const INVALID_RESPONSE_MESSAGE = "Flex devolvió una respuesta no válida para l
 const isNullableString = (value: unknown): value is string | null =>
   typeof value === "string" || value === null;
 
-const isFlexMotorUnit = (value: unknown): value is FlexMotorUnit => {
-  if (!value || typeof value !== "object") return false;
+/** Validates a unit and fills the manufacturer omitted by the pre-rollout Edge Function. */
+const normalizeFlexMotorUnit = (value: unknown): FlexMotorUnit | null => {
+  if (!value || typeof value !== "object") return null;
   const unit = value as Record<string, unknown>;
-  return typeof unit.id === "string"
-    && typeof unit.modelId === "string"
-    && typeof unit.modelName === "string"
-    && isNullableString(unit.manufacturer)
-    && typeof unit.serial === "string"
-    && isNullableString(unit.barcode)
-    && isNullableString(unit.stencil)
-    && isNullableString(unit.modelNumber)
-    && isNullableString(unit.currentLocation)
-    && isNullableString(unit.shippedDate)
-    && isNullableString(unit.returnDate);
+  const manufacturer = unit.manufacturer === undefined ? null : unit.manufacturer;
+  if (
+    typeof unit.id !== "string"
+    || typeof unit.modelId !== "string"
+    || typeof unit.modelName !== "string"
+    || !isNullableString(manufacturer)
+    || typeof unit.serial !== "string"
+    || !isNullableString(unit.barcode)
+    || !isNullableString(unit.stencil)
+    || !isNullableString(unit.modelNumber)
+    || !isNullableString(unit.currentLocation)
+    || !isNullableString(unit.shippedDate)
+    || !isNullableString(unit.returnDate)
+  ) {
+    return null;
+  }
+
+  return {
+    id: unit.id,
+    modelId: unit.modelId,
+    modelName: unit.modelName,
+    manufacturer,
+    serial: unit.serial,
+    barcode: unit.barcode,
+    stencil: unit.stencil,
+    modelNumber: unit.modelNumber,
+    currentLocation: unit.currentLocation,
+    shippedDate: unit.shippedDate,
+    returnDate: unit.returnDate,
+  };
 };
 
 const isFlexMotorModelError = (value: unknown): value is FlexMotorModelError => {
@@ -92,6 +112,7 @@ const isFlexMotorManifestSelection = (value: unknown): value is FlexMotorManifes
     && manifest.warnings.every((warning) => typeof warning === "string");
 };
 
+/** Fetches and validates the management-only Flex motor inventory response for a job. */
 export async function fetchFlexMotorUnits(jobId: string): Promise<FlexMotorUnitsResult> {
   const { data, error } = await dataLayerClient.functions.invoke("fetch-flex-motor-units", {
     body: { jobId },
@@ -106,17 +127,23 @@ export async function fetchFlexMotorUnits(jobId: string): Promise<FlexMotorUnits
 
   const payload = data as Record<string, unknown>;
   if (!Array.isArray(payload.units)
-    || !payload.units.every(isFlexMotorUnit)
     || !Array.isArray(payload.modelErrors)
     || !payload.modelErrors.every(isFlexMotorModelError)
     || !isFlexMotorManifestSelection(payload.manifest)) {
     throw new Error(INVALID_RESPONSE_MESSAGE);
   }
 
-  const validUnitIds = new Set(payload.units.map((unit) => unit.id));
+  const units: FlexMotorUnit[] = [];
+  for (const value of payload.units) {
+    const unit = normalizeFlexMotorUnit(value);
+    if (!unit) throw new Error(INVALID_RESPONSE_MESSAGE);
+    units.push(unit);
+  }
+
+  const validUnitIds = new Set(units.map((unit) => unit.id));
   const manifest = {
     ...payload.manifest,
     unitIds: payload.manifest.unitIds.filter((id) => validUnitIds.has(id)),
   };
-  return { units: payload.units, modelErrors: payload.modelErrors, manifest };
+  return { units, modelErrors: payload.modelErrors, manifest };
 }

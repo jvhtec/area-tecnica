@@ -30,6 +30,7 @@ export const MOTOR_MODELS: readonly MotorModelDefinition[] = [
   { id: "39b21045-09f6-49ac-9c02-c24342caa70e", name: "Motor de velocidad variable 750 kg" },
 ] as const;
 
+/** Extracts a non-empty display string from the shapes returned by Flex. */
 export const textValue = (value: unknown): string | null => {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -55,6 +56,7 @@ const recordValue = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+/** Normalizes live inventory-model metadata without changing the approved model ID. */
 export function normalizeMotorModel(value: unknown, fallback: MotorModelDefinition): MotorModelDefinition {
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
   const model = value as Record<string, unknown>;
@@ -65,6 +67,7 @@ export function normalizeMotorModel(value: unknown, fallback: MotorModelDefiniti
   };
 }
 
+/** Normalizes one available serialized unit and attaches its resolved model metadata. */
 export function normalizeMotorUnit(
   value: unknown,
   model: MotorModelDefinition,

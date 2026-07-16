@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { fetchFlexMotorUnits } from "@/services/flexMotorUnits";
+import { fetchFlexMotorUnits, type FlexMotorUnit } from "@/services/flexMotorUnits";
 
 vi.mock("@/services/dataLayerClient", () => ({
   dataLayerClient: {
@@ -11,7 +11,7 @@ vi.mock("@/services/dataLayerClient", () => ({
 
 const invokeMock = vi.mocked(dataLayerClient.functions.invoke);
 
-const motorUnit = {
+const motorUnit: FlexMotorUnit = {
   id: "unit-1",
   modelId: "model-1",
   modelName: "LIFTKET STAR 500 kg",
@@ -72,11 +72,34 @@ describe("fetchFlexMotorUnits", () => {
     });
   });
 
-  it("rejects a unit without the manufacturer field", async () => {
+  it("normalizes a pre-rollout unit without manufacturer to null", async () => {
     const { manufacturer: _manufacturer, ...malformedUnit } = motorUnit;
     invokeMock.mockResolvedValue({
       data: {
         units: [malformedUnit],
+        modelErrors: [],
+        manifest: { status: "empty", unitIds: [], sources: [], message: "No hay motores.", warnings: [] },
+      },
+      error: null,
+    } as never);
+
+    await expect(fetchFlexMotorUnits("job-1")).resolves.toEqual({
+      units: [{ ...malformedUnit, manufacturer: null }],
+      modelErrors: [],
+      manifest: {
+        status: "empty",
+        unitIds: [],
+        sources: [],
+        message: "No hay motores.",
+        warnings: [],
+      },
+    });
+  });
+
+  it("rejects a unit with a malformed manufacturer", async () => {
+    invokeMock.mockResolvedValue({
+      data: {
+        units: [{ ...motorUnit, manufacturer: 42 }],
         modelErrors: [],
         manifest: { status: "empty", unitIds: [], sources: [], message: "No hay motores.", warnings: [] },
       },
