@@ -38,6 +38,11 @@
       "verifyJwt": true,
       "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT and requires admin/management before fetching Flex inventory model details."
     },
+    "fetch-flex-motor-units": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper, validates the caller JWT, requires admin/management, and reads only the fixed allowlist of motor serial-unit models from Flex."
+    },
     "fetch-flex-material-report": {
       "class": "privileged-role",
       "verifyJwt": true,
