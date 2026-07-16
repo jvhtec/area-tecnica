@@ -12,6 +12,7 @@ import {
 import {
   buildMotorSerialUnitGridUrl,
   MOTOR_MODELS,
+  normalizeMotorModel,
   normalizeMotorUnit,
   parseMotorGridPage,
   type FlexMotorUnit,
@@ -72,10 +73,30 @@ async function fetchFlexJson(
   return response.json();
 }
 
+async function fetchModelDefinition(
+  fallback: MotorModelDefinition,
+  flexAuthToken: string,
+): Promise<MotorModelDefinition> {
+  try {
+    const raw = await fetchFlexJson(
+      `/inventory-model/${encodeURIComponent(fallback.id)}`,
+      flexAuthToken,
+    );
+    return normalizeMotorModel(raw, fallback);
+  } catch (error) {
+    console.error("Unable to fetch Flex motor model metadata; using configured fallback", {
+      modelId: fallback.id,
+      error,
+    });
+    return fallback;
+  }
+}
+
 async function fetchUnitsForModel(
-  model: MotorModelDefinition,
+  fallback: MotorModelDefinition,
   flexAuthToken: string,
 ): Promise<FlexMotorUnit[]> {
+  const model = await fetchModelDefinition(fallback, flexAuthToken);
   const units = new Map<string, FlexMotorUnit>();
   const seenRawIds = new Set<string>();
 
@@ -276,8 +297,10 @@ serve(createHttpHandler(async (req: Request) => {
   }
 
   const [settled, folderResult] = await Promise.all([
-    Promise.allSettled(
-      MOTOR_MODELS.map((model) => fetchUnitsForModel(model, flexAuthToken)),
+    allSettledWithConcurrency(
+      MOTOR_MODELS,
+      FLEX_REQUEST_CONCURRENCY,
+      (model) => fetchUnitsForModel(model, flexAuthToken),
     ),
     supabase
       .from("flex_folders")
