@@ -16,15 +16,20 @@ describe("fetchFlexMotorUnits", () => {
     vi.clearAllMocks();
   });
 
-  it("normalizes the sanitized motor-unit response", async () => {
+  it("accepts the sanitized motor-unit response and filters unknown manifest units", async () => {
     invokeMock.mockResolvedValue({
       data: {
         units: [{
           id: "unit-1",
           modelId: "model-1",
           modelName: "Motor 500 kg",
-          serial: " L5755TC ",
+          serial: "L5755TC",
           barcode: "53658-01",
+          stencil: null,
+          modelNumber: null,
+          currentLocation: null,
+          shippedDate: null,
+          returnDate: null,
         }],
         modelErrors: [],
         manifest: {

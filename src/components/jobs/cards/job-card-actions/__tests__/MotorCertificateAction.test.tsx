@@ -106,7 +106,7 @@ describe("MotorCertificateAction", () => {
     expect(screen.queryByText("SERIE-2")).not.toBeInTheDocument();
     expect(screen.getByText("1 motor seleccionado")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: /Selección manual/ }));
+    await user.click(screen.getByRole("button", { name: "Selección manual" }));
     expect(await screen.findByText("SERIE-2")).toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: "Seleccionar motor SERIE-2" }));
     await user.click(screen.getByRole("button", { name: "Generar 2 certificados" }));

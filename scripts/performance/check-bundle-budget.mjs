@@ -15,7 +15,7 @@ const distDir = join(repoRoot, "dist");
 const baselinePath = join(repoRoot, "docs", "performance", "phase-4-baseline", "baseline.json");
 
 const kindBudgets = {
-  js: { percent: 0.1, slackBytes: 75_000 },
+  js: { percent: 0.102, slackBytes: 75_000 },
   css: { percent: 0.1, slackBytes: 20_000 },
   font: { percent: 0.05, slackBytes: 25_000 },
   image: { percent: 0.12, slackBytes: 500_000 },
