@@ -33,7 +33,7 @@ describe("fetchFlexMotorUnits", () => {
   it("accepts the sanitized motor-unit response and filters unknown manifest units", async () => {
     invokeMock.mockResolvedValue({
       data: {
-        units: [motorUnit],
+        units: [{ ...motorUnit, internalOnly: "omit from the normalized result" }],
         modelErrors: [],
         manifest: {
           status: "found",

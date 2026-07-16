@@ -45,40 +45,37 @@ const INVALID_RESPONSE_MESSAGE = "Flex devolvió una respuesta no válida para l
 const isNullableString = (value: unknown): value is string | null =>
   typeof value === "string" || value === null;
 
+const UNIT_FIELDS = [
+  // The first four fields are required strings; the remaining fields accept null.
+  "id",
+  "modelId",
+  "modelName",
+  "serial",
+  "barcode",
+  "stencil",
+  "modelNumber",
+  "currentLocation",
+  "shippedDate",
+  "returnDate",
+] as const;
+
 /** Validates a unit and fills the manufacturer omitted by the pre-rollout Edge Function. */
 const normalizeFlexMotorUnit = (value: unknown): FlexMotorUnit | null => {
   if (!value || typeof value !== "object") return null;
   const unit = value as Record<string, unknown>;
   const manufacturer = unit.manufacturer === undefined ? null : unit.manufacturer;
   if (
-    typeof unit.id !== "string"
-    || typeof unit.modelId !== "string"
-    || typeof unit.modelName !== "string"
+    !UNIT_FIELDS.every((key, index) => (
+      index < 4 ? typeof unit[key] === "string" : isNullableString(unit[key])
+    ))
     || !isNullableString(manufacturer)
-    || typeof unit.serial !== "string"
-    || !isNullableString(unit.barcode)
-    || !isNullableString(unit.stencil)
-    || !isNullableString(unit.modelNumber)
-    || !isNullableString(unit.currentLocation)
-    || !isNullableString(unit.shippedDate)
-    || !isNullableString(unit.returnDate)
   ) {
     return null;
   }
 
-  return {
-    id: unit.id,
-    modelId: unit.modelId,
-    modelName: unit.modelName,
-    manufacturer,
-    serial: unit.serial,
-    barcode: unit.barcode,
-    stencil: unit.stencil,
-    modelNumber: unit.modelNumber,
-    currentLocation: unit.currentLocation,
-    shippedDate: unit.shippedDate,
-    returnDate: unit.returnDate,
-  };
+  return Object.fromEntries(
+    [...UNIT_FIELDS.map((key) => [key, unit[key]]), ["manufacturer", manufacturer]],
+  ) as FlexMotorUnit;
 };
 
 const isFlexMotorModelError = (value: unknown): value is FlexMotorModelError => {

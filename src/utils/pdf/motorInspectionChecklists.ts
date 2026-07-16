@@ -17,18 +17,23 @@ export type MotorInspectionChecklist = {
 
 export type MotorInspectionChecklists = Record<MotorBrandKey | "generic", MotorInspectionChecklist>;
 
-type MotorInspectionChecklistDocument = {
+export type MotorInspectionReport = {
+  checklists: MotorInspectionChecklists;
+  reportCopy: string[];
+};
+
+type MotorInspectionChecklistDocument = MotorInspectionReport & {
   version: string;
   campaignYear: number;
-  checklists: MotorInspectionChecklists;
 };
+
+const CHECKLIST_KEYS = ["chainmaster", "liftket", "cm", "generic"] as const;
+const TEXT_KEYS = ["label", "source", "result"] as const;
 
 const isChecklist = (value: unknown): value is MotorInspectionChecklist => {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<MotorInspectionChecklist>;
-  return typeof candidate.label === "string"
-    && typeof candidate.source === "string"
-    && typeof candidate.result === "string"
+  return TEXT_KEYS.every((key) => typeof candidate[key] === "string")
     && typeof candidate.manufacturerSpecific === "boolean"
     && Array.isArray(candidate.checks)
     && candidate.checks.length > 0
@@ -40,27 +45,27 @@ const isChecklist = (value: unknown): value is MotorInspectionChecklist => {
     ));
 };
 
-const parseChecklistDocument = (value: unknown): MotorInspectionChecklists => {
+const parseChecklistDocument = (value: unknown): MotorInspectionReport => {
   if (!value || typeof value !== "object") throw new Error("El checklist de motores 2026 no es válido.");
   const document = value as Partial<MotorInspectionChecklistDocument>;
   const entries = document.checklists;
   if (
     document.campaignYear !== 2026
     || typeof document.version !== "string"
+    || !Array.isArray(document.reportCopy)
+    || document.reportCopy.length !== 25
+    || !document.reportCopy.every((item) => typeof item === "string")
     || !entries
-    || !isChecklist(entries.chainmaster)
-    || !isChecklist(entries.liftket)
-    || !isChecklist(entries.cm)
-    || !isChecklist(entries.generic)
+    || !CHECKLIST_KEYS.every((key) => isChecklist(entries[key]))
   ) {
     throw new Error("El checklist de motores 2026 no es válido.");
   }
-  return entries;
+  return document as MotorInspectionReport;
 };
 
-export const loadMotorInspectionChecklists = async (
+export const loadMotorInspectionReport = async (
   fetchDocument: typeof fetch = globalThis.fetch,
-): Promise<MotorInspectionChecklists> => {
+): Promise<MotorInspectionReport> => {
   const response = await fetchDocument(MOTOR_INSPECTION_CHECKLIST_URL);
   if (!response.ok) throw new Error("No se pudo cargar el checklist de motores 2026.");
   return parseChecklistDocument(await response.json());

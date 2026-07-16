@@ -5,24 +5,20 @@ import liftketLogoUrl from "@/assets/motor-brands/liftket.png?no-inline";
 export type MotorBrandKey = "chainmaster" | "liftket" | "cm";
 
 type MotorBrandAsset = {
-  label: string;
   mimeType: "image/jpeg" | "image/png";
   url: string;
 };
 
 export const MOTOR_BRAND_LOGOS: Record<MotorBrandKey, MotorBrandAsset> = {
   chainmaster: {
-    label: "ChainMaster",
     mimeType: "image/jpeg",
     url: chainmasterLogoUrl,
   },
   liftket: {
-    label: "LIFTKET",
     mimeType: "image/png",
     url: liftketLogoUrl,
   },
   cm: {
-    label: "CM",
     mimeType: "image/jpeg",
     url: cmLogoUrl,
   },
@@ -33,16 +29,10 @@ export const resolveMotorBrandKey = (
   manufacturer: string | null,
   modelName: string,
 ): MotorBrandKey | null => {
-  const value = `${manufacturer ?? ""} ${modelName}`.toLocaleLowerCase("en");
-  if (value.includes("chainmaster") || value.includes("chain master")) return "chainmaster";
+  const value = `${manufacturer ?? ""} ${modelName}`.toLowerCase();
+  if (/chain ?master/.test(value)) return "chainmaster";
   if (value.includes("liftket")) return "liftket";
-  if (
-    value.includes("columbus mckinnon")
-    || /(^|\s)cm(\s|$)/.test(value)
-    || value.includes("lodestar")
-  ) {
-    return "cm";
-  }
+  if (/columbus mckinnon|(^|\s)cm(\s|$)|lodestar/.test(value)) return "cm";
   return null;
 };
 
@@ -50,11 +40,11 @@ export const resolveMotorBrandKey = (
 export const loadMotorBrandLogo = async (
   brand: MotorBrandKey,
   fetchImage: typeof fetch = globalThis.fetch,
-): Promise<Uint8Array> => {
+): Promise<ArrayBuffer> => {
   const asset = MOTOR_BRAND_LOGOS[brand];
   const response = await fetchImage(asset.url);
   if (!response.ok) {
-    throw new Error(`No se pudo cargar el logotipo local de ${asset.label}.`);
+    throw new Error("No se pudo cargar el logotipo local.");
   }
-  return new Uint8Array(await response.arrayBuffer());
+  return response.arrayBuffer();
 };

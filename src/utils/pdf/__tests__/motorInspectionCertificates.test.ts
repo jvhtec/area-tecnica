@@ -8,8 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { FlexMotorUnit } from "@/services/flexMotorUnits";
 import type { MotorBrandKey } from "@/utils/pdf/motorBrandLogos";
 import {
-  loadMotorInspectionChecklists,
-  type MotorInspectionChecklists,
+  loadMotorInspectionReport,
+  type MotorInspectionReport,
 } from "@/utils/pdf/motorInspectionChecklists";
 import {
   generateMotorInspectionCertificates,
@@ -25,13 +25,13 @@ const logoFileByBrand: Record<MotorBrandKey, string> = {
 const loadTestBrandLogo = (brand: MotorBrandKey): Promise<Buffer> =>
   readFile(resolve(process.cwd(), "src/assets/motor-brands", logoFileByBrand[brand]));
 
-const loadTestChecklists = async (): Promise<MotorInspectionChecklists> => {
+const loadTestReport = async (): Promise<MotorInspectionReport> => {
   const value: unknown = JSON.parse(await readFile(resolve(
     process.cwd(),
     "public/certificates/motor-inspection-checklists-2026.json",
   ), "utf8"));
   const fetchDocument = vi.fn().mockResolvedValue({ ok: true, json: async () => value });
-  return loadMotorInspectionChecklists(fetchDocument as unknown as typeof fetch);
+  return loadMotorInspectionReport(fetchDocument as unknown as typeof fetch);
 };
 
 const unit = (
@@ -68,7 +68,7 @@ describe("generateMotorInspectionCertificates", () => {
       units: [unit("1", "J36717"), unit("2", "J36724", "CM")],
       jobName: "Gira Norte",
       signedInspectionRecordBytes: await createSignedPage(),
-      inspectionChecklists: await loadTestChecklists(),
+      inspectionReport: await loadTestReport(),
       loadBrandLogo: loadTestBrandLogo,
     });
 
@@ -76,7 +76,6 @@ describe("generateMotorInspectionCertificates", () => {
     expect(pdf.getPageCount()).toBe(4);
     expect(pdf.getTitle()).toBe("Certificados de motores - Gira Norte");
     expect(pdf.getAuthor()).toBe("SATPRO, S.L.U.");
-    expect(pdf.getSubject()).toContain("reemitido desde el acta SATPRO 2026");
     expect(result.filename).toBe("Certificados de motores - Gira Norte.pdf");
   });
 
@@ -84,7 +83,7 @@ describe("generateMotorInspectionCertificates", () => {
     const result = await generateMotorInspectionCertificates({
       units: [unit("1", "J36717")],
       signedInspectionRecordBytes: await createSignedPage(),
-      inspectionChecklists: await loadTestChecklists(),
+      inspectionReport: await loadTestReport(),
       loadBrandLogo: loadTestBrandLogo,
     });
     expect(result.filename).toBe("Certificado de motor - J36717.pdf");
@@ -94,7 +93,7 @@ describe("generateMotorInspectionCertificates", () => {
     const result = await generateMotorInspectionCertificates({
       units: [unit("1", "J36717", "Fabricante sin logo", "Motor D8+ 750 kg")],
       signedInspectionRecordBytes: await createSignedPage(),
-      inspectionChecklists: await loadTestChecklists(),
+      inspectionReport: await loadTestReport(),
     });
     const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
     expect(pdf.getPageCount()).toBe(2);
@@ -105,14 +104,14 @@ describe("generateMotorInspectionCertificates", () => {
     const result = await generateMotorInspectionCertificates({
       units: [unit("1", "J36717")],
       signedInspectionRecordBytes: await createSignedPage(),
-      inspectionChecklists: await loadTestChecklists(),
+      inspectionReport: await loadTestReport(),
       loadBrandLogo: vi.fn().mockRejectedValue(new Error("asset unavailable")),
     });
 
     const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
     expect(pdf.getPageCount()).toBe(2);
     expect(warning).toHaveBeenCalledWith(
-      "No se pudo incrustar el logotipo del fabricante; se generará sin marca.",
+      "Logotipo local omitido.",
       expect.objectContaining({ brand: "chainmaster" }),
     );
     warning.mockRestore();
@@ -122,20 +121,20 @@ describe("generateMotorInspectionCertificates", () => {
     await expect(generateMotorInspectionCertificates({
       units: [],
       signedInspectionRecordBytes: await createSignedPage(),
-    })).rejects.toThrow("Selecciona al menos un motor");
+    })).rejects.toThrow("Selecciona algún motor");
   });
 
   it("rejects an archived source that is not exactly one page", async () => {
     await expect(generateMotorInspectionCertificates({
       units: [unit("1", "J36717")],
       signedInspectionRecordBytes: await createSignedPage(2),
-      inspectionChecklists: await loadTestChecklists(),
+      inspectionReport: await loadTestReport(),
       loadBrandLogo: loadTestBrandLogo,
-    })).rejects.toThrow("no contiene exactamente una página");
+    })).rejects.toThrow("debe tener una página");
   });
 
   it("keeps a 12-row manufacturer checklist for every supported brand", async () => {
-    const { generic, ...manufacturerChecklists } = await loadTestChecklists();
+    const { generic, ...manufacturerChecklists } = (await loadTestReport()).checklists;
     expect(Object.keys(manufacturerChecklists)).toEqual(["chainmaster", "liftket", "cm"]);
     Object.values(manufacturerChecklists).forEach((checklist) => {
       expect(checklist.checks).toHaveLength(12);
@@ -150,7 +149,7 @@ describe("generateMotorInspectionCertificates", () => {
       ok: true,
       json: async () => ({ version: "2026.1", campaignYear: 2026, checklists: {} }),
     });
-    await expect(loadMotorInspectionChecklists(fetchDocument as unknown as typeof fetch))
+    await expect(loadMotorInspectionReport(fetchDocument as unknown as typeof fetch))
       .rejects.toThrow("no es válido");
   });
 

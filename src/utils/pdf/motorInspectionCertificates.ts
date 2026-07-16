@@ -10,10 +10,10 @@ import {
   type MotorBrandKey,
 } from "@/utils/pdf/motorBrandLogos";
 import {
-  loadMotorInspectionChecklists,
+  loadMotorInspectionReport,
   resolveMotorInspectionChecklist,
   type MotorInspectionChecklist,
-  type MotorInspectionChecklists,
+  type MotorInspectionReport,
 } from "@/utils/pdf/motorInspectionChecklists";
 
 export const MOTOR_CERTIFICATE_SOURCE = {
@@ -29,7 +29,7 @@ type GenerateMotorCertificatesOptions = {
   units: FlexMotorUnit[];
   jobName?: string | null;
   signedInspectionRecordBytes?: ArrayBuffer | Uint8Array;
-  inspectionChecklists?: MotorInspectionChecklists;
+  inspectionReport?: MotorInspectionReport;
   loadBrandLogo?: (brand: MotorBrandKey) => Promise<ArrayBuffer | Uint8Array>;
 };
 
@@ -146,6 +146,16 @@ const drawLines = (
   });
 };
 
+const drawText = (
+  page: PDFPage,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+  font: PDFFont,
+  color: RGB,
+) => page.drawText(text, { x, y, size, font, color });
+
 const drawCheckbox = (
   page: PDFPage,
   x: number,
@@ -212,13 +222,15 @@ const drawInspectionTable = (
     drawCell(page, cursorX, headerBottom, width, TABLE_HEADER_HEIGHT, colors, colors.pale);
     const centered = index >= 2 && index <= 4;
     const headingWidth = fonts.bold.widthOfTextAtSize(heading, 7.2);
-    page.drawText(heading, {
-      x: centered ? cursorX + ((width - headingWidth) / 2) : cursorX + 4,
-      y: headerBottom + 6,
-      size: 7.2,
-      font: fonts.bold,
-      color: colors.green,
-    });
+    drawText(
+      page,
+      heading,
+      centered ? cursorX + ((width - headingWidth) / 2) : cursorX + 4,
+      headerBottom + 6,
+      7.2,
+      fonts.bold,
+      colors.green,
+    );
     cursorX += width;
   });
 
@@ -256,21 +268,9 @@ const drawInspectionTable = (
 
     const statusStart = TABLE_X + TABLE_WIDTHS[0] + TABLE_WIDTHS[1];
     const checkboxY = rowBottom + ((rowHeight - 9) / 2);
-    drawCheckbox(page, statusStart + ((TABLE_WIDTHS[2] - 9) / 2), checkboxY, true, colors);
-    drawCheckbox(
-      page,
-      statusStart + TABLE_WIDTHS[2] + ((TABLE_WIDTHS[3] - 9) / 2),
-      checkboxY,
-      false,
-      colors,
-    );
-    drawCheckbox(
-      page,
-      statusStart + TABLE_WIDTHS[2] + TABLE_WIDTHS[3] + ((TABLE_WIDTHS[4] - 9) / 2),
-      checkboxY,
-      false,
-      colors,
-    );
+    for (let index = 0; index < 3; index += 1) {
+      drawCheckbox(page, statusStart + (index * 26) + 8.5, checkboxY, index === 0, colors);
+    }
     rowTop = rowBottom;
   });
 };
@@ -279,6 +279,7 @@ const drawInspectionPage = ({
   page,
   unit,
   checklist,
+  reportCopy,
   signatureSeal,
   fonts,
   colors,
@@ -286,26 +287,29 @@ const drawInspectionPage = ({
   page: PDFPage;
   unit: FlexMotorUnit;
   checklist: MotorInspectionChecklist;
+  reportCopy: string[];
   signatureSeal: PDFEmbeddedPage;
   fonts: CertificateFonts;
   colors: CertificateColors;
 }) => {
+  const [
+    reissueHeader,
+    inspectionTitle,
+    identityLabel,
+    datesLabel,
+    sourceLabel,
+    resultLabel,
+    maintainerLabel,
+    signatureLabel,
+    provenanceLabel,
+    originLabel,
+    pageLabel,
+  ] = reportCopy;
+  const identityFallback = reportCopy[24];
   page.drawRectangle({ x: 0, y: A4_HEIGHT - 36, width: A4_WIDTH, height: 36, color: colors.green });
-  page.drawText("REEMISIÓN 2026 · FORMATO ACTUALIZADO", {
-    x: 51,
-    y: A4_HEIGHT - 23,
-    size: 8.5,
-    font: fonts.bold,
-    color: colors.white,
-  });
-  page.drawText("REGISTRO TÉCNICO DE INSPECCIÓN", {
-    x: 51,
-    y: 765,
-    size: 18,
-    font: fonts.bold,
-    color: colors.green,
-  });
-  page.drawText(checklist.label, { x: 51, y: 744, size: 10, font: fonts.bold, color: colors.muted });
+  drawText(page, reissueHeader, 51, A4_HEIGHT - 23, 8.5, fonts.bold, colors.white);
+  drawText(page, inspectionTitle, 51, 765, 18, fonts.bold, colors.green);
+  drawText(page, checklist.label, 51, 744, 10, fonts.bold, colors.muted);
 
   page.drawRectangle({
     x: 51,
@@ -316,38 +320,29 @@ const drawInspectionPage = ({
     borderColor: colors.green,
     color: colors.panel,
   });
-  page.drawText("FABRICANTE / MODELO / SERIE", {
-    x: 63,
-    y: 708,
-    size: 6.7,
-    font: fonts.bold,
-    color: colors.muted,
-  });
-  page.drawText("REVISIÓN / PRÓXIMA", {
-    x: 405,
-    y: 708,
-    size: 6.7,
-    font: fonts.bold,
-    color: colors.muted,
-  });
-  const identity = `${unit.manufacturer || "Fabricante no indicado"} · ${unit.modelName} · ${unit.serial}`;
-  page.drawText(truncateTextToWidth(
-    identity,
-    325,
-    (text) => fonts.bold.widthOfTextAtSize(text, 8.3),
-  ), {
-    x: 63,
-    y: 690,
-    size: 8.3,
-    font: fonts.bold,
-    color: colors.dark,
-  });
-  page.drawText(
+  drawText(page, identityLabel, 63, 708, 6.7, fonts.bold, colors.muted);
+  drawText(page, datesLabel, 405, 708, 6.7, fonts.bold, colors.muted);
+  const identity = `${unit.manufacturer || identityFallback} · ${unit.modelName} · ${unit.serial}`;
+  drawText(
+    page,
+    truncateTextToWidth(identity, 325, (text) => fonts.bold.widthOfTextAtSize(text, 8.3)),
+    63,
+    690,
+    8.3,
+    fonts.bold,
+    colors.dark,
+  );
+  drawText(
+    page,
     `${formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate)} · ${formatDate(MOTOR_CERTIFICATE_SOURCE.nextAnnualInspectionDate)}`,
-    { x: 405, y: 690, size: 8.3, font: fonts.bold, color: colors.dark },
+    405,
+    690,
+    8.3,
+    fonts.bold,
+    colors.dark,
   );
 
-  page.drawText("Fuente:", { x: 51, y: 650, size: 6.8, font: fonts.bold, color: colors.muted });
+  drawText(page, sourceLabel, 51, 650, 6.8, fonts.bold, colors.muted);
   drawLines(
     page,
     wrapText(checklist.source, 447, fonts.regular, 6.8),
@@ -358,7 +353,7 @@ const drawInspectionPage = ({
     colors.muted,
     8.2,
   );
-  page.drawText("Resultado:", { x: 51, y: 633, size: 6.8, font: fonts.bold, color: colors.muted });
+  drawText(page, resultLabel, 51, 633, 6.8, fonts.bold, colors.muted);
   const resultText = checklist.result.replace(
     "{inspectionDate}",
     formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate),
@@ -383,50 +378,38 @@ const drawInspectionPage = ({
 
   page.drawLine({ start: { x: 51, y: 94 }, end: { x: 222, y: 94 }, thickness: 0.6, color: colors.muted });
   page.drawLine({ start: { x: 242, y: 94 }, end: { x: 391, y: 94 }, thickness: 0.6, color: colors.muted });
-  page.drawText("Empresa mantenedora: SATPRO S.L.U.", {
-    x: 51,
-    y: 82,
-    size: 6.8,
-    font: fonts.regular,
-    color: colors.muted,
-  });
-  page.drawText(`Fecha: ${formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate)}`, {
-    x: 242,
-    y: 82,
-    size: 6.8,
-    font: fonts.regular,
-    color: colors.muted,
-  });
+  drawText(page, maintainerLabel, 51, 82, 6.8, fonts.regular, colors.muted);
+  drawText(
+    page,
+    `Fecha: ${formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate)}`,
+    242,
+    82,
+    6.8,
+    fonts.regular,
+    colors.muted,
+  );
   page.drawPage(signatureSeal, { x: 427, y: 60, width: 106, height: 96 });
-  page.drawText("Firma y sello SATPRO", {
-    x: 436,
-    y: 49,
-    size: 6.8,
-    font: fonts.regular,
-    color: colors.muted,
-  });
+  drawText(page, signatureLabel, 436, 49, 6.8, fonts.regular, colors.muted);
 
-  page.drawText("Reemitido desde el acta SATPRO 2026; firma y sello reproducidos con autorización de SATPRO.", {
-    x: 51,
-    y: 28,
-    size: 6.2,
-    font: fonts.bold,
-    color: colors.green,
-  });
-  page.drawText(`Origen archivado · SHA-256 ${MOTOR_CERTIFICATE_SOURCE.archivedSignedInspectionSha256}`, {
-    x: 51,
-    y: 17,
-    size: 5.7,
-    font: fonts.regular,
-    color: colors.muted,
-  });
-  page.drawText("Página 2 de 2", {
-    x: 496,
-    y: 17,
-    size: 6.3,
-    font: fonts.bold,
-    color: colors.muted,
-  });
+  drawText(
+    page,
+    provenanceLabel,
+    51,
+    28,
+    6.2,
+    fonts.bold,
+    colors.green,
+  );
+  drawText(
+    page,
+    `${originLabel} ${MOTOR_CERTIFICATE_SOURCE.archivedSignedInspectionSha256}`,
+    51,
+    17,
+    5.7,
+    fonts.regular,
+    colors.muted,
+  );
+  drawText(page, pageLabel, 496, 17, 6.3, fonts.bold, colors.muted);
 };
 
 /** Generates an identity page and a signed manufacturer-specific inspection record per motor. */
@@ -434,21 +417,48 @@ export async function generateMotorInspectionCertificates({
   units,
   jobName,
   signedInspectionRecordBytes,
-  inspectionChecklists,
+  inspectionReport,
   loadBrandLogo = loadMotorBrandLogo,
 }: GenerateMotorCertificatesOptions): Promise<GeneratedMotorCertificates> {
   if (units.length === 0) {
-    throw new Error("Selecciona al menos un motor para generar certificados.");
+    throw new Error("Selecciona algún motor.");
   }
 
-  const [{ PDFDocument, StandardFonts, rgb }, sourceBytes, checklists] = await Promise.all([
+  const [{ PDFDocument, StandardFonts, rgb }, sourceBytes, report] = await Promise.all([
     import("pdf-lib"),
     loadSignedInspectionRecord(signedInspectionRecordBytes),
-    inspectionChecklists ?? loadMotorInspectionChecklists(),
+    inspectionReport ?? loadMotorInspectionReport(),
   ]);
+  const { checklists, reportCopy } = report;
+  const [
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    certificateTitle,
+    equipmentType,
+    certificationAction,
+    ownerPrefix,
+    manufacturerLabel,
+    missingManufacturer,
+    modelLabel,
+    serialLabel,
+    flexCodeLabel,
+    inspectionDateLabel,
+    nextInspectionLabel,
+    detailNote,
+    inventoryNote,
+  ] = reportCopy;
   const signedPdf = await PDFDocument.load(sourceBytes);
   if (signedPdf.getPageCount() !== 1) {
-    throw new Error("El acta SATPRO 2026 archivada no contiene exactamente una página.");
+    throw new Error("El acta SATPRO 2026 debe tener una página.");
   }
 
   const output = await PDFDocument.create();
@@ -478,9 +488,7 @@ export async function generateMotorInspectionCertificates({
     right: 130,
     top: 314,
   });
-  const title = buildFilename(units, jobName).replace(/\.pdf$/i, "");
-  output.setTitle(title);
-  output.setSubject("Certificado individual de revisión de motor reemitido desde el acta SATPRO 2026.");
+  output.setTitle(buildFilename(units, jobName).replace(/\.pdf$/i, ""));
   output.setAuthor(MOTOR_CERTIFICATE_SOURCE.inspectionProvider);
 
   const requiredBrands = new Set(
@@ -498,7 +506,7 @@ export async function generateMotorInspectionCertificates({
         : await output.embedJpg(bytes);
       embeddedBrandLogos.set(brand, embedded);
     } catch (error) {
-      console.warn("No se pudo incrustar el logotipo del fabricante; se generará sin marca.", {
+      console.warn("Logotipo local omitido.", {
         brand,
         error,
       });
@@ -511,25 +519,26 @@ export async function generateMotorInspectionCertificates({
     const brand = resolveMotorBrandKey(unit.manufacturer, unit.modelName);
     const brandLogo = brand ? embeddedBrandLogos.get(brand) : undefined;
 
-    page.drawText("CERTIFICADO INDIVIDUAL DE REVISIÓN", {
-      x: 55,
-      y: 700,
-      size: 18,
-      font: fonts.bold,
-      color: colors.green,
-    });
-    page.drawText("MOTOR ELÉCTRICO", { x: 55, y: 672, size: 12, font: fonts.bold, color: colors.muted });
-    page.drawText(
-      `${MOTOR_CERTIFICATE_SOURCE.inspectionProvider} certifica la revisión y el mantenimiento del motor indicado,`,
-      { x: 55, y: 625, size: 11, font: fonts.regular, color: colors.dark },
+    drawText(page, certificateTitle, 55, 700, 18, fonts.bold, colors.green);
+    drawText(page, equipmentType, 55, 672, 12, fonts.bold, colors.muted);
+    drawText(
+      page,
+      `${MOTOR_CERTIFICATE_SOURCE.inspectionProvider} ${certificationAction}`,
+      55,
+      625,
+      11,
+      fonts.regular,
+      colors.dark,
     );
-    page.drawText(`propiedad de ${MOTOR_CERTIFICATE_SOURCE.equipmentOwner}.`, {
-      x: 55,
-      y: 606,
-      size: 11,
-      font: fonts.regular,
-      color: colors.dark,
-    });
+    drawText(
+      page,
+      `${ownerPrefix} ${MOTOR_CERTIFICATE_SOURCE.equipmentOwner}.`,
+      55,
+      606,
+      11,
+      fonts.regular,
+      colors.dark,
+    );
 
     page.drawRectangle({
       x: 55,
@@ -552,75 +561,66 @@ export async function generateMotorInspectionCertificates({
       });
       manufacturerMaxWidth = Math.max(120, logoX - 94);
     }
-    page.drawText("FABRICANTE", { x: 78, y: 510, size: 9, font: fonts.bold, color: colors.muted });
-    const manufacturer = unit.manufacturer || "No indicado en Flex";
-    page.drawText(truncateTextToWidth(
-      manufacturer,
-      manufacturerMaxWidth,
-      (text) => fonts.bold.widthOfTextAtSize(text, 13),
-    ), {
-      x: 78,
-      y: 486,
-      size: 13,
-      font: fonts.bold,
-      color: colors.dark,
-    });
-    page.drawText("MODELO", { x: 78, y: 447, size: 9, font: fonts.bold, color: colors.muted });
-    page.drawText(unit.modelName.slice(0, 62), {
-      x: 78,
-      y: 423,
-      size: 13,
-      font: fonts.bold,
-      color: colors.dark,
-    });
-    page.drawText("N.º DE SERIE", { x: 78, y: 382, size: 9, font: fonts.bold, color: colors.muted });
-    page.drawText(unit.serial, { x: 78, y: 350, size: 22, font: fonts.bold, color: colors.dark });
+    drawText(page, manufacturerLabel, 78, 510, 9, fonts.bold, colors.muted);
+    const manufacturer = unit.manufacturer || missingManufacturer;
+    drawText(
+      page,
+      truncateTextToWidth(
+        manufacturer,
+        manufacturerMaxWidth,
+        (text) => fonts.bold.widthOfTextAtSize(text, 13),
+      ),
+      78,
+      486,
+      13,
+      fonts.bold,
+      colors.dark,
+    );
+    drawText(page, modelLabel, 78, 447, 9, fonts.bold, colors.muted);
+    drawText(page, unit.modelName.slice(0, 62), 78, 423, 13, fonts.bold, colors.dark);
+    drawText(page, serialLabel, 78, 382, 9, fonts.bold, colors.muted);
+    drawText(page, unit.serial, 78, 350, 22, fonts.bold, colors.dark);
     if (unit.barcode) {
-      page.drawText(`Código Flex: ${unit.barcode}`, {
-        x: 330,
-        y: 352,
-        size: 9,
-        font: fonts.regular,
-        color: colors.muted,
-      });
+      drawText(page, `${flexCodeLabel} ${unit.barcode}`, 330, 352, 9, fonts.regular, colors.muted);
     }
 
-    page.drawText("Revisión realizada", { x: 78, y: 292, size: 9, font: fonts.bold, color: colors.muted });
-    page.drawText(formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate), {
-      x: 78,
-      y: 269,
-      size: 13,
-      font: fonts.bold,
-      color: colors.dark,
-    });
-    page.drawText("Próxima revisión anual", { x: 320, y: 292, size: 9, font: fonts.bold, color: colors.muted });
-    page.drawText(formatDate(MOTOR_CERTIFICATE_SOURCE.nextAnnualInspectionDate), {
-      x: 320,
-      y: 269,
-      size: 13,
-      font: fonts.bold,
-      color: colors.dark,
-    });
-    page.drawText("Las operaciones realizadas y la firma de la empresa mantenedora constan en la página siguiente.", {
-      x: 78,
-      y: 210,
-      size: 9,
-      font: fonts.regular,
-      color: colors.dark,
-    });
-    page.drawText("Marca y modelo obtenidos del registro de inventario de Flex.", {
-      x: 78,
-      y: 194,
-      size: 8,
-      font: fonts.regular,
-      color: colors.muted,
-    });
+    drawText(page, inspectionDateLabel, 78, 292, 9, fonts.bold, colors.muted);
+    drawText(
+      page,
+      formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate),
+      78,
+      269,
+      13,
+      fonts.bold,
+      colors.dark,
+    );
+    drawText(page, nextInspectionLabel, 320, 292, 9, fonts.bold, colors.muted);
+    drawText(
+      page,
+      formatDate(MOTOR_CERTIFICATE_SOURCE.nextAnnualInspectionDate),
+      320,
+      269,
+      13,
+      fonts.bold,
+      colors.dark,
+    );
+    drawText(
+      page,
+      detailNote,
+      78,
+      210,
+      9,
+      fonts.regular,
+      colors.dark,
+    );
+    drawText(page, inventoryNote, 78, 194, 8, fonts.regular, colors.muted);
 
     const inspectionPage = output.addPage([A4_WIDTH, A4_HEIGHT]);
     drawInspectionPage({
       page: inspectionPage,
       unit,
       checklist: resolveMotorInspectionChecklist(checklists, brand),
+      reportCopy,
       signatureSeal,
       fonts,
       colors,
@@ -628,9 +628,8 @@ export async function generateMotorInspectionCertificates({
   }
 
   const bytes = await output.save();
-  const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   return {
-    blob: new Blob([arrayBuffer], { type: "application/pdf" }),
+    blob: new Blob([bytes as BlobPart], { type: "application/pdf" }),
     filename: buildFilename(units, jobName),
   };
 }

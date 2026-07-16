@@ -1,6 +1,33 @@
 {
   "version": "2026.1",
   "campaignYear": 2026,
+  "reportCopy": [
+    "REEMISIÓN 2026 · FORMATO ACTUALIZADO",
+    "REGISTRO TÉCNICO DE INSPECCIÓN",
+    "FABRICANTE / MODELO / SERIE",
+    "REVISIÓN / PRÓXIMA",
+    "Fuente:",
+    "Resultado:",
+    "Empresa mantenedora: SATPRO S.L.U.",
+    "Firma y sello SATPRO",
+    "Reemitido desde el acta SATPRO 2026; firma y sello reproducidos con autorización de SATPRO.",
+    "Origen archivado · SHA-256",
+    "Página 2 de 2",
+    "CERTIFICADO INDIVIDUAL DE REVISIÓN",
+    "MOTOR ELÉCTRICO",
+    "certifica la revisión y el mantenimiento del motor indicado,",
+    "propiedad de",
+    "FABRICANTE",
+    "No indicado en Flex",
+    "MODELO",
+    "N.º DE SERIE",
+    "Código Flex:",
+    "Revisión realizada",
+    "Próxima revisión anual",
+    "Las operaciones realizadas y la firma de la empresa mantenedora constan en la página siguiente.",
+    "Marca y modelo obtenidos del registro de inventario de Flex.",
+    "Fabricante no indicado"
+  ],
   "checklists": {
     "chainmaster": {
       "label": "CHAINMASTER",
