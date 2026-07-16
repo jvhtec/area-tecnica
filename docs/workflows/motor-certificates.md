@@ -2,6 +2,8 @@
 
 > Generates a client-facing certificate pack for the exact serialized MOTOR units assigned to a job in Flex, without manually editing Word files or sending the full company serial-number register.
 
+Manufacturer/model enrichment and the supplied ChainMaster, LIFTKET and CM brand assets are documented in [Motor certificate manufacturer data and branding](motor-certificate-branding.md).
+
 ## Purpose
 
 The motor certificate workflow replaces a repetitive administrative process:
@@ -35,7 +37,7 @@ The action is intentionally restricted because it reads serialized inventory dat
 1. OPEN the relevant job in Project Management.
 2. CLICK "Cert. motores" on the job card.
 3. WAIT while Área Técnica reads the job's Flex folders, equipment lists,
-   outbound manifest state, and eligible serialized MOTOR units.
+   outbound manifest state, eligible serialized MOTOR units, and model metadata.
 4. REVIEW the motors selected from the manifest.
 5. OPTIONAL: switch to manual selection for an exception or when no usable
    manifest exists.
@@ -57,6 +59,7 @@ Job
   -> related equipment lists
   -> outbound prep/ship manifests
   -> serialized MOTOR rows in the manifest
+  -> Flex inventory-model manufacturer and display name
   -> normalized Flex motor units
   -> selected unit IDs
   -> client-side PDF generation
@@ -70,7 +73,9 @@ Job
 | Job and related Flex element IDs | `flex_folders` |
 | Serialized unit identity | Flex serial-unit grid |
 | Motor assigned to the job | Flex outbound prep/ship manifest |
+| Manufacturer and display model | Flex inventory-model endpoint |
 | Model allowlist | `MOTOR_MODELS` in the Edge Function |
+| Brand artwork | Supplied ChainMaster, LIFTKET and CM assets embedded in `motorBrandLogos.ts` |
 | Inspection date, next inspection date, provider, and owner | `MOTOR_CERTIFICATE_SOURCE` |
 | Signed maintenance evidence | `public/certificates/revision-motores-2026-pagina-firmada.pdf` |
 
@@ -118,7 +123,9 @@ A unit must have both a Flex unit ID and a serial number before it can be select
 The browser generates one PDF for the complete selection. Each motor contributes exactly two pages:
 
 1. **Individual identity page**
-   - certified model,
+   - manufacturer from Flex,
+   - display model from Flex,
+   - supplied brand logo when the manufacturer/model resolves to ChainMaster, LIFTKET or CM,
    - serial number,
    - Flex barcode when present,
    - inspection date,
@@ -128,6 +135,8 @@ The browser generates one PDF for the complete selection. Each motor contributes
 
 2. **Signed maintenance page**
    - copied unchanged from the configured one-page signed master PDF.
+
+If Flex model metadata cannot be read, the configured allowlist name remains available and certificate generation continues without a manufacturer logo. Unknown manufacturers also generate normally without a logo.
 
 For one selected motor, the filename includes the serial number. For multiple motors, the filename includes the job name.
 
@@ -156,6 +165,8 @@ The client validates the complete Edge Function response again before presenting
 | No related Flex lists | Show `unavailable`; offer manual selection |
 | No outbound prep/ship manifest yet | Show `unavailable`; offer manual selection |
 | Manifest has no matching certified motors | Show `empty`; offer manual selection |
+| Flex manufacturer/model metadata fails | Keep configured model fallback and omit the brand logo |
+| Manufacturer has no mapped logo | Generate the full certificate without a logo |
 | Some motor models fail to load | Show a partial warning; keep successfully loaded models available |
 | All motor models fail to load | Return an error and block certificate selection |
 | Signed master PDF is missing or invalid | Stop generation and show an error |
@@ -176,7 +187,7 @@ To renew it:
 6. Generate and visually inspect a representative multi-motor certificate pack.
 7. Run the focused PDF, service, Edge Function, and interaction tests.
 
-Changing only the certificate dates or signed page does not require a database migration. Changes to the model allowlist or Flex request contract require an Edge Function deployment.
+Changing only the certificate dates or signed page does not require a database migration. Changes to the model allowlist, model metadata retrieval or Flex request contract require an Edge Function deployment.
 
 The current hardcoded campaign is intentionally simple. If several certificate campaigns must coexist, replace it with a versioned certificate-source record rather than adding more conditional constants.
 
@@ -189,6 +200,7 @@ The current hardcoded campaign is intentionally simple. If several certificate c
 | Dialog and operator workflow | `src/components/jobs/cards/job-card-actions/MotorCertificateAction.tsx` |
 | Client service and response validation | `src/services/flexMotorUnits.ts` |
 | PDF generator and campaign configuration | `src/utils/pdf/motorInspectionCertificates.ts` |
+| Supplied local brand assets and aliases | `src/utils/pdf/motorBrandLogos.ts` |
 | Signed master page | `public/certificates/revision-motores-2026-pagina-firmada.pdf` |
 | Protected Flex adapter | `supabase/functions/fetch-flex-motor-units/index.ts` |
 | Motor normalization and allowlist | `supabase/functions/fetch-flex-motor-units/motorUnits.ts` |
@@ -201,8 +213,8 @@ The current hardcoded campaign is intentionally simple. If several certificate c
 |---|---|
 | Job-card interaction and selection | `src/components/jobs/cards/job-card-actions/__tests__/MotorCertificateAction.test.tsx` |
 | Client response validation | `src/services/flexMotorUnits.test.ts` |
-| PDF page count, content, and filenames | `src/utils/pdf/__tests__/motorInspectionCertificates.test.ts` |
-| Flex unit parsing and request contract | `supabase/functions/fetch-flex-motor-units/motorUnits.test.ts` |
+| PDF page count, branding fallback, and filenames | `src/utils/pdf/__tests__/motorInspectionCertificates.test.ts` |
+| Flex model/unit parsing and request contract | `supabase/functions/fetch-flex-motor-units/motorUnits.test.ts` |
 | Manifest discovery and matching | `supabase/functions/fetch-flex-motor-units/manifestUnits.test.ts` |
 | Concurrency limits | `supabase/functions/fetch-flex-motor-units/concurrency.test.ts` |
 
@@ -215,3 +227,5 @@ The current hardcoded campaign is intentionally simple. If several certificate c
 5. One selected motor must always produce exactly two pages.
 6. The Edge Function must remain authenticated, role-restricted, read-only, and bounded.
 7. Certificate generation must not depend on a parallel manually maintained serial-number registry.
+8. Brand logos must remain local deterministic assets; certificate generation must not fetch them from third-party sites.
+9. A missing or unknown brand logo must never block certificate generation.
