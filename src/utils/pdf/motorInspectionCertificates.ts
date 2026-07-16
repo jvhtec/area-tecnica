@@ -2,6 +2,12 @@ import { format, parseISO } from "date-fns";
 
 import type { FlexMotorUnit } from "@/services/flexMotorUnits";
 import { buildReadableFilename } from "@/utils/fileName";
+import {
+  decodeBase64Image,
+  MOTOR_BRAND_LOGOS,
+  resolveMotorBrandKey,
+  type MotorBrandKey,
+} from "@/utils/pdf/motorBrandLogos";
 
 export const MOTOR_CERTIFICATE_SOURCE = {
   inspectionDate: "2026-05-21",
@@ -43,6 +49,11 @@ const loadSignedPage = async (
   return response.arrayBuffer();
 };
 
+const fitImage = (width: number, height: number, maxWidth: number, maxHeight: number) => {
+  const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+  return { width: width * scale, height: height * scale };
+};
+
 export async function generateMotorInspectionCertificates({
   units,
   jobName,
@@ -72,6 +83,21 @@ export async function generateMotorInspectionCertificates({
   });
   output.setTitle(buildFilename(units, jobName).replace(/\.pdf$/i, ""));
 
+  const requiredBrands = new Set(
+    units
+      .map((unit) => resolveMotorBrandKey(unit.manufacturer, unit.modelName))
+      .filter((brand): brand is MotorBrandKey => brand !== null),
+  );
+  const embeddedBrandLogos = new Map<MotorBrandKey, Awaited<ReturnType<typeof output.embedPng>>>();
+  for (const brand of requiredBrands) {
+    const asset = MOTOR_BRAND_LOGOS[brand];
+    const bytes = decodeBase64Image(asset.base64);
+    const embedded = asset.mimeType === "image/png"
+      ? await output.embedPng(bytes)
+      : await output.embedJpg(bytes);
+    embeddedBrandLogos.set(brand, embedded);
+  }
+
   for (const unit of units) {
     const page = output.addPage([A4_WIDTH, A4_HEIGHT]);
     const dark = rgb(0.12, 0.14, 0.16);
@@ -79,6 +105,18 @@ export async function generateMotorInspectionCertificates({
     const green = rgb(0.10, 0.42, 0.28);
 
     page.drawPage(logo, { x: 45, y: 765, width: 140, height: 65 });
+    const brand = resolveMotorBrandKey(unit.manufacturer, unit.modelName);
+    const brandLogo = brand ? embeddedBrandLogos.get(brand) : undefined;
+    if (brandLogo) {
+      const dimensions = fitImage(brandLogo.width, brandLogo.height, 170, 58);
+      page.drawImage(brandLogo, {
+        x: A4_WIDTH - 45 - dimensions.width,
+        y: 775 + (50 - dimensions.height) / 2,
+        width: dimensions.width,
+        height: dimensions.height,
+      });
+    }
+
     page.drawText("CERTIFICADO INDIVIDUAL DE REVISIÓN", {
       x: 55,
       y: 700,
@@ -101,43 +139,58 @@ export async function generateMotorInspectionCertificates({
 
     page.drawRectangle({
       x: 55,
-      y: 355,
+      y: 335,
       width: A4_WIDTH - 110,
-      height: 195,
+      height: 215,
       borderWidth: 1.2,
       borderColor: green,
       color: rgb(0.975, 0.98, 0.976),
     });
-    page.drawText("MODELO", { x: 78, y: 505, size: 9, font: bold, color: muted });
-    page.drawText(unit.modelName.slice(0, 62), { x: 78, y: 478, size: 15, font: bold, color: dark });
-    page.drawText("N.º DE SERIE", { x: 78, y: 425, size: 9, font: bold, color: muted });
-    page.drawText(unit.serial, { x: 78, y: 390, size: 22, font: bold, color: dark });
-    if (unit.barcode) {
-      page.drawText(`Código Flex: ${unit.barcode}`, { x: 330, y: 392, size: 9, font: regular, color: muted });
-    }
-
-    page.drawText("Revisión realizada", { x: 78, y: 305, size: 9, font: bold, color: muted });
-    page.drawText(formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate), {
+    page.drawText("FABRICANTE", { x: 78, y: 510, size: 9, font: bold, color: muted });
+    page.drawText((unit.manufacturer || "No indicado en Flex").slice(0, 48), {
       x: 78,
-      y: 282,
+      y: 486,
       size: 13,
       font: bold,
       color: dark,
     });
-    page.drawText("Próxima revisión anual", { x: 320, y: 305, size: 9, font: bold, color: muted });
+    page.drawText("MODELO", { x: 78, y: 447, size: 9, font: bold, color: muted });
+    page.drawText(unit.modelName.slice(0, 62), { x: 78, y: 423, size: 13, font: bold, color: dark });
+    page.drawText("N.º DE SERIE", { x: 78, y: 382, size: 9, font: bold, color: muted });
+    page.drawText(unit.serial, { x: 78, y: 350, size: 22, font: bold, color: dark });
+    if (unit.barcode) {
+      page.drawText(`Código Flex: ${unit.barcode}`, { x: 330, y: 352, size: 9, font: regular, color: muted });
+    }
+
+    page.drawText("Revisión realizada", { x: 78, y: 292, size: 9, font: bold, color: muted });
+    page.drawText(formatDate(MOTOR_CERTIFICATE_SOURCE.inspectionDate), {
+      x: 78,
+      y: 269,
+      size: 13,
+      font: bold,
+      color: dark,
+    });
+    page.drawText("Próxima revisión anual", { x: 320, y: 292, size: 9, font: bold, color: muted });
     page.drawText(formatDate(MOTOR_CERTIFICATE_SOURCE.nextAnnualInspectionDate), {
       x: 320,
-      y: 282,
+      y: 269,
       size: 13,
       font: bold,
       color: dark,
     });
     page.drawText("Las operaciones realizadas y la firma de la empresa mantenedora constan en la página siguiente.", {
       x: 78,
-      y: 220,
+      y: 210,
       size: 9,
       font: regular,
       color: dark,
+    });
+    page.drawText("Marca y modelo obtenidos del registro de inventario de Flex.", {
+      x: 78,
+      y: 194,
+      size: 8,
+      font: regular,
+      color: muted,
     });
 
     const [signedPage] = await output.copyPages(signedPdf, [0]);
