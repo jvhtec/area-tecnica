@@ -4,10 +4,11 @@ import { describe, expect, it } from "vitest";
 import type { FlexMotorUnit } from "@/services/flexMotorUnits";
 import { generateMotorInspectionCertificates } from "@/utils/pdf/motorInspectionCertificates";
 
-const unit = (id: string, serial: string): FlexMotorUnit => ({
+const unit = (id: string, serial: string, manufacturer = "ChainMaster"): FlexMotorUnit => ({
   id,
   modelId: "model-1",
-  modelName: "Motor eléctrico de elevación ChainMaster D8+ 750 kg - 24 m",
+  modelName: "ChainMaster D8+ 750 kg",
+  manufacturer,
   serial,
   barcode: `BAR-${id}`,
   stencil: null,
@@ -25,9 +26,9 @@ const createSignedPage = async (): Promise<Uint8Array> => {
 };
 
 describe("generateMotorInspectionCertificates", () => {
-  it("creates one two-page certificate per selected motor", async () => {
+  it("creates one branded two-page certificate per selected motor", async () => {
     const result = await generateMotorInspectionCertificates({
-      units: [unit("1", "J36717"), unit("2", "J36724")],
+      units: [unit("1", "J36717"), unit("2", "J36724", "CM")],
       jobName: "Gira Norte",
       signedMaintenancePageBytes: await createSignedPage(),
     });
@@ -44,6 +45,15 @@ describe("generateMotorInspectionCertificates", () => {
       signedMaintenancePageBytes: await createSignedPage(),
     });
     expect(result.filename).toBe("Certificado de motor - J36717.pdf");
+  });
+
+  it("supports an unknown manufacturer without requiring a logo", async () => {
+    const result = await generateMotorInspectionCertificates({
+      units: [unit("1", "J36717", "Fabricante sin logo")],
+      signedMaintenancePageBytes: await createSignedPage(),
+    });
+    const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
+    expect(pdf.getPageCount()).toBe(2);
   });
 
   it("refuses to generate an empty certificate batch", async () => {
