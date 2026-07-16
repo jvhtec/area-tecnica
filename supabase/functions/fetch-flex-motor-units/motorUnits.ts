@@ -48,6 +48,11 @@ const textValue = (value: unknown): string | null => {
 const trueValue = (value: unknown): boolean =>
   value === true || (typeof value === "string" && value.toLowerCase() === "true");
 
+const recordValue = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
 export function normalizeMotorUnit(
   value: unknown,
   model: MotorModelDefinition,
@@ -55,18 +60,23 @@ export function normalizeMotorUnit(
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 
   const row = value as Record<string, unknown>;
-  const id = textValue(row.id) || textValue(row.unitId);
-  const serial = textValue(row.serial) || textValue(row.serialNumber);
+  const data = recordValue(row.data);
+  const field = (...keys: string[]): unknown => {
+    for (const key of keys) {
+      if (row[key] !== undefined && row[key] !== null) return row[key];
+      if (data?.[key] !== undefined && data[key] !== null) return data[key];
+    }
+    return null;
+  };
+  const id = textValue(field("id", "unitId"));
+  const serial = textValue(field("serial", "serialNumber"));
 
   if (!id || !serial) return null;
 
   const unavailable = [
-    row.ooc,
-    row.outOfCommission,
-    row.presumedMissing,
-    row.decommissioned,
-    row.sold,
-    row.deleted,
+    field("decommissioned"),
+    field("sold"),
+    field("deleted"),
   ].some(trueValue);
 
   if (unavailable) return null;
@@ -76,12 +86,12 @@ export function normalizeMotorUnit(
     modelId: model.id,
     modelName: model.name,
     serial,
-    barcode: textValue(row.barcode),
-    stencil: textValue(row.stencil),
-    modelNumber: textValue(row.modelNumber),
-    currentLocation: textValue(row.currentLocation),
-    shippedDate: textValue(row.shippedDate),
-    returnDate: textValue(row.returnDate),
+    barcode: textValue(field("barcode")),
+    stencil: textValue(field("stencil")),
+    modelNumber: textValue(field("modelNumber")),
+    currentLocation: textValue(field("currentLocation")),
+    shippedDate: textValue(field("shippedDate")),
+    returnDate: textValue(field("returnDate")),
   };
 }
 export type MotorGridPage = {
@@ -100,20 +110,56 @@ export function parseMotorGridPage(value: unknown): MotorGridPage {
   }
 
   const payload = value as Record<string, unknown>;
-  const rows = Array.isArray(payload.content)
-    ? payload.content
-    : Array.isArray(payload.items)
-      ? payload.items
-      : Array.isArray(payload.data)
-        ? payload.data
-        : [];
-  const totalCandidate = payload.totalElements ?? payload.total;
+  const rows = Array.isArray(payload.rows)
+    ? payload.rows
+    : Array.isArray(payload.content)
+      ? payload.content
+      : Array.isArray(payload.items)
+        ? payload.items
+        : Array.isArray(payload.data)
+          ? payload.data
+          : Array.isArray(payload.children)
+            ? payload.children
+            : [];
+  const totalCandidate = payload.totalElements
+    ?? payload.total
+    ?? payload.totalCount
+    ?? payload.count;
+  const numericTotal = typeof totalCandidate === "number"
+    ? totalCandidate
+    : typeof totalCandidate === "string" && totalCandidate.trim()
+      ? Number(totalCandidate)
+      : Number.NaN;
 
   return {
     rows,
-    totalElements: typeof totalCandidate === "number" && Number.isFinite(totalCandidate)
-      ? totalCandidate
+    totalElements: Number.isFinite(numericTotal)
+      ? numericTotal
       : null,
     last: typeof payload.last === "boolean" ? payload.last : null,
   };
+}
+
+export function buildMotorSerialUnitGridUrl(options: {
+  apiBaseUrl: string;
+  modelId: string;
+  pageIndex: number;
+  pageSize: number;
+  cacheBuster?: number;
+}): URL {
+  const { apiBaseUrl, modelId, pageIndex, pageSize } = options;
+  const url = new URL(`${apiBaseUrl}/serial-unit/grid-node`);
+  url.searchParams.set("_dc", String(options.cacheBuster ?? Date.now()));
+  url.searchParams.set("modelId", modelId);
+  url.searchParams.set("page", String(pageIndex + 1));
+  url.searchParams.set("start", String(pageIndex * pageSize));
+  url.searchParams.set("size", String(pageSize));
+  url.searchParams.set("sort", "createdDate,DESC");
+  url.searchParams.set("dir", "");
+  url.searchParams.set("filter", JSON.stringify([
+    { property: "includeOut", value: true },
+    { property: "includeOOC", value: true },
+    { property: "includePresumedMissing", value: true },
+  ]));
+  return url;
 }

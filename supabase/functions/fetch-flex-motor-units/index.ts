@@ -10,6 +10,7 @@ import {
   requireEnvValues,
 } from "../_shared/http.ts";
 import {
+  buildMotorSerialUnitGridUrl,
   MOTOR_MODELS,
   normalizeMotorUnit,
   parseMotorGridPage,
@@ -28,11 +29,8 @@ import { allSettledWithConcurrency } from "./concurrency.ts";
 const FLEX_API_BASE_URL =
   Deno.env.get("FLEX_API_BASE_URL") ||
   "https://sectorpro.flexrentalsolutions.com/f5/api";
-const PAGE_SIZE = 250;
+const PAGE_SIZE = 25;
 const MAX_PAGES_PER_MODEL = 20;
-const ACTIVE_AND_OUT_FILTER = JSON.stringify([
-  { id: "includeOut", property: "includeOut", value: true },
-]);
 const MAX_EQUIPMENT_LISTS = 100;
 const FLEX_REQUEST_CONCURRENCY = 5;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -82,12 +80,12 @@ async function fetchUnitsForModel(
   const seenRawIds = new Set<string>();
 
   for (let pageIndex = 0; pageIndex < MAX_PAGES_PER_MODEL; pageIndex += 1) {
-    const url = new URL(`${FLEX_API_BASE_URL}/serial-unit/grid-node`);
-    url.searchParams.set("modelId", model.id);
-    url.searchParams.set("page", String(pageIndex + 1));
-    url.searchParams.set("start", String(pageIndex * PAGE_SIZE));
-    url.searchParams.set("size", String(PAGE_SIZE));
-    url.searchParams.set("filter", ACTIVE_AND_OUT_FILTER);
+    const url = buildMotorSerialUnitGridUrl({
+      apiBaseUrl: FLEX_API_BASE_URL,
+      modelId: model.id,
+      pageIndex,
+      pageSize: PAGE_SIZE,
+    });
 
     const response = await fetchWithRetry(url.toString(), {
       headers: flexHeaders(flexAuthToken),
