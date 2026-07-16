@@ -24,6 +24,7 @@ import {
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { ArchiveToFlexAction } from "@/components/jobs/cards/job-card-actions/ArchiveToFlexAction";
 import { BackfillDocTecnicaAction } from "@/components/jobs/cards/job-card-actions/BackfillDocTecnicaAction";
+import { MotorCertificateAction } from "@/components/jobs/cards/job-card-actions/MotorCertificateAction";
 import { PrintFlexReportAction } from "@/components/jobs/cards/job-card-actions/PrintFlexReportAction";
 import type {
   JobCardActionButtonsProps,
@@ -73,6 +74,7 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
     isFestivalLike,
     isHouseTech,
     isManagementUser,
+    isProjectManagementPage,
     isTechnicianUser,
     job,
     navigateToCalculator,
@@ -331,6 +333,7 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
                 </>
               )}
               {isProductionDepartment && isManagementUser && <PrintFlexReportAction job={job} />}
+              {isProjectManagementPage && isManagementUser && <MotorCertificateAction job={job} />}
               {!isProductionDepartment && <ArchiveToFlexAction job={job} />}
               {!isProductionDepartment && <BackfillDocTecnicaAction job={job} />}
               {!isProductionDepartment && canSubmitTechnicianIncidentReports(userRole) && job.job_type !== "dryhire" && (

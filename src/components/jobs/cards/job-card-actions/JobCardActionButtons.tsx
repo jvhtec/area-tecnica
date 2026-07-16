@@ -25,6 +25,7 @@ import { TechnicianIncidentReportDialog } from "@/components/incident-reports/Te
 import { ArchiveToFlexAction } from "@/components/jobs/cards/job-card-actions/ArchiveToFlexAction";
 import { BackfillDocTecnicaAction } from "@/components/jobs/cards/job-card-actions/BackfillDocTecnicaAction";
 import { MobileJobCardActions } from "@/components/jobs/cards/job-card-actions/MobileJobCardActions";
+import { MotorCertificateAction } from "@/components/jobs/cards/job-card-actions/MotorCertificateAction";
 import { PrintFlexReportAction } from "@/components/jobs/cards/job-card-actions/PrintFlexReportAction";
 import { Button } from "@/components/ui/button";
 import {
@@ -415,6 +416,9 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
           reportType="quote"
         />
       </>
+    )}
+    {isProjectManagementPage && isManagementUser && (
+      <MotorCertificateAction job={job} />
     )}
     {technicalPower.canGenerateTechnicalPowerPack && allowedJobType && (
       <TooltipProvider>
