@@ -182,7 +182,7 @@ export const MotorCertificateAction = ({ job }: MotorCertificateActionProps) => 
             <DialogTitle>Certificados de motores</DialogTitle>
             <DialogDescription>
               Los motores escaneados en el manifiesto del trabajo se seleccionan automáticamente. También puedes añadir o elegir números de serie manualmente.
-              Los datos de revisión y la firma proceden del certificado maestro vigente.
+              La segunda página usa el checklist del fabricante y reemite la firma y el sello del acta SATPRO 2026.
             </DialogDescription>
           </DialogHeader>
 

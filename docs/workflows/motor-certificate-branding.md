@@ -37,7 +37,7 @@ The first page now presents:
 5. the Flex barcode when available,
 6. inspection and next-inspection dates.
 
-The brand logo identifies the equipment only; placing it inside the motor-details panel keeps it visually separate from the SATPRO issuer header. The text explicitly states that brand and model data come from the Flex inventory record; the signed SATPRO maintenance page remains the unchanged second page for each motor.
+The brand logo identifies the equipment only; placing it inside the motor-details panel keeps it visually separate from the SATPRO issuer header. The text explicitly states that brand and model data come from the Flex inventory record. The second page is now generated from the matching manufacturer checklist and cites the applicable manual revision; the authorised SATPRO signature and seal are reproduced from the checksum-pinned archived 2026 acta instead of copying its obsolete Yale table.
 
 ## Deployment and maintenance
 
@@ -48,7 +48,8 @@ To add another supported brand:
 1. obtain an approved logo asset and store it under `src/assets/motor-brands/`,
 2. add its non-inlined URL and MIME type to `MOTOR_BRAND_LOGOS`,
 3. extend `MotorBrandKey` and `resolveMotorBrandKey`,
-4. add a PDF test for the brand,
-5. visually inspect a representative certificate.
+4. add its sourced checklist to `public/certificates/motor-inspection-checklists-2026.json`,
+5. add a PDF test for the brand,
+6. visually inspect a representative certificate.
 
 Do not fetch logos from manufacturer or other third-party sites during certificate generation. The generator loads only the bundled same-origin assets, which keeps output deterministic and independent of manufacturer websites.

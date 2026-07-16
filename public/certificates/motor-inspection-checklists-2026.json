@@ -1,0 +1,81 @@
+{
+  "version": "2026.1",
+  "campaignYear": 2026,
+  "checklists": {
+    "chainmaster": {
+      "label": "CHAINMASTER",
+      "source": "ChainMaster D8/D8Plus/C1 B/MB/SB, rev. 2.3 (2020), apéndice A.1, pp. 54-60.",
+      "result": "CONFORME. SATPRO confirma que la inspección completa correspondiente al manual del fabricante se superó el {inspectionDate}. Este documento reemite el registro en un formato actualizado y mantiene la trazabilidad con el acta original de 2026.",
+      "manufacturerSpecific": true,
+      "checks": [
+        { "area": "Trazabilidad", "verification": "Placa, tipo D8/D8+, manual, registro y vida útil remanente identificados." },
+        { "area": "Cuerpo y suspensión", "verification": "Cuerpo, tapas, suspensión, tornillería, pernos, pasadores y sellos sin daños ni holguras." },
+        { "area": "Guiado", "verification": "Guía, prensacadena, rueda y placa guía comprobadas; desgaste dentro de límites." },
+        { "area": "Frenos - estado", "verification": "Sin abrasión, sobretemperatura, corrosión ni lubricante; forro y entrehierro en tolerancia." },
+        { "area": "Frenos - función", "verification": "Prueba con carga nominal; cada freno probado independientemente cuando existe doble freno." },
+        { "area": "Embrague", "verification": "Desgaste y funcionamiento comprobados; reajuste realizado cuando resulta necesario." },
+        { "area": "Cadena", "verification": "Inspección eslabón a eslabón: lubricación, daños, desgaste, torsión y fijación del extremo." },
+        { "area": "Bolsa de cadena", "verification": "Material, costuras, bastidor, fondo, suspensión y cincha en buen estado y fijados." },
+        { "area": "Bloque y gancho", "verification": "Marcado, cuerpo, polea, tornillería, topes, abertura, cojinete, tuerca y pestillo verificados." },
+        { "area": "Limitador", "verification": "Limitador de elevación y tope de goma correctamente montados, fijados y sin desgaste indebido." },
+        { "area": "Electricidad", "verification": "Protección, PE, aislamiento, seccionamiento, cables y conectores verificados." },
+        { "area": "Mando", "verification": "Mando, parada de emergencia y finales de carrera comprobados." }
+      ]
+    },
+    "liftket": {
+      "label": "LIFTKET",
+      "source": "LIFTKET STAR, Ho 05/2020 English, sección 7.1, tabla 8, p. 25.",
+      "result": "CONFORME. SATPRO confirma que la inspección completa correspondiente al manual del fabricante se superó el {inspectionDate}. Este documento reemite el registro en un formato actualizado y mantiene la trazabilidad con el acta original de 2026.",
+      "manufacturerSpecific": true,
+      "checks": [
+        { "area": "Equipo completo", "verification": "Inspección visual general; estado, montaje y ausencia de daños evidentes." },
+        { "area": "Freno", "verification": "Funcionamiento comprobado y revisión anual ejecutada según el apartado 7.2." },
+        { "area": "Limitador", "verification": "Funcionamiento del limitador de elevación comprobado." },
+        { "area": "Embrague", "verification": "Mantenimiento o ajuste anual realizado por personal competente." },
+        { "area": "Cadena", "verification": "Desgaste verificado según 7.4; cadena limpia y lubricada con producto y frecuencia aplicables." },
+        { "area": "Elementos elásticos", "verification": "Topes y elementos de goma inspeccionados; sustituidos cuando presentan desgaste." },
+        { "area": "Ganchos", "verification": "Cojinetes, bloqueo de tuerca, punzonados y pestillo de seguridad comprobados." },
+        { "area": "Fijaciones y guiado", "verification": "Tornillería, prensacadena, guía, cadena sin torsión y seguridades verificados." },
+        { "area": "Bolsa de cadena", "verification": "Estado, fijación y posición segura comprobados." },
+        { "area": "Electricidad y mando", "verification": "Cable de potencia, cable de control y botonera inspeccionados." },
+        { "area": "Carro", "verification": "Carro y ruedas verificados cuando forman parte de la configuración." },
+        { "area": "Vida útil", "verification": "Periodo de trabajo seguro remanente determinado y documentado." }
+      ]
+    },
+    "cm": {
+      "label": "CM LODESTAR",
+      "source": "CM Lodestar D8+ SQP2, P/N 10001681 Rev AF (2020), tabla 4, pp. 11-12.",
+      "result": "CONFORME. SATPRO confirma que la inspección completa correspondiente al manual del fabricante se superó el {inspectionDate}. Este documento reemite el registro en un formato actualizado y mantiene la trazabilidad con el acta original de 2026.",
+      "manufacturerSpecific": true,
+      "checks": [
+        { "area": "Clasificación", "verification": "Servicio clasificado y periodicidad aplicada; incluye controles frecuentes y periódicos." },
+        { "area": "Freno", "verification": "Sistema de frenado y ajuste comprobados; piezas sin desgaste o daño excesivo." },
+        { "area": "Ganchos", "verification": "Montaje, herrajes, daños, torsión, abertura, pestillo y funcionamiento verificados." },
+        { "area": "Cadena - frecuente", "verification": "Lubricación, desgaste, daños, corrosión, suciedad, reenvío y torsiones comprobados." },
+        { "area": "Limitadores", "verification": "Finales de carrera comprobados cuando están instalados." },
+        { "area": "Fijaciones", "verification": "Ausencia de tornillos, pernos o tuercas flojos." },
+        { "area": "Bloque y suspensión", "verification": "Bloque, suspensión, engranajes, rodamientos, extremo y pasador sin daños ni deformación." },
+        { "area": "Ruedas y guía", "verification": "Alvéolos de rueda/polea y guía de cadena sin desgaste excesivo ni daño." },
+        { "area": "Cadena - periódica", "verification": "Inspección eslabón a eslabón por desgaste entre eslabones y daños." },
+        { "area": "Control eléctrico", "verification": "Contactor -si existe-, cables, prensaestopas, conectores y envolvente verificados." },
+        { "area": "Elementos portantes", "verification": "Rodamientos, suspensión y tuercas/pasadores del gancho inferior comprobados." },
+        { "area": "Estanqueidad", "verification": "Ausencia de fugas y registro/corrección de deficiencias antes de volver a servicio." }
+      ]
+    },
+    "generic": {
+      "label": "MOTOR ELÉCTRICO",
+      "source": "Acta SATPRO 2026; fabricante no resuelto en los datos de Flex.",
+      "result": "CONFORME. SATPRO confirma que el alcance general documentado se superó el {inspectionDate}. El fabricante no pudo resolverse en Flex; este registro no atribuye comprobaciones adicionales a un manual concreto.",
+      "manufacturerSpecific": false,
+      "checks": [
+        { "area": "Freno", "verification": "Funcionamiento del freno comprobado." },
+        { "area": "Cadena", "verification": "Inspección visual, limpieza, lubricación y ausencia de daños comprobadas." },
+        { "area": "Suspensión", "verification": "Suspensión de la caja de mando y elementos portantes comprobados." },
+        { "area": "Limitador", "verification": "Funcionamiento del limitador comprobado." },
+        { "area": "Polea", "verification": "Polea de cadenas de trócola lubricada y comprobada." },
+        { "area": "Fijaciones", "verification": "Tornillos, bridas, pernos y pasadores comprobados." },
+        { "area": "Electricidad y mando", "verification": "Cableado, conectores, mando y seguridades comprobados." }
+      ]
+    }
+  }
+}

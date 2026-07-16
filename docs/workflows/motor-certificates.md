@@ -75,9 +75,10 @@ Job
 | Motor assigned to the job | Flex outbound prep/ship manifest |
 | Manufacturer and display model | Flex inventory-model endpoint |
 | Model allowlist | `MOTOR_MODELS` in the Edge Function |
-| Brand artwork | Supplied ChainMaster, LIFTKET and CM assets embedded in `motorBrandLogos.ts` |
+| Brand artwork | Supplied ChainMaster, LIFTKET and CM assets registered by `motorBrandLogos.ts` |
 | Inspection date, next inspection date, provider, and owner | `MOTOR_CERTIFICATE_SOURCE` |
-| Signed maintenance evidence | `public/certificates/revision-motores-2026-pagina-firmada.pdf` |
+| Manufacturer-specific inspection scope | `public/certificates/motor-inspection-checklists-2026.json`, traced to the manuals listed below |
+| Archived signed evidence and authorised SATPRO mark | `public/certificates/revision-motores-2026-pagina-firmada.pdf` |
 
 No separate certificate table is created. The document is generated on demand from current Flex data plus the configured certificate source.
 
@@ -133,10 +134,27 @@ The browser generates one PDF for the complete selection. Each motor contributes
    - inspection provider,
    - equipment owner.
 
-2. **Signed maintenance page**
-   - copied unchanged from the configured one-page signed master PDF.
+2. **Signed manufacturer-specific inspection record**
+   - the applicable ChainMaster, LIFTKET or CM checklist,
+   - all checks completed as `Conforme` for the inspection passed on 21 May 2026,
+   - inspection and next-inspection dates,
+   - SATPRO signature and seal reproduced from the archived 2026 acta with SATPRO's authorisation,
+   - the exact archived source checksum in the provenance footer,
+   - and the manufacturer-manual revision and page range used to derive the checklist.
 
-If Flex model metadata cannot be read, the configured allowlist name remains available and certificate generation continues without a manufacturer logo. Unknown manufacturers and unavailable local logo assets also generate normally without a logo. During a staggered deployment, the client treats the previous Edge Function's omitted `manufacturer` field as `null`.
+The obsolete Yale maintenance table in the archived acta is not copied into generated reports. The archived PDF remains the evidence source for the authorised SATPRO issuer mark, signature and seal; the generated second page is a transparent reissue in the current manufacturer-specific format.
+
+The versioned checklist JSON is a bundled same-origin public asset loaded only when an operator generates certificates. It is validated before use, keeps the large source text out of the initial application bundle, and never depends on a manufacturer website at runtime.
+
+### Manufacturer references
+
+The checklist wording is an original Spanish operational summary rather than a copied manual page. Consult the complete source whenever applicability or a limit must be confirmed:
+
+- **ChainMaster:** *Operation / assembly instructions — electric chain hoists D8, D8Plus and C1, series B/MB/SB*, revision 2.3 (2020), appendix A.1; motor-specific scope on printed pages 54-60. The manufacturer-issued manual is hosted by [LTH](https://www.lth-gmbh.de/media/39107-oi_chainhoist_mb_sb_en-pdf-2.pdf).
+- **LIFTKET:** *Operating Instructions STAR LIFTKET — Electric Chain Hoists*, Ho 05/2020 English, section 7.1, Table 8, printed page 25. [Official LIFTKET manual](https://liftket.de/wp-content/uploads/2021/05/BA_STAR_englisch.pdf).
+- **CM:** *Lodestar D8+ SQP2 Operation and Maintenance Manual*, P/N 10001681 Rev AF (August 2020), inspection section and Table 4, pages 11-12. [Official Columbus McKinnon manual](https://www.cmco.com/globalassets/inriver/resources/cmk_12478-cmet-lodestar_10001681-rev-af_v1.pdf).
+
+If Flex model metadata cannot be read, the configured allowlist name remains available and certificate generation continues without a manufacturer logo. Brand resolution also considers the model name, so the manufacturer-specific checklist still resolves during a staggered deployment when the previous Edge Function omits `manufacturer`. A genuinely unknown manufacturer uses the explicit generic SATPRO 2026 scope and no manufacturer logo; unavailable local logo assets never block the checklist or certificate.
 
 For one selected motor, the filename includes the serial number. For multiple motors, the filename includes the job name.
 
@@ -168,11 +186,13 @@ The client validates the complete Edge Function response again before presenting
 | Flex manufacturer/model metadata fails | Keep configured model fallback and omit the brand logo |
 | Frontend deploys before the enriched Edge Function | Normalize the omitted manufacturer to `null`; continue unbranded |
 | Manufacturer has no mapped logo | Generate the full certificate without a logo |
+| Manufacturer and model match no checklist | Generate the explicit generic SATPRO 2026 scope and identify that fallback in the source line |
 | Bundled logo cannot be loaded or embedded | Log a warning and generate the full certificate without a logo |
 | Some motor models fail to load | Show a partial warning; keep successfully loaded models available |
 | All motor models fail to load | Return an error and block certificate selection |
-| Signed master PDF is missing or invalid | Stop generation and show an error |
-| Signed master PDF has more or fewer than one page | Stop generation and show an error |
+| Archived signed acta is missing or invalid | Stop generation and show an error |
+| Archived signed acta has more or fewer than one page | Stop generation and show an error |
+| Versioned checklist asset is missing or malformed | Stop generation and show an error; do not issue a partial certificate |
 | No units selected | Disable generation |
 
 ## Annual certificate renewal
@@ -181,13 +201,14 @@ The current certificate campaign is configured in `MOTOR_CERTIFICATE_SOURCE`.
 
 To renew it:
 
-1. Replace or add the signed one-page maintenance PDF under `public/certificates/`.
-2. Update `signedMaintenancePageUrl`.
+1. Preserve the previous acta as an immutable archive and add the new signed one-page source under `public/certificates/`.
+2. Update `archivedSignedInspectionUrl` and `archivedSignedInspectionSha256`.
 3. Update `inspectionDate` and `nextAnnualInspectionDate`.
-4. Update `inspectionProvider` or `equipmentOwner` if either legal entity changes.
-5. Confirm the signed source PDF contains exactly one page.
-6. Generate and visually inspect a representative multi-motor certificate pack.
-7. Run the focused PDF, service, Edge Function, and interaction tests.
+4. Review `motor-inspection-checklists-2026.json` against the then-current manufacturer manuals and update its source revision/page range.
+5. Update `inspectionProvider` or `equipmentOwner` if either legal entity changes.
+6. Confirm the signed source PDF contains exactly one page and that the issuer/signature crop bounds still select only the authorised SATPRO marks.
+7. Generate and visually inspect a representative ChainMaster, LIFTKET and CM pack.
+8. Run the focused PDF, service, Edge Function, and interaction tests.
 
 Changing only the certificate dates or signed page does not require a database migration. Changes to the model allowlist, model metadata retrieval or Flex request contract require an Edge Function deployment.
 
@@ -202,9 +223,11 @@ The current hardcoded campaign is intentionally simple. If several certificate c
 | Dialog and operator workflow | `src/components/jobs/cards/job-card-actions/MotorCertificateAction.tsx` |
 | Client service and response validation | `src/services/flexMotorUnits.ts` |
 | PDF generator and campaign configuration | `src/utils/pdf/motorInspectionCertificates.ts` |
+| Versioned checklist content and references | `public/certificates/motor-inspection-checklists-2026.json` |
+| Checklist loading, validation, and brand fallback | `src/utils/pdf/motorInspectionChecklists.ts` |
 | Supplied local brand assets | `src/assets/motor-brands/` |
 | Brand aliases, MIME types, and asset loading | `src/utils/pdf/motorBrandLogos.ts` |
-| Signed master page | `public/certificates/revision-motores-2026-pagina-firmada.pdf` |
+| Archived signed source | `public/certificates/revision-motores-2026-pagina-firmada.pdf` |
 | Protected Flex adapter | `supabase/functions/fetch-flex-motor-units/index.ts` |
 | Motor normalization and allowlist | `supabase/functions/fetch-flex-motor-units/motorUnits.ts` |
 | Manifest discovery and matching | `supabase/functions/fetch-flex-motor-units/manifestUnits.ts` |
@@ -226,9 +249,11 @@ The current hardcoded campaign is intentionally simple. If several certificate c
 1. A client certificate pack must include only the motors deliberately selected for that job.
 2. Manifest-derived selection must remain the default path.
 3. Manual selection must not create or mutate inventory data.
-4. The signed maintenance page must be copied unchanged after every individual identity page.
-5. One selected motor must always produce exactly two pages.
-6. The Edge Function must remain authenticated, role-restricted, read-only, and bounded.
-7. Certificate generation must not depend on a parallel manually maintained serial-number registry.
-8. Brand logos must remain local deterministic assets; certificate generation must not fetch them from third-party sites.
-9. A missing or unknown brand logo must never block certificate generation.
+4. The generated second page must use the checklist associated with the resolved manufacturer and cite its manual revision/page range.
+5. All 2026 result cells and dates must reflect the inspection SATPRO confirms was completed; the archived signature/seal may only be reproduced with explicit SATPRO authorisation and traceability.
+6. One selected motor must always produce exactly two pages.
+7. The Edge Function must remain authenticated, role-restricted, read-only, and bounded.
+8. Certificate generation must not depend on a parallel manually maintained serial-number registry.
+9. Brand logos must remain local deterministic assets; certificate generation must not fetch them from third-party sites.
+10. A missing or unknown brand logo must never block certificate generation.
+11. Manufacturer manual pages must not be redistributed inside generated certificates; only original summaries and source references are included.
