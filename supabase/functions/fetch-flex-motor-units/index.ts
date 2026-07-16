@@ -23,6 +23,7 @@ import {
   type FlexEquipmentListReference,
   type FlexManifestSource,
 } from "./manifestUnits.ts";
+import { allSettledWithConcurrency } from "./concurrency.ts";
 
 const FLEX_API_BASE_URL =
   Deno.env.get("FLEX_API_BASE_URL") ||
@@ -33,6 +34,7 @@ const ACTIVE_AND_OUT_FILTER = JSON.stringify([
   { id: "includeOut", property: "includeOut", value: true },
 ]);
 const MAX_EQUIPMENT_LISTS = 100;
+const FLEX_REQUEST_CONCURRENCY = 5;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type ManifestSelection = {
@@ -166,13 +168,17 @@ async function discoverManifestSelection(options: {
     };
   }
 
-  const stateResults = await Promise.allSettled(candidates.map(async (equipmentList) => {
-    const state = await fetchFlexJson(
-      `/equipment-list/warehouse-state/${encodeURIComponent(equipmentList.id)}`,
-      flexAuthToken,
-    );
-    return selectOutboundManifest(state, equipmentList);
-  }));
+  const stateResults = await allSettledWithConcurrency(
+    candidates,
+    FLEX_REQUEST_CONCURRENCY,
+    async (equipmentList) => {
+      const state = await fetchFlexJson(
+        `/equipment-list/warehouse-state/${encodeURIComponent(equipmentList.id)}`,
+        flexAuthToken,
+      );
+      return selectOutboundManifest(state, equipmentList);
+    },
+  );
   const sources = new Map<string, FlexManifestSource>();
   let stateFailures = 0;
 
@@ -199,14 +205,18 @@ async function discoverManifestSelection(options: {
     };
   }
 
-  const rowResults = await Promise.allSettled(manifestSources.map(async (source) => {
-    const rowData = await fetchFlexJson(
-      `/line-item/${encodeURIComponent(source.manifestId)}/row-data/`,
-      flexAuthToken,
-      { codeList: ["name", "barcode", "serial", "stencil"] },
-    );
-    return matchMotorUnitsInManifest(rowData, units);
-  }));
+  const rowResults = await allSettledWithConcurrency(
+    manifestSources,
+    FLEX_REQUEST_CONCURRENCY,
+    async (source) => {
+      const rowData = await fetchFlexJson(
+        `/line-item/${encodeURIComponent(source.manifestId)}/row-data/`,
+        flexAuthToken,
+        { codeList: ["name", "barcode", "serial", "stencil"] },
+      );
+      return matchMotorUnitsInManifest(rowData, units);
+    },
+  );
   const unitIds = new Set<string>();
   let rowFailures = 0;
 

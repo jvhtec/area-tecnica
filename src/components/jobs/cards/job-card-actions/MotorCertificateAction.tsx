@@ -191,6 +191,7 @@ export const MotorCertificateAction = ({ job }: MotorCertificateActionProps) => 
               type="button"
               size="sm"
               variant={selectionMode === "manifest" ? "secondary" : "ghost"}
+              aria-pressed={selectionMode === "manifest"}
               onClick={() => handleSelectionModeChange("manifest")}
             >
               Desde el manifiesto
@@ -199,6 +200,7 @@ export const MotorCertificateAction = ({ job }: MotorCertificateActionProps) => 
               type="button"
               size="sm"
               variant={selectionMode === "manual" ? "secondary" : "ghost"}
+              aria-pressed={selectionMode === "manual"}
               onClick={() => handleSelectionModeChange("manual")}
             >
               Selección manual

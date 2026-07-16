@@ -84,4 +84,22 @@ describe("fetchFlexMotorUnits", () => {
     invokeMock.mockResolvedValue({ data: null, error: null } as never);
     await expect(fetchFlexMotorUnits("job-1")).rejects.toThrow("respuesta no válida");
   });
+
+  it("rejects malformed nested manifest data", async () => {
+    invokeMock.mockResolvedValue({
+      data: {
+        units: [],
+        modelErrors: [],
+        manifest: {
+          status: "empty",
+          sources: [],
+          message: "No hay motores.",
+          warnings: [],
+        },
+      },
+      error: null,
+    } as never);
+
+    await expect(fetchFlexMotorUnits("job-1")).rejects.toThrow("respuesta no válida");
+  });
 });

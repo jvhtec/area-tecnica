@@ -106,7 +106,12 @@ describe("MotorCertificateAction", () => {
     expect(screen.queryByText("SERIE-2")).not.toBeInTheDocument();
     expect(screen.getByText("1 motor seleccionado")).toBeInTheDocument();
 
+    expect(screen.getByRole("button", { name: "Desde el manifiesto" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Selección manual" })).toHaveAttribute("aria-pressed", "false");
+
     await user.click(screen.getByRole("button", { name: "Selección manual" }));
+    expect(screen.getByRole("button", { name: "Desde el manifiesto" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Selección manual" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByText("SERIE-2")).toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: "Seleccionar motor SERIE-2" }));
     await user.click(screen.getByRole("button", { name: "Generar 2 certificados" }));

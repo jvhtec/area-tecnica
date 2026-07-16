@@ -1,3 +1,5 @@
+import { format, parseISO } from "date-fns";
+
 import type { FlexMotorUnit } from "@/services/flexMotorUnits";
 import { buildReadableFilename } from "@/utils/fileName";
 
@@ -23,10 +25,7 @@ export type GeneratedMotorCertificates = {
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
 
-const formatDate = (isoDate: string): string => {
-  const [year, month, day] = isoDate.split("-");
-  return `${day}/${month}/${year}`;
-};
+const formatDate = (isoDate: string): string => format(parseISO(isoDate), "dd/MM/yyyy");
 
 const buildFilename = (units: FlexMotorUnit[], jobName?: string | null): string => {
   if (units.length === 1) {
