@@ -4,6 +4,7 @@ export type FlexMotorUnit = {
   id: string;
   modelId: string;
   modelName: string;
+  manufacturer: string | null;
   serial: string;
   barcode: string | null;
   stencil: string | null;
@@ -50,6 +51,7 @@ const isFlexMotorUnit = (value: unknown): value is FlexMotorUnit => {
   return typeof unit.id === "string"
     && typeof unit.modelId === "string"
     && typeof unit.modelName === "string"
+    && isNullableString(unit.manufacturer)
     && typeof unit.serial === "string"
     && isNullableString(unit.barcode)
     && isNullableString(unit.stencil)
