@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Loader2 } from "lucide-react";
+import { Loader2, ScrollText } from "lucide-react";
 
 import type { JobCardJob } from "@/components/jobs/cards/job-card-actions/types";
 import { Button } from "@/components/ui/button";
@@ -172,7 +172,7 @@ export const MotorCertificateAction = ({ job }: MotorCertificateActionProps) => 
           setOpen(true);
         }}
       >
-        <BadgeCheck className="h-4 w-4" />
+        <ScrollText className="h-4 w-4" />
         <span className="hidden sm:inline">Cert. motores</span>
       </Button>
 
@@ -182,7 +182,7 @@ export const MotorCertificateAction = ({ job }: MotorCertificateActionProps) => 
             <DialogTitle>Certificados de motores</DialogTitle>
             <DialogDescription>
               Los motores escaneados en el manifiesto del trabajo se seleccionan automáticamente. También puedes añadir o elegir números de serie manualmente.
-              Los datos de revisión y la firma proceden del certificado maestro vigente.
+              La segunda página usa el checklist del fabricante y reemite la firma y el sello del acta SATPRO 2026.
             </DialogDescription>
           </DialogHeader>
 

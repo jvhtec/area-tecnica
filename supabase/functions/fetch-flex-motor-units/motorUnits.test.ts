@@ -3,24 +3,38 @@ import { describe, expect, it } from "vitest";
 import {
   buildMotorSerialUnitGridUrl,
   MOTOR_MODELS,
+  normalizeMotorModel,
   normalizeMotorUnit,
   parseMotorGridPage,
 } from "./motorUnits";
 
 describe("Flex motor unit normalization", () => {
+  it("normalizes the manufacturer and display model from the Flex inventory model", () => {
+    expect(normalizeMotorModel({
+      preferredDisplayString: "LIFTKET STAR 1.000 kg",
+      manufacturer: { displayString: "LIFTKET" },
+    }, MOTOR_MODELS[0])).toEqual({
+      id: MOTOR_MODELS[0].id,
+      name: "LIFTKET STAR 1.000 kg",
+      manufacturer: "LIFTKET",
+    });
+  });
+
   it("keeps only the read-only fields required by the certificate selector", () => {
+    const model = { ...MOTOR_MODELS[0], name: "LIFTKET STAR", manufacturer: "LIFTKET" };
     const unit = normalizeMotorUnit({
       id: "unit-1",
       serial: " J36717 ",
       barcode: "04113-01",
       currentLocation: { preferredDisplayString: "Almacén" },
       purchaseCost: 9999,
-    }, MOTOR_MODELS[0]);
+    }, model);
 
     expect(unit).toEqual({
       id: "unit-1",
-      modelId: MOTOR_MODELS[0].id,
-      modelName: MOTOR_MODELS[0].name,
+      modelId: model.id,
+      modelName: "LIFTKET STAR",
+      manufacturer: "LIFTKET",
       serial: "J36717",
       barcode: "04113-01",
       stencil: null,
@@ -76,6 +90,7 @@ describe("Flex motor unit normalization", () => {
     }, MOTOR_MODELS[2])).toEqual(expect.objectContaining({
       id: "unit-1",
       modelId: MOTOR_MODELS[2].id,
+      manufacturer: null,
       serial: "J36717",
       barcode: "04113-01",
       currentLocation: "Almacén",

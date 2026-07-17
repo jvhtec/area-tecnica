@@ -18,6 +18,7 @@ Detailed documentation for each major subsystem — key files, database tables, 
 - **[Job Assignment Matrix](workflows/job-assignment-matrix.md)** — Virtualized crew matrix, conflict detection, staffing campaigns
 - **[Timesheet System](workflows/timesheet-system.md)** — Draft → submitted → approved workflow, server-side rate calculation
 - **[Equipment Management](workflows/equipment-management.md)** — Stock tracking, sub-rentals, presets
+- **[Individual Motor Certificates](workflows/motor-certificates.md)** — Per-job certificates for serialized Flex motors, selected from outbound manifests with manual fallback
 - **[Rates & Payouts](workflows/rates-and-payouts.md)** — Rate catalog, approval workflow, payout overrides
 - **[Activity / Audit Logging](workflows/activity-audit-logging.md)** — 30+ event types, realtime toasts, visibility controls
 - **[Public Artist Form](workflows/public-artist-form.md)** — Tokenized public routes for artist rider submission

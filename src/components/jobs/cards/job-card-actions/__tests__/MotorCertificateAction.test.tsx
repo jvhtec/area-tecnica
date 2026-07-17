@@ -45,7 +45,8 @@ describe("MotorCertificateAction", () => {
         {
           id: "unit-1",
           modelId: "model-1",
-          modelName: "Motor 500 kg",
+          modelName: "LIFTKET STAR 500 kg",
+          manufacturer: "LIFTKET",
           serial: "SERIE-1",
           barcode: "BAR-1",
           stencil: null,
@@ -57,7 +58,8 @@ describe("MotorCertificateAction", () => {
         {
           id: "unit-2",
           modelId: "model-1",
-          modelName: "Motor 500 kg",
+          modelName: "LIFTKET STAR 500 kg",
+          manufacturer: "LIFTKET",
           serial: "SERIE-2",
           barcode: "BAR-2",
           stencil: null,
@@ -118,8 +120,8 @@ describe("MotorCertificateAction", () => {
 
     await waitFor(() => expect(generateMock).toHaveBeenCalledWith({
       units: expect.arrayContaining([
-        expect.objectContaining({ serial: "SERIE-1" }),
-        expect.objectContaining({ serial: "SERIE-2" }),
+        expect.objectContaining({ serial: "SERIE-1", manufacturer: "LIFTKET" }),
+        expect.objectContaining({ serial: "SERIE-2", manufacturer: "LIFTKET" }),
       ]),
       jobName: "Gira Norte",
     }));

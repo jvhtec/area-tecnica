@@ -1,12 +1,14 @@
 export type MotorModelDefinition = {
   id: string;
   name: string;
+  manufacturer?: string | null;
 };
 
 export type FlexMotorUnit = {
   id: string;
   modelId: string;
   modelName: string;
+  manufacturer: string | null;
   serial: string;
   barcode: string | null;
   stencil: string | null;
@@ -28,7 +30,8 @@ export const MOTOR_MODELS: readonly MotorModelDefinition[] = [
   { id: "39b21045-09f6-49ac-9c02-c24342caa70e", name: "Motor de velocidad variable 750 kg" },
 ] as const;
 
-const textValue = (value: unknown): string | null => {
+/** Extracts a non-empty display string from the shapes returned by Flex. */
+export const textValue = (value: unknown): string | null => {
   if (typeof value === "string") {
     const trimmed = value.trim();
     return trimmed || null;
@@ -53,6 +56,18 @@ const recordValue = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+/** Normalizes live inventory-model metadata without changing the approved model ID. */
+export function normalizeMotorModel(value: unknown, fallback: MotorModelDefinition): MotorModelDefinition {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+  const model = value as Record<string, unknown>;
+  return {
+    id: fallback.id,
+    name: textValue(model.preferredDisplayString) || textValue(model.name) || fallback.name,
+    manufacturer: textValue(model.manufacturer),
+  };
+}
+
+/** Normalizes one available serialized unit and attaches its resolved model metadata. */
 export function normalizeMotorUnit(
   value: unknown,
   model: MotorModelDefinition,
@@ -85,6 +100,7 @@ export function normalizeMotorUnit(
     id,
     modelId: model.id,
     modelName: model.name,
+    manufacturer: model.manufacturer ?? null,
     serial,
     barcode: textValue(field("barcode")),
     stencil: textValue(field("stencil")),
@@ -94,6 +110,7 @@ export function normalizeMotorUnit(
     returnDate: textValue(field("returnDate")),
   };
 }
+
 export type MotorGridPage = {
   rows: unknown[];
   totalElements: number | null;
