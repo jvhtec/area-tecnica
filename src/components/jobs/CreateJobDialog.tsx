@@ -318,6 +318,9 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           <div className="space-y-2">
             <Label>Descripción</Label>
             <Textarea {...register("description")} className={fieldClass} />
+            <p className="text-xs text-muted-foreground">
+              Se usará como mensaje predeterminado al enviar una oferta a un técnico.
+            </p>
           </div>
 
           <div className="space-y-2">

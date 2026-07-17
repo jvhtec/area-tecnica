@@ -70,6 +70,7 @@ interface JobMeta {
   job_type?: string | null
   start_time?: string | null
   end_time?: string | null
+  description?: string | null
 }
 
 interface RequiredRole {
@@ -130,7 +131,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     queryKey: queryKeys.scope('staffing_job_meta', jobId),
     queryFn: async () => {
       const { data } = await dataLayerClient.from('jobs')
-        .select('id, title, job_type, start_time, end_time')
+        .select('id, title, job_type, start_time, end_time, description')
         .eq('id', jobId)
         .maybeSingle()
       return data as JobMeta | null
@@ -278,6 +279,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
       waveBuffer: defaults.waveBuffer,
       waveWaitMinutes: defaults.waveWaitMinutes,
       maxWaves: defaults.maxWaves,
+      offerMessage: current.offerMessage || jobMeta.description || '',
       autoSendNextWave: current.mode === 'auto'
     }))
     setProfileDefaultsApplied(true)

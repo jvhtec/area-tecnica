@@ -20,6 +20,7 @@ export type MatrixJob = {
   color?: string | null;
   status: string;
   job_type: string;
+  description?: string | null;
   job_date_types?: Array<{ date: string; type: string }>;
   _assigned_count?: number;
 };
@@ -43,6 +44,7 @@ type RawMatrixJobRow = {
   color?: string | null;
   status: string;
   job_type: string;
+  description?: string | null;
   job_date_types?: Array<{ date: string; type: string }>;
   job_assignments?: MatrixJobAssignment[];
 };
@@ -132,7 +134,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
   let overlapQuery = dataLayerClient.from("jobs")
     .select(
       `
-      id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
+      id, title, start_time, end_time, color, status, job_type, description, job_date_types(date, type),
       job_departments!inner(department),
       job_assignments!job_id(technician_id, status, sound_role, lights_role, video_role, production_role)
     `
@@ -152,7 +154,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
       date,
       type,
       jobs!inner(
-        id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
+        id, title, start_time, end_time, color, status, job_type, description, job_date_types(date, type),
         job_departments!inner(department),
         job_assignments!job_id(technician_id, status, sound_role, lights_role, video_role, production_role)
       )
@@ -198,6 +200,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
         color: j.color,
         status: j.status,
         job_type: j.job_type,
+        description: j.description,
         job_date_types: Array.isArray(j.job_date_types) ? j.job_date_types : [],
         _assigned_count: countMatrixAssignmentsForDepartment(assigns, department),
       } as MatrixJob;
