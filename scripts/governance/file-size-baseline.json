@@ -10,7 +10,7 @@
     "src/components/tours/TourDefaultsManager.tsx": 1722,
     "src/components/jobs/cards/JobCardNew.tsx": 1438,
     "src/components/tours/TourDateManagementDialog.tsx": 1342,
-    "src/components/matrix/StaffingCampaignPanel.tsx": 1297,
+    "src/components/matrix/StaffingCampaignPanel.tsx": 1299,
     "src/components/soundvision/SoundVisionInteractiveMap.tsx": 1293,
     "src/routes/app-route-manifest.tsx": 1410,
     "src/utils/rates-pdf-export.ts": 1244,
