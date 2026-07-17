@@ -147,6 +147,7 @@ export const MatrixDialogs = ({
         onClose={closeDialogs}
         technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
         jobTitle={jobs.find((j) => j.id === cellAction.selectedJobId)?.title}
+        jobDescription={jobs.find((j) => j.id === cellAction.selectedJobId)?.description}
         technicianDepartment={currentTechnician.department}
         defaultSingleDay={cellAction.singleDay}
         jobStartTimeIso={jobs.find((j) => j.id === cellAction.selectedJobId)?.start_time}

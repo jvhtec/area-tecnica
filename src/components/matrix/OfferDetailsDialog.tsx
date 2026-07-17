@@ -16,6 +16,7 @@ interface OfferDetailsDialogProps {
   onClose: () => void;
   technicianName: string;
   jobTitle?: string;
+  jobDescription?: string | null;
   technicianDepartment: Department | string;
   onSubmit: (details: { role: string; message: string; singleDay?: boolean; dates?: string[] }) => void;
   defaultSingleDay?: boolean;
@@ -24,7 +25,7 @@ interface OfferDetailsDialogProps {
   defaultDateIso?: string;
 }
 
-export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, technicianDepartment, onSubmit, defaultSingleDay, jobStartTimeIso, jobEndTimeIso, defaultDateIso }) => {
+export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, jobDescription, technicianDepartment, onSubmit, defaultSingleDay, jobStartTimeIso, jobEndTimeIso, defaultDateIso }) => {
   const [role, setRole] = useState(''); // stores code
   const [message, setMessage] = useState('');
   const [coverageMode, setCoverageMode] = useState<'full' | 'single' | 'multi'>(defaultSingleDay ? 'single' : 'full');
@@ -65,8 +66,9 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
   React.useEffect(() => {
     if (open) {
       setCoverageMode(defaultSingleDay ? 'single' : 'full');
+      setMessage(jobDescription || '');
     }
-  }, [open, defaultSingleDay]);
+  }, [open, defaultSingleDay, jobDescription]);
 
   const jobSpan = useMemo(() => {
     const s = jobStartTimeIso ? new Date(jobStartTimeIso) : null;
