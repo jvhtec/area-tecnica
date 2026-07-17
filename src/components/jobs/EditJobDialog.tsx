@@ -490,6 +490,9 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 rows={4}
                 className={fieldClass}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Used as the default message when sending a job offer to a technician.
+              </p>
             </div>
 
             {/* Venue Section */}
