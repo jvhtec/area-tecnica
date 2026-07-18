@@ -797,7 +797,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
             </Button>
           </div>
 
-          {results && <AmplifierResultsSummary results={results} />}
+          {results && <AmplifierResultsSummary results={results} jobId={jobId} tourId={tourId} />}
 
           {results && (
             <SaveResultsToPresetPanel

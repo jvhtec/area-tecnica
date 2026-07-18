@@ -1,42 +1,42 @@
 {
-  "generatedAt": "2026-06-04T06:29:33.797Z",
-  "gitCommit": "afbdc748a80c47b435299741e47f6cbe08faadfb",
+  "generatedAt": "2026-07-18T15:40:53.945Z",
+  "gitCommit": "4c186bfad2113d9bd99e181ad047d8dd7c83bf0c",
   "previewUrl": "http://127.0.0.1:4174",
   "profilerUrl": "http://127.0.0.1:4175",
   "bundle": {
-    "totalFiles": 511,
+    "totalFiles": 572,
     "totalsByKind": {
       "image": {
-        "files": 82,
-        "sizeBytes": 8873444,
-        "gzipBytes": 7321949
+        "files": 92,
+        "sizeBytes": 8897820,
+        "gzipBytes": 7355944
       },
       "other": {
-        "files": 11,
-        "sizeBytes": 114590,
-        "gzipBytes": 28564
+        "files": 15,
+        "sizeBytes": 451792,
+        "gzipBytes": 311539
       },
       "js": {
-        "files": 412,
-        "sizeBytes": 9463882,
-        "gzipBytes": 2867879
+        "files": 454,
+        "sizeBytes": 10413347,
+        "gzipBytes": 3160223
       },
       "css": {
-        "files": 3,
-        "sizeBytes": 243039,
-        "gzipBytes": 37357
+        "files": 7,
+        "sizeBytes": 302681,
+        "gzipBytes": 48478
       },
       "font": {
-        "files": 3,
-        "sizeBytes": 4641516,
-        "gzipBytes": 2695508
+        "files": 4,
+        "sizeBytes": 4727084,
+        "gzipBytes": 2775005
       }
     },
     "entryScripts": [
-      "/assets/index-CLAyxBtI.js"
+      "/assets/index-DZ9oXxSZ.js"
     ],
     "entryStyles": [
-      "/assets/index-7EI0iGa4.css"
+      "/assets/index-DKbY7j-s.css"
     ],
     "largestAssets": [
       {
@@ -44,240 +44,233 @@
         "file": "NotoSans-Italic-VariableFont_wdth,wght.ttf",
         "kind": "font",
         "sizeBytes": 2300468,
-        "gzipBytes": 1380169
+        "gzipBytes": 1398443
       },
       {
         "path": "dist/fonts/NotoSans-VariableFont_wdth,wght.ttf",
         "file": "NotoSans-VariableFont_wdth,wght.ttf",
         "kind": "font",
         "sizeBytes": 2044548,
-        "gzipBytes": 1192112
-      },
-      {
-        "path": "dist/assets/maps-lib-DdH6LNk6.js",
-        "file": "maps-lib-DdH6LNk6.js",
-        "kind": "js",
-        "sizeBytes": 1800536,
-        "gzipBytes": 495773
-      },
-      {
-        "path": "dist/assets/pdf-libs-BvqGlGrx.js",
-        "file": "pdf-libs-BvqGlGrx.js",
-        "kind": "js",
-        "sizeBytes": 948847,
-        "gzipBytes": 345205
-      },
-      {
-        "path": "dist/assets/spreadsheet-libs-C15GPh2f.js",
-        "file": "spreadsheet-libs-C15GPh2f.js",
-        "kind": "js",
-        "sizeBytes": 939186,
-        "gzipBytes": 269573
+        "gzipBytes": 1209033
       },
       {
         "path": "dist/stamps/sector-pro-stamp.png",
         "file": "sector-pro-stamp.png",
         "kind": "image",
         "sizeBytes": 725939,
-        "gzipBytes": 723068
+        "gzipBytes": 723450
       },
       {
         "path": "dist/lovable-uploads/IMG_7835.jpeg",
         "file": "IMG_7835.jpeg",
         "kind": "image",
         "sizeBytes": 716389,
-        "gzipBytes": 688816
+        "gzipBytes": 688748
       },
       {
-        "path": "dist/assets/index-CLAyxBtI.js",
-        "file": "index-CLAyxBtI.js",
+        "path": "dist/assets/maps-lib-B4ghr3Nh.js",
+        "file": "maps-lib-B4ghr3Nh.js",
         "kind": "js",
-        "sizeBytes": 562803,
-        "gzipBytes": 163971
+        "sizeBytes": 1836785,
+        "gzipBytes": 509365
       },
       {
         "path": "dist/lovable-uploads/IMG_7834.jpeg",
         "file": "IMG_7834.jpeg",
         "kind": "image",
         "sizeBytes": 530046,
-        "gzipBytes": 501003
+        "gzipBytes": 501015
       },
       {
         "path": "dist/lovable-uploads/IMG_7836.jpeg",
         "file": "IMG_7836.jpeg",
         "kind": "image",
         "sizeBytes": 436854,
-        "gzipBytes": 397340
+        "gzipBytes": 397538
       },
       {
-        "path": "dist/lovable-uploads/assignmentMatrix.jpg",
-        "file": "assignmentMatrix.jpg",
-        "kind": "image",
-        "sizeBytes": 416551,
-        "gzipBytes": 242086
+        "path": "dist/assets/pdf-libs-B0OBO3mS.js",
+        "file": "pdf-libs-B0OBO3mS.js",
+        "kind": "js",
+        "sizeBytes": 957821,
+        "gzipBytes": 350382
       },
       {
         "path": "dist/8067C0A4-0C71-4CDF-952B-0E699DA25A74.png",
         "file": "8067C0A4-0C71-4CDF-952B-0E699DA25A74.png",
         "kind": "image",
         "sizeBytes": 315123,
-        "gzipBytes": 301337
+        "gzipBytes": 304769
       },
       {
         "path": "dist/og-image.png",
         "file": "og-image.png",
         "kind": "image",
         "sizeBytes": 315123,
-        "gzipBytes": 301337
+        "gzipBytes": 304769
       },
       {
-        "path": "dist/lovable-uploads/festivalManagement3.jpg",
-        "file": "festivalManagement3.jpg",
-        "kind": "image",
-        "sizeBytes": 298974,
-        "gzipBytes": 226968
-      },
-      {
-        "path": "dist/fonts/NotoEmoji-Regular.ttf",
-        "file": "NotoEmoji-Regular.ttf",
-        "kind": "font",
-        "sizeBytes": 296500,
-        "gzipBytes": 123227
-      },
-      {
-        "path": "dist/assets/ModernHojaDeRuta-D-NjnmMA.js",
-        "file": "ModernHojaDeRuta-D-NjnmMA.js",
-        "kind": "js",
-        "sizeBytes": 279036,
-        "gzipBytes": 80793
-      },
-      {
-        "path": "dist/lovable-uploads/dashboardHero.jpg",
-        "file": "dashboardHero.jpg",
-        "kind": "image",
-        "sizeBytes": 266995,
-        "gzipBytes": 178795
-      },
-      {
-        "path": "dist/lovable-uploads/tourManagement1.jpg",
-        "file": "tourManagement1.jpg",
-        "kind": "image",
-        "sizeBytes": 261073,
-        "gzipBytes": 195215
-      },
-      {
-        "path": "dist/lovable-uploads/festivalManagement1.jpg",
-        "file": "festivalManagement1.jpg",
-        "kind": "image",
-        "sizeBytes": 255057,
-        "gzipBytes": 185377
-      },
-      {
-        "path": "dist/lovable-uploads/personalCalendar.jpg",
-        "file": "personalCalendar.jpg",
-        "kind": "image",
-        "sizeBytes": 229804,
-        "gzipBytes": 154365
-      },
-      {
-        "path": "dist/assets/editor-lib-BfTMioMs.js",
-        "file": "editor-lib-BfTMioMs.js",
-        "kind": "js",
-        "sizeBytes": 216921,
-        "gzipBytes": 55632
-      },
-      {
-        "path": "dist/lovable-uploads/festivalManagement4.jpg",
-        "file": "festivalManagement4.jpg",
-        "kind": "image",
-        "sizeBytes": 212926,
-        "gzipBytes": 109744
-      },
-      {
-        "path": "dist/assets/html2canvas.esm-vQ3n7XO2.js",
-        "file": "html2canvas.esm-vQ3n7XO2.js",
-        "kind": "js",
-        "sizeBytes": 201876,
-        "gzipBytes": 47579
-      },
-      {
-        "path": "dist/lovable-uploads/tourManagement2.jpg",
-        "file": "tourManagement2.jpg",
-        "kind": "image",
-        "sizeBytes": 201374,
-        "gzipBytes": 137683
-      },
-      {
-        "path": "dist/assets/UserManual-DYvN8aZ1.js",
-        "file": "UserManual-DYvN8aZ1.js",
-        "kind": "js",
-        "sizeBytes": 182194,
-        "gzipBytes": 56407
-      },
-      {
-        "path": "dist/lovable-uploads/calendar.jpg",
-        "file": "calendar.jpg",
-        "kind": "image",
-        "sizeBytes": 179058,
-        "gzipBytes": 128899
-      },
-      {
-        "path": "dist/assets/index-7EI0iGa4.css",
-        "file": "index-7EI0iGa4.css",
-        "kind": "css",
-        "sizeBytes": 178267,
-        "gzipBytes": 27969
-      },
-      {
-        "path": "dist/assets/JobAssignmentMatrix-B50a1vC0.js",
-        "file": "JobAssignmentMatrix-B50a1vC0.js",
-        "kind": "js",
-        "sizeBytes": 177839,
-        "gzipBytes": 47983
-      },
-      {
-        "path": "dist/assets/TechnicianRfTableModal-BY1SAcC2.js",
-        "file": "TechnicianRfTableModal-BY1SAcC2.js",
-        "kind": "js",
-        "sizeBytes": 174670,
-        "gzipBytes": 44991
-      },
-      {
-        "path": "dist/lovable-uploads/IMG_8504.png",
-        "file": "IMG_8504.png",
-        "kind": "image",
-        "sizeBytes": 160513,
-        "gzipBytes": 157650
-      }
-    ],
-    "largeJsAssets": [
-      {
-        "path": "dist/assets/maps-lib-DdH6LNk6.js",
-        "file": "maps-lib-DdH6LNk6.js",
-        "kind": "js",
-        "sizeBytes": 1800536,
-        "gzipBytes": 495773
-      },
-      {
-        "path": "dist/assets/pdf-libs-BvqGlGrx.js",
-        "file": "pdf-libs-BvqGlGrx.js",
-        "kind": "js",
-        "sizeBytes": 948847,
-        "gzipBytes": 345205
+        "path": "dist/certificates/revision-motores-2026-pagina-firmada.pdf",
+        "file": "revision-motores-2026-pagina-firmada.pdf",
+        "kind": "other",
+        "sizeBytes": 314176,
+        "gzipBytes": 275772
       },
       {
         "path": "dist/assets/spreadsheet-libs-C15GPh2f.js",
         "file": "spreadsheet-libs-C15GPh2f.js",
         "kind": "js",
         "sizeBytes": 939186,
-        "gzipBytes": 269573
+        "gzipBytes": 270968
       },
       {
-        "path": "dist/assets/index-CLAyxBtI.js",
-        "file": "index-CLAyxBtI.js",
+        "path": "dist/lovable-uploads/assignmentMatrix.jpg",
+        "file": "assignmentMatrix.jpg",
+        "kind": "image",
+        "sizeBytes": 416551,
+        "gzipBytes": 242222
+      },
+      {
+        "path": "dist/lovable-uploads/festivalManagement3.jpg",
+        "file": "festivalManagement3.jpg",
+        "kind": "image",
+        "sizeBytes": 298974,
+        "gzipBytes": 226971
+      },
+      {
+        "path": "dist/lovable-uploads/tourManagement1.jpg",
+        "file": "tourManagement1.jpg",
+        "kind": "image",
+        "sizeBytes": 261073,
+        "gzipBytes": 195292
+      },
+      {
+        "path": "dist/lovable-uploads/festivalManagement1.jpg",
+        "file": "festivalManagement1.jpg",
+        "kind": "image",
+        "sizeBytes": 255057,
+        "gzipBytes": 185502
+      },
+      {
+        "path": "dist/lovable-uploads/dashboardHero.jpg",
+        "file": "dashboardHero.jpg",
+        "kind": "image",
+        "sizeBytes": 266995,
+        "gzipBytes": 178885
+      },
+      {
+        "path": "dist/lovable-uploads/IMG_8504.png",
+        "file": "IMG_8504.png",
+        "kind": "image",
+        "sizeBytes": 160513,
+        "gzipBytes": 157802
+      },
+      {
+        "path": "dist/lovable-uploads/e78ab52e-aa81-4770-a6bb-f802a5ff651e.png",
+        "file": "e78ab52e-aa81-4770-a6bb-f802a5ff651e.png",
+        "kind": "image",
+        "sizeBytes": 160513,
+        "gzipBytes": 157802
+      },
+      {
+        "path": "dist/lovable-uploads/personalCalendar.jpg",
+        "file": "personalCalendar.jpg",
+        "kind": "image",
+        "sizeBytes": 229804,
+        "gzipBytes": 154491
+      },
+      {
+        "path": "dist/icons/icon-512.webp",
+        "file": "icon-512.webp",
+        "kind": "image",
+        "sizeBytes": 146943,
+        "gzipBytes": 145201
+      },
+      {
+        "path": "dist/lovable-uploads/tourManagement2.jpg",
+        "file": "tourManagement2.jpg",
+        "kind": "image",
+        "sizeBytes": 201374,
+        "gzipBytes": 137707
+      },
+      {
+        "path": "dist/lovable-uploads/calendar.jpg",
+        "file": "calendar.jpg",
+        "kind": "image",
+        "sizeBytes": 179058,
+        "gzipBytes": 128951
+      },
+      {
+        "path": "dist/fonts/NotoEmoji-Regular.ttf",
+        "file": "NotoEmoji-Regular.ttf",
+        "kind": "font",
+        "sizeBytes": 296500,
+        "gzipBytes": 122623
+      },
+      {
+        "path": "dist/lovable-uploads/7bd0c1d7-3226-470d-bea4-5cd7222e3248.webp",
+        "file": "7bd0c1d7-3226-470d-bea4-5cd7222e3248.webp",
+        "kind": "image",
+        "sizeBytes": 118482,
+        "gzipBytes": 118243
+      },
+      {
+        "path": "dist/assets/index-DZ9oXxSZ.js",
+        "file": "index-DZ9oXxSZ.js",
         "kind": "js",
-        "sizeBytes": 562803,
-        "gzipBytes": 163971
+        "sizeBytes": 396823,
+        "gzipBytes": 109846
+      },
+      {
+        "path": "dist/lovable-uploads/festivalManagement4.jpg",
+        "file": "festivalManagement4.jpg",
+        "kind": "image",
+        "sizeBytes": 212926,
+        "gzipBytes": 109717
+      },
+      {
+        "path": "dist/lovable-uploads/REPORT6.jpg",
+        "file": "REPORT6.jpg",
+        "kind": "image",
+        "sizeBytes": 155238,
+        "gzipBytes": 100144
+      },
+      {
+        "path": "dist/Logos/wild tour.png",
+        "file": "wild tour.png",
+        "kind": "image",
+        "sizeBytes": 92796,
+        "gzipBytes": 92844
+      },
+      {
+        "path": "dist/lovable-uploads/78EA43B6-3727-454E-BB54-257619F40C1E.jpeg",
+        "file": "78EA43B6-3727-454E-BB54-257619F40C1E.jpeg",
+        "kind": "image",
+        "sizeBytes": 97361,
+        "gzipBytes": 90291
+      }
+    ],
+    "largeJsAssets": [
+      {
+        "path": "dist/assets/maps-lib-B4ghr3Nh.js",
+        "file": "maps-lib-B4ghr3Nh.js",
+        "kind": "js",
+        "sizeBytes": 1836785,
+        "gzipBytes": 509365
+      },
+      {
+        "path": "dist/assets/pdf-libs-B0OBO3mS.js",
+        "file": "pdf-libs-B0OBO3mS.js",
+        "kind": "js",
+        "sizeBytes": 957821,
+        "gzipBytes": 350382
+      },
+      {
+        "path": "dist/assets/spreadsheet-libs-C15GPh2f.js",
+        "file": "spreadsheet-libs-C15GPh2f.js",
+        "kind": "js",
+        "sizeBytes": 939186,
+        "gzipBytes": 270968
       }
     ]
   },
