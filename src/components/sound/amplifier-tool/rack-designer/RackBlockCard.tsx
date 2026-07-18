@@ -28,13 +28,25 @@ interface DragState {
 interface RackBlockCardProps {
   block: RackDesignerBlock;
   selected: boolean;
+  /** Current canvas zoom — pointer deltas are in screen px and must be unscaled. */
+  zoom: number;
+  /** True while a two-finger pinch is in progress; drags freeze so racks don't jump. */
+  pinchActiveRef: React.RefObject<boolean>;
   onSelect: (id: string) => void;
   onMove: (id: string, x: number, y: number) => void;
   /** Fired on a tap (press + release without dragging). ampId is null for the header. */
   onTap: (id: string, ampId: string | null) => void;
 }
 
-export function RackBlockCard({ block, selected, onSelect, onMove, onTap }: RackBlockCardProps) {
+export function RackBlockCard({
+  block,
+  selected,
+  zoom,
+  pinchActiveRef,
+  onSelect,
+  onMove,
+  onTap,
+}: RackBlockCardProps) {
   const dragState = useRef<DragState | null>(null);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -57,6 +69,10 @@ export function RackBlockCard({ block, selected, onSelect, onMove, onTap }: Rack
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragState.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (pinchActiveRef.current) {
+      drag.moved = true;
+      return;
+    }
     const deltaX = event.clientX - drag.startX;
     const deltaY = event.clientY - drag.startY;
     if (!drag.moved && Math.hypot(deltaX, deltaY) < TAP_MOVEMENT_THRESHOLD_PX) return;
@@ -64,8 +80,8 @@ export function RackBlockCard({ block, selected, onSelect, onMove, onTap }: Rack
     const snap = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
     const maxX = CANVAS_WIDTH - BLOCK_WIDTH;
     const maxY = CANVAS_HEIGHT - blockPixelHeight(block);
-    const nextX = Math.min(Math.max(snap(drag.originX + deltaX), 0), maxX);
-    const nextY = Math.min(Math.max(snap(drag.originY + deltaY), 0), maxY);
+    const nextX = Math.min(Math.max(snap(drag.originX + deltaX / zoom), 0), maxX);
+    const nextY = Math.min(Math.max(snap(drag.originY + deltaY / zoom), 0), maxY);
     if (nextX !== block.x || nextY !== block.y) {
       onMove(block.id, nextX, nextY);
     }

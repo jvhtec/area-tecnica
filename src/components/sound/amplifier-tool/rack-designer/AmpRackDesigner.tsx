@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, Network, Plus, RefreshCw, Wand2, X } from 'lucide-react';
+import { FileText, Network, Plus, RefreshCw, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -49,6 +49,7 @@ import {
 import { RackBlockCard } from './RackBlockCard';
 import { BlockEditorPanel } from './BlockEditorPanel';
 import { AmpEditFields } from './AmpEditFields';
+import { useCanvasZoom } from './useCanvasZoom';
 
 export interface AmpRackDesignerProps {
   results: AmplifierResults;
@@ -72,6 +73,11 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
   const [baseIp, setBaseIp] = useState(DEFAULT_IP_BASE);
   const [includeRackLabels, setIncludeRackLabels] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const { zoom, zoomIn, zoomOut, fitToView, pinchActiveRef, scrollRef } = useCanvasZoom({
+    enabled: open,
+    contentWidth: CANVAS_WIDTH,
+    contentHeight: CANVAS_HEIGHT,
+  });
 
   const scope = jobId ?? tourId ?? 'standalone';
 
@@ -82,6 +88,13 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
     setAmpTarget(null);
     setMobileBlockEditorOpen(false);
   }, [open, scope, results]);
+
+  // On phones start zoomed out so the whole plan is visible; pinch in from there.
+  useEffect(() => {
+    if (!open || !isMobile) return;
+    const frame = requestAnimationFrame(() => fitToView());
+    return () => cancelAnimationFrame(frame);
+  }, [open, isMobile, fitToView]);
 
   useEffect(() => {
     if (open && layout) saveStoredLayout(scope, layout);
@@ -343,63 +356,118 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3 md:flex-row">
-            <div
-              className="relative min-h-[240px] flex-1 overflow-auto rounded-md border bg-muted/20"
-              onPointerDown={clearCanvasSelection}
-            >
+            <div className="relative min-h-[240px] flex-1">
               <div
-                className="relative"
-                style={{
-                  width: CANVAS_WIDTH,
-                  height: CANVAS_HEIGHT,
-                  backgroundImage:
-                    'linear-gradient(to right, hsl(var(--border) / 0.35) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border) / 0.35) 1px, transparent 1px)',
-                  backgroundSize: '50px 50px',
-                }}
+                ref={scrollRef}
+                className="absolute inset-0 overflow-auto rounded-md border bg-muted/20"
+                style={{ touchAction: 'pan-x pan-y' }}
+                onPointerDown={clearCanvasSelection}
               >
-                {layout?.blocks.map((block) => (
-                  <RackBlockCard
-                    key={block.id}
-                    block={block}
-                    selected={block.id === selectedBlockId}
-                    onSelect={setSelectedBlockId}
-                    onMove={moveBlock}
-                    onTap={handleBlockTap}
-                  />
-                ))}
-
-                {!isMobile && targetedAmp && (
+                <div
+                  className="relative"
+                  style={{ width: CANVAS_WIDTH * zoom, height: CANVAS_HEIGHT * zoom }}
+                >
                   <div
-                    className="absolute z-20 w-60 rounded-md border bg-background p-3 shadow-lg"
+                    className="relative origin-top-left"
                     style={{
-                      left: Math.min(targetedAmp.block.x + BLOCK_WIDTH + 10, CANVAS_WIDTH - 250),
-                      top: Math.min(
-                        targetedAmp.block.y + BLOCK_HEADER_HEIGHT + targetedAmp.ampIndex * AMP_CELL_HEIGHT,
-                        CANVAS_HEIGHT - 190,
-                      ),
+                      width: CANVAS_WIDTH,
+                      height: CANVAS_HEIGHT,
+                      transform: `scale(${zoom})`,
+                      backgroundImage:
+                        'linear-gradient(to right, hsl(var(--border) / 0.35) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border) / 0.35) 1px, transparent 1px)',
+                      backgroundSize: '50px 50px',
                     }}
-                    onPointerDown={(event) => event.stopPropagation()}
                   >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-semibold">Editar amplificador</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => setAmpTarget(null)}
-                        aria-label="Cerrar editor de amplificador"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <AmpEditFields
-                      amp={targetedAmp.amp}
-                      autoFocusIp
-                      onChange={(patch) => updateAmp(targetedAmp.block.id, targetedAmp.amp.id, patch)}
-                    />
+                    {layout?.blocks.map((block) => (
+                      <RackBlockCard
+                        key={block.id}
+                        block={block}
+                        selected={block.id === selectedBlockId}
+                        zoom={zoom}
+                        pinchActiveRef={pinchActiveRef}
+                        onSelect={setSelectedBlockId}
+                        onMove={moveBlock}
+                        onTap={handleBlockTap}
+                      />
+                    ))}
                   </div>
-                )}
+
+                  {/* Unscaled layer so the editor card stays readable at any zoom. */}
+                  {!isMobile && targetedAmp && (
+                    <div
+                      className="absolute z-20 w-60 rounded-md border bg-background p-3 shadow-lg"
+                      style={{
+                        left: Math.max(
+                          0,
+                          Math.min(
+                            (targetedAmp.block.x + BLOCK_WIDTH) * zoom + 10,
+                            CANVAS_WIDTH * zoom - 250,
+                          ),
+                        ),
+                        top: Math.max(
+                          0,
+                          Math.min(
+                            (targetedAmp.block.y +
+                              BLOCK_HEADER_HEIGHT +
+                              targetedAmp.ampIndex * AMP_CELL_HEIGHT) * zoom,
+                            CANVAS_HEIGHT * zoom - 190,
+                          ),
+                        ),
+                      }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-semibold">Editar amplificador</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setAmpTarget(null)}
+                          aria-label="Cerrar editor de amplificador"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <AmpEditFields
+                        amp={targetedAmp.amp}
+                        autoFocusIp
+                        onChange={(patch) => updateAmp(targetedAmp.block.id, targetedAmp.amp.id, patch)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="absolute bottom-2 right-2 z-20 flex items-center gap-0.5 rounded-md border bg-background/95 p-0.5 shadow-sm">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={zoomOut}
+                  aria-label="Alejar"
+                >
+                  <ZoomOut className="h-3.5 w-3.5" />
+                </Button>
+                <button
+                  type="button"
+                  className="w-11 text-center text-xs tabular-nums text-muted-foreground hover:text-foreground"
+                  onClick={fitToView}
+                  title="Ajustar a la vista"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={zoomIn}
+                  aria-label="Acercar"
+                >
+                  <ZoomIn className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
 
