@@ -12,12 +12,17 @@ import {
   blockPixelHeight,
 } from './layout-utils';
 
+const TAP_MOVEMENT_THRESHOLD_PX = 6;
+
 interface DragState {
   pointerId: number;
   startX: number;
   startY: number;
   originX: number;
   originY: number;
+  moved: boolean;
+  /** Amp cell the gesture started on, if any — used to open its editor on tap. */
+  ampId: string | null;
 }
 
 interface RackBlockCardProps {
@@ -25,21 +30,26 @@ interface RackBlockCardProps {
   selected: boolean;
   onSelect: (id: string) => void;
   onMove: (id: string, x: number, y: number) => void;
+  /** Fired on a tap (press + release without dragging). ampId is null for the header. */
+  onTap: (id: string, ampId: string | null) => void;
 }
 
-export function RackBlockCard({ block, selected, onSelect, onMove }: RackBlockCardProps) {
+export function RackBlockCard({ block, selected, onSelect, onMove, onTap }: RackBlockCardProps) {
   const dragState = useRef<DragState | null>(null);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.stopPropagation();
     onSelect(block.id);
+    const ampCell = (event.target as HTMLElement).closest('[data-amp-id]') as HTMLElement | null;
     dragState.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       originX: block.x,
       originY: block.y,
+      moved: false,
+      ampId: ampCell?.dataset.ampId ?? null,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -47,11 +57,15 @@ export function RackBlockCard({ block, selected, onSelect, onMove }: RackBlockCa
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragState.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < TAP_MOVEMENT_THRESHOLD_PX) return;
+    drag.moved = true;
     const snap = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
     const maxX = CANVAS_WIDTH - BLOCK_WIDTH;
     const maxY = CANVAS_HEIGHT - blockPixelHeight(block);
-    const nextX = Math.min(Math.max(snap(drag.originX + event.clientX - drag.startX), 0), maxX);
-    const nextY = Math.min(Math.max(snap(drag.originY + event.clientY - drag.startY), 0), maxY);
+    const nextX = Math.min(Math.max(snap(drag.originX + deltaX), 0), maxX);
+    const nextY = Math.min(Math.max(snap(drag.originY + deltaY), 0), maxY);
     if (nextX !== block.x || nextY !== block.y) {
       onMove(block.id, nextX, nextY);
     }
@@ -63,6 +77,9 @@ export function RackBlockCard({ block, selected, onSelect, onMove }: RackBlockCa
     dragState.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (event.type === 'pointerup' && !drag.moved) {
+      onTap(block.id, drag.ampId);
     }
   };
 
@@ -92,7 +109,8 @@ export function RackBlockCard({ block, selected, onSelect, onMove }: RackBlockCa
       {block.amps.map((amp) => (
         <div
           key={amp.id}
-          className="flex flex-col items-center justify-center border border-t-0 border-black/60 px-1 text-center"
+          data-amp-id={amp.id}
+          className="flex cursor-pointer flex-col items-center justify-center border border-t-0 border-black/60 px-1 text-center"
           style={{ height: AMP_CELL_HEIGHT, backgroundColor: block.color }}
         >
           <span className="w-full truncate text-xs font-bold text-black">{amp.presetName}</span>
