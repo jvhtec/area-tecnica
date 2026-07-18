@@ -23,5 +23,7 @@ export interface RackDesignerBlock {
 export interface RackDesignerLayout {
   version: 1;
   title: string;
+  /** Fingerprint of the calculator results this layout was generated from. */
+  resultsFingerprint?: string;
   blocks: RackDesignerBlock[];
 }

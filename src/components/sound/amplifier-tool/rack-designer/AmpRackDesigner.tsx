@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { FileText, Network, Plus, RefreshCw, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,15 +21,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { generateAmpRackLayoutPdf } from '@/utils/amplifierRackLayoutPdf';
-import type { AmplifierResults } from '../types';
-import type { RackDesignerAmp, RackDesignerBlock, RackDesignerLayout } from './types';
+import type { AmplifierResults } from '@/components/sound/amplifier-tool/types';
+import type {
+  RackDesignerAmp,
+  RackDesignerBlock,
+  RackDesignerLayout,
+} from '@/components/sound/amplifier-tool/rack-designer/types';
 import {
   BLOCK_HEADER_HEIGHT,
   BLOCK_WIDTH,
@@ -40,16 +44,19 @@ import {
   DEFAULT_LAYOUT_TITLE,
   RACK_COLOR_PALETTE,
   assignSequentialIps,
+  computeResultsFingerprint,
   generateLayoutFromResults,
   isValidIp,
   loadStoredLayout,
   makeDesignerId,
   saveStoredLayout,
-} from './layout-utils';
-import { RackBlockCard } from './RackBlockCard';
-import { BlockEditorPanel } from './BlockEditorPanel';
-import { AmpEditFields } from './AmpEditFields';
-import { useCanvasZoom } from './useCanvasZoom';
+} from '@/components/sound/amplifier-tool/rack-designer/layout-utils';
+import { RackBlockCard } from '@/components/sound/amplifier-tool/rack-designer/RackBlockCard';
+import { BlockEditorPanel } from '@/components/sound/amplifier-tool/rack-designer/BlockEditorPanel';
+import { AmpEditFields } from '@/components/sound/amplifier-tool/rack-designer/AmpEditFields';
+import { useCanvasZoom } from '@/components/sound/amplifier-tool/rack-designer/useCanvasZoom';
+
+const MADRID_TZ = 'Europe/Madrid';
 
 export interface AmpRackDesignerProps {
   results: AmplifierResults;
@@ -83,7 +90,15 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
 
   useEffect(() => {
     if (!open) return;
-    setLayout(loadStoredLayout(scope) ?? generateLayoutFromResults(results));
+    // A saved layout is only reused when it came from the same calculation;
+    // otherwise it would silently contradict the results summary next to it.
+    const stored = loadStoredLayout(scope);
+    const fingerprint = computeResultsFingerprint(results);
+    setLayout(
+      stored && stored.resultsFingerprint === fingerprint
+        ? stored
+        : generateLayoutFromResults(results, stored?.title ?? DEFAULT_LAYOUT_TITLE),
+    );
     setSelectedBlockId(null);
     setAmpTarget(null);
     setMobileBlockEditorOpen(false);
@@ -156,42 +171,39 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
     setMobileBlockEditorOpen(false);
   };
 
+  // Blocks are built outside the setLayout updaters so the updaters stay pure —
+  // React may invoke them more than once (e.g. StrictMode).
   const duplicateBlock = (id: string) => {
-    setLayout((prev) => {
-      if (!prev) return prev;
-      const source = prev.blocks.find((block) => block.id === id);
-      if (!source) return prev;
-      const copy: RackDesignerBlock = {
-        ...source,
-        id: makeDesignerId(),
-        label: `${source.label} (copia)`,
-        x: Math.min(source.x + 20, CANVAS_WIDTH - 200),
-        y: Math.min(source.y + 20, CANVAS_HEIGHT - 100),
-        amps: source.amps.map((amp) => ({ ...amp, id: makeDesignerId() })),
-      };
-      setSelectedBlockId(copy.id);
-      return { ...prev, blocks: [...prev.blocks, copy] };
-    });
+    const source = layout?.blocks.find((block) => block.id === id);
+    if (!source) return;
+    const copy: RackDesignerBlock = {
+      ...source,
+      id: makeDesignerId(),
+      label: `${source.label} (copia)`,
+      x: Math.min(source.x + 20, CANVAS_WIDTH - 200),
+      y: Math.min(source.y + 20, CANVAS_HEIGHT - 100),
+      amps: source.amps.map((amp) => ({ ...amp, id: makeDesignerId() })),
+    };
+    setLayout((prev) => (prev ? { ...prev, blocks: [...prev.blocks, copy] } : prev));
+    setSelectedBlockId(copy.id);
   };
 
   const addBlock = () => {
-    setLayout((prev) => {
-      if (!prev) return prev;
-      const block: RackDesignerBlock = {
-        id: makeDesignerId(),
-        label: `RACK ${prev.blocks.length + 1}`,
-        color: RACK_COLOR_PALETTE[7].value,
-        x: 40,
-        y: 40,
-        amps: [{ id: makeDesignerId(), presetName: 'PRESET', ip: DEFAULT_IP_BASE, model: 'LA12X' }],
-      };
-      setSelectedBlockId(block.id);
-      return { ...prev, blocks: [...prev.blocks, block] };
-    });
+    if (!layout) return;
+    const block: RackDesignerBlock = {
+      id: makeDesignerId(),
+      label: `RACK ${layout.blocks.length + 1}`,
+      color: RACK_COLOR_PALETTE[7].value,
+      x: 40,
+      y: 40,
+      amps: [{ id: makeDesignerId(), presetName: 'PRESET', ip: DEFAULT_IP_BASE, model: 'LA12X' }],
+    };
+    setLayout((prev) => (prev ? { ...prev, blocks: [...prev.blocks, block] } : prev));
+    setSelectedBlockId(block.id);
   };
 
   const regenerate = () => {
-    setLayout((prev) => generateLayoutFromResults(results, prev?.title ?? DEFAULT_LAYOUT_TITLE));
+    setLayout(generateLayoutFromResults(results, layout?.title ?? DEFAULT_LAYOUT_TITLE));
     setSelectedBlockId(null);
     setAmpTarget(null);
     toast({
@@ -226,7 +238,7 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `distribucion-amplificadores-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      link.download = `distribucion-amplificadores-${formatInTimeZone(new Date(), MADRID_TZ, 'yyyy-MM-dd')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -483,17 +495,17 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
         </DialogContent>
       </Dialog>
 
-      <Drawer
+      <Sheet
         open={isMobile && !!targetedAmp}
-        onOpenChange={(drawerOpen) => {
-          if (!drawerOpen) setAmpTarget(null);
+        onOpenChange={(sheetOpen) => {
+          if (!sheetOpen) setAmpTarget(null);
         }}
       >
-        <DrawerContent>
-          <DrawerHeader className="pb-2 text-left">
-            <DrawerTitle>Editar amplificador</DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 pb-8">
+        <SheetContent side="bottom" className="rounded-t-lg">
+          <SheetHeader className="pb-2 text-left">
+            <SheetTitle>Editar amplificador</SheetTitle>
+          </SheetHeader>
+          <div className="pb-4">
             {targetedAmp && (
               <AmpEditFields
                 amp={targetedAmp.amp}
@@ -501,20 +513,20 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
               />
             )}
           </div>
-        </DrawerContent>
-      </Drawer>
+        </SheetContent>
+      </Sheet>
 
-      <Drawer
+      <Sheet
         open={isMobile && mobileBlockEditorOpen && !!selectedBlock}
         onOpenChange={setMobileBlockEditorOpen}
       >
-        <DrawerContent>
-          <DrawerHeader className="pb-2 text-left">
-            <DrawerTitle>Editar rack</DrawerTitle>
-          </DrawerHeader>
-          <div className="max-h-[65dvh] overflow-y-auto px-4 pb-8">{blockEditor}</div>
-        </DrawerContent>
-      </Drawer>
+        <SheetContent side="bottom" className="rounded-t-lg">
+          <SheetHeader className="pb-2 text-left">
+            <SheetTitle>Editar rack</SheetTitle>
+          </SheetHeader>
+          <div className="max-h-[65dvh] overflow-y-auto pb-4">{blockEditor}</div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

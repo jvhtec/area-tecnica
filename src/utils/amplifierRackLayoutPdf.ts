@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import type { RackDesignerLayout } from '@/components/sound/amplifier-tool/rack-designer/types';
 import {
@@ -123,7 +123,11 @@ export const generateAmpRackLayoutPdf = async (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Generado: ${format(new Date(), 'dd/MM/yyyy')}`, margin, pageHeight - 6);
+  doc.text(
+    `Generado: ${formatInTimeZone(new Date(), 'Europe/Madrid', 'dd/MM/yyyy')}`,
+    margin,
+    pageHeight - 6,
+  );
 
   return new Promise((resolve) => {
     const logo = new Image();

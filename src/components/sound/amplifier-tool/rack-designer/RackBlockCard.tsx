@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { RackDesignerBlock } from './types';
+import type { RackDesignerBlock } from '@/components/sound/amplifier-tool/rack-designer/types';
 import {
   AMP_CELL_HEIGHT,
   BLOCK_HEADER_HEIGHT,
@@ -10,7 +10,7 @@ import {
   CANVAS_WIDTH,
   GRID_SIZE,
   blockPixelHeight,
-} from './layout-utils';
+} from '@/components/sound/amplifier-tool/rack-designer/layout-utils';
 
 const TAP_MOVEMENT_THRESHOLD_PX = 6;
 
@@ -99,10 +99,39 @@ export function RackBlockCard({
     }
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const arrowDeltas: Record<string, [number, number]> = {
+      ArrowLeft: [-GRID_SIZE, 0],
+      ArrowRight: [GRID_SIZE, 0],
+      ArrowUp: [0, -GRID_SIZE],
+      ArrowDown: [0, GRID_SIZE],
+    };
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(block.id);
+      onTap(block.id, null);
+      return;
+    }
+    const delta = arrowDeltas[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    const maxX = CANVAS_WIDTH - BLOCK_WIDTH;
+    const maxY = CANVAS_HEIGHT - blockPixelHeight(block);
+    onMove(
+      block.id,
+      Math.min(Math.max(block.x + delta[0], 0), maxX),
+      Math.min(Math.max(block.y + delta[1], 0), maxY),
+    );
+  };
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Rack ${block.label}: seleccionar con Intro, mover con las flechas`}
       className={cn(
         'absolute select-none touch-none cursor-grab active:cursor-grabbing rounded-sm shadow-sm',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
         selected && 'ring-2 ring-primary ring-offset-1 z-10',
       )}
       style={{ left: block.x, top: block.y, width: BLOCK_WIDTH }}
@@ -110,6 +139,8 @@ export function RackBlockCard({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
+      onKeyDown={handleKeyDown}
+      onFocus={() => onSelect(block.id)}
     >
       <div
         className="flex items-center gap-1 border border-black/60 px-2 text-xs font-semibold text-black/80"
@@ -130,7 +161,7 @@ export function RackBlockCard({
           style={{ height: AMP_CELL_HEIGHT, backgroundColor: block.color }}
         >
           <span className="w-full truncate text-xs font-bold text-black">{amp.presetName}</span>
-          <span className="text-[11px] leading-tight text-black/90">{amp.ip}</span>
+          <span className="text-xs leading-tight text-black/90">{amp.ip}</span>
         </div>
       ))}
     </div>

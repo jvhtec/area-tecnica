@@ -1,11 +1,11 @@
-import type { AmplifierResults } from '../types';
+import type { AmplifierResults } from '@/components/sound/amplifier-tool/types';
 import type {
   AmpModel,
   RackDesignerAmp,
   RackDesignerBlock,
   RackDesignerLayout,
   RackSide,
-} from './types';
+} from '@/components/sound/amplifier-tool/rack-designer/types';
 
 export const CANVAS_WIDTH = 1500;
 export const CANVAS_HEIGHT = 1100;
@@ -113,16 +113,18 @@ function buildSectionAmps(
 
   const amps: GeneratedAmp[] = [];
   if (data.mirrored) {
+    // Alternate sides across the whole section (not per model) so mixed
+    // LA12X/PLM sections stay balanced — e.g. 1 LA + 1 PLM lands L + R.
     const leftAmps: GeneratedAmp[] = [];
     const rightAmps: GeneratedAmp[] = [];
     const counters = { L: 0, R: 0 };
+    let nextSide: 'L' | 'R' = 'L';
     for (const [model, count] of typeCounts) {
-      const leftCount = Math.ceil(count / 2);
-      for (let i = 0; i < leftCount; i++) {
-        leftAmps.push({ presetName: `${base} L${++counters.L}`, model, side: 'L' });
-      }
-      for (let i = 0; i < count - leftCount; i++) {
-        rightAmps.push({ presetName: `${base} R${++counters.R}`, model, side: 'R' });
+      for (let i = 0; i < count; i++) {
+        const side: 'L' | 'R' = nextSide;
+        nextSide = side === 'L' ? 'R' : 'L';
+        const target = side === 'L' ? leftAmps : rightAmps;
+        target.push({ presetName: `${base} ${side}${++counters[side]}`, model, side });
       }
     }
     amps.push(...leftAmps, ...rightAmps);
@@ -140,6 +142,20 @@ function buildSectionAmps(
     }
   }
   return amps;
+}
+
+/**
+ * Stable fingerprint of the calculation a layout was generated from. Stored
+ * with the layout so a stale saved design is regenerated instead of silently
+ * shown next to a newer calculation.
+ */
+export function computeResultsFingerprint(results: AmplifierResults): string {
+  const parts = SECTION_ORDER.map((section) => {
+    const data = results.perSection[section];
+    if (!data || data.totalAmps === 0) return `${section}:0`;
+    return `${section}:${data.laAmps ?? 0}/${data.plmAmps ?? 0}/${data.mirrored ? 'm' : 's'}`;
+  });
+  return parts.join('|');
 }
 
 /**
@@ -213,18 +229,61 @@ export function generateLayoutFromResults(
   const sideRows = Math.max(Math.ceil(left.length / 3), Math.ceil(right.length / 3));
   placeGrid(center, 40, 40 + Math.max(sideRows, 1) * rowPitch, 6);
 
-  return { version: 1, title, blocks: [...left, ...right, ...center] };
+  return {
+    version: 1,
+    title,
+    resultsFingerprint: computeResultsFingerprint(results),
+    blocks: [...left, ...right, ...center],
+  };
 }
 
 const storageKey = (scope: string) => `amp-rack-designer:${scope}`;
+
+const AMP_MODELS: readonly string[] = ['LA12X', 'PLM20000D'];
+
+function isStoredAmp(value: unknown): value is RackDesignerAmp {
+  const amp = value as RackDesignerAmp;
+  return (
+    !!amp &&
+    typeof amp.id === 'string' &&
+    typeof amp.presetName === 'string' &&
+    typeof amp.ip === 'string' &&
+    AMP_MODELS.includes(amp.model)
+  );
+}
+
+function isStoredBlock(value: unknown): value is RackDesignerBlock {
+  const block = value as RackDesignerBlock;
+  return (
+    !!block &&
+    typeof block.id === 'string' &&
+    typeof block.label === 'string' &&
+    typeof block.color === 'string' &&
+    Number.isFinite(block.x) &&
+    Number.isFinite(block.y) &&
+    Array.isArray(block.amps) &&
+    block.amps.every(isStoredAmp)
+  );
+}
+
+function isStoredLayout(value: unknown): value is RackDesignerLayout {
+  const layout = value as RackDesignerLayout;
+  return (
+    !!layout &&
+    layout.version === 1 &&
+    typeof layout.title === 'string' &&
+    (layout.resultsFingerprint === undefined || typeof layout.resultsFingerprint === 'string') &&
+    Array.isArray(layout.blocks) &&
+    layout.blocks.every(isStoredBlock)
+  );
+}
 
 export function loadStoredLayout(scope: string): RackDesignerLayout | null {
   try {
     const raw = localStorage.getItem(storageKey(scope));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as RackDesignerLayout;
-    if (parsed?.version !== 1 || !Array.isArray(parsed.blocks)) return null;
-    return parsed;
+    const parsed: unknown = JSON.parse(raw);
+    return isStoredLayout(parsed) ? parsed : null;
   } catch {
     return null;
   }

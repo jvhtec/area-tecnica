@@ -4,6 +4,7 @@ import {
   AMPS_PER_RACK,
   assignBlockIps,
   assignSequentialIps,
+  computeResultsFingerprint,
   generateLayoutFromResults,
   incrementIp,
   isValidIp,
@@ -114,6 +115,19 @@ describe('generateLayoutFromResults', () => {
     }
   });
 
+  it('stamps and changes the results fingerprint when the calculation changes', () => {
+    const resultsA = makeResults({
+      mains: { amps: 4, details: [], totalAmps: 4, mirrored: true, laAmps: 4, plmAmps: 0 },
+    });
+    const resultsB = makeResults({
+      mains: { amps: 6, details: [], totalAmps: 6, mirrored: true, laAmps: 6, plmAmps: 0 },
+    });
+    const layout = generateLayoutFromResults(resultsA);
+    expect(layout.resultsFingerprint).toBe(computeResultsFingerprint(resultsA));
+    expect(computeResultsFingerprint(resultsA)).not.toBe(computeResultsFingerprint(resultsB));
+    expect(computeResultsFingerprint(resultsA)).toBe(computeResultsFingerprint(makeResults(resultsA.perSection)));
+  });
+
   it('colors left racks red, right racks blue and center racks green', () => {
     const results = makeResults({
       mains: { amps: 2, details: [], totalAmps: 2, mirrored: true, laAmps: 2, plmAmps: 0 },
@@ -125,6 +139,15 @@ describe('generateLayoutFromResults', () => {
     expect(byName('MAIN L')?.color).toBe('#f87171');
     expect(byName('MAIN R')?.color).toBe('#60a5fa');
     expect(byName('SUB')?.color).toBe('#4ade80');
+  });
+
+  it('balances mixed amp models across sides in mirrored sections', () => {
+    const results = makeResults({
+      mains: { amps: 2, details: [], totalAmps: 2, mirrored: true, laAmps: 1, plmAmps: 1 },
+    });
+    const layout = generateLayoutFromResults(results);
+    const names = layout.blocks.flatMap((block) => block.amps.map((amp) => amp.presetName));
+    expect(names).toEqual(['MAIN L1', 'MAIN R1']);
   });
 
   it('does not overlap default block positions', () => {

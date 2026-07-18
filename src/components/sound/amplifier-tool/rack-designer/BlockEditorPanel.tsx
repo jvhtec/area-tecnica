@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import type { RackDesignerAmp, RackDesignerBlock } from './types';
+import type { RackDesignerAmp, RackDesignerBlock } from '@/components/sound/amplifier-tool/rack-designer/types';
 import {
   DEFAULT_IP_BASE,
   RACK_COLOR_PALETTE,
@@ -12,7 +12,7 @@ import {
   incrementIp,
   isValidIp,
   makeDesignerId,
-} from './layout-utils';
+} from '@/components/sound/amplifier-tool/rack-designer/layout-utils';
 
 interface BlockEditorPanelProps {
   block: RackDesignerBlock;
@@ -165,7 +165,7 @@ export function BlockEditorPanel({ block, onChange, onDuplicate, onDelete }: Blo
                 placeholder="192.168.1.11"
                 className={cn('h-7 font-mono text-xs', !isValidIp(amp.ip) && 'border-destructive')}
               />
-              <span className="shrink-0 text-[10px] text-muted-foreground">{amp.model}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{amp.model}</span>
             </div>
           </div>
         ))}

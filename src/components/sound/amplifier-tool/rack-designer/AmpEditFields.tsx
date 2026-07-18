@@ -1,8 +1,8 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import type { RackDesignerAmp } from './types';
-import { isValidIp } from './layout-utils';
+import type { RackDesignerAmp } from '@/components/sound/amplifier-tool/rack-designer/types';
+import { isValidIp } from '@/components/sound/amplifier-tool/rack-designer/layout-utils';
 
 interface AmpEditFieldsProps {
   amp: RackDesignerAmp;
@@ -36,7 +36,7 @@ export function AmpEditFields({ amp, onChange, autoFocusIp = false }: AmpEditFie
           className={cn('h-8 font-mono text-sm', !isValidIp(amp.ip) && 'border-destructive')}
         />
       </div>
-      <p className="text-[10px] text-muted-foreground">{amp.model}</p>
+      <p className="text-xs text-muted-foreground">{amp.model}</p>
     </div>
   );
 }
