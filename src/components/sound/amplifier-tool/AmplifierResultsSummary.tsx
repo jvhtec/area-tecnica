@@ -1,10 +1,16 @@
 import React from "react";
 import type { AmplifierResults } from "./types";
+import { AmpRackDesigner } from "./rack-designer/AmpRackDesigner";
 
-export const AmplifierResultsSummary: React.FC<{ results: AmplifierResults }> = ({ results }) => (
+export const AmplifierResultsSummary: React.FC<{
+  results: AmplifierResults;
+  jobId?: string;
+  tourId?: string;
+}> = ({ results, jobId, tourId }) => (
   <div className="mt-6 border rounded-lg overflow-hidden">
-    <div className="bg-muted px-4 py-3">
+    <div className="bg-muted px-4 py-3 flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-lg font-semibold">Required Amplifiers</h3>
+      <AmpRackDesigner results={results} jobId={jobId} tourId={tourId} />
     </div>
 
     <div className="p-4 space-y-4">
