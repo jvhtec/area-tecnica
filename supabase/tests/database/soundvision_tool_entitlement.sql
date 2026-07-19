@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(19);
+SELECT plan(20);
 
 SELECT has_column(
   'public',
@@ -28,6 +28,18 @@ SELECT ok(
       AND contype = 'c'
   ),
   'only sound department profiles may hold the entitlement'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgrelid = 'public.profiles'::regclass
+      AND tgname = 'enforce_profile_privilege_changes'
+      AND tgenabled = 'O'
+      AND NOT tgisinternal
+  ),
+  'the existing profile privilege guard is re-enabled after the rollout backfill'
 );
 
 SELECT ok(

@@ -90,6 +90,16 @@ EXECUTE FUNCTION public.grant_soundvision_tool_access_from_responsable();
 -- Honor already-recorded responsable assignments at rollout. This is the only
 -- broad backfill; a later manual revocation remains in force until a future
 -- responsable assignment event grants access again.
+--
+-- Production already has the profile privilege guard from
+-- 20260623160000_phase0_authorization_hardening.sql. The migration connection
+-- has no PostgREST JWT claims, so that guard rejects a root-level UPDATE even
+-- though the migration owns the table. Disable only that exact guard for this
+-- trusted backfill and immediately restore it. PostgreSQL rolls both ALTERs
+-- back with the migration if any statement fails.
+ALTER TABLE public.profiles
+  DISABLE TRIGGER enforce_profile_privilege_changes;
+
 UPDATE public.profiles p
 SET soundvision_tool_access_enabled = true
 WHERE p.soundvision_tool_access_enabled IS DISTINCT FROM true
@@ -109,6 +119,9 @@ WHERE p.soundvision_tool_access_enabled IS DISTINCT FROM true
         AND upper(btrim(ta.role)) ~ '^[A-Z]{3}-[A-Z0-9_]+-R$'
     )
   );
+
+ALTER TABLE public.profiles
+  ENABLE TRIGGER enforce_profile_privilege_changes;
 
 -- profiles has intentionally broad authenticated UPDATE RLS plus a trigger
 -- privilege boundary. Guard this new entitlement explicitly so a technician
