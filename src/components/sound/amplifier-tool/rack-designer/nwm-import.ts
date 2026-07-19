@@ -33,6 +33,10 @@ export interface NwmMap {
 
 const SIDE_COLORS = { L: '#f87171', R: '#60a5fa', C: '#4ade80' } as const;
 
+export function isLaSessionFileName(fileName: string): boolean {
+  return /\.(nwm|xmlp)$/i.test(fileName.trim());
+}
+
 // Top-level sections in the order they should appear, and the group name NM uses
 // for each. A unit is assigned to the first section whose group contains it.
 const SECTION_ORDER: Array<{ key: string; group: string }> = [

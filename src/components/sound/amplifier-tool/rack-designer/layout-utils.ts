@@ -18,6 +18,16 @@ export const AMPS_PER_RACK = 3;
 export const DEFAULT_IP_BASE = '192.168.1.11';
 export const DEFAULT_LAYOUT_TITLE = 'SISTEMA PA';
 
+export function createEmptyRackDesignerLayout(
+  title: string = DEFAULT_LAYOUT_TITLE,
+): RackDesignerLayout {
+  return {
+    version: 1,
+    title,
+    blocks: [],
+  };
+}
+
 export const RACK_COLOR_PALETTE = [
   { name: 'Rojo', value: '#f87171' },
   { name: 'Azul', value: '#60a5fa' },

@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { nwmMapToLayout, type NwmMap } from '../nwm-import';
+import { isLaSessionFileName, nwmMapToLayout, type NwmMap } from '../nwm-import';
+
+describe('isLaSessionFileName', () => {
+  it('accepts NM and Soundvision session files case-insensitively', () => {
+    expect(isLaSessionFileName('show.nwm')).toBe(true);
+    expect(isLaSessionFileName('SHOW.XMLP')).toBe(true);
+  });
+
+  it('rejects unrelated files and misleading partial extensions', () => {
+    expect(isLaSessionFileName('show.xml')).toBe(false);
+    expect(isLaSessionFileName('show.nwm.pdf')).toBe(false);
+    expect(isLaSessionFileName('nwm')).toBe(false);
+  });
+});
 
 // Mirrors the real NM structure: overlapping logical groups (a unit can appear
 // in several), top-level sections (MAINS/SUBS…), and LEFT/RIGHT side groups.
