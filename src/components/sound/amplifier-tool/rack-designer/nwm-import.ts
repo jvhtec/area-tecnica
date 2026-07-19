@@ -45,17 +45,29 @@ const SECTION_ORDER: Array<{ key: string; group: string }> = [
 
 type Side = 'L' | 'R' | 'C';
 
+interface Bucket {
+  label: string;
+  side: Side;
+  units: NwmUnit[];
+}
+
 function toAmpModel(model: string): AmpModel {
   // The designer's amp union is LA12X / PLM20000D. NM's LA-family controllers all
   // map to LA12X for labeling; only PLM/TF-driven units would be PLM20000D.
   return /plm|tf/i.test(model) ? 'PLM20000D' : 'LA12X';
 }
 
-function buildMembership(groups: NwmGroup[]): {
-  sectionOf: Map<number, string>;
-  sideOf: Map<number, Side>;
-} {
-  const byName = new Map(groups.map((g) => [g.name.toUpperCase(), g]));
+function sideFromName(name: string): Side {
+  const last = name.trim().slice(-1).toUpperCase();
+  return last === 'L' ? 'L' : last === 'R' ? 'R' : 'C';
+}
+
+/**
+ * NM strategy: sessions carry explicit LEFT / RIGHT side groups and top-level
+ * section parents (MAINS, SUBS…). Section comes from the parent group, side from
+ * LEFT/RIGHT; block label is "MAIN L", "SUB R", etc.
+ */
+function bucketByLeftRight(map: NwmMap, byName: Map<string, NwmGroup>): Bucket[] {
   const sectionOf = new Map<number, string>();
   for (const { key, group } of SECTION_ORDER) {
     for (const octet of byName.get(group)?.members ?? []) {
@@ -65,50 +77,86 @@ function buildMembership(groups: NwmGroup[]): {
   const sideOf = new Map<number, Side>();
   for (const octet of byName.get('LEFT')?.members ?? []) sideOf.set(octet, 'L');
   for (const octet of byName.get('RIGHT')?.members ?? []) sideOf.set(octet, 'R');
-  return { sectionOf, sideOf };
-}
 
-/**
- * Builds a rack-designer layout from an imported NM map. Each unique amplifier
- * becomes one cell (no duplication across the file's overlapping logical
- * groups); cells are IP-sorted within each section+side (MAIN L, SUB R…) and
- * then packed into physical-rack-sized blocks of AMPS_PER_RACK, colored by PA
- * side, with the real preset name and control IP from the file. The .nwm does
- * not record which road case each amp lives in, so a section with more than a
- * rack's worth of amps is split into "MAIN L", "MAIN L 2", … which the user can
- * rearrange. Units NM didn't file under a known section fall into "OTROS".
- */
-export function nwmMapToLayout(map: NwmMap): RackDesignerLayout {
-  const { sectionOf, sideOf } = buildMembership(map.groups);
-
-  // Bucket units by "SECTION SIDE" (or a fallback), preserving one entry per amp.
-  const buckets = new Map<string, { section: string; side: Side; units: NwmUnit[] }>();
+  const buckets = new Map<string, Bucket>();
   for (const unit of map.units) {
     const section = sectionOf.get(unit.octet) ?? 'OTROS';
     const side: Side = sideOf.get(unit.octet) ?? 'C';
     const label = section === 'OTROS' ? 'OTROS' : `${section} ${side}`;
-    if (!buckets.has(label)) buckets.set(label, { section, side, units: [] });
+    if (!buckets.has(label)) buckets.set(label, { label, side, units: [] });
     buckets.get(label)!.units.push(unit);
   }
 
-  // Stable order: by section order, then L before R before C.
   const sideRank: Record<Side, number> = { L: 0, R: 1, C: 2 };
-  const sectionRank = (s: string) => {
-    const i = SECTION_ORDER.findIndex((entry) => entry.key === s);
+  const sectionRank = (label: string) => {
+    const i = SECTION_ORDER.findIndex((entry) => entry.key === label.split(' ')[0]);
     return i === -1 ? SECTION_ORDER.length : i;
   };
-  const ordered = [...buckets.entries()].sort(([la, a], [lb, b]) => {
-    const bySection = sectionRank(a.section) - sectionRank(b.section);
-    if (bySection !== 0) return bySection;
-    const bySide = sideRank[a.side] - sideRank[b.side];
-    if (bySide !== 0) return bySide;
-    return la.localeCompare(lb);
-  });
+  return [...buckets.values()].sort(
+    (a, b) =>
+      sectionRank(a.label) - sectionRank(b.label) ||
+      sideRank[a.side] - sideRank[b.side] ||
+      a.label.localeCompare(b.label),
+  );
+}
 
-  // Each section+side is packed into physical-rack-sized blocks (3 amps),
-  // matching real LA-RAK/PLM-RAK capacity and the calculator-generated layout.
+/**
+ * Soundvision strategy: `.xmlp` sessions have no LEFT/RIGHT groups; the sided
+ * arrays are the `role="source"` groups whose names already read "K2 L",
+ * "Out R", "KS28 In L". Each amp is assigned to its first source group (document
+ * order), the block label is that name, and the side is read off the name.
+ */
+function bucketBySourceGroups(map: NwmMap): Bucket[] {
+  const unitByOctet = new Map(map.units.map((u) => [u.octet, u]));
+  const sources = map.groups.filter((g) => g.role === 'source');
+  const assigned = new Map<number, string>();
+  for (const group of sources) {
+    for (const octet of group.members) {
+      if (unitByOctet.has(octet) && !assigned.has(octet)) assigned.set(octet, group.name);
+    }
+  }
+
+  const buckets = new Map<string, Bucket>();
+  for (const unit of map.units) {
+    const label = assigned.get(unit.octet) ?? 'OTROS';
+    const side = label === 'OTROS' ? 'C' : sideFromName(label);
+    if (!buckets.has(label)) buckets.set(label, { label, side, units: [] });
+    buckets.get(label)!.units.push(unit);
+  }
+
+  const orderIndex = new Map(sources.map((group, i) => [group.name, i]));
+  return [...buckets.values()].sort((a, b) => {
+    const ai = a.label === 'OTROS' ? Infinity : orderIndex.get(a.label) ?? Infinity;
+    const bi = b.label === 'OTROS' ? Infinity : orderIndex.get(b.label) ?? Infinity;
+    return ai - bi || a.label.localeCompare(b.label);
+  });
+}
+
+/**
+ * Builds a rack-designer layout from an imported NM/Soundvision map. Each unique
+ * amplifier becomes one cell (no duplication across the file's overlapping
+ * logical groups); cells are IP-sorted within each section+side and packed into
+ * physical-rack-sized blocks of AMPS_PER_RACK, colored by PA side, with the real
+ * preset name and control IP from the file. The session files don't record which
+ * road case each amp lives in, so a group with more than a rack's worth of amps
+ * is split into "MAIN L", "MAIN L 2", … which the user can rearrange. Amps in no
+ * recognized group fall into "OTROS". Handles both the NM convention (LEFT/RIGHT
+ * side groups) and the Soundvision one (sided `role="source"` groups).
+ */
+export function nwmMapToLayout(map: NwmMap): RackDesignerLayout {
+  // LEFT/RIGHT side groups are the NM-format signal; Soundvision sessions have
+  // neither and instead carry sided role="source" groups.
+  const byName = new Map(map.groups.map((g) => [g.name.toUpperCase(), g]));
+  const ordered =
+    byName.has('LEFT') || byName.has('RIGHT')
+      ? bucketByLeftRight(map, byName)
+      : bucketBySourceGroups(map);
+
+  // Each group is packed into physical-rack-sized blocks (3 amps), matching real
+  // LA-RAK/PLM-RAK capacity and the calculator-generated layout.
   const blocks: RackDesignerBlock[] = [];
-  for (const [label, bucket] of ordered) {
+  for (const bucket of ordered) {
+    const label = bucket.label;
     const sortedUnits = [...bucket.units].sort((a, b) => a.octet - b.octet);
     const rackCount = Math.ceil(sortedUnits.length / AMPS_PER_RACK);
     for (let i = 0; i < sortedUnits.length; i += AMPS_PER_RACK) {

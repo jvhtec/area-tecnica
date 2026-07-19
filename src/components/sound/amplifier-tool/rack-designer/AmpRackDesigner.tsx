@@ -252,7 +252,7 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
     setIsImporting(true);
     try {
       const base64 = await fileToBase64(file);
-      const { data, error } = await supabase.functions.invoke('parse-nwm', {
+      const { data, error } = await supabase.functions.invoke('parse-la-session', {
         body: { file: base64 },
       });
       if (error) throw error;
@@ -381,7 +381,7 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
             <input
               ref={nwmInputRef}
               type="file"
-              accept=".nwm"
+              accept=".nwm,.xmlp"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -396,10 +396,10 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
               className="gap-1"
               disabled={isImporting}
               onClick={() => nwmInputRef.current?.click()}
-              title="Importar sesión de L-Acoustics Network Manager (.nwm)"
+              title="Importar sesión de L-Acoustics: Network Manager (.nwm) o Soundvision (.xmlp)"
             >
               <Upload className="h-3.5 w-3.5" />
-              {isImporting ? 'Importando…' : 'Importar NM'}
+              {isImporting ? 'Importando…' : 'Importar NM/SV'}
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>

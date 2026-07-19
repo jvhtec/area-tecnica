@@ -96,3 +96,51 @@ describe('nwmMapToLayout', () => {
     expect(nwmMapToLayout({ ...sampleMap, sessionName: '' }).title).toBe('SISTEMA PA');
   });
 });
+
+// Soundvision .xmlp has no LEFT/RIGHT groups; sides live in the role="source"
+// group names, and an amp can appear in several source groups (first wins).
+const xmlpMap: NwmMap = {
+  sessionName: 'PA',
+  units: [
+    { octet: 11, ip: '192.168.1.11', presetName: 'K2 110', familyName: 'K2', model: 'LA12X', x: 0, y: 0 },
+    { octet: 12, ip: '192.168.1.12', presetName: 'K2 110', familyName: 'K2', model: 'LA12X', x: 0, y: 0 },
+    { octet: 21, ip: '192.168.1.21', presetName: 'K2 110', familyName: 'K2', model: 'LA12X', x: 0, y: 0 },
+    { octet: 31, ip: '192.168.1.31', presetName: 'KS28_60_C', familyName: 'KS28', model: 'LA12X', x: 0, y: 0 },
+    { octet: 41, ip: '192.168.1.41', presetName: 'KARA', familyName: 'KARA', model: 'LA12X', x: 0, y: 0 },
+    { octet: 99, ip: '192.168.1.99', presetName: 'SPARE', familyName: '', model: 'LA12X', x: 0, y: 0 },
+  ],
+  groups: [
+    { name: 'Main', role: 'parent', members: [11, 12, 21] },
+    { name: 'K2 L', role: 'source', members: [11, 12] },
+    { name: 'K2 R', role: 'source', members: [21] },
+    { name: 'KS28 Out L', role: 'source', members: [31] },
+    { name: 'KARA 1', role: 'source', members: [41] },
+    { name: 'KARA 2', role: 'source', members: [41] }, // overlaps 41 — first wins
+    { name: '#1…3 K2 L', role: 'zoning', members: [11, 21] },
+  ],
+};
+
+describe('nwmMapToLayout — Soundvision (.xmlp) source-group convention', () => {
+  it('buckets by source-group name in document order', () => {
+    const labels = nwmMapToLayout(xmlpMap).blocks.map((b) => b.label);
+    expect(labels).toEqual(['K2 L', 'K2 R', 'KS28 Out L', 'KARA 1', 'OTROS']);
+  });
+
+  it('reads side (and color) from the source-group name suffix', () => {
+    const blocks = nwmMapToLayout(xmlpMap).blocks;
+    expect(blocks.find((b) => b.label === 'K2 L')!.color).toBe('#f87171'); // L → red
+    expect(blocks.find((b) => b.label === 'K2 R')!.color).toBe('#60a5fa'); // R → blue
+    expect(blocks.find((b) => b.label === 'KARA 1')!.color).toBe('#4ade80'); // no side → green
+  });
+
+  it('assigns an amp shared across source groups to the first only (no duplication)', () => {
+    const ips = nwmMapToLayout(xmlpMap).blocks.flatMap((b) => b.amps.map((a) => a.ip));
+    expect(ips.filter((ip) => ip === '192.168.1.41')).toHaveLength(1);
+    expect(new Set(ips).size).toBe(ips.length);
+  });
+
+  it('routes an amp in no source group to OTROS', () => {
+    const otros = nwmMapToLayout(xmlpMap).blocks.find((b) => b.label === 'OTROS');
+    expect(otros!.amps.map((a) => a.ip)).toEqual(['192.168.1.99']);
+  });
+});

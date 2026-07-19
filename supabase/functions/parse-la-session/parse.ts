@@ -55,6 +55,24 @@ function decodeXmlEntities(value: string): string {
     .replace(/&apos;/g, "'");
 }
 
+function textOf(body: string, tag: string): string {
+  const m = body.match(new RegExp(`<${tag}>\\s*([^<]*?)\\s*</${tag}>`));
+  return m ? decodeXmlEntities(m[1]) : "";
+}
+
+/** Extracts LAGROUP definitions (shared by both NM and embedded Soundvision sessions). */
+function parseGroups(xml: string): NwmGroup[] {
+  const groups: NwmGroup[] = [];
+  for (const m of xml.matchAll(/<LAGROUP\b([^>]*)>([\s\S]*?)<\/LAGROUP>/g)) {
+    const a = attrs(m[1]);
+    if (!a.Name) continue;
+    const members = [...m[2].matchAll(/<unit\s+unitIp="(\d+)"/g)].map((u) => Number(u[1]));
+    groups.push({ name: decodeXmlEntities(a.Name), role: a.role ?? "", members });
+  }
+  return groups;
+}
+
+/** Parses a standalone NM `.nwm` session XML (`Nwm2`). */
 export function parseNwmXml(xml: string): NwmMap {
   const sessionMatch = xml.match(/<COMPONENTS[^>]*\bsessionName="([^"]*)"/);
   const sessionName = sessionMatch ? decodeXmlEntities(sessionMatch[1]) : "";
@@ -76,13 +94,40 @@ export function parseNwmXml(xml: string): NwmMap {
     });
   }
 
-  const groups: NwmGroup[] = [];
-  for (const m of xml.matchAll(/<LAGROUP\b([^>]*)>([\s\S]*?)<\/LAGROUP>/g)) {
-    const a = attrs(m[1]);
-    if (!a.Name) continue;
-    const members = [...m[2].matchAll(/<unit\s+unitIp="(\d+)"/g)].map((u) => Number(u[1]));
-    groups.push({ name: decodeXmlEntities(a.Name), role: a.role ?? "", members });
+  return { sessionName, units, groups: parseGroups(xml) };
+}
+
+/**
+ * Parses a Soundvision `.xmlp` project XML. Amps come from
+ * `physical_configuration/amplification/units` (element-nested: `<model>`,
+ * `<ip>` octet, first `<channelSet><preset>`); the sided groups come from the
+ * embedded `<nwm_session>` block's LAGROUPs (same schema as a standalone `.nwm`).
+ */
+export function parseXmlpXml(xml: string): NwmMap {
+  const sessionMatch = xml.match(/<COMPONENTS[^>]*\bsessionName="([^"]*)"/);
+  const sessionName = (sessionMatch ? decodeXmlEntities(sessionMatch[1]) : "").replace(/\.xmlp$/i, "");
+
+  const ampSection = xml.match(/<amplification>([\s\S]*?)<\/amplification>/)?.[1] ?? "";
+  const unitsSection = ampSection.match(/<units>([\s\S]*?)<\/units>/)?.[1] ?? "";
+
+  const units: NwmUnit[] = [];
+  for (const m of unitsSection.matchAll(/<unit>([\s\S]*?)<\/unit>/g)) {
+    const body = m[1];
+    const octet = Number(textOf(body, "ip"));
+    if (!Number.isFinite(octet) || octet === 0) continue;
+    const preset = textOf(body, "preset"); // first channelSet preset
+    const model = textOf(body, "model");
+    units.push({
+      octet,
+      ip: `192.168.1.${octet}`,
+      presetName: preset,
+      familyName: "",
+      model: model || "LA12X",
+      x: 0,
+      y: 0,
+    });
   }
 
-  return { sessionName, units, groups };
+  const embedded = xml.match(/<nwm_session>([\s\S]*?)<\/nwm_session>/)?.[1] ?? "";
+  return { sessionName, units, groups: parseGroups(embedded) };
 }
