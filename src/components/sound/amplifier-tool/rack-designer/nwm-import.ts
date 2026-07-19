@@ -4,6 +4,7 @@ import type {
   RackDesignerLayout,
 } from '@/components/sound/amplifier-tool/rack-designer/types';
 import {
+  AMPS_PER_RACK,
   BLOCK_WIDTH,
   blockPixelHeight,
   makeDesignerId,
@@ -70,10 +71,12 @@ function buildMembership(groups: NwmGroup[]): {
 /**
  * Builds a rack-designer layout from an imported NM map. Each unique amplifier
  * becomes one cell (no duplication across the file's overlapping logical
- * groups); cells are grouped into one block per section+side (MAIN L, MAIN R,
- * SUB L…), IP-sorted and numbered L1…Ln / R1…Rn, colored by PA side, with the
- * real preset name and control IP from the file. Units NM didn't file under a
- * known section fall into an "OTROS" block so nothing is dropped.
+ * groups); cells are IP-sorted within each section+side (MAIN L, SUB R…) and
+ * then packed into physical-rack-sized blocks of AMPS_PER_RACK, colored by PA
+ * side, with the real preset name and control IP from the file. The .nwm does
+ * not record which road case each amp lives in, so a section with more than a
+ * rack's worth of amps is split into "MAIN L", "MAIN L 2", … which the user can
+ * rearrange. Units NM didn't file under a known section fall into "OTROS".
  */
 export function nwmMapToLayout(map: NwmMap): RackDesignerLayout {
   const { sectionOf, sideOf } = buildMembership(map.groups);
@@ -102,22 +105,29 @@ export function nwmMapToLayout(map: NwmMap): RackDesignerLayout {
     return la.localeCompare(lb);
   });
 
-  const blocks: RackDesignerBlock[] = ordered.map(([label, bucket]) => {
+  // Each section+side is packed into physical-rack-sized blocks (3 amps),
+  // matching real LA-RAK/PLM-RAK capacity and the calculator-generated layout.
+  const blocks: RackDesignerBlock[] = [];
+  for (const [label, bucket] of ordered) {
     const sortedUnits = [...bucket.units].sort((a, b) => a.octet - b.octet);
-    return {
-      id: makeDesignerId(),
-      label,
-      color: SIDE_COLORS[bucket.side],
-      x: 0,
-      y: 0,
-      amps: sortedUnits.map((unit) => ({
+    const rackCount = Math.ceil(sortedUnits.length / AMPS_PER_RACK);
+    for (let i = 0; i < sortedUnits.length; i += AMPS_PER_RACK) {
+      const rackNumber = i / AMPS_PER_RACK + 1;
+      blocks.push({
         id: makeDesignerId(),
-        presetName: unit.presetName || unit.familyName || `AMP ${unit.octet}`,
-        ip: unit.ip,
-        model: toAmpModel(unit.model),
-      })),
-    };
-  });
+        label: rackCount > 1 ? `${label} ${rackNumber}` : label,
+        color: SIDE_COLORS[bucket.side],
+        x: 0,
+        y: 0,
+        amps: sortedUnits.slice(i, i + AMPS_PER_RACK).map((unit) => ({
+          id: makeDesignerId(),
+          presetName: unit.presetName || unit.familyName || `AMP ${unit.octet}`,
+          ip: unit.ip,
+          model: toAmpModel(unit.model),
+        })),
+      });
+    }
+  }
 
   // Lay blocks left→right in section order, wrapping to new rows; keep columns
   // aligned to a simple grid so the result is tidy before the user rearranges.

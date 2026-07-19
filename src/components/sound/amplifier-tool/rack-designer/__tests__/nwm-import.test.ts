@@ -61,6 +61,32 @@ describe('nwmMapToLayout', () => {
     expect(otros!.amps.map((a) => a.ip)).toEqual(['192.168.1.90']);
   });
 
+  it('packs a section+side into physical-rack-sized blocks of 3, numbered', () => {
+    const sevenMainL: NwmMap = {
+      sessionName: 'BIG',
+      units: Array.from({ length: 7 }, (_, i) => ({
+        octet: 11 + i,
+        ip: `192.168.1.${11 + i}`,
+        presetName: 'K1',
+        familyName: 'K1',
+        model: 'LA12X',
+        x: 0,
+        y: 0,
+      })),
+      groups: [
+        { name: 'MAINS', role: 'parent', members: [11, 12, 13, 14, 15, 16, 17] },
+        { name: 'LEFT', role: '', members: [11, 12, 13, 14, 15, 16, 17] },
+      ],
+    };
+    const blocks = nwmMapToLayout(sevenMainL).blocks;
+    expect(blocks.map((b) => b.label)).toEqual(['MAIN L 1', 'MAIN L 2', 'MAIN L 3']);
+    expect(blocks.map((b) => b.amps.length)).toEqual([3, 3, 1]);
+    // Every amp present exactly once, in IP order across the racks.
+    expect(blocks.flatMap((b) => b.amps.map((a) => a.ip))).toEqual(
+      Array.from({ length: 7 }, (_, i) => `192.168.1.${11 + i}`),
+    );
+  });
+
   it('does not overlap block positions', () => {
     const positions = nwmMapToLayout(sampleMap).blocks.map((b) => `${b.x},${b.y}`);
     expect(new Set(positions).size).toBe(positions.length);
