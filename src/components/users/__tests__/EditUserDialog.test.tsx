@@ -118,6 +118,9 @@ describe("EditUserDialog", () => {
     const soundVisionCheckbox = screen.getByRole("checkbox", { name: /soundvision access/i });
     expect(soundVisionCheckbox).toBeChecked();
     expect(soundVisionCheckbox).toBeDisabled();
+    const designerCheckbox = screen.getByRole("checkbox", { name: /nm\/sv designer access/i });
+    expect(designerCheckbox).toBeChecked();
+    expect(designerCheckbox).toBeDisabled();
 
     expect(screen.getByText("Profile picture: none")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /simulate upload/i }));
@@ -144,6 +147,7 @@ describe("EditUserDialog", () => {
           assignable_as_tech: true,
           warehouse_duty_exempt: true,
           soundvision_access_enabled: true,
+          soundvision_tool_access_enabled: true,
           residencia: "Valencia",
           home_latitude: 39.4699,
           home_longitude: -0.3763,
@@ -167,9 +171,13 @@ describe("EditUserDialog", () => {
 
     const soundVisionCheckbox = screen.getByRole("checkbox", { name: /soundvision access/i });
     expect(soundVisionCheckbox).not.toBeChecked();
+    const designerCheckbox = screen.getByRole("checkbox", { name: /nm\/sv designer access/i });
+    expect(designerCheckbox).not.toBeChecked();
 
     await user.click(soundVisionCheckbox);
     expect(soundVisionCheckbox).toBeChecked();
+    await user.click(designerCheckbox);
+    expect(designerCheckbox).toBeChecked();
 
     const flexUrlInput = screen.getByLabelText(/flex contact url/i);
     const flexIdInput = screen.getByLabelText(/flex resource id/i);
@@ -195,11 +203,25 @@ describe("EditUserDialog", () => {
         expect.objectContaining({
           id: "tech-1",
           soundvision_access_enabled: true,
+          soundvision_tool_access_enabled: true,
           flex_resource_id: extractedFromRaw,
         }),
       );
     });
   }, 15000);
+
+  it("does not offer NM/SV tool access to technicians outside the sound department", () => {
+    renderDialog(
+      createUserProfile({
+        id: "lights-tech-1",
+        role: "technician",
+        department: "lights",
+        soundvision_tool_access_enabled: false,
+      }),
+    );
+
+    expect(screen.queryByRole("checkbox", { name: /nm\/sv designer access/i })).not.toBeInTheDocument();
+  });
 
   it("sends onboarding emails and surfaces both success and failure toasts", async () => {
     const user = userEvent.setup();

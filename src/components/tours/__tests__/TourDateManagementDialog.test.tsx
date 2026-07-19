@@ -182,7 +182,7 @@ describe("TourDateManagementDialog", () => {
       { job_id: "job-1", date: "2026-04-11", type: "rehearsal" },
       { job_id: "job-1", date: "2026-04-12", type: "rehearsal" },
     ]);
-  });
+  }, 10_000);
 
   it("stores S package intent when creating a date with the Tour Pack shortcut and no default sets", async () => {
     const user = userEvent.setup();

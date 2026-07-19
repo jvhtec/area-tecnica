@@ -15,12 +15,14 @@ const {
   setThemeMock,
   useMyToursMock,
   useTableSubscriptionMock,
+  dashboardScreenMock,
 } = vi.hoisted(() => ({
   useOptimizedAuthMock: vi.fn(),
   useThemeMock: vi.fn(),
   setThemeMock: vi.fn(),
   useMyToursMock: vi.fn(),
   useTableSubscriptionMock: vi.fn(),
+  dashboardScreenMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
@@ -56,9 +58,10 @@ vi.mock("@/services/hourlyTourDateTimesheets", () => ({
 }));
 
 vi.mock("@/components/technician/DashboardScreen", () => ({
-  DashboardScreen: ({ assignments }: { assignments: any[] }) => (
-    <div data-testid="dashboard-screen">Dashboard assignments: {assignments.length}</div>
-  ),
+  DashboardScreen: (props: { assignments: any[]; hasSoundVisionToolAccess: boolean }) => {
+    dashboardScreenMock(props);
+    return <div data-testid="dashboard-screen">Dashboard assignments: {props.assignments.length}</div>;
+  },
 }));
 
 vi.mock("@/components/technician/JobsView", () => ({
@@ -179,9 +182,14 @@ describe("TechnicianSuperApp", () => {
     useTableSubscriptionMock.mockReturnValue({ isSubscribed: true, isStale: false });
   });
 
-  const configureSupabase = () => {
+  const configureSupabase = (profileOverrides: Record<string, unknown> = {}) => {
     const profileBuilder = createMockQueryBuilder({
-      data: createTechnicianProfile({ id: "technician-user", role: "technician", department: "sound" }),
+      data: createTechnicianProfile({
+        id: "technician-user",
+        role: "technician",
+        department: "sound",
+        ...profileOverrides,
+      }),
       error: null,
     });
     const assignmentBuilder = createMockQueryBuilder({
@@ -260,6 +268,30 @@ describe("TechnicianSuperApp", () => {
 
     expect(await screen.findByText("Dashboard assignments: 2")).toBeInTheDocument();
     expect(assignmentBuilder.eq).toHaveBeenCalledWith("status", "confirmed");
+  });
+
+  it("passes the permanent NM/SV entitlement to the technician dashboard", async () => {
+    configureSupabase({ soundvision_tool_access_enabled: true });
+
+    renderWithProviders(<TechnicianSuperApp />, { route: "/tech-app" });
+
+    await waitFor(() => {
+      expect(dashboardScreenMock).toHaveBeenCalledWith(
+        expect.objectContaining({ hasSoundVisionToolAccess: true }),
+      );
+    });
+  });
+
+  it("does not expose the NM/SV designer outside the sound department", async () => {
+    configureSupabase({ department: "lights", soundvision_tool_access_enabled: true });
+
+    renderWithProviders(<TechnicianSuperApp />, { route: "/tech-app" });
+
+    await waitFor(() => {
+      expect(dashboardScreenMock).toHaveBeenCalledWith(
+        expect.objectContaining({ hasSoundVisionToolAccess: false }),
+      );
+    });
   });
 
   it("opens the about modal from the URL parameter and clears the search param", async () => {

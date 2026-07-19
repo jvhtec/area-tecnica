@@ -12,10 +12,12 @@ import {
 } from "../_shared/http.ts";
 import { extractNwmBlob } from "./sqlite.ts";
 import { parseNwmXml, parseXmlpXml, type NwmMap } from "./parse.ts";
+import { canUseLaSessionTools } from "./access.ts";
 
-// Roles allowed to import sessions. House techs run the amp systems, so they are
-// included alongside admin/management.
-const ALLOWED_ROLES = new Set(["admin", "management", "house_tech"]);
+// Technician access is additionally checked against the permanent per-profile
+// entitlement below; keeping the function privileged-role classified prevents
+// the XMLP/NWM decryption service from becoming a general authenticated API.
+const ALLOWED_ROLES = new Set(["admin", "management", "house_tech", "technician"]);
 
 // Generous ceiling: real sessions are tens–hundreds of KB; base64 adds ~33%.
 // Cap the decrypted XML too so a crafted file can't exhaust memory.
@@ -27,6 +29,8 @@ const SQLITE_MAGIC = "SQLite format 3";
 interface ParseSessionBody extends Record<string, unknown> {
   /** base64-encoded raw .nwm / .xmlp file bytes. */
   file?: unknown;
+  /** Original client filename, used only as a display-name fallback. */
+  fileName?: unknown;
 }
 
 function hexToBytes(hex: string, expectedLen: number, name: string): Uint8Array {
@@ -111,16 +115,43 @@ serve(
       );
 
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      await requireAuthenticatedRole(supabase, req, {
+      const caller = await requireAuthenticatedRole(supabase, req, {
         allowedRoles: ALLOWED_ROLES,
         logContext: "parse-la-session",
-        forbiddenMessage: "Solo admin, management o house_tech pueden importar sesiones.",
+        forbiddenMessage: "No tiene acceso al diseñador NM/SV.",
       });
+
+      const { data: callerProfile, error: callerProfileError } = await supabase
+        .from("profiles")
+        .select("department, soundvision_tool_access_enabled")
+        .eq("id", caller.userId)
+        .maybeSingle();
+
+      if (callerProfileError) {
+        console.error("[parse-la-session] Tool entitlement lookup failed:", callerProfileError.message);
+        throw new HttpError(500, "Authorization lookup failed", {
+          code: "authorization_lookup_failed",
+          exposeDetails: false,
+        });
+      }
+
+      if (!canUseLaSessionTools(
+        caller.role,
+        callerProfile?.department,
+        Boolean(callerProfile?.soundvision_tool_access_enabled),
+      )) {
+        throw new HttpError(403, "No tiene acceso al diseñador NM/SV.", {
+          code: "soundvision_tool_access_required",
+        });
+      }
 
       const body = await readBoundedJsonObject<ParseSessionBody>(req, { maxBytes: MAX_BODY_BYTES });
       if (typeof body.file !== "string" || body.file.length === 0) {
         throw new HttpError(400, "Missing base64 'file' field", { code: "missing_file" });
       }
+      const fileName = typeof body.fileName === "string"
+        ? body.fileName.slice(0, 200).replace(/^.*[\\/]/, "")
+        : "";
 
       let fileBytes: Uint8Array;
       try {
@@ -166,7 +197,7 @@ serve(
           if (!xml.includes("<project") && !xml.includes("amplification")) {
             throw new HttpError(422, "El archivo no parece un proyecto de Soundvision válido", { code: "xmlp_not_recognized" });
           }
-          map = parseXmlpXml(xml);
+          map = parseXmlpXml(xml, fileName);
         }
       } catch (error) {
         if (error instanceof HttpError) throw error;
@@ -177,8 +208,10 @@ serve(
         });
       }
 
-      if (map.units.length === 0) {
-        throw new HttpError(422, "La sesión no contiene amplificadores", { code: "session_no_units" });
+      if (map.units.length === 0 && !map.flysheet?.arrays.length) {
+        throw new HttpError(422, "La sesión no contiene amplificadores ni arrays compatibles", {
+          code: "session_no_units_or_arrays",
+        });
       }
 
       // Transient: we return the parsed map and never persist the file or XML.

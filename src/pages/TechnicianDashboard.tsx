@@ -36,6 +36,7 @@ import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates'
 import { TechnicianArtistReadOnlyModal } from '@/components/technician/TechnicianArtistReadOnlyModal';
 import { TechnicianRfTableModal } from '@/components/technician/TechnicianRfTableModal';
 import { FestivalPushFeedButton } from '@/components/festival/FestivalPushFeedButton';
+import { AmpRackDesigner } from '@/components/sound/amplifier-tool/rack-designer/AmpRackDesigner';
 
 // Type definitions
 interface TechnicianJobData {
@@ -146,7 +147,7 @@ const TechnicianDashboard = () => {
     async () => {
       if (!user?.id) return null;
       const { data, error } = await dataLayerClient.from('profiles')
-        .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department')
+        .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department, soundvision_tool_access_enabled')
         .eq('id', user.id)
         .single();
       if (error) throw error;
@@ -343,6 +344,8 @@ const TechnicianDashboard = () => {
   const userName = userProfile?.first_name && userProfile?.last_name
     ? `${userProfile.first_name} ${userProfile.last_name}`
     : user?.email || 'Técnico';
+  const hasSoundVisionToolAccess = userProfile?.department === 'sound'
+    && (userProfile.role === 'house_tech' || userProfile.soundvision_tool_access_enabled === true);
 
   return (
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
@@ -363,7 +366,9 @@ const TechnicianDashboard = () => {
             onOpenRates={() => setShowRatesModal(true)}
             onOpenMessages={() => setShowMessagesModal(true)}
             onOpenSysCalc={() => navigate('/syscalc')}
+            onOpenSoundVisionTools={() => setActiveModal('soundvision-tools')}
             hasSoundVisionAccess={hasSoundVisionAccess}
+            hasSoundVisionToolAccess={hasSoundVisionToolAccess}
           />
         )}
         {tab === 'jobs' && (
@@ -430,6 +435,16 @@ const TechnicianDashboard = () => {
       )}
       {activeModal === 'soundvision' && hasSoundVisionAccess && (
         <SoundVisionModal theme={t} isDark={isDark} onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === 'soundvision-tools' && hasSoundVisionToolAccess && (
+        <AmpRackDesigner
+          standalone
+          hideTrigger
+          open
+          onOpenChange={(isOpen) => !isOpen && setActiveModal(null)}
+          storageScope={`technician-soundvision-tools:${user?.id ?? 'unknown'}`}
+          createdBy={userName}
+        />
       )}
       {showObliqueStrategy && (
         <ObliqueStrategyModal theme={t} isDark={isDark} onClose={() => setShowObliqueStrategy(false)} />

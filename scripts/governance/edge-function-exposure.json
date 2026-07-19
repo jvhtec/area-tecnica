@@ -73,7 +73,7 @@
       "verifyJwt": true,
       "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT, requires admin/management, and validates created Flex element records before service-role persistence."
     },
-    "parse-la-session": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT and requires admin/management/house_tech via requireAuthenticatedRole before decrypting an uploaded L-Acoustics session (.nwm via NWM_AES_KEY/IV, .xmlp via SV_AES_KEY/IV). Decryption keys are deployment secrets (each format returns 503 when its secret is unset); the file and decrypted XML are processed transiently and never persisted." },
+    "parse-la-session": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT and allows admin/management, sound house techs, or explicitly entitled sound technicians before decrypting an uploaded L-Acoustics session (.nwm via NWM_AES_KEY/IV, .xmlp via SV_AES_KEY/IV). Technician entitlement is stored on profiles and granted by a protected responsable-assignment trigger or admin/management. Decryption keys are deployment secrets (each format returns 503 when its secret is unset); the file and decrypted XML are processed transiently and never persisted." },
     "place-photos": { "class": "authenticated-user", "verifyJwt": true },
     "place-restaurants": { "class": "authenticated-user", "verifyJwt": true },
     "push": { "class": "authenticated-user", "verifyJwt": true },

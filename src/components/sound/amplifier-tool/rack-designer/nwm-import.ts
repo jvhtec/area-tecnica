@@ -25,10 +25,39 @@ export interface NwmGroup {
   role: string;
   members: number[];
 }
+export interface SoundvisionFlysheetEnclosure {
+  model: string;
+  splayAngleDegrees: number | null;
+  siteAngleDegrees: number | null;
+  trimHeightMeters: number | null;
+}
+export interface SoundvisionFlysheetArray {
+  groupName: string;
+  arrayName: string;
+  deployment: 'flown' | 'stacked' | 'unknown';
+  azimuthDegrees: number | null;
+  topSiteDegrees: number | null;
+  bottomSiteDegrees: number | null;
+  topHeightMeters: number | null;
+  bottomHeightMeters: number | null;
+  riggingFrame: string;
+  flyingBarSetting: string;
+  pickupConfiguration: string;
+  totalMassKg: number | null;
+  frontLoadKg: number | null;
+  rearLoadKg: number | null;
+  enclosures: SoundvisionFlysheetEnclosure[];
+  warnings: string[];
+}
+export interface SoundvisionFlysheet {
+  projectName: string;
+  arrays: SoundvisionFlysheetArray[];
+}
 export interface NwmMap {
   sessionName: string;
   units: NwmUnit[];
   groups: NwmGroup[];
+  flysheet?: SoundvisionFlysheet;
 }
 
 const SIDE_COLORS = { L: '#f87171', R: '#60a5fa', C: '#4ade80' } as const;

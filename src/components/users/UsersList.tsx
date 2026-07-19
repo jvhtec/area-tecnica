@@ -87,7 +87,7 @@ export const UsersList = ({
       
       try {
         let query = dataLayerClient.from('profiles')
-          .select('id, first_name, nickname, last_name, email, role, phone, department, dni, residencia, assignable_as_tech, warehouse_duty_exempt, flex_resource_id, soundvision_access_enabled, autonomo', { count: 'exact' });
+          .select('id, first_name, nickname, last_name, email, role, phone, department, dni, residencia, assignable_as_tech, warehouse_duty_exempt, flex_resource_id, soundvision_access_enabled, soundvision_tool_access_enabled, autonomo', { count: 'exact' });
 
         // Apply filters
         if (roleFilter) {
