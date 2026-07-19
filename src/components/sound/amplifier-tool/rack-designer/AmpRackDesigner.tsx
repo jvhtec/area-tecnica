@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { FileText, Network, Plus, RefreshCw, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { FileText, Network, Plus, RefreshCw, Upload, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -55,8 +55,24 @@ import { RackBlockCard } from '@/components/sound/amplifier-tool/rack-designer/R
 import { BlockEditorPanel } from '@/components/sound/amplifier-tool/rack-designer/BlockEditorPanel';
 import { AmpEditFields } from '@/components/sound/amplifier-tool/rack-designer/AmpEditFields';
 import { useCanvasZoom } from '@/components/sound/amplifier-tool/rack-designer/useCanvasZoom';
+import { nwmMapToLayout, type NwmMap } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
+import { supabase } from '@/integrations/supabase/client';
 
 const MADRID_TZ = 'Europe/Madrid';
+
+/** Reads a File as a base64 string (no data: prefix). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
 
 export interface AmpRackDesignerProps {
   results: AmplifierResults;
@@ -80,6 +96,8 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
   const [baseIp, setBaseIp] = useState(DEFAULT_IP_BASE);
   const [includeRackLabels, setIncludeRackLabels] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const nwmInputRef = useRef<HTMLInputElement>(null);
   const { zoom, zoomIn, zoomOut, fitToView, pinchActiveRef, scrollRef } = useCanvasZoom({
     enabled: open,
     contentWidth: CANVAS_WIDTH,
@@ -230,6 +248,34 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
     });
   };
 
+  const importNwm = async (file: File) => {
+    setIsImporting(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke('parse-nwm', {
+        body: { file: base64 },
+      });
+      if (error) throw error;
+      const map = (data as { map?: NwmMap } | null)?.map;
+      if (!map || !map.units?.length) {
+        throw new Error('La sesión no contiene amplificadores.');
+      }
+      setLayout(nwmMapToLayout(map));
+      setSelectedBlockId(null);
+      setAmpTarget(null);
+      toast({
+        title: 'Sesión importada',
+        description: `${map.units.length} amplificadores cargados desde ${file.name}.`,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo importar el archivo de NM.';
+      toast({ title: 'Error al importar', description: message, variant: 'destructive' });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const exportPdf = async () => {
     if (!layout) return;
     setIsExporting(true);
@@ -331,6 +377,29 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
             <Button type="button" variant="outline" size="sm" className="gap-1" onClick={addBlock}>
               <Plus className="h-3.5 w-3.5" />
               Añadir rack
+            </Button>
+            <input
+              ref={nwmInputRef}
+              type="file"
+              accept=".nwm"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) void importNwm(file);
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={isImporting}
+              onClick={() => nwmInputRef.current?.click()}
+              title="Importar sesión de L-Acoustics Network Manager (.nwm)"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              {isImporting ? 'Importando…' : 'Importar NM'}
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>

@@ -22,6 +22,9 @@ verify_jwt = true
 [functions.place-restaurants]
 verify_jwt = true
 
+[functions.parse-nwm]
+verify_jwt = true
+
 [functions.enrich-artist-metadata]
 verify_jwt = true
 

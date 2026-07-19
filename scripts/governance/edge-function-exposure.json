@@ -73,6 +73,7 @@
       "verifyJwt": true,
       "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT, requires admin/management, and validates created Flex element records before service-role persistence."
     },
+    "parse-nwm": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT and requires admin/management/house_tech via requireAuthenticatedRole before decrypting an uploaded .nwm session. Decryption key/IV are deployment secrets (feature returns 503 when unset); the file and decrypted XML are processed transiently and never persisted." },
     "place-photos": { "class": "authenticated-user", "verifyJwt": true },
     "place-restaurants": { "class": "authenticated-user", "verifyJwt": true },
     "push": { "class": "authenticated-user", "verifyJwt": true },
