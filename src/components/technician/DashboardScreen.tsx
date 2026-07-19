@@ -1,7 +1,7 @@
 import React from 'react';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase, Binary, Network } from 'lucide-react';
+import { Map as MapIcon, MessageSquare, Euro, Loader2, Briefcase, Binary, Network } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useMyTours } from '@/hooks/useMyTours';
