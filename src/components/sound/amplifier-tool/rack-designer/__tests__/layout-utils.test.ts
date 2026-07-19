@@ -5,10 +5,21 @@ import {
   assignBlockIps,
   assignSequentialIps,
   computeResultsFingerprint,
+  createEmptyRackDesignerLayout,
   generateLayoutFromResults,
   incrementIp,
   isValidIp,
 } from '../layout-utils';
+
+describe('createEmptyRackDesignerLayout', () => {
+  it('creates a standalone canvas without a calculator fingerprint', () => {
+    expect(createEmptyRackDesignerLayout()).toEqual({
+      version: 1,
+      title: 'SISTEMA PA',
+      blocks: [],
+    });
+  });
+});
 
 const emptySection = { amps: 0, details: [] as string[], totalAmps: 0 };
 

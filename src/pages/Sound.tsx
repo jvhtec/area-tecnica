@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Zap, FileStack, AlertTriangle, Plus, Database, Lock, Music, Box, Layout, Binary, Server } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, AlertTriangle, Plus, Database, Lock, Music, Box, Layout, Binary, Network, Server } from 'lucide-react';
 import type { JobType } from "@/types/job";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { ReportGenerator } from "../components/sound/ReportGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
+import { AmpRackDesigner } from "@/components/sound/amplifier-tool/rack-designer/AmpRackDesigner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools";
@@ -53,6 +54,7 @@ const Sound = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
+  const [showSessionRackDesigner, setShowSessionRackDesigner] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
   const [showIncidentReport, setShowIncidentReport] = useState(false);
   const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
@@ -141,6 +143,7 @@ const Sound = () => {
     { label: "Consumos", to: "/consumos-tool", icon: Calculator, color: "text-purple-500" },
     { label: "Informe SV", onClick: () => setShowReportGenerator(true), icon: FileText, color: "text-blue-500" },
     { label: "Amplificador", onClick: () => setShowAmplifierTool(true), icon: Zap, color: "text-orange-500" },
+    { label: "Diseño NM/SV", onClick: () => setShowSessionRackDesigner(true), icon: Network, color: "text-emerald-500" },
     { label: "Memoria", onClick: () => setShowMemoriaTecnica(true), icon: FileStack, color: "text-cyan-500" },
     { label: "Incidencia", onClick: () => setShowIncidentReport(true), icon: AlertTriangle, color: "text-red-500" },
     { label: "Plano de escenario", to: "/stage-plot", icon: Layout, color: "text-green-500" },
@@ -366,6 +369,16 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
+                  onClick={() => setShowSessionRackDesigner(true)}
+                >
+                  <Network className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Diseñador NM/SV
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
                   onClick={() => setShowMemoriaTecnica(true)}
                 >
                   <FileStack className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
@@ -534,6 +547,13 @@ const Sound = () => {
           <AmplifierTool />
         </DialogContent>
       </Dialog>
+
+      <AmpRackDesigner
+        standalone
+        hideTrigger
+        open={showSessionRackDesigner}
+        onOpenChange={setShowSessionRackDesigner}
+      />
 
       <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
         <DialogContent className="w-[95vw] max-w-4xl overflow-y-auto">

@@ -1,6 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { FileText, Network, Plus, RefreshCw, Upload, Wand2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  FileText,
+  Network,
+  Plus,
+  RefreshCw,
+  Upload,
+  UploadCloud,
+  Wand2,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -45,6 +56,7 @@ import {
   RACK_COLOR_PALETTE,
   assignSequentialIps,
   computeResultsFingerprint,
+  createEmptyRackDesignerLayout,
   generateLayoutFromResults,
   isValidIp,
   loadStoredLayout,
@@ -55,7 +67,11 @@ import { RackBlockCard } from '@/components/sound/amplifier-tool/rack-designer/R
 import { BlockEditorPanel } from '@/components/sound/amplifier-tool/rack-designer/BlockEditorPanel';
 import { AmpEditFields } from '@/components/sound/amplifier-tool/rack-designer/AmpEditFields';
 import { useCanvasZoom } from '@/components/sound/amplifier-tool/rack-designer/useCanvasZoom';
-import { nwmMapToLayout, type NwmMap } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
+import {
+  isLaSessionFileName,
+  nwmMapToLayout,
+  type NwmMap,
+} from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import { supabase } from '@/integrations/supabase/client';
 
 const MADRID_TZ = 'Europe/Madrid';
@@ -75,9 +91,14 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 export interface AmpRackDesignerProps {
-  results: AmplifierResults;
+  results?: AmplifierResults;
   jobId?: string;
   tourId?: string;
+  standalone?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+  storageScope?: string;
 }
 
 interface AmpTarget {
@@ -85,10 +106,19 @@ interface AmpTarget {
   ampId: string;
 }
 
-export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps) {
+export function AmpRackDesigner({
+  results,
+  jobId,
+  tourId,
+  standalone = false,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+  storageScope,
+}: AmpRackDesignerProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [layout, setLayout] = useState<RackDesignerLayout | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [ampTarget, setAmpTarget] = useState<AmpTarget | null>(null);
@@ -97,20 +127,35 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
   const [includeRackLabels, setIncludeRackLabels] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const nwmInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (nextOpen: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
   const { zoom, zoomIn, zoomOut, fitToView, pinchActiveRef, scrollRef } = useCanvasZoom({
     enabled: open,
     contentWidth: CANVAS_WIDTH,
     contentHeight: CANVAS_HEIGHT,
   });
 
-  const scope = jobId ?? tourId ?? 'standalone';
+  const scope =
+    storageScope ?? (standalone ? 'sound-session-rack-designer' : jobId ?? tourId ?? 'standalone');
 
   useEffect(() => {
     if (!open) return;
-    // A saved layout is only reused when it came from the same calculation;
-    // otherwise it would silently contradict the results summary next to it.
     const stored = loadStoredLayout(scope);
+    if (!results) {
+      setLayout(stored ?? createEmptyRackDesignerLayout());
+      setSelectedBlockId(null);
+      setAmpTarget(null);
+      setMobileBlockEditorOpen(false);
+      return;
+    }
+    // A calculator layout is only reused when it came from the same calculation;
+    // otherwise it would silently contradict the results summary next to it.
     const fingerprint = computeResultsFingerprint(results);
     setLayout(
       stored && stored.resultsFingerprint === fingerprint
@@ -121,6 +166,12 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
     setAmpTarget(null);
     setMobileBlockEditorOpen(false);
   }, [open, scope, results]);
+
+  useEffect(() => {
+    if (open) return;
+    dragDepthRef.current = 0;
+    setIsDraggingFile(false);
+  }, [open]);
 
   // On phones start zoomed out so the whole plan is visible; pinch in from there.
   useEffect(() => {
@@ -221,6 +272,7 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
   };
 
   const regenerate = () => {
+    if (!results) return;
     setLayout(generateLayoutFromResults(results, layout?.title ?? DEFAULT_LAYOUT_TITLE));
     setSelectedBlockId(null);
     setAmpTarget(null);
@@ -248,7 +300,15 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
     });
   };
 
-  const importNwm = async (file: File) => {
+  const importSession = async (file: File) => {
+    if (!isLaSessionFileName(file.name)) {
+      toast({
+        title: 'Archivo no compatible',
+        description: 'Selecciona una sesión de Network Manager (.nwm) o Soundvision (.xmlp).',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsImporting(true);
     try {
       const base64 = await fileToBase64(file);
@@ -260,7 +320,7 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
       if (!map || !map.units?.length) {
         throw new Error('La sesión no contiene amplificadores.');
       }
-      setLayout(nwmMapToLayout(map, computeResultsFingerprint(results)));
+      setLayout(nwmMapToLayout(map, results ? computeResultsFingerprint(results) : undefined));
       setSelectedBlockId(null);
       setAmpTarget(null);
       toast({
@@ -269,11 +329,37 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'No se pudo importar el archivo de NM.';
+        error instanceof Error ? error.message : 'No se pudo importar el archivo de NM/SV.';
       toast({ title: 'Error al importar', description: message, variant: 'destructive' });
     } finally {
       setIsImporting(false);
     }
+  };
+
+  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!event.dataTransfer.types.includes('Files')) return;
+    dragDepthRef.current += 1;
+    setIsDraggingFile(true);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDraggingFile(false);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDraggingFile(false);
+    const file = event.dataTransfer.files[0];
+    if (file) void importSession(file);
   };
 
   const exportPdf = async () => {
@@ -329,20 +415,28 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
-        <Network className="h-4 w-4" />
-        Diseñador de racks
-      </Button>
+      {!hideTrigger && (
+        <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
+          <Network className="h-4 w-4" />
+          Diseñador de racks
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-dvh max-h-dvh w-screen max-w-none flex-col gap-2 rounded-none p-3 md:h-[92vh] md:max-h-[92vh] md:w-[96vw] md:max-w-[1400px] md:gap-3 md:rounded-lg md:p-4">
           <DialogHeader className="space-y-0.5 text-left">
-            <DialogTitle>Diseñador visual de racks</DialogTitle>
+            <DialogTitle>
+              {standalone ? 'Diseñador NM/SV de racks' : 'Diseñador visual de racks'}
+            </DialogTitle>
             <DialogDescription className="hidden md:block">
-              Arrastra los racks para posicionarlos, edita presets, colores e IPs y exporta el plano a PDF.
+              {standalone
+                ? 'Suelta una sesión .nwm o .xmlp, ajusta los racks y exporta el plano a PDF.'
+                : 'Arrastra los racks para posicionarlos, edita presets, colores e IPs y exporta el plano a PDF.'}
             </DialogDescription>
             <DialogDescription className="md:hidden">
-              Toca un amplificador para editar su IP y preset; toca la cabecera para editar el rack.
+              {standalone
+                ? 'Importa una sesión NM/SV, edita los racks y exporta el plano a PDF.'
+                : 'Toca un amplificador para editar su IP y preset; toca la cabecera para editar el rack.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -386,7 +480,7 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = '';
-                if (file) void importNwm(file);
+                if (file) void importSession(file);
               }}
             />
             <Button
@@ -401,27 +495,29 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
               <Upload className="h-3.5 w-3.5" />
               {isImporting ? 'Importando…' : 'Importar NM/SV'}
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="gap-1">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Regenerar
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Regenerar el diseño?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Se descartarán los cambios manuales (posiciones, colores, presets e IPs) y los
-                    racks se volverán a generar desde el cálculo actual.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={regenerate}>Regenerar</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {results && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Regenerar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Regenerar el diseño?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Se descartarán los cambios manuales (posiciones, colores, presets e IPs) y los
+                      racks se volverán a generar desde el cálculo actual.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={regenerate}>Regenerar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <div className="flex h-8 items-center gap-1.5">
               <Checkbox
                 id="include-rack-labels"
@@ -430,14 +526,29 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
               />
               <Label htmlFor="include-rack-labels" className="text-xs">Nombres de rack en PDF</Label>
             </div>
-            <Button type="button" size="sm" className="ml-auto gap-1" onClick={exportPdf} disabled={isExporting || !layout}>
+            <Button
+              type="button"
+              size="sm"
+              className="ml-auto gap-1"
+              onClick={exportPdf}
+              disabled={isExporting || !layout?.blocks.length}
+            >
               <FileText className="h-3.5 w-3.5" />
               {isExporting ? 'Generando…' : 'Exportar PDF'}
             </Button>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3 md:flex-row">
-            <div className="relative min-h-[240px] flex-1">
+            <div
+              className={cn(
+                'relative min-h-[240px] flex-1 rounded-md transition-shadow',
+                isDraggingFile && 'ring-2 ring-primary ring-offset-2',
+              )}
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <div
                 ref={scrollRef}
                 className="absolute inset-0 overflow-auto rounded-md border bg-muted/20"
@@ -519,6 +630,32 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
                   )}
                 </div>
               </div>
+
+              {standalone && !layout?.blocks.length && (
+                <button
+                  type="button"
+                  className={cn(
+                    'absolute inset-4 z-10 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-background/90 px-6 text-center transition-colors',
+                    isDraggingFile
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-muted-foreground/30 hover:border-primary/60 hover:bg-muted/60',
+                  )}
+                  onClick={() => nwmInputRef.current?.click()}
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <UploadCloud className="h-10 w-10" />
+                  <span className="font-semibold">Suelta aquí una sesión NM o Soundvision</span>
+                  <span className="text-sm text-muted-foreground">
+                    o pulsa para seleccionar un archivo .nwm o .xmlp
+                  </span>
+                </button>
+              )}
+
+              {isDraggingFile && !!layout?.blocks.length && (
+                <div className="pointer-events-none absolute inset-4 z-30 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/90 text-center text-sm font-semibold text-primary shadow-lg">
+                  Suelta el archivo para reemplazar el diseño actual
+                </div>
+              )}
 
               <div className="absolute bottom-2 right-2 z-20 flex items-center gap-0.5 rounded-md border bg-background/95 p-0.5 shadow-sm">
                 <Button
