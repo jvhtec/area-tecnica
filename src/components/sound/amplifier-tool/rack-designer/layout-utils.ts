@@ -239,7 +239,14 @@ export function generateLayoutFromResults(
 
 const storageKey = (scope: string) => `amp-rack-designer:${scope}`;
 
-const AMP_MODELS: readonly string[] = ['LA12X', 'PLM20000D'];
+const AMP_MODELS: readonly string[] = [
+  'LA4',
+  'LA4X',
+  'LA8',
+  'LA12X',
+  'PLM20000D',
+  'OTRO',
+];
 
 function isStoredAmp(value: unknown): value is RackDesignerAmp {
   const amp = value as RackDesignerAmp;

@@ -1,4 +1,4 @@
-export type AmpModel = 'LA12X' | 'PLM20000D';
+export type AmpModel = 'LA4' | 'LA4X' | 'LA8' | 'LA12X' | 'PLM20000D' | 'OTRO';
 
 /** Side of the PA the amp feeds: left, right or center/mono (subs, delays, fills…). */
 export type RackSide = 'L' | 'R' | 'C';
