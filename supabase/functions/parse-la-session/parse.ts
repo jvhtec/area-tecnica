@@ -47,12 +47,12 @@ function attrs(tag: string): Record<string, string> {
 
 function decodeXmlEntities(value: string): string {
   return value
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#8230;/g, "…")
-    .replace(/&apos;/g, "'");
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
 }
 
 function textOf(body: string, tag: string): string {

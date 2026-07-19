@@ -260,7 +260,7 @@ export function AmpRackDesigner({ results, jobId, tourId }: AmpRackDesignerProps
       if (!map || !map.units?.length) {
         throw new Error('La sesión no contiene amplificadores.');
       }
-      setLayout(nwmMapToLayout(map));
+      setLayout(nwmMapToLayout(map, computeResultsFingerprint(results)));
       setSelectedBlockId(null);
       setAmpTarget(null);
       toast({

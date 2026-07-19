@@ -95,6 +95,42 @@ describe('nwmMapToLayout', () => {
   it('falls back to a default title when the session is unnamed', () => {
     expect(nwmMapToLayout({ ...sampleMap, sessionName: '' }).title).toBe('SISTEMA PA');
   });
+
+  it('persists the current calculator fingerprint on an imported layout', () => {
+    expect(nwmMapToLayout(sampleMap, 'current-results').resultsFingerprint).toBe(
+      'current-results',
+    );
+  });
+
+  it('preserves supported imported controller models and marks unknown models explicitly', () => {
+    const modelMap: NwmMap = {
+      sessionName: 'MODELS',
+      units: [
+        ...['LA4', 'LA4X', 'LA8', 'LA12X', 'PLM20000D'].map((model, index) => ({
+          octet: 10 + index,
+          ip: `192.168.1.${10 + index}`,
+          presetName: model,
+          familyName: '',
+          model,
+          x: 0,
+          y: 0,
+        })),
+        {
+          octet: 20,
+          ip: '192.168.1.20',
+          presetName: 'UNKNOWN',
+          familyName: '',
+          model: 'type99',
+          x: 0,
+          y: 0,
+        },
+      ],
+      groups: [],
+    };
+
+    expect(nwmMapToLayout(modelMap).blocks.flatMap((block) => block.amps.map((amp) => amp.model)))
+      .toEqual(['LA4', 'LA4X', 'LA8', 'LA12X', 'PLM20000D', 'OTRO']);
+  });
 });
 
 // Soundvision .xmlp has no LEFT/RIGHT groups; sides live in the role="source"

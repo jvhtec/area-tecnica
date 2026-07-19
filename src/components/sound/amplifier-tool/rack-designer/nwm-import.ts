@@ -52,9 +52,13 @@ interface Bucket {
 }
 
 function toAmpModel(model: string): AmpModel {
-  // The designer's amp union is LA12X / PLM20000D. NM's LA-family controllers all
-  // map to LA12X for labeling; only PLM/TF-driven units would be PLM20000D.
-  return /plm|tf/i.test(model) ? 'PLM20000D' : 'LA12X';
+  const normalized = model.trim().toUpperCase();
+  if (normalized === 'LA4' || normalized === 'LA4X' || normalized === 'LA8') {
+    return normalized;
+  }
+  if (normalized === 'LA12X') return 'LA12X';
+  if (/PLM|TF/.test(normalized)) return 'PLM20000D';
+  return 'OTRO';
 }
 
 function sideFromName(name: string): Side {
@@ -143,7 +147,10 @@ function bucketBySourceGroups(map: NwmMap): Bucket[] {
  * recognized group fall into "OTROS". Handles both the NM convention (LEFT/RIGHT
  * side groups) and the Soundvision one (sided `role="source"` groups).
  */
-export function nwmMapToLayout(map: NwmMap): RackDesignerLayout {
+export function nwmMapToLayout(
+  map: NwmMap,
+  resultsFingerprint?: string,
+): RackDesignerLayout {
   // LEFT/RIGHT side groups are the NM-format signal; Soundvision sessions have
   // neither and instead carry sided role="source" groups.
   const byName = new Map(map.groups.map((g) => [g.name.toUpperCase(), g]));
@@ -197,6 +204,7 @@ export function nwmMapToLayout(map: NwmMap): RackDesignerLayout {
   return {
     version: 1,
     title: map.sessionName?.trim() || 'SISTEMA PA',
+    resultsFingerprint,
     blocks,
   };
 }
