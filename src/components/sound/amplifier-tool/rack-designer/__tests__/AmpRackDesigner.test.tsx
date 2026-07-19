@@ -28,6 +28,27 @@ const calculatorResults: AmplifierResults = {
   },
 };
 
+const parsedSessionResponse = {
+  data: {
+    map: {
+      sessionName: 'GIRA 2026',
+      units: [
+        {
+          octet: 11,
+          ip: '192.168.1.11',
+          presetName: 'K2 110',
+          familyName: 'K2',
+          model: 'LA12X',
+          x: 0,
+          y: 0,
+        },
+      ],
+      groups: [{ name: 'K2 L', role: 'source', members: [11] }],
+    },
+  },
+  error: null as null,
+};
+
 describe('AmpRackDesigner — modo independiente', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -70,26 +91,7 @@ describe('AmpRackDesigner — modo independiente', () => {
   });
 
   it('imports a dropped Soundvision file through the shared session parser', async () => {
-    mockSupabase.functions.invoke.mockResolvedValueOnce({
-      data: {
-        map: {
-          sessionName: 'GIRA 2026',
-          units: [
-            {
-              octet: 11,
-              ip: '192.168.1.11',
-              presetName: 'K2 110',
-              familyName: 'K2',
-              model: 'LA12X',
-              x: 0,
-              y: 0,
-            },
-          ],
-          groups: [{ name: 'K2 L', role: 'source', members: [11] }],
-        },
-      },
-      error: null,
-    });
+    mockSupabase.functions.invoke.mockResolvedValueOnce(parsedSessionResponse);
     render(
       <AmpRackDesigner
         standalone
@@ -116,6 +118,42 @@ describe('AmpRackDesigner — modo independiente', () => {
     });
     expect(await screen.findByText('K2 L')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Exportar PDF' })).toBeEnabled();
+  });
+
+  it('ignores a second dropped session while an import is already in progress', async () => {
+    let resolveImport!: (value: typeof parsedSessionResponse) => void;
+    const pendingImport = new Promise<typeof parsedSessionResponse>((resolve) => {
+      resolveImport = resolve;
+    });
+    mockSupabase.functions.invoke.mockImplementationOnce(() => pendingImport);
+    render(
+      <AmpRackDesigner
+        standalone
+        hideTrigger
+        open
+        onOpenChange={vi.fn()}
+        storageScope="standalone-reentrant-test"
+      />,
+    );
+
+    const dropPrompt = await screen.findByText('Suelta aquí una sesión NM o Soundvision');
+    const dropTarget = dropPrompt.closest('button')?.parentElement;
+    expect(dropTarget).not.toBeNull();
+    const firstFile = new File(['first-session'], 'first.xmlp');
+    const secondFile = new File(['second-session'], 'second.nwm');
+    fireEvent.drop(dropTarget!, {
+      dataTransfer: { types: ['Files'], files: [firstFile] },
+    });
+    await waitFor(() => expect(mockSupabase.functions.invoke).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Importando…' })).toBeDisabled();
+
+    fireEvent.drop(dropTarget!, {
+      dataTransfer: { types: ['Files'], files: [secondFile] },
+    });
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledTimes(1);
+
+    resolveImport(parsedSessionResponse);
+    expect(await screen.findByText('K2 L')).toBeInTheDocument();
   });
 });
 

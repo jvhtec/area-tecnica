@@ -301,6 +301,7 @@ export function AmpRackDesigner({
   };
 
   const importSession = async (file: File) => {
+    if (isImporting) return;
     if (!isLaSessionFileName(file.name)) {
       toast({
         title: 'Archivo no compatible',
