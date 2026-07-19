@@ -27,6 +27,8 @@ const SQLITE_MAGIC = "SQLite format 3";
 interface ParseSessionBody extends Record<string, unknown> {
   /** base64-encoded raw .nwm / .xmlp file bytes. */
   file?: unknown;
+  /** Original client filename, used only as a display-name fallback. */
+  fileName?: unknown;
 }
 
 function hexToBytes(hex: string, expectedLen: number, name: string): Uint8Array {
@@ -121,6 +123,9 @@ serve(
       if (typeof body.file !== "string" || body.file.length === 0) {
         throw new HttpError(400, "Missing base64 'file' field", { code: "missing_file" });
       }
+      const fileName = typeof body.fileName === "string"
+        ? body.fileName.slice(0, 200).replace(/^.*[\\/]/, "")
+        : "";
 
       let fileBytes: Uint8Array;
       try {
@@ -166,7 +171,7 @@ serve(
           if (!xml.includes("<project") && !xml.includes("amplification")) {
             throw new HttpError(422, "El archivo no parece un proyecto de Soundvision válido", { code: "xmlp_not_recognized" });
           }
-          map = parseXmlpXml(xml);
+          map = parseXmlpXml(xml, fileName);
         }
       } catch (error) {
         if (error instanceof HttpError) throw error;
@@ -177,8 +182,10 @@ serve(
         });
       }
 
-      if (map.units.length === 0) {
-        throw new HttpError(422, "La sesión no contiene amplificadores", { code: "session_no_units" });
+      if (map.units.length === 0 && !map.flysheet?.arrays.length) {
+        throw new HttpError(422, "La sesión no contiene amplificadores ni arrays compatibles", {
+          code: "session_no_units_or_arrays",
+        });
       }
 
       // Transient: we return the parsed map and never persist the file or XML.

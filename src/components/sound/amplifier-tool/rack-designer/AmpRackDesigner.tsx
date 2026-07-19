@@ -64,6 +64,7 @@ import {
   saveStoredLayout,
 } from '@/components/sound/amplifier-tool/rack-designer/layout-utils';
 import { RackBlockCard } from '@/components/sound/amplifier-tool/rack-designer/RackBlockCard';
+import { SoundvisionFlysheetButton } from '@/components/sound/amplifier-tool/rack-designer/SoundvisionFlysheetButton';
 import { BlockEditorPanel } from '@/components/sound/amplifier-tool/rack-designer/BlockEditorPanel';
 import { AmpEditFields } from '@/components/sound/amplifier-tool/rack-designer/AmpEditFields';
 import { useCanvasZoom } from '@/components/sound/amplifier-tool/rack-designer/useCanvasZoom';
@@ -300,6 +301,17 @@ export function AmpRackDesigner({
     });
   };
 
+  const parseLaSessionFile = async (file: File): Promise<NwmMap> => {
+    const base64 = await fileToBase64(file);
+    const { data, error } = await supabase.functions.invoke('parse-la-session', {
+      body: { file: base64, fileName: file.name },
+    });
+    if (error) throw error;
+    const map = (data as { map?: NwmMap } | null)?.map;
+    if (!map) throw new Error('No se pudo interpretar el archivo de L-Acoustics.');
+    return map;
+  };
+
   const importSession = async (file: File) => {
     if (isImporting) return;
     if (!isLaSessionFileName(file.name)) {
@@ -312,15 +324,8 @@ export function AmpRackDesigner({
     }
     setIsImporting(true);
     try {
-      const base64 = await fileToBase64(file);
-      const { data, error } = await supabase.functions.invoke('parse-la-session', {
-        body: { file: base64 },
-      });
-      if (error) throw error;
-      const map = (data as { map?: NwmMap } | null)?.map;
-      if (!map || !map.units?.length) {
-        throw new Error('La sesión no contiene amplificadores.');
-      }
+      const map = await parseLaSessionFile(file);
+      if (!map.units?.length) throw new Error('La sesión no contiene amplificadores.');
       setLayout(nwmMapToLayout(map, results ? computeResultsFingerprint(results) : undefined));
       setSelectedBlockId(null);
       setAmpTarget(null);
@@ -496,6 +501,7 @@ export function AmpRackDesigner({
               <Upload className="h-3.5 w-3.5" />
               {isImporting ? 'Importando…' : 'Importar NM/SV'}
             </Button>
+            <SoundvisionFlysheetButton parseSessionFile={parseLaSessionFile} />
             {results && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>

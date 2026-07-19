@@ -66,6 +66,7 @@ describe('AmpRackDesigner — modo independiente', () => {
     );
 
     expect(await screen.findByText('Suelta aquí una sesión NM o Soundvision')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generar flysheet' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Regenerar' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Exportar PDF' })).toBeDisabled();
   });
@@ -113,7 +114,7 @@ describe('AmpRackDesigner — modo independiente', () => {
 
     await waitFor(() => {
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('parse-la-session', {
-        body: { file: 'c291bmR2aXNpb24tc2Vzc2lvbg==' },
+        body: { file: 'c291bmR2aXNpb24tc2Vzc2lvbg==', fileName: 'gira.xmlp' },
       });
     });
     expect(await screen.findByText('K2 L')).toBeInTheDocument();
