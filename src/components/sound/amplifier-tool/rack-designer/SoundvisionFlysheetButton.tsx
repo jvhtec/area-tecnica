@@ -5,20 +5,45 @@ import { FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { NwmMap } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
+import { supabase } from '@/integrations/supabase/client';
 import { generateSoundvisionFlysheetPdf } from '@/utils/soundvisionFlysheetPdf';
+import { formatUserName } from '@/utils/userName';
 
 const MADRID_TZ = 'Europe/Madrid';
 
 interface SoundvisionFlysheetButtonProps {
   parseSessionFile: (file: File) => Promise<NwmMap>;
+  createdBy?: string;
 }
 
 export function SoundvisionFlysheetButton({
   parseSessionFile,
+  createdBy,
 }: SoundvisionFlysheetButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const resolvePredictionCreator = async (): Promise<string> => {
+    if (createdBy?.trim()) return createdBy.trim();
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return 'No identificado';
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, nickname, last_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      return formatUserName(profile?.first_name, profile?.nickname, profile?.last_name)
+        || user.email
+        || 'No identificado';
+    } catch (error) {
+      console.warn('No se pudo resolver el autor del flysheet:', error);
+      return 'No identificado';
+    }
+  };
 
   const generateFlysheet = async (file: File) => {
     if (isGenerating) return;
@@ -37,8 +62,10 @@ export function SoundvisionFlysheetButton({
       if (!map.flysheet?.arrays.length) {
         throw new Error('El proyecto no contiene arrays compatibles con el flysheet.');
       }
+      const predictionCreator = await resolvePredictionCreator();
       const blob = await generateSoundvisionFlysheetPdf(map.flysheet, {
         sourceFileName: file.name,
+        createdBy: predictionCreator,
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');

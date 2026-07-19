@@ -30,6 +30,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
   const [warehouseDutyExempt, setWarehouseDutyExempt] = useState<boolean>(!!user?.warehouse_duty_exempt);
   const [soundvisionAccessEnabled, setSoundvisionAccessEnabled] = useState<boolean>(!!user?.soundvision_access_enabled);
+  const [soundvisionToolAccessEnabled, setSoundvisionToolAccessEnabled] = useState<boolean>(!!user?.soundvision_tool_access_enabled);
   const [isAutonomo, setIsAutonomo] = useState<boolean>(user?.autonomo !== false);
   const [selectedRole, setSelectedRole] = useState<string>(user?.role || "technician");
   const { userRole } = useOptimizedAuth();
@@ -48,6 +49,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     setWarehouseDutyExempt(!!user?.warehouse_duty_exempt);
     const forceSoundvisionForHouseTech = user?.department === 'sound' && user?.role === 'house_tech';
     setSoundvisionAccessEnabled(forceSoundvisionForHouseTech ? true : !!user?.soundvision_access_enabled);
+    setSoundvisionToolAccessEnabled(forceSoundvisionForHouseTech ? true : !!user?.soundvision_tool_access_enabled);
     setSelectedRole(user?.role || "technician");
     setFlexResourceId(user?.flex_resource_id || "");
     setFlexUrl("");
@@ -88,6 +90,9 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       console.error("Cannot update user: No valid ID");
       return;
     }
+    const nextDepartment = formData.get('department') as Department;
+    const nextRole = formData.get('role') as string;
+    const nextIsSoundHouseTech = nextDepartment === 'sound' && nextRole === 'house_tech';
 
     const updatedData: Partial<Profile> = {
       id: user.id,
@@ -95,17 +100,21 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       nickname: formData.get('nickname') as string,
       last_name: formData.get('lastName') as string,
       phone: formData.get('phone') as string,
-      department: formData.get('department') as Department,
+      department: nextDepartment,
       dni: formData.get('dni') as string,
       residencia: residencia,
       home_latitude: homeLatitude,
       home_longitude: homeLongitude,
       bg_color: bgColor || null,
-      role: formData.get('role') as string,
+      role: nextRole,
       assignable_as_tech: assignableAsTech,
       warehouse_duty_exempt: warehouseDutyExempt,
       flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
       soundvision_access_enabled: forceSoundvisionAccess ? true : soundvisionAccessEnabled,
+      soundvision_tool_access_enabled:
+        nextDepartment === 'sound'
+          ? nextIsSoundHouseTech || soundvisionToolAccessEnabled
+          : false,
       autonomo: isAutonomo,
     };
 
@@ -190,20 +199,38 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
               </div>
             </div>
             {isManagementUser && (isSoundTechnician || isSoundHouseTech) && (
-              <div className="space-y-2">
-                <Label htmlFor="soundvisionAccess">SoundVision Access</Label>
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    id="soundvisionAccess"
-                    checked={forceSoundvisionAccess ? true : soundvisionAccessEnabled}
-                    onCheckedChange={(v) => !forceSoundvisionAccess && setSoundvisionAccessEnabled(!!v)}
-                    disabled={forceSoundvisionAccess}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {forceSoundvisionAccess
-                      ? 'House techs always retain SoundVision access.'
-                      : 'Allow this sound technician to access SoundVision files and tools.'}
-                  </span>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="soundvisionAccess">SoundVision Access</Label>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="soundvisionAccess"
+                      checked={forceSoundvisionAccess ? true : soundvisionAccessEnabled}
+                      onCheckedChange={(v) => !forceSoundvisionAccess && setSoundvisionAccessEnabled(!!v)}
+                      disabled={forceSoundvisionAccess}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {forceSoundvisionAccess
+                        ? 'House techs always retain SoundVision access.'
+                        : 'Allow this sound technician to access the SoundVision file library.'}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="soundvisionToolAccess">NM/SV Designer Access</Label>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="soundvisionToolAccess"
+                      checked={forceSoundvisionAccess ? true : soundvisionToolAccessEnabled}
+                      onCheckedChange={(v) => !forceSoundvisionAccess && setSoundvisionToolAccessEnabled(!!v)}
+                      disabled={forceSoundvisionAccess}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {forceSoundvisionAccess
+                        ? 'Sound house techs always retain access to amplifier maps and flysheets.'
+                        : 'Allow this sound technician to create NM/SV amplifier maps and Spanish flysheets.'}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}

@@ -100,6 +100,7 @@ export interface AmpRackDesignerProps {
   onOpenChange?: (open: boolean) => void;
   hideTrigger?: boolean;
   storageScope?: string;
+  createdBy?: string;
 }
 
 interface AmpTarget {
@@ -116,6 +117,7 @@ export function AmpRackDesigner({
   onOpenChange,
   hideTrigger = false,
   storageScope,
+  createdBy,
 }: AmpRackDesignerProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -501,7 +503,10 @@ export function AmpRackDesigner({
               <Upload className="h-3.5 w-3.5" />
               {isImporting ? 'Importando…' : 'Importar NM/SV'}
             </Button>
-            <SoundvisionFlysheetButton parseSessionFile={parseLaSessionFile} />
+            <SoundvisionFlysheetButton
+              parseSessionFile={parseLaSessionFile}
+              createdBy={createdBy}
+            />
             {results && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>

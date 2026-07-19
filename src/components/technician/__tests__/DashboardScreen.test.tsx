@@ -110,7 +110,9 @@ describe("DashboardScreen", () => {
         onOpenRates={vi.fn()}
         onOpenMessages={vi.fn()}
         onOpenSysCalc={vi.fn()}
+        onOpenSoundVisionTools={vi.fn()}
         hasSoundVisionAccess
+        hasSoundVisionToolAccess
       />,
     );
 
@@ -121,6 +123,7 @@ describe("DashboardScreen", () => {
     expect(screen.getByTestId("tech-job-card")).toHaveTextContent("Hoy");
     expect(screen.getByTestId("tech-job-card")).toHaveTextContent("crew-chief:true");
     expect(screen.getByRole("button", { name: /open madrid run/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /diseñador\s*nm\/sv/i })).toBeInTheDocument();
   });
 
   it("gates optional tools and routes tour navigation through the card callback", async () => {
@@ -128,6 +131,7 @@ describe("DashboardScreen", () => {
     const onOpenTour = vi.fn();
     const onOpenSysCalc = vi.fn();
     const onOpenSV = vi.fn();
+    const onOpenSoundVisionTools = vi.fn();
 
     useMyToursMock.mockReturnValue({
       activeTours: [createTour({ id: "tour-77", name: "Mini Tour" })],
@@ -148,17 +152,21 @@ describe("DashboardScreen", () => {
         onOpenRates={vi.fn()}
         onOpenMessages={vi.fn()}
         onOpenSysCalc={onOpenSysCalc}
+        onOpenSoundVisionTools={onOpenSoundVisionTools}
         hasSoundVisionAccess={false}
+        hasSoundVisionToolAccess={false}
       />,
     );
 
     expect(screen.queryByText(/soundvision/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/syscalc/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/diseñador/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /open mini tour/i }));
 
     expect(onOpenTour).toHaveBeenCalledWith("tour-77");
     expect(onOpenSV).not.toHaveBeenCalled();
     expect(onOpenSysCalc).not.toHaveBeenCalled();
+    expect(onOpenSoundVisionTools).not.toHaveBeenCalled();
   });
 });

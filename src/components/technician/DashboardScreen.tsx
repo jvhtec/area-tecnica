@@ -1,7 +1,7 @@
 import React from 'react';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase, Binary } from 'lucide-react';
+import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase, Binary, Network } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useMyTours } from '@/hooks/useMyTours';
@@ -37,10 +37,29 @@ interface DashboardScreenProps {
     onOpenRates: () => void;
     onOpenMessages: () => void;
     onOpenSysCalc?: () => void;
+    onOpenSoundVisionTools: () => void;
     hasSoundVisionAccess: boolean;
+    hasSoundVisionToolAccess: boolean;
 }
 
-export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, onOpenRates, onOpenMessages, onOpenSysCalc, hasSoundVisionAccess }: DashboardScreenProps) => {
+export const DashboardScreen = ({
+    theme,
+    isDark,
+    user,
+    userProfile,
+    assignments,
+    isLoading,
+    onOpenAction,
+    onOpenSV,
+    onOpenObliqueStrategy,
+    onOpenTour,
+    onOpenRates,
+    onOpenMessages,
+    onOpenSysCalc,
+    onOpenSoundVisionTools,
+    hasSoundVisionAccess,
+    hasSoundVisionToolAccess,
+}: DashboardScreenProps) => {
     const { activeTours } = useMyTours();
 
     const userInitials = userProfile?.first_name && userProfile?.last_name
@@ -146,6 +165,16 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         >
                             <MapIcon size={20} className="text-blue-500 group-hover:scale-110 transition-transform" />
                             <span className={`text-xs font-bold ${theme.textMain}`}>SoundVision<br />Database</span>
+                        </button>
+                    )}
+                    {hasSoundVisionToolAccess && (
+                        <button
+                            type="button"
+                            onClick={onOpenSoundVisionTools}
+                            className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-red-500 transition-colors text-left group`}
+                        >
+                            <Network size={20} className="text-red-500 group-hover:scale-110 transition-transform" />
+                            <span className={`text-xs font-bold ${theme.textMain}`}>Diseñador<br />NM/SV</span>
                         </button>
                     )}
                     <button

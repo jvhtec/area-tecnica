@@ -18,6 +18,7 @@ export type Profile = {
   warehouse_duty_exempt?: boolean | null;
   flex_resource_id?: string | null;
   soundvision_access_enabled?: boolean | null;
+  soundvision_tool_access_enabled?: boolean | null;
   autonomo?: boolean | null;
   bg_color?: string | null;
 };

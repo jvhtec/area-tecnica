@@ -46,6 +46,7 @@ describe('generateSoundvisionFlysheetPdf', () => {
     const blob = await generateSoundvisionFlysheetPdf(makeFlysheet(6), {
       sourceFileName: 'prueba.xmlp',
       generatedAt: new Date('2026-07-19T12:00:00Z'),
+      brandLogoDataUrl: null,
     });
     const pdf = await PDFDocument.load(await blob.arrayBuffer());
 
@@ -71,6 +72,7 @@ describe('generateSoundvisionFlysheetPdf', () => {
     const blob = await generateSoundvisionFlysheetPdf(flysheet, {
       sourceFileName: 'array-largo.xmlp',
       generatedAt: new Date('2026-07-19T10:00:00Z'),
+      brandLogoDataUrl: null,
     });
     const pdf = await PDFDocument.load(await blob.arrayBuffer());
 

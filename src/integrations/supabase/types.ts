@@ -6110,6 +6110,7 @@ export type Database = {
           selected_job_statuses: string[] | null
           selected_job_types: string[] | null
           soundvision_access_enabled: boolean | null
+          soundvision_tool_access_enabled: boolean
           time_span: string | null
           timezone: string | null
           tours_expanded: boolean | null
@@ -6147,6 +6148,7 @@ export type Database = {
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
           soundvision_access_enabled?: boolean | null
+          soundvision_tool_access_enabled?: boolean
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
@@ -6184,6 +6186,7 @@ export type Database = {
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
           soundvision_access_enabled?: boolean | null
+          soundvision_tool_access_enabled?: boolean
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null

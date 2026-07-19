@@ -154,6 +154,7 @@ export const createTechnicianProfile = (overrides: Record<string, unknown> = {})
   department: "sound",
   assignable_as_tech: false,
   soundvision_access_enabled: false,
+  soundvision_tool_access_enabled: false,
   tours_expanded: true,
   ...overrides,
 });
@@ -169,6 +170,7 @@ export const createUserProfile = (overrides: Record<string, unknown> = {}) => ({
   assignable_as_tech: false,
   warehouse_duty_exempt: false,
   soundvision_access_enabled: false,
+  soundvision_tool_access_enabled: false,
   autonomo: true,
   ...overrides,
 });

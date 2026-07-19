@@ -4,11 +4,16 @@ import type {
   SoundvisionFlysheet,
   SoundvisionFlysheetArray,
 } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
+import {
+  loadCompanyLogoDataUrl,
+  safeAddPdfImage,
+  SECTOR_PRO_RED,
+} from '@/utils/pdf/exportHelpers';
 import { loadJsPDF } from '@/utils/pdf/lazyPdf';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 
 const MAX_ARRAYS_PER_PAGE = 5;
-const MAX_ENCLOSURES_PER_PAGE = 30;
+const MAX_ENCLOSURES_PER_PAGE = 21;
 const MARGIN = 8;
 const LABEL_COLUMN_WIDTH = 37;
 const SUMMARY_ROW_HEIGHT = 5.5;
@@ -21,11 +26,13 @@ const LIGHT_GRAY: PdfColor = [238, 238, 238];
 const MEDIUM_GRAY: PdfColor = [210, 210, 210];
 const YELLOW: PdfColor = [255, 235, 0];
 const RED: PdfColor = [222, 30, 30];
-const SECTOR_RED: PdfColor = [125, 1, 1];
 
 export interface SoundvisionFlysheetPdfOptions {
   sourceFileName: string;
   generatedAt?: Date;
+  createdBy?: string;
+  /** Optional override used by non-browser renderers; the app loads the Sector Pro asset by default. */
+  brandLogoDataUrl?: string | null;
 }
 
 const formatNumber = (value: number | null, suffix: string, digits = 1): string =>
@@ -284,63 +291,97 @@ function drawHeader(
   pdf: jsPDF,
   flysheet: SoundvisionFlysheet,
   sourceFileName: string,
+  createdBy: string,
   pageNumber: number,
   pageCount: number,
 ): number {
   const pageWidth = pdf.internal.pageSize.getWidth();
-  const titleWidth = pageWidth * 0.43;
-  drawCell(pdf, 'Proyecto', MARGIN, MARGIN, 30, 8, { bold: true, fontSize: 8 });
-  drawCell(pdf, flysheet.projectName || 'SIN NOMBRE', MARGIN + 30, MARGIN, titleWidth - 30, 8, {
-    bold: true,
-    fontSize: 9,
-  });
-  drawCell(pdf, 'FLYSHEET', MARGIN, MARGIN + 8, titleWidth, 13, {
-    bold: true,
-    fill: SECTOR_RED,
-    fontSize: 18,
-    textColor: [255, 255, 255],
-  });
+  const contentWidth = pageWidth - MARGIN * 2;
+  pdf.setFillColor(...SECTOR_PRO_RED);
+  pdf.rect(0, 0, pageWidth, 30, 'F');
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(20);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text('FLYSHEET SOUNDVISION', pageWidth / 2, 20, { align: 'center' });
 
-  const metaX = MARGIN + titleWidth + 12;
-  const metaWidth = pageWidth - MARGIN - metaX;
-  drawCell(pdf, 'Archivo XMLP', metaX, MARGIN, 36, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, sourceFileName, metaX + 36, MARGIN, metaWidth - 36, 7, { fontSize: 7.5 });
-  drawCell(pdf, 'Página', metaX, MARGIN + 7, 36, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, `${pageNumber} / ${pageCount}`, metaX + 36, MARGIN + 7, metaWidth - 36, 7, { fontSize: 7.5 });
-  drawCell(pdf, 'Validación', metaX, MARGIN + 14, 36, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, 'Cargas, seguridad y flying bar: comprobar en Soundvision', metaX + 36, MARGIN + 14, metaWidth - 36, 7, {
+  const metaY = 36;
+  const columnGap = 6;
+  const columnWidth = (contentWidth - columnGap) / 2;
+  const leftValueX = MARGIN + 34;
+  const rightX = MARGIN + columnWidth + columnGap;
+  const rightValueX = rightX + 34;
+  drawCell(pdf, 'Proyecto', MARGIN, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, flysheet.projectName || 'SIN NOMBRE', leftValueX, metaY, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
+  drawCell(pdf, 'Archivo XMLP', rightX, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, sourceFileName, rightValueX, metaY, columnWidth - 34, 7, { fontSize: 7.5 });
+  drawCell(pdf, 'Predicción creada por', MARGIN, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7 });
+  drawCell(pdf, createdBy, leftValueX, metaY + 7, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
+  drawCell(pdf, 'Página', rightX, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, `${pageNumber} / ${pageCount}`, rightValueX, metaY + 7, columnWidth - 34, 7, { fontSize: 7.5 });
+  drawCell(pdf, 'Validación', MARGIN, metaY + 14, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, 'Cargas, seguridad y flying bar: comprobar en Soundvision', leftValueX, metaY + 14, contentWidth - 34, 7, {
     bold: true,
     fill: YELLOW,
     fontSize: 7.2,
   });
-  return MARGIN + 26;
+  return metaY + 25;
 }
 
-function drawFooter(pdf: jsPDF, generatedAt: Date): void {
+function drawFooter(
+  pdf: jsPDF,
+  generatedAt: Date,
+  brandLogoDataUrl: string | null,
+  pageNumber: number,
+  pageCount: number,
+): void {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  pdf.setDrawColor(...SECTOR_RED);
-  pdf.setLineWidth(0.8);
-  pdf.line(MARGIN, pageHeight - 9, pageWidth - MARGIN, pageHeight - 9);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7);
   pdf.setTextColor(80, 80, 80);
   pdf.text(
-    `Generado el ${formatInTimeZone(generatedAt, MADRID_TIMEZONE, 'dd/MM/yyyy HH:mm')} · Confirme cargas, seguridad y ajuste del flying bar en Soundvision.`,
+    `Generado: ${formatInTimeZone(generatedAt, MADRID_TIMEZONE, 'dd/MM/yyyy HH:mm')}`,
     MARGIN,
-    pageHeight - 5,
+    pageHeight - 10,
+  );
+
+  pdf.setTextColor(...BLACK);
+  pdf.setFontSize(8);
+  pdf.text(`Página ${pageNumber} de ${pageCount}`, pageWidth / 2, pageHeight - 10, {
+    align: 'center',
+  });
+
+  const logoWidth = 40;
+  const logoHeight = logoWidth / 7.94;
+  safeAddPdfImage(
+    pdf,
+    brandLogoDataUrl,
+    'PNG',
+    pageWidth - 50,
+    pageHeight - 25,
+    logoWidth,
+    logoHeight,
+    'No se pudo añadir el logotipo de Sector Pro al flysheet:',
   );
 }
 
 /** Generates an A3 landscape Spanish deployment flysheet from normalized XMLP data. */
 export async function generateSoundvisionFlysheetPdf(
   flysheet: SoundvisionFlysheet,
-  { sourceFileName, generatedAt = new Date() }: SoundvisionFlysheetPdfOptions,
+  {
+    sourceFileName,
+    generatedAt = new Date(),
+    createdBy = 'No identificado',
+    brandLogoDataUrl,
+  }: SoundvisionFlysheetPdfOptions,
 ): Promise<Blob> {
   if (flysheet.arrays.length === 0) {
     throw new Error('El proyecto no contiene arrays compatibles con el flysheet.');
   }
 
+  const sectorProLogo = brandLogoDataUrl === undefined
+    ? await loadCompanyLogoDataUrl()
+    : brandLogoDataUrl;
   const jsPDF = await loadJsPDF();
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
   const pages: Array<{
@@ -380,14 +421,15 @@ export async function generateSoundvisionFlysheetPdf(
       pdf,
       flysheet,
       sourceFileName,
+      createdBy.trim() || 'No identificado',
       pageIndex + 1,
       pages.length,
     );
     const cabinetsStartY = drawSummaryRows(pdf, arrays, MARGIN, tableStartY, arrayWidth) + 2;
     const warningsStartY =
       drawCabinetRows(pdf, arrays, MARGIN, cabinetsStartY, arrayWidth, enclosureOffset) + 4;
-    drawWarnings(pdf, arrays, MARGIN, warningsStartY, arrayWidth, pageHeight - 14, continues);
-    drawFooter(pdf, generatedAt);
+    drawWarnings(pdf, arrays, MARGIN, warningsStartY, arrayWidth, pageHeight - 27, continues);
+    drawFooter(pdf, generatedAt, sectorProLogo, pageIndex + 1, pages.length);
   });
 
   return pdf.output('blob') as Blob;
