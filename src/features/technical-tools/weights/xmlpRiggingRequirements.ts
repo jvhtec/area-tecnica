@@ -24,15 +24,15 @@ export const normalizeXmlpEquipmentName = (value: string) =>
     .replace(/[^A-Z0-9]/g, '');
 
 const RIGGING_FRAME_ALIASES: Array<{ pattern: RegExp; canonicalKey: string }> = [
-  { pattern: /K1.*(?:BUMP|BAR)/, canonicalKey: 'BUMPER K1' },
-  { pattern: /K2.*(?:BUMP|BAR)/, canonicalKey: 'BUMPER K2' },
-  { pattern: /K3.*(?:BUMP|BAR)/, canonicalKey: 'BUMPER K3' },
+  { pattern: /K1(?:BUMP|BAR)/, canonicalKey: 'BUMPER K1' },
+  { pattern: /K2(?:BUMP|BAR)/, canonicalKey: 'BUMPER K2' },
+  { pattern: /K3(?:BUMP|BAR)/, canonicalKey: 'BUMPER K3' },
   { pattern: /^MBUMP$/, canonicalKey: 'BUMPER KARA' },
-  { pattern: /KARA.*(?:BUMP|MINIBU|BAR)/, canonicalKey: 'BUMPER KARA' },
-  { pattern: /KIVA.*(?:BUMP|BAR)/, canonicalKey: 'BUMPER KIVA' },
-  { pattern: /KS28.*(?:BUMP|OUTRIG|BAR)/, canonicalKey: 'BUMPER KS28' },
-  { pattern: /TFS900.*(?:BUMP|BAR)/, canonicalKey: 'BUMPER TFS900' },
-  { pattern: /TFS550.*(?:BUMP|BAR)/, canonicalKey: 'BUMPER TFS550' },
+  { pattern: /KARA(?:BUMP|MINIBU|BAR)/, canonicalKey: 'BUMPER KARA' },
+  { pattern: /KIVA(?:BUMP|BAR)/, canonicalKey: 'BUMPER KIVA' },
+  { pattern: /KS28(?:BUMP|OUTRIG|BAR)/, canonicalKey: 'BUMPER KS28' },
+  { pattern: /TFS900(?:BUMP|BAR)/, canonicalKey: 'BUMPER TFS900' },
+  { pattern: /TFS550(?:BUMP|BAR)/, canonicalKey: 'BUMPER TFS550' },
 ];
 
 const serializedQuantity = (value: string) => {
@@ -60,16 +60,24 @@ export function resolveXmlpRiggingRequirement(
     .map((value) => value.trim())
     .filter(Boolean);
 
-  for (const value of values) {
-    const canonicalKey = aliasFor(value);
-    if (!canonicalKey) continue;
+  const resolved = values
+    .map((value) => ({ value, canonicalKey: aliasFor(value) }))
+    .filter(
+      (entry): entry is { value: string; canonicalKey: string } =>
+        entry.canonicalKey !== undefined,
+    );
+  const first = resolved[0];
+  if (first) {
+    const matchingValues = resolved.filter((entry) => entry.canonicalKey === first.canonicalKey);
+    const quantity = Math.max(...matchingValues.map((entry) => serializedQuantity(entry.value)));
+    const serialized = matchingValues.find((entry) => serializedQuantity(entry.value) === quantity)!;
     return {
-      canonicalKey,
-      displayName: canonicalKey,
-      quantity: serializedQuantity(value),
+      canonicalKey: first.canonicalKey,
+      displayName: first.canonicalKey,
+      quantity,
       sourceArray: array.arrayName.trim() || array.groupName.trim() || `Array ${sourceArrayIndex + 1}`,
       sourceArrayIndex,
-      serializedValue: value,
+      serializedValue: serialized.value,
     };
   }
 

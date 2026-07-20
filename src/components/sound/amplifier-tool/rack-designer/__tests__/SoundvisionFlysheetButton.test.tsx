@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SoundvisionFlysheet } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
+import type { NwmMap, SoundvisionFlysheet } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import { mockSupabase, resetMockSupabase } from '@/test/mockSupabase';
 
 const { generateFlysheetPdfMock, toastMock } = vi.hoisted(() => ({
@@ -61,22 +61,27 @@ describe('SoundvisionFlysheetButton', () => {
         warnings: [],
       }],
     };
-    const parseSessionFile = vi.fn().mockResolvedValue({
+    const map: NwmMap = {
       sessionName: 'Gira 2026',
       units: [],
       groups: [],
       flysheet,
-    });
-    const { container } = render(
+    };
+    render(
       <SoundvisionFlysheetButton
-        parseSessionFile={parseSessionFile}
+        session={{
+          sourceFileName: 'gira.xmlp',
+          sourceType: 'xmlp',
+          importedAt: '2026-07-20T20:00:00.000Z',
+          map,
+          flysheet,
+          units: [],
+          storageScope: 'test',
+        }}
         createdBy="Pat Jones"
       />,
     );
-    const input = container.querySelector('input[type="file"]');
-    const file = new File(['encrypted'], 'gira.xmlp', { type: 'application/octet-stream' });
-
-    fireEvent.change(input!, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Generar flysheet' }));
 
     await waitFor(() => {
       expect(generateFlysheetPdfMock).toHaveBeenCalledWith(

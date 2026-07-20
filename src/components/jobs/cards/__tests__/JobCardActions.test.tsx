@@ -20,6 +20,7 @@ const {
   loadTechnicalPowerSummaryDataMock,
   fetchJobLogoMock,
   dataLayerFunctionsInvokeMock,
+  useIsMobileMock,
   useQueryMock,
   jobDepartmentsQueryState,
   technicalPowerSummaryQueryState,
@@ -34,6 +35,7 @@ const {
   loadTechnicalPowerSummaryDataMock: vi.fn(),
   fetchJobLogoMock: vi.fn(),
   dataLayerFunctionsInvokeMock: vi.fn(),
+  useIsMobileMock: vi.fn(() => false),
   useQueryMock: vi.fn(),
   jobDepartmentsQueryState: {
     data: ['sound', 'lights', 'video'] as any,
@@ -143,7 +145,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('@/hooks/use-mobile', () => ({
-  useIsMobile: () => false,
+  useIsMobile: useIsMobileMock,
 }));
 
 vi.mock('@/hooks/useOptimizedAuth', () => ({
@@ -259,6 +261,7 @@ describe('JobCardActions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useIsMobileMock.mockReturnValue(false);
     supabaseFromMock.mockImplementation((table: string) => {
       if (table === 'job_departments') {
         return createSupabaseBuilder({
@@ -362,6 +365,38 @@ describe('JobCardActions', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('Sound XMLP Flex job action', () => {
+    it('renders only on the Sound department job card', () => {
+      const { rerender } = render(<JobCardActions {...defaultProps} department="sound" />);
+
+      expect(screen.getByRole('button', { name: 'XMLP → Flex' })).toBeInTheDocument();
+
+      rerender(<JobCardActions {...defaultProps} department="lights" />);
+      expect(screen.queryByRole('button', { name: 'XMLP → Flex' })).not.toBeInTheDocument();
+
+      rerender(<JobCardActions {...defaultProps} department="video" />);
+      expect(screen.queryByRole('button', { name: 'XMLP → Flex' })).not.toBeInTheDocument();
+    });
+
+    it('opens the dedicated XMLP import workflow', async () => {
+      render(<JobCardActions {...defaultProps} department="sound" />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'XMLP → Flex' }));
+
+      expect(await screen.findByRole('heading', { name: 'Importar XMLP de Soundvision' })).toBeInTheDocument();
+      expect(screen.getByText(/elegir su Presupuesto o Pull Sheet/)).toBeInTheDocument();
+      expect(screen.queryByText(/Diseñador NM\/SV/)).not.toBeInTheDocument();
+    });
+
+    it('remains available on the mobile Sound job card', () => {
+      useIsMobileMock.mockReturnValue(true);
+
+      render(<JobCardActions {...defaultProps} department="sound" />);
+
+      expect(screen.getByRole('button', { name: 'XMLP → Flex' })).toBeInTheDocument();
+    });
   });
 
   describe('Open Flex button', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { soundWeightComponents } from '@/features/technical-tools/weights/soundWeightComponents';
+import { resolveXmlpRiggingRequirement } from '@/features/technical-tools/weights/xmlpRiggingRequirements';
 import { buildXmlpWeightTables } from '@/features/technical-tools/weights/xmlpWeightImport';
 
 type XmlpArrayInput = Parameters<typeof buildXmlpWeightTables>[0]['arrays'][number];
@@ -16,6 +17,30 @@ const makeArray = (overrides: Partial<XmlpArrayInput> = {}): XmlpArrayInput => (
   rearLoadKg: null,
   enclosures: [{ model: 'K2' }, { model: 'K2' }],
   ...overrides,
+});
+
+describe('resolveXmlpRiggingRequirement', () => {
+  it.each([
+    ['K1-BUMP', 'BUMPER K1'],
+    ['K1 BAR', 'BUMPER K1'],
+    ['K2-BUMP', 'BUMPER K2'],
+    ['K3 BAR', 'BUMPER K3'],
+    ['M-BUMP', 'BUMPER KARA'],
+    ['KARA MINI-BU', 'BUMPER KARA'],
+    ['KIVA-BAR', 'BUMPER KIVA'],
+    ['KS28 OUTRIG', 'BUMPER KS28'],
+    ['TFS900 BUMP', 'BUMPER TFS900'],
+    ['TFS550 BAR', 'BUMPER TFS550'],
+  ])('maps %s to %s', (riggingFrame, canonicalKey) => {
+    expect(resolveXmlpRiggingRequirement(makeArray({ riggingFrame }), 0)).toMatchObject({
+      canonicalKey,
+      quantity: 1,
+    });
+  });
+
+  it('does not treat a different numbered model as K1 or K2 rigging', () => {
+    expect(resolveXmlpRiggingRequirement(makeArray({ riggingFrame: 'K20-BUMP' }), 0)).toBeNull();
+  });
 });
 
 describe('buildXmlpWeightTables', () => {

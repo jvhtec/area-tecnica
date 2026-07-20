@@ -130,6 +130,71 @@ function extractXmlBlocks(xml: string, tag: string): XmlBlock[] {
   return blocks;
 }
 
+interface NamedXmlAncestor {
+  tagName: string;
+  name: string;
+}
+
+/**
+ * Soundvision can nest clusters inside named scene groups below one broad
+ * physical_configuration (commonly named "ALL"). Capture the closest named
+ * ancestor for each cluster without requiring a fixed group tag name; project
+ * files from different Soundvision versions use slightly different wrappers.
+ */
+function closestNamedAncestors(
+  xml: string,
+  targetStarts: readonly number[],
+): Map<number, string> {
+  const targets = new Set(targetStarts);
+  const result = new Map<number, string>();
+  const stack: NamedXmlAncestor[] = [];
+  const tags = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\/[A-Za-z_][\w:.-]*\s*>|<[A-Za-z_][\w:.-]*\b[^>]*>/g;
+
+  for (const match of xml.matchAll(tags)) {
+    const start = match.index;
+    const raw = match[0];
+    if (targets.has(start)) {
+      const ancestor = [...stack]
+        .reverse()
+        .find((entry) => entry.name && entry.tagName !== "project");
+      if (ancestor) result.set(start, ancestor.name);
+    }
+
+    if (raw.startsWith("<!--") || raw.startsWith("<?") || raw.startsWith("<!")) {
+      continue;
+    }
+
+    const closing = raw.match(/^<\/([A-Za-z_][\w:.-]*)/);
+    if (closing) {
+      const tagName = closing[1].split(":").pop()!.toLowerCase();
+      while (stack.length > 0) {
+        const entry = stack.pop()!;
+        if (entry.tagName === tagName) break;
+      }
+      continue;
+    }
+
+    const opening = raw.match(/^<([A-Za-z_][\w:.-]*)\b([^>]*)>/);
+    if (!opening) continue;
+    const tagName = opening[1].split(":").pop()!.toLowerCase();
+    if (tagName === "name" || tagName === "label") {
+      const directText = xml
+        .slice(start + raw.length)
+        .match(new RegExp(`^\\s*([^<]*?)\\s*</(?:[\\w.-]+:)?${tagName}\\s*>`, "i"))?.[1];
+      const parent = stack[stack.length - 1];
+      if (parent && directText?.trim()) parent.name = decodeXmlEntities(directText.trim());
+    }
+
+    if (raw.endsWith("/>")) continue;
+    stack.push({
+      tagName,
+      name: firstAttribute(attrs(opening[2]), ["name", "label"]),
+    });
+  }
+
+  return result;
+}
+
 function firstTextOf(body: string, tags: readonly string[]): string {
   for (const tag of tags) {
     const value = textOf(body, tag);
@@ -343,6 +408,7 @@ export function parseSoundvisionFlysheet(
   const arrays: SoundvisionFlysheetArray[] = [];
   const allConfigurations = extractXmlBlocks(xml, "physical_configuration");
   const clusters = extractXmlBlocks(xml, "cluster");
+  const namedAncestors = closestNamedAncestors(xml, clusters.map((cluster) => cluster.start));
 
   for (const cluster of clusters) {
     const configuration = allConfigurations
@@ -353,6 +419,7 @@ export function parseSoundvisionFlysheet(
     const configurationAttributes = attrs(configuration.attributes);
     const configurationBody = configuration.body;
     const groupName =
+      namedAncestors.get(cluster.start) ||
       firstAttribute(configurationAttributes, ["name", "id"]) ||
       firstTextOf(configurationBody.split(/<cluster\b/i)[0], ["name", "label"]) ||
       "SISTEMA";

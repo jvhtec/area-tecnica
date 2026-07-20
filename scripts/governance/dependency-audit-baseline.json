@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-07-01T21:13:42Z",
+  "generatedAt": "2026-07-20T00:00:00Z",
   "note": "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities.",
   "advisoryIds": [
     "1112659",
@@ -14,7 +14,11 @@
     "1114680",
     "1116451",
     "1119441",
-    "1120782"
+    "1120782",
+    "1123939",
+    "1123940",
+    "1123941",
+    "1123942"
   ],
   "exceptions": [
     {
@@ -100,6 +104,34 @@
       "owner": "platform-security",
       "reviewBy": "2026-09-30",
       "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x. @capacitor/assets is already at its latest release and npm audit reports no fixAvailable path for that nested CLI; remove this exception when @capacitor/assets publishes a compatible release that no longer depends on the vulnerable tar range."
+    },
+    {
+      "advisoryId": "1123939",
+      "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
+      "rationale": "This remains only in local/build tooling through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar 6.2.1. The production @capacitor/cli path was upgraded to tar 7.5.20; @capacitor/assets is already at its latest release and has no compatible fix, so remove this exception when its nested CLI is updated."
+    },
+    {
+      "advisoryId": "1123940",
+      "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
+      "rationale": "This remains only in local/build tooling through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar 6.2.1. The production @capacitor/cli path was upgraded to tar 7.5.20; @capacitor/assets is already at its latest release and has no compatible fix, so remove this exception when its nested CLI is updated."
+    },
+    {
+      "advisoryId": "1123941",
+      "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
+      "rationale": "This remains only in local/build tooling through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar 6.2.1. The production @capacitor/cli path was upgraded to tar 7.5.20; @capacitor/assets is already at its latest release and has no compatible fix, so remove this exception when its nested CLI is updated."
+    },
+    {
+      "advisoryId": "1123942",
+      "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
+      "rationale": "This remains only in local/build tooling through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar 6.2.1. The production @capacitor/cli path was upgraded to tar 7.5.20; @capacitor/assets is already at its latest release and has no compatible fix, so remove this exception when its nested CLI is updated."
     }
   ],
   "vulnerabilityCounts": {
@@ -107,7 +139,7 @@
     "low": 1,
     "moderate": 3,
     "high": 6,
-    "critical": 0
+    "critical": 1
   },
   "total": 10
 }

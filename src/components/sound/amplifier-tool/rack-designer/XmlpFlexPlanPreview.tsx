@@ -92,7 +92,10 @@ export function XmlpFlexPlanPreview({
                 disabled={selectableIds.length === 0}
                 onCheckedChange={(value) => {
                   const next = new Set(selectedIds);
-                  for (const id of selectableIds) value === true ? next.add(id) : next.delete(id);
+                  for (const id of selectableIds) {
+                    if (value === true) next.add(id);
+                    else next.delete(id);
+                  }
                   onSelectedIdsChange(next);
                 }}
                 aria-label={`Seleccionar grupo ${group.label}`}

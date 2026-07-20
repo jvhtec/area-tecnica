@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AmplifierResults } from '@/components/sound/amplifier-tool/types';
+import type { NwmMap } from '../nwm-import';
 import { mockSupabase } from '@/test/mockSupabase';
 import { AmpRackDesigner } from '../AmpRackDesigner';
 
@@ -28,9 +29,7 @@ const calculatorResults: AmplifierResults = {
   },
 };
 
-const parsedSessionResponse = {
-  data: {
-    map: {
+const parsedSessionMap: NwmMap = {
       sessionName: 'GIRA 2026',
       units: [
         {
@@ -44,7 +43,38 @@ const parsedSessionResponse = {
         },
       ],
       groups: [{ name: 'K2 L', role: 'source', members: [11] }],
-    },
+      flysheet: {
+        projectName: 'GIRA 2026',
+        arrays: [{
+          groupName: 'PA',
+          arrayName: 'K2 L',
+          deployment: 'stacked' as const,
+          azimuthDegrees: null,
+          topSiteDegrees: null,
+          bottomSiteDegrees: null,
+          topHeightMeters: null,
+          bottomHeightMeters: null,
+          riggingFrame: '',
+          flyingBarSetting: '',
+          pickupConfiguration: '',
+          totalMassKg: null,
+          frontLoadKg: null,
+          rearLoadKg: null,
+          enclosures: [{
+            model: 'K2',
+            splayAngleDegrees: null,
+            siteAngleDegrees: null,
+            trimHeightMeters: null,
+            dispersionSetting: null,
+          }],
+          warnings: [],
+        }],
+      },
+};
+
+const parsedSessionResponse = {
+  data: {
+    map: parsedSessionMap,
   },
   error: null as null,
 };
@@ -66,9 +96,26 @@ describe('AmpRackDesigner — modo independiente', () => {
     );
 
     expect(await screen.findByText('Suelta aquí una sesión NM o Soundvision')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Generar flysheet' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Generar flysheet' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Enviar a Flex' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Regenerar' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Exportar PDF' })).toBeDisabled();
+  });
+
+  it('keeps Flex export out of the NM/SV designer even when it is job-scoped', async () => {
+    render(
+      <AmpRackDesigner
+        standalone
+        hideTrigger
+        open
+        onOpenChange={vi.fn()}
+        jobId="job-123"
+        storageScope="job-scoped-test"
+      />,
+    );
+
+    expect(await screen.findByText('Suelta aquí una sesión NM o Soundvision')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enviar a Flex' })).not.toBeInTheDocument();
   });
 
   it('allows starting a design manually and persists it in the standalone scope', async () => {
@@ -99,6 +146,7 @@ describe('AmpRackDesigner — modo independiente', () => {
         hideTrigger
         open
         onOpenChange={vi.fn()}
+        jobId="job-123"
         storageScope="standalone-drop-test"
       />,
     );
@@ -119,6 +167,8 @@ describe('AmpRackDesigner — modo independiente', () => {
     });
     expect(await screen.findByText('K2 L')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Exportar PDF' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Generar flysheet' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Enviar a Flex' })).not.toBeInTheDocument();
   });
 
   it('ignores a second dropped session while an import is already in progress', async () => {

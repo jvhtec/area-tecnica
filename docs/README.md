@@ -25,6 +25,7 @@ Detailed documentation for each major subsystem — key files, database tables, 
 - **[SoundVision Files](workflows/soundvision-files.md)** — File library with access request and review workflow
 - **[Technical PDF Sync](technical-pdf-sync.md)** — How generated technical PDFs (consumos, pesos, memorias, SV reports) stay in sync for jobs and tour dates; required triggers when adding generators/mutations
 - **[Consumos power calculations](technical-tools/power-calculations.md)** — canonical equations, assumptions, validation, PDU planning policy, persisted snapshots, report aggregation, and engineering limitations
+- **[Soundvision XMLP → Flex package](architecture/xmlp-flex-export.md)** — parse-once ownership, shared Pesos/Consumos derivation, exact equipment mapping, Pull Sheet/Presupuesto preview, and strict grouped writes
 
 
 ## Festival architecture (section-specific)

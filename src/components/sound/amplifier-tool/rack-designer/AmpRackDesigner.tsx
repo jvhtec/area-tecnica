@@ -7,8 +7,6 @@ import {
   Network,
   Plus,
   RefreshCw,
-  Send,
-  Upload,
   UploadCloud,
   Wand2,
   X,
@@ -69,7 +67,8 @@ import {
 import { useAmpJoin } from '@/components/sound/amplifier-tool/rack-designer/useAmpJoin';
 import { useRackDragMerge } from '@/components/sound/amplifier-tool/rack-designer/useRackDragMerge';
 import { RackBlockCard } from '@/components/sound/amplifier-tool/rack-designer/RackBlockCard';
-import { SoundvisionFlysheetButton } from '@/components/sound/amplifier-tool/rack-designer/SoundvisionFlysheetButton';
+import { ImportedXmlpActions } from '@/components/sound/amplifier-tool/rack-designer/ImportedXmlpActions';
+import { LaSessionImportButton } from '@/components/sound/amplifier-tool/rack-designer/LaSessionImportButton';
 import { BlockEditorPanel } from '@/components/sound/amplifier-tool/rack-designer/BlockEditorPanel';
 import { AmpEditFields } from '@/components/sound/amplifier-tool/rack-designer/AmpEditFields';
 import { useCanvasZoom } from '@/components/sound/amplifier-tool/rack-designer/useCanvasZoom';
@@ -79,11 +78,9 @@ import {
 } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import { parseLaSessionFile } from '@/components/sound/amplifier-tool/rack-designer/parse-session-file';
 import {
-  canExportCompleteXmlpPackage,
   createImportedLaSession,
   type ImportedLaSession,
 } from '@/components/sound/amplifier-tool/rack-designer/importedLaSession';
-import { XmlpFlexExportDialog } from '@/components/sound/amplifier-tool/rack-designer/XmlpFlexExportDialog';
 
 const MADRID_TZ = 'Europe/Madrid';
 
@@ -128,7 +125,6 @@ export function AmpRackDesigner({
   const [isImporting, setIsImporting] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [importedSession, setImportedSession] = useState<ImportedLaSession | null>(null);
-  const [flexExportOpen, setFlexExportOpen] = useState(false);
   const nwmInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const open = controlledOpen ?? internalOpen;
@@ -147,7 +143,6 @@ export function AmpRackDesigner({
 
   useEffect(() => {
     setImportedSession(null);
-    setFlexExportOpen(false);
   }, [scope]);
 
   useEffect(() => {
@@ -319,7 +314,9 @@ export function AmpRackDesigner({
     setIsImporting(true);
     try {
       const map = await parseLaSessionFile(file);
-      if (!map.units?.length) throw new Error('La sesión no contiene amplificadores.');
+      if (!map.units?.length && !map.flysheet?.arrays.length) {
+        throw new Error('La sesión no contiene amplificadores ni arrays exportables.');
+      }
       setImportedSession(createImportedLaSession(file.name, map, {
         jobId,
         tourId,
@@ -330,7 +327,7 @@ export function AmpRackDesigner({
       setAmpTarget(null);
       toast({
         title: 'Sesión importada',
-        description: `${map.units.length} amplificadores cargados desde ${file.name}.`,
+        description: `${map.units.length} amplificadores y ${map.flysheet?.arrays.length ?? 0} arrays cargados desde ${file.name}.`,
       });
     } catch (error) {
       const message =
@@ -514,45 +511,15 @@ export function AmpRackDesigner({
               <Layers className="h-3.5 w-3.5" />
               Unir amps
             </Button>
-            <input
-              ref={nwmInputRef}
-              type="file"
-              accept=".nwm,.xmlp"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (file) void importSession(file);
-              }}
+            <LaSessionImportButton
+              inputRef={nwmInputRef}
+              isImporting={isImporting}
+              onImport={(file) => void importSession(file)}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              disabled={isImporting}
-              onClick={() => nwmInputRef.current?.click()}
-              title="Importar sesión de L-Acoustics: Network Manager (.nwm) o Soundvision (.xmlp)"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              {isImporting ? 'Importando…' : 'Importar NM/SV'}
-            </Button>
-            <SoundvisionFlysheetButton
+            <ImportedXmlpActions
               session={importedSession}
               createdBy={createdBy}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              disabled={!canExportCompleteXmlpPackage(importedSession)}
-              onClick={() => setFlexExportOpen(true)}
-              title="Revisar y enviar el paquete técnico del XMLP a Flex"
-            >
-              <Send className="h-3.5 w-3.5" />
-              Enviar a Flex
-            </Button>
             {results && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -827,13 +794,6 @@ export function AmpRackDesigner({
         </SheetContent>
       </Sheet>
 
-      {importedSession && canExportCompleteXmlpPackage(importedSession) && (
-        <XmlpFlexExportDialog
-          open={flexExportOpen}
-          onOpenChange={setFlexExportOpen}
-          session={importedSession}
-        />
-      )}
     </>
   );
 }

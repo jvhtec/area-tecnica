@@ -202,6 +202,31 @@ describe("parseSoundvisionFlysheet", () => {
     ]);
   });
 
+  it("uses the closest explicit Soundvision group below an ALL configuration", () => {
+    const groupedShape = `<project name="Grouped">
+      <physical_configuration><name>ALL</name><children>
+        <group><name>SISTEMA DE PA</name><children>
+          <cluster name="Copy of K1 L"><elements><enclosure model="K2" /></elements></cluster>
+        </children></group>
+        <source_group name="Outfill"><children>
+          <cluster name="KARA II 1"><elements><enclosure model="KARA" /></elements></cluster>
+        </children></source_group>
+        <source_group><label>Frontfill</label><children>
+          <cluster name="Copy of KARA II 1"><elements><enclosure model="KARA" /></elements></cluster>
+        </children></source_group>
+      </children></physical_configuration>
+    </project>`;
+
+    expect(parseSoundvisionFlysheet(groupedShape).arrays.map((array) => ({
+      groupName: array.groupName,
+      arrayName: array.arrayName,
+    }))).toEqual([
+      { groupName: "SISTEMA DE PA", arrayName: "Copy of K1 L" },
+      { groupName: "Outfill", arrayName: "KARA II 1" },
+      { groupName: "Frontfill", arrayName: "Copy of KARA II 1" },
+    ]);
+  });
+
   it("attaches flysheet data to the existing XMLP amplifier map", () => {
     const xml = soundvisionProject.replace(
       "</project>",

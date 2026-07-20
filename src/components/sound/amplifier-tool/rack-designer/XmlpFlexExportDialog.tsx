@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Loader2, Send } from 'lucide-react';
+import { useEffect, useMemo, useState, type MouseEventHandler } from 'react';
+import { AlertTriangle, Loader2, Plus, RefreshCw, Send } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   buildXmlpFlexExportPlan,
+  type XmlpFlexCandidate,
   type XmlpEquipmentRow,
   type XmlpFlexExportPlan,
 } from '@/features/technical-tools/flex/xmlpFlexExportPlan';
@@ -43,9 +44,20 @@ interface XmlpFlexExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   session: ImportedLaSession;
+  onCreateFlexTarget?: MouseEventHandler<HTMLButtonElement>;
 }
 
-export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexExportDialogProps) {
+interface XmlpFlexPushOutcome extends StrictGroupedPushResult {
+  skippedUnmappedItems: XmlpFlexCandidate[];
+  skippedAmbiguousItems: XmlpFlexCandidate[];
+}
+
+export function XmlpFlexExportDialog({
+  open,
+  onOpenChange,
+  session,
+  onCreateFlexTarget,
+}: XmlpFlexExportDialogProps) {
   const { toast } = useToast();
   const [plan, setPlan] = useState<XmlpFlexExportPlan | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -56,8 +68,9 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
   const [urlDocumentType, setUrlDocumentType] = useState<FlexEquipmentDocumentType>('pullsheet');
   const [confirmedAdditive, setConfirmedAdditive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshingTargets, setIsRefreshingTargets] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
-  const [result, setResult] = useState<StrictGroupedPushResult | null>(null);
+  const [result, setResult] = useState<XmlpFlexPushOutcome | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -89,7 +102,6 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
         if (discoveredTargets.length === 1) {
           setSelectedTargetKey(`${discoveredTargets[0].document_type}:${discoveredTargets[0].element_id}`);
         }
-        if (session.jobId && discoveredTargets.length === 0) setTargetMode('url');
       })
       .catch((error) => {
         if (!active) return;
@@ -114,8 +126,14 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
     ) ?? [],
     [plan, selectedIds],
   );
-  const allCandidates = plan?.groups.flatMap((group) => group.items) ?? [];
+  const allCandidates = plan
+    ? [...plan.groups.flatMap((group) => group.items), ...plan.unassignedItems]
+    : [];
   const mapped = allCandidates.filter((item) => item.mappingStatus === 'mapped' && item.flexCategoryKey);
+  const unmapped = allCandidates.filter(
+    (item) => item.mappingStatus === 'missing-equipment' || item.mappingStatus === 'missing-resource-id',
+  );
+  const ambiguous = allCandidates.filter((item) => item.mappingStatus === 'ambiguous');
   const selectedQuantity = selectedCandidates.reduce((sum, item) => sum + item.quantity, 0);
   const urlElementId = extractFlexElementId(url);
   const selectedJobTarget = targets.find(
@@ -126,6 +144,40 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
     : targetMode === 'url' && urlElementId
       ? { elementId: urlElementId, documentType: urlDocumentType }
       : null;
+
+  const handleRefreshTargets = async () => {
+    if (!session.jobId || isRefreshingTargets) return;
+    setIsRefreshingTargets(true);
+    try {
+      const discoveredTargets = await getJobFlexEquipmentTargets(session.jobId);
+      setTargets(discoveredTargets);
+      setSelectedTargetKey((current) => {
+        if (discoveredTargets.some(
+          (item) => `${item.document_type}:${item.element_id}` === current,
+        )) return current;
+        return discoveredTargets.length === 1
+          ? `${discoveredTargets[0].document_type}:${discoveredTargets[0].element_id}`
+          : '';
+      });
+      if (discoveredTargets.length > 0) setTargetMode('job');
+      toast({
+        title: 'Documentos Flex actualizados',
+        description: discoveredTargets.length > 0
+          ? discoveredTargets.length === 1
+            ? '1 destino disponible.'
+            : `${discoveredTargets.length} destinos disponibles.`
+          : 'Todavía no hay Pull Sheets ni Presupuestos disponibles para este trabajo.',
+      });
+    } catch (error) {
+      toast({
+        title: 'No se pudieron actualizar los documentos',
+        description: error instanceof Error ? error.message : 'Error consultando Flex.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshingTargets(false);
+    }
+  };
 
   const handlePush = async () => {
     if (!target || selectedCandidates.length === 0 || !confirmedAdditive) return;
@@ -141,7 +193,11 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
           flexCategoryKey: item.flexCategoryKey!,
         })),
       );
-      setResult(pushed);
+      setResult({
+        ...pushed,
+        skippedUnmappedItems: unmapped,
+        skippedAmbiguousItems: ambiguous,
+      });
       const failed = pushed.groupsFailed.length + pushed.failedChildItems.length;
       toast({
         title: failed === 0 ? 'Paquete enviado a Flex' : 'Envío parcial a Flex',
@@ -175,7 +231,8 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
             <div className="flex flex-wrap gap-2">
               <Badge>{mapped.length} líneas mapeadas</Badge>
               <Badge variant="secondary">{mapped.reduce((sum, item) => sum + item.quantity, 0)} unidades mapeadas</Badge>
-              <Badge variant="destructive">{plan.missingMappings.length} sin resolver</Badge>
+              <Badge variant="destructive">{unmapped.length} sin mapear</Badge>
+              <Badge variant="outline">{ambiguous.length} ambiguas</Badge>
               <Badge variant="outline">{allCandidates.length - selectedCandidates.length} excluidas</Badge>
               <Badge variant="outline">{plan.warnings.length} avisos</Badge>
             </div>
@@ -207,6 +264,31 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="flex flex-wrap gap-2">
+                  {onCreateFlexTarget && (
+                    <Button type="button" variant="outline" size="sm" onClick={onCreateFlexTarget}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Crear documento Flex
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isRefreshingTargets}
+                    onClick={() => void handleRefreshTargets()}
+                  >
+                    {isRefreshingTargets
+                      ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Actualizar documentos
+                  </Button>
+                </div>
+                {onCreateFlexTarget && (
+                  <p className="text-xs text-muted-foreground">
+                    “Crear documento Flex” abre el selector de carpetas del trabajo. Al terminar, vuelve aquí y actualiza la lista.
+                  </p>
+                )}
               </TabsContent>
               <TabsContent value="url" className="space-y-2">
                 <Label htmlFor="xmlp-flex-url">URL de Pull Sheet o Presupuesto</Label>
@@ -232,9 +314,17 @@ export function XmlpFlexExportDialog({ open, onOpenChange, session }: XmlpFlexEx
             {result && (
               <Alert variant={result.equipmentLinesAdded === 0 ? 'destructive' : 'default'}>
                 <Send className="h-4 w-4" />
-                <AlertTitle>{result.equipmentLinesAdded > 0 ? 'Resultado del envío' : 'No se añadió equipo'}</AlertTitle>
+                <AlertTitle>
+                  {result.equipmentLinesAdded === 0 && result.groupsFailed.length > 0
+                    ? 'Fallo de cabecera'
+                    : result.equipmentLinesAdded === 0
+                      ? 'No se añadió equipo'
+                      : result.groupsFailed.length > 0 || result.failedChildItems.length > 0
+                        ? 'Envío parcial'
+                        : 'Envío completo'}
+                </AlertTitle>
                 <AlertDescription>
-                  {result.groupsCreated.length} grupos creados; {result.equipmentLinesAdded} líneas añadidas; {result.groupsFailed.length} grupos fallidos; {result.failedChildItems.length} líneas hijas fallidas; {result.childrenSkippedBecauseParentFailed.length} hijas omitidas por fallo de cabecera.
+                  {result.groupsCreated.length} grupos creados; {result.equipmentLinesAdded} líneas añadidas; {result.groupsFailed.length} grupos fallidos; {result.failedChildItems.length} líneas hijas fallidas; {result.childrenSkippedBecauseParentFailed.length} hijas omitidas por fallo de cabecera; {result.skippedUnmappedItems.length} sin mapear omitidas; {result.skippedAmbiguousItems.length} ambiguas omitidas.
                 </AlertDescription>
               </Alert>
             )}

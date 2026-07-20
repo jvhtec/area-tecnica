@@ -120,9 +120,19 @@ const normalizedTokens = (value: string) =>
     .filter(Boolean);
 
 const hasToken = (tokens: string[], ...words: string[]) =>
-  tokens.some((token) => words.some((word) => token === word || token.startsWith(word)));
+  tokens.some((token) => words.includes(token));
 
-const SUB_MODELS = new Set(['KS28', 'K1SB', 'SB18', 'SB15', 'SB10', 'SB28']);
+const SUB_MODELS = new Set([
+  'KS28',
+  'KS21',
+  'K1SB',
+  'SB28',
+  'SB18',
+  'SB15',
+  'SB10',
+  'TFS900B',
+  'TFS550L',
+]);
 const FULL_RANGE_MODELS = new Set([
   'K1',
   'K2',
@@ -132,26 +142,26 @@ const FULL_RANGE_MODELS = new Set([
   'KIVA',
   'TFS900H',
   'TFA600',
+  'TFS600A',
   'TFS550H',
-  'TFS550L',
 ]);
 
 const explicitCategory = (value: string): XmlpFlexCategoryKey | null => {
   const tokens = normalizedTokens(value);
-  if (hasToken(tokens, 'DOWNFILL') || hasToken(tokens, 'DOWN') || value.match(/DOWN\s+FILL/i)) {
+  if (hasToken(tokens, 'DOWNFILL', 'DOWNFILLS', 'DOWN') || value.match(/DOWN\s+FILL/i)) {
     return 'pa_downfill';
   }
-  if (hasToken(tokens, 'OUTFILL', 'SIDEFILL') || hasToken(tokens, 'OUT', 'SIDE') || tokens.includes('OF')) {
+  if (hasToken(tokens, 'OUTFILL', 'OUTFILLS', 'SIDEFILL', 'SIDEFILLS', 'OUT', 'SIDE')) {
     return 'pa_outfill';
   }
-  if (hasToken(tokens, 'FRONTFILL') || hasToken(tokens, 'FRONT') || tokens.includes('FF')) {
+  if (hasToken(tokens, 'FRONTFILL', 'FRONTFILLS', 'FRONT', 'FRONTS') || tokens.includes('FF')) {
     return 'pa_frontfill';
   }
-  if (hasToken(tokens, 'DELAY') || tokens.includes('DLY')) return 'pa_delays';
-  if (hasToken(tokens, 'SUBWOOFER') || hasToken(tokens, 'SUB') || tokens.includes('SB')) {
+  if (hasToken(tokens, 'DELAY', 'DELAYS') || tokens.includes('DLY')) return 'pa_delays';
+  if (hasToken(tokens, 'SUBWOOFER', 'SUBWOOFERS', 'SUB', 'SUBS') || tokens.includes('SB')) {
     return 'pa_subs';
   }
-  if (hasToken(tokens, 'MAIN', 'MAINS', 'SYSTEM', 'SISTEMA') || tokens.includes('PA')) {
+  if (hasToken(tokens, 'MAIN', 'MAINS', 'SYSTEM', 'SYSTEMS', 'SISTEMA', 'SISTEMAS') || tokens.includes('PA')) {
     return 'pa_mains';
   }
   return null;
@@ -166,10 +176,10 @@ export function classifyXmlpArray(array: SoundvisionFlysheetArray): XmlpArrayCla
       ? `${array.arrayName || array.groupName}: mezcla sospechosa de subgraves y recintos full-range.`
       : undefined;
 
-  const fromArrayName = explicitCategory(array.arrayName);
-  if (fromArrayName) return { category: fromArrayName, warning: mixedWarning };
   const fromGroupName = explicitCategory(array.groupName);
   if (fromGroupName) return { category: fromGroupName, warning: mixedWarning };
+  const fromArrayName = explicitCategory(array.arrayName);
+  if (fromArrayName) return { category: fromArrayName, warning: mixedWarning };
   if (hasSubs && !hasFullRange) return { category: 'pa_subs', warning: mixedWarning };
 
   const nameTokens = normalizedTokens(`${array.arrayName} ${array.groupName}`);
@@ -211,7 +221,13 @@ const aliases: XmlpEquipmentAlias[] = [
   { canonicalKey: 'K3', acceptedNames: ["L'Acoustics K3", 'K3'], departments: ['sound'], categories: ['speakers', 'pa_mains'] },
   { canonicalKey: 'KARA II', acceptedNames: ["L'Acoustics Kara", "L'Acoustics Kara II", 'Kara', 'Kara II'], departments: ['sound'], categories: ['speakers', 'pa_mains'] },
   { canonicalKey: 'KIVA', acceptedNames: ["L'Acoustics Kiva", 'Kiva'], departments: ['sound'], categories: ['speakers', 'pa_mains'] },
-  { canonicalKey: 'KS28', acceptedNames: ["L'Acoustics KS28", 'KS28'], departments: ['sound'], categories: ['speakers', 'pa_subs'] },
+  { canonicalKey: 'KS28', acceptedNames: ["L'Acoustics KS 28", "L'Acoustics KS28", 'KS28'], departments: ['sound'], categories: ['speakers', 'pa_subs'] },
+  { canonicalKey: 'KS21', acceptedNames: ["L'Acoustics KS21", 'KS21'], departments: ['sound'], categories: ['speakers', 'pa_subs'] },
+  { canonicalKey: 'TFS900B', acceptedNames: ['Turbosound TFS-900B', 'TFS900B'], departments: ['sound'], categories: ['speakers', 'pa_subs'] },
+  { canonicalKey: 'TFS550L', acceptedNames: ['Turbosound TFS-550L', 'TFS550L'], departments: ['sound'], categories: ['speakers', 'pa_subs'] },
+  { canonicalKey: 'TFS900H', acceptedNames: ['Turbosound TFS-900H', 'TFS900H'], departments: ['sound'], categories: ['speakers', 'pa_mains'] },
+  { canonicalKey: 'TFA600', acceptedNames: ['Turbosound TFA-600', 'TFA600', 'Turbosound TFS-600A', 'TFS600A'], departments: ['sound'], categories: ['speakers', 'pa_mains'] },
+  { canonicalKey: 'TFS550H', acceptedNames: ['Turbosound TFS-550H', 'TFS550H'], departments: ['sound'], categories: ['speakers', 'pa_mains'] },
   { canonicalKey: 'LA12X', acceptedNames: ["L'Acoustics LA12X", 'LA12X'], departments: ['sound'], categories: ['amplificacion', 'pa_amp'] },
   { canonicalKey: 'LA8', acceptedNames: ["L'Acoustics LA8", 'LA8'], departments: ['sound'], categories: ['amplificacion', 'pa_amp'] },
   { canonicalKey: 'LA4X', acceptedNames: ["L'Acoustics LA4X", 'LA4X'], departments: ['sound'], categories: ['amplificacion', 'pa_amp'] },
@@ -219,12 +235,15 @@ const aliases: XmlpEquipmentAlias[] = [
   { canonicalKey: 'PLM20000D', acceptedNames: ['PLM 20000DP', 'PLM20000D'], departments: ['sound'], categories: ['amplificacion', 'pa_amp'] },
   { canonicalKey: 'LA-RAK II', acceptedNames: ["L'Acoustics LA-RAK II", 'LA-RAK II'], departments: ['sound'], categories: ['amplificacion', 'pa_amp'] },
   { canonicalKey: 'LA-CASE', acceptedNames: ["L'Acoustics LA-CASE II", 'LA-CASE II'], departments: ['sound'], categories: ['amplificacion', 'pa_amp'] },
-  { canonicalKey: 'BUMPER K1', acceptedNames: ['Dual K1 Rigging Flight Case', 'K1 Rigging Flight Case'], departments: ['lights'], categories: ['rigging'] },
-  { canonicalKey: 'BUMPER K2', acceptedNames: ['Dual K2 Rigging Flight Case'], departments: ['lights'], categories: ['rigging'] },
+  { canonicalKey: 'BUMPER K1 DUAL CASE', acceptedNames: ['Dual K1 Rigging Flight Case'], departments: ['lights'], categories: ['rigging'] },
+  { canonicalKey: 'BUMPER K1 SINGLE CASE', acceptedNames: ['K1 Rigging Flight Case'], departments: ['lights'], categories: ['rigging'] },
+  { canonicalKey: 'BUMPER K2 DUAL CASE', acceptedNames: ['Dual K2 Rigging Flight Case'], departments: ['lights'], categories: ['rigging'] },
   { canonicalKey: 'BUMPER K3', acceptedNames: ['K3-BUMP'], departments: ['lights'], categories: ['rigging'] },
-  { canonicalKey: 'BUMPER KARA', acceptedNames: ['Dual Kara Rigging Flight Case'], departments: ['lights'], categories: ['rigging'] },
+  { canonicalKey: 'BUMPER KARA DUAL CASE', acceptedNames: ['Dual Kara Rigging Flight Case'], departments: ['lights'], categories: ['rigging'] },
   { canonicalKey: 'BUMPER KIVA', acceptedNames: ["L'Acoustics KIBU", 'KIBU'], departments: ['lights'], categories: ['rigging'] },
   { canonicalKey: 'BUMPER KS28', acceptedNames: ['KS28 BUMP'], departments: ['lights'], categories: ['rigging'] },
+  { canonicalKey: 'BUMPER TFS900', acceptedNames: ['TFS900 Bumper', 'TFS900 BUMP'], departments: ['lights'], categories: ['rigging'] },
+  { canonicalKey: 'BUMPER TFS550', acceptedNames: ['TFS550 Bumper', 'TFS550 BUMP'], departments: ['lights'], categories: ['rigging'] },
   { canonicalKey: 'MOTOR 2T', acceptedNames: ['Motor Elevacion 2T D8+ - 25 m'], departments: ['lights'], categories: ['rigging'] },
   { canonicalKey: 'MOTOR 1T', acceptedNames: ['Motor Electrico de Elevación ChainMaster D8 1000kg - 30 m'], departments: ['lights'], categories: ['rigging'] },
   { canonicalKey: 'MOTOR 750KG', acceptedNames: ['Motor Elevacion ChainMaster D8+ 750kg - 24 m'], departments: ['lights'], categories: ['rigging'] },
@@ -239,6 +258,7 @@ const canonicalSpeaker = (model: string) => {
   const normalized = normalizeXmlpEquipmentName(model);
   if (normalized === 'KARA' || normalized === 'KARAII') return 'KARA II';
   if (normalized === 'K1SB') return 'K1-SB';
+  if (normalized === 'TFS600A') return 'TFA600';
   return normalized;
 };
 
@@ -256,17 +276,109 @@ interface RawCandidate {
   warning?: string;
 }
 
+interface PackagedRiggingCandidate extends RawCandidate {
+  canonicalKey:
+    | 'BUMPER K1'
+    | 'BUMPER K2'
+    | 'BUMPER KARA';
+}
+
+const packagedRiggingKeys = new Set<PackagedRiggingCandidate['canonicalKey']>([
+  'BUMPER K1',
+  'BUMPER K2',
+  'BUMPER KARA',
+]);
+
+const isPackagedRiggingCandidate = (
+  candidate: RawCandidate,
+): candidate is PackagedRiggingCandidate =>
+  candidate.source === 'xmlp-rigging' &&
+  packagedRiggingKeys.has(candidate.canonicalKey as PackagedRiggingCandidate['canonicalKey']);
+
+/**
+ * Converts serialized bumper pieces into the physical flight cases used by
+ * Flex. Pieces are aggregated per destination group before the dual-case
+ * calculation so left/right arrays share a case when appropriate.
+ */
+function packageRiggingCandidates(candidates: RawCandidate[]): RawCandidate[] {
+  const aggregated = new Map<string, PackagedRiggingCandidate>();
+  for (const candidate of candidates) {
+    if (!isPackagedRiggingCandidate(candidate)) continue;
+    const key = `${candidate.flexCategoryKey ?? 'unassigned'}:${candidate.canonicalKey}`;
+    const existing = aggregated.get(key);
+    if (!existing) {
+      aggregated.set(key, {
+        ...candidate,
+        sourceArrays: [...candidate.sourceArrays],
+      });
+      continue;
+    }
+    existing.quantity += candidate.quantity;
+    existing.sourceArrays = [...new Set([...existing.sourceArrays, ...candidate.sourceArrays])];
+    existing.warning = [existing.warning, candidate.warning].filter(Boolean).join(' ') || undefined;
+  }
+
+  const emitted = new Set<string>();
+  const packaged: RawCandidate[] = [];
+  for (const candidate of candidates) {
+    if (!isPackagedRiggingCandidate(candidate)) {
+      packaged.push(candidate);
+      continue;
+    }
+    const key = `${candidate.flexCategoryKey ?? 'unassigned'}:${candidate.canonicalKey}`;
+    if (emitted.has(key)) continue;
+    emitted.add(key);
+    const total = aggregated.get(key)!;
+
+    if (candidate.canonicalKey === 'BUMPER K1') {
+      const dualCases = Math.floor(total.quantity / 2);
+      if (dualCases > 0) {
+        packaged.push({
+          ...total,
+          canonicalKey: 'BUMPER K1 DUAL CASE',
+          displayName: 'Dual K1 Rigging Flight Case',
+          quantity: dualCases,
+        });
+      }
+      if (total.quantity % 2 === 1) {
+        packaged.push({
+          ...total,
+          canonicalKey: 'BUMPER K1 SINGLE CASE',
+          displayName: 'K1 Rigging Flight Case',
+          quantity: 1,
+        });
+      }
+      continue;
+    }
+
+    const isK2 = candidate.canonicalKey === 'BUMPER K2';
+    packaged.push({
+      ...total,
+      canonicalKey: isK2 ? 'BUMPER K2 DUAL CASE' : 'BUMPER KARA DUAL CASE',
+      displayName: isK2 ? 'Dual K2 Rigging Flight Case' : 'Dual Kara Rigging Flight Case',
+      quantity: Math.ceil(total.quantity / 2),
+    });
+  }
+  return packaged;
+}
+
 function resolveCandidate(raw: RawCandidate, equipment: XmlpEquipmentRow[]): XmlpFlexCandidate {
   const alias = aliasFor(raw.canonicalKey);
-  const base = {
+  const base: Omit<XmlpFlexCandidate, 'mappingStatus'> = {
     id: `${raw.flexCategoryKey ?? 'unassigned'}:${raw.canonicalKey}:${raw.source}`,
-    ...raw,
+    canonicalKey: raw.canonicalKey,
+    displayName: raw.displayName,
+    quantity: raw.quantity,
+    flexCategoryKey: raw.flexCategoryKey,
     sources: [raw.source],
+    sourceArrays: raw.sourceArrays,
+    inference: raw.inference,
     equipmentId: null,
     equipmentName: null,
     resourceId: null,
     expectedDepartment: alias?.departments.join(', ') ?? 'sound/lights',
     expectedCategories: alias?.categories ?? [],
+    warning: raw.warning,
   };
   if (!alias) return { ...base, mappingStatus: 'missing-equipment' };
 
@@ -286,7 +398,8 @@ function resolveCandidate(raw: RawCandidate, equipment: XmlpEquipmentRow[]): Xml
       warning: raw.warning ?? `Hay ${matches.length} recursos físicos aprobados para ${raw.canonicalKey}.`,
     };
   }
-  const match = matches[0];
+  const resolvedResourceId = [...resources][0];
+  const match = matches.find((row) => row.resource_id === resolvedResourceId) ?? matches[0];
   if (!match) return { ...base, mappingStatus: 'missing-equipment' };
   if (!match.resource_id) {
     return {
@@ -308,7 +421,11 @@ function resolveCandidate(raw: RawCandidate, equipment: XmlpEquipmentRow[]): Xml
 const mergeCandidates = (candidates: XmlpFlexCandidate[]) => {
   const merged = new Map<string, XmlpFlexCandidate>();
   for (const candidate of candidates) {
-    const key = `${candidate.flexCategoryKey ?? 'unassigned'}:${candidate.resourceId ?? candidate.canonicalKey}:${candidate.mappingStatus}`;
+    const identity =
+      candidate.mappingStatus === 'mapped' && candidate.resourceId
+        ? candidate.resourceId
+        : candidate.canonicalKey;
+    const key = `${candidate.flexCategoryKey ?? 'unassigned'}:${identity}:${candidate.mappingStatus}`;
     const existing = merged.get(key);
     if (!existing) {
       merged.set(key, { ...candidate, sourceArrays: [...candidate.sourceArrays], sources: [...candidate.sources] });
@@ -347,6 +464,9 @@ export function buildXmlpFlexExportPlan(
     const classification = classifications[index];
     if (classification.warning) warnings.push(classification.warning);
     const arrayName = array.arrayName.trim() || array.groupName.trim() || `Array ${index + 1}`;
+    const sourceArray = [array.groupName.trim(), arrayName]
+      .filter((value, sourceIndex, values) => value && values.indexOf(value) === sourceIndex)
+      .join(' / ');
     const counts = new Map<string, number>();
     for (const enclosure of array.enclosures) {
       const canonicalKey = canonicalSpeaker(enclosure.model);
@@ -359,7 +479,7 @@ export function buildXmlpFlexExportPlan(
         quantity,
         flexCategoryKey: classification.category,
         source: 'xmlp-speaker',
-        sourceArrays: [arrayName],
+        sourceArrays: [sourceArray],
         inference: 'explicit',
         warning: classification.warning,
       });
@@ -401,8 +521,11 @@ export function buildXmlpFlexExportPlan(
   for (const unit of uniqueUnits) {
     const model = toAmpModel(unit.model);
     const canonicalKey = model === 'OTRO' ? normalizeXmlpEquipmentName(unit.model) : model;
-    ampCounts.set(canonicalKey, (ampCounts.get(canonicalKey) ?? 0) + 1);
-    if (['LA4', 'LA4X', 'LA8', 'LA12X'].includes(model)) compatibleLaAmplifierCount += 1;
+    if (['LA4', 'LA4X', 'LA8', 'LA12X'].includes(model)) {
+      compatibleLaAmplifierCount += 1;
+    } else {
+      ampCounts.set(canonicalKey, (ampCounts.get(canonicalKey) ?? 0) + 1);
+    }
   }
   for (const [canonicalKey, quantity] of ampCounts) {
     raw.push({
@@ -451,22 +574,16 @@ export function buildXmlpFlexExportPlan(
     });
   }
 
-  const resolved = mergeCandidates(raw.map((candidate) => resolveCandidate(candidate, equipment)));
-  for (const candidate of resolved) {
-    if (candidate.flexCategoryKey === null) {
-      candidate.mappingStatus = 'ambiguous';
-      candidate.warning =
-        candidate.warning ?? 'El array necesita una asignación de grupo antes de poder enviarse.';
-    }
-  }
+  const individuallyResolved = packageRiggingCandidates(raw)
+    .map((candidate) => resolveCandidate(candidate, equipment));
   const canonicalKeysByResource = new Map<string, Set<string>>();
-  for (const candidate of resolved) {
+  for (const candidate of individuallyResolved) {
     if (!candidate.resourceId) continue;
     const keys = canonicalKeysByResource.get(candidate.resourceId) ?? new Set<string>();
     keys.add(candidate.canonicalKey);
     canonicalKeysByResource.set(candidate.resourceId, keys);
   }
-  for (const candidate of resolved) {
+  for (const candidate of individuallyResolved) {
     const keys = candidate.resourceId
       ? canonicalKeysByResource.get(candidate.resourceId)
       : undefined;
@@ -474,6 +591,14 @@ export function buildXmlpFlexExportPlan(
     candidate.mappingStatus = 'ambiguous';
     candidate.warning = `El resource_id ${candidate.resourceId} está asignado a identidades canónicas distintas (${[...keys].join(', ')}).`;
     warnings.push(candidate.warning);
+  }
+  const resolved = mergeCandidates(individuallyResolved);
+  for (const candidate of resolved) {
+    if (candidate.flexCategoryKey === null) {
+      candidate.mappingStatus = 'ambiguous';
+      candidate.warning =
+        candidate.warning ?? 'El array necesita una asignación de grupo antes de poder enviarse.';
+    }
   }
   const groups = XMLP_FLEX_GROUP_ORDER.map((flexCategoryKey) => ({
     flexCategoryKey,

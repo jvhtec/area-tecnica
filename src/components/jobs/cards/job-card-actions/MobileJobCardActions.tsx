@@ -26,6 +26,7 @@ import { ArchiveToFlexAction } from "@/components/jobs/cards/job-card-actions/Ar
 import { BackfillDocTecnicaAction } from "@/components/jobs/cards/job-card-actions/BackfillDocTecnicaAction";
 import { MotorCertificateAction } from "@/components/jobs/cards/job-card-actions/MotorCertificateAction";
 import { PrintFlexReportAction } from "@/components/jobs/cards/job-card-actions/PrintFlexReportAction";
+import { SoundvisionXmlpFlexJobAction } from "@/components/jobs/cards/job-card-actions/SoundvisionXmlpFlexJobAction";
 import type {
   JobCardActionButtonsProps,
   JobCardActionsProps,
@@ -309,6 +310,14 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
         <Button variant="outline" size="sm" onClick={onJobDetailsClick} className="gap-2">
           <Info className="h-4 w-4" /> Detalles
         </Button>
+      )}
+      {department === "sound" && isManagementUser && allowedJobType && job.job_type !== "dryhire" && (
+        <SoundvisionXmlpFlexJobAction
+          jobId={job.id}
+          jobName={job.job_name ?? job.name ?? job.title}
+          tourId={job.tour_id ?? job.tour?.id}
+          onCreateFlexTarget={canCreateFlexFolders ? onCreateFlexFolders : undefined}
+        />
       )}
       <MobileActionSheet
         title="Más acciones"
