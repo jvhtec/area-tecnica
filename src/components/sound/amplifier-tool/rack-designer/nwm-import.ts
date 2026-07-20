@@ -30,6 +30,11 @@ export interface SoundvisionFlysheetEnclosure {
   splayAngleDegrees: number | null;
   siteAngleDegrees: number | null;
   trimHeightMeters: number | null;
+  /**
+   * Panflex horizontal-dispersion setting for variable-directivity enclosures
+   * (K2, K3, KARA II), e.g. "55/35"; null for fixed-directivity boxes.
+   */
+  dispersionSetting: string | null;
 }
 export interface SoundvisionFlysheetArray {
   groupName: string;

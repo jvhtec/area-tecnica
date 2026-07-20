@@ -200,7 +200,7 @@ function drawCabinetRows(
   arrays.forEach((array, index) => {
     drawCell(
       pdf,
-      `${array.arrayName} · Recinto / Ángulo`,
+      `${array.arrayName} · Recinto / Áng. / Disp.`,
       startX + LABEL_COLUMN_WIDTH + index * arrayWidth,
       y,
       arrayWidth,
@@ -217,7 +217,9 @@ function drawCabinetRows(
     arrays.forEach((array, index) => {
       const enclosure = array.enclosures[row];
       const value = enclosure
-        ? `${enclosure.model}  |  ${formatCompactNumber(enclosure.splayAngleDegrees, '°')}`
+        ? `${enclosure.model}  |  ${formatCompactNumber(enclosure.splayAngleDegrees, '°')}${
+            enclosure.dispersionSetting ? `  |  ${enclosure.dispersionSetting}` : ''
+          }`
         : '';
       drawCell(
         pdf,
@@ -285,6 +287,78 @@ function drawWarnings(
       fontSize: 6.7,
     });
   });
+}
+
+const DISPERSION_NOTE_HEIGHT = 20;
+
+/**
+ * Draws the variable-dispersion (Panflex) legend: a small top-view diagram of a
+ * cabinet split into left/right halves seen from the box's own perspective, plus
+ * a Spanish note on how to read the "L/R" setting (e.g. 55/35).
+ */
+function drawDispersionNote(pdf: jsPDF, x: number, y: number, width: number): void {
+  const height = DISPERSION_NOTE_HEIGHT;
+  pdf.setFillColor(...LIGHT_GRAY);
+  pdf.setDrawColor(...BLACK);
+  pdf.setLineWidth(0.35);
+  pdf.rect(x, y, width, height, 'FD');
+
+  // Title.
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7.8);
+  pdf.setTextColor(...BLACK);
+  pdf.text('DISPERSIÓN VARIABLE (PANFLEX · K2 / K3 / KARA II)', x + 3, y + 4.5);
+
+  // --- Diagram: cabinet seen from above, from the box's own perspective ---
+  const diagramW = 46;
+  const dx = x + 4;
+  const dyTop = y + 7;
+  const audienceY = dyTop + 1; // "toward audience" is up
+  const cabinetY = y + height - 5;
+  const centerX = dx + diagramW / 2;
+
+  pdf.setLineWidth(0.4);
+  // Cabinet body (a short bar) split into two halves.
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(dx + 6, cabinetY, diagramW - 12, 2.6, 'FD');
+  pdf.line(centerX, cabinetY, centerX, cabinetY + 2.6); // centre divider
+  // Coverage fans: left half wider than right to illustrate an asymmetric set.
+  pdf.setDrawColor(...RED);
+  pdf.line(centerX - 3, cabinetY, dx, audienceY); // left outer (wide)
+  pdf.line(centerX - 3, cabinetY, centerX - 1, audienceY); // left inner
+  pdf.line(centerX + 3, cabinetY, centerX + 1, audienceY); // right inner
+  pdf.line(centerX + 3, cabinetY, dx + diagramW - 8, audienceY); // right outer (narrow)
+  pdf.setDrawColor(...BLACK);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(6.2);
+  pdf.text('IZQ', dx + 4, cabinetY + 2, { align: 'center' });
+  pdf.text('DER', dx + diagramW - 4, cabinetY + 2, { align: 'center' });
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(5.6);
+  pdf.triangle(
+    centerX - 1.2,
+    audienceY - 0.6,
+    centerX + 1.2,
+    audienceY - 0.6,
+    centerX,
+    audienceY - 2.4,
+    'F',
+  );
+  pdf.text('hacia el público', centerX + 3, audienceY - 1, { align: 'left' });
+
+  // --- Explanatory text ---
+  const textX = dx + diagramW + 4;
+  const textW = width - (diagramW + 11);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(6.6);
+  const note =
+    'Los recintos de directividad variable muestran su ajuste Panflex como IZQUIERDA/DERECHA ' +
+    '(p. ej. 55/35), leído desde la perspectiva del propio recinto mirando hacia el público: ' +
+    'el primer valor es la apertura horizontal (°) del lado izquierdo y el segundo la del lado derecho. ' +
+    'Los recintos de directividad fija (KS28, KARA, K1) no muestran ajuste. Confirme siempre en Soundvision.';
+  const lines = pdf.splitTextToSize(note, Math.max(1, textW));
+  pdf.text(lines, textX, y + 8);
 }
 
 function drawHeader(
@@ -428,7 +502,17 @@ export async function generateSoundvisionFlysheetPdf(
     const cabinetsStartY = drawSummaryRows(pdf, arrays, MARGIN, tableStartY, arrayWidth) + 2;
     const warningsStartY =
       drawCabinetRows(pdf, arrays, MARGIN, cabinetsStartY, arrayWidth, enclosureOffset) + 4;
-    drawWarnings(pdf, arrays, MARGIN, warningsStartY, arrayWidth, pageHeight - 27, continues);
+    // Reserve the legend strip only when this page actually shows a
+    // variable-dispersion enclosure, so pages without one keep the full height.
+    const hasDispersion = arrays.some((array) =>
+      array.enclosures.some((enclosure) => enclosure.dispersionSetting),
+    );
+    const footerTop = pageHeight - 27;
+    const warningsMaxY = hasDispersion ? footerTop - DISPERSION_NOTE_HEIGHT - 2 : footerTop;
+    drawWarnings(pdf, arrays, MARGIN, warningsStartY, arrayWidth, warningsMaxY, continues);
+    if (hasDispersion) {
+      drawDispersionNote(pdf, MARGIN, warningsMaxY + 2, contentWidth);
+    }
     drawFooter(pdf, generatedAt, sectorProLogo, pageIndex + 1, pages.length);
   });
 

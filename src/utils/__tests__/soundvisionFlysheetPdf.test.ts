@@ -35,6 +35,7 @@ const makeFlysheet = (arrayCount: number): SoundvisionFlysheet => ({
       splayAngleDegrees: enclosureIndex < 2 ? 5 : 0.25,
       siteAngleDegrees: -2.5 - enclosureIndex,
       trimHeightMeters: 10 - enclosureIndex * 0.45,
+      dispersionSetting: '55/55',
       }),
     ),
     warnings: arrayIndex === 0 ? ['Tipping hazard'] : [],
@@ -66,6 +67,7 @@ describe('generateSoundvisionFlysheetPdf', () => {
         splayAngleDegrees: 0.25,
         siteAngleDegrees: null,
         trimHeightMeters: null,
+        dispersionSetting: index % 2 === 0 ? '55/35' : null,
       }),
     );
 
