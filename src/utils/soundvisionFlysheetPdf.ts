@@ -26,6 +26,13 @@ const LIGHT_GRAY: PdfColor = [238, 238, 238];
 const MEDIUM_GRAY: PdfColor = [210, 210, 210];
 const YELLOW: PdfColor = [255, 235, 0];
 const RED: PdfColor = [222, 30, 30];
+// Non-default Panflex settings are colour-coded by pattern, echoing the
+// simétrico/asimétrico grouping in the dispersion legend below. The two
+// asymmetric directions get distinct colours too — 55/35 and 35/55 are
+// mirror images of each other, and mixing them up misaims the box.
+const DISPERSION_SYMMETRIC: PdfColor = [186, 230, 253]; // narrower but still even (e.g. 35/35 -> 70°)
+const DISPERSION_WIDE_LEFT: PdfColor = [255, 200, 120]; // L > R (e.g. 55/35) -> coverage skews left
+const DISPERSION_WIDE_RIGHT: PdfColor = [216, 180, 254]; // R > L (e.g. 35/55) -> coverage skews right
 
 export interface SoundvisionFlysheetPdfOptions {
   sourceFileName: string;
@@ -40,6 +47,32 @@ const formatNumber = (value: number | null, suffix: string, digits = 1): string 
 
 const formatCompactNumber = (value: number | null, suffix: string): string =>
   value === null ? '-' : `${value.toFixed(2).replace(/\.?0+$/, '')}${suffix}`;
+
+export type DispersionHighlight = 'symmetric' | 'wideLeft' | 'wideRight' | null;
+
+/**
+ * Classifies a Panflex "L/R" setting for the flysheet's cabinet table: the
+ * default symmetric 55/55 (110°) and fixed-directivity boxes (no setting)
+ * are never flagged; any other symmetric setting (e.g. 35/35 -> 70°) is
+ * flagged as narrower-but-even; an asymmetric setting is split by which side
+ * is wider (55/35 -> "wideLeft", 35/55 -> "wideRight") since the two are
+ * mirror images and mixing them up misaims the box.
+ */
+export const classifyDispersionHighlight = (setting: string | null | undefined): DispersionHighlight => {
+  const match = setting?.trim().match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
+  if (!match) return null;
+  const [, leftStr, rightStr] = match;
+  const left = Number(leftStr);
+  const right = Number(rightStr);
+  if (left === right) return left === 55 ? null : 'symmetric';
+  return left > right ? 'wideLeft' : 'wideRight';
+};
+
+const DISPERSION_HIGHLIGHT_COLOR: Record<Exclude<DispersionHighlight, null>, PdfColor> = {
+  symmetric: DISPERSION_SYMMETRIC,
+  wideLeft: DISPERSION_WIDE_LEFT,
+  wideRight: DISPERSION_WIDE_RIGHT,
+};
 
 const deploymentLabel = (deployment: SoundvisionFlysheetArray['deployment']): string => {
   if (deployment === 'flown') return 'VOLADO';
@@ -200,7 +233,7 @@ function drawCabinetRows(
   arrays.forEach((array, index) => {
     drawCell(
       pdf,
-      `${array.arrayName} · Recinto / Ángulo`,
+      `${array.arrayName} · Recinto / Áng. / Disp.`,
       startX + LABEL_COLUMN_WIDTH + index * arrayWidth,
       y,
       arrayWidth,
@@ -217,8 +250,14 @@ function drawCabinetRows(
     arrays.forEach((array, index) => {
       const enclosure = array.enclosures[row];
       const value = enclosure
-        ? `${enclosure.model}  |  ${formatCompactNumber(enclosure.splayAngleDegrees, '°')}`
+        ? `${enclosure.model}  |  ${formatCompactNumber(enclosure.splayAngleDegrees, '°')}${
+            enclosure.dispersionSetting ? `  |  ${enclosure.dispersionSetting}` : ''
+          }`
         : '';
+      // Flag boxes whose Panflex setting isn't the default 55/55, colour-coded
+      // by pattern so an asymmetric setting (orientation matters) reads
+      // differently from a merely narrower symmetric one.
+      const highlight = enclosure ? classifyDispersionHighlight(enclosure.dispersionSetting) : null;
       drawCell(
         pdf,
         value,
@@ -226,7 +265,11 @@ function drawCabinetRows(
         y,
         arrayWidth,
         CABINET_ROW_HEIGHT,
-        { fontSize: 7.2 },
+        {
+          fontSize: 7.2,
+          fill: highlight ? DISPERSION_HIGHLIGHT_COLOR[highlight] : undefined,
+          bold: !!highlight,
+        },
       );
     });
     y += CABINET_ROW_HEIGHT;
@@ -285,6 +328,158 @@ function drawWarnings(
       fontSize: 6.7,
     });
   });
+}
+
+const DISPERSION_NOTE_HEIGHT = 39;
+
+/**
+ * The four canonical Panflex settings. The two numbers are the left/right
+ * half-apertures read from the enclosure's own perspective (facing the
+ * audience); their sum is the nominal horizontal coverage. Recreated as an
+ * original vector legend rather than embedding L-Acoustics' reference image.
+ */
+const PANFLEX_SETTINGS: Array<{
+  code: string;
+  left: number;
+  right: number;
+  name: string;
+  highlight: DispersionHighlight;
+}> = [
+  { code: '55 / 55', left: 55, right: 55, name: '110° · simétrico', highlight: null },
+  { code: '35 / 35', left: 35, right: 35, name: '70° · simétrico', highlight: 'symmetric' },
+  { code: '55 / 35', left: 55, right: 35, name: '90° · asim. izq.', highlight: 'wideLeft' },
+  { code: '35 / 55', left: 35, right: 55, name: '90° · asim. der.', highlight: 'wideRight' },
+];
+
+/**
+ * Draws a small top-view Panflex coverage fan (audience is "up") for one
+ * setting: a shaded wedge bounded by the left/right half-aperture edges, with
+ * the enclosure marked as a bar at the apex.
+ */
+function drawPanflexGlyph(
+  pdf: jsPDF,
+  cx: number,
+  bottomY: number,
+  leftDeg: number,
+  rightDeg: number,
+  radius: number,
+): void {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const lx = cx - radius * Math.sin(toRad(leftDeg));
+  const ly = bottomY - radius * Math.cos(toRad(leftDeg));
+  const rx = cx + radius * Math.sin(toRad(rightDeg));
+  const ry = bottomY - radius * Math.cos(toRad(rightDeg));
+  // Shaded coverage wedge (chord approximation of the fan).
+  pdf.setFillColor(250, 214, 214);
+  pdf.triangle(cx, bottomY, lx, ly, rx, ry, 'F');
+  // Coverage edges.
+  pdf.setDrawColor(...RED);
+  pdf.setLineWidth(0.4);
+  pdf.line(cx, bottomY, lx, ly);
+  pdf.line(cx, bottomY, rx, ry);
+  // Forward axis reference tick.
+  pdf.setDrawColor(...MEDIUM_GRAY);
+  pdf.setLineWidth(0.2);
+  pdf.line(cx, bottomY, cx, bottomY - radius);
+  // Enclosure marker.
+  pdf.setFillColor(...BLACK);
+  pdf.rect(cx - 2.4, bottomY, 4.8, 1.4, 'F');
+  pdf.setDrawColor(...BLACK);
+}
+
+/**
+ * Draws the variable-dispersion (Panflex) legend: a top-view diagram of a
+ * cabinet split into left/right halves seen from the box's own perspective, a
+ * mapping of the canonical settings (55/55, 35/35, 55/35, 35/55) to their named
+ * coverage patterns, and a Spanish note on how to read the "L/R" setting.
+ */
+function drawDispersionNote(pdf: jsPDF, x: number, y: number, width: number): void {
+  const height = DISPERSION_NOTE_HEIGHT;
+  pdf.setFillColor(...LIGHT_GRAY);
+  pdf.setDrawColor(...BLACK);
+  pdf.setLineWidth(0.35);
+  pdf.rect(x, y, width, height, 'FD');
+
+  // Title.
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7.8);
+  pdf.setTextColor(...BLACK);
+  pdf.text('DISPERSIÓN VARIABLE (PANFLEX · K2 / K3 / KARA II)', x + 3, y + 4.5);
+
+  // --- Left: cabinet seen from above, from the box's own perspective ---
+  const diagramW = 48;
+  const dx = x + 3;
+  const audienceY = y + 9; // "toward audience" is up
+  const cabinetY = y + 21;
+  const centerX = dx + diagramW / 2;
+
+  pdf.setLineWidth(0.4);
+  // Cabinet body (a short bar) split into two halves.
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(dx + 6, cabinetY, diagramW - 12, 2.6, 'FD');
+  pdf.line(centerX, cabinetY, centerX, cabinetY + 2.6); // centre divider
+  // Coverage fans: left half wider than right to illustrate an asymmetric set.
+  pdf.setDrawColor(...RED);
+  pdf.line(centerX - 3, cabinetY, dx, audienceY); // left outer (wide)
+  pdf.line(centerX - 3, cabinetY, centerX - 1, audienceY); // left inner
+  pdf.line(centerX + 3, cabinetY, centerX + 1, audienceY); // right inner
+  pdf.line(centerX + 3, cabinetY, dx + diagramW - 8, audienceY); // right outer (narrow)
+  pdf.setDrawColor(...BLACK);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(6.2);
+  pdf.text('IZQ', dx + 4, cabinetY + 2, { align: 'center' });
+  pdf.text('DER', dx + diagramW - 4, cabinetY + 2, { align: 'center' });
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(5.6);
+  pdf.triangle(
+    centerX - 1.2,
+    audienceY - 0.6,
+    centerX + 1.2,
+    audienceY - 0.6,
+    centerX,
+    audienceY - 2.4,
+    'F',
+  );
+  pdf.text('hacia el público', centerX + 3, audienceY - 1, { align: 'left' });
+
+  // --- Middle: settings-to-pattern mapping glyphs ---
+  const glyphZoneX = x + diagramW + 8;
+  const glyphZoneW = width - (diagramW + 12);
+  const cellW = glyphZoneW / PANFLEX_SETTINGS.length;
+  PANFLEX_SETTINGS.forEach((setting, index) => {
+    const cx = glyphZoneX + cellW * (index + 0.5);
+    // Swatch behind the code label mirrors the cabinet table's fill for this
+    // pattern, so the legend doubles as a colour key.
+    if (setting.highlight) {
+      pdf.setFillColor(...DISPERSION_HIGHLIGHT_COLOR[setting.highlight]);
+      pdf.rect(cx - 9, y + 5.8, 18, 3.4, 'F');
+    }
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.setTextColor(...BLACK);
+    pdf.text(setting.code, cx, y + 8.5, { align: 'center' });
+    drawPanflexGlyph(pdf, cx, y + 21, setting.left, setting.right, 10.5);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6);
+    pdf.text(setting.name, cx, y + 25.5, { align: 'center' });
+  });
+
+  // --- Explanatory text across the bottom ---
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(6.4);
+  pdf.setTextColor(...BLACK);
+  const note =
+    'Los recintos de directividad variable muestran su ajuste Panflex como IZQUIERDA/DERECHA (p. ej. 55/35), ' +
+    'leído desde la perspectiva del propio recinto mirando hacia el público: cada cifra es la semiapertura (°) de ese lado ' +
+    'y su suma es la cobertura horizontal total (55/55 = 110°, 35/35 = 70°, 55/35 y 35/55 = 90° asimétrico). ' +
+    'Cada recinto puede llevar un ajuste distinto (configuración mixta, p. ej. 70°/110° en el mismo array). ' +
+    'Los recintos con ajuste distinto de 55/55 se resaltan por color: azul si es simétrico pero más estrecho ' +
+    '(p. ej. 35/35); si es asimétrico se distingue además el lado más abierto — naranja cuando es el IZQUIERDO ' +
+    '(p. ej. 55/35) y morado cuando es el DERECHO (p. ej. 35/55) — para no confundir la orientación del recinto. ' +
+    'Los recintos de directividad fija (KS28, KARA, K1) no muestran ajuste. Confirme siempre en Soundvision.';
+  const lines = pdf.splitTextToSize(note, Math.max(1, width - 6));
+  pdf.text(lines, x + 3, y + 29);
 }
 
 function drawHeader(
@@ -428,7 +623,17 @@ export async function generateSoundvisionFlysheetPdf(
     const cabinetsStartY = drawSummaryRows(pdf, arrays, MARGIN, tableStartY, arrayWidth) + 2;
     const warningsStartY =
       drawCabinetRows(pdf, arrays, MARGIN, cabinetsStartY, arrayWidth, enclosureOffset) + 4;
-    drawWarnings(pdf, arrays, MARGIN, warningsStartY, arrayWidth, pageHeight - 27, continues);
+    // Reserve the legend strip only when this page actually shows a
+    // variable-dispersion enclosure, so pages without one keep the full height.
+    const hasDispersion = arrays.some((array) =>
+      array.enclosures.some((enclosure) => enclosure.dispersionSetting),
+    );
+    const footerTop = pageHeight - 27;
+    const warningsMaxY = hasDispersion ? footerTop - DISPERSION_NOTE_HEIGHT - 2 : footerTop;
+    drawWarnings(pdf, arrays, MARGIN, warningsStartY, arrayWidth, warningsMaxY, continues);
+    if (hasDispersion) {
+      drawDispersionNote(pdf, MARGIN, warningsMaxY + 2, contentWidth);
+    }
     drawFooter(pdf, generatedAt, sectorProLogo, pageIndex + 1, pages.length);
   });
 

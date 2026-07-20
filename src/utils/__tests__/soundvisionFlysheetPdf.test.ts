@@ -6,6 +6,7 @@ import type {
   SoundvisionFlysheetEnclosure,
 } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import {
+  classifyDispersionHighlight,
   generateSoundvisionFlysheetPdf,
   soundvisionWarningSeverity,
   translateSoundvisionWarning,
@@ -35,6 +36,7 @@ const makeFlysheet = (arrayCount: number): SoundvisionFlysheet => ({
       splayAngleDegrees: enclosureIndex < 2 ? 5 : 0.25,
       siteAngleDegrees: -2.5 - enclosureIndex,
       trimHeightMeters: 10 - enclosureIndex * 0.45,
+      dispersionSetting: '55/55',
       }),
     ),
     warnings: arrayIndex === 0 ? ['Tipping hazard'] : [],
@@ -66,6 +68,7 @@ describe('generateSoundvisionFlysheetPdf', () => {
         splayAngleDegrees: 0.25,
         siteAngleDegrees: null,
         trimHeightMeters: null,
+        dispersionSetting: index % 2 === 0 ? '55/35' : null,
       }),
     );
 
@@ -108,5 +111,28 @@ describe('translateSoundvisionWarning', () => {
     ).toBe('danger');
     expect(soundvisionWarningSeverity('Tipping hazard')).toBe('warning');
     expect(soundvisionWarningSeverity('Site angle is impossible.')).toBe('caution');
+  });
+});
+
+describe('classifyDispersionHighlight', () => {
+  it('flags a narrower-but-still-symmetric setting as "symmetric"', () => {
+    expect(classifyDispersionHighlight('35/35')).toBe('symmetric');
+    expect(classifyDispersionHighlight('45/45')).toBe('symmetric');
+  });
+
+  it('distinguishes which side is wider on an asymmetric setting, since 55/35 and 35/55 are mirror images', () => {
+    expect(classifyDispersionHighlight('55/35')).toBe('wideLeft');
+    expect(classifyDispersionHighlight('35/55')).toBe('wideRight');
+    expect(classifyDispersionHighlight('60/45')).toBe('wideLeft');
+    expect(classifyDispersionHighlight('45/60')).toBe('wideRight');
+  });
+
+  it('does not flag the default 55/55, a fixed-directivity box, or an unparsable value', () => {
+    expect(classifyDispersionHighlight('55/55')).toBeNull();
+    expect(classifyDispersionHighlight(' 55/55 ')).toBeNull();
+    expect(classifyDispersionHighlight(null)).toBeNull();
+    expect(classifyDispersionHighlight(undefined)).toBeNull();
+    expect(classifyDispersionHighlight('')).toBeNull();
+    expect(classifyDispersionHighlight('not-a-setting')).toBeNull();
   });
 });

@@ -87,10 +87,10 @@ describe("parseSoundvisionFlysheet", () => {
       warnings: ["Factor de seguridad por debajo del mínimo."],
     });
     expect(flysheet.arrays[0].enclosures).toEqual([
-      { model: "K2", splayAngleDegrees: 5, siteAngleDegrees: -2.5, trimHeightMeters: 11.2 },
-      { model: "K2", splayAngleDegrees: 10, siteAngleDegrees: -7.5, trimHeightMeters: 9.8 },
-      { model: "K2", splayAngleDegrees: 0.25, siteAngleDegrees: -17.5, trimHeightMeters: 7.1 },
-      { model: "K2", splayAngleDegrees: null, siteAngleDegrees: -24.5, trimHeightMeters: 4.35 },
+      { model: "K2", splayAngleDegrees: 5, siteAngleDegrees: -2.5, trimHeightMeters: 11.2, dispersionSetting: null },
+      { model: "K2", splayAngleDegrees: 10, siteAngleDegrees: -7.5, trimHeightMeters: 9.8, dispersionSetting: null },
+      { model: "K2", splayAngleDegrees: 0.25, siteAngleDegrees: -17.5, trimHeightMeters: 7.1, dispersionSetting: null },
+      { model: "K2", splayAngleDegrees: null, siteAngleDegrees: -24.5, trimHeightMeters: 4.35, dispersionSetting: null },
     ]);
     expect(flysheet.arrays[1]).toMatchObject({
       arrayName: "SUB L",
@@ -103,8 +103,8 @@ describe("parseSoundvisionFlysheet", () => {
       rearLoadKg: null,
     });
     expect(flysheet.arrays[1].enclosures).toEqual([
-      { model: "KS28", splayAngleDegrees: 0, siteAngleDegrees: null, trimHeightMeters: null },
-      { model: "KS28", splayAngleDegrees: 0, siteAngleDegrees: null, trimHeightMeters: null },
+      { model: "KS28", splayAngleDegrees: 0, siteAngleDegrees: null, trimHeightMeters: null, dispersionSetting: null },
+      { model: "KS28", splayAngleDegrees: 0, siteAngleDegrees: null, trimHeightMeters: null, dispersionSetting: null },
     ]);
   });
 
@@ -157,6 +157,13 @@ describe("parseSoundvisionFlysheet", () => {
       "2x K2-BAR · Orificio A",
       "1x K2-BAR · Orificio A · Invertido",
     ]);
+    // Variable-dispersion Panflex setting is read from each enclosure's
+    // physical_configuration; enclosures without one report null.
+    expect(flysheet.arrays[0].enclosures.map((e) => e.dispersionSetting)).toEqual([
+      "55/55",
+      "55/55",
+    ]);
+    expect(flysheet.arrays[1].enclosures[0].dispersionSetting).toBeNull();
   });
 
   it("keeps arrays from mixed nested and flat physical configurations", () => {

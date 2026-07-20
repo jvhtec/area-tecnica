@@ -35,6 +35,11 @@ export interface SoundvisionFlysheetEnclosure {
   splayAngleDegrees: number | null;
   siteAngleDegrees: number | null;
   trimHeightMeters: number | null;
+  /**
+   * Panflex horizontal-dispersion setting for variable-directivity enclosures
+   * (K2, K3, KARA II), e.g. "55/35"; null for fixed-directivity boxes.
+   */
+  dispersionSetting: string | null;
 }
 
 export interface SoundvisionFlysheetArray {
@@ -262,6 +267,18 @@ function parseWarnings(body: string): string[] {
   return [...new Set(warnings)];
 }
 
+/**
+ * Extracts the Panflex horizontal-dispersion setting ("L/R", e.g. "55/35") from
+ * an enclosure body. Returns the first `physical_configuration` shaped like two
+ * slash-separated integers, or null for fixed-directivity enclosures.
+ */
+function parseDispersionSetting(elementBody: string): string | null {
+  const match = elementBody.match(
+    /<physical_configuration>\s*(\d{1,3}\s*\/\s*\d{1,3})\s*<\/physical_configuration>/i,
+  );
+  return match ? match[1].replace(/\s+/g, "") : null;
+}
+
 function parseEnclosures(clusterBody: string): SoundvisionFlysheetEnclosure[] {
   const elementsBody = extractXmlBlocks(clusterBody, "elements")
     .filter((block) => /<(?:element|enclosure)\b/i.test(block.body))
@@ -289,6 +306,10 @@ function parseEnclosures(clusterBody: string): SoundvisionFlysheetEnclosure[] {
       firstTextOf(elementBody, ["type", "model", "refid", "name", "enclosure_type"]);
     return {
       model: model || `RECINTO ${index + 1}`,
+      // Variable-directivity boxes serialize their Panflex setting as an
+      // "L/R" physical_configuration (e.g. 55/35) inside each acoustic way;
+      // fixed boxes (KS28, KARA, K1) have none.
+      dispersionSetting: parseDispersionSetting(elementBody),
       splayAngleDegrees:
         firstNumberOf(elementBody, ["splay", "splay_angle", "inter_angle", "angle"]) ??
         firstNumberAttribute(elementAttributes, ["splay", "splay_angle", "inter_angle", "angle"]) ??
