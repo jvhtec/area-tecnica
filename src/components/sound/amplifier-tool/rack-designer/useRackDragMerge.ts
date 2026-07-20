@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   findMergeTarget,
   mergeRackIntoRack,
@@ -40,21 +40,15 @@ export function useRackDragMerge({
     return findMergeTarget(layout.blocks, draggingBlockId);
   }, [enabled, draggingBlockId, layout]);
 
-  // Read the live target at drop time without re-creating the drop handler on
-  // every pointer move.
-  const mergeTargetRef = useRef<string | null>(null);
-  mergeTargetRef.current = mergeTargetId;
-
   const onDragStart = (blockId: string) => setDraggingBlockId(blockId);
 
   const onDragEnd = (blockId: string) => {
-    const targetId = mergeTargetRef.current;
     setDraggingBlockId(null);
-    if (!targetId) return;
+    if (!mergeTargetId) return;
     setLayout((prev) =>
-      prev ? { ...prev, blocks: mergeRackIntoRack(prev.blocks, blockId, targetId) } : prev,
+      prev ? { ...prev, blocks: mergeRackIntoRack(prev.blocks, blockId, mergeTargetId) } : prev,
     );
-    onMerged?.(targetId);
+    onMerged?.(mergeTargetId);
     toast({
       title: 'Racks unidos',
       description: 'Los amplificadores se han unido en el rack de destino.',
