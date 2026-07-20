@@ -23,6 +23,7 @@ import {
 import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "@/features/technical-tools/power/consumos/config";
 import { useConsumosTool } from "@/features/technical-tools/power/consumos/useConsumosTool";
 import { CustomComponentDialog } from "@/features/technical-tools/power/consumos/CustomComponentDialog";
+import { XmlpWeightImportButton } from "@/features/technical-tools/weights/XmlpWeightImportButton";
 import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerStagePlot";
 import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyToStageMenu";
 import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/QuickPresetsMenu";
@@ -96,6 +97,9 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     removeRow,
     updateInput,
     addComponentToRow,
+    isImportingXmlp,
+    importXmlpPower,
+    addPrebuiltMonitorPdu,
     selectedPosition,
     setSelectedPosition,
     customPosition,
@@ -217,6 +221,25 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {isNormalMode && config.department === "sound" && (
+              <XmlpWeightImportButton
+                isImporting={isImportingXmlp}
+                onImport={(file) => void importXmlpPower(file)}
+                title="Crear tablas de potencia desde un proyecto Soundvision (.xmlp)"
+              />
+            )}
+            {isNormalMode && config.department === "sound" && (
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                onClick={addPrebuiltMonitorPdu}
+                title="Añadir una PDU Monitores sin posición con Control Mon (L), RF Rack, Backline y Varios"
+              >
+                <Plus className="h-4 w-4" />
+                Añadir Monitores
+              </Button>
+            )}
             {isNormalMode && jobStages.length > 1 && activeTables.length > 0 && (
               <CopyToStageMenu
                 label={labels.copySetToStage}

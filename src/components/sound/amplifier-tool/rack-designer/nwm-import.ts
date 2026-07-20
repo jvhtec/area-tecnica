@@ -89,7 +89,8 @@ interface Bucket {
   units: NwmUnit[];
 }
 
-function toAmpModel(model: string): AmpModel {
+/** Exported for reuse by the Consumos XMLP amplifier-power importer. */
+export function toAmpModel(model: string): AmpModel {
   const normalized = model.trim().toUpperCase();
   if (normalized === 'LA4' || normalized === 'LA4X' || normalized === 'LA8') {
     return normalized;
