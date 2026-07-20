@@ -77,6 +77,7 @@ import {
   useCustomPowerComponents,
 } from "./useCustomPowerComponents";
 import { useConsumosComponents } from "./useConsumosComponents";
+import { useXmlpPowerImport } from "./useXmlpPowerImport";
 import {
   downloadPdfBlob,
   type ConsumosJob,
@@ -519,6 +520,15 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       : {
           powerFactor: table.calculation?.powerFactor ?? pf,
         }),
+  });
+
+  // XMLP amplifier-power import (Soundvision projects, sound department only)
+  const { isImportingXmlp, importXmlpPower } = useXmlpPowerImport({
+    components,
+    pduOptions,
+    getSettings: getPowerSettings,
+    selectedStage: selectedStage ?? null,
+    onTablesImported: (importedTables) => setTables((prev) => [...prev, ...importedTables]),
   });
 
   // Builder row handlers
@@ -1760,6 +1770,8 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     removeRow,
     updateInput,
     addComponentToRow,
+    isImportingXmlp,
+    importXmlpPower,
     selectedPosition,
     setSelectedPosition,
     customPosition,

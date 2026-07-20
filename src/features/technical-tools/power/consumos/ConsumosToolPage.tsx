@@ -23,6 +23,7 @@ import {
 import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "@/features/technical-tools/power/consumos/config";
 import { useConsumosTool } from "@/features/technical-tools/power/consumos/useConsumosTool";
 import { CustomComponentDialog } from "@/features/technical-tools/power/consumos/CustomComponentDialog";
+import { XmlpWeightImportButton } from "@/features/technical-tools/weights/XmlpWeightImportButton";
 import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerStagePlot";
 import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyToStageMenu";
 import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/QuickPresetsMenu";
@@ -96,6 +97,8 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     removeRow,
     updateInput,
     addComponentToRow,
+    isImportingXmlp,
+    importXmlpPower,
     selectedPosition,
     setSelectedPosition,
     customPosition,
@@ -217,6 +220,12 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {isNormalMode && config.department === "sound" && (
+              <XmlpWeightImportButton
+                isImporting={isImportingXmlp}
+                onImport={(file) => void importXmlpPower(file)}
+              />
+            )}
             {isNormalMode && jobStages.length > 1 && activeTables.length > 0 && (
               <CopyToStageMenu
                 label={labels.copySetToStage}
