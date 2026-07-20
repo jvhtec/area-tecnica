@@ -36,12 +36,18 @@ interface RackBlockCardProps {
   joinMode?: boolean;
   /** Ids of amps currently selected for joining (highlighted with a check). */
   selectedAmpIds?: ReadonlySet<string>;
+  /** True while another block is being dragged over this one to merge into it. */
+  mergeTarget?: boolean;
   onSelect: (id: string) => void;
   onMove: (id: string, x: number, y: number) => void;
   /** Fired on a tap (press + release without dragging). ampId is null for the header. */
   onTap: (id: string, ampId: string | null) => void;
   /** Fired when an amp cell is tapped in join mode. */
   onAmpToggle?: (ampId: string) => void;
+  /** Fired once a positioning drag actually starts (desktop drag-to-merge). */
+  onDragStart?: (id: string) => void;
+  /** Fired when a positioning drag ends (drop). Pairs with onDragStart. */
+  onDragEnd?: (id: string) => void;
 }
 
 export function RackBlockCard({
@@ -51,10 +57,13 @@ export function RackBlockCard({
   pinchActiveRef,
   joinMode = false,
   selectedAmpIds,
+  mergeTarget = false,
   onSelect,
   onMove,
   onTap,
   onAmpToggle,
+  onDragStart,
+  onDragEnd,
 }: RackBlockCardProps) {
   const dragState = useRef<DragState | null>(null);
 
@@ -92,6 +101,7 @@ export function RackBlockCard({
     const deltaX = event.clientX - drag.startX;
     const deltaY = event.clientY - drag.startY;
     if (!drag.moved && Math.hypot(deltaX, deltaY) < TAP_MOVEMENT_THRESHOLD_PX) return;
+    if (!drag.moved) onDragStart?.(block.id);
     drag.moved = true;
     const snap = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
     const maxX = CANVAS_WIDTH - BLOCK_WIDTH;
@@ -112,6 +122,8 @@ export function RackBlockCard({
     }
     if (event.type === 'pointerup' && !drag.moved) {
       onTap(block.id, drag.ampId);
+    } else if (drag.moved) {
+      onDragEnd?.(block.id);
     }
   };
 
@@ -149,6 +161,7 @@ export function RackBlockCard({
         'absolute select-none touch-none cursor-grab active:cursor-grabbing rounded-sm shadow-sm',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
         selected && 'ring-2 ring-primary ring-offset-1 z-10',
+        mergeTarget && 'ring-2 ring-emerald-500 ring-offset-2 z-20',
       )}
       style={{ left: block.x, top: block.y, width: BLOCK_WIDTH }}
       onPointerDown={handlePointerDown}
@@ -169,6 +182,11 @@ export function RackBlockCard({
         <GripVertical className="h-3 w-3 shrink-0" />
         <span className="truncate">{block.label}</span>
       </div>
+      {mergeTarget && (
+        <span className="pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 text-xs font-semibold text-white shadow">
+          Soltar para unir
+        </span>
+      )}
       {block.amps.map((amp) => {
         const ampSelected = joinMode && !!selectedAmpIds?.has(amp.id);
         return (

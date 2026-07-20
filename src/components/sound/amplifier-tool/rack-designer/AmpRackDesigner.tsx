@@ -66,6 +66,7 @@ import {
   saveStoredLayout,
 } from '@/components/sound/amplifier-tool/rack-designer/layout-utils';
 import { useAmpJoin } from '@/components/sound/amplifier-tool/rack-designer/useAmpJoin';
+import { useRackDragMerge } from '@/components/sound/amplifier-tool/rack-designer/useRackDragMerge';
 import { RackBlockCard } from '@/components/sound/amplifier-tool/rack-designer/RackBlockCard';
 import { SoundvisionFlysheetButton } from '@/components/sound/amplifier-tool/rack-designer/SoundvisionFlysheetButton';
 import { BlockEditorPanel } from '@/components/sound/amplifier-tool/rack-designer/BlockEditorPanel';
@@ -399,6 +400,20 @@ export function AmpRackDesigner({
     },
   });
 
+  // Desktop drag-to-merge: dropping a rack onto another one (that has room)
+  // pours its amps into that rack. Disabled on touch — mobile uses the
+  // tap-select "Unir amps" flow — and while join mode is active.
+  const dragMerge = useRackDragMerge({
+    enabled: !isMobile && !join.joinMode,
+    layout,
+    setLayout,
+    toast,
+    onMerged: (targetId) => {
+      setSelectedBlockId(targetId);
+      setAmpTarget(null);
+    },
+  });
+
   const blockEditor = selectedBlock ? (
     <BlockEditorPanel
       key={selectedBlock.id}
@@ -426,8 +441,8 @@ export function AmpRackDesigner({
             </DialogTitle>
             <DialogDescription className="hidden md:block">
               {standalone
-                ? 'Suelta una sesión .nwm o .xmlp, ajusta los racks y exporta el plano a PDF.'
-                : 'Arrastra los racks para posicionarlos, edita presets, colores e IPs y exporta el plano a PDF.'}
+                ? 'Suelta una sesión .nwm o .xmlp, arrastra un rack sobre otro para unirlos (máx. 3) y exporta el plano a PDF.'
+                : 'Arrastra los racks para posicionarlos, suelta uno sobre otro para unirlos (máx. 3) y exporta el plano a PDF.'}
             </DialogDescription>
             <DialogDescription className="md:hidden">
               {standalone
@@ -591,10 +606,13 @@ export function AmpRackDesigner({
                         pinchActiveRef={pinchActiveRef}
                         joinMode={join.joinMode}
                         selectedAmpIds={join.selectedAmpIdSet}
+                        mergeTarget={block.id === dragMerge.mergeTargetId}
                         onSelect={setSelectedBlockId}
                         onMove={moveBlock}
                         onTap={handleBlockTap}
                         onAmpToggle={join.toggle}
+                        onDragStart={dragMerge.onDragStart}
+                        onDragEnd={dragMerge.onDragEnd}
                       />
                     ))}
                   </div>

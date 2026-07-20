@@ -7,10 +7,12 @@ import {
   assignSequentialIps,
   computeResultsFingerprint,
   createEmptyRackDesignerLayout,
+  findMergeTarget,
   generateLayoutFromResults,
   incrementIp,
   isValidIp,
   joinAmpsIntoRack,
+  mergeRackIntoRack,
 } from '../layout-utils';
 
 describe('createEmptyRackDesignerLayout', () => {
@@ -238,5 +240,97 @@ describe('joinAmpsIntoRack', () => {
       { id: 'a1', presetName: 'K1', ip: '192.168.1.31', model: 'LA12X' },
       { id: 'a2', presetName: 'K2 90', ip: '192.168.1.34', model: 'LA12X' },
     ]);
+  });
+});
+
+describe('mergeRackIntoRack', () => {
+  const amp = (id: string) => ({ id, presetName: id.toUpperCase(), ip: '192.168.1.11', model: 'LA12X' as const });
+
+  it('pours the source amp into the target and drops the emptied source', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'SUELTO', color: '#f87171', x: 400, y: 200, amps: [amp('a1')] },
+      { id: 'dst', label: 'RACK L', color: '#60a5fa', x: 40, y: 40, amps: [amp('a2')] },
+    ];
+    const result = mergeRackIntoRack(blocks, 'src', 'dst');
+    expect(result).toHaveLength(1);
+    const target = result[0];
+    // Target keeps its identity and gains the source's amp.
+    expect(target.id).toBe('dst');
+    expect(target.label).toBe('RACK L');
+    expect({ x: target.x, y: target.y }).toEqual({ x: 40, y: 40 });
+    expect(target.amps.map((a) => a.id)).toEqual(['a2', 'a1']);
+  });
+
+  it('moves only what fits and leaves the surplus in the source rack', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'SUELTOS', color: '#f87171', x: 400, y: 40, amps: [amp('a1'), amp('a2')] },
+      { id: 'dst', label: 'RACK', color: '#60a5fa', x: 40, y: 40, amps: [amp('a3'), amp('a4')] },
+    ];
+    const result = mergeRackIntoRack(blocks, 'src', 'dst');
+    const target = result.find((b) => b.id === 'dst')!;
+    expect(target.amps).toHaveLength(AMPS_PER_RACK);
+    expect(target.amps.map((a) => a.id)).toEqual(['a3', 'a4', 'a1']);
+    // The amp that didn't fit stays in the source rack, kept in place.
+    const source = result.find((b) => b.id === 'src')!;
+    expect(source.amps.map((a) => a.id)).toEqual(['a2']);
+    expect({ x: source.x, y: source.y }).toEqual({ x: 400, y: 40 });
+  });
+
+  it('is a no-op for a full target, a self-merge or a missing block', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'S', color: '#f87171', x: 400, y: 40, amps: [amp('a1')] },
+      { id: 'full', label: 'F', color: '#60a5fa', x: 40, y: 40, amps: [amp('b1'), amp('b2'), amp('b3')] },
+    ];
+    expect(mergeRackIntoRack(blocks, 'src', 'full')).toBe(blocks);
+    expect(mergeRackIntoRack(blocks, 'src', 'src')).toBe(blocks);
+    expect(mergeRackIntoRack(blocks, 'src', 'ghost')).toBe(blocks);
+  });
+
+  it('preserves amp identity when merging', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'S', color: '#f87171', x: 400, y: 40, amps: [{ id: 'a1', presetName: 'K2 55', ip: '192.168.1.40', model: 'LA12X' }] },
+      { id: 'dst', label: 'D', color: '#60a5fa', x: 40, y: 40, amps: [] },
+    ];
+    const target = mergeRackIntoRack(blocks, 'src', 'dst').find((b) => b.id === 'dst')!;
+    expect(target.amps).toEqual([{ id: 'a1', presetName: 'K2 55', ip: '192.168.1.40', model: 'LA12X' }]);
+  });
+});
+
+describe('findMergeTarget', () => {
+  const amp = (id: string) => ({ id, presetName: id.toUpperCase(), ip: '192.168.1.11', model: 'LA12X' as const });
+
+  it('returns the rack whose bounds contain the dragged rack header centre', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'S', color: '#f87171', x: 100, y: 100, amps: [amp('a1')] },
+      { id: 'dst', label: 'D', color: '#60a5fa', x: 150, y: 90, amps: [amp('a2')] },
+    ];
+    // src header centre is (100+90, 100+14) = (190, 114), inside dst (150..330, 90..166).
+    expect(findMergeTarget(blocks, 'src')).toBe('dst');
+  });
+
+  it('ignores full racks and returns null when the target has no room', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'S', color: '#f87171', x: 100, y: 100, amps: [amp('a1')] },
+      { id: 'dst', label: 'D', color: '#60a5fa', x: 150, y: 90, amps: [amp('a2'), amp('a3'), amp('a4')] },
+    ];
+    expect(findMergeTarget(blocks, 'src')).toBeNull();
+  });
+
+  it('returns null when the dragged rack overlaps nothing', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'S', color: '#f87171', x: 100, y: 100, amps: [amp('a1')] },
+      { id: 'dst', label: 'D', color: '#60a5fa', x: 800, y: 600, amps: [amp('a2')] },
+    ];
+    expect(findMergeTarget(blocks, 'src')).toBeNull();
+  });
+
+  it('picks the nearest rack when several overlap the header centre', () => {
+    const blocks: RackDesignerBlock[] = [
+      { id: 'src', label: 'S', color: '#f87171', x: 100, y: 100, amps: [amp('a1')] },
+      // Both contain the probe (190,114); far's centre is further from it.
+      { id: 'near', label: 'N', color: '#60a5fa', x: 120, y: 100, amps: [amp('a2')] },
+      { id: 'far', label: 'F', color: '#4ade80', x: 40, y: 60, amps: [amp('a3')] },
+    ];
+    expect(findMergeTarget(blocks, 'src')).toBe('near');
   });
 });
