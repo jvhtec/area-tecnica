@@ -6,8 +6,8 @@ import type {
   SoundvisionFlysheetEnclosure,
 } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import {
+  classifyDispersionHighlight,
   generateSoundvisionFlysheetPdf,
-  isHighlightedDispersion,
   soundvisionWarningSeverity,
   translateSoundvisionWarning,
 } from '@/utils/soundvisionFlysheetPdf';
@@ -114,18 +114,23 @@ describe('translateSoundvisionWarning', () => {
   });
 });
 
-describe('isHighlightedDispersion', () => {
-  it('flags any Panflex setting other than the default 55/55', () => {
-    expect(isHighlightedDispersion('35/35')).toBe(true);
-    expect(isHighlightedDispersion('55/35')).toBe(true);
-    expect(isHighlightedDispersion('35/55')).toBe(true);
+describe('classifyDispersionHighlight', () => {
+  it('flags a narrower-but-still-symmetric setting as "symmetric"', () => {
+    expect(classifyDispersionHighlight('35/35')).toBe('symmetric');
+    expect(classifyDispersionHighlight('45/45')).toBe('symmetric');
   });
 
-  it('does not flag the default 55/55 or a fixed-directivity box', () => {
-    expect(isHighlightedDispersion('55/55')).toBe(false);
-    expect(isHighlightedDispersion(' 55/55 ')).toBe(false);
-    expect(isHighlightedDispersion(null)).toBe(false);
-    expect(isHighlightedDispersion(undefined)).toBe(false);
-    expect(isHighlightedDispersion('')).toBe(false);
+  it('flags a setting where L and R differ as "asymmetric"', () => {
+    expect(classifyDispersionHighlight('55/35')).toBe('asymmetric');
+    expect(classifyDispersionHighlight('35/55')).toBe('asymmetric');
+  });
+
+  it('does not flag the default 55/55, a fixed-directivity box, or an unparsable value', () => {
+    expect(classifyDispersionHighlight('55/55')).toBeNull();
+    expect(classifyDispersionHighlight(' 55/55 ')).toBeNull();
+    expect(classifyDispersionHighlight(null)).toBeNull();
+    expect(classifyDispersionHighlight(undefined)).toBeNull();
+    expect(classifyDispersionHighlight('')).toBeNull();
+    expect(classifyDispersionHighlight('not-a-setting')).toBeNull();
   });
 });
