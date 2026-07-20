@@ -36,40 +36,11 @@ import {
   useQuickPresets,
   type QuickPreset,
 } from '@/features/technical-tools/table-presets/useQuickPresets';
+import { XmlpWeightImportButton } from '@/features/technical-tools/weights/XmlpWeightImportButton';
+import { soundWeightComponents } from '@/features/technical-tools/weights/soundWeightComponents';
+import { useXmlpWeightImport } from '@/features/technical-tools/weights/useXmlpWeightImport';
 
-// Database for sound components.
-const soundComponentDatabase = [
-  { id: 1, name: ' K1 ', weight: 106 },
-  { id: 2, name: ' K2 ', weight: 56 },
-  { id: 3, name: ' K3 ', weight: 43 },
-  { id: 4, name: ' KARA II ', weight: 25 },
-  { id: 5, name: ' KIVA ', weight: 14 },
-  { id: 6, name: ' KS28 ', weight: 79 },
-  { id: 7, name: ' K1-SB ', weight: 83 },
-  { id: 8, name: ' BUMPER K1 ', weight: 108 },
-  { id: 9, name: ' BUMPER K2 ', weight: 60 },
-  { id: 10, name: ' BUMPER K3 ', weight: 50 },
-  { id: 11, name: ' BUMPER KARA ', weight: 20 },
-  { id: 12, name: ' BUMPER KIVA ', weight: 13 },
-  { id: 13, name: ' BUMPER KS28 ', weight: 15 },
-  { id: 14, name: ' KARADOWNK1 ', weight: 15 },
-  { id: 15, name: ' KARADOWNK2 ', weight: 15 },
-  { id: 16, name: ' MOTOR 2T ', weight: 90 },
-  { id: 17, name: ' MOTOR 1T ', weight: 70 },
-  { id: 18, name: ' MOTOR 750Kg ', weight: 60 },
-  { id: 19, name: ' MOTOR 500Kg ', weight: 50 },
-  { id: 20, name: ' POLIPASTO 1T ', weight: 10.4 },
-  { id: 21, name: ' TFS900H ', weight: 102 },
-  { id: 22, name: ' TFA600 ', weight: 41 },
-  { id: 23, name: ' TFS550H ', weight: 13.4 },
-  { id: 24, name: ' TFS550L ', weight: 27 },
-  { id: 25, name: ' BUMPER TFS900 ', weight: 20 },
-  { id: 26, name: ' TFS900>TFA600 ', weight: 14 },
-  { id: 27, name: ' TFS900>TFS550 ', weight: 14 },
-  { id: 28, name: ' BUMPER TFS550 ', weight: 16 },
-  { id: 29, name: ' CABLEADO L ', weight: 100 },
-  { id: 30, name: ' CABLEADO H ', weight: 250 },
-];
+const soundComponentDatabase = soundWeightComponents;
 
 interface TableRow {
   id: string;
@@ -223,6 +194,14 @@ const PesosTool: React.FC = () => {
     });
     return nextTables;
   };
+
+  const { isImportingXmlp, importXmlpWeights } = useXmlpWeightImport({
+    components: soundComponentDatabase,
+    existingTableIds: tables.flatMap((table) => typeof table.id === 'number' ? [table.id] : []),
+    selectedStage: selectedStage ?? null,
+    onTablesImported: (importedTables) =>
+      updateTablesState((previous) => [...previous, ...importedTables]),
+  });
 
   // Updated hooks for tour defaults
   const {
@@ -1110,6 +1089,10 @@ const PesosTool: React.FC = () => {
       headerExtras={
         isNormalJobMode ? (
           <>
+            <XmlpWeightImportButton
+              isImporting={isImportingXmlp}
+              onImport={(file) => void importXmlpWeights(file)}
+            />
             {jobStages.length > 1 && activeTables.length > 0 && (
               <CopyToStageMenu
                 label="Copy set to..."
