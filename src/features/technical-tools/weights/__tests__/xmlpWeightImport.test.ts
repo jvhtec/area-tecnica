@@ -8,6 +8,7 @@ type XmlpArrayInput = Parameters<typeof buildXmlpWeightTables>[0]['arrays'][numb
 const makeArray = (overrides: Partial<XmlpArrayInput> = {}): XmlpArrayInput => ({
   arrayName: 'MAIN L',
   groupName: 'PA',
+  deployment: 'flown',
   riggingFrame: 'K2-BUMP',
   pickupConfiguration: '',
   totalMassKg: null,
@@ -18,6 +19,18 @@ const makeArray = (overrides: Partial<XmlpArrayInput> = {}): XmlpArrayInput => (
 });
 
 describe('buildXmlpWeightTables', () => {
+  it('imports only flown arrays and leaves ground stacks out of motor tables', () => {
+    const result = buildXmlpWeightTables({
+      arrays: [
+        makeArray(),
+        makeArray({ arrayName: 'SUB L', deployment: 'stacked' }),
+        makeArray({ arrayName: 'FRONT FILL', deployment: 'unknown' }),
+      ],
+    }, soundWeightComponents);
+
+    expect(result.tables.map((table) => table.name)).toEqual(['MAIN L']);
+  });
+
   it('uses the serialized XMLP mass instead of silently substituting catalog math', () => {
     const result = buildXmlpWeightTables({
       arrays: [makeArray({
@@ -76,16 +89,38 @@ describe('buildXmlpWeightTables', () => {
     ]);
   });
 
-  it('adds one motor for a single pickup and sizes it against the complete load', () => {
+  it('maps the Soundvision M-BUMP name used by flown KARA II arrays', () => {
     const result = buildXmlpWeightTables({
       arrays: [makeArray({
-        pickupConfiguration: '1 motor',
-        totalMassKg: 500.1,
+        arrayName: 'Out L',
+        riggingFrame: 'M-BUMP',
+        pickupConfiguration: 'Posiciones: 0 / 2',
+        enclosures: Array.from({ length: 12 }, () => ({ model: 'KARA II' })),
       })],
     }, soundWeightComponents);
 
     expect(result.tables[0]).toMatchObject({
-      totalWeight: 560.1,
+      name: 'Out L',
+      totalWeight: 420,
+      dualMotors: true,
+    });
+    expect(result.tables[0].rows).toEqual([
+      expect.objectContaining({ componentName: 'KARA II', quantity: '12', totalWeight: 300 }),
+      expect.objectContaining({ componentName: 'BUMPER KARA', quantity: '1', totalWeight: 20 }),
+      expect.objectContaining({ componentName: 'MOTOR 500Kg', quantity: '2', totalWeight: 100 }),
+    ]);
+  });
+
+  it('adds one motor per pickup and applies a 20% capacity safety margin', () => {
+    const result = buildXmlpWeightTables({
+      arrays: [makeArray({
+        pickupConfiguration: '1 motor',
+        totalMassKg: 500,
+      })],
+    }, soundWeightComponents);
+
+    expect(result.tables[0]).toMatchObject({
+      totalWeight: 560,
       dualMotors: false,
     });
     expect(result.tables[0].rows[1]).toMatchObject({
@@ -95,14 +130,14 @@ describe('buildXmlpWeightTables', () => {
     });
   });
 
-  it('does not select an undersized motor when the full load exceeds the catalog', () => {
+  it('rejects loads whose 20% safety margin exceeds the motor catalog', () => {
     const result = buildXmlpWeightTables({
-      arrays: [makeArray({ totalMassKg: 2000.1 })],
+      arrays: [makeArray({ totalMassKg: 1666.7 })],
     }, soundWeightComponents);
 
     expect(result.tables).toEqual([]);
     expect(result.warnings).toEqual([
-      'MAIN L: ningún motor del catálogo puede soportar por sí solo 2000.1 kg; no se importó.',
+      'MAIN L: ningún motor del catálogo puede soportar por sí solo 1666.7 kg con un margen del 20 %; no se importó.',
     ]);
   });
 

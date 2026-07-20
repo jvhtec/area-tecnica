@@ -187,7 +187,7 @@ function parseNumericTokens(value: string): number[] {
 function parseDeployment(value: string): SoundvisionFlysheetArray["deployment"] {
   const normalized = value.trim().toLowerCase();
   if (normalized.includes("flown") || normalized.includes("fly")) return "flown";
-  if (normalized.includes("stack")) return "stacked";
+  if (normalized.includes("stack") || normalized.includes("ground")) return "stacked";
   return "unknown";
 }
 
@@ -263,7 +263,9 @@ function parseWarnings(body: string): string[] {
 }
 
 function parseEnclosures(clusterBody: string): SoundvisionFlysheetEnclosure[] {
-  const elementsBody = extractXmlBlocks(clusterBody, "elements")[0]?.body ?? "";
+  const elementsBody = extractXmlBlocks(clusterBody, "elements")
+    .filter((block) => /<(?:element|enclosure)\b/i.test(block.body))
+    .sort((a, b) => b.body.length - a.body.length)[0]?.body ?? "";
   const elementMatches = elementsBody
     ? [
         ...[...elementsBody.matchAll(/<(element|enclosure)\b([^>]*)>([\s\S]*?)<\/\1>/gi)].map(
@@ -365,13 +367,17 @@ export function parseSoundvisionFlysheet(
       .map((element) => element.splayAngleDegrees)
       .filter((angle): angle is number => angle !== null);
 
+    const deployment = parseDeployment([
+      firstTextOf(clusterMetadata, ["configuration", "deployment", "deployment_orientation"]),
+      firstAttribute(clusterAttributes, ["deployment_orientation", "deployment", "configuration"]),
+      firstTextOf(riggingBody, ["configuration", "deployment", "deployment_orientation"]),
+      firstTextOf(clusterBody, ["configuration"]),
+    ].filter(Boolean).join(" "));
+
     arrays.push({
       groupName,
       arrayName,
-      deployment: parseDeployment(
-        firstTextOf(clusterMetadata, ["configuration", "deployment", "deployment_orientation"]) ||
-          firstAttribute(clusterAttributes, ["deployment_orientation", "deployment", "configuration"]),
-      ),
+      deployment,
       azimuthDegrees:
         firstNumberOf(clusterMetadata, ["azimuth", "azimuth_angle"]) ??
         firstNumberAttribute(clusterAttributes, ["azimuth", "azimuth_angle"]) ??

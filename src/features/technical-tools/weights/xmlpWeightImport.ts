@@ -7,6 +7,7 @@ interface XmlpEnclosure {
 interface XmlpArray {
   arrayName: string;
   groupName: string;
+  deployment: 'flown' | 'stacked' | 'unknown';
   riggingFrame: string;
   pickupConfiguration: string;
   totalMassKg: number | null;
@@ -44,12 +45,14 @@ const RIGGING_FRAME_ALIASES: Array<{ pattern: RegExp; component: string }> = [
   { pattern: /K1.*(?:BUMP|BAR)/, component: 'BUMPER K1' },
   { pattern: /K2.*(?:BUMP|BAR)/, component: 'BUMPER K2' },
   { pattern: /K3.*(?:BUMP|BAR)/, component: 'BUMPER K3' },
+  { pattern: /^MBUMP$/, component: 'BUMPER KARA' },
   { pattern: /KARA.*(?:BUMP|MINIBU|BAR)/, component: 'BUMPER KARA' },
   { pattern: /KIVA.*(?:BUMP|BAR)/, component: 'BUMPER KIVA' },
   { pattern: /KS28.*(?:BUMP|OUTRIG|BAR)/, component: 'BUMPER KS28' },
   { pattern: /TFS900.*(?:BUMP|BAR)/, component: 'BUMPER TFS900' },
   { pattern: /TFS550.*(?:BUMP|BAR)/, component: 'BUMPER TFS550' },
 ];
+const MOTOR_CAPACITY_SAFETY_FACTOR = 1.2;
 
 const formatWeight = (value: number) => Number(value.toFixed(3)).toString();
 
@@ -157,6 +160,8 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
   let exactMassTableCount = 0;
 
   for (const [index, array] of flysheet.arrays.entries()) {
+    if (array.deployment !== 'flown') continue;
+
     const name = array.arrayName.trim() || array.groupName.trim() || `Array ${index + 1}`;
     const totalMassKg = array.totalMassKg;
     const hasExactMass = totalMassKg !== null && Number.isFinite(totalMassKg) && totalMassKg > 0;
@@ -211,12 +216,13 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
       }
     }
 
-    // Select against the complete suspended load even when two pickup points
-    // share it, so either generated motor is independently large enough.
-    const motor = findMotorForLoad(loadWeight, components);
+    // Select against 120% of the complete suspended load even when two pickup
+    // points share it, so either motor independently includes the safety margin.
+    const requiredMotorCapacity = loadWeight * MOTOR_CAPACITY_SAFETY_FACTOR;
+    const motor = findMotorForLoad(requiredMotorCapacity, components);
     if (!motor) {
       warnings.push(
-        `${name}: ningún motor del catálogo puede soportar por sí solo ${formatWeight(loadWeight)} kg; no se importó.`,
+        `${name}: ningún motor del catálogo puede soportar por sí solo ${formatWeight(loadWeight)} kg con un margen del 20 %; no se importó.`,
       );
       continue;
     }

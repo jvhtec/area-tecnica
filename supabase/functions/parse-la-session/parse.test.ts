@@ -170,6 +170,9 @@ describe("parseSoundvisionFlysheet", () => {
       <physical_configuration name="Out">
         <cluster name="Out L"><elements>
           <rigging_element model="KARA-MINIBU" />
+          <enclosure model="KARA II 90"><modules><elements>
+            <module><label>nested module data</label></module>
+          </elements></modules></enclosure>
           <enclosure model="KARA II 90" />
         </elements></cluster>
         <cluster name="Out R"><elements>
@@ -184,10 +187,11 @@ describe("parseSoundvisionFlysheet", () => {
     expect(flysheet.arrays.map((array) => ({
       groupName: array.groupName,
       arrayName: array.arrayName,
+      enclosureCount: array.enclosures.length,
     }))).toEqual([
-      { groupName: "Main", arrayName: "K2 L" },
-      { groupName: "Out", arrayName: "Out L" },
-      { groupName: "Out", arrayName: "Out R" },
+      { groupName: "Main", arrayName: "K2 L", enclosureCount: 1 },
+      { groupName: "Out", arrayName: "Out L", enclosureCount: 2 },
+      { groupName: "Out", arrayName: "Out R", enclosureCount: 1 },
     ]);
   });
 
