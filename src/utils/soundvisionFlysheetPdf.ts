@@ -27,9 +27,12 @@ const MEDIUM_GRAY: PdfColor = [210, 210, 210];
 const YELLOW: PdfColor = [255, 235, 0];
 const RED: PdfColor = [222, 30, 30];
 // Non-default Panflex settings are colour-coded by pattern, echoing the
-// simétrico/asimétrico grouping in the dispersion legend below.
+// simétrico/asimétrico grouping in the dispersion legend below. The two
+// asymmetric directions get distinct colours too — 55/35 and 35/55 are
+// mirror images of each other, and mixing them up misaims the box.
 const DISPERSION_SYMMETRIC: PdfColor = [186, 230, 253]; // narrower but still even (e.g. 35/35 -> 70°)
-const DISPERSION_ASYMMETRIC: PdfColor = [255, 200, 120]; // L/R differ (e.g. 55/35) -> orientation matters
+const DISPERSION_WIDE_LEFT: PdfColor = [255, 200, 120]; // L > R (e.g. 55/35) -> coverage skews left
+const DISPERSION_WIDE_RIGHT: PdfColor = [216, 180, 254]; // R > L (e.g. 35/55) -> coverage skews right
 
 export interface SoundvisionFlysheetPdfOptions {
   sourceFileName: string;
@@ -45,26 +48,30 @@ const formatNumber = (value: number | null, suffix: string, digits = 1): string 
 const formatCompactNumber = (value: number | null, suffix: string): string =>
   value === null ? '-' : `${value.toFixed(2).replace(/\.?0+$/, '')}${suffix}`;
 
-export type DispersionHighlight = 'symmetric' | 'asymmetric' | null;
+export type DispersionHighlight = 'symmetric' | 'wideLeft' | 'wideRight' | null;
 
 /**
  * Classifies a Panflex "L/R" setting for the flysheet's cabinet table: the
  * default symmetric 55/55 (110°) and fixed-directivity boxes (no setting)
  * are never flagged; any other symmetric setting (e.g. 35/35 -> 70°) is
- * flagged as narrower-but-even, and an L != R setting (e.g. 55/35 -> 90°) is
- * flagged as asymmetric, since getting the side wrong there misaims the box.
+ * flagged as narrower-but-even; an asymmetric setting is split by which side
+ * is wider (55/35 -> "wideLeft", 35/55 -> "wideRight") since the two are
+ * mirror images and mixing them up misaims the box.
  */
 export const classifyDispersionHighlight = (setting: string | null | undefined): DispersionHighlight => {
   const match = setting?.trim().match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
   if (!match) return null;
-  const [, left, right] = match;
-  if (left === right) return left === '55' ? null : 'symmetric';
-  return 'asymmetric';
+  const [, leftStr, rightStr] = match;
+  const left = Number(leftStr);
+  const right = Number(rightStr);
+  if (left === right) return left === 55 ? null : 'symmetric';
+  return left > right ? 'wideLeft' : 'wideRight';
 };
 
 const DISPERSION_HIGHLIGHT_COLOR: Record<Exclude<DispersionHighlight, null>, PdfColor> = {
   symmetric: DISPERSION_SYMMETRIC,
-  asymmetric: DISPERSION_ASYMMETRIC,
+  wideLeft: DISPERSION_WIDE_LEFT,
+  wideRight: DISPERSION_WIDE_RIGHT,
 };
 
 const deploymentLabel = (deployment: SoundvisionFlysheetArray['deployment']): string => {
@@ -323,7 +330,7 @@ function drawWarnings(
   });
 }
 
-const DISPERSION_NOTE_HEIGHT = 34;
+const DISPERSION_NOTE_HEIGHT = 39;
 
 /**
  * The four canonical Panflex settings. The two numbers are the left/right
@@ -340,8 +347,8 @@ const PANFLEX_SETTINGS: Array<{
 }> = [
   { code: '55 / 55', left: 55, right: 55, name: '110° · simétrico', highlight: null },
   { code: '35 / 35', left: 35, right: 35, name: '70° · simétrico', highlight: 'symmetric' },
-  { code: '55 / 35', left: 55, right: 35, name: '90° · asimétrico', highlight: 'asymmetric' },
-  { code: '35 / 55', left: 35, right: 55, name: '90° · asimétrico', highlight: 'asymmetric' },
+  { code: '55 / 35', left: 55, right: 35, name: '90° · asim. izq.', highlight: 'wideLeft' },
+  { code: '35 / 55', left: 35, right: 55, name: '90° · asim. der.', highlight: 'wideRight' },
 ];
 
 /**
@@ -468,7 +475,8 @@ function drawDispersionNote(pdf: jsPDF, x: number, y: number, width: number): vo
     'y su suma es la cobertura horizontal total (55/55 = 110°, 35/35 = 70°, 55/35 y 35/55 = 90° asimétrico). ' +
     'Cada recinto puede llevar un ajuste distinto (configuración mixta, p. ej. 70°/110° en el mismo array). ' +
     'Los recintos con ajuste distinto de 55/55 se resaltan por color: azul si es simétrico pero más estrecho ' +
-    '(p. ej. 35/35), naranja si es asimétrico (p. ej. 55/35), donde el lado importa. ' +
+    '(p. ej. 35/35); si es asimétrico se distingue además el lado más abierto — naranja cuando es el IZQUIERDO ' +
+    '(p. ej. 55/35) y morado cuando es el DERECHO (p. ej. 35/55) — para no confundir la orientación del recinto. ' +
     'Los recintos de directividad fija (KS28, KARA, K1) no muestran ajuste. Confirme siempre en Soundvision.';
   const lines = pdf.splitTextToSize(note, Math.max(1, width - 6));
   pdf.text(lines, x + 3, y + 29);

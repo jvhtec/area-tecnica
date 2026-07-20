@@ -120,9 +120,11 @@ describe('classifyDispersionHighlight', () => {
     expect(classifyDispersionHighlight('45/45')).toBe('symmetric');
   });
 
-  it('flags a setting where L and R differ as "asymmetric"', () => {
-    expect(classifyDispersionHighlight('55/35')).toBe('asymmetric');
-    expect(classifyDispersionHighlight('35/55')).toBe('asymmetric');
+  it('distinguishes which side is wider on an asymmetric setting, since 55/35 and 35/55 are mirror images', () => {
+    expect(classifyDispersionHighlight('55/35')).toBe('wideLeft');
+    expect(classifyDispersionHighlight('35/55')).toBe('wideRight');
+    expect(classifyDispersionHighlight('60/45')).toBe('wideLeft');
+    expect(classifyDispersionHighlight('45/60')).toBe('wideRight');
   });
 
   it('does not flag the default 55/55, a fixed-directivity box, or an unparsable value', () => {
