@@ -67,7 +67,7 @@ describe("buildXmlpPowerTables", () => {
 
     expect(result.tables).toHaveLength(1);
     const sidefill = result.tables[0];
-    expect(sidefill.name).toBe("Sidefill");
+    expect(sidefill.name).toBe("Monitores");
     expect(sidefill.includesHoist).toBe(false);
     expect(sidefill.position).toBeUndefined();
     expect(sidefill.rows).toEqual([
@@ -111,7 +111,7 @@ describe("buildXmlpPowerTables", () => {
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables.map((table) => table.name)).toEqual(["Sidefill"]);
+    expect(result.tables.map((table) => table.name)).toEqual(["Monitores"]);
   });
 
   it("warns and drops amps whose model has no catalog equivalent", () => {
@@ -174,7 +174,7 @@ describe("buildXmlpPowerTables", () => {
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables.map((table) => table.name)).toEqual(["Sidefill"]);
+    expect(result.tables.map((table) => table.name)).toEqual(["Monitores"]);
   });
 
   it("recognizes the 'DLY' abbreviation (vowel-dropped, not a prefix of DELAY) as a delay group", () => {

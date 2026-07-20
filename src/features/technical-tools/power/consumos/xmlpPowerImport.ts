@@ -167,8 +167,8 @@ const addExtraRow = (
  * Builds Consumos PDU tables from an imported Soundvision `.xmlp` amplifier
  * map. Mains/subs/outfills/front fills are merged by side into "Main L" /
  * "Main R" PDUs (hoist power required); sidefill amps are merged into a
- * single stage PDU with the usual monitor-world extras; each delay group
- * keeps its own PDU, exactly as named in the session file.
+ * single "Monitores" stage PDU with the usual monitor-world extras; each
+ * delay group keeps its own PDU, exactly as named in the session file.
  */
 export function buildXmlpPowerTables(
   map: XmlpAmpMap,
@@ -246,10 +246,10 @@ export function buildXmlpPowerTables(
       ["Varios", 1],
     ];
     for (const [name, quantity] of extras) {
-      addExtraRow(rows, name, quantity, components, warnings, "Sidefill");
+      addExtraRow(rows, name, quantity, components, warnings, "Monitores");
     }
     if (rows.length > 0) {
-      tables.push({ name: "Sidefill", rows, includesHoist: false });
+      tables.push({ name: "Monitores", rows, includesHoist: false });
     }
   }
 
