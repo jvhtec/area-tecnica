@@ -40,6 +40,26 @@ import {
 import type { ImportedLaSession } from './importedLaSession';
 import { XmlpFlexPlanPreview } from './XmlpFlexPlanPreview';
 
+const XMLP_EQUIPMENT_PAGE_SIZE = 1000;
+
+async function fetchXmlpEquipmentRows(): Promise<XmlpEquipmentRow[]> {
+  const equipment: XmlpEquipmentRow[] = [];
+
+  for (let from = 0; ; from += XMLP_EQUIPMENT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('equipment')
+      .select('id, name, department, category, resource_id')
+      .in('department', ['sound', 'lights'])
+      .order('id', { ascending: true })
+      .range(from, from + XMLP_EQUIPMENT_PAGE_SIZE - 1);
+
+    if (error) throw error;
+    const page = (data ?? []) as XmlpEquipmentRow[];
+    equipment.push(...page);
+    if (page.length < XMLP_EQUIPMENT_PAGE_SIZE) return equipment;
+  }
+}
+
 interface XmlpFlexExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -80,15 +100,14 @@ export function XmlpFlexExportDialog({
     setResult(null);
     setConfirmedAdditive(false);
     Promise.all([
-      supabase.from('equipment').select('id, name, department, category, resource_id').limit(1000),
+      fetchXmlpEquipmentRows(),
       session.jobId ? getJobFlexEquipmentTargets(session.jobId) : Promise.resolve([]),
     ])
-      .then(([equipmentResult, discoveredTargets]) => {
+      .then(([equipmentRows, discoveredTargets]) => {
         if (!active) return;
-        if (equipmentResult.error) throw equipmentResult.error;
         const nextPlan = buildXmlpFlexExportPlan(
           session.map,
-          (equipmentResult.data ?? []) as XmlpEquipmentRow[],
+          equipmentRows,
         );
         setPlan(nextPlan);
         setSelectedIds(new Set(
@@ -198,6 +217,8 @@ export function XmlpFlexExportDialog({
         skippedUnmappedItems: unmapped,
         skippedAmbiguousItems: ambiguous,
       });
+      setConfirmedAdditive(false);
+      setSelectedIds(new Set());
       const failed = pushed.groupsFailed.length + pushed.failedChildItems.length;
       toast({
         title: failed === 0 ? 'Paquete enviado a Flex' : 'Envío parcial a Flex',

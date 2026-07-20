@@ -1,5 +1,5 @@
-import type { ImportedLaSession } from './importedLaSession';
-import { SoundvisionFlysheetButton } from './SoundvisionFlysheetButton';
+import type { ImportedLaSession } from '@/components/sound/amplifier-tool/rack-designer/importedLaSession';
+import { SoundvisionFlysheetButton } from '@/components/sound/amplifier-tool/rack-designer/SoundvisionFlysheetButton';
 
 interface ImportedXmlpActionsProps {
   session: ImportedLaSession | null;

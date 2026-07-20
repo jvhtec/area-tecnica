@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AmplifierResults } from '@/components/sound/amplifier-tool/types';
-import type { NwmMap } from '../nwm-import';
+import type { NwmMap } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import { mockSupabase } from '@/test/mockSupabase';
 import { AmpRackDesigner } from '../AmpRackDesigner';
 

@@ -1,4 +1,4 @@
-import type { NwmMap } from './nwm-import';
+import type { NwmMap } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 
 export interface ImportedLaSession {
   sourceFileName: string;

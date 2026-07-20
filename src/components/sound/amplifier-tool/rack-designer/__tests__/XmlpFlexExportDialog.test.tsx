@@ -5,10 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ImportedLaSession } from '../importedLaSession';
 import type { StrictGroupedPushResult } from '@/services/flexPullsheets';
 
-const { getTargetsMock, pushMock, toastMock, equipmentRows } = vi.hoisted(() => ({
+const { getTargetsMock, pushMock, toastMock, equipmentRangeMock, equipmentRows } = vi.hoisted(() => ({
   getTargetsMock: vi.fn(),
   pushMock: vi.fn(),
   toastMock: vi.fn(),
+  equipmentRangeMock: vi.fn(),
   equipmentRows: [
     { id: 'k2-row', name: 'K2', department: 'sound', category: 'speakers', resource_id: 'k2-resource' },
     { id: 'k1-row', name: "L'Acoustics K1", department: 'sound', category: 'speakers', resource_id: null },
@@ -19,7 +20,11 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastMock }) }))
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: () => ({
-      select: () => ({ limit: vi.fn().mockResolvedValue({ data: equipmentRows, error: null }) }),
+      select: () => ({
+        in: () => ({
+          order: () => ({ range: equipmentRangeMock }),
+        }),
+      }),
     }),
   },
 }));
@@ -82,6 +87,7 @@ const successfulResult: StrictGroupedPushResult = {
 describe('XmlpFlexExportDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    equipmentRangeMock.mockResolvedValue({ data: equipmentRows, error: null });
     getTargetsMock.mockResolvedValue([
       {
         id: 'quote-id', element_id: 'quote-id', department: 'sound',
@@ -116,6 +122,48 @@ describe('XmlpFlexExportDialog', () => {
     ));
     expect(await screen.findByText('Envío completo')).toBeInTheDocument();
     expect(screen.getByText(/1 grupos creados; 1 líneas añadidas/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Seleccionar K2' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Entiendo que el envío es aditivo/ })).not.toBeChecked();
+    expect(send).toBeDisabled();
+  });
+
+  it('paginates equipment rows so mappings beyond the first 1000 records are available', async () => {
+    const firstPage = Array.from({ length: 1000 }, (_, index) => ({
+      id: `unrelated-${index}`,
+      name: `Unrelated ${index}`,
+      department: 'sound',
+      category: 'speakers',
+      resource_id: `unrelated-resource-${index}`,
+    }));
+    equipmentRangeMock
+      .mockResolvedValueOnce({ data: firstPage, error: null })
+      .mockResolvedValueOnce({ data: equipmentRows, error: null });
+
+    render(<XmlpFlexExportDialog open onOpenChange={vi.fn()} session={session('job-id')} />);
+
+    expect(await screen.findByText(/1 líneas mapeadas/)).toBeInTheDocument();
+    expect(equipmentRangeMock).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(equipmentRangeMock).toHaveBeenNthCalledWith(2, 1000, 1999);
+  });
+
+  it('preserves the selection and additive confirmation when a push rejects', async () => {
+    pushMock.mockRejectedValueOnce(new Error('upstream failed'));
+    render(<XmlpFlexExportDialog open onOpenChange={vi.fn()} session={session('job-id')} />);
+    await screen.findByText(/1 líneas mapeadas/);
+
+    const selected = screen.getByRole('checkbox', { name: 'Seleccionar K2' });
+    const confirmation = screen.getByRole('checkbox', { name: /Entiendo que el envío es aditivo/ });
+    const send = screen.getByRole('button', { name: 'Enviar seleccionados a Flex' });
+    fireEvent.click(confirmation);
+    fireEvent.click(send);
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Error al enviar a Flex',
+      variant: 'destructive',
+    })));
+    expect(selected).toBeChecked();
+    expect(confirmation).toBeChecked();
+    expect(send).toBeEnabled();
   });
 
   it('allows deselecting a complete group', async () => {

@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { generateSoundvisionFlysheetPdf } from '@/utils/soundvisionFlysheetPdf';
 import { formatUserName } from '@/utils/userName';
-import type { ImportedLaSession } from './importedLaSession';
+import type { ImportedLaSession } from '@/components/sound/amplifier-tool/rack-designer/importedLaSession';
 
 const MADRID_TZ = 'Europe/Madrid';
 

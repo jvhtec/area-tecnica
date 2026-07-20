@@ -4,7 +4,7 @@ import { flexApiFetch } from '@/lib/flex-api-client';
 import {
   FLEX_CATEGORY_MAP,
   pushEquipmentToFlexDocumentStrict,
-} from '../flexPullsheets';
+} from '@/services/flexPullsheets';
 
 vi.mock('@/lib/flex-api-client', () => ({ flexApiFetch: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
