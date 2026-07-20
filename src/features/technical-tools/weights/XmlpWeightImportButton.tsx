@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 interface XmlpWeightImportButtonProps {
   isImporting: boolean;
   onImport: (file: File) => void;
+  title?: string;
 }
 
 export function XmlpWeightImportButton({
   isImporting,
   onImport,
+  title = 'Crear requisitos de peso desde un proyecto Soundvision (.xmlp)',
 }: XmlpWeightImportButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +36,7 @@ export function XmlpWeightImportButton({
         className="gap-2"
         disabled={isImporting}
         onClick={() => inputRef.current?.click()}
-        title="Crear requisitos de peso desde un proyecto Soundvision (.xmlp)"
+        title={title}
       >
         <FileInput className="h-4 w-4" />
         {isImporting ? 'Extrayendo XMLP…' : 'Extraer de XMLP'}

@@ -20,4 +20,19 @@ describe('XmlpWeightImportButton', () => {
     rerender(<XmlpWeightImportButton isImporting onImport={onImport} />);
     expect(screen.getByRole('button', { name: 'Extrayendo XMLP…' })).toBeDisabled();
   });
+
+  it('allows power importers to supply context-specific help text', () => {
+    render(
+      <XmlpWeightImportButton
+        isImporting={false}
+        onImport={() => undefined}
+        title="Crear tablas de potencia desde un proyecto Soundvision (.xmlp)"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Extraer de XMLP' })).toHaveAttribute(
+      'title',
+      'Crear tablas de potencia desde un proyecto Soundvision (.xmlp)',
+    );
+  });
 });

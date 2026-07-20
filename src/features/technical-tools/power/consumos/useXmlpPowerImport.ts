@@ -6,6 +6,7 @@ import { createCalculatedPowerTable } from "@/features/technical-tools/power/pow
 import type { PowerElectricalSettings, PowerTable } from "@/features/technical-tools/power/types";
 
 import type { ConsumosComponent } from "./config";
+import { createPrebuiltMonitorPdu } from "./monitorPduPreset";
 import { buildXmlpPowerTables } from "./xmlpPowerImport";
 
 interface ImportStage {
@@ -19,6 +20,7 @@ interface UseXmlpPowerImportOptions {
   getSettings: () => PowerElectricalSettings;
   selectedStage: ImportStage | null;
   onTablesImported: (tables: PowerTable[]) => void;
+  onMonitorPduCreated: (table: PowerTable) => void;
 }
 
 export function useXmlpPowerImport({
@@ -27,6 +29,7 @@ export function useXmlpPowerImport({
   getSettings,
   selectedStage,
   onTablesImported,
+  onMonitorPduCreated,
 }: UseXmlpPowerImportOptions) {
   const [isImportingXmlp, setIsImportingXmlp] = useState(false);
   const { toast } = useToast();
@@ -92,5 +95,29 @@ export function useXmlpPowerImport({
     }
   };
 
-  return { isImportingXmlp, importXmlpPower };
+  const addPrebuiltMonitorPdu = () => {
+    try {
+      onMonitorPduCreated(
+        createPrebuiltMonitorPdu({
+          components,
+          id: Date.now(),
+          pduOptions,
+          settings: getSettings(),
+          stage: selectedStage,
+        }),
+      );
+      toast({ title: "Éxito", description: "PDU de Monitores añadida sin posición." });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "No se pudo añadir la PDU de Monitores.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return { isImportingXmlp, importXmlpPower, addPrebuiltMonitorPdu };
 }

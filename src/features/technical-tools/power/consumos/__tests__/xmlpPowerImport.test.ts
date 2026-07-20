@@ -128,16 +128,109 @@ describe("buildXmlpPowerTables", () => {
     );
   });
 
-  it("skips a PA-classified group when its side cannot be determined, with a warning", () => {
+  it("preserves unsided PA groups in one unpositioned Main PDU", () => {
     const map: XmlpAmpMap = {
-      units: [{ octet: 1, model: "LA12X" }],
-      groups: [{ name: "MAIN", role: "source", members: [1] }],
+      units: [
+        { octet: 1, model: "LA12X" },
+        { octet: 2, model: "LA12X" },
+        { octet: 3, model: "LA12X" },
+        { octet: 4, model: "LA12X" },
+      ],
+      groups: [
+        { name: "Main K2", role: "source", members: [1] },
+        { name: "SUBS", role: "source", members: [2] },
+        { name: "Outfill", role: "source", members: [3] },
+        { name: "Frontfill", role: "source", members: [4] },
+      ],
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables).toEqual([]);
+    expect(result.tables).toHaveLength(1);
+    expect(result.tables[0]).toEqual(
+      expect.objectContaining({ name: "Main", includesHoist: true }),
+    );
+    expect(result.tables[0]).not.toHaveProperty("position");
+    expect(rowFor(result, "Main", "LA12X")).toEqual(
+      expect.objectContaining({ quantity: "4" }),
+    );
     expect(result.warnings).toEqual([
-      'No se pudo determinar el lado (L/R) del grupo "MAIN"; no se importó.',
+      "No se pudo determinar el lado (L/R) de 4 amplificador(es) de PA; se añadieron a \"Main\" sin posición.",
+    ]);
+  });
+
+  it("uses screenshot-style parent groups to classify cabinet-named source groups", () => {
+    const map: XmlpAmpMap = {
+      units: [
+        { octet: 11, model: "LA12X" },
+        { octet: 12, model: "LA12X" },
+        { octet: 21, model: "LA12X" },
+        { octet: 22, model: "LA12X" },
+      ],
+      groups: [
+        { name: "ALL", role: "parent", members: [11, 12, 21, 22] },
+        { name: "Main K2", role: "parent", members: [11, 12] },
+        { name: "SUBS", role: "parent", members: [21] },
+        { name: "Outfill", role: "parent", members: [22] },
+        { name: "K2 L", role: "source", members: [11] },
+        { name: "K2 R", role: "source", members: [12] },
+        { name: "KS28 L", role: "source", members: [21] },
+        { name: "KARA R", role: "source", members: [22] },
+      ],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(result.tables.map((table) => table.name).sort()).toEqual(["Main L", "Main R"]);
+    expect(rowFor(result, "Main L", "LA12X")).toEqual(
+      expect.objectContaining({ quantity: "2" }),
+    );
+    expect(rowFor(result, "Main R", "LA12X")).toEqual(
+      expect.objectContaining({ quantity: "2" }),
+    );
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("uses independent LEFT/RIGHT membership when source names have no side", () => {
+    const map: XmlpAmpMap = {
+      units: [
+        { octet: 11, model: "LA12X" },
+        { octet: 12, model: "LA12X" },
+      ],
+      groups: [
+        { name: "Main K2", role: "parent", members: [11, 12] },
+        { name: "LEFT", role: "side", members: [11] },
+        { name: "RIGHT", role: "side", members: [12] },
+        { name: "K2", role: "source", members: [11, 12] },
+      ],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(result.tables.map((table) => table.name).sort()).toEqual(["Main L", "Main R"]);
+    expect(rowFor(result, "Main L", "LA12X")?.quantity).toBe("1");
+    expect(rowFor(result, "Main R", "LA12X")?.quantity).toBe("1");
+  });
+
+  it("recognizes common PA, fill, sidefill, and delay abbreviations", () => {
+    const map: XmlpAmpMap = {
+      units: [
+        { octet: 1, model: "LA12X" },
+        { octet: 2, model: "LA12X" },
+        { octet: 3, model: "LA4X" },
+        { octet: 4, model: "LA8" },
+      ],
+      groups: [
+        { name: "PA L", role: "source", members: [1] },
+        { name: "FF R", role: "source", members: [2] },
+        { name: "SF", role: "source", members: [3] },
+        { name: "DLY 1", role: "source", members: [4] },
+      ],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(result.tables.map((table) => table.name).sort()).toEqual([
+      "DLY 1",
+      "Main L",
+      "Main R",
+      "Monitores",
     ]);
   });
 
@@ -216,6 +309,19 @@ describe("buildXmlpPowerTables", () => {
 
     const result = buildXmlpPowerTables(map, components);
     expect(result.tables).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("maps legacy LA4 units to the bundled LA4X planning component instead of dropping them", () => {
+    const map: XmlpAmpMap = {
+      units: [{ octet: 1, model: "LA4" }],
+      groups: [{ name: "SIDE L", role: "source", members: [1] }],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(rowFor(result, "Monitores", "LA4X")).toEqual(
+      expect.objectContaining({ quantity: "1", watts: "750" }),
+    );
     expect(result.warnings).toEqual([]);
   });
 });

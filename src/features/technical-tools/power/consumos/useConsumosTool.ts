@@ -523,12 +523,13 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   });
 
   // XMLP amplifier-power import (Soundvision projects, sound department only)
-  const { isImportingXmlp, importXmlpPower } = useXmlpPowerImport({
+  const { isImportingXmlp, importXmlpPower, addPrebuiltMonitorPdu } = useXmlpPowerImport({
     components,
     pduOptions,
     getSettings: getPowerSettings,
     selectedStage: selectedStage ?? null,
     onTablesImported: (importedTables) => setTables((prev) => [...prev, ...importedTables]),
+    onMonitorPduCreated: (table) => setTables((prev) => [...prev, table]),
   });
 
   // Builder row handlers
@@ -1772,6 +1773,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     addComponentToRow,
     isImportingXmlp,
     importXmlpPower,
+    addPrebuiltMonitorPdu,
     selectedPosition,
     setSelectedPosition,
     customPosition,

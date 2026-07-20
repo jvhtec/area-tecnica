@@ -1,17 +1,14 @@
-import { toAmpModel } from "@/components/sound/amplifier-tool/rack-designer/nwm-import";
+import {
+  toAmpModel,
+  type NwmGroup,
+  type NwmUnit,
+} from "@/components/sound/amplifier-tool/rack-designer/nwm-import";
 import type { PowerTableRow } from "@/features/technical-tools/power/types";
 import type { ConsumosComponent } from "./config";
+import { buildMonitorPduRows, MONITOR_PDU_NAME } from "./monitorPduPreset";
 
-interface XmlpAmpUnit {
-  octet: number;
-  model: string;
-}
-
-interface XmlpAmpGroup {
-  name: string;
-  role: string;
-  members: number[];
-}
+type XmlpAmpUnit = Pick<NwmUnit, "octet" | "model">;
+type XmlpAmpGroup = Pick<NwmGroup, "name" | "role" | "members">;
 
 export interface XmlpAmpMap {
   units: XmlpAmpUnit[];
@@ -71,6 +68,9 @@ const tokenMatchesKeyword = (token: string, keyword: string) =>
   (keyword.length >= MIN_PARTIAL_TOKEN_LENGTH && token.startsWith(keyword));
 
 const PA_KEYWORDS = ["MAIN", "SUB", "OUT", "FRONT", "FILL"];
+const SIDE_KEYWORDS = ["SIDE", "MONITOR"];
+const PA_ALIASES = new Set(["PA", "FF", "OF"]);
+const SIDE_ALIASES = new Set(["SF"]);
 // Vowel-dropped shorthand that isn't a prefix of the full word, so it can't
 // be caught by tokenMatchesKeyword's prefix check.
 const DELAY_ALIASES = new Set(["DLY"]);
@@ -80,25 +80,40 @@ const DELAY_ALIASES = new Set(["DLY"]);
 // front/out fill.
 function classifySection(groupName: string): Section {
   const tokens = tokenize(groupName);
-  if (tokens.some((token) => tokenMatchesKeyword(token, "SIDE"))) return "SIDE";
+  if (
+    tokens.some(
+      (token) =>
+        SIDE_ALIASES.has(token) ||
+        SIDE_KEYWORDS.some((keyword) => tokenMatchesKeyword(token, keyword)),
+    )
+  ) {
+    return "SIDE";
+  }
   if (
     tokens.some((token) => tokenMatchesKeyword(token, "DELAY") || DELAY_ALIASES.has(token))
   ) {
     return "DELAY";
   }
-  if (tokens.some((token) => PA_KEYWORDS.some((keyword) => tokenMatchesKeyword(token, keyword)))) {
+  if (
+    tokens.some(
+      (token) =>
+        PA_ALIASES.has(token) ||
+        PA_KEYWORDS.some((keyword) => tokenMatchesKeyword(token, keyword)),
+    )
+  ) {
     return "PA";
   }
   return "OTHER";
 }
 
-// Reads the side off the group name's last token so "MAIN L", "MAIN LEFT"
-// and "MAIN-L" are all recognized the same way.
+// Reads a standalone side token anywhere in the group name so "MAIN L",
+// "LEFT MAIN" and "MAIN-L" are all recognized the same way.
 const sideFromName = (name: string): Side => {
   const tokens = tokenize(name);
-  const last = tokens[tokens.length - 1] ?? "";
-  if (last === "L" || last === "LEFT") return "L";
-  if (last === "R" || last === "RIGHT") return "R";
+  for (const token of [...tokens].reverse()) {
+    if (token === "L" || token === "LEFT") return "L";
+    if (token === "R" || token === "RIGHT") return "R";
+  }
   return "C";
 };
 
@@ -125,7 +140,10 @@ const countAmpsByComponent = (
   const counts = new Map<string, { component: ConsumosComponent; quantity: number }>();
   for (const unit of units) {
     const ampModel = toAmpModel(unit.model);
-    const component = findComponent(ampModel, components);
+    // The bundled planning catalog has no separate LA4 row. Reuse the LA4X
+    // planning entry so an older session never loses that amplifier entirely.
+    const catalogModel = ampModel === "LA4" ? "LA4X" : ampModel;
+    const component = findComponent(catalogModel, components);
     if (!component) {
       warnings.push(
         `Amplificador con modelo "${unit.model}" sin equivalencia en el catálogo de consumos; no se incluyó.`,
@@ -179,44 +197,65 @@ export function buildXmlpPowerTables(
   const sourceGroups = map.groups.filter((group) => group.role === "source");
 
   // First source group wins for amps that appear in multiple overlapping groups.
-  const assignedGroup = new Map<number, string>();
+  const assignedGroup = new Map<number, XmlpAmpGroup>();
   for (const group of sourceGroups) {
     for (const octet of group.members) {
       if (unitByOctet.has(octet) && !assignedGroup.has(octet)) {
-        assignedGroup.set(octet, group.name);
+        assignedGroup.set(octet, group);
       }
     }
   }
 
-  const unitsByGroup = new Map<string, XmlpAmpUnit[]>();
-  for (const [octet, groupName] of assignedGroup) {
-    const unit = unitByOctet.get(octet)!;
-    if (!unitsByGroup.has(groupName)) unitsByGroup.set(groupName, []);
-    unitsByGroup.get(groupName)!.push(unit);
+  // Category and side are not always repeated in a source group name. NM and
+  // some Soundvision projects instead expose parents such as "Main K2",
+  // "SUBS", "Outfill" and "Frontfill", plus separate LEFT/RIGHT membership.
+  // Index all non-source memberships so each amp can inherit that context.
+  const contextGroupsByOctet = new Map<number, XmlpAmpGroup[]>();
+  for (const group of map.groups) {
+    if (group.role === "source") continue;
+    for (const octet of group.members) {
+      if (!unitByOctet.has(octet)) continue;
+      const groups = contextGroupsByOctet.get(octet) ?? [];
+      groups.push(group);
+      contextGroupsByOctet.set(octet, groups);
+    }
   }
 
-  const paUnitsBySide: Record<"L" | "R", XmlpAmpUnit[]> = { L: [], R: [] };
+  const paUnitsBySide: Record<Side, XmlpAmpUnit[]> = { L: [], R: [], C: [] };
   const sidefillUnits: XmlpAmpUnit[] = [];
-  const delayGroups: Array<{ name: string; units: XmlpAmpUnit[] }> = [];
+  const delayGroups = new Map<string, XmlpAmpUnit[]>();
 
-  for (const [groupName, units] of unitsByGroup) {
-    const section = classifySection(groupName);
+  for (const [octet, sourceGroup] of assignedGroup) {
+    const unit = unitByOctet.get(octet)!;
+    const contextGroups = [...(contextGroupsByOctet.get(octet) ?? [])].sort(
+      (left, right) => left.members.length - right.members.length,
+    );
+    const directSection = classifySection(sourceGroup.name);
+    const section =
+      directSection === "OTHER"
+        ? contextGroups
+            .map((group) => classifySection(group.name))
+            .find((candidate) => candidate !== "OTHER") ?? "OTHER"
+        : directSection;
+    const directSide = sideFromName(sourceGroup.name);
+    const side =
+      directSide === "C"
+        ? contextGroups
+            .map((group) => sideFromName(group.name))
+            .find((candidate) => candidate !== "C") ?? "C"
+        : directSide;
+
     if (section === "PA") {
-      const side = sideFromName(groupName);
-      if (side === "C") {
-        warnings.push(
-          `No se pudo determinar el lado (L/R) del grupo "${groupName}"; no se importó.`,
-        );
-        continue;
-      }
-      paUnitsBySide[side].push(...units);
+      paUnitsBySide[side].push(unit);
     } else if (section === "SIDE") {
-      sidefillUnits.push(...units);
+      sidefillUnits.push(unit);
     } else if (section === "DELAY") {
-      delayGroups.push({ name: groupName, units });
+      const units = delayGroups.get(sourceGroup.name) ?? [];
+      units.push(unit);
+      delayGroups.set(sourceGroup.name, units);
     } else {
       warnings.push(
-        `Grupo "${groupName}" no coincide con mains/subs/outfills/frontfills/sidefill/delay; sus amplificadores no se incluyeron.`,
+        `Grupo "${sourceGroup.name}" no coincide con mains/subs/outfills/frontfills/sidefill/delay; sus amplificadores no se incluyeron.`,
       );
     }
   }
@@ -237,23 +276,33 @@ export function buildXmlpPowerTables(
     });
   });
 
-  if (sidefillUnits.length > 0) {
-    const rows = rowsFromCounts(countAmpsByComponent(sidefillUnits, components, warnings));
-    const extras: Array<[string, number]> = [
-      ["Control Mon (L)", 1],
-      ["RF Rack", 1],
-      ["Backline", 1],
-      ["Varios", 1],
-    ];
-    for (const [name, quantity] of extras) {
-      addExtraRow(rows, name, quantity, components, warnings, "Monitores");
-    }
+  const unsidedPaUnits = paUnitsBySide.C;
+  if (unsidedPaUnits.length > 0) {
+    const rows = rowsFromCounts(countAmpsByComponent(unsidedPaUnits, components, warnings));
+    addExtraRow(rows, "Varios", 1, components, warnings, "Main");
     if (rows.length > 0) {
-      tables.push({ name: "Monitores", rows, includesHoist: false });
+      tables.push({ name: "Main", rows, includesHoist: true });
+      warnings.push(
+        `No se pudo determinar el lado (L/R) de ${unsidedPaUnits.length} amplificador(es) de PA; se añadieron a "Main" sin posición.`,
+      );
     }
   }
 
-  for (const { name, units } of delayGroups) {
+  if (sidefillUnits.length > 0) {
+    const rows = rowsFromCounts(countAmpsByComponent(sidefillUnits, components, warnings));
+    const monitorRows = buildMonitorPduRows(components);
+    rows.push(...monitorRows.rows);
+    for (const componentName of monitorRows.missingComponents) {
+      warnings.push(
+        `No se encontró el componente "${componentName}" en el catálogo; no se añadió esa fila a ${MONITOR_PDU_NAME}.`,
+      );
+    }
+    if (rows.length > 0) {
+      tables.push({ name: MONITOR_PDU_NAME, rows, includesHoist: false });
+    }
+  }
+
+  for (const [name, units] of delayGroups) {
     const rows = rowsFromCounts(countAmpsByComponent(units, components, warnings));
     addExtraRow(rows, "Varios", 1, components, warnings, `"${name}"`);
     if (rows.length === 0) continue;
