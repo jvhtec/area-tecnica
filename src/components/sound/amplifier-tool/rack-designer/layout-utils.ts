@@ -67,6 +67,136 @@ export function blockPixelHeight(block: Pick<RackDesignerBlock, 'amps'>): number
   return BLOCK_HEADER_HEIGHT + block.amps.length * AMP_CELL_HEIGHT;
 }
 
+/**
+ * Joins the given amps (by id) into a single rack of at most AMPS_PER_RACK.
+ * The amps are collected in canvas order (block order, then position within the
+ * block), moved out of their source racks into one new rack placed where the
+ * first selected amp lived, and any rack left empty is dropped. A partially
+ * emptied source rack is nudged aside so it doesn't sit under the new one.
+ * Returns the blocks unchanged when fewer than two amps resolve.
+ */
+export function joinAmpsIntoRack(
+  blocks: RackDesignerBlock[],
+  ampIds: readonly string[],
+): RackDesignerBlock[] {
+  const wanted = new Set(ampIds);
+  const selected: RackDesignerAmp[] = [];
+  let anchor: RackDesignerBlock | null = null;
+  for (const block of blocks) {
+    for (const amp of block.amps) {
+      if (wanted.has(amp.id)) {
+        selected.push(amp);
+        if (!anchor) anchor = block;
+      }
+    }
+  }
+  if (selected.length < 2 || !anchor) return blocks;
+
+  const joinedAmps = selected.slice(0, AMPS_PER_RACK);
+  const joinedIds = new Set(joinedAmps.map((amp) => amp.id));
+  const newBlock: RackDesignerBlock = {
+    id: makeDesignerId(),
+    label: anchor.label,
+    color: anchor.color,
+    x: anchor.x,
+    y: anchor.y,
+    amps: joinedAmps.map((amp) => ({ ...amp })),
+  };
+
+  const result: RackDesignerBlock[] = [];
+  for (const block of blocks) {
+    const remainingAmps = block.amps.filter((amp) => !joinedIds.has(amp.id));
+    if (block.id === anchor.id) {
+      result.push(newBlock);
+      if (remainingAmps.length > 0) {
+        // Leftover amps from the anchor rack shift right when possible, or left
+        // when the anchor is too close to the canvas edge.
+        const rightX = block.x + BLOCK_WIDTH + 30;
+        const maxX = CANVAS_WIDTH - BLOCK_WIDTH;
+        result.push({
+          ...block,
+          x: rightX <= maxX ? rightX : Math.max(0, block.x - BLOCK_WIDTH - 30),
+          amps: remainingAmps,
+        });
+      }
+    } else if (remainingAmps.length > 0) {
+      result.push({ ...block, amps: remainingAmps });
+    }
+  }
+  return result;
+}
+
+/**
+ * Drops the source rack's amps into the target rack, keeping the target's
+ * identity (label, colour and position). Only as many amps as fit under
+ * AMPS_PER_RACK move; any surplus stays in the source rack, which is left where
+ * it is. A fully emptied source rack is removed. Returns the blocks unchanged
+ * when the merge can't apply (same block, missing block, or a full target).
+ */
+export function mergeRackIntoRack(
+  blocks: RackDesignerBlock[],
+  sourceId: string,
+  targetId: string,
+): RackDesignerBlock[] {
+  if (sourceId === targetId) return blocks;
+  const source = blocks.find((block) => block.id === sourceId);
+  const target = blocks.find((block) => block.id === targetId);
+  if (!source || !target) return blocks;
+  const capacity = AMPS_PER_RACK - target.amps.length;
+  if (capacity <= 0) return blocks;
+
+  const moving = source.amps.slice(0, capacity);
+  const movingIds = new Set(moving.map((amp) => amp.id));
+  const leftover = source.amps.filter((amp) => !movingIds.has(amp.id));
+
+  const result: RackDesignerBlock[] = [];
+  for (const block of blocks) {
+    if (block.id === targetId) {
+      result.push({ ...block, amps: [...block.amps, ...moving.map((amp) => ({ ...amp }))] });
+    } else if (block.id === sourceId) {
+      if (leftover.length > 0) result.push({ ...block, amps: leftover });
+      // A source rack emptied by the merge is dropped.
+    } else {
+      result.push(block);
+    }
+  }
+  return result;
+}
+
+/**
+ * Finds the rack a dragged block would merge into: the block whose bounds
+ * contain the dragged block's header centre (the grab point), skipping the
+ * dragged block itself and any rack already at AMPS_PER_RACK. When several
+ * overlap, the one whose centre is nearest wins. Returns null when none qualify.
+ */
+export function findMergeTarget(
+  blocks: RackDesignerBlock[],
+  sourceId: string,
+): string | null {
+  const source = blocks.find((block) => block.id === sourceId);
+  if (!source) return null;
+  const probeX = source.x + BLOCK_WIDTH / 2;
+  const probeY = source.y + BLOCK_HEADER_HEIGHT / 2;
+  let bestId: string | null = null;
+  let bestDist = Infinity;
+  for (const block of blocks) {
+    if (block.id === sourceId || block.amps.length >= AMPS_PER_RACK) continue;
+    const height = blockPixelHeight(block);
+    const inside =
+      probeX >= block.x &&
+      probeX <= block.x + BLOCK_WIDTH &&
+      probeY >= block.y &&
+      probeY <= block.y + height;
+    if (!inside) continue;
+    const dist = Math.hypot(probeX - (block.x + BLOCK_WIDTH / 2), probeY - (block.y + height / 2));
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestId = block.id;
+    }
+  }
+  return bestId;
+}
+
 export function isValidIp(ip: string): boolean {
   const parts = ip.trim().split('.');
   if (parts.length !== 4) return false;
