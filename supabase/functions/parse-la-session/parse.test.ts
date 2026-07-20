@@ -159,6 +159,42 @@ describe("parseSoundvisionFlysheet", () => {
     ]);
   });
 
+  it("keeps arrays from mixed nested and flat physical configurations", () => {
+    const mixedShape = `<project name="Mixed configurations">
+      <physical_configuration name="Main"><children>
+        <cluster name="K2 L"><elements>
+          <rigging_element model="K2-BUMP" />
+          <enclosure model="K2" />
+        </elements></cluster>
+      </children></physical_configuration>
+      <physical_configuration name="Out">
+        <cluster name="Out L"><elements>
+          <rigging_element model="KARA-MINIBU" />
+          <enclosure model="KARA II 90"><modules><elements>
+            <module><label>nested module data</label></module>
+          </elements></modules></enclosure>
+          <enclosure model="KARA II 90" />
+        </elements></cluster>
+        <cluster name="Out R"><elements>
+          <rigging_element model="KARA-MINIBU" />
+          <enclosure model="KARA II 90" />
+        </elements></cluster>
+      </physical_configuration>
+    </project>`;
+
+    const flysheet = parseSoundvisionFlysheet(mixedShape);
+
+    expect(flysheet.arrays.map((array) => ({
+      groupName: array.groupName,
+      arrayName: array.arrayName,
+      enclosureCount: array.enclosures.length,
+    }))).toEqual([
+      { groupName: "Main", arrayName: "K2 L", enclosureCount: 1 },
+      { groupName: "Out", arrayName: "Out L", enclosureCount: 2 },
+      { groupName: "Out", arrayName: "Out R", enclosureCount: 1 },
+    ]);
+  });
+
   it("attaches flysheet data to the existing XMLP amplifier map", () => {
     const xml = soundvisionProject.replace(
       "</project>",

@@ -95,11 +95,13 @@ function textOf(body: string, tag: string): string {
 interface XmlBlock {
   attributes: string;
   body: string;
+  start: number;
+  end: number;
 }
 
 function extractXmlBlocks(xml: string, tag: string): XmlBlock[] {
   const blocks: XmlBlock[] = [];
-  const stack: Array<{ attributes: string; bodyStart: number }> = [];
+  const stack: Array<{ attributes: string; bodyStart: number; start: number }> = [];
   const tokenPattern = new RegExp(`<${tag}\\b([^>]*)>|</${tag}>`, "gi");
   for (const match of xml.matchAll(tokenPattern)) {
     if (match[0].startsWith("</")) {
@@ -108,12 +110,15 @@ function extractXmlBlocks(xml: string, tag: string): XmlBlock[] {
         blocks.push({
           attributes: open.attributes,
           body: xml.slice(open.bodyStart, match.index),
+          start: open.start,
+          end: match.index + match[0].length,
         });
       }
     } else if (!match[0].endsWith("/>")) {
       stack.push({
         attributes: match[1] ?? "",
         bodyStart: match.index + match[0].length,
+        start: match.index,
       });
     }
   }
@@ -182,7 +187,7 @@ function parseNumericTokens(value: string): number[] {
 function parseDeployment(value: string): SoundvisionFlysheetArray["deployment"] {
   const normalized = value.trim().toLowerCase();
   if (normalized.includes("flown") || normalized.includes("fly")) return "flown";
-  if (normalized.includes("stack")) return "stacked";
+  if (normalized.includes("stack") || normalized.includes("ground")) return "stacked";
   return "unknown";
 }
 
@@ -258,7 +263,9 @@ function parseWarnings(body: string): string[] {
 }
 
 function parseEnclosures(clusterBody: string): SoundvisionFlysheetEnclosure[] {
-  const elementsBody = extractXmlBlocks(clusterBody, "elements")[0]?.body ?? "";
+  const elementsBody = extractXmlBlocks(clusterBody, "elements")
+    .filter((block) => /<(?:element|enclosure)\b/i.test(block.body))
+    .sort((a, b) => b.body.length - a.body.length)[0]?.body ?? "";
   const elementMatches = elementsBody
     ? [
         ...[...elementsBody.matchAll(/<(element|enclosure)\b([^>]*)>([\s\S]*?)<\/\1>/gi)].map(
@@ -314,97 +321,98 @@ export function parseSoundvisionFlysheet(
 
   const arrays: SoundvisionFlysheetArray[] = [];
   const allConfigurations = extractXmlBlocks(xml, "physical_configuration");
-  const nestedConfigurations = allConfigurations.filter((block) =>
-    /<children\b/i.test(block.body)
-  );
-  const configurations = nestedConfigurations.length > 0
-    ? nestedConfigurations
-    : allConfigurations.filter((block) => /<cluster\b/i.test(block.body));
+  const clusters = extractXmlBlocks(xml, "cluster");
 
-  for (const configuration of configurations) {
+  for (const cluster of clusters) {
+    const configuration = allConfigurations
+      .filter((candidate) => candidate.start < cluster.start && candidate.end > cluster.end)
+      .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0];
+    if (!configuration) continue;
+
     const configurationAttributes = attrs(configuration.attributes);
-    const configurationBody = extractXmlBlocks(configuration.body, "children")[0]?.body ??
-      configuration.body;
+    const configurationBody = configuration.body;
     const groupName =
       firstAttribute(configurationAttributes, ["name", "id"]) ||
       firstTextOf(configurationBody.split(/<cluster\b/i)[0], ["name", "label"]) ||
       "SISTEMA";
 
-    for (const cluster of extractXmlBlocks(configurationBody, "cluster")) {
-      const clusterAttributes = attrs(cluster.attributes);
-      const clusterBody = cluster.body;
-      const elements = parseEnclosures(clusterBody);
-      if (elements.length === 0) continue;
+    const clusterAttributes = attrs(cluster.attributes);
+    const clusterBody = cluster.body;
+    const elements = parseEnclosures(clusterBody);
+    if (elements.length === 0) continue;
 
-      const clusterMetadata = clusterBody
-        .replace(/<elements>[\s\S]*?<\/elements>/i, "")
-        .replace(/<connection_sets>[\s\S]*?<\/connection_sets>/i, "");
-      const arrayName =
-        firstAttribute(clusterAttributes, ["name", "id", "label"]) ||
-        firstTextOf(clusterMetadata, ["name", "label"]) ||
-        `ARRAY ${arrays.length + 1}`;
-      const riggingBlock = extractXmlBlocks(clusterBody, "rigging_element")[0];
-      const riggingBody = riggingBlock?.body ?? "";
-      const riggingAttributes = attrs(riggingBlock?.attributes ?? "");
-      const riggingModel =
-        firstAttribute(riggingAttributes, ["type", "model", "refid", "name"]) ||
-        firstTextOf(riggingBody, ["type", "model", "refid", "name"]);
-      const topElement = elements[0];
-      const bottomElement = elements[elements.length - 1];
-      const position = parseNumericTokens(firstTextOf(clusterMetadata, ["position"]));
-      const orientation = parseNumericTokens(firstTextOf(clusterMetadata, ["orientation"]));
-      const topSiteDegrees =
-        firstNumberOf(clusterMetadata, ["top_site", "top_site_angle"]) ??
-        topElement.siteAngleDegrees ??
-        orientation[0] ??
-        null;
-      const serializedSplay = elements
-        .map((element) => element.splayAngleDegrees)
-        .filter((angle): angle is number => angle !== null);
+    const clusterMetadata = clusterBody
+      .replace(/<elements>[\s\S]*?<\/elements>/i, "")
+      .replace(/<connection_sets>[\s\S]*?<\/connection_sets>/i, "");
+    const arrayName =
+      firstAttribute(clusterAttributes, ["name", "id", "label"]) ||
+      firstTextOf(clusterMetadata, ["name", "label"]) ||
+      `ARRAY ${arrays.length + 1}`;
+    const riggingBlock = extractXmlBlocks(clusterBody, "rigging_element")[0];
+    const riggingBody = riggingBlock?.body ?? "";
+    const riggingAttributes = attrs(riggingBlock?.attributes ?? "");
+    const riggingModel =
+      firstAttribute(riggingAttributes, ["type", "model", "refid", "name"]) ||
+      firstTextOf(riggingBody, ["type", "model", "refid", "name"]);
+    const topElement = elements[0];
+    const bottomElement = elements[elements.length - 1];
+    const position = parseNumericTokens(firstTextOf(clusterMetadata, ["position"]));
+    const orientation = parseNumericTokens(firstTextOf(clusterMetadata, ["orientation"]));
+    const topSiteDegrees =
+      firstNumberOf(clusterMetadata, ["top_site", "top_site_angle"]) ??
+      topElement.siteAngleDegrees ??
+      orientation[0] ??
+      null;
+    const serializedSplay = elements
+      .map((element) => element.splayAngleDegrees)
+      .filter((angle): angle is number => angle !== null);
 
-      arrays.push({
-        groupName,
-        arrayName,
-        deployment: parseDeployment(
-          firstTextOf(clusterMetadata, ["configuration", "deployment", "deployment_orientation"]) ||
-            firstAttribute(clusterAttributes, ["deployment_orientation", "deployment", "configuration"]),
-        ),
-        azimuthDegrees:
-          firstNumberOf(clusterMetadata, ["azimuth", "azimuth_angle"]) ??
-          firstNumberAttribute(clusterAttributes, ["azimuth", "azimuth_angle"]) ??
-          orientation[2] ??
-          null,
-        topSiteDegrees,
-        bottomSiteDegrees:
-          firstNumberOf(clusterMetadata, ["bottom_site", "bottom_site_angle"]) ??
-          bottomElement.siteAngleDegrees ??
-          (topSiteDegrees !== null && serializedSplay.length > 0
-            ? topSiteDegrees - serializedSplay.reduce((sum, angle) => sum + angle, 0)
-            : null),
-        topHeightMeters:
-          firstNumberOf(clusterMetadata, ["top_height", "top_z", "top_elevation"]) ??
-          topElement.trimHeightMeters ??
-          position[2] ??
-          null,
-        bottomHeightMeters:
-          firstNumberOf(clusterMetadata, ["bottom_height", "bottom_z", "bottom_elevation"]) ??
-          bottomElement.trimHeightMeters,
-        riggingFrame: riggingModel.replace(/_Hole.*$/i, ""),
-        flyingBarSetting: parseFlyingBarSetting(
-          clusterMetadata,
-          clusterAttributes,
-          riggingBody,
-          riggingAttributes,
-          riggingModel,
-        ),
-        pickupConfiguration: parsePickupConfiguration(clusterBody),
-        totalMassKg: firstNumberOf(clusterMetadata, ["total_mass", "total_weight"]),
-        frontLoadKg: firstNumberOf(clusterMetadata, ["front_load", "front_pick_load"]),
-        rearLoadKg: firstNumberOf(clusterMetadata, ["rear_load", "rear_pick_load"]),
-        enclosures: elements,
-        warnings: parseWarnings(clusterBody),
-      });
-    }
+    const deployment = parseDeployment([
+      firstTextOf(clusterMetadata, ["configuration", "deployment", "deployment_orientation"]),
+      firstAttribute(clusterAttributes, ["deployment_orientation", "deployment", "configuration"]),
+      firstTextOf(riggingBody, ["configuration", "deployment", "deployment_orientation"]),
+      firstTextOf(clusterBody, ["configuration"]),
+    ].filter(Boolean).join(" "));
+
+    arrays.push({
+      groupName,
+      arrayName,
+      deployment,
+      azimuthDegrees:
+        firstNumberOf(clusterMetadata, ["azimuth", "azimuth_angle"]) ??
+        firstNumberAttribute(clusterAttributes, ["azimuth", "azimuth_angle"]) ??
+        orientation[2] ??
+        null,
+      topSiteDegrees,
+      bottomSiteDegrees:
+        firstNumberOf(clusterMetadata, ["bottom_site", "bottom_site_angle"]) ??
+        bottomElement.siteAngleDegrees ??
+        (topSiteDegrees !== null && serializedSplay.length > 0
+          ? topSiteDegrees - serializedSplay.reduce((sum, angle) => sum + angle, 0)
+          : null),
+      topHeightMeters:
+        firstNumberOf(clusterMetadata, ["top_height", "top_z", "top_elevation"]) ??
+        topElement.trimHeightMeters ??
+        position[2] ??
+        null,
+      bottomHeightMeters:
+        firstNumberOf(clusterMetadata, ["bottom_height", "bottom_z", "bottom_elevation"]) ??
+        bottomElement.trimHeightMeters,
+      riggingFrame: riggingModel.replace(/_Hole.*$/i, ""),
+      flyingBarSetting: parseFlyingBarSetting(
+        clusterMetadata,
+        clusterAttributes,
+        riggingBody,
+        riggingAttributes,
+        riggingModel,
+      ),
+      pickupConfiguration: parsePickupConfiguration(clusterBody),
+      totalMassKg: firstNumberOf(clusterMetadata, ["total_mass", "total_weight"]),
+      frontLoadKg: firstNumberOf(clusterMetadata, ["front_load", "front_pick_load"]),
+      rearLoadKg: firstNumberOf(clusterMetadata, ["rear_load", "rear_pick_load"]),
+      enclosures: elements,
+      warnings: parseWarnings(clusterBody),
+    });
   }
 
   return { projectName: projectName.replace(/\.xmlp$/i, ""), arrays };
