@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { GripVertical } from 'lucide-react';
+import { Check, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RackDesignerBlock } from '@/components/sound/amplifier-tool/rack-designer/types';
 import {
@@ -32,10 +32,16 @@ interface RackBlockCardProps {
   zoom: number;
   /** True while a two-finger pinch is in progress; drags freeze so racks don't jump. */
   pinchActiveRef: React.RefObject<boolean>;
+  /** In join mode, tapping an amp selects it instead of opening its editor, and dragging is off. */
+  joinMode?: boolean;
+  /** Ids of amps currently selected for joining (highlighted with a check). */
+  selectedAmpIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onMove: (id: string, x: number, y: number) => void;
   /** Fired on a tap (press + release without dragging). ampId is null for the header. */
   onTap: (id: string, ampId: string | null) => void;
+  /** Fired when an amp cell is tapped in join mode. */
+  onAmpToggle?: (ampId: string) => void;
 }
 
 export function RackBlockCard({
@@ -43,15 +49,25 @@ export function RackBlockCard({
   selected,
   zoom,
   pinchActiveRef,
+  joinMode = false,
+  selectedAmpIds,
   onSelect,
   onMove,
   onTap,
+  onAmpToggle,
 }: RackBlockCardProps) {
   const dragState = useRef<DragState | null>(null);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.stopPropagation();
+    // Join mode: a tap on an amp cell toggles its selection; block dragging and
+    // the normal editor tap are suspended so selection is reliable on touch.
+    if (joinMode) {
+      const ampCell = (event.target as HTMLElement).closest('[data-amp-id]') as HTMLElement | null;
+      if (ampCell?.dataset.ampId) onAmpToggle?.(ampCell.dataset.ampId);
+      return;
+    }
     onSelect(block.id);
     const ampCell = (event.target as HTMLElement).closest('[data-amp-id]') as HTMLElement | null;
     dragState.current = {
@@ -153,17 +169,28 @@ export function RackBlockCard({
         <GripVertical className="h-3 w-3 shrink-0" />
         <span className="truncate">{block.label}</span>
       </div>
-      {block.amps.map((amp) => (
-        <div
-          key={amp.id}
-          data-amp-id={amp.id}
-          className="flex cursor-pointer flex-col items-center justify-center border border-t-0 border-black/60 px-1 text-center"
-          style={{ height: AMP_CELL_HEIGHT, backgroundColor: block.color }}
-        >
-          <span className="w-full truncate text-xs font-bold text-black">{amp.presetName}</span>
-          <span className="text-xs leading-tight text-black/90">{amp.ip}</span>
-        </div>
-      ))}
+      {block.amps.map((amp) => {
+        const ampSelected = joinMode && !!selectedAmpIds?.has(amp.id);
+        return (
+          <div
+            key={amp.id}
+            data-amp-id={amp.id}
+            className={cn(
+              'relative flex cursor-pointer flex-col items-center justify-center border border-t-0 border-black/60 px-1 text-center',
+              ampSelected && 'ring-2 ring-inset ring-primary',
+            )}
+            style={{ height: AMP_CELL_HEIGHT, backgroundColor: block.color }}
+          >
+            <span className="w-full truncate text-xs font-bold text-black">{amp.presetName}</span>
+            <span className="text-xs leading-tight text-black/90">{amp.ip}</span>
+            {ampSelected && (
+              <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <Check className="h-3 w-3" />
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

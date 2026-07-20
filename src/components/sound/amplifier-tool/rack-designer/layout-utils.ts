@@ -67,6 +67,62 @@ export function blockPixelHeight(block: Pick<RackDesignerBlock, 'amps'>): number
   return BLOCK_HEADER_HEIGHT + block.amps.length * AMP_CELL_HEIGHT;
 }
 
+/**
+ * Joins the given amps (by id) into a single rack of at most AMPS_PER_RACK.
+ * The amps are collected in canvas order (block order, then position within the
+ * block), moved out of their source racks into one new rack placed where the
+ * first selected amp lived, and any rack left empty is dropped. A partially
+ * emptied source rack is nudged aside so it doesn't sit under the new one.
+ * Returns the blocks unchanged when fewer than two amps resolve.
+ */
+export function joinAmpsIntoRack(
+  blocks: RackDesignerBlock[],
+  ampIds: readonly string[],
+): RackDesignerBlock[] {
+  const wanted = new Set(ampIds);
+  const selected: RackDesignerAmp[] = [];
+  let anchor: RackDesignerBlock | null = null;
+  for (const block of blocks) {
+    for (const amp of block.amps) {
+      if (wanted.has(amp.id)) {
+        selected.push(amp);
+        if (!anchor) anchor = block;
+      }
+    }
+  }
+  if (selected.length < 2 || !anchor) return blocks;
+
+  const joinedAmps = selected.slice(0, AMPS_PER_RACK);
+  const joinedIds = new Set(joinedAmps.map((amp) => amp.id));
+  const newBlock: RackDesignerBlock = {
+    id: makeDesignerId(),
+    label: anchor.label,
+    color: anchor.color,
+    x: anchor.x,
+    y: anchor.y,
+    amps: joinedAmps.map((amp) => ({ ...amp })),
+  };
+
+  const result: RackDesignerBlock[] = [];
+  for (const block of blocks) {
+    const remainingAmps = block.amps.filter((amp) => !joinedIds.has(amp.id));
+    if (block.id === anchor.id) {
+      result.push(newBlock);
+      if (remainingAmps.length > 0) {
+        // Leftover amps from the anchor rack shift right so they don't overlap.
+        result.push({
+          ...block,
+          x: Math.min(block.x + BLOCK_WIDTH + 30, CANVAS_WIDTH - BLOCK_WIDTH),
+          amps: remainingAmps,
+        });
+      }
+    } else if (remainingAmps.length > 0) {
+      result.push({ ...block, amps: remainingAmps });
+    }
+  }
+  return result;
+}
+
 export function isValidIp(ip: string): boolean {
   const parts = ip.trim().split('.');
   if (parts.length !== 4) return false;

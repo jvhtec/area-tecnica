@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
 import {
+  Check,
   FileText,
+  Layers,
   Network,
   Plus,
   RefreshCw,
@@ -63,6 +65,7 @@ import {
   makeDesignerId,
   saveStoredLayout,
 } from '@/components/sound/amplifier-tool/rack-designer/layout-utils';
+import { useAmpJoin } from '@/components/sound/amplifier-tool/rack-designer/useAmpJoin';
 import { RackBlockCard } from '@/components/sound/amplifier-tool/rack-designer/RackBlockCard';
 import { SoundvisionFlysheetButton } from '@/components/sound/amplifier-tool/rack-designer/SoundvisionFlysheetButton';
 import { BlockEditorPanel } from '@/components/sound/amplifier-tool/rack-designer/BlockEditorPanel';
@@ -385,6 +388,17 @@ export function AmpRackDesigner({
     setAmpTarget(null);
   };
 
+  const join = useAmpJoin({
+    open,
+    setLayout,
+    toast,
+    onEnter: () => {
+      setSelectedBlockId(null);
+      setAmpTarget(null);
+      setMobileBlockEditorOpen(false);
+    },
+  });
+
   const blockEditor = selectedBlock ? (
     <BlockEditorPanel
       key={selectedBlock.id}
@@ -453,6 +467,18 @@ export function AmpRackDesigner({
             <Button type="button" variant="outline" size="sm" className="gap-1" onClick={addBlock}>
               <Plus className="h-3.5 w-3.5" />
               Añadir rack
+            </Button>
+            <Button
+              type="button"
+              variant={join.joinMode ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1"
+              aria-pressed={join.joinMode}
+              onClick={join.joinMode ? join.exit : join.enter}
+              title="Unir amplificadores sueltos en un mismo rack (máx. 3)"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Unir amps
             </Button>
             <input
               ref={nwmInputRef}
@@ -563,9 +589,12 @@ export function AmpRackDesigner({
                         selected={block.id === selectedBlockId}
                         zoom={zoom}
                         pinchActiveRef={pinchActiveRef}
+                        joinMode={join.joinMode}
+                        selectedAmpIds={join.selectedAmpIdSet}
                         onSelect={setSelectedBlockId}
                         onMove={moveBlock}
                         onTap={handleBlockTap}
+                        onAmpToggle={join.toggle}
                       />
                     ))}
                   </div>
@@ -640,6 +669,35 @@ export function AmpRackDesigner({
               {isDraggingFile && !!layout?.blocks.length && (
                 <div className="pointer-events-none absolute inset-4 z-30 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/90 text-center text-sm font-semibold text-primary shadow-lg">
                   Suelta el archivo para reemplazar el diseño actual
+                </div>
+              )}
+
+              {join.joinMode && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-2">
+                  <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border bg-background/95 px-3 py-2 shadow-lg">
+                    <span className="text-xs font-medium tabular-nums">
+                      {join.selectedAmpIds.length}/{join.maxPerRack} seleccionados
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 gap-1"
+                      disabled={join.selectedAmpIds.length < 2}
+                      onClick={join.confirm}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Unir en un rack
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8"
+                      onClick={join.exit}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
                 </div>
               )}
 
