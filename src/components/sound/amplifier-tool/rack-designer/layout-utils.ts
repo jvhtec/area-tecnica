@@ -109,10 +109,13 @@ export function joinAmpsIntoRack(
     if (block.id === anchor.id) {
       result.push(newBlock);
       if (remainingAmps.length > 0) {
-        // Leftover amps from the anchor rack shift right so they don't overlap.
+        // Leftover amps from the anchor rack shift right when possible, or left
+        // when the anchor is too close to the canvas edge.
+        const rightX = block.x + BLOCK_WIDTH + 30;
+        const maxX = CANVAS_WIDTH - BLOCK_WIDTH;
         result.push({
           ...block,
-          x: Math.min(block.x + BLOCK_WIDTH + 30, CANVAS_WIDTH - BLOCK_WIDTH),
+          x: rightX <= maxX ? rightX : Math.max(0, block.x - BLOCK_WIDTH - 30),
           amps: remainingAmps,
         });
       }

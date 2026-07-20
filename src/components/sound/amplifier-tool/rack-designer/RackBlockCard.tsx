@@ -128,6 +128,12 @@ export function RackBlockCard({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    // The rack itself stops being an interactive control in join mode; its amp
+    // cells below own the keyboard interaction instead.
+    if (joinMode) {
+      if (event.key === 'Enter' || event.key === ' ') event.preventDefault();
+      return;
+    }
     const arrowDeltas: Record<string, [number, number]> = {
       ArrowLeft: [-GRID_SIZE, 0],
       ArrowRight: [GRID_SIZE, 0],
@@ -154,9 +160,13 @@ export function RackBlockCard({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={`Rack ${block.label}: seleccionar con Intro, mover con las flechas`}
+      role={joinMode ? 'group' : 'button'}
+      tabIndex={joinMode ? -1 : 0}
+      aria-label={
+        joinMode
+          ? `Rack ${block.label}: selecciona amplificadores para unir`
+          : `Rack ${block.label}: seleccionar con Intro, mover con las flechas`
+      }
       className={cn(
         'absolute select-none touch-none cursor-grab active:cursor-grabbing rounded-sm shadow-sm',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
@@ -193,6 +203,17 @@ export function RackBlockCard({
           <div
             key={amp.id}
             data-amp-id={amp.id}
+            role={joinMode ? 'button' : undefined}
+            tabIndex={joinMode ? 0 : undefined}
+            aria-label={joinMode ? `${amp.presetName}, ${amp.ip}` : undefined}
+            aria-pressed={joinMode ? ampSelected : undefined}
+            onKeyDown={(event) => {
+              if (joinMode && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault();
+                event.stopPropagation();
+                onAmpToggle?.(amp.id);
+              }
+            }}
             className={cn(
               'relative flex cursor-pointer flex-col items-center justify-center border border-t-0 border-black/60 px-1 text-center',
               ampSelected && 'ring-2 ring-inset ring-primary',

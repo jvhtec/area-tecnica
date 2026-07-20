@@ -3,6 +3,8 @@ import type { AmplifierResults } from '../../types';
 import type { RackDesignerBlock } from '../types';
 import {
   AMPS_PER_RACK,
+  BLOCK_WIDTH,
+  CANVAS_WIDTH,
   assignBlockIps,
   assignSequentialIps,
   computeResultsFingerprint,
@@ -221,6 +223,29 @@ describe('joinAmpsIntoRack', () => {
     expect(leftover.amps.map((a) => a.id)).toEqual(['a2']);
     // Leftover is nudged aside so it doesn't sit under the new rack.
     expect(leftover.x).toBeGreaterThan(joined.x);
+  });
+
+  it('shifts anchor leftovers left when the joined rack is at the right canvas edge', () => {
+    const rightEdge = CANVAS_WIDTH - BLOCK_WIDTH;
+    const blocks: RackDesignerBlock[] = [
+      {
+        id: 'b1',
+        label: 'MAIN R',
+        color: '#f87171',
+        x: rightEdge,
+        y: 40,
+        amps: [amp('a1'), amp('a2')],
+      },
+      { id: 'b2', label: 'FRONT', color: '#60a5fa', x: 240, y: 40, amps: [amp('a3')] },
+    ];
+
+    const result = joinAmpsIntoRack(blocks, ['a1', 'a3']);
+    const joined = result.find((block) => block.amps.some((item) => item.id === 'a3'))!;
+    const leftover = result.find((block) => block.amps.some((item) => item.id === 'a2'))!;
+
+    expect(joined.x).toBe(rightEdge);
+    expect(leftover.x).toBeGreaterThanOrEqual(0);
+    expect(leftover.x).toBeLessThan(joined.x);
   });
 
   it('is a no-op for fewer than two resolved amps', () => {
