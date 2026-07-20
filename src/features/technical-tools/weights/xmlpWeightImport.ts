@@ -73,16 +73,45 @@ const findRiggingComponent = <Component extends WeightComponent>(
   return alias ? findComponentByName(alias.component, components) : undefined;
 };
 
-const hasDualMotors = (array: XmlpArray) => {
-  if (array.frontLoadKg !== null && array.rearLoadKg !== null) return true;
-  if (/\bF:\s*[^/]+\/\s*R:/i.test(array.pickupConfiguration)) return true;
-
+const getPickupPointCount = (array: XmlpArray) => {
+  const serializedLoadCount = [array.frontLoadKg, array.rearLoadKg]
+    .filter((load) => load !== null).length;
+  const labeledPickupCount = array.pickupConfiguration
+    .match(/\b(?:F|R|PB)\s*:/gi)?.length ?? 0;
   const positions = array.pickupConfiguration.match(/^Posiciones:\s*(.+)$/i)?.[1]
     ?.split('/')
     .map((position) => position.trim())
     .filter(Boolean);
-  return Boolean(positions && positions.length > 1);
+  const explicitMotorCount = Number.parseInt(
+    array.pickupConfiguration.match(/\b(\d+)\s*motores?\b/i)?.[1] ?? '',
+    10,
+  );
+
+  return Math.max(
+    1,
+    serializedLoadCount,
+    labeledPickupCount,
+    positions?.length ?? 0,
+    Number.isFinite(explicitMotorCount) ? explicitMotorCount : 0,
+  );
 };
+
+const getMotorCapacityKg = (componentName: string) => {
+  const match = normalizeModel(componentName).match(/^MOTOR(\d+)(T|KG)$/);
+  if (!match) return null;
+
+  const capacity = Number.parseInt(match[1], 10);
+  return match[2] === 'T' ? capacity * 1000 : capacity;
+};
+
+const findMotorForLoad = <Component extends WeightComponent>(
+  loadKg: number,
+  components: Component[],
+) => components
+  .map((component) => ({ component, capacityKg: getMotorCapacityKg(component.name) }))
+  .filter((candidate): candidate is { component: Component; capacityKg: number } =>
+    candidate.capacityKg !== null && candidate.capacityKg >= loadKg)
+  .sort((left, right) => left.capacityKg - right.capacityKg)[0]?.component;
 
 const summarizeArray = (array: XmlpArray) => {
   const counts = new Map<string, number>();
@@ -131,77 +160,79 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
     const name = array.arrayName.trim() || array.groupName.trim() || `Array ${index + 1}`;
     const totalMassKg = array.totalMassKg;
     const hasExactMass = totalMassKg !== null && Number.isFinite(totalMassKg) && totalMassKg > 0;
+    let rows: ImportedXmlpWeightTable['rows'];
+    let loadWeight: number;
 
     if (hasExactMass) {
-      tables.push({
-        name,
-        rows: [exactMassRow(array, totalMassKg)],
-        totalWeight: totalMassKg,
-        dualMotors: hasDualMotors(array),
-        usedExactXmlpMass: true,
-      });
-      exactMassTableCount += 1;
-      continue;
-    }
+      rows = [exactMassRow(array, totalMassKg)];
+      loadWeight = totalMassKg;
+    } else {
+      const counts = new Map<string, { component: Component; quantity: number }>();
+      const unknownModels = new Set<string>();
+      for (const enclosure of array.enclosures) {
+        const component = findComponentByName(enclosure.model, components);
+        if (!component) {
+          unknownModels.add(enclosure.model.trim() || 'modelo sin nombre');
+          continue;
+        }
+        const key = component.id.toString();
+        const current = counts.get(key);
+        counts.set(key, { component, quantity: (current?.quantity ?? 0) + 1 });
+      }
 
-    const counts = new Map<string, { component: Component; quantity: number }>();
-    const unknownModels = new Set<string>();
-    for (const enclosure of array.enclosures) {
-      const component = findComponentByName(enclosure.model, components);
-      if (!component) {
-        unknownModels.add(enclosure.model.trim() || 'modelo sin nombre');
+      const riggingFrame = array.riggingFrame.trim();
+      const riggingComponent = riggingFrame
+        ? findRiggingComponent(riggingFrame, components)
+        : undefined;
+      if (riggingFrame && !riggingComponent) unknownModels.add(riggingFrame);
+      if (riggingComponent) {
+        const key = riggingComponent.id.toString();
+        const current = counts.get(key);
+        counts.set(key, {
+          component: riggingComponent,
+          quantity: (current?.quantity ?? 0) + 1,
+        });
+      }
+
+      if (unknownModels.size > 0) {
+        warnings.push(
+          `${name}: sin peso XMLP y sin equivalencia segura para ${[...unknownModels].join(', ')}; no se importó.`,
+        );
         continue;
       }
-      const key = component.id.toString();
-      const current = counts.get(key);
-      counts.set(key, { component, quantity: (current?.quantity ?? 0) + 1 });
+
+      rows = [...counts.values()].map(({ component, quantity }) =>
+        componentRow(component, quantity),
+      );
+      loadWeight = rows.reduce((sum, row) => sum + row.totalWeight, 0);
+      if (rows.length === 0 || loadWeight <= 0) {
+        warnings.push(`${name}: el XMLP no contiene un peso utilizable; no se importó.`);
+        continue;
+      }
     }
 
-    const riggingFrame = array.riggingFrame.trim();
-    const riggingComponent = riggingFrame
-      ? findRiggingComponent(riggingFrame, components)
-      : undefined;
-    if (riggingFrame && !riggingComponent) unknownModels.add(riggingFrame);
-    if (riggingComponent) {
-      const key = riggingComponent.id.toString();
-      const current = counts.get(key);
-      counts.set(key, {
-        component: riggingComponent,
-        quantity: (current?.quantity ?? 0) + 1,
-      });
-    }
-
-    if (unknownModels.size > 0) {
+    // Select against the complete suspended load even when two pickup points
+    // share it, so either generated motor is independently large enough.
+    const motor = findMotorForLoad(loadWeight, components);
+    if (!motor) {
       warnings.push(
-        `${name}: sin peso XMLP y sin equivalencia segura para ${[...unknownModels].join(', ')}; no se importó.`,
+        `${name}: ningún motor del catálogo puede soportar por sí solo ${formatWeight(loadWeight)} kg; no se importó.`,
       );
       continue;
     }
 
-    const rows = [...counts.values()].map(({ component, quantity }) =>
-      componentRow(component, quantity),
-    );
+    const pickupPointCount = getPickupPointCount(array);
+    rows.push(componentRow(motor, pickupPointCount));
     const totalWeight = rows.reduce((sum, row) => sum + row.totalWeight, 0);
-    if (rows.length === 0 || totalWeight <= 0) {
-      warnings.push(`${name}: el XMLP no contiene un peso utilizable; no se importó.`);
-      continue;
-    }
-
-    rows.push({
-      quantity: '0',
-      componentId: '',
-      componentName: 'Revisar motores y cableado (no incluidos en el peso derivado)',
-      weight: '0',
-      totalWeight: 0,
-    });
-    warnings.push(`${name}: peso derivado del catálogo; revisa motores y cableado.`);
+    if (!hasExactMass) warnings.push(`${name}: peso derivado del catálogo; revisa el cableado.`);
     tables.push({
       name,
       rows,
       totalWeight,
-      dualMotors: hasDualMotors(array),
-      usedExactXmlpMass: false,
+      dualMotors: pickupPointCount > 1,
+      usedExactXmlpMass: hasExactMass,
     });
+    if (hasExactMass) exactMassTableCount += 1;
   }
 
   return { tables, warnings, exactMassTableCount };

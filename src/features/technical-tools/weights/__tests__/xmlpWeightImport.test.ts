@@ -31,7 +31,7 @@ describe('buildXmlpWeightTables', () => {
     expect(result.warnings).toEqual([]);
     expect(result.tables[0]).toMatchObject({
       name: 'MAIN L',
-      totalWeight: 1180.6,
+      totalWeight: 1360.6,
       dualMotors: true,
       usedExactXmlpMass: true,
     });
@@ -41,6 +41,12 @@ describe('buildXmlpWeightTables', () => {
         componentName: 'Peso total XMLP (2× K2 + K2-BUMP)',
         weight: '1180.6',
         totalWeight: 1180.6,
+      }),
+      expect.objectContaining({
+        componentName: 'MOTOR 2T',
+        quantity: '2',
+        weight: '90',
+        totalWeight: 180,
       }),
     ]);
   });
@@ -52,7 +58,7 @@ describe('buildXmlpWeightTables', () => {
 
     expect(result.exactMassTableCount).toBe(0);
     expect(result.tables[0]).toMatchObject({
-      totalWeight: 172,
+      totalWeight: 272,
       dualMotors: true,
       usedExactXmlpMass: false,
     });
@@ -60,12 +66,43 @@ describe('buildXmlpWeightTables', () => {
       expect.objectContaining({ componentName: 'K2', quantity: '2', totalWeight: 112 }),
       expect.objectContaining({ componentName: 'BUMPER K2', quantity: '1', totalWeight: 60 }),
       expect.objectContaining({
-        componentName: 'Revisar motores y cableado (no incluidos en el peso derivado)',
-        totalWeight: 0,
+        componentName: 'MOTOR 500Kg',
+        quantity: '2',
+        totalWeight: 100,
       }),
     ]);
     expect(result.warnings).toEqual([
-      'MAIN L: peso derivado del catálogo; revisa motores y cableado.',
+      'MAIN L: peso derivado del catálogo; revisa el cableado.',
+    ]);
+  });
+
+  it('adds one motor for a single pickup and sizes it against the complete load', () => {
+    const result = buildXmlpWeightTables({
+      arrays: [makeArray({
+        pickupConfiguration: '1 motor',
+        totalMassKg: 500.1,
+      })],
+    }, soundWeightComponents);
+
+    expect(result.tables[0]).toMatchObject({
+      totalWeight: 560.1,
+      dualMotors: false,
+    });
+    expect(result.tables[0].rows[1]).toMatchObject({
+      componentName: 'MOTOR 750Kg',
+      quantity: '1',
+      totalWeight: 60,
+    });
+  });
+
+  it('does not select an undersized motor when the full load exceeds the catalog', () => {
+    const result = buildXmlpWeightTables({
+      arrays: [makeArray({ totalMassKg: 2000.1 })],
+    }, soundWeightComponents);
+
+    expect(result.tables).toEqual([]);
+    expect(result.warnings).toEqual([
+      'MAIN L: ningún motor del catálogo puede soportar por sí solo 2000.1 kg; no se importó.',
     ]);
   });
 
