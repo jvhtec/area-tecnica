@@ -98,7 +98,7 @@ describe('XmlpFlexExportDialog', () => {
     expect(await screen.findByText(/1 líneas mapeadas/)).toBeInTheDocument();
     expect(screen.getByText('1 sin mapear')).toBeInTheDocument();
     expect(screen.getByText('0 ambiguas')).toBeInTheDocument();
-    expect(screen.getByText('missing-resource-id')).toBeInTheDocument();
+    expect(screen.getByText('Sin recurso Flex')).toBeInTheDocument();
     expect(screen.getAllByText(/MAIN L/)).toHaveLength(2);
     const send = screen.getByRole('button', { name: 'Enviar seleccionados a Flex' });
     expect(send).toBeDisabled();

@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type {
   XmlpFlexCandidate,
   XmlpFlexExportPlan,
+  XmlpFlexMappingStatus,
 } from '@/features/technical-tools/flex/xmlpFlexExportPlan';
 
 interface XmlpFlexPlanPreviewProps {
@@ -12,6 +13,13 @@ interface XmlpFlexPlanPreviewProps {
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
 }
+
+const MAPPING_STATUS_LABELS: Record<XmlpFlexMappingStatus, string> = {
+  mapped: 'Mapeado',
+  'missing-resource-id': 'Sin recurso Flex',
+  'missing-equipment': 'Sin equipo',
+  ambiguous: 'Ambiguo',
+};
 
 const MappingIcon = ({ item }: { item: XmlpFlexCandidate }) => {
   if (item.mappingStatus === 'mapped' && item.flexCategoryKey) {
@@ -48,16 +56,16 @@ const CandidateRow = ({
             <span className="font-semibold">{item.quantity} × {item.displayName}</span>
             <Badge variant="outline">{item.inference === 'explicit' ? 'Explícito' : 'Inferido'}</Badge>
             <Badge variant={item.mappingStatus === 'mapped' ? 'secondary' : 'destructive'}>
-              {item.mappingStatus}
+              {MAPPING_STATUS_LABELS[item.mappingStatus]}
             </Badge>
           </div>
           <p className="mt-1 break-all text-muted-foreground">Clave: {item.canonicalKey}</p>
           <p className="text-muted-foreground">Origen: {item.sources.join(', ')}</p>
           <p className="text-muted-foreground">Arrays/tablas: {item.sourceArrays.join(', ') || '—'}</p>
           <p className="text-muted-foreground">
-            Equipment: {item.equipmentName ?? 'sin fila'}{item.equipmentId ? ` (${item.equipmentId})` : ''}
+            Equipo: {item.equipmentName ?? 'sin fila'}{item.equipmentId ? ` (${item.equipmentId})` : ''}
           </p>
-          <p className="break-all text-muted-foreground">Flex resource: {item.resourceId ?? 'sin resource_id'}</p>
+          <p className="break-all text-muted-foreground">Recurso Flex: {item.resourceId ?? 'sin resource_id'}</p>
           {item.warning && <p className="mt-1 text-amber-700 dark:text-amber-400">{item.warning}</p>}
         </div>
       </div>
