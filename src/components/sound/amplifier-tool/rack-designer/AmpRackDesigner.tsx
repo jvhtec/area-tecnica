@@ -7,6 +7,7 @@ import {
   Network,
   Plus,
   RefreshCw,
+  Send,
   Upload,
   UploadCloud,
   Wand2,
@@ -77,6 +78,12 @@ import {
   nwmMapToLayout,
 } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import { parseLaSessionFile } from '@/components/sound/amplifier-tool/rack-designer/parse-session-file';
+import {
+  canExportCompleteXmlpPackage,
+  createImportedLaSession,
+  type ImportedLaSession,
+} from '@/components/sound/amplifier-tool/rack-designer/importedLaSession';
+import { XmlpFlexExportDialog } from '@/components/sound/amplifier-tool/rack-designer/XmlpFlexExportDialog';
 
 const MADRID_TZ = 'Europe/Madrid';
 
@@ -120,6 +127,8 @@ export function AmpRackDesigner({
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [importedSession, setImportedSession] = useState<ImportedLaSession | null>(null);
+  const [flexExportOpen, setFlexExportOpen] = useState(false);
   const nwmInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const open = controlledOpen ?? internalOpen;
@@ -135,6 +144,11 @@ export function AmpRackDesigner({
 
   const scope =
     storageScope ?? (standalone ? 'sound-session-rack-designer' : jobId ?? tourId ?? 'standalone');
+
+  useEffect(() => {
+    setImportedSession(null);
+    setFlexExportOpen(false);
+  }, [scope]);
 
   useEffect(() => {
     if (!open) return;
@@ -306,6 +320,11 @@ export function AmpRackDesigner({
     try {
       const map = await parseLaSessionFile(file);
       if (!map.units?.length) throw new Error('La sesión no contiene amplificadores.');
+      setImportedSession(createImportedLaSession(file.name, map, {
+        jobId,
+        tourId,
+        storageScope: scope,
+      }));
       setLayout(nwmMapToLayout(map, results ? computeResultsFingerprint(results) : undefined));
       setSelectedBlockId(null);
       setAmpTarget(null);
@@ -519,9 +538,21 @@ export function AmpRackDesigner({
               {isImporting ? 'Importando…' : 'Importar NM/SV'}
             </Button>
             <SoundvisionFlysheetButton
-              parseSessionFile={parseLaSessionFile}
+              session={importedSession}
               createdBy={createdBy}
             />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={!canExportCompleteXmlpPackage(importedSession)}
+              onClick={() => setFlexExportOpen(true)}
+              title="Revisar y enviar el paquete técnico del XMLP a Flex"
+            >
+              <Send className="h-3.5 w-3.5" />
+              Enviar a Flex
+            </Button>
             {results && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -795,6 +826,14 @@ export function AmpRackDesigner({
           <div className="max-h-[65dvh] overflow-y-auto pb-4">{blockEditor}</div>
         </SheetContent>
       </Sheet>
+
+      {importedSession && canExportCompleteXmlpPackage(importedSession) && (
+        <XmlpFlexExportDialog
+          open={flexExportOpen}
+          onOpenChange={setFlexExportOpen}
+          session={importedSession}
+        />
+      )}
     </>
   );
 }

@@ -1,4 +1,11 @@
 import type { WeightComponent, WeightTableRow } from './weightCalculations';
+import {
+  findWeightComponentByName,
+  findXmlpMotorForLoad,
+  getXmlpMotorCapacityKg,
+  resolveXmlpRiggingRequirement,
+  type XmlpRiggingRequirement,
+} from './xmlpRiggingRequirements';
 
 interface XmlpEnclosure {
   model: string;
@@ -9,6 +16,7 @@ interface XmlpArray {
   groupName: string;
   deployment: 'flown' | 'stacked' | 'unknown';
   riggingFrame: string;
+  flyingBarSetting?: string;
   pickupConfiguration: string;
   totalMassKg: number | null;
   frontLoadKg: number | null;
@@ -32,49 +40,23 @@ export interface XmlpWeightImportResult {
   tables: ImportedXmlpWeightTable[];
   warnings: string[];
   exactMassTableCount: number;
+  riggingRequirements: XmlpRiggingRequirement[];
+  motorRequirements: InferredMotorRequirement[];
 }
 
-const normalizeModel = (value: string) =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '');
-
-const RIGGING_FRAME_ALIASES: Array<{ pattern: RegExp; component: string }> = [
-  { pattern: /K1.*(?:BUMP|BAR)/, component: 'BUMPER K1' },
-  { pattern: /K2.*(?:BUMP|BAR)/, component: 'BUMPER K2' },
-  { pattern: /K3.*(?:BUMP|BAR)/, component: 'BUMPER K3' },
-  { pattern: /^MBUMP$/, component: 'BUMPER KARA' },
-  { pattern: /KARA.*(?:BUMP|MINIBU|BAR)/, component: 'BUMPER KARA' },
-  { pattern: /KIVA.*(?:BUMP|BAR)/, component: 'BUMPER KIVA' },
-  { pattern: /KS28.*(?:BUMP|OUTRIG|BAR)/, component: 'BUMPER KS28' },
-  { pattern: /TFS900.*(?:BUMP|BAR)/, component: 'BUMPER TFS900' },
-  { pattern: /TFS550.*(?:BUMP|BAR)/, component: 'BUMPER TFS550' },
-];
 const MOTOR_CAPACITY_SAFETY_FACTOR = 1.2;
 
+export interface InferredMotorRequirement {
+  canonicalKey: string;
+  displayName: string;
+  quantity: number;
+  sourceArray: string;
+  sourceArrayIndex: number;
+  requiredCapacityKg: number;
+  selectedCapacityKg: number;
+}
+
 const formatWeight = (value: number) => Number(value.toFixed(3)).toString();
-
-const findComponentByName = <Component extends WeightComponent>(
-  name: string,
-  components: Component[],
-): Component | undefined => {
-  const normalized = normalizeModel(name);
-  return components.find((component) => normalizeModel(component.name) === normalized);
-};
-
-const findRiggingComponent = <Component extends WeightComponent>(
-  riggingFrame: string,
-  components: Component[],
-): Component | undefined => {
-  const exact = findComponentByName(riggingFrame, components);
-  if (exact) return exact;
-
-  const normalized = normalizeModel(riggingFrame);
-  const alias = RIGGING_FRAME_ALIASES.find(({ pattern }) => pattern.test(normalized));
-  return alias ? findComponentByName(alias.component, components) : undefined;
-};
 
 const getPickupPointCount = (array: XmlpArray) => {
   const serializedLoadCount = [array.frontLoadKg, array.rearLoadKg]
@@ -98,23 +80,6 @@ const getPickupPointCount = (array: XmlpArray) => {
     Number.isFinite(explicitMotorCount) ? explicitMotorCount : 0,
   );
 };
-
-const getMotorCapacityKg = (componentName: string) => {
-  const match = normalizeModel(componentName).match(/^MOTOR(\d+)(T|KG)$/);
-  if (!match) return null;
-
-  const capacity = Number.parseInt(match[1], 10);
-  return match[2] === 'T' ? capacity * 1000 : capacity;
-};
-
-const findMotorForLoad = <Component extends WeightComponent>(
-  loadKg: number,
-  components: Component[],
-) => components
-  .map((component) => ({ component, capacityKg: getMotorCapacityKg(component.name) }))
-  .filter((candidate): candidate is { component: Component; capacityKg: number } =>
-    candidate.capacityKg !== null && candidate.capacityKg >= loadKg)
-  .sort((left, right) => left.capacityKg - right.capacityKg)[0]?.component;
 
 const summarizeArray = (array: XmlpArray) => {
   const counts = new Map<string, number>();
@@ -157,6 +122,10 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
 ): XmlpWeightImportResult {
   const tables: ImportedXmlpWeightTable[] = [];
   const warnings: string[] = [];
+  const riggingRequirements = flysheet.arrays
+    .map((array, index) => resolveXmlpRiggingRequirement(array, index))
+    .filter((requirement): requirement is XmlpRiggingRequirement => requirement !== null);
+  const motorRequirements: InferredMotorRequirement[] = [];
   let exactMassTableCount = 0;
 
   for (const [index, array] of flysheet.arrays.entries()) {
@@ -175,7 +144,7 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
       const counts = new Map<string, { component: Component; quantity: number }>();
       const unknownModels = new Set<string>();
       for (const enclosure of array.enclosures) {
-        const component = findComponentByName(enclosure.model, components);
+        const component = findWeightComponentByName(enclosure.model, components);
         if (!component) {
           unknownModels.add(enclosure.model.trim() || 'modelo sin nombre');
           continue;
@@ -185,17 +154,18 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
         counts.set(key, { component, quantity: (current?.quantity ?? 0) + 1 });
       }
 
-      const riggingFrame = array.riggingFrame.trim();
-      const riggingComponent = riggingFrame
-        ? findRiggingComponent(riggingFrame, components)
+      const riggingRequirement = resolveXmlpRiggingRequirement(array, index);
+      const serializedRigging = array.riggingFrame.trim() || array.flyingBarSetting?.trim() || '';
+      const riggingComponent = riggingRequirement
+        ? findWeightComponentByName(riggingRequirement.canonicalKey, components)
         : undefined;
-      if (riggingFrame && !riggingComponent) unknownModels.add(riggingFrame);
-      if (riggingComponent) {
+      if (serializedRigging && !riggingComponent) unknownModels.add(serializedRigging);
+      if (riggingComponent && riggingRequirement) {
         const key = riggingComponent.id.toString();
         const current = counts.get(key);
         counts.set(key, {
           component: riggingComponent,
-          quantity: (current?.quantity ?? 0) + 1,
+          quantity: (current?.quantity ?? 0) + riggingRequirement.quantity,
         });
       }
 
@@ -219,8 +189,8 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
     // Select against 120% of the complete suspended load even when two pickup
     // points share it, so either motor independently includes the safety margin.
     const requiredMotorCapacity = loadWeight * MOTOR_CAPACITY_SAFETY_FACTOR;
-    const motor = findMotorForLoad(requiredMotorCapacity, components);
-    if (!motor) {
+    const selectedMotor = findXmlpMotorForLoad(requiredMotorCapacity, components);
+    if (!selectedMotor) {
       warnings.push(
         `${name}: ningún motor del catálogo puede soportar por sí solo ${formatWeight(loadWeight)} kg con un margen del 20 %; no se importó.`,
       );
@@ -228,7 +198,17 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
     }
 
     const pickupPointCount = getPickupPointCount(array);
-    rows.push(componentRow(motor, pickupPointCount));
+    rows.push(componentRow(selectedMotor.component, pickupPointCount));
+    motorRequirements.push({
+      canonicalKey: selectedMotor.component.name.trim().toUpperCase(),
+      displayName: selectedMotor.component.name.trim(),
+      quantity: pickupPointCount,
+      sourceArray: name,
+      sourceArrayIndex: index,
+      requiredCapacityKg: requiredMotorCapacity,
+      selectedCapacityKg:
+        getXmlpMotorCapacityKg(selectedMotor.component.name) ?? selectedMotor.capacityKg,
+    });
     const totalWeight = rows.reduce((sum, row) => sum + row.totalWeight, 0);
     if (!hasExactMass) warnings.push(`${name}: peso derivado del catálogo; revisa el cableado.`);
     tables.push({
@@ -241,5 +221,5 @@ export function buildXmlpWeightTables<Component extends WeightComponent>(
     if (hasExactMass) exactMassTableCount += 1;
   }
 
-  return { tables, warnings, exactMassTableCount };
+  return { tables, warnings, exactMassTableCount, riggingRequirements, motorRequirements };
 }

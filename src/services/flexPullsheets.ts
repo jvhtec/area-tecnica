@@ -1,6 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flexApiFetch } from '@/lib/flex-api-client';
 import type { PresetSubsystem } from '@/types/equipment';
+import { FLEX_FOLDER_IDS } from '@/utils/flex-folders/constants';
+
+export type FlexEquipmentDocumentType = 'pullsheet' | 'presupuesto';
 
 // Material de sonido is a root-only grouping in Flex and intentionally omitted here.
 export const FLEX_CATEGORY_MAP = new Map<string, string>([
@@ -34,9 +37,18 @@ async function addResourceLineItem(options: {
   quantity: number;
   parentLineItemId?: string;
   nextSiblingId?: string;
+  documentType?: FlexEquipmentDocumentType;
 }): Promise<{ success: boolean; error?: string; lineItemId?: string }> {
-  const { documentId, resourceId, quantity, parentLineItemId = '', nextSiblingId = '' } = options;
-  const endpoint = `/line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
+  const {
+    documentId,
+    resourceId,
+    quantity,
+    parentLineItemId = '',
+    nextSiblingId = '',
+    documentType = 'pullsheet',
+  } = options;
+  const path = documentType === 'presupuesto' ? 'financial-document-line-item' : 'line-item';
+  const baseEndpoint = `/${path}/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
 
   const headers = {
     accept: '*/*',
@@ -50,6 +62,14 @@ async function addResourceLineItem(options: {
     parentLineItemId: parentLineItemId,
     nextSiblingId: nextSiblingId,
   });
+  const endpoint =
+    documentType === 'presupuesto'
+      ? `${baseEndpoint}?${new URLSearchParams({
+          resourceParentId: '',
+          managedResourceLineItemType: 'inventory-model',
+          quantity: String(quantity),
+        }).toString()}`
+      : baseEndpoint;
 
   try {
     const res = await flexApiFetch(endpoint, {
@@ -141,6 +161,107 @@ export interface PushResult {
   failed: Array<{ name: string; error: string }>;
 }
 
+export interface StrictGroupedPushFailure {
+  flexCategoryKey: string;
+  name: string;
+  error: string;
+}
+
+export interface StrictGroupedPushResult {
+  groupsCreated: string[];
+  groupsReused: string[];
+  groupsFailed: StrictGroupedPushFailure[];
+  equipmentLinesAdded: number;
+  totalQuantitiesRepresented: number;
+  childrenSkippedBecauseParentFailed: StrictGroupedPushFailure[];
+  failedChildItems: StrictGroupedPushFailure[];
+  warnings: string[];
+}
+
+export interface StrictFlexDocumentTarget {
+  elementId: string;
+  documentType: FlexEquipmentDocumentType;
+}
+
+/**
+ * Strict XMLP-package writer. Unlike the legacy preset writer, a failed group
+ * header can never cause its children to fall back to the document root.
+ */
+export async function pushEquipmentToFlexDocumentStrict(
+  target: StrictFlexDocumentTarget,
+  equipment: EquipmentItem[],
+): Promise<StrictGroupedPushResult> {
+  const result: StrictGroupedPushResult = {
+    groupsCreated: [],
+    groupsReused: [],
+    groupsFailed: [],
+    equipmentLinesAdded: 0,
+    totalQuantitiesRepresented: 0,
+    childrenSkippedBecauseParentFailed: [],
+    failedChildItems: [],
+    warnings: ['La integración actual no permite reconciliar líneas existentes; el envío es aditivo.'],
+  };
+  const normalized = normalizeEquipmentItems(equipment).filter(
+    (item) => item.quantity > 0 && Boolean(item.resourceId),
+  );
+  const byCategory = new Map<string, Array<EquipmentItem & { flexCategoryKey: string }>>();
+  for (const item of normalized) {
+    const items = byCategory.get(item.flexCategoryKey) ?? [];
+    items.push(item);
+    byCategory.set(item.flexCategoryKey, items);
+  }
+
+  for (const [flexCategoryKey, items] of byCategory) {
+    const headerResourceId = FLEX_CATEGORY_MAP.get(flexCategoryKey);
+    if (!headerResourceId) {
+      const error = 'No existe un recurso de cabecera Flex aprobado para este grupo.';
+      result.groupsFailed.push({ flexCategoryKey, name: flexCategoryKey, error });
+      result.childrenSkippedBecauseParentFailed.push(
+        ...items.map((item) => ({ flexCategoryKey, name: item.name, error })),
+      );
+      continue;
+    }
+
+    const header = await addResourceLineItem({
+      documentId: target.elementId,
+      documentType: target.documentType,
+      resourceId: headerResourceId,
+      quantity: 1,
+    });
+    if (!header.success || !header.lineItemId) {
+      const error = header.error ?? 'Flex no devolvió el ID de la cabecera creada.';
+      result.groupsFailed.push({ flexCategoryKey, name: flexCategoryKey, error });
+      result.childrenSkippedBecauseParentFailed.push(
+        ...items.map((item) => ({ flexCategoryKey, name: item.name, error })),
+      );
+      continue;
+    }
+
+    result.groupsCreated.push(flexCategoryKey);
+    for (const item of items) {
+      const child = await addResourceLineItem({
+        documentId: target.elementId,
+        documentType: target.documentType,
+        resourceId: item.resourceId,
+        quantity: item.quantity,
+        parentLineItemId: header.lineItemId,
+      });
+      if (!child.success) {
+        result.failedChildItems.push({
+          flexCategoryKey,
+          name: item.name,
+          error: child.error ?? 'Error desconocido al crear la línea hija.',
+        });
+        continue;
+      }
+      result.equipmentLinesAdded += 1;
+      result.totalQuantitiesRepresented += item.quantity;
+    }
+  }
+
+  return result;
+}
+
 export async function pushEquipmentToPullsheet(
   pullsheetElementId: string,
   equipment: EquipmentItem[]
@@ -226,8 +347,17 @@ export interface JobPullsheet {
   source?: 'database' | 'flex_api';
 }
 
+export interface JobFlexEquipmentTarget extends JobPullsheet {
+  document_type: FlexEquipmentDocumentType;
+  folder_type?: string;
+}
+
 // Pullsheet definition ID from Flex API
-const PULLSHEET_DEFINITION_ID = 'a220432c-af33-11df-b8d5-00e08175e43e';
+const PULLSHEET_DEFINITION_ID = FLEX_FOLDER_IDS.pullSheet;
+const PRESUPUESTO_DEFINITION_IDS = new Set([
+  FLEX_FOLDER_IDS.presupuesto,
+  FLEX_FOLDER_IDS.presupuestoDryHire,
+]);
 // Some Flex tree responses omit definitionId; pullsheets still have this domainId.
 const PULLSHEET_DOMAIN_ID = 'equipment-list';
 
@@ -420,4 +550,87 @@ function extractPullsheetsFromTree(node: FlexTreeNode | FlexTreeNode[], depth: n
   }
 
   return results;
+}
+
+function extractPresupuestosFromTree(
+  node: FlexTreeNode | FlexTreeNode[],
+  depth: number = 0,
+): JobFlexEquipmentTarget[] {
+  if (depth > MAX_TREE_DEPTH || !node) return [];
+  if (Array.isArray(node)) {
+    return node.flatMap((item) => extractPresupuestosFromTree(item, depth));
+  }
+  const results: JobFlexEquipmentTarget[] = [];
+  const elementId = node.elementId || node.nodeId || node.id;
+  const definitionId = node.definitionId || node.elementDefinitionId;
+  if (elementId && definitionId && PRESUPUESTO_DEFINITION_IDS.has(definitionId)) {
+    results.push({
+      id: elementId,
+      element_id: elementId,
+      department: null,
+      created_at:
+        node.createdAt || node.created_at || node.dateCreated || node.date_created ||
+        '2000-01-01T00:00:00.000Z',
+      display_name: node.displayName || node.name || node.documentNumber || 'Presupuesto',
+      source: 'flex_api',
+      document_type: 'presupuesto',
+    });
+  }
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      results.push(...extractPresupuestosFromTree(child, depth + 1));
+    }
+  }
+  return results;
+}
+
+/** Discovers both equipment-list Pull Sheets and actual quote documents. */
+export async function getJobFlexEquipmentTargets(jobId: string): Promise<JobFlexEquipmentTarget[]> {
+  const { data, error } = await supabase
+    .from('flex_folders')
+    .select('id, element_id, department, created_at, folder_type')
+    .eq('job_id', jobId)
+    .in('folder_type', ['pull_sheet', 'comercial_presupuesto', 'dryhire_presupuesto'])
+    .order('created_at', { ascending: true })
+    .limit(100);
+  if (error) throw new Error(`Failed to query Flex equipment targets: ${error.message}`);
+
+  const dbTargets: JobFlexEquipmentTarget[] = (data ?? []).map((row) => ({
+    ...row,
+    document_type: row.folder_type === 'pull_sheet' ? 'pullsheet' : 'presupuesto',
+    display_name:
+      row.folder_type === 'pull_sheet'
+        ? row.department ? `${row.department} Pull Sheet` : 'Pull Sheet'
+        : row.department ? `${row.department} Presupuesto` : 'Presupuesto',
+    source: 'database' as const,
+  }));
+
+  const { data: mainFolder } = await supabase
+    .from('flex_folders')
+    .select('element_id')
+    .eq('job_id', jobId)
+    .or('folder_type.eq.main_event,folder_type.eq.main')
+    .maybeSingle();
+  if (!mainFolder?.element_id) return dbTargets;
+
+  try {
+    const response = await flexApiFetch(
+      `/element/${encodeURIComponent(mainFolder.element_id)}/tree`,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+    );
+    if (!response.ok) return dbTargets;
+    const tree = await response.json<FlexTreeNode | FlexTreeNode[]>();
+    const apiTargets: JobFlexEquipmentTarget[] = [
+      ...extractPullsheetsFromTree(tree).map((target) => ({ ...target, document_type: 'pullsheet' as const })),
+      ...extractPresupuestosFromTree(tree),
+    ];
+    const byElementId = new Map(dbTargets.map((target) => [target.element_id, target]));
+    for (const target of apiTargets) {
+      if (!byElementId.has(target.element_id)) byElementId.set(target.element_id, target);
+    }
+    return [...byElementId.values()];
+  } catch (fetchError) {
+    console.warn('[FlexPullsheets] Could not augment equipment targets from Flex tree:', fetchError);
+    return dbTargets;
+  }
 }
