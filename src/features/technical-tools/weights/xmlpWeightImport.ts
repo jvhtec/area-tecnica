@@ -83,7 +83,7 @@ const getPickupPointCount = (array: XmlpArray) => {
     .map((position) => position.trim())
     .filter(Boolean);
   const explicitMotorCount = Number.parseInt(
-    array.pickupConfiguration.match(/\b(\d+)\s*motores?\b/i)?.[1] ?? '',
+    array.pickupConfiguration.match(/\b(\d+)\s*motor(?:es)?\b/i)?.[1] ?? '',
     10,
   );
 
