@@ -45,20 +45,62 @@ const findComponent = (name: string, components: ConsumosComponent[]) => {
   return components.find((component) => normalizeName(component.name) === normalized);
 };
 
-const sideFromName = (name: string): Side => {
-  const last = name.trim().slice(-1).toUpperCase();
-  return last === "L" ? "L" : last === "R" ? "R" : "C";
-};
+// Session-file group names come straight from whoever built the Soundvision
+// project, so they show up in every case (SIDE, Side, side), split on spaces,
+// hyphens or underscores, and are often abbreviated or truncated (SIDE for
+// "sidefill", DLY/DEL for "delay"). Tokenizing on word boundaries \u2014 rather
+// than searching the whole raw string \u2014 keeps a compound name like
+// "SIDEFILL" from matching the PA keyword "FILL" out of position.
+const tokenize = (name: string): string[] =>
+  name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean);
 
-// SIDE is checked before the generic PA pattern so "SIDEFILL" (which also
-// contains "FILL") is not misclassified as a front/out fill.
+const MIN_PARTIAL_TOKEN_LENGTH = 3;
+
+// True when `token` is the keyword itself, a truncated prefix of it (e.g.
+// "SID" or "DEL" for "DELAY"), or the keyword is a prefix of a compound token
+// (e.g. "SIDEFILL", "OUTFILL"). The length guard keeps short side/number
+// tokens ("L", "R", "1") from spuriously prefix-matching a keyword.
+const tokenMatchesKeyword = (token: string, keyword: string) =>
+  token === keyword ||
+  (token.length >= MIN_PARTIAL_TOKEN_LENGTH && keyword.startsWith(token)) ||
+  (keyword.length >= MIN_PARTIAL_TOKEN_LENGTH && token.startsWith(keyword));
+
+const PA_KEYWORDS = ["MAIN", "SUB", "OUT", "FRONT", "FILL"];
+// Vowel-dropped shorthand that isn't a prefix of the full word, so it can't
+// be caught by tokenMatchesKeyword's prefix check.
+const DELAY_ALIASES = new Set(["DLY"]);
+
+// SIDE and DELAY are checked before the generic PA pattern so "SIDEFILL"
+// (which also starts a compound containing "FILL") is not misclassified as a
+// front/out fill.
 function classifySection(groupName: string): Section {
-  const normalized = normalizeName(groupName);
-  if (/SIDE/.test(normalized)) return "SIDE";
-  if (/DELAY/.test(normalized)) return "DELAY";
-  if (/MAIN|SUB|OUT|FRONT|FILL/.test(normalized)) return "PA";
+  const tokens = tokenize(groupName);
+  if (tokens.some((token) => tokenMatchesKeyword(token, "SIDE"))) return "SIDE";
+  if (
+    tokens.some((token) => tokenMatchesKeyword(token, "DELAY") || DELAY_ALIASES.has(token))
+  ) {
+    return "DELAY";
+  }
+  if (tokens.some((token) => PA_KEYWORDS.some((keyword) => tokenMatchesKeyword(token, keyword)))) {
+    return "PA";
+  }
   return "OTHER";
 }
+
+// Reads the side off the group name's last token so "MAIN L", "MAIN LEFT"
+// and "MAIN-L" are all recognized the same way.
+const sideFromName = (name: string): Side => {
+  const tokens = tokenize(name);
+  const last = tokens[tokens.length - 1] ?? "";
+  if (last === "L" || last === "LEFT") return "L";
+  if (last === "R" || last === "RIGHT") return "R";
+  return "C";
+};
 
 const appendRow = (rows: PowerTableRow[], component: ConsumosComponent, quantity: number) => {
   rows.push({
@@ -69,6 +111,12 @@ const appendRow = (rows: PowerTableRow[], component: ConsumosComponent, quantity
   });
 };
 
+// Counts amplifier hardware units (LA12X, LA8, …) driving each PDU — never
+// the loudspeaker enclosures/boxes those amps power. `unit.model` comes from
+// the amp channel's own `<model>` tag in the session file (parseXmlpXml
+// defaults it to "LA12X" when that tag is absent, since that's virtually
+// always the true amp on a modern K/Kara/KS session), not from the box/preset
+// name a channel happens to be driving.
 const countAmpsByComponent = (
   units: XmlpAmpUnit[],
   components: ConsumosComponent[],

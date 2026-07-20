@@ -167,6 +167,47 @@ describe("buildXmlpPowerTables", () => {
     expect(result.tables.map((table) => table.name)).toEqual(["Main L"]);
   });
 
+  it("recognizes an abbreviated bare 'SIDE' group as sidefill", () => {
+    const map: XmlpAmpMap = {
+      units: [{ octet: 1, model: "LA4X" }],
+      groups: [{ name: "SIDE L", role: "source", members: [1] }],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(result.tables.map((table) => table.name)).toEqual(["Sidefill"]);
+  });
+
+  it("recognizes the 'DLY' abbreviation (vowel-dropped, not a prefix of DELAY) as a delay group", () => {
+    const map: XmlpAmpMap = {
+      units: [{ octet: 1, model: "LA8" }],
+      groups: [{ name: "DLY 1 L", role: "source", members: [1] }],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(result.tables.map((table) => table.name)).toEqual(["DLY 1 L"]);
+  });
+
+  it("classifies group names regardless of case (mixed/lowercase)", () => {
+    const map: XmlpAmpMap = {
+      units: [{ octet: 1, model: "LA12X" }],
+      groups: [{ name: "main l", role: "source", members: [1] }],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(result.tables.map((table) => table.name)).toEqual(["Main L"]);
+  });
+
+  it("reads the fully spelled-out side word (LEFT/RIGHT), not just L/R", () => {
+    const map: XmlpAmpMap = {
+      units: [{ octet: 1, model: "LA12X" }],
+      groups: [{ name: "MAIN LEFT", role: "source", members: [1] }],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+    expect(result.tables.map((table) => table.name)).toEqual(["Main L"]);
+    expect(result.tables[0].position).toBe("DOSL");
+  });
+
   it("ignores non-source-role groups entirely (parent/zoning groups)", () => {
     const map: XmlpAmpMap = {
       units: [{ octet: 1, model: "LA12X" }],
