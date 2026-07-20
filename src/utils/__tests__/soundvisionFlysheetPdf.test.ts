@@ -7,6 +7,7 @@ import type {
 } from '@/components/sound/amplifier-tool/rack-designer/nwm-import';
 import {
   generateSoundvisionFlysheetPdf,
+  isHighlightedDispersion,
   soundvisionWarningSeverity,
   translateSoundvisionWarning,
 } from '@/utils/soundvisionFlysheetPdf';
@@ -110,5 +111,21 @@ describe('translateSoundvisionWarning', () => {
     ).toBe('danger');
     expect(soundvisionWarningSeverity('Tipping hazard')).toBe('warning');
     expect(soundvisionWarningSeverity('Site angle is impossible.')).toBe('caution');
+  });
+});
+
+describe('isHighlightedDispersion', () => {
+  it('flags any Panflex setting other than the default 55/55', () => {
+    expect(isHighlightedDispersion('35/35')).toBe(true);
+    expect(isHighlightedDispersion('55/35')).toBe(true);
+    expect(isHighlightedDispersion('35/55')).toBe(true);
+  });
+
+  it('does not flag the default 55/55 or a fixed-directivity box', () => {
+    expect(isHighlightedDispersion('55/55')).toBe(false);
+    expect(isHighlightedDispersion(' 55/55 ')).toBe(false);
+    expect(isHighlightedDispersion(null)).toBe(false);
+    expect(isHighlightedDispersion(undefined)).toBe(false);
+    expect(isHighlightedDispersion('')).toBe(false);
   });
 });

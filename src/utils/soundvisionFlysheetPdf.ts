@@ -41,6 +41,14 @@ const formatNumber = (value: number | null, suffix: string, digits = 1): string 
 const formatCompactNumber = (value: number | null, suffix: string): string =>
   value === null ? '-' : `${value.toFixed(2).replace(/\.?0+$/, '')}${suffix}`;
 
+/**
+ * A variable-dispersion box is worth flagging on the flysheet when its Panflex
+ * setting isn't the default symmetric 55/55 (110°). Fixed-directivity boxes
+ * (no setting) are never flagged.
+ */
+export const isHighlightedDispersion = (setting: string | null | undefined): boolean =>
+  !!setting && setting.trim() !== '55/55';
+
 const deploymentLabel = (deployment: SoundvisionFlysheetArray['deployment']): string => {
   if (deployment === 'flown') return 'VOLADO';
   if (deployment === 'stacked') return 'APILADO';
@@ -221,6 +229,9 @@ function drawCabinetRows(
             enclosure.dispersionSetting ? `  |  ${enclosure.dispersionSetting}` : ''
           }`
         : '';
+      // Flag boxes whose Panflex setting isn't the default 55/55 so an
+      // asymmetric/narrow dispersion doesn't slip by unnoticed.
+      const highlight = enclosure ? isHighlightedDispersion(enclosure.dispersionSetting) : false;
       drawCell(
         pdf,
         value,
@@ -228,7 +239,7 @@ function drawCabinetRows(
         y,
         arrayWidth,
         CABINET_ROW_HEIGHT,
-        { fontSize: 7.2 },
+        { fontSize: 7.2, fill: highlight ? YELLOW : undefined, bold: highlight },
       );
     });
     y += CABINET_ROW_HEIGHT;
@@ -426,6 +437,7 @@ function drawDispersionNote(pdf: jsPDF, x: number, y: number, width: number): vo
     'leído desde la perspectiva del propio recinto mirando hacia el público: cada cifra es la semiapertura (°) de ese lado ' +
     'y su suma es la cobertura horizontal total (55/55 = 110°, 35/35 = 70°, 55/35 y 35/55 = 90° asimétrico). ' +
     'Cada recinto puede llevar un ajuste distinto (configuración mixta, p. ej. 70°/110° en el mismo array). ' +
+    'Se resaltan en amarillo los recintos cuyo ajuste difiere de 55/55 (110°). ' +
     'Los recintos de directividad fija (KS28, KARA, K1) no muestran ajuste. Confirme siempre en Soundvision.';
   const lines = pdf.splitTextToSize(note, Math.max(1, width - 6));
   pdf.text(lines, x + 3, y + 29);
