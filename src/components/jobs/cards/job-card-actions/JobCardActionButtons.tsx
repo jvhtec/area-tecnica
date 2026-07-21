@@ -27,6 +27,7 @@ import { BackfillDocTecnicaAction } from "@/components/jobs/cards/job-card-actio
 import { MobileJobCardActions } from "@/components/jobs/cards/job-card-actions/MobileJobCardActions";
 import { MotorCertificateAction } from "@/components/jobs/cards/job-card-actions/MotorCertificateAction";
 import { PrintFlexReportAction } from "@/components/jobs/cards/job-card-actions/PrintFlexReportAction";
+import { SoundvisionXmlpFlexJobAction } from "@/components/jobs/cards/job-card-actions/SoundvisionXmlpFlexJobAction";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -402,6 +403,14 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
           </Button>
         )}
       </>
+    )}
+    {department === "sound" && isProjectManagementPage && isManagementUser && allowedJobType && job.job_type !== "dryhire" && (
+      <SoundvisionXmlpFlexJobAction
+        jobId={job.id}
+        jobName={job.job_name ?? job.name ?? job.title}
+        tourId={job.tour_id ?? job.tour?.id}
+        onCreateFlexTarget={canCreateFlexFolders ? onCreateFlexFolders : undefined}
+      />
     )}
     {flexReportDepartment && isProjectManagementPage && isManagementUser && (
       <>

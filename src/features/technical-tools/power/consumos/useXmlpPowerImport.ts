@@ -2,12 +2,11 @@ import { useState } from "react";
 
 import { parseLaSessionFile } from "@/components/sound/amplifier-tool/rack-designer/parse-session-file";
 import { useToast } from "@/hooks/use-toast";
-import { createCalculatedPowerTable } from "@/features/technical-tools/power/powerCalculations";
 import type { PowerElectricalSettings, PowerTable } from "@/features/technical-tools/power/types";
 
 import type { ConsumosComponent } from "./config";
 import { createPrebuiltMonitorPdu } from "./monitorPduPreset";
-import { buildXmlpPowerTables } from "./xmlpPowerImport";
+import { buildCalculatedXmlpPowerRequirements } from "./xmlpPowerRequirements";
 
 interface ImportStage {
   name: string;
@@ -48,32 +47,21 @@ export function useXmlpPowerImport({
     setIsImportingXmlp(true);
     try {
       const map = await parseLaSessionFile(file);
-      const result = buildXmlpPowerTables(map, components);
+      const result = buildCalculatedXmlpPowerRequirements({
+        map,
+        components,
+        pduOptions,
+        settings: getSettings(),
+        firstId: Date.now(),
+        stage: selectedStage,
+      });
       if (result.tables.length === 0) {
         throw new Error(
           result.warnings[0] || "El XMLP no contiene amplificadores reconocibles.",
         );
       }
 
-      const settings = getSettings();
-      const firstId = Date.now();
-      const builtTables = result.tables.map((table, index) =>
-        createCalculatedPowerTable({
-          components,
-          currentTable: { rows: table.rows, position: table.position },
-          id: firstId + index,
-          name: table.name,
-          pduOptions,
-          settings,
-          tablePatch: {
-            includesHoist: table.includesHoist,
-            stageName: selectedStage?.name ?? null,
-            stageNumber: selectedStage?.number ?? null,
-          },
-        }) as PowerTable,
-      );
-
-      onTablesImported(builtTables);
+      onTablesImported(result.tables);
 
       const warningSuffix =
         result.warnings.length > 0

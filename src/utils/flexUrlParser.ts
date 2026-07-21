@@ -49,6 +49,19 @@ export function extractFlexElementId(url: string): string | null {
   }
 }
 
+export type FlexEquipmentUrlDocumentType = 'pullsheet' | 'presupuesto';
+
+/** Returns a document type only when the Flex URL schema states it explicitly. */
+export function extractFlexEquipmentDocumentType(
+  url: string,
+): FlexEquipmentUrlDocumentType | null {
+  if (!url || typeof url !== 'string') return null;
+  const normalized = url.trim().toLowerCase();
+  if (normalized.includes('#equipment-list/')) return 'pullsheet';
+  if (normalized.includes('#fin-doc/')) return 'presupuesto';
+  return null;
+}
+
 /**
  * Validates if a string looks like a Flex URL
  *
