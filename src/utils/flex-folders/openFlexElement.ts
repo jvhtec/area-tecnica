@@ -261,7 +261,9 @@ function navigateWithLinkClick(url: string): void {
   
   // Clean up after a short delay
   setTimeout(() => {
-    document.body.removeChild(link);
+    if (link.isConnected) {
+      link.remove();
+    }
     console.log('[openFlexElement] Programmatic link removed');
   }, 100);
 }
