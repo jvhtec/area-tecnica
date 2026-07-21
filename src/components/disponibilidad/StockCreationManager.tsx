@@ -11,8 +11,8 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { StockAdvancedEditDialog } from './stock-creation-manager/StockAdvancedEditDialog';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -753,123 +753,30 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
         </div>
       </ScrollArea>
 
-      {/* Advanced Edit Dialog */}
-      <Dialog open={!!advancedEditItem} onOpenChange={(open) => !open && closeAdvancedEdit()}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Editar Equipo</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="adv-name">Nombre del Equipo</Label>
-              <Input
-                id="adv-name"
-                value={advEditName}
-                onChange={(e) => setAdvEditName(e.target.value)}
-                placeholder="Nombre del equipo"
-                className="mt-1"
-                disabled={isFetchingAdvFlex}
-              />
-            </div>
-            <div>
-              <Label htmlFor="adv-manufacturer">Fabricante</Label>
-              <Input
-                id="adv-manufacturer"
-                value={advEditManufacturer}
-                onChange={(e) => setAdvEditManufacturer(e.target.value)}
-                placeholder="Fabricante (opcional)"
-                className="mt-1"
-                disabled={isFetchingAdvFlex}
-              />
-            </div>
-            <div>
-              <Label>Categoría</Label>
-              <Select value={advEditCategory} onValueChange={setAdvEditCategory} disabled={isFetchingAdvFlex}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {allCategoryLabels[cat as AllCategories] || cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Collapsible open={showAdvFlexSection} onOpenChange={setShowAdvFlexSection}>
-              <CollapsibleTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="w-full">
-                  <Link className="mr-2 h-4 w-4" />
-                  {showAdvFlexSection ? 'Ocultar integración Flex' : 'Integración con Flex (opcional)'}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-3 mt-3 border rounded-md p-3">
-                <div>
-                  <Label htmlFor="adv-resourceId">Flex Resource ID</Label>
-                  <Input
-                    id="adv-resourceId"
-                    value={advEditResourceId}
-                    onChange={(e) => setAdvEditResourceId(e.target.value)}
-                    placeholder="UUID del recurso en Flex"
-                    className="mt-1"
-                    disabled={isFetchingAdvFlex}
-                  />
-                </div>
-                <div>
-                  <Label>URL de Flex</Label>
-                  <div className="flex gap-2 mt-1">
-                    <Input
-                      value={advEditFlexUrl}
-                      onChange={(e) => setAdvEditFlexUrl(e.target.value)}
-                      placeholder="Pegar URL de Flex"
-                      disabled={isFetchingAdvFlex}
-                      className="flex-1"
-                    />
-                    <Button type="button" variant="outline" size="icon" onClick={() => handlePasteAndExtract(true)} disabled={isFetchingAdvFlex} title="Pegar URL">
-                      <ClipboardPaste className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleFetchFromFlex(true)}
-                      disabled={isFetchingAdvFlex || (!advEditResourceId && !advEditFlexUrl)}
-                    >
-                      {isFetchingAdvFlex ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                      {isFetchingAdvFlex ? 'Obteniendo...' : 'Obtener'}
-                    </Button>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="adv-imageId">Image ID</Label>
-                  <Input
-                    id="adv-imageId"
-                    value={advEditImageId}
-                    onChange={(e) => setAdvEditImageId(e.target.value)}
-                    placeholder="ID de imagen de Flex"
-                    className="mt-1"
-                    disabled={isFetchingAdvFlex}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={closeAdvancedEdit}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => advancedUpdateMutation.mutate()}
-              disabled={!advEditName.trim() || advancedUpdateMutation.isPending || isFetchingAdvFlex}
-            >
-              {advancedUpdateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Guardar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <StockAdvancedEditDialog
+        open={!!advancedEditItem}
+        onClose={closeAdvancedEdit}
+        categories={categories}
+        name={advEditName}
+        onNameChange={setAdvEditName}
+        manufacturer={advEditManufacturer}
+        onManufacturerChange={setAdvEditManufacturer}
+        category={advEditCategory}
+        onCategoryChange={setAdvEditCategory}
+        resourceId={advEditResourceId}
+        onResourceIdChange={setAdvEditResourceId}
+        flexUrl={advEditFlexUrl}
+        onFlexUrlChange={setAdvEditFlexUrl}
+        imageId={advEditImageId}
+        onImageIdChange={setAdvEditImageId}
+        showFlexSection={showAdvFlexSection}
+        onShowFlexSectionChange={setShowAdvFlexSection}
+        isFetchingFlex={isFetchingAdvFlex}
+        isSaving={advancedUpdateMutation.isPending}
+        onPasteFlexUrl={() => handlePasteAndExtract(true)}
+        onFetchFlex={() => handleFetchFromFlex(true)}
+        onSave={() => advancedUpdateMutation.mutate()}
+      />
     </div>
   );
 };

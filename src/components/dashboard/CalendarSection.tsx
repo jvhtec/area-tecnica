@@ -17,11 +17,6 @@ import {
   endOfMonth,
   eachDayOfInterval,
   isSameMonth,
-  addMonths,
-  startOfQuarter,
-  endOfQuarter,
-  startOfYear,
-  endOfYear,
   eachMonthOfInterval,
   parseISO,
 } from "date-fns";
@@ -31,6 +26,14 @@ import { useToast } from "@/hooks/use-toast";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
 import { DateType, DATE_TYPE_META, DATE_TYPE_ORDER, getDateTypeMeta } from "@/constants/dateTypes";
+import {
+  buildCalendarDays,
+  collectCalendarJobIds,
+  filterCalendarJobsForDate,
+  formatCalendarDays,
+  getCalendarExportInterval,
+  prepareCalendarJobs,
+} from "./calendar-section/calendarViewModel";
 
 type PrintableJobType = keyof PrintSettings["jobTypes"];
 
@@ -73,28 +76,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
   const currentMonth = useMemo(() => date ?? new Date(), [date]);
 
-  const allDays = useMemo(() => {
-    const firstDayOfMonth = startOfMonth(currentMonth);
-    const lastDayOfMonth = endOfMonth(currentMonth);
-    const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
-    const startDay = firstDayOfMonth.getDay();
-
-    // Adjust startDay for Monday as first day (0=Sunday, 1=Monday -> 0=Monday, 6=Sunday)
-    const paddingDays = startDay === 0 ? 6 : startDay - 1;
-    const prefixDays = Array.from({ length: paddingDays }).map((_, i) => {
-      const day = new Date(firstDayOfMonth);
-      day.setDate(day.getDate() - (paddingDays - i));
-      return day;
-    });
-    const totalDaysNeeded = 42; // Ensures 6 full weeks
-    const suffixDays = Array.from({ length: totalDaysNeeded - (prefixDays.length + daysInMonth.length) }).map((_, i) => {
-      const day = new Date(lastDayOfMonth);
-      day.setDate(day.getDate() + (i + 1));
-      return day;
-    });
-
-    return [...prefixDays, ...daysInMonth, ...suffixDays];
-  }, [currentMonth]);
+  const allDays = useMemo(() => buildCalendarDays(currentMonth), [currentMonth]);
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
   const distinctJobStatuses = jobs ? Array.from(new Set(jobs.map((job) => job.status).filter(Boolean))) : [];
 
@@ -168,53 +150,25 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setIsStatusDropdownOpen(false);
   };
 
-  const processedJobs = useMemo(() => {
-    if (!jobs) return [];
-    return jobs.map((job) => ({
-      ...job,
-      jobTimezone: job.timezone || 'Europe/Madrid',
-      departmentIds: job.job_departments?.map((d: any) => d.department) || [],
-    }));
-  }, [jobs]);
+  const processedJobs = useMemo(() => prepareCalendarJobs(jobs || []), [jobs]);
 
   // Memoize getJobsForDate to prevent unnecessary re-renders and stabilize its reference for effects
-  const getJobsForDate = useMemo(() => (date: Date) => {
-    if (!processedJobs.length) return [];
-    return processedJobs.filter((job) => {
-      try {
-        if (!job.start_time || !job.end_time) {
-          console.warn("Invalid date found for job:", job);
-          return false;
-        }
-
-        const isWithinDuration = isJobOnDate(job.start_time, job.end_time, date, job.jobTimezone);
-
-        const matchesDepartment = department
-          ? isWithinDuration && job.departmentIds.some((dept: string) => dept === department)
-          : isWithinDuration;
-        const matchesJobType = selectedJobTypes.length === 0 || selectedJobTypes.includes(job.job_type);
-        const matchesJobStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-        return matchesDepartment && matchesJobType && matchesJobStatus;
-      } catch (error) {
-        console.error("Error processing job dates:", error, job);
-        return false;
-      }
-    });
-  }, [processedJobs, department, selectedJobTypes, selectedJobStatuses]); // Dependencies for getJobsForDate
-
-  const formattedDays = useMemo(() =>
-    allDays.map((d) => ({ date: d, formatted: format(d, 'yyyy-MM-dd') })),
-    [allDays]
+  const getJobsForDate = useMemo(
+    () => (selectedDate: Date) => filterCalendarJobsForDate(processedJobs, selectedDate, {
+      department,
+      selectedJobTypes,
+      selectedJobStatuses,
+    }),
+    [processedJobs, department, selectedJobTypes, selectedJobStatuses],
   );
 
+  const formattedDays = useMemo(() => formatCalendarDays(allDays), [allDays]);
+
   // Simplified date type fetching optimization
-  const jobIdsInView = useMemo(() => {
-    const jobIdSet = new Set<string>();
-    formattedDays.forEach(({ date }) => {
-      getJobsForDate(date).forEach((job) => jobIdSet.add(job.id));
-    });
-    return Array.from(jobIdSet);
-  }, [formattedDays, getJobsForDate]);
+  const jobIdsInView = useMemo(
+    () => collectCalendarJobIds(formattedDays, getJobsForDate),
+    [formattedDays, getJobsForDate],
+  );
 
   const formattedDatesInView = useMemo(() =>
     Array.from(new Set(formattedDays.map(({ formatted }) => formatted))),
@@ -251,7 +205,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const jsPDF = await loadJsPDF();
     const doc = new jsPDF("landscape", "mm", [420, 297]); // A3 dimensions explicitly
     const currentDate = date || new Date();
-    let startDate: Date, endDate: Date;
+    const { startDate, endDate } = getCalendarExportInterval(range, currentDate);
 
     const logo = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
@@ -272,24 +226,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const calendarStartY = monthTitleY + 15;
     const footerSpace = 40;
     const legendSpace = 15;
-
-    switch (range) {
-      case "month":
-        startDate = startOfMonth(currentDate);
-        endDate = endOfMonth(currentDate);
-        break;
-      case "quarter":
-        startDate = startOfQuarter(addMonths(currentDate, 1));
-        endDate = endOfQuarter(addMonths(startDate, 2));
-        break;
-      case "year":
-        startDate = startOfYear(currentDate);
-        endDate = endOfYear(currentDate);
-        break;
-      default:
-        startDate = startOfMonth(currentDate);
-        endDate = endOfMonth(currentDate);
-    }
 
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
@@ -571,25 +507,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
     const ExcelJS = await loadExceljs();
     const currentDate = date || new Date();
-    let startDate: Date, endDate: Date;
-
-    switch (range) {
-      case "month":
-        startDate = startOfMonth(currentDate);
-        endDate = endOfMonth(currentDate);
-        break;
-      case "quarter":
-        startDate = startOfQuarter(addMonths(currentDate, 1));
-        endDate = endOfQuarter(addMonths(startDate, 2));
-        break;
-      case "year":
-        startDate = startOfYear(currentDate);
-        endDate = endOfYear(currentDate);
-        break;
-      default:
-        startDate = startOfMonth(currentDate);
-        endDate = endOfMonth(currentDate);
-    }
+    const { startDate, endDate } = getCalendarExportInterval(range, currentDate);
 
     const daysOfWeek = ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO"];
 

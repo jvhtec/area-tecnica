@@ -1,6 +1,5 @@
-import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
+import { formatFrequencyBand } from '@/lib/frequencyBands';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import {
   CORPORATE_RED,
@@ -18,139 +17,15 @@ import {
   loadSectorProFooterLogo,
 } from '@/utils/pdf/shared/pdfExportShared';
 import { drawArtistScheduleSection } from '@/utils/pdf/artistScheduleSection';
+import type { ArtistPdfData, ArtistPdfOptions } from '@/utils/pdf/artistPdfTypes';
 
-export interface ArtistTechnicalInfo {
-  fohTech: boolean;
-  monTech: boolean;
-  fohConsole: { model: string; providedBy: string };
-  monConsole: { model: string; providedBy: string };
-  monitorsFromFoh?: boolean;
-  fohWavesOutboard?: string;
-  monWavesOutboard?: string;
-  wireless: {
-    systems?: WirelessSystem[];
-    model?: string;
-    providedBy: string;
-    handhelds?: number;
-    bodypacks?: number;
-    band?: FrequencyBandSelection | string;
-    channels?: number;
-    hh?: number;
-    bp?: number;
-  };
-  iem: {
-    systems?: IEMSystem[];
-    model?: string;
-    providedBy: string;
-    quantity?: number;
-    band?: FrequencyBandSelection | string;
-  };
-  monitors: {
-    enabled: boolean;
-    quantity: number;
-  };
-}
-
-// Local interfaces for internal PDF generation use
-interface WirelessSystemDetail {
-  quantity_hh?: number;
-  quantity_bp?: number;
-  quantity_ch?: number;
-  model: string;
-  band?: FrequencyBandSelection | string;
-}
-
-interface IEMSystemDetail {
-  quantity: number;
-  model: string;
-  band?: FrequencyBandSelection | string;
-}
-
-export interface ArtistInfrastructure {
-  providedBy: string;
-  cat6: { enabled: boolean; quantity: number };
-  hma: { enabled: boolean; quantity: number };
-  coax: { enabled: boolean; quantity: number };
-  opticalconDuo: { enabled: boolean; quantity: number };
-  analog: number;
-  other: string;
-}
-
-export interface PdfFestivalGearOptions {
-  fohConsoles?: Array<{ model: string; quantity: number }>;
-  monConsoles?: Array<{ model: string; quantity: number }>;
-  fohWavesOutboard?: string;
-  monWavesOutboard?: string;
-  wirelessSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; quantity_ch?: number; band?: FrequencyBandSelection | string }>;
-  iemSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: FrequencyBandSelection | string }>;
-  wiredMics?: Array<{ model: string; quantity: number }>;
-  monitorsQuantity?: number;
-  hasSideFill?: boolean;
-  hasDrumFill?: boolean;
-  hasDjBooth?: boolean;
-  availableCat6Runs?: number;
-  availableHmaRuns?: number;
-  availableCoaxRuns?: number;
-  availableOpticalconDuoRuns?: number;
-  availableAnalogRuns?: number;
-}
-
-export interface ArtistPdfData {
-  name: string;
-  stage: number;
-  date: string;
-  schedule: {
-    loadIn?: string;
-    show: { start: string; end: string };
-    soundcheck?: { start: string; end: string };
-    lineCheck?: { start: string; end: string };
-  };
-  technical: ArtistTechnicalInfo;
-  infrastructure: ArtistInfrastructure;
-  extras: {
-    sideFill: boolean;
-    drumFill: boolean;
-    djBooth: boolean;
-    wired: string;
-  };
-  notes?: string;
-  logoUrl?: string;
-  wiredMics?: Array<{
-    model: string;
-    quantity: number;
-    exclusive_use?: boolean;
-    notes?: string;
-  }>;
-  micKit?: 'festival' | 'band' | 'mixed';
-  riderMissing?: boolean;
-  festivalOptions?: PdfFestivalGearOptions;
-  publicFormUrl?: string;
-  publicFormQrDataUrl?: string;
-  stagePlotUrl?: string;
-  stagePlotFileType?: string;
-}
-
-export interface ArtistPdfOptions {
-  templateMode?: boolean;
-  language?: "es" | "en";
-}
-
-// Helper functions to process wireless and IEM data
-const getWirelessSummary = (systems: WirelessSystem[] = []) => {
-  const totalHH = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
-  const totalBP = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
-  return { hh: totalHH, bp: totalBP };
-};
-
-const getIEMSummary = (systems: IEMSystem[] = []) => {
-  const totalChannels = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
-  const totalBodpacks = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
-  return { 
-    channels: totalChannels, 
-    bodypacks: totalBodpacks,
-    total: totalChannels // For backward compatibility
-  };
-};
+export type {
+  ArtistInfrastructure,
+  ArtistPdfData,
+  ArtistPdfOptions,
+  ArtistTechnicalInfo,
+  PdfFestivalGearOptions,
+} from '@/utils/pdf/artistPdfTypes';
 
 const imageToJpegDataUrl = (image: HTMLImageElement): string => {
   const canvas = document.createElement("canvas");

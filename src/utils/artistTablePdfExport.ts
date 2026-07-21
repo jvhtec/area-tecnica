@@ -12,20 +12,13 @@ import {
   loadImageWithTimeout,
   loadSectorProFooterLogo,
 } from '@/utils/pdf/shared/pdfExportShared';
-
-// Local interfaces for internal PDF generation use
-interface WirelessSystemDetail {
-  quantity_hh?: number;
-  quantity_bp?: number;
-  model: string;
-  band?: string;
-}
-
-interface IEMSystemDetail {
-  quantity: number;
-  model: string;
-  band?: string;
-}
+import {
+  BAND_TEXT_TOKEN,
+  FESTIVAL_TEXT_TOKEN,
+  formatInfrastructureForPdf,
+  formatWiredMicsForPdf,
+  formatWirelessSystemsForPdf,
+} from '@/utils/pdf/artistTableFormatters';
 
 export interface ArtistTablePdfData {
   jobTitle: string;
@@ -106,112 +99,6 @@ export interface ArtistTablePdfData {
   equipmentNeeds?: EquipmentNeeds;
 }
 
-// Fixed infrastructure formatting function
-const formatInfrastructureForPdf = (infrastructure: any) => {
-  console.log('formatInfrastructureForPdf called with:', infrastructure);
-  
-  if (!infrastructure) {
-    console.log('No infrastructure data provided');
-    return 'Ninguno';
-  }
-
-  const infraItems: string[] = [];
-  
-  try {
-    if (infrastructure.infra_cat6 && infrastructure.infra_cat6_quantity) {
-      infraItems.push(`${infrastructure.infra_cat6_quantity}x CAT6`);
-    }
-    if (infrastructure.infra_hma && infrastructure.infra_hma_quantity) {
-      infraItems.push(`${infrastructure.infra_hma_quantity}x HMA`);
-    }
-    if (infrastructure.infra_coax && infrastructure.infra_coax_quantity) {
-      infraItems.push(`${infrastructure.infra_coax_quantity}x Coax`);
-    }
-    if (infrastructure.infra_opticalcon_duo && infrastructure.infra_opticalcon_duo_quantity) {
-      infraItems.push(`${infrastructure.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
-    }
-    if (infrastructure.infra_analog && infrastructure.infra_analog > 0) {
-      infraItems.push(`${infrastructure.infra_analog}x Analog`);
-    }
-    if (infrastructure.other_infrastructure) {
-      infraItems.push(infrastructure.other_infrastructure);
-    }
-    
-    console.log('Infrastructure items found:', infraItems);
-    return infraItems.length > 0 ? infraItems.join(", ") : "Ninguno";
-  } catch (error) {
-    console.error('Error formatting infrastructure:', error);
-    return 'Error formatting infrastructure';
-  }
-};
-
-const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> = [], micKit: string = 'band') => {
-  if (mics.length === 0) return "Ninguno";
-  
-  return mics.map(mic => {
-    const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
-    return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
-  }).join(", ");
-};
-
-const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "festival", isIEM = false) => {
-  if (systems.length === 0) return "Ninguno";
-  
-  if (providedBy === "mixed") {
-    // Show individual system providers when mixed
-    return systems.map(system => {
-      const provider = system.provided_by || "festival";
-      const providerLabel = provider === "festival" ? "Festival" : "Banda";
-      const providerToken = provider === "festival" ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
-      
-      if (isIEM) {
-        const channels = system.quantity_hh || system.quantity || 0;
-        const beltpacks = system.quantity_bp || 0;
-        return `${providerToken}${providerLabel}: ${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
-      } else {
-        const channels = system.quantity_ch || 0;
-        const hh = system.quantity_hh || 0;
-        const bp = system.quantity_bp || 0;
-        const total = hh + bp;
-        const channelPart = channels > 0 ? `${channels} ch` : '';
-        if (hh > 0 && bp > 0) {
-          const txPart = `${hh}x HH, ${bp}x BP`;
-          return `${providerToken}${providerLabel}: ${system.model}: ${channelPart ? `${channelPart}, ` : ''}${txPart}`;
-        } else if (total > 0) {
-          return `${providerToken}${providerLabel}: ${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x`;
-        } else if (channels > 0) {
-          return `${providerToken}${providerLabel}: ${system.model}: ${channels} ch`;
-        }
-        return `${providerToken}${providerLabel}: ${system.model}`;
-      }
-    }).join("\n");
-  } else {
-    // Original formatting for single provider
-    return systems.map(system => {
-      if (isIEM) {
-        const channels = system.quantity_hh || system.quantity || 0;
-        const beltpacks = system.quantity_bp || 0;
-        return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
-      } else {
-        const channels = system.quantity_ch || 0;
-        const hh = system.quantity_hh || 0;
-        const bp = system.quantity_bp || 0;
-        const total = hh + bp;
-        const channelPart = channels > 0 ? `${channels} ch` : '';
-        if (hh > 0 && bp > 0) {
-          const txPart = `${hh}x HH, ${bp}x BP`;
-          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${txPart}`;
-        } else if (total > 0) {
-          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x`;
-        } else if (channels > 0) {
-          return `${system.model}: ${channels} ch`;
-        }
-        return system.model;
-      }
-    }).join("; ");
-  }
-};
-
 const formatConsolesWithTech = (console: { model: string; providedBy: string }, techRequired: boolean, position: string) => {
   const techIndicator = techRequired ? " + Tec" : "";
   const providerDisplay = console.providedBy === "mixed" ? "(Mixto)" : `(${console.providedBy})`;
@@ -280,9 +167,6 @@ const getProviderCellColor = (provider: 'festival' | 'band' | 'mixed'): [number,
   if (provider === 'band') return [255, 226, 204];
   return [232, 232, 232];
 };
-
-const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
-const BAND_TEXT_TOKEN = '__BAND_ITEM__';
 
 const hasProviderTextToken = (value: string): boolean =>
   value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN);

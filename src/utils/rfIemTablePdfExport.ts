@@ -1,52 +1,22 @@
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
-import { extractRfIemScheduleFields, formatRfIemScheduleCell, type RawRfIemScheduleFields, type RfIemScheduleFields } from '@/utils/rfIemScheduleFields';
+import { extractRfIemScheduleFields, formatRfIemScheduleCell } from '@/utils/rfIemScheduleFields';
+import { groupArtistsByFestivalDay } from '@/utils/pdf/rfIemFestivalDays';
+import type {
+  ArtistRfIemData,
+  RawArtistLike,
+  RfIemSystemData,
+  RfIemTablePdfData,
+} from '@/utils/pdf/rfIemTableTypes';
 
 export { formatTimeRange } from '@/utils/rfIemScheduleFields';
-
-export interface RfIemSystemData {
-  model: string;
-  quantity?: number;
-  quantity_ch?: number;
-  quantity_hh?: number;
-  quantity_bp?: number;
-  band?: FrequencyBandSelection | string;
-  provided_by?: 'festival' | 'band' | 'mixed';
-}
-
-export interface ArtistRfIemData extends RfIemScheduleFields {
-  id?: string;
-  name: string;
-  stage: number;
-  wirelessSystems: RfIemSystemData[];
-  iemSystems: RfIemSystemData[];
-  date?: string;
-  isAfterMidnight?: boolean;
-}
-
-export interface RfIemTablePdfData {
-  jobTitle: string;
-  logoUrl?: string;
-  artists: ArtistRfIemData[];
-}
-
-export type RawArtistLike = RawRfIemScheduleFields & {
-  id?: string;
-  name: string;
-  stage: number;
-  wirelessSystems?: RfIemSystemData[];
-  iemSystems?: RfIemSystemData[];
-  wireless_systems?: unknown;
-  iem_systems?: unknown;
-  wireless_provided_by?: unknown;
-  iem_provided_by?: unknown;
-  date?: unknown;
-  isaftermidnight?: unknown;
-  isAfterMidnight?: unknown;
-};
+export { computeRfIemFestivalDayKey, groupArtistsByFestivalDay } from '@/utils/pdf/rfIemFestivalDays';
+export type {
+  ArtistRfIemData,
+  RawArtistLike,
+  RfIemSystemData,
+  RfIemTablePdfData,
+} from '@/utils/pdf/rfIemTableTypes';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -59,101 +29,6 @@ const toNumber = (value: unknown, fallback = 0): number => {
 const toProvider = (value: unknown, fallback: 'festival' | 'band' | 'mixed' = 'festival'): 'festival' | 'band' | 'mixed' => {
   if (value === 'festival' || value === 'band' || value === 'mixed') return value;
   return fallback;
-};
-
-const FESTIVAL_DAY_ROLLOVER_HOUR = 7;
-const MADRID_TIMEZONE = 'Europe/Madrid';
-
-const parseTimeToMinutes = (value: string | null | undefined): number => {
-  if (!value || typeof value !== 'string') return Number.NaN;
-  const match = value.trim().match(/^(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?$/);
-  if (!match) return Number.NaN;
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2] || '0');
-  const second = Number(match[3] || '0');
-  if (!Number.isFinite(hour) || !Number.isFinite(minute) || !Number.isFinite(second)) return Number.NaN;
-  return hour * 60 + minute + second / 60;
-};
-
-const parseIsoDate = (value: string | undefined): Date | null => {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const utcDate = fromZonedTime(`${value}T00:00:00`, MADRID_TIMEZONE);
-  return Number.isNaN(utcDate.getTime()) ? null : utcDate;
-};
-
-const toMadridIsoDate = (value: Date): string => format(toZonedTime(value, MADRID_TIMEZONE), 'yyyy-MM-dd');
-
-const getShowSortMinutes = (artist: ArtistRfIemData): number => {
-  const parsed = parseTimeToMinutes(artist.showStart);
-  if (!Number.isFinite(parsed)) return Number.MAX_SAFE_INTEGER;
-  if (parsed >= FESTIVAL_DAY_ROLLOVER_HOUR * 60) {
-    return parsed;
-  }
-  const explicitAfterMidnight = artist.isAfterMidnight === true;
-  if (explicitAfterMidnight || parsed < FESTIVAL_DAY_ROLLOVER_HOUR * 60) {
-    return parsed + (24 * 60);
-  }
-  return parsed;
-};
-
-export const computeRfIemFestivalDayKey = (artist: ArtistRfIemData): string => {
-  const parsedDate = parseIsoDate(artist.date);
-  if (!parsedDate) {
-    return 'Sin fecha';
-  }
-
-  const showMinutes = parseTimeToMinutes(artist.showStart);
-  const shouldUsePreviousDay = artist.isAfterMidnight !== true &&
-    Number.isFinite(showMinutes) &&
-    showMinutes < FESTIVAL_DAY_ROLLOVER_HOUR * 60;
-
-  if (!shouldUsePreviousDay) {
-    return toMadridIsoDate(parsedDate);
-  }
-
-  const madridDate = toZonedTime(parsedDate, MADRID_TIMEZONE);
-  madridDate.setDate(madridDate.getDate() - 1);
-  return format(madridDate, 'yyyy-MM-dd');
-};
-
-const formatFestivalDayLabel = (dayKey: string): string => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return dayKey;
-  const parsed = parseIsoDate(dayKey);
-  if (!parsed) return dayKey;
-  return format(toZonedTime(parsed, MADRID_TIMEZONE), 'dd/MM/yyyy', { locale: es });
-};
-
-export const groupArtistsByFestivalDay = (artists: ArtistRfIemData[]): Array<{
-  key: string;
-  label: string;
-  artists: ArtistRfIemData[];
-}> => {
-  const sorted = [...artists].sort((a, b) => {
-    const dayA = computeRfIemFestivalDayKey(a);
-    const dayB = computeRfIemFestivalDayKey(b);
-    if (dayA !== dayB) return dayA.localeCompare(dayB);
-
-    const timeA = getShowSortMinutes(a);
-    const timeB = getShowSortMinutes(b);
-    if (timeA !== timeB) return timeA - timeB;
-
-    if (a.stage !== b.stage) return a.stage - b.stage;
-    return (a.name || '').localeCompare(b.name || '');
-  });
-
-  const grouped = new Map<string, ArtistRfIemData[]>();
-  for (const artist of sorted) {
-    const dayKey = computeRfIemFestivalDayKey(artist);
-    if (!grouped.has(dayKey)) grouped.set(dayKey, []);
-    grouped.get(dayKey)?.push(artist);
-  }
-
-  return [...grouped.entries()].map(([key, groupArtists]) => ({
-    key,
-    label: formatFestivalDayLabel(key),
-    artists: groupArtists,
-  }));
 };
 
 const normalizeSystems = (
