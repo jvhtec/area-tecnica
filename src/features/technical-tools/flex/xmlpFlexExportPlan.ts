@@ -20,7 +20,9 @@ export type XmlpFlexCategoryKey =
   | 'pa_subs'
   | 'pa_frontfill'
   | 'pa_delays'
-  | 'pa_amp';
+  | 'pa_amp'
+  | 'rigging_hardware'
+  | 'motores_controles';
 
 export type XmlpFlexSource =
   | 'xmlp-speaker'
@@ -44,6 +46,8 @@ export const XMLP_FLEX_GROUP_ORDER: XmlpFlexCategoryKey[] = [
   'pa_frontfill',
   'pa_delays',
   'pa_amp',
+  'rigging_hardware',
+  'motores_controles',
 ];
 
 export const XMLP_FLEX_GROUP_LABELS: Record<XmlpFlexCategoryKey, string> = {
@@ -54,6 +58,8 @@ export const XMLP_FLEX_GROUP_LABELS: Record<XmlpFlexCategoryKey, string> = {
   pa_frontfill: 'Frontfill',
   pa_delays: 'Delays',
   pa_amp: 'Amplificación',
+  rigging_hardware: 'Rigging Hardware',
+  motores_controles: 'Motores y Controles',
 };
 
 export interface XmlpEquipmentRow {
@@ -504,28 +510,31 @@ export function buildXmlpFlexExportPlan(
   if (flysheet) {
     const weights = buildXmlpWeightTables(flysheet, soundWeightComponents);
     warnings.push(...weights.warnings);
+    // Bumpers/frames are rigging hardware, not part of a speaker group; they
+    // all nest under the single "Rigging Hardware" Flex header regardless of
+    // which PA array they fly, so a dual case can be shared across arrays.
     for (const rigging of weights.riggingRequirements) {
       raw.push({
         canonicalKey: rigging.canonicalKey,
         displayName: rigging.displayName,
         quantity: rigging.quantity,
-        flexCategoryKey: classifications[rigging.sourceArrayIndex]?.category ?? null,
+        flexCategoryKey: 'rigging_hardware',
         source: 'xmlp-rigging',
         sourceArrays: [rigging.sourceArray],
         inference: 'explicit',
-        warning: classifications[rigging.sourceArrayIndex]?.warning,
       });
     }
+    // Motors belong under their own "Motores y Controles" header, not under the
+    // speaker group of the array they lift.
     for (const motor of weights.motorRequirements) {
       raw.push({
         canonicalKey: motor.canonicalKey,
         displayName: motor.displayName,
         quantity: motor.quantity,
-        flexCategoryKey: classifications[motor.sourceArrayIndex]?.category ?? null,
+        flexCategoryKey: 'motores_controles',
         source: 'pesos-motor',
         sourceArrays: [motor.sourceArray],
         inference: 'derived',
-        warning: classifications[motor.sourceArrayIndex]?.warning,
       });
     }
   }
