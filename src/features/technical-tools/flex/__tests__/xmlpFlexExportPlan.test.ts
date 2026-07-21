@@ -175,6 +175,25 @@ describe('XMLP speaker, rigging and motor extraction', () => {
       .toEqual(expect.objectContaining({ quantity: 1, resourceId: 'resource-bumper' }));
   });
 
+  it('pools same-model bumpers across Flex groups into one shared dual case', () => {
+    const plan = buildXmlpFlexExportPlan(
+      map([
+        array('MAIN L', ['K2'], { riggingFrame: 'K2-BUMP' }),
+        array('OUT L', ['K2'], { riggingFrame: 'K2-BUMP' }),
+      ]),
+      [equipment('Dual K2 Rigging Flight Case', 'resource-bumper', 'lights', 'rigging')],
+    );
+    const cases = plan.groups
+      .flatMap((group) => group.items)
+      .filter((item) => item.canonicalKey === 'BUMPER K2 DUAL CASE');
+    // One dual case holds both lone bumpers instead of one case per PA group.
+    expect(cases).toHaveLength(1);
+    expect(cases[0]).toEqual(
+      expect.objectContaining({ quantity: 1, resourceId: 'resource-bumper', flexCategoryKey: 'pa_mains' }),
+    );
+    expect(cases[0].sourceArrays).toEqual(expect.arrayContaining(['MAIN L', 'OUT L']));
+  });
+
   it('packages K1 bumpers into dual cases plus an odd single case', () => {
     const plan = buildXmlpFlexExportPlan(map([array('MAIN L', ['K1'], {
       riggingFrame: 'K1-BUMP',

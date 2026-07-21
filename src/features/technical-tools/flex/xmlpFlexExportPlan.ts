@@ -297,17 +297,29 @@ const isPackagedRiggingCandidate = (
 
 /**
  * Converts serialized bumper pieces into the physical flight cases used by
- * Flex. Pieces are aggregated per destination group before the dual-case
- * calculation so left/right arrays share a case when appropriate.
+ * Flex. A dual case physically holds two bumpers of the same model regardless
+ * of which PA array each one flies, so pieces are pooled per model across the
+ * whole system (not per destination group) before the dual-case calculation.
+ * Two lone arrays that each need one bumper therefore share a single dual case
+ * instead of ordering one apiece. The consolidated case is filed under the most
+ * prominent PA group (by XMLP_FLEX_GROUP_ORDER) that contributed a bumper of
+ * that model.
  */
 function packageRiggingCandidates(candidates: RawCandidate[]): RawCandidate[] {
-  const aggregated = new Map<string, PackagedRiggingCandidate>();
+  // Rank a destination group so the shared case is filed under the most
+  // prominent one; unassigned/unknown groups sort last.
+  const groupRank = (key: XmlpFlexCategoryKey | null): number => {
+    if (key === null) return XMLP_FLEX_GROUP_ORDER.length;
+    const index = XMLP_FLEX_GROUP_ORDER.indexOf(key);
+    return index === -1 ? XMLP_FLEX_GROUP_ORDER.length : index;
+  };
+
+  const aggregated = new Map<PackagedRiggingCandidate['canonicalKey'], PackagedRiggingCandidate>();
   for (const candidate of candidates) {
     if (!isPackagedRiggingCandidate(candidate)) continue;
-    const key = `${candidate.flexCategoryKey ?? 'unassigned'}:${candidate.canonicalKey}`;
-    const existing = aggregated.get(key);
+    const existing = aggregated.get(candidate.canonicalKey);
     if (!existing) {
-      aggregated.set(key, {
+      aggregated.set(candidate.canonicalKey, {
         ...candidate,
         sourceArrays: [...candidate.sourceArrays],
       });
@@ -316,19 +328,22 @@ function packageRiggingCandidates(candidates: RawCandidate[]): RawCandidate[] {
     existing.quantity += candidate.quantity;
     existing.sourceArrays = [...new Set([...existing.sourceArrays, ...candidate.sourceArrays])];
     existing.warning = [existing.warning, candidate.warning].filter(Boolean).join(' ') || undefined;
+    // File the pooled case under the highest-priority contributing group.
+    if (groupRank(candidate.flexCategoryKey) < groupRank(existing.flexCategoryKey)) {
+      existing.flexCategoryKey = candidate.flexCategoryKey;
+    }
   }
 
-  const emitted = new Set<string>();
+  const emitted = new Set<PackagedRiggingCandidate['canonicalKey']>();
   const packaged: RawCandidate[] = [];
   for (const candidate of candidates) {
     if (!isPackagedRiggingCandidate(candidate)) {
       packaged.push(candidate);
       continue;
     }
-    const key = `${candidate.flexCategoryKey ?? 'unassigned'}:${candidate.canonicalKey}`;
-    if (emitted.has(key)) continue;
-    emitted.add(key);
-    const total = aggregated.get(key)!;
+    if (emitted.has(candidate.canonicalKey)) continue;
+    emitted.add(candidate.canonicalKey);
+    const total = aggregated.get(candidate.canonicalKey)!;
 
     if (candidate.canonicalKey === 'BUMPER K1') {
       const dualCases = Math.floor(total.quantity / 2);
