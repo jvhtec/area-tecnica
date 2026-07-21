@@ -171,8 +171,29 @@ describe('XMLP speaker, rigging and motor extraction', () => {
     const plan = buildXmlpFlexExportPlan(map([source]), [
       equipment('Dual K2 Rigging Flight Case', 'resource-bumper', 'lights', 'rigging'),
     ]);
-    expect(plan.groups[0].items.find((item) => item.canonicalKey === 'BUMPER K2 DUAL CASE'))
+    const rigging = plan.groups.find((group) => group.flexCategoryKey === 'rigging_hardware');
+    expect(rigging?.items.find((item) => item.canonicalKey === 'BUMPER K2 DUAL CASE'))
       .toEqual(expect.objectContaining({ quantity: 1, resourceId: 'resource-bumper' }));
+  });
+
+  it('pools same-model bumpers across Flex groups into one shared dual case', () => {
+    const plan = buildXmlpFlexExportPlan(
+      map([
+        array('MAIN L', ['K2'], { riggingFrame: 'K2-BUMP' }),
+        array('OUT L', ['K2'], { riggingFrame: 'K2-BUMP' }),
+      ]),
+      [equipment('Dual K2 Rigging Flight Case', 'resource-bumper', 'lights', 'rigging')],
+    );
+    const cases = plan.groups
+      .flatMap((group) => group.items)
+      .filter((item) => item.canonicalKey === 'BUMPER K2 DUAL CASE');
+    // One dual case holds both lone bumpers, filed under Rigging Hardware
+    // rather than one case per PA speaker group.
+    expect(cases).toHaveLength(1);
+    expect(cases[0]).toEqual(
+      expect.objectContaining({ quantity: 1, resourceId: 'resource-bumper', flexCategoryKey: 'rigging_hardware' }),
+    );
+    expect(cases[0].sourceArrays).toEqual(expect.arrayContaining(['MAIN L', 'OUT L']));
   });
 
   it('packages K1 bumpers into dual cases plus an odd single case', () => {
@@ -184,7 +205,8 @@ describe('XMLP speaker, rigging and motor extraction', () => {
       equipment('K1 Rigging Flight Case', 'resource-k1-single', 'lights', 'rigging'),
     ]);
 
-    expect(plan.groups[0].items).toEqual(expect.arrayContaining([
+    const rigging = plan.groups.find((group) => group.flexCategoryKey === 'rigging_hardware');
+    expect(rigging?.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ canonicalKey: 'BUMPER K1 DUAL CASE', quantity: 1, resourceId: 'resource-k1-dual' }),
       expect.objectContaining({ canonicalKey: 'BUMPER K1 SINGLE CASE', quantity: 1, resourceId: 'resource-k1-single' }),
     ]));
@@ -198,9 +220,34 @@ describe('XMLP speaker, rigging and motor extraction', () => {
       equipment('Dual Kara Rigging Flight Case', 'resource-kara-dual', 'lights', 'rigging'),
     ]);
 
-    const frontfill = plan.groups.find((group) => group.flexCategoryKey === 'pa_frontfill');
-    expect(frontfill?.items.find((item) => item.canonicalKey === 'BUMPER KARA DUAL CASE'))
+    const rigging = plan.groups.find((group) => group.flexCategoryKey === 'rigging_hardware');
+    expect(rigging?.items.find((item) => item.canonicalKey === 'BUMPER KARA DUAL CASE'))
       .toEqual(expect.objectContaining({ quantity: 2, resourceId: 'resource-kara-dual' }));
+  });
+
+  it('nests bumpers and motors under their own headers, never a PA speaker group', () => {
+    const plan = buildXmlpFlexExportPlan(
+      map([array('MAIN L', ['K2'], {
+        deployment: 'flown',
+        totalMassKg: 600,
+        riggingFrame: 'K2-BUMP',
+        pickupConfiguration: 'F: 1 / R: 2',
+      })]),
+      [
+        equipment('K2', 'resource-k2'),
+        equipment('Dual K2 Rigging Flight Case', 'resource-bumper', 'lights', 'rigging'),
+        equipment('Motor Elevacion ChainMaster D8+ 750kg - 24 m', 'resource-750', 'lights', 'rigging'),
+      ],
+    );
+    const groupOf = (canonicalKey: string) =>
+      plan.groups.find((group) => group.items.some((item) => item.canonicalKey === canonicalKey))
+        ?.flexCategoryKey;
+    expect(groupOf('K2')).toBe('pa_mains');
+    expect(groupOf('BUMPER K2 DUAL CASE')).toBe('rigging_hardware');
+    expect(groupOf('MOTOR 750KG')).toBe('motores_controles');
+    // No rigging/motor items leaked into the PA speaker group.
+    const paMains = plan.groups.find((group) => group.flexCategoryKey === 'pa_mains');
+    expect(paMains?.items.every((item) => item.sources.includes('xmlp-speaker'))).toBe(true);
   });
 
   it('infers motors only for flown arrays with the existing 120% Pesos rule', () => {
@@ -218,7 +265,8 @@ describe('XMLP speaker, rigging and motor extraction', () => {
         'rigging',
       ),
     ]);
-    const motors = plan.groups[0].items.filter((item) => item.sources.includes('pesos-motor'));
+    const motorGroup = plan.groups.find((group) => group.flexCategoryKey === 'motores_controles');
+    const motors = motorGroup?.items.filter((item) => item.sources.includes('pesos-motor'));
     expect(motors).toEqual([
       expect.objectContaining({ canonicalKey: 'MOTOR 750KG', quantity: 2, resourceId: 'resource-750' }),
     ]);
@@ -333,10 +381,17 @@ describe('safe equipment resolution', () => {
       equipment('KS28', 'shared-resource'),
       equipment('KS28 BUMP', 'shared-resource', 'lights', 'rigging'),
     ]);
+    const allItems = plan.groups.flatMap((group) => group.items);
+    // The speaker stays in its PA group and the bumper in Rigging Hardware, but
+    // both must fail closed because they share one Flex resource ID.
     expect(plan.groups.find((group) => group.flexCategoryKey === 'pa_subs')?.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ canonicalKey: 'KS28', mappingStatus: 'ambiguous' }),
-        expect.objectContaining({ canonicalKey: 'BUMPER KS28', mappingStatus: 'ambiguous' }),
+      ]),
+    );
+    expect(allItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ canonicalKey: 'BUMPER KS28', flexCategoryKey: 'rigging_hardware', mappingStatus: 'ambiguous' }),
       ]),
     );
   });

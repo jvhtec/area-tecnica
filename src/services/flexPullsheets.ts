@@ -19,6 +19,8 @@ export const FLEX_CATEGORY_MAP = new Map<string, string>([
   ['pa_frontfill', 'd9b588e6-b9a8-4327-baa5-fecf104a6775'],
   ['pa_delays', 'e38db281-4b27-40eb-a846-e4a27db3961f'],
   ['pa_amp', '9d463da6-40f1-4ab0-9a96-123fd0025f88'],
+  ['rigging_hardware', '65fa6a64-927e-400d-af45-c6f56b7cc38e'], // Rigging Hardware
+  ['motores_controles', 'f5c6a972-2f03-433c-95e8-c3b7e1c57df7'], // Motores y Controles
 ]);
 
 const SUBSYSTEM_TO_FLEX_CATEGORY: Record<PresetSubsystem, string> = {
