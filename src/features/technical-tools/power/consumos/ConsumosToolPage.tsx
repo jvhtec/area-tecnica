@@ -29,6 +29,7 @@ import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyTo
 import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/QuickPresetsMenu";
 import type { PowerTable } from "@/features/technical-tools/power/types";
 import { GeneratedPowerTableCard } from "@/features/technical-tools/power/consumos/GeneratedPowerTableCard";
+import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 import { PowerTableSummary } from "@/features/technical-tools/power/consumos/PowerTableSummary";
 import {
   TOUR_PACKAGE_LABELS,
@@ -630,18 +631,13 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                 {isNormalMode && !jobIdFromUrl && (
                   <div className="space-y-2">
                     <Label htmlFor="jobSelect">{labels.selectJob}</Label>
-                    <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={labels.selectJobPlaceholder} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {jobs?.map((job) => (
-                          <SelectItem key={job.id} value={job.id}>
-                            {job.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <DocumentationJobPicker
+                      id="jobSelect"
+                      jobs={jobs}
+                      onValueChange={handleJobSelect}
+                      placeholder={labels.selectJobPlaceholder}
+                      value={selectedJobId}
+                    />
                   </div>
                 )}
 

@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
-import { Calendar, Plus, Sparkles, Trash2, Zap, Building2 } from "lucide-react";
+import { Plus, Sparkles, Trash2, Zap, Building2 } from "lucide-react";
 import type { AuxiliaryMachineryType, EventData } from "@/types/hoja-de-ruta";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { AUXILIARY_MACHINERY_OPTIONS } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
+import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 
 interface ModernEventSectionProps {
   eventData: EventData;
@@ -139,21 +140,15 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="job-select">Trabajo Base</Label>
-                  <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                    <SelectTrigger className="border-2">
-                      <SelectValue placeholder="Seleccionar trabajo..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {jobs?.map((job) => (
-                        <SelectItem key={job.id} value={job.id}>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            {job.title}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <DocumentationJobPicker
+                    id="job-select"
+                    isLoading={isLoadingJobs}
+                    jobs={jobs}
+                    onValueChange={setSelectedJobId}
+                    placeholder="Seleccionar trabajo..."
+                    triggerClassName="border-2"
+                    value={selectedJobId}
+                  />
                 </div>
                 
                 <div className="flex items-end">

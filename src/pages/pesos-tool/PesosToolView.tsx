@@ -12,6 +12,7 @@ import {
   TechnicalStageSelector,
   type TechnicalStage,
 } from "@/features/technical-tools/stage/stageAllocation";
+import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 import {
   TOUR_PACKAGE_LABELS,
   TOUR_PACKAGE_SIZES,
@@ -312,19 +313,14 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                 {/* Hide job selection when coming from card (jobId in URL), or in tour defaults mode */}
                 {!isTourContext && !isTourDefaults && !jobIdFromUrl && (
                   <div className="space-y-2">
-                    <Label htmlFor="jobSelect">Select Job</Label>
-                    <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a job" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {jobs?.map((job) => (
-                          <SelectItem key={job.id} value={job.id}>
-                            {job.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="jobSelect">Seleccionar trabajo</Label>
+                    <DocumentationJobPicker
+                      id="jobSelect"
+                      jobs={jobs}
+                      onValueChange={handleJobSelect}
+                      placeholder="Seleccionar trabajo"
+                      value={selectedJobId}
+                    />
                   </div>
                 )}
 

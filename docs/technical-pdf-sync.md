@@ -12,7 +12,9 @@ here — every gap in this table has historically produced stale documents.
 ### Storage layouts
 
 Generated PDFs can live under two layouts; **both must be treated as one
-logical slot** per job/category/stage:
+logical slot** per job/category/stage. Flex material-list and quote reports
+further scope that slot by the selected Flex Presupuesto element, so sibling
+department, extras, or stage budgets do not replace each other:
 
 | Layout | Written by |
 |---|---|
@@ -54,9 +56,12 @@ next successful regeneration.
 
 ### Consumers (what goes stale if the slot isn't cleaned)
 
-- **Memoria Técnica auto-fill** (`useMemoriaAutoFill` → `findLatestJobDocumentForStage`):
-  picks the newest `job_documents` row per category/stage, with a
+- **Memoria Técnica auto-fill** (`useMemoriaAutoFill` → `findJobDocumentsForStage`):
+  exposes every matching `job_documents` row per category/stage, with a
   department filter for power reports (`getTechnicalPowerDepartmentFromDocument`).
+  The newest row is selected by default, and the Sound/Lights/Video forms show
+  an inline selector when extras or repeated generations leave multiple valid
+  source PDFs.
 - **Power report readiness** (`getTechnicalPowerReportStatus`): latest report
   per department, used by hoja de ruta / power summary flows.
 - **Sound documentation duplication** (`selectSoundDocumentsForCopy`): copies
@@ -82,6 +87,18 @@ next successful regeneration.
 5. **Replacements are serialized per logical slot.** Concurrent regenerations
    for the same job/category/stage wait for each other, so an older generation
    cannot finish last and become the document consumers detect as newest.
+6. **Flex report cleanup is element-scoped.** `fetch-flex-material-report`
+   publishes a uniquely named object first, then retires only older direct-child
+   objects/rows for the same Flex element. The pre-element shared filename is
+   removed on the next successful generation, while PDFs from sibling
+   Presupuestos remain available. Memoria auto-fill defaults to the most recent
+   material list in the requested job/category/stage while allowing any sibling
+   Presupuesto PDF to be selected explicitly.
+
+Documentation generators that start without a job-card deep link use the shared
+`DocumentationJobPicker`. It searches job title/date and is backed by
+`useJobSelection`, which includes ongoing and future jobs only and excludes
+`Completado` and `Cancelado` jobs.
 
 ## Tour dates (`tour_documents` + `tour-documents` bucket)
 

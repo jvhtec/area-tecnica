@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useJobSelection } from "@/hooks/useJobSelection";
+import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 
 import { TRUSS_MODELS } from "@/data/trussModels";
 import { HOIST_CATALOG } from "@/data/hoists";
@@ -309,15 +310,15 @@ const LightsRiggingPlanner: React.FC = () => {
 
         {!isTourDefaults && !jobIdFromUrl && (
           <div className="grid gap-2 max-w-sm">
-            <Label>Select Job</Label>
-            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-              <SelectTrigger><SelectValue placeholder="Select job" /></SelectTrigger>
-              <SelectContent>
-                {jobs?.map(job => (
-                  <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="lights-rigging-job">Seleccionar trabajo</Label>
+            <DocumentationJobPicker
+              ariaLabel="Seleccionar trabajo"
+              id="lights-rigging-job"
+              jobs={jobs}
+              onValueChange={setSelectedJobId}
+              placeholder="Seleccionar trabajo"
+              value={selectedJobId}
+            />
           </div>
         )}
       </CardHeader>

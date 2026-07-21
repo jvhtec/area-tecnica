@@ -36,6 +36,8 @@ interface ComboboxProps {
   className?: string;
   triggerClassName?: string;
   disabled?: boolean;
+  triggerId?: string;
+  ariaLabel?: string;
 }
 
 export function Combobox({
@@ -49,6 +51,8 @@ export function Combobox({
   className,
   triggerClassName,
   disabled,
+  triggerId,
+  ariaLabel,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -65,9 +69,11 @@ export function Combobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          id={triggerId}
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={ariaLabel}
           disabled={disabled}
           className={cn('w-full justify-between font-normal', !value && 'text-muted-foreground', triggerClassName)}
         >

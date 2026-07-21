@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
 import { isStorageNotFoundError, uploadStorageObject } from "@/utils/storageUpload";
 import { useMemoriaJobAndStage } from "@/features/technical-tools/memoria/useMemoriaJobAndStage";
-import { formatMemoriaUploadDate } from "@/features/technical-tools/memoria/dateFormat";
+import { MemoriaDetectedDocumentSelect } from "@/features/technical-tools/memoria/MemoriaDetectedDocumentSelect";
 import {
   useMemoriaAutoFill,
   type MemoriaAutoFillCategorySpec,
@@ -21,6 +21,7 @@ import {
 import { TechnicalStageSelector } from "@/features/technical-tools/stage/stageAllocation";
 import { upsertMemoriaTecnicaDocument } from "@/utils/memoriaTecnicaDocuments";
 import { fetchFlexMaterialReport } from "@/utils/flexMaterialReport";
+import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 
 const AUTO_FILL_CATEGORIES: Record<string, MemoriaAutoFillCategorySpec> = {
   material: "calculators/lista-material/sound",
@@ -72,7 +73,12 @@ export const MemoriaTecnica = () => {
     }
   }, [selectedJob?.title]);
 
-  const { detected: detectedDocuments, refetch: refetchAutoFill } = useMemoriaAutoFill(
+  const {
+    candidates: detectedDocumentCandidates,
+    detected: detectedDocuments,
+    refetch: refetchAutoFill,
+    selectDocument: selectDetectedDocument,
+  } = useMemoriaAutoFill(
     selectedJobId,
     hasMultipleStages ? selectedStage : null,
     AUTO_FILL_CATEGORIES
@@ -109,7 +115,7 @@ export const MemoriaTecnica = () => {
       } else if (result.elementJobMismatch) {
         setFlexMaterialWarning("El ID de elemento de Flex indicado pertenece a otro trabajo. Verifique antes de usarlo.");
       }
-      refetchAutoFill();
+      refetchAutoFill("material");
       toast({ title: "Éxito", description: "Lista de material obtenida de Flex" });
     } catch (error) {
       console.error("Error fetching Flex material report:", error);
@@ -407,22 +413,13 @@ export const MemoriaTecnica = () => {
               {!jobIdFromUrl && (
                 <div className="space-y-2">
                   <Label htmlFor="memoria-job-select">Trabajo</Label>
-                  <Select
+                  <DocumentationJobPicker
+                    id="memoria-job-select"
+                    isLoading={isLoadingJobs}
+                    jobs={jobs}
                     value={selectedJobId}
                     onValueChange={setSelectedJobId}
-                    disabled={isLoadingJobs}
-                  >
-                    <SelectTrigger id="memoria-job-select" className="w-full">
-                      <SelectValue placeholder="Seleccione un trabajo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {jobs?.map((job) => (
-                        <SelectItem key={job.id} value={job.id}>
-                          {job.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
               )}
               <TechnicalStageSelector
@@ -568,10 +565,12 @@ export const MemoriaTecnica = () => {
                 <div key={doc.id} className="space-y-2">
                   <Label>{doc.title}</Label>
                   {!doc.file && detected && (
-                    <p className="text-xs text-muted-foreground">
-                      Detectado: {detected.fileName}
-                      {detected.uploadedAt ? ` (${formatMemoriaUploadDate(detected.uploadedAt)})` : ""}
-                    </p>
+                    <MemoriaDetectedDocumentSelect
+                      candidates={detectedDocumentCandidates[doc.id] ?? []}
+                      onSelect={(filePath) => selectDetectedDocument(doc.id, filePath)}
+                      sectionTitle={doc.title}
+                      selected={detected}
+                    />
                   )}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Input

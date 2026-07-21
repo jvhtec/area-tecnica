@@ -46,7 +46,7 @@
     "fetch-flex-material-report": {
       "class": "privileged-role",
       "verifyJwt": true,
-      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; requires requireAuthenticatedRole (admin/management/house_tech) before resolving a job's Flex quote element and fetching its materials-list report."
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; requires requireAuthenticatedRole (admin/management/house_tech), validates overrides against job/department, permits untracked overrides only for admin/management, and replaces only the selected element's stored PDF."
     },
     "generate-lights-memoria-tecnica": { "class": "authenticated-user", "verifyJwt": true },
     "generate-memoria-tecnica": { "class": "authenticated-user", "verifyJwt": true },

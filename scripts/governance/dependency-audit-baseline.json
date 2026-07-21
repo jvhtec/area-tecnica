@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-07-20T00:00:00Z",
+  "generatedAt": "2026-07-21T22:37:24.260Z",
   "note": "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities.",
   "advisoryIds": [
     "1112659",
@@ -18,7 +18,8 @@
     "1123939",
     "1123940",
     "1123941",
-    "1123942"
+    "1123942",
+    "1124066"
   ],
   "exceptions": [
     {
@@ -132,6 +133,13 @@
       "owner": "platform-security",
       "reviewBy": "2026-09-30",
       "rationale": "This remains only in local/build tooling through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar 6.2.1. The production @capacitor/cli path was upgraded to tar 7.5.20; @capacitor/assets is already at its latest release and has no compatible fix, so remove this exception when its nested CLI is updated."
+    },
+    {
+      "advisoryId": "1124066",
+      "package": "sharp",
+      "owner": "platform-security",
+      "reviewBy": "2026-08-31",
+      "rationale": "The vulnerable sharp 0.32.6 copy is confined to local/build tooling through @capacitor/assets 3.0.5; the direct runtime sharp dependency is already 0.35.2. @capacitor/assets is at its latest release and npm audit reports no compatible fix for its nested sharp, so remove this exception when that package adopts sharp >=0.35.0 or the asset-generation toolchain is replaced."
     }
   ],
   "vulnerabilityCounts": {
@@ -141,5 +149,5 @@
     "high": 6,
     "critical": 1
   },
-  "total": 10
+  "total": 11
 }
