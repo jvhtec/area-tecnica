@@ -1191,6 +1191,119 @@ describe('JobCardActions', () => {
       expect(screen.getByTitle('No hay presupuesto de Iluminación en Flex')).toBeTruthy();
     });
 
+    it('offers a chooser labelled with Flex names when a department has multiple presupuestos', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(flexMainFolderId, 'getMainFlexElementIdSync').mockReturnValue({
+        elementId: 'main-element-id',
+        department: 'sound',
+      });
+      getElementTreeMock.mockResolvedValue([
+        {
+          elementId: 'main-element-id',
+          displayName: 'Main',
+          children: [
+            { elementId: 'sound-a', displayName: 'Presupuesto Principal', documentNumber: 'PR01', children: [] },
+            { elementId: 'sound-b', displayName: 'Extras Sonido', documentNumber: 'PR02', children: [] },
+          ],
+        },
+      ]);
+      dataLayerFunctionsInvokeMock.mockResolvedValue({
+        data: {
+          url: 'https://example.test/extras-material-list.pdf',
+          fileName: 'Listado de Material - sound - sound-b.pdf',
+          elementId: 'sound-b',
+          folderType: 'comercial_presupuesto',
+          elementValidated: true,
+          elementJobMismatch: false,
+          reportType: 'material-list',
+        },
+        error: null,
+      });
+
+      const props = {
+        ...defaultProps,
+        department: 'sound',
+        job: {
+          ...defaultProps.job,
+          flex_folders: [
+            { id: 'sound-a-folder', department: 'sound', element_id: 'sound-a', folder_type: 'comercial_presupuesto' },
+            { id: 'sound-b-folder', department: 'sound', element_id: 'sound-b', folder_type: 'comercial_presupuesto' },
+          ],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      const materialButton = screen.getByRole('button', { name: /Lista Material/i });
+      expect(materialButton).toHaveAttribute('title', 'Imprimir lista de material de Sonido desde Flex');
+
+      await user.click(materialButton);
+
+      // Names are fetched from the job's Flex element tree and used as labels.
+      const extrasItem = await screen.findByText('Extras Sonido (PR02)');
+      expect(screen.getByText('Presupuesto Principal (PR01)')).toBeTruthy();
+
+      await user.click(extrasItem);
+
+      await waitFor(() => {
+        expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
+          'fetch-flex-material-report',
+          expect.objectContaining({
+            body: expect.objectContaining({
+              jobId: 'test-job-id',
+              department: 'sound',
+              reportType: 'material-list',
+              overrideElementId: 'sound-b',
+            }),
+          })
+        );
+      });
+      expect(window.open).toHaveBeenCalledWith(
+        'https://example.test/extras-material-list.pdf',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    });
+
+    it('falls back to generic presupuesto labels when Flex names are unavailable', async () => {
+      const user = userEvent.setup();
+      // getMainFlexElementIdSync stays null (beforeEach default) -> no name fetch.
+      const props = {
+        ...defaultProps,
+        department: 'lights',
+        job: {
+          ...defaultProps.job,
+          flex_folders: [
+            { id: 'lights-a-folder', department: 'lights', element_id: 'lights-a', folder_type: 'comercial_presupuesto' },
+            { id: 'lights-b-folder', department: 'lights', element_id: 'lights-b', folder_type: 'comercial_presupuesto' },
+          ],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: /Lista Material/i }));
+
+      expect(await screen.findByText('Presupuesto comercial 1')).toBeTruthy();
+      const secondOption = screen.getByText('Presupuesto comercial 2');
+
+      await user.click(secondOption);
+
+      await waitFor(() => {
+        expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
+          'fetch-flex-material-report',
+          expect.objectContaining({
+            body: expect.objectContaining({
+              jobId: 'test-job-id',
+              department: 'lights',
+              overrideElementId: 'lights-b',
+            }),
+          })
+        );
+      });
+      expect(getElementTreeMock).not.toHaveBeenCalled();
+    });
+
     it('should render the technical power summary button for project management managers', () => {
       render(<JobCardActions {...defaultProps} />);
 

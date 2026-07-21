@@ -6,10 +6,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import type { JobCardJob } from "@/components/jobs/cards/job-card-actions/types";
+import { getElementTree } from "@/utils/flex-folders";
+import type { FlexElementNode } from "@/utils/flex-folders/getElementTree";
+import { getMainFlexElementIdSync } from "@/utils/flexMainFolderId";
 import {
   fetchFlexMaterialReport,
   type FlexMaterialReportDepartment,
@@ -23,16 +29,34 @@ const MATERIAL_LIST_DEPARTMENTS: Array<{ department: PrintableDepartment; label:
   { department: "lights", label: "Iluminación" },
 ];
 
-const MATERIAL_LIST_FOLDER_TYPES = new Set([
+// Ordered by preference: the first matching folder type is the "primary" quote,
+// the rest are per-department extras / received quotes.
+const MATERIAL_LIST_FOLDER_TYPES = [
   "comercial_presupuesto",
   "dryhire_presupuesto",
   "presupuestos_recibidos",
-]);
+] as const;
 
-const PRINTABLE_QUOTE_FOLDER_TYPES = new Set([
+const PRINTABLE_QUOTE_FOLDER_TYPES = [
   "comercial_presupuesto",
   "dryhire_presupuesto",
-]);
+] as const;
+
+const FOLDER_TYPE_LABELS: Record<string, string> = {
+  comercial_presupuesto: "Presupuesto comercial",
+  dryhire_presupuesto: "Presupuesto dry hire",
+  presupuestos_recibidos: "Presupuesto recibido",
+};
+
+type PresupuestoCandidate = {
+  elementId: string;
+  folderType: string;
+};
+
+type ElementNameInfo = {
+  name: string | null;
+  documentNumber: string | null;
+};
 
 type PrintFlexReportActionProps = {
   job: JobCardJob;
@@ -43,22 +67,8 @@ type PrintFlexReportActionProps = {
 const getFolderElementId = (folder: NonNullable<JobCardJob["flex_folders"]>[number]) =>
   folder.element_id || folder.elementId || null;
 
-const getReportFolderTypes = (reportType: FlexMaterialReportType) =>
+const getReportFolderTypes = (reportType: FlexMaterialReportType): readonly string[] =>
   reportType === "quote" ? PRINTABLE_QUOTE_FOLDER_TYPES : MATERIAL_LIST_FOLDER_TYPES;
-
-const hasReportForDepartment = (
-  job: JobCardJob,
-  department: PrintableDepartment,
-  reportType: FlexMaterialReportType
-) => {
-  const folderTypes = getReportFolderTypes(reportType);
-  return (job.flex_folders || []).some((folder) =>
-    folder.department === department &&
-    typeof folder.folder_type === "string" &&
-    folderTypes.has(folder.folder_type) &&
-    Boolean(getFolderElementId(folder))
-  );
-};
 
 const REPORT_COPY: Record<FlexMaterialReportType, {
   buttonLabel: string;
@@ -117,92 +127,256 @@ export const PrintFlexReportAction = ({
 }: PrintFlexReportActionProps) => {
   const { toast } = useToast();
   const [loadingDepartment, setLoadingDepartment] = React.useState<PrintableDepartment | null>(null);
+  const [namesByElementId, setNamesByElementId] = React.useState<Record<string, ElementNameInfo>>({});
+  const [isLoadingNames, setIsLoadingNames] = React.useState(false);
+  const namesRequestedRef = React.useRef(false);
   const copy = REPORT_COPY[reportType];
+
   const scopedDepartmentOption = React.useMemo(
     () => MATERIAL_LIST_DEPARTMENTS.find((option) => option.department === department) ?? null,
     [department]
   );
-  const quoteAvailability = React.useMemo(
-    () => new Map(
-      MATERIAL_LIST_DEPARTMENTS.map(({ department: optionDepartment }) => [
-        optionDepartment,
-        hasReportForDepartment(job, optionDepartment, reportType),
-      ])
-    ),
-    [job, reportType]
-  );
-  const hasAnyQuote = Array.from(quoteAvailability.values()).some(Boolean);
 
-  const handlePrintReport = React.useCallback(async (department: PrintableDepartment, label: string) => {
-    if (!job.id || loadingDepartment || !quoteAvailability.get(department)) return;
-
-    setLoadingDepartment(department);
-    // Open the tab synchronously (still within the click's user-gesture window) so
-    // popup blockers don't drop the navigation once the async fetch resolves later.
-    const reportWindow = window.open("", "_blank");
-    try {
-      const result = await fetchFlexMaterialReport(
-        job.id,
-        department,
-        undefined,
-        null,
-        reportType
-      );
-
-      if (reportWindow) {
-        reportWindow.opener = null;
-        reportWindow.location.href = result.url;
-      } else {
-        window.open(result.url, "_blank", "noopener,noreferrer");
-      }
-      toast({
-        title: copy.successTitle,
-        description: copy.successDescription(label),
-      });
-    } catch (error: unknown) {
-      reportWindow?.close();
-      toast({
-        title: copy.errorTitle,
-        description: error instanceof Error ? error.message : copy.fallbackError,
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingDepartment(null);
+  // One presupuesto candidate per report-capable Flex folder, grouped by
+  // department and ordered so the primary quote comes first. A job/department can
+  // hold several presupuestos (the main quote plus per-department "extras"), so
+  // the user picks which one to print instead of always getting the newest.
+  const candidatesByDepartment = React.useMemo(() => {
+    const folderTypes = getReportFolderTypes(reportType);
+    const rankOf = (folderType: string) => {
+      const index = folderTypes.indexOf(folderType);
+      return index === -1 ? folderTypes.length : index;
+    };
+    const map = new Map<PrintableDepartment, PresupuestoCandidate[]>();
+    for (const { department: optionDepartment } of MATERIAL_LIST_DEPARTMENTS) {
+      const list = (job.flex_folders || [])
+        .filter(
+          (folder) =>
+            folder.department === optionDepartment &&
+            typeof folder.folder_type === "string" &&
+            folderTypes.includes(folder.folder_type) &&
+            Boolean(getFolderElementId(folder))
+        )
+        .map((folder) => ({
+          elementId: getFolderElementId(folder) as string,
+          folderType: folder.folder_type,
+        }))
+        .sort((a, b) => rankOf(a.folderType) - rankOf(b.folderType));
+      map.set(optionDepartment, list);
     }
-  }, [copy, job.id, loadingDepartment, quoteAvailability, reportType, toast]);
+    return map;
+  }, [job.flex_folders, reportType]);
+
+  const isDepartmentAvailable = React.useCallback(
+    (optionDepartment: PrintableDepartment) => (candidatesByDepartment.get(optionDepartment)?.length ?? 0) > 0,
+    [candidatesByDepartment]
+  );
+
+  const hasAnyQuote = MATERIAL_LIST_DEPARTMENTS.some(({ department: optionDepartment }) =>
+    isDepartmentAvailable(optionDepartment)
+  );
+
+  // Only worth fetching Flex names when at least one department offers a choice --
+  // single-candidate menus are labelled by department alone.
+  const needsNames = React.useMemo(
+    () => Array.from(candidatesByDepartment.values()).some((list) => list.length > 1),
+    [candidatesByDepartment]
+  );
+
+  const ensureNamesLoaded = React.useCallback(async () => {
+    if (namesRequestedRef.current) return;
+    namesRequestedRef.current = true;
+    const main = getMainFlexElementIdSync(job);
+    if (!main?.elementId) return;
+    setIsLoadingNames(true);
+    try {
+      const tree = await getElementTree(main.elementId);
+      const map: Record<string, ElementNameInfo> = {};
+      const walk = (nodes: FlexElementNode[]) => {
+        for (const node of nodes) {
+          if (node.elementId) {
+            map[node.elementId] = {
+              name: node.displayName && node.displayName !== "Unnamed" ? node.displayName : null,
+              documentNumber: node.documentNumber ?? null,
+            };
+          }
+          if (node.children?.length) walk(node.children);
+        }
+      };
+      walk(tree);
+      setNamesByElementId(map);
+    } catch (error) {
+      // Names are best-effort -- keep the generic fallback labels if Flex is
+      // unreachable rather than blocking the chooser.
+      console.error("Failed to load Flex presupuesto names:", error);
+    } finally {
+      setIsLoadingNames(false);
+    }
+  }, [job]);
+
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (open && needsNames) void ensureNamesLoaded();
+    },
+    [ensureNamesLoaded, needsNames]
+  );
+
+  const getCandidateLabel = React.useCallback(
+    (candidate: PresupuestoCandidate, index: number, total: number) => {
+      const info = namesByElementId[candidate.elementId];
+      if (info?.name) {
+        return info.documentNumber ? `${info.name} (${info.documentNumber})` : info.name;
+      }
+      const base = FOLDER_TYPE_LABELS[candidate.folderType] ?? "Presupuesto";
+      if (info?.documentNumber) {
+        return `${base} (${info.documentNumber})`;
+      }
+      return total > 1 ? `${base} ${index + 1}` : base;
+    },
+    [namesByElementId]
+  );
+
+  const handlePrintReport = React.useCallback(
+    async (printDepartment: PrintableDepartment, label: string, overrideElementId?: string) => {
+      if (!job.id || loadingDepartment || !isDepartmentAvailable(printDepartment)) return;
+
+      setLoadingDepartment(printDepartment);
+      // Open the tab synchronously (still within the click's user-gesture window) so
+      // popup blockers don't drop the navigation once the async fetch resolves later.
+      const reportWindow = window.open("", "_blank");
+      try {
+        const result = await fetchFlexMaterialReport(
+          job.id,
+          printDepartment,
+          overrideElementId,
+          null,
+          reportType
+        );
+
+        if (reportWindow) {
+          reportWindow.opener = null;
+          reportWindow.location.href = result.url;
+        } else {
+          window.open(result.url, "_blank", "noopener,noreferrer");
+        }
+        toast({
+          title: copy.successTitle,
+          description: copy.successDescription(label),
+        });
+      } catch (error: unknown) {
+        reportWindow?.close();
+        toast({
+          title: copy.errorTitle,
+          description: error instanceof Error ? error.message : copy.fallbackError,
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingDepartment(null);
+      }
+    },
+    [copy, isDepartmentAvailable, job.id, loadingDepartment, reportType, toast]
+  );
 
   const loadingLabel = MATERIAL_LIST_DEPARTMENTS.find(
     (option) => option.department === loadingDepartment
   )?.label;
 
-  if (scopedDepartmentOption) {
-    const isAvailable = quoteAvailability.get(scopedDepartmentOption.department) ?? false;
-    return (
-      <Button
-        variant="outline"
-        size="sm"
+  const renderCandidateItems = (
+    itemDepartment: PrintableDepartment,
+    label: string,
+    candidates: PresupuestoCandidate[]
+  ) =>
+    candidates.map((candidate, index) => (
+      <DropdownMenuItem
+        key={candidate.elementId}
         className="gap-2"
-        disabled={!!loadingDepartment || !isAvailable}
-        onClick={() => void handlePrintReport(scopedDepartmentOption.department, scopedDepartmentOption.label)}
-        title={
-          isAvailable
-            ? copy.scopedTitle(scopedDepartmentOption.label)
-            : copy.unavailableScopedTitle(scopedDepartmentOption.label)
-        }
+        onSelect={(event) => {
+          event.preventDefault();
+          void handlePrintReport(itemDepartment, label, candidate.elementId);
+        }}
       >
-        <ReportAvailabilityLight available={isAvailable} />
-        {loadingDepartment ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Printer className="h-4 w-4" />
-        )}
-        <span className="hidden sm:inline">{copy.buttonLabel}</span>
-      </Button>
+        <ReportAvailabilityLight available />
+        {getCandidateLabel(candidate, index, candidates.length)}
+      </DropdownMenuItem>
+    ));
+
+  if (scopedDepartmentOption) {
+    const candidates = candidatesByDepartment.get(scopedDepartmentOption.department) ?? [];
+    const isAvailable = candidates.length > 0;
+
+    // Zero or one presupuesto keeps the direct-print button; multiple presupuestos
+    // turn it into a chooser so the user selects which one to print.
+    if (candidates.length <= 1) {
+      const singleCandidate = candidates[0];
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={!!loadingDepartment || !isAvailable}
+          onClick={() =>
+            void handlePrintReport(
+              scopedDepartmentOption.department,
+              scopedDepartmentOption.label,
+              singleCandidate?.elementId
+            )
+          }
+          title={
+            isAvailable
+              ? copy.scopedTitle(scopedDepartmentOption.label)
+              : copy.unavailableScopedTitle(scopedDepartmentOption.label)
+          }
+        >
+          <ReportAvailabilityLight available={isAvailable} />
+          {loadingDepartment ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Printer className="h-4 w-4" />
+          )}
+          <span className="hidden sm:inline">{copy.buttonLabel}</span>
+        </Button>
+      );
+    }
+
+    return (
+      <DropdownMenu onOpenChange={handleOpenChange}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={!!loadingDepartment}
+            title={copy.scopedTitle(scopedDepartmentOption.label)}
+          >
+            <ReportAvailabilityLight available />
+            {loadingDepartment ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">{copy.buttonLabel}</span>
+            {!loadingDepartment && <ChevronDown className="h-3.5 w-3.5" />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" onClick={(event) => event.stopPropagation()}>
+          {isLoadingNames && (
+            <DropdownMenuItem disabled className="gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando presupuestos…
+            </DropdownMenuItem>
+          )}
+          {renderCandidateItems(
+            scopedDepartmentOption.department,
+            scopedDepartmentOption.label,
+            candidates
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
@@ -224,20 +398,52 @@ export const PrintFlexReportAction = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" onClick={(event) => event.stopPropagation()}>
-        {MATERIAL_LIST_DEPARTMENTS.map(({ department, label }) => (
-          <DropdownMenuItem
-            key={department}
-            className="gap-2"
-            disabled={!quoteAvailability.get(department)}
-            onSelect={(event) => {
-              event.preventDefault();
-              void handlePrintReport(department, label);
-            }}
-          >
-            <ReportAvailabilityLight available={quoteAvailability.get(department) ?? false} />
-            {label}
+        {isLoadingNames && (
+          <DropdownMenuItem disabled className="gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Cargando presupuestos…
           </DropdownMenuItem>
-        ))}
+        )}
+        {MATERIAL_LIST_DEPARTMENTS.map(({ department: optionDepartment, label }) => {
+          const candidates = candidatesByDepartment.get(optionDepartment) ?? [];
+
+          if (candidates.length === 0) {
+            return (
+              <DropdownMenuItem key={optionDepartment} className="gap-2" disabled>
+                <ReportAvailabilityLight available={false} />
+                {label}
+              </DropdownMenuItem>
+            );
+          }
+
+          if (candidates.length === 1) {
+            return (
+              <DropdownMenuItem
+                key={optionDepartment}
+                className="gap-2"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  void handlePrintReport(optionDepartment, label, candidates[0].elementId);
+                }}
+              >
+                <ReportAvailabilityLight available />
+                {label}
+              </DropdownMenuItem>
+            );
+          }
+
+          return (
+            <DropdownMenuSub key={optionDepartment}>
+              <DropdownMenuSubTrigger className="gap-2">
+                <ReportAvailabilityLight available />
+                {label}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent onClick={(event) => event.stopPropagation()}>
+                {renderCandidateItems(optionDepartment, label, candidates)}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

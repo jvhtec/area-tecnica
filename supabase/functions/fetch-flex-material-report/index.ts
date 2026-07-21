@@ -260,24 +260,29 @@ serve(createHttpHandler(async (req: Request) => {
   const category = `${reportDefinition.storageCategory}/${department}`;
   const stageScope = stageNumber ? getTechnicalStageStorageScope(stageNumber, stageName) : null;
   const baseFolder = stageScope ? `${category}/${jobId}/${stageScope}` : `${category}/${jobId}`;
-  const fileName = `${reportDefinition.fileNamePrefix} - ${sanitizeFileNameSegment(department)}.pdf`;
+  // Encode the source presupuesto (Flex element) into the file name so reports
+  // generated from different presupuestos of the same job/department/stage coexist
+  // instead of overwriting each other. A job/department can hold several
+  // presupuestos (the main quote plus per-department "extras"), and the user picks
+  // which one to print.
+  const fileName = `${reportDefinition.fileNamePrefix} - ${sanitizeFileNameSegment(department)} - ${sanitizeFileNameSegment(elementId)}.pdf`;
   const objectPath = `${baseFolder}/${fileName}`;
 
-  // Clean up any previous auto-fetched report for this exact job/department/stage
-  // scope before writing the new one. Scope both the storage removal and the
-  // job_documents delete to the same direct-children list -- baseFolder may have
+  // Clean up only the previous report generated from THIS SAME presupuesto element
+  // before writing the new one -- regenerating a presupuesto refreshes its own file
+  // while sibling presupuestos' files are left untouched. Matching by exact file
+  // name keeps the removal scoped to the current element (the element id is part of
+  // the name) and to this baseFolder's direct children: baseFolder may have
   // stage-scoped sibling subfolders (a non-stage caller like PrintFlexReportAction
   // and a stage-aware Memoria form can both write under the same job/department),
-  // and storage.list() doesn't recurse into those, so a broader `LIKE baseFolder/%`
-  // delete on job_documents would drop sibling stage rows without removing their
-  // underlying storage objects.
+  // and storage.list() doesn't recurse into those.
   const { data: existingObjects } = await supabase.storage.from(bucket).list(baseFolder);
-  const existingObjectPaths = (existingObjects || [])
-    .filter((entry) => entry.id)
+  const staleObjectPaths = (existingObjects || [])
+    .filter((entry) => entry.id && entry.name === fileName)
     .map((entry) => `${baseFolder}/${entry.name}`);
-  if (existingObjectPaths.length > 0) {
-    await supabase.storage.from(bucket).remove(existingObjectPaths);
-    await supabase.from("job_documents").delete().eq("job_id", jobId).in("file_path", existingObjectPaths);
+  if (staleObjectPaths.length > 0) {
+    await supabase.storage.from(bucket).remove(staleObjectPaths);
+    await supabase.from("job_documents").delete().eq("job_id", jobId).in("file_path", staleObjectPaths);
   }
 
   const { error: uploadError } = await supabase.storage
