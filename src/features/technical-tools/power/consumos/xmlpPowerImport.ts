@@ -27,7 +27,6 @@ export interface XmlpPowerImportResult {
   warnings: string[];
 }
 
-type Side = "L" | "R" | "C";
 type Section = "PA" | "SIDE" | "DELAY" | "OTHER";
 
 const normalizeName = (value: string) =>
@@ -105,17 +104,6 @@ function classifySection(groupName: string): Section {
   }
   return "OTHER";
 }
-
-// Reads a standalone side token anywhere in the group name so "MAIN L",
-// "LEFT MAIN" and "MAIN-L" are all recognized the same way.
-const sideFromName = (name: string): Side => {
-  const tokens = tokenize(name);
-  for (const token of [...tokens].reverse()) {
-    if (token === "L" || token === "LEFT") return "L";
-    if (token === "R" || token === "RIGHT") return "R";
-  }
-  return "C";
-};
 
 const appendRow = (rows: PowerTableRow[], component: ConsumosComponent, quantity: number) => {
   rows.push({
@@ -221,7 +209,12 @@ export function buildXmlpPowerTables(
     }
   }
 
-  const paUnitsBySide: Record<Side, XmlpAmpUnit[]> = { L: [], R: [], C: [] };
+  // Every amplifier that isn't a sidefill or a delay is main PA and goes into
+  // one shared pool — mains, subs, outfills, frontfills, and cabinet-named or
+  // otherwise unrecognized groups alike. The pool is split evenly across the
+  // two main power drops (Main L / Main R); per-amp L/R labels in the session
+  // don't determine which drop feeds them.
+  const mainsPool: XmlpAmpUnit[] = [];
   const sidefillUnits: XmlpAmpUnit[] = [];
   const delayGroups = new Map<string, XmlpAmpUnit[]>();
 
@@ -237,55 +230,55 @@ export function buildXmlpPowerTables(
             .map((group) => classifySection(group.name))
             .find((candidate) => candidate !== "OTHER") ?? "OTHER"
         : directSection;
-    const directSide = sideFromName(sourceGroup.name);
-    const side =
-      directSide === "C"
-        ? contextGroups
-            .map((group) => sideFromName(group.name))
-            .find((candidate) => candidate !== "C") ?? "C"
-        : directSide;
 
-    if (section === "PA") {
-      paUnitsBySide[side].push(unit);
-    } else if (section === "SIDE") {
+    if (section === "SIDE") {
       sidefillUnits.push(unit);
     } else if (section === "DELAY") {
       const units = delayGroups.get(sourceGroup.name) ?? [];
       units.push(unit);
       delayGroups.set(sourceGroup.name, units);
     } else {
-      warnings.push(
-        `Grupo "${sourceGroup.name}" no coincide con mains/subs/outfills/frontfills/sidefill/delay; sus amplificadores no se incluyeron.`,
-      );
+      mainsPool.push(unit);
+      if (section === "OTHER") {
+        warnings.push(
+          `Grupo "${sourceGroup.name}" no se identificó como sidefill ni delay; sus amplificadores se añadieron al PA principal.`,
+        );
+      }
     }
   }
 
   const tables: XmlpPowerBuiltTable[] = [];
 
-  (["L", "R"] as const).forEach((side) => {
-    const units = paUnitsBySide[side];
-    if (units.length === 0) return;
-    const rows = rowsFromCounts(countAmpsByComponent(units, components, warnings));
-    addExtraRow(rows, "Varios", 1, components, warnings, `Main ${side}`);
-    if (rows.length === 0) return;
-    tables.push({
-      name: `Main ${side}`,
-      rows,
-      includesHoist: true,
-      position: side === "L" ? "DOSL" : "DOSR",
-    });
-  });
-
-  const unsidedPaUnits = paUnitsBySide.C;
-  if (unsidedPaUnits.length > 0) {
-    const rows = rowsFromCounts(countAmpsByComponent(unsidedPaUnits, components, warnings));
-    addExtraRow(rows, "Varios", 1, components, warnings, "Main");
-    if (rows.length > 0) {
-      tables.push({ name: "Main", rows, includesHoist: true });
-      warnings.push(
-        `No se pudo determinar el lado (L/R) de ${unsidedPaUnits.length} amplificador(es) de PA; se añadieron a "Main" sin posición.`,
-      );
+  // Split the pooled amplifiers as evenly as possible into a Main L and a Main
+  // R PDU, balancing each model between them and alternating which side gets
+  // the odd unit so the two hoist-powered drops carry the same load.
+  if (mainsPool.length > 0) {
+    const mainsCounts = countAmpsByComponent(mainsPool, components, warnings);
+    const leftCounts = new Map<string, { component: ConsumosComponent; quantity: number }>();
+    const rightCounts = new Map<string, { component: ConsumosComponent; quantity: number }>();
+    let oddGoesLeft = true;
+    for (const [key, { component, quantity }] of mainsCounts) {
+      let left = Math.floor(quantity / 2);
+      let right = left;
+      if (quantity % 2 === 1) {
+        if (oddGoesLeft) left += 1;
+        else right += 1;
+        oddGoesLeft = !oddGoesLeft;
+      }
+      if (left > 0) leftCounts.set(key, { component, quantity: left });
+      if (right > 0) rightCounts.set(key, { component, quantity: right });
     }
+
+    (["L", "R"] as const).forEach((side) => {
+      const rows = rowsFromCounts(side === "L" ? leftCounts : rightCounts);
+      addExtraRow(rows, "Varios", 1, components, warnings, `Main ${side}`);
+      tables.push({
+        name: `Main ${side}`,
+        rows,
+        includesHoist: true,
+        position: side === "L" ? "DOSL" : "DOSR",
+      });
+    });
   }
 
   if (sidefillUnits.length > 0) {

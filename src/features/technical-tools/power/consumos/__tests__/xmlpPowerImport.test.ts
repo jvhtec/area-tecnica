@@ -11,7 +11,7 @@ const rowFor = (result: ReturnType<typeof buildXmlpPowerTables>, tableName: stri
     ?.rows.find((row) => row.componentName === componentName);
 
 describe("buildXmlpPowerTables", () => {
-  it("merges mains/subs/outfills/frontfills by side into Main L / Main R with hoist and a Varios row", () => {
+  it("pools mains/subs/outfills/frontfills and splits them evenly into Main L / Main R with hoist and a Varios row", () => {
     const map: XmlpAmpMap = {
       units: [
         { octet: 11, model: "LA12X" },
@@ -34,11 +34,12 @@ describe("buildXmlpPowerTables", () => {
 
     expect(result.tables.map((table) => table.name).sort()).toEqual(["Main L", "Main R"]);
 
+    // All 6 PA amps pool and split evenly, regardless of the L/R labels above.
     const mainL = result.tables.find((table) => table.name === "Main L")!;
     expect(mainL.includesHoist).toBe(true);
     expect(mainL.position).toBe("DOSL");
     expect(mainL.rows).toEqual([
-      expect.objectContaining({ componentName: "LA12X", quantity: "4" }), // 11,12 (main) + 31 (sub) + 51 (front fill)
+      expect.objectContaining({ componentName: "LA12X", quantity: "3" }),
       expect.objectContaining({ componentName: "Varios", quantity: "1" }),
     ]);
 
@@ -46,9 +47,49 @@ describe("buildXmlpPowerTables", () => {
     expect(mainR.includesHoist).toBe(true);
     expect(mainR.position).toBe("DOSR");
     expect(mainR.rows).toEqual([
-      expect.objectContaining({ componentName: "LA12X", quantity: "2" }), // 21 (main) + 41 (out)
+      expect.objectContaining({ componentName: "LA12X", quantity: "3" }),
       expect.objectContaining({ componentName: "Varios", quantity: "1" }),
     ]);
+  });
+
+  it("pools every non-sidefill, non-delay amp and splits it half to Main L, half to Main R", () => {
+    const map: XmlpAmpMap = {
+      units: [
+        { octet: 11, model: "LA12X" }, // main
+        { octet: 12, model: "LA12X" }, // main
+        { octet: 21, model: "LA12X" }, // sub
+        { octet: 22, model: "LA12X" }, // outfill
+        { octet: 31, model: "LA4X" }, // sidefill (excluded from the pool)
+        { octet: 41, model: "LA8" }, // delay (excluded from the pool)
+      ],
+      groups: [
+        { name: "MAIN L", role: "source", members: [11] },
+        { name: "MAIN R", role: "source", members: [12] },
+        { name: "SUBS", role: "source", members: [21] },
+        { name: "OUTFILL", role: "source", members: [22] },
+        { name: "SIDEFILL", role: "source", members: [31] },
+        { name: "DELAY 1", role: "source", members: [41] },
+      ],
+    };
+
+    const result = buildXmlpPowerTables(map, components);
+
+    // 4 main-PA amps split 2/2; sidefill -> Monitores, delay -> its own PDU.
+    expect(result.tables.map((table) => table.name).sort()).toEqual([
+      "DELAY 1",
+      "Main L",
+      "Main R",
+      "Monitores",
+    ]);
+    const mainL = result.tables.find((table) => table.name === "Main L")!;
+    const mainR = result.tables.find((table) => table.name === "Main R")!;
+    expect(mainL.includesHoist).toBe(true);
+    expect(mainR.includesHoist).toBe(true);
+    expect(rowFor(result, "Main L", "LA12X")?.quantity).toBe("2");
+    expect(rowFor(result, "Main R", "LA12X")?.quantity).toBe("2");
+    // The sidefill/delay amps never leak into the main pool.
+    expect(rowFor(result, "Main L", "LA4X")).toBeUndefined();
+    expect(rowFor(result, "Main R", "LA8")).toBeUndefined();
   });
 
   it("merges sidefill amps (both sides) into a single stage PDU with the monitor-world extras", () => {
@@ -128,7 +169,7 @@ describe("buildXmlpPowerTables", () => {
     );
   });
 
-  it("preserves unsided PA groups in one unpositioned Main PDU", () => {
+  it("splits unsided PA groups evenly across Main L and Main R", () => {
     const map: XmlpAmpMap = {
       units: [
         { octet: 1, model: "LA12X" },
@@ -145,17 +186,12 @@ describe("buildXmlpPowerTables", () => {
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables).toHaveLength(1);
-    expect(result.tables[0]).toEqual(
-      expect.objectContaining({ name: "Main", includesHoist: true }),
-    );
-    expect(result.tables[0]).not.toHaveProperty("position");
-    expect(rowFor(result, "Main", "LA12X")).toEqual(
-      expect.objectContaining({ quantity: "4" }),
-    );
-    expect(result.warnings).toEqual([
-      "No se pudo determinar el lado (L/R) de 4 amplificador(es) de PA; se añadieron a \"Main\" sin posición.",
-    ]);
+    expect(result.tables.map((table) => table.name).sort()).toEqual(["Main L", "Main R"]);
+    expect(rowFor(result, "Main L", "LA12X")).toEqual(expect.objectContaining({ quantity: "2" }));
+    expect(rowFor(result, "Main R", "LA12X")).toEqual(expect.objectContaining({ quantity: "2" }));
+    expect(result.tables.find((table) => table.name === "Main L")?.position).toBe("DOSL");
+    expect(result.tables.find((table) => table.name === "Main R")?.position).toBe("DOSR");
+    expect(result.warnings).toEqual([]);
   });
 
   it("uses screenshot-style parent groups to classify cabinet-named source groups", () => {
@@ -234,17 +270,18 @@ describe("buildXmlpPowerTables", () => {
     ]);
   });
 
-  it("ignores and warns about groups that match none of the known sections", () => {
+  it("folds unrecognized (non-sidefill, non-delay) groups into the main PA pool with a note", () => {
     const map: XmlpAmpMap = {
       units: [{ octet: 1, model: "LA12X" }],
       groups: [{ name: "KARA 1", role: "source", members: [1] }],
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables).toEqual([]);
-    expect(result.warnings).toEqual([
-      'Grupo "KARA 1" no coincide con mains/subs/outfills/frontfills/sidefill/delay; sus amplificadores no se incluyeron.',
-    ]);
+    expect(result.tables.map((table) => table.name).sort()).toEqual(["Main L", "Main R"]);
+    expect(rowFor(result, "Main L", "LA12X")).toEqual(expect.objectContaining({ quantity: "1" }));
+    expect(result.warnings).toContain(
+      'Grupo "KARA 1" no se identificó como sidefill ni delay; sus amplificadores se añadieron al PA principal.',
+    );
   });
 
   it("assigns an amp shared across overlapping source groups to the first group only", () => {
@@ -257,7 +294,14 @@ describe("buildXmlpPowerTables", () => {
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables.map((table) => table.name)).toEqual(["Main L"]);
+    // The shared amp is assigned to the first source group only, so it is
+    // counted once across the pooled Main L / Main R split (not double-added).
+    const mainLA12X = result.tables
+      .filter((table) => table.name.startsWith("Main "))
+      .flatMap((table) => table.rows)
+      .filter((row) => row.componentName === "LA12X")
+      .reduce((sum, row) => sum + Number(row.quantity), 0);
+    expect(mainLA12X).toBe(1);
   });
 
   it("recognizes an abbreviated bare 'SIDE' group as sidefill", () => {
@@ -287,18 +331,20 @@ describe("buildXmlpPowerTables", () => {
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables.map((table) => table.name)).toEqual(["Main L"]);
+    // Recognized as main PA (not dropped) and routed into the pooled split.
+    expect(result.tables.map((table) => table.name).sort()).toEqual(["Main L", "Main R"]);
   });
 
-  it("reads the fully spelled-out side word (LEFT/RIGHT), not just L/R", () => {
+  it("recognizes the fully spelled-out MAIN keyword as main PA", () => {
     const map: XmlpAmpMap = {
       units: [{ octet: 1, model: "LA12X" }],
       groups: [{ name: "MAIN LEFT", role: "source", members: [1] }],
     };
 
     const result = buildXmlpPowerTables(map, components);
-    expect(result.tables.map((table) => table.name)).toEqual(["Main L"]);
-    expect(result.tables[0].position).toBe("DOSL");
+    expect(result.tables.map((table) => table.name).sort()).toEqual(["Main L", "Main R"]);
+    expect(result.tables.find((table) => table.name === "Main L")?.position).toBe("DOSL");
+    expect(result.tables.find((table) => table.name === "Main R")?.position).toBe("DOSR");
   });
 
   it("ignores non-source-role groups entirely (parent/zoning groups)", () => {
