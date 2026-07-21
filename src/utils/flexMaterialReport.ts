@@ -14,6 +14,11 @@ export interface FlexMaterialReportResult {
 export type FlexMaterialReportDepartment = "sound" | "lights" | "video" | "production";
 export type FlexMaterialReportType = "material-list" | "quote";
 
+export interface FlexMaterialReportElementDescriptor {
+  displayName?: string;
+  documentNumber?: string;
+}
+
 /**
  * Resolves the job's Flex quote (flex_folders.element_id) for the given department
  * and fetches Flex's own "Listado de Material" report, persisting it into
@@ -25,13 +30,16 @@ export const fetchFlexMaterialReport = async (
   department: FlexMaterialReportDepartment,
   overrideElementId?: string,
   stage?: TechnicalStage | null,
-  reportType: FlexMaterialReportType = "material-list"
+  reportType: FlexMaterialReportType = "material-list",
+  elementDescriptor?: FlexMaterialReportElementDescriptor,
 ): Promise<FlexMaterialReportResult> => {
   const { data, error } = await dataLayerClient.functions.invoke("fetch-flex-material-report", {
     body: {
       jobId,
       department,
       overrideElementId: overrideElementId || undefined,
+      elementDisplayName: elementDescriptor?.displayName || undefined,
+      elementDocumentNumber: elementDescriptor?.documentNumber || undefined,
       reportType,
       stageNumber: stage?.number,
       stageName: stage?.name,

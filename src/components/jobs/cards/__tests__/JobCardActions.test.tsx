@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { JobCardActions } from '../JobCardActions';
 import { buildTechnicalPowerSummaryPackFilename } from '@/utils/pdf/technicalPowerSummaryPack';
-import type { FlatElementNode } from '@/utils/flex-folders';
+import type { FlatElementNode, FlexElementNode } from '@/utils/flex-folders';
+import { FLEX_FOLDER_IDS as FLEX_FOLDER_DEFINITION_IDS } from '@/utils/flex-folders/constants';
 import type { CombinedTechnicalPowerSummaryData } from '@/utils/technicalPowerTypes';
 import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
@@ -22,6 +23,7 @@ const {
   dataLayerFunctionsInvokeMock,
   useIsMobileMock,
   useQueryMock,
+  flexElementTreeQueryState,
   jobDepartmentsQueryState,
   technicalPowerSummaryQueryState,
 } = vi.hoisted(() => ({
@@ -37,6 +39,12 @@ const {
   dataLayerFunctionsInvokeMock: vi.fn(),
   useIsMobileMock: vi.fn(() => false),
   useQueryMock: vi.fn(),
+  flexElementTreeQueryState: {
+    data: undefined as FlexElementNode[] | undefined,
+    isLoading: false,
+    isError: false,
+    error: null as Error | null,
+  },
   jobDepartmentsQueryState: {
     data: ['sound', 'lights', 'video'] as any,
     isLoading: false,
@@ -286,6 +294,10 @@ describe('JobCardActions', () => {
     technicalPowerSummaryQueryState.isLoading = false;
     technicalPowerSummaryQueryState.isError = false;
     technicalPowerSummaryQueryState.error = null;
+    flexElementTreeQueryState.data = undefined;
+    flexElementTreeQueryState.isLoading = false;
+    flexElementTreeQueryState.isError = false;
+    flexElementTreeQueryState.error = null;
     useQueryMock.mockImplementation((options: any) => {
       if (!options?.enabled) {
         return {
@@ -298,6 +310,16 @@ describe('JobCardActions', () => {
       }
 
       const queryKey = Array.isArray(options?.queryKey) ? options.queryKey : [];
+
+      if (queryKey.includes('flexElementTree')) {
+        return {
+          data: flexElementTreeQueryState.data,
+          isLoading: flexElementTreeQueryState.isLoading,
+          isError: flexElementTreeQueryState.isError,
+          error: flexElementTreeQueryState.error,
+          refetch: vi.fn(),
+        };
+      }
 
       if (queryKey.includes('technical-power-job-departments')) {
         return {
@@ -969,7 +991,7 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...defaultProps} department="production" />);
 
       expect(screen.getByRole('button', { name: /Lista Material/i })).toBeDisabled();
-      expect(screen.getByTitle('No hay presupuesto de sonido o iluminación en Flex')).toBeTruthy();
+      expect(screen.getByTitle('No hay presupuestos disponibles en Flex')).toBeTruthy();
     });
 
     it('shows production technical-power department status dots', () => {
@@ -1018,7 +1040,7 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...props} />);
 
       await user.click(screen.getByRole('button', { name: /Lista Material/i }));
-      await user.click(await screen.findByText('Sonido'));
+      await user.click(await screen.findByText(/Sonido · Presupuesto · sound-q/));
 
       await waitFor(() => {
         expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
@@ -1027,6 +1049,7 @@ describe('JobCardActions', () => {
             body: expect.objectContaining({
               jobId: 'test-job-id',
               department: 'sound',
+              overrideElementId: 'sound-quote-element',
               reportType: 'material-list',
             }),
           })
@@ -1037,6 +1060,81 @@ describe('JobCardActions', () => {
         '_blank',
         'noopener,noreferrer'
       );
+    });
+
+    it('lists every presupuesto discovered in the Flex tree and prints the selected element', async () => {
+      const user = userEvent.setup();
+      flexElementTreeQueryState.data = [{
+        elementId: 'main-element',
+        displayName: 'Trabajo',
+        children: [{
+          elementId: 'sound-folder',
+          displayName: 'Sonido',
+          definitionId: FLEX_FOLDER_DEFINITION_IDS.subFolder,
+          children: [{
+            elementId: 'quote-main-element',
+            displayName: 'Presupuesto principal',
+            documentNumber: 'Q-100',
+            definitionId: FLEX_FOLDER_DEFINITION_IDS.presupuesto,
+          }, {
+            elementId: 'quote-extra-element',
+            displayName: 'Extra escenario B',
+            documentNumber: 'Q-101',
+            definitionId: FLEX_FOLDER_DEFINITION_IDS.presupuesto,
+          }],
+        }],
+      }];
+      dataLayerFunctionsInvokeMock.mockResolvedValueOnce({
+        data: {
+          url: 'https://example.test/extra-material-list.pdf',
+          fileName: 'Listado de Material - Sonido - Extra_escenario_B - Q-101.pdf',
+          elementId: 'quote-extra-element',
+          folderType: null,
+          elementValidated: true,
+          elementJobMismatch: false,
+          reportType: 'material-list',
+        },
+        error: null,
+      });
+
+      render(<JobCardActions
+        {...defaultProps}
+        department="production"
+        job={{
+          ...defaultProps.job,
+          flex_folders: [{
+            id: 'main-row',
+            department: null,
+            element_id: 'main-element',
+            folder_type: 'main_event',
+          }, {
+            id: 'sound-row',
+            department: 'sound',
+            element_id: 'sound-folder',
+            folder_type: 'department',
+          }],
+        }}
+      />);
+
+      await user.click(screen.getByRole('button', { name: /Lista Material/i }));
+      expect(await screen.findByText(/Presupuesto principal · Q-100/)).toBeInTheDocument();
+      await user.click(screen.getByText(/Extra escenario B · Q-101/));
+
+      await waitFor(() => {
+        expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
+          'fetch-flex-material-report',
+          expect.objectContaining({
+            body: expect.objectContaining({
+              department: 'sound',
+              elementDisplayName: 'Extra escenario B',
+              elementDocumentNumber: 'Q-101',
+              jobId: 'test-job-id',
+              overrideElementId: 'quote-extra-element',
+              reportType: 'material-list',
+            }),
+          })
+        );
+      });
     });
 
     it('prints a scoped Flex material list directly from the sound project tab', async () => {
@@ -1079,10 +1177,10 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...props} />);
 
       const materialButton = screen.getByRole('button', { name: /Lista Material/i });
-      expect(materialButton).toHaveAttribute('title', 'Imprimir lista de material de Sonido desde Flex');
-      expect(screen.queryByText('Sonido')).toBeNull();
+      expect(materialButton).toHaveAttribute('title', 'Elegir presupuesto para imprimir la lista de material de Flex');
 
       await user.click(materialButton);
+      await user.click(await screen.findByText(/Sonido · Presupuesto · sound-q/));
 
       await waitFor(() => {
         expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
@@ -1091,6 +1189,7 @@ describe('JobCardActions', () => {
             body: expect.objectContaining({
               jobId: 'test-job-id',
               department: 'sound',
+              overrideElementId: 'sound-quote-element',
               reportType: 'material-list',
             }),
           })
@@ -1143,10 +1242,10 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...props} />);
 
       const quoteButton = screen.getByRole('button', { name: /Presupuesto/i });
-      expect(quoteButton).toHaveAttribute('title', 'Imprimir presupuesto de Iluminación desde Flex');
-      expect(screen.queryByText('Iluminación')).toBeNull();
+      expect(quoteButton).toHaveAttribute('title', 'Elegir presupuesto de Flex para imprimir');
 
       await user.click(quoteButton);
+      await user.click(await screen.findByText(/Iluminación · Presupuesto · lights-q/));
 
       await waitFor(() => {
         expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
@@ -1155,6 +1254,7 @@ describe('JobCardActions', () => {
             body: expect.objectContaining({
               jobId: 'test-job-id',
               department: 'lights',
+              overrideElementId: 'lights-quote-element',
               reportType: 'quote',
             }),
           })
@@ -1186,9 +1286,9 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      expect(screen.getByRole('button', { name: /Lista Material/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /Lista Material/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Presupuesto/i })).toBeDisabled();
-      expect(screen.getByTitle('No hay presupuesto de Iluminación en Flex')).toBeTruthy();
+      expect(screen.getAllByTitle('No hay presupuestos disponibles en Flex')).toHaveLength(2);
     });
 
     it('should render the technical power summary button for project management managers', () => {

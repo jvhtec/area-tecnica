@@ -49,9 +49,9 @@ export const useJobSelection = () => {
             )
           )
         `)
-        .gte('start_time', today.toISOString()) // Filter to present/future jobs only
+        .gte('end_time', today.toISOString()) // Include ongoing jobs; exclude jobs that already ended
         .in('job_type', ['single', 'festival', 'ciclo', 'tourdate']) // Only include relevant job types
-        .neq('status', 'Completado') // Exclude completed/deleted jobs
+        .or('status.is.null,status.in.(Tentativa,Confirmado)') // Exclude completed/cancelled jobs
         .order("start_time", { ascending: true });
 
       if (error) {

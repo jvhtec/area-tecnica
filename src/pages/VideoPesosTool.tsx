@@ -10,6 +10,7 @@ import { FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { getJobTechnicalPdfFileName } from '@/utils/technicalPdfNames';
 import { useJobSelection } from '@/hooks/useJobSelection';
+import { DocumentationJobPicker } from '@/features/technical-tools/jobs/DocumentationJobPicker';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { dataLayerClient } from '@/services/dataLayerClient';
@@ -424,19 +425,14 @@ const VideoPesosTool: React.FC = () => {
 
           {!jobIdFromUrl && (
             <div className="space-y-2">
-              <Label htmlFor="jobSelect">Select Job</Label>
-              <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a job" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobs?.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>
-                      {job.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="jobSelect">Seleccionar trabajo</Label>
+              <DocumentationJobPicker
+                id="jobSelect"
+                jobs={jobs}
+                onValueChange={handleJobSelect}
+                placeholder="Seleccionar trabajo"
+                value={selectedJobId}
+              />
             </div>
           )}
 

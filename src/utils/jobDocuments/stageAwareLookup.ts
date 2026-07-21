@@ -40,15 +40,15 @@ export const parseStageScopeSegment = (
 };
 
 /**
- * Latest job_documents row for a job+category, scoped to a specific festival stage
- * (or the unscoped upload, for single-stage jobs / no stage selected).
+ * All job_documents rows for a job+category, scoped to a specific festival stage
+ * (or the unscoped uploads, for single-stage jobs / no stage selected), newest first.
  */
-export const findLatestJobDocumentForStage = async (
+export const findJobDocumentsForStage = async (
   jobId: string,
   category: string,
   stage?: TechnicalStage | null,
   filter?: StageAwareJobDocumentFilter
-): Promise<StageAwareJobDocument | null> => {
+): Promise<StageAwareJobDocument[]> => {
   const { data, error } = await dataLayerClient
     .from("job_documents")
     .select("id, file_name, file_path, uploaded_at")
@@ -60,11 +60,20 @@ export const findLatestJobDocumentForStage = async (
 
   const wantedScope = getTechnicalStageStorageScope(stage ?? null) ?? null;
 
-  const match = (data || []).find(
+  return (data || []).filter(
     (doc) =>
       parseStageScopeSegment(doc.file_path, jobId, category) === wantedScope &&
       (!filter || filter(doc))
   );
+};
 
-  return match ?? null;
+/** Backward-compatible helper for callers that only need the newest match. */
+export const findLatestJobDocumentForStage = async (
+  jobId: string,
+  category: string,
+  stage?: TechnicalStage | null,
+  filter?: StageAwareJobDocumentFilter
+): Promise<StageAwareJobDocument | null> => {
+  const documents = await findJobDocumentsForStage(jobId, category, stage, filter);
+  return documents[0] ?? null;
 };

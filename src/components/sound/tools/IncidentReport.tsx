@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileText, PenTool, X, Check, Download, Camera, Trash2, Loader2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
@@ -18,8 +17,7 @@ import {
   OPTIMIZED_MAX_DIMENSION,
   OPTIMIZED_QUALITY
 } from "@/utils/incident-report/photo-utils";
-import { format } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
+import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 
 interface IncidentReportData {
   jobId: string;
@@ -247,18 +245,13 @@ export const IncidentReport = () => {
         <div className="space-y-4">
           <div>
             <Label htmlFor="jobSelect">Trabajo Asociado *</Label>
-            <Select value={formData.jobId} onValueChange={(value) => handleInputChange('jobId', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar trabajo..." />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title} - {format(toZonedTime(new Date(job.start_time), 'Europe/Madrid'), 'dd/MM/yyyy')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DocumentationJobPicker
+              id="jobSelect"
+              jobs={jobs}
+              onValueChange={(value) => handleInputChange('jobId', value)}
+              placeholder="Seleccionar trabajo..."
+              value={formData.jobId}
+            />
           </div>
         </div>
 

@@ -9,6 +9,10 @@ import {
   readBoundedJsonObject,
   requireEnvValues,
 } from "../_shared/http.ts";
+import {
+  buildFlexReportFileIdentity,
+  isFlexReportPredecessorObject,
+} from "./reportFiles.ts";
 
 // Fixed Flex report constants confirmed against the live Flex account. Only
 // PROJECT_ELEMENT_ID varies per job/department for the material-list report.
@@ -57,6 +61,8 @@ const REPORT_FOLDER_TYPES: Record<FlexReportType, string[]> = {
 };
 
 interface FetchFlexMaterialReportBody extends Record<string, unknown> {
+  elementDisplayName?: unknown;
+  elementDocumentNumber?: unknown;
   jobId?: unknown;
   department?: unknown;
   overrideElementId?: unknown;
@@ -64,9 +70,6 @@ interface FetchFlexMaterialReportBody extends Record<string, unknown> {
   stageName?: unknown;
   stageNumber?: unknown;
 }
-
-const sanitizeFileNameSegment = (value: string) =>
-  value.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_{2,}/g, "_").replace(/^_|_$/g, "") || "segment";
 
 const normalizePathSegment = (value: string) =>
   value
@@ -95,6 +98,12 @@ serve(createHttpHandler(async (req: Request) => {
   const jobId = typeof body.jobId === "string" ? body.jobId : null;
   const department = typeof body.department === "string" ? body.department : null;
   const overrideElementId = typeof body.overrideElementId === "string" ? body.overrideElementId : null;
+  const elementDisplayName = typeof body.elementDisplayName === "string" && body.elementDisplayName.trim()
+    ? body.elementDisplayName.trim().slice(0, 160)
+    : null;
+  const elementDocumentNumber = typeof body.elementDocumentNumber === "string" && body.elementDocumentNumber.trim()
+    ? body.elementDocumentNumber.trim().slice(0, 80)
+    : null;
   const reportType = typeof body.reportType === "string" && body.reportType.trim()
     ? body.reportType.trim()
     : DEFAULT_REPORT_TYPE;
@@ -260,29 +269,20 @@ serve(createHttpHandler(async (req: Request) => {
   const category = `${reportDefinition.storageCategory}/${department}`;
   const stageScope = stageNumber ? getTechnicalStageStorageScope(stageNumber, stageName) : null;
   const baseFolder = stageScope ? `${category}/${jobId}/${stageScope}` : `${category}/${jobId}`;
-  const fileName = `${reportDefinition.fileNamePrefix} - ${sanitizeFileNameSegment(department)}.pdf`;
-  const objectPath = `${baseFolder}/${fileName}`;
-
-  // Clean up any previous auto-fetched report for this exact job/department/stage
-  // scope before writing the new one. Scope both the storage removal and the
-  // job_documents delete to the same direct-children list -- baseFolder may have
-  // stage-scoped sibling subfolders (a non-stage caller like PrintFlexReportAction
-  // and a stage-aware Memoria form can both write under the same job/department),
-  // and storage.list() doesn't recurse into those, so a broader `LIKE baseFolder/%`
-  // delete on job_documents would drop sibling stage rows without removing their
-  // underlying storage objects.
-  const { data: existingObjects } = await supabase.storage.from(bucket).list(baseFolder);
-  const existingObjectPaths = (existingObjects || [])
-    .filter((entry) => entry.id)
-    .map((entry) => `${baseFolder}/${entry.name}`);
-  if (existingObjectPaths.length > 0) {
-    await supabase.storage.from(bucket).remove(existingObjectPaths);
-    await supabase.from("job_documents").delete().eq("job_id", jobId).in("file_path", existingObjectPaths);
-  }
+  const fileIdentity = buildFlexReportFileIdentity({
+    department,
+    displayName: elementDisplayName,
+    documentNumber: elementDocumentNumber,
+    elementId,
+    fileNamePrefix: reportDefinition.fileNamePrefix,
+    versionKey: `${Date.now()}-${crypto.randomUUID()}`,
+  });
+  const fileName = fileIdentity.fileName;
+  const objectPath = `${baseFolder}/${fileIdentity.objectName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(bucket)
-    .upload(objectPath, pdfBytes, { contentType: "application/pdf", cacheControl: "0", upsert: true });
+    .upload(objectPath, pdfBytes, { contentType: "application/pdf", cacheControl: "0", upsert: false });
   if (uploadError) {
     throw new HttpError(500, `Failed to store the generated ${reportDefinition.displayName}`, {
       code: "storage_upload_failed",
@@ -290,17 +290,22 @@ serve(createHttpHandler(async (req: Request) => {
     });
   }
 
-  const { error: insertError } = await supabase.from("job_documents").insert({
-    job_id: jobId,
-    file_name: fileName,
-    file_path: objectPath,
-    file_type: "application/pdf",
-    file_size: pdfBytes.byteLength,
-    uploaded_by: caller.userId,
-    original_type: "pdf",
-    visible_to_tech: true,
-  });
-  if (insertError) {
+  const { data: insertedDocument, error: insertError } = await supabase
+    .from("job_documents")
+    .insert({
+      job_id: jobId,
+      file_name: fileName,
+      file_path: objectPath,
+      file_type: "application/pdf",
+      file_size: pdfBytes.byteLength,
+      uploaded_by: caller.userId,
+      original_type: "pdf",
+      visible_to_tech: true,
+    })
+    .select("id")
+    .single();
+  if (insertError || !insertedDocument) {
+    await supabase.storage.from(bucket).remove([objectPath]);
     throw new HttpError(500, `Failed to record the generated ${reportDefinition.displayName}`, {
       code: "job_document_insert_failed",
       exposeDetails: false,
@@ -311,16 +316,84 @@ serve(createHttpHandler(async (req: Request) => {
     .from(bucket)
     .createSignedUrl(objectPath, 3600, { cacheNonce: crypto.randomUUID() });
   if (signError || !signedUrlData) {
+    await supabase.from("job_documents").delete().eq("id", insertedDocument.id);
+    await supabase.storage.from(bucket).remove([objectPath]);
     throw new HttpError(500, `Failed to sign the generated ${reportDefinition.displayName} URL`, {
       code: "sign_url_failed",
       exposeDetails: false,
     });
   }
 
+  // The logical replacement slot includes the selected Flex element. Publish and
+  // sign the new object first, then retire only older versions of that element.
+  // Direct-child filtering preserves stage-scoped sibling folders. The legacy
+  // department-wide filename is retired once because it cannot be attributed to
+  // a specific Presupuesto.
+  const { data: existingObjects, error: listError } = await supabase.storage
+    .from(bucket)
+    .list(baseFolder);
+  if (listError) {
+    console.warn("[fetch-flex-material-report] Could not list predecessor objects", listError);
+  }
+
+  const predecessorObjectPaths = (existingObjects || [])
+    .filter((entry) =>
+      entry.id &&
+      entry.name !== fileIdentity.objectName &&
+      isFlexReportPredecessorObject(
+        entry.name,
+        fileIdentity.elementStoragePrefix,
+        fileIdentity.legacyFileName,
+      )
+    )
+    .map((entry) => `${baseFolder}/${entry.name}`);
+
+  const { data: scopedDocuments, error: scopedDocumentsError } = await supabase
+    .from("job_documents")
+    .select("id, file_path")
+    .eq("job_id", jobId)
+    .like("file_path", `${baseFolder}/%`);
+  if (scopedDocumentsError) {
+    console.warn("[fetch-flex-material-report] Could not list predecessor rows", scopedDocumentsError);
+  }
+
+  const directPathPrefix = `${baseFolder}/`;
+  const predecessorDocumentIds = (listError ? [] : (scopedDocuments || []))
+    .filter((document) => {
+      if (document.id === insertedDocument.id || !document.file_path.startsWith(directPathPrefix)) return false;
+      const objectName = document.file_path.slice(directPathPrefix.length);
+      return !objectName.includes("/") && isFlexReportPredecessorObject(
+        objectName,
+        fileIdentity.elementStoragePrefix,
+        fileIdentity.legacyFileName,
+      );
+    })
+    .map((document) => document.id);
+
+  let canRemovePredecessorObjects = !listError && !scopedDocumentsError;
+  if (predecessorDocumentIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("job_documents")
+      .delete()
+      .in("id", predecessorDocumentIds);
+    if (deleteError) {
+      canRemovePredecessorObjects = false;
+      console.warn("[fetch-flex-material-report] Could not remove predecessor rows", deleteError);
+    }
+  }
+  if (canRemovePredecessorObjects && predecessorObjectPaths.length > 0) {
+    const { error: removeError } = await supabase.storage.from(bucket).remove(predecessorObjectPaths);
+    if (removeError) {
+      console.warn("[fetch-flex-material-report] Could not remove predecessor objects", removeError);
+    }
+  }
+
   return jsonResponse({
     url: signedUrlData.signedUrl,
     fileName,
     elementId,
+    elementDisplayName,
+    elementDocumentNumber,
     folderType,
     elementValidated,
     elementJobMismatch,

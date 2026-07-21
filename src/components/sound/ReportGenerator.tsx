@@ -3,7 +3,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useJobSelection } from "@/hooks/useJobSelection";
@@ -22,6 +21,7 @@ import {
 } from "@/features/technical-tools/stage/stageAllocation";
 import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
 import { uploadJobPdfWithCleanup } from "@/utils/jobDocumentsUpload";
+import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 
 const reportSections = [
   {
@@ -449,18 +449,12 @@ export const ReportGenerator = () => {
           {/* Job Selection */}
           <div className="space-y-2">
             <Label htmlFor="jobSelect">Trabajo</Label>
-            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccione un trabajo" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map(job => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DocumentationJobPicker
+              id="jobSelect"
+              jobs={jobs}
+              onValueChange={setSelectedJobId}
+              value={selectedJobId}
+            />
           </div>
 
           <TechnicalStageSelector
