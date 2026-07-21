@@ -74,4 +74,52 @@ describe("stage-aware job document lookup helpers", () => {
 
     expect(matches.map((document) => document.id)).toEqual(["new", "old"]);
   });
+
+  it("applies stage scope and custom filters without changing server order", async () => {
+    const documents = [
+      {
+        id: "video-new",
+        file_name: "video-new.pdf",
+        file_path: "job-1/calculators/pesos/stage-2-main/video-new.pdf",
+        uploaded_at: "2026-07-22T10:00:00Z",
+      },
+      {
+        id: "sound-same-stage",
+        file_name: "sound.pdf",
+        file_path: "job-1/calculators/pesos/stage-2-main/sound.pdf",
+        uploaded_at: "2026-07-22T09:00:00Z",
+      },
+      {
+        id: "video-old",
+        file_name: "video-old.pdf",
+        file_path: "calculators/pesos/job-1/stage-2-main/video-old.pdf",
+        uploaded_at: "2026-07-21T10:00:00Z",
+      },
+      {
+        id: "video-other-stage",
+        file_name: "video-other-stage.pdf",
+        file_path: "job-1/calculators/pesos/stage-3-secondary/video-other-stage.pdf",
+        uploaded_at: "2026-07-23T10:00:00Z",
+      },
+    ];
+    const builder = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      or: vi.fn(),
+      order: vi.fn().mockResolvedValue({ data: documents, error: null }),
+    };
+    builder.select.mockReturnValue(builder);
+    builder.eq.mockReturnValue(builder);
+    builder.or.mockReturnValue(builder);
+    fromMock.mockReturnValue(builder);
+
+    const matches = await findJobDocumentsForStage(
+      "job-1",
+      "calculators/pesos",
+      { number: 2, name: "Main" },
+      (document) => document.file_name.startsWith("video-")
+    );
+
+    expect(matches.map((document) => document.id)).toEqual(["video-new", "video-old"]);
+  });
 });

@@ -27,9 +27,7 @@ export const useJobSelection = () => {
     queryFn: async () => {
       console.log("Fetching jobs for selection...");
       
-      // Get today's date in ISO format to filter future/present jobs
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Set to start of day
+      const activeJobCutoff = new Date().toISOString();
       
       const { data: jobs, error } = await supabase
         .from("jobs")
@@ -49,7 +47,7 @@ export const useJobSelection = () => {
             )
           )
         `)
-        .gte('end_time', today.toISOString()) // Include ongoing jobs; exclude jobs that already ended
+        .gte('end_time', activeJobCutoff) // Include ongoing jobs; exclude jobs that already ended
         .in('job_type', ['single', 'festival', 'ciclo', 'tourdate']) // Only include relevant job types
         .or('status.is.null,status.in.(Tentativa,Confirmado)') // Exclude completed/cancelled jobs
         .order("start_time", { ascending: true });
