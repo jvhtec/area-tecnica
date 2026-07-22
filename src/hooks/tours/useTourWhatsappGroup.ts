@@ -177,12 +177,12 @@ export const useTourWhatsappGroup = ({ isManagementUser, tourDates }: Options) =
         return;
       }
 
-      const result = clearResult as any;
+      const result = (clearResult ?? {}) as any;
 
       if (!result.success) {
         toast({
           title: 'Aviso',
-          description: result.error || result.message,
+          description: result.error || result.message || 'No se pudo procesar la solicitud.',
           variant: result.can_retry ? 'default' : 'destructive'
         });
         await Promise.all([refetchWaGroup(), refetchWaRequest()]);

@@ -11,7 +11,7 @@ export const loadFestivalStageMetadata = async (jobId: string) => {
   if (error) console.error("Error fetching stage names:", error);
 
   const getStageNameByNumber = (stageNumber: number): string =>
-    stageNames?.find((stage) => stage.number === stageNumber)?.name || `Stage ${stageNumber}`;
+    stageNames?.find((stage) => Number(stage.number) === stageNumber)?.name || `Escenario ${stageNumber}`;
   const stageNamesByNumber = (stageNames || []).reduce<Record<number, string>>((names, stage) => {
     names[Number(stage.number)] = stage.name || `Escenario ${stage.number}`;
     return names;

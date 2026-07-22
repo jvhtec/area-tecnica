@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { lazy } from "react";
 
-type RouteComponent = React.LazyExoticComponent<React.ComponentType<Record<string, never>>>;
+import type { RouteComponent } from "@/routes/app-route-types";
 
 export const lazyPage = (importer: () => Promise<{ default: React.ComponentType<Record<string, never>> }>): RouteComponent =>
   lazy(importer);

@@ -3,6 +3,7 @@ import { TRANSPORT_PROVIDERS } from '@/constants/transportProviders';
 import type { LogisticsItem } from '../../types';
 import { SPANISH_DAY_NAMES } from '../../calendar';
 import { getJobCardBackground, getTransportIcon } from '../../utils';
+import { WALLBOARD_PANEL_PAGE_SIZES } from '../../panelPageSizes';
 import { AutoScrollWrapper, PanelContainer } from '../shared';
 
 export const LogisticsPanel: React.FC<{
@@ -10,7 +11,7 @@ export const LogisticsPanel: React.FC<{
   page?: number;
   pageSize?: number;
   theme?: 'light' | 'dark';
-}> = ({ data, page = 0, pageSize = 6, theme = 'light' }) => {
+}> = ({ data, page = 0, pageSize = WALLBOARD_PANEL_PAGE_SIZES.logistics, theme = 'light' }) => {
   const items = data ?? [];
   const paginatedItems = items.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(items.length / pageSize);

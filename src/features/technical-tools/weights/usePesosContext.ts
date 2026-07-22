@@ -1,10 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { formatInTimeZone } from "date-fns-tz";
 import type { JobSelection } from "@/hooks/useJobSelection";
 import { dataLayerClient } from "@/services/dataLayerClient";
 
 type Options = { selectedJob: JobSelection | null; isTourContext: boolean; tourId: string | null; tourDateId: string | null };
+const MADRID_TIMEZONE = "Europe/Madrid";
+const formatMadridDate = (value: string) => formatInTimeZone(new Date(value), MADRID_TIMEZONE, "dd/MM/yyyy");
 
 export const usePesosContext = ({ selectedJob, isTourContext, tourId, tourDateId }: Options) => {
   const navigate = useNavigate();
@@ -29,7 +32,7 @@ export const usePesosContext = ({ selectedJob, isTourContext, tourId, tourDateId
       if (data) {
         setJobTourInfo({
           tourName: (data.tour as any)?.name || 'Unknown Tour',
-          date: new Date(data.date).toLocaleDateString(),
+          date: formatMadridDate(data.date),
           location: (data.location as any)?.name || 'Unknown Location'
         });
       }
@@ -75,7 +78,7 @@ export const usePesosContext = ({ selectedJob, isTourContext, tourId, tourDateId
 
         if (data) {
           setTourDateInfo({
-            date: new Date(data.date).toLocaleDateString(),
+            date: formatMadridDate(data.date),
             location: (data.locations as any)?.name || 'Unknown location'
           });
         }

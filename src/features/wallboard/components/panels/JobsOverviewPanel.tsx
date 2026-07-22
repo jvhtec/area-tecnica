@@ -7,6 +7,7 @@ import {
   getDateTypeIcon,
   getJobCardBackground,
 } from '../../utils';
+import { WALLBOARD_PANEL_PAGE_SIZES } from '../../panelPageSizes';
 import { AutoScrollWrapper, PanelContainer, StatusDot } from '../shared';
 
 export const JobsOverviewPanel: React.FC<{
@@ -15,7 +16,7 @@ export const JobsOverviewPanel: React.FC<{
   page?: number;
   pageSize?: number;
   theme?: 'light' | 'dark';
-}> = ({ data, highlightIds, page = 0, pageSize = 6, theme = 'light' }) => {
+}> = ({ data, highlightIds, page = 0, pageSize = WALLBOARD_PANEL_PAGE_SIZES.overview, theme = 'light' }) => {
   const jobs = data?.jobs ?? [];
   const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(jobs.length / pageSize);

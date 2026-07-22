@@ -186,13 +186,13 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
       await syncTourDefaultDocumentsForDate(newTourDate.id);
 
       toast({
-        title: "Success",
-        description: "Tour date and job created successfully",
+        title: "Fecha creada",
+        description: "La fecha de gira y el trabajo se crearon correctamente.",
       });
     } catch (error: any) {
       console.error("Error adding date:", error);
       toast({
-        title: "Error adding date",
+        title: "Error al añadir la fecha",
         description: error.message,
         variant: "destructive",
       });
@@ -360,8 +360,8 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
               syncResult.errors
             );
             toast({
-              title: "Tour date updated with warnings",
-              description: `Tour date saved but ${syncResult.failed} Flex element(s) failed to sync.`,
+              title: "Fecha actualizada con avisos",
+              description: `La fecha se guardó, pero no se pudieron sincronizar ${syncResult.failed} elemento(s) de Flex.`,
               variant: "destructive",
             });
           } else if (syncResult.success > 0) {
@@ -376,8 +376,8 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
             ? syncError.message
             : String(syncError);
           toast({
-            title: "Tour date updated with warnings",
-            description: "Tour date saved but Flex sync failed: " + errorMessage,
+            title: "Fecha actualizada con avisos",
+            description: "La fecha se guardó, pero falló la sincronización con Flex: " + errorMessage,
             variant: "destructive",
           });
         }
@@ -396,14 +396,14 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
       // Only show success toast if flex sync didn't have warnings or errors
       if (!flexSyncHadWarningsOrError) {
         toast({
-          title: "Success",
-          description: "Tour date updated successfully",
+          title: "Fecha actualizada",
+          description: "La fecha de gira se actualizó correctamente.",
         });
       }
     } catch (error: any) {
       console.error("Error editing date:", error);
       toast({
-        title: "Error editing date",
+        title: "Error al editar la fecha",
         description: error.message,
         variant: "destructive",
       });

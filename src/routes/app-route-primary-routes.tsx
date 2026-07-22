@@ -1,4 +1,4 @@
-import type { AppRoute } from "@/routes/app-route-manifest";
+import type { AppRoute } from "@/routes/app-route-types";
 import {
   Achievements,
   ActivityCenter,

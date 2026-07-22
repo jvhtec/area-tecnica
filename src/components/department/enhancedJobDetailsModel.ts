@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { format } from "date-fns";
+import { isValid } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { labelForCode } from "@/utils/roles";
 
@@ -20,7 +21,6 @@ export interface EnhancedJobDetailsModalProps {
   userRole?: string | null;
   userDepartment?: string | null;
   userId: string | null;
-  department?: string;
 }
 
 export type TabId = "Info" | "Ubicación" | "Personal" | "Docs" | "Restau." | "Clima" | "Tarifas" | "Extras";
@@ -83,8 +83,23 @@ export const formatWeatherDate = (dateStr: string): string => {
   }
 };
 
+const MADRID_TIMEZONE = "Europe/Madrid";
+const UNAVAILABLE_DATE = "Fecha no disponible";
+
+const formatMadridDate = (value: string | null | undefined, pattern: string): string => {
+  if (!value) return UNAVAILABLE_DATE;
+  const date = new Date(value);
+  if (!isValid(date)) return UNAVAILABLE_DATE;
+
+  try {
+    return formatInTimeZone(date, MADRID_TIMEZONE, pattern, { locale: es });
+  } catch {
+    return UNAVAILABLE_DATE;
+  }
+};
+
 export const formatJobDate = (value?: string | null): string =>
-  value ? format(new Date(value), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es }) : "Fecha no disponible";
+  formatMadridDate(value, "d 'de' MMMM 'de' yyyy 'a las' HH:mm");
 
 export const formatDocumentUploadDate = (value: string): string =>
-  format(new Date(value), "d 'de' MMMM 'de' yyyy", { locale: es });
+  formatMadridDate(value, "d 'de' MMMM 'de' yyyy");

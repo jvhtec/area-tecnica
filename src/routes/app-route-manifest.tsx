@@ -3,6 +3,13 @@ import { Navigate, generatePath, matchPath } from "react-router-dom";
 
 import { primaryAppRoutes } from "@/routes/app-route-primary-routes";
 import { secondaryAppRoutes } from "@/routes/app-route-secondary-routes";
+import type {
+  AccessPolicyId,
+  AppRoute,
+  NavConfig,
+  SubscriptionProfile,
+  SubscriptionProfileId,
+} from "@/routes/app-route-types";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -19,16 +26,18 @@ import {
   isManagementRole,
 } from "@/utils/permissions";
 
-type RouteComponent = React.LazyExoticComponent<React.ComponentType<Record<string, never>>>;
-type LayoutKind = "public" | "fullscreen" | "app";
-type SubscriptionPriority = "high" | "medium" | "low";
-
-export type SubscriptionTableRequirement = {
-  table: string;
-  priority: SubscriptionPriority;
-};
-
-export type SubscriptionProfile = readonly SubscriptionTableRequirement[];
+export type {
+  AccessPolicyId,
+  AppRoute,
+  BreadcrumbConfig,
+  LayoutKind,
+  NavConfig,
+  RouteComponent,
+  SubscriptionPriority,
+  SubscriptionProfile,
+  SubscriptionProfileId,
+  SubscriptionTableRequirement,
+} from "@/routes/app-route-types";
 
 type RouteAccessPolicy = {
   allowedRoles?: readonly UserRole[];
@@ -180,41 +189,7 @@ export const accessPolicies = {
   soundTools: withRoleAccess(SOUND_TOOL_ROLES),
   soundToolsWithTechnician: withRoleAccess(SOUND_TOOL_ROLES_WITH_TECH),
   rackBuilder: withRoleAccess(SOUND_TOOL_ROLES, { guard: RackBuilderDepartmentGuard }),
-} as const;
-
-export type AccessPolicyId = keyof typeof accessPolicies;
-
-export type NavConfig = {
-  id: string;
-  label: string;
-  mobileLabel?: string;
-  shortcut?: {
-    id: string;
-    keybind?: string;
-    icon?: string;
-  };
-};
-
-export type BreadcrumbConfig = {
-  label: string;
-  parentPath?: string;
-};
-
-export type AppRoute = {
-  id: string;
-  path: string;
-  component: RouteComponent;
-  layout: LayoutKind;
-  access: AccessPolicyId;
-  subscriptions?: SubscriptionProfileId;
-  subscriptionRouteKey?: string;
-  nav?: NavConfig;
-  breadcrumb?: BreadcrumbConfig;
-  chrome?: {
-    suppress?: boolean;
-    mobileFullscreen?: boolean;
-  };
-};
+} as const satisfies Record<AccessPolicyId, RouteAccessPolicy>;
 
 
 export const subscriptionProfiles = {
@@ -318,9 +293,7 @@ export const subscriptionProfiles = {
     { table: "jobs", priority: "high" },
     { table: "job_departments", priority: "medium" },
   ],
-} as const satisfies Record<string, SubscriptionProfile>;
-
-export type SubscriptionProfileId = keyof typeof subscriptionProfiles;
+} as const satisfies Record<SubscriptionProfileId, SubscriptionProfile>;
 
 export const appRoutes: readonly AppRoute[] = [...primaryAppRoutes, ...secondaryAppRoutes];
 

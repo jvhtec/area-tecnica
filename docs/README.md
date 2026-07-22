@@ -76,7 +76,7 @@ Detailed deep-dive docs for the full festival subsystem:
 - **Performance**
   - `PERFORMANCE_AUDIT.md`
   - `PERFORMANCE_AUDIT_REPORT.md`
-  - **[God-file refactor checklist](performance/god-file-refactor-checklist.md)** — live 43-to-0 oversized-module paydown list and per-file definition of done
+  - **[God-file refactor checklist](performance/god-file-refactor-checklist.md)** — live 43-to-0 oversized-module paydown list, completed batches, and remaining queue
 - **Generated Supabase types**
   - Source: `src/integrations/supabase/types.ts`
   - Regenerate from the linked project with `npx supabase gen types typescript --linked --schema public > src/integrations/supabase/types.ts`

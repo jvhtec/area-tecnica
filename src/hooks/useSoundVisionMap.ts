@@ -160,7 +160,7 @@ export const useSoundVisionMap = ({ activeVenueId, city, country, drawerHeight, 
             const group = venueGroups.get(venueId);
             if (!mapboxgl || !mapInstance || !group) return;
 
-            closePopup();
+            closePopup({ preserveSelection: true });
 
             const avg = group.ratingsCount > 0 ? group.ratingTotal / group.ratingsCount : null;
 

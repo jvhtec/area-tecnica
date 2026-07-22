@@ -37,20 +37,18 @@ import { useSoundVisionFiles, useDownloadSoundVisionFile, SoundVisionFile } from
 import { StarRating } from '@/components/soundvision/StarRating';
 import { SoundVisionReviewDialog } from '@/components/soundvision/SoundVisionReviewDialog';
 import { SoundVisionFileUploader } from '@/components/soundvision/SoundVisionFileUploader';
+import type { VenueGroup } from '@/components/soundvision/soundVisionMapModel';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Theme } from '@/components/technician/types';
-
-
 import { queryKeys } from "@/lib/react-query";
+import { useSoundVisionMap } from '@/hooks/useSoundVisionMap';
+
 export interface SoundVisionInteractiveMapProps {
     theme: Theme;
     isDark: boolean;
     onClose?: () => void;
 }
-
-import type { VenueGroup } from "@/components/soundvision/soundVisionMapModel";
-import { useSoundVisionMap } from "@/hooks/useSoundVisionMap";
 
 // (context menu removed; selection is handled via activeVenueId)
 

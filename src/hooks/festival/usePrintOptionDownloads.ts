@@ -79,6 +79,20 @@ const blobToBase64 = (blob: Blob) =>
     reader.readAsDataURL(blob);
   });
 
+const downloadBlob = (blob: Blob, filenameParts: Array<unknown>, extension?: string) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = buildReadableFilename(filenameParts, extension);
+  document.body.appendChild(anchor);
+  try {
+    anchor.click();
+  } finally {
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+};
+
 export const usePrintOptionDownloads = ({
   jobId,
   jobTitle,
@@ -178,18 +192,10 @@ export const usePrintOptionDownloads = ({
     try {
       const { pdfBlob } = await buildMissingRiderReport();
 
-      // Download file
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildReadableFilename([
+      downloadBlob(pdfBlob, [
         jobTitle || "Festival",
         "Reporte riders faltantes",
       ]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       toast.success("Reporte de Riders Faltantes descargado exitosamente");
     } catch (error: any) {
@@ -298,33 +304,19 @@ export const usePrintOptionDownloads = ({
 
       if (gearBlobs.length === 1) {
         // Single stage - download directly
-        const url = URL.createObjectURL(gearBlobs[0]);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = buildReadableFilename([
+        downloadBlob(gearBlobs[0], [
           jobTitle || "Festival",
           `Escenario ${options.gearSetupStages[0]}`,
           "Dotación técnica",
         ]);
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
       } else {
         // Multiple stages - merge and download
         const mergedBlob = await mergePDFs(gearBlobs);
 
-        const url = URL.createObjectURL(mergedBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = buildReadableFilename([
+        downloadBlob(mergedBlob, [
           jobTitle || "Festival",
           "Dotación técnica",
         ]);
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
       }
 
       toast.success("Equipamiento descargado exitosamente");
@@ -448,17 +440,10 @@ export const usePrintOptionDownloads = ({
 
       const outputBlob =
         shiftPdfs.length === 1 ? shiftPdfs[0] : await mergePDFs(shiftPdfs);
-      const url = URL.createObjectURL(outputBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildReadableFilename([
+      downloadBlob(outputBlob, [
         jobTitle || "Festival",
         "Horarios de turnos",
       ]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       toast.success("Horarios de Turnos descargados exitosamente");
     } catch (error: any) {
@@ -551,17 +536,10 @@ export const usePrintOptionDownloads = ({
         artistTablePdfs.length === 1
           ? artistTablePdfs[0]
           : await mergePDFs(artistTablePdfs);
-      const url = URL.createObjectURL(outputBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildReadableFilename([
+      downloadBlob(outputBlob, [
         jobTitle || "Festival",
         "Cronograma artistas",
       ]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       toast.success("Tablas de Artistas descargadas exitosamente");
     } catch (error: any) {
@@ -614,17 +592,10 @@ export const usePrintOptionDownloads = ({
 
       const pdfBlob = await exportRfIemTablePDF(rfIemData);
 
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildReadableFilename([
+      downloadBlob(pdfBlob, [
         jobTitle || "Festival",
         "Tabla RF IEM",
       ]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       toast.success("Tabla de RF/IEM descargada exitosamente");
     } catch (error: any) {
@@ -683,17 +654,10 @@ export const usePrintOptionDownloads = ({
 
       const pdfBlob = await exportInfrastructureTablePDF(infraData);
 
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildReadableFilename([
+      downloadBlob(pdfBlob, [
         jobTitle || "Festival",
         "Tabla infraestructura",
       ]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       toast.success("Tabla de Infraestructura descargada exitosamente");
     } catch (error: any) {
@@ -748,17 +712,10 @@ export const usePrintOptionDownloads = ({
 
       const pdfBlob = await exportWiredMicrophoneMatrixPDF(wiredMicData);
 
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildReadableFilename([
+      downloadBlob(pdfBlob, [
         jobTitle || "Festival",
         "Necesidades micrófonos cableados",
       ]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       toast.success(
         "Necesidades de Micrófonos Cableados descargadas exitosamente"

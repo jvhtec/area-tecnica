@@ -13,12 +13,17 @@ import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { HojaDeRutaPrintPreviewTarget } from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
 import type { HojaDeRutaPdfPreview } from "@/components/hoja-de-ruta/HojaDeRutaPdfPreviewDialog";
 
+type HojaDeRutaExportMetadata = Omit<
+  Pick<HojaDeRutaMetadata, "id" | "document_version" | "status" | "created_at" | "updated_at" | "last_modified">,
+  "status"
+> & { status?: string | null };
+
 type Options = {
   accommodations: any[];
   eventData: EventData;
   handleSaveAll: () => Promise<unknown>;
   hasSavedData: boolean | string;
-  hojaDeRuta: any;
+  hojaDeRuta: HojaDeRutaExportMetadata | null | undefined;
   imagePreviews: any;
   isDirty: boolean | string;
   jobs: any[] | undefined;
