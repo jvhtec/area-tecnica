@@ -1,13 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flexApiFetch } from '@/lib/flex-api-client';
-import { DEPARTMENT_SUFFIXES, FLEX_FOLDER_IDS } from '@/utils/flex-folders/constants';
+import { FLEX_FOLDER_IDS } from '@/utils/flex-folders/constants';
 import { resourceIdForRole, EXTRA_RESOURCE_IDS } from '@/utils/flex-labor-resources';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 import { formatFlexWorkOrderDate } from '@/services/flexWorkOrderDates';
 
 import {
   CURRENCY_EUR_ID,
-  DEFAULT_LOCATION_ID,
   PERSONNEL_RESPONSIBLE_ID,
   PRICING_MODEL_BASE_2025_ID,
   PRICING_MODEL_DIA_TOUR_ID,
