@@ -6,16 +6,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import type { JobCardJob } from "@/components/jobs/cards/job-card-actions/types";
-import { getElementTree } from "@/utils/flex-folders";
-import type { FlexElementNode } from "@/utils/flex-folders/getElementTree";
-import { getMainFlexElementIdSync } from "@/utils/flexMainFolderId";
+import {
+  getJobPresupuestoTargets,
+  type JobPresupuestoTarget,
+} from "@/services/flexPullsheets";
 import {
   fetchFlexMaterialReport,
   type FlexMaterialReportDepartment,
@@ -29,34 +29,12 @@ const MATERIAL_LIST_DEPARTMENTS: Array<{ department: PrintableDepartment; label:
   { department: "lights", label: "Iluminación" },
 ];
 
-// Ordered by preference: the first matching folder type is the "primary" quote,
-// the rest are per-department extras / received quotes.
-const MATERIAL_LIST_FOLDER_TYPES = [
+// Only real, printable presupuesto elements. `presupuestos_recibidos` is a
+// container folder, not a presupuesto, and is intentionally excluded.
+const PRESUPUESTO_FOLDER_TYPES = new Set([
   "comercial_presupuesto",
   "dryhire_presupuesto",
-  "presupuestos_recibidos",
-] as const;
-
-const PRINTABLE_QUOTE_FOLDER_TYPES = [
-  "comercial_presupuesto",
-  "dryhire_presupuesto",
-] as const;
-
-const FOLDER_TYPE_LABELS: Record<string, string> = {
-  comercial_presupuesto: "Presupuesto comercial",
-  dryhire_presupuesto: "Presupuesto dry hire",
-  presupuestos_recibidos: "Presupuesto recibido",
-};
-
-type PresupuestoCandidate = {
-  elementId: string;
-  folderType: string;
-};
-
-type ElementNameInfo = {
-  name: string | null;
-  documentNumber: string | null;
-};
+]);
 
 type PrintFlexReportActionProps = {
   job: JobCardJob;
@@ -66,9 +44,6 @@ type PrintFlexReportActionProps = {
 
 const getFolderElementId = (folder: NonNullable<JobCardJob["flex_folders"]>[number]) =>
   folder.element_id || folder.elementId || null;
-
-const getReportFolderTypes = (reportType: FlexMaterialReportType): readonly string[] =>
-  reportType === "quote" ? PRINTABLE_QUOTE_FOLDER_TYPES : MATERIAL_LIST_FOLDER_TYPES;
 
 const REPORT_COPY: Record<FlexMaterialReportType, {
   buttonLabel: string;
@@ -120,6 +95,9 @@ const ReportAvailabilityLight = ({ available }: { available: boolean }) => (
   />
 );
 
+const targetLabel = (target: JobPresupuestoTarget) =>
+  target.document_number ? `${target.display_name} (${target.document_number})` : target.display_name;
+
 export const PrintFlexReportAction = ({
   job,
   department,
@@ -127,9 +105,9 @@ export const PrintFlexReportAction = ({
 }: PrintFlexReportActionProps) => {
   const { toast } = useToast();
   const [loadingDepartment, setLoadingDepartment] = React.useState<PrintableDepartment | null>(null);
-  const [namesByElementId, setNamesByElementId] = React.useState<Record<string, ElementNameInfo>>({});
-  const [isLoadingNames, setIsLoadingNames] = React.useState(false);
-  const namesRequestedRef = React.useRef(false);
+  const [targets, setTargets] = React.useState<JobPresupuestoTarget[] | null>(null);
+  const [isLoadingTargets, setIsLoadingTargets] = React.useState(false);
+  const targetsRequestedRef = React.useRef(false);
   const copy = REPORT_COPY[reportType];
 
   const scopedDepartmentOption = React.useMemo(
@@ -137,108 +115,73 @@ export const PrintFlexReportAction = ({
     [department]
   );
 
-  // One presupuesto candidate per report-capable Flex folder, grouped by
-  // department and ordered so the primary quote comes first. A job/department can
-  // hold several presupuestos (the main quote plus per-department "extras"), so
-  // the user picks which one to print instead of always getting the newest.
-  const candidatesByDepartment = React.useMemo(() => {
-    const folderTypes = getReportFolderTypes(reportType);
-    const rankOf = (folderType: string) => {
-      const index = folderTypes.indexOf(folderType);
-      return index === -1 ? folderTypes.length : index;
-    };
-    const map = new Map<PrintableDepartment, PresupuestoCandidate[]>();
+  // Fast, synchronous availability check straight off the job card's folders --
+  // drives the enabled state and the "one presupuesto vs. a chooser" decision
+  // without waiting on a Flex round-trip. The full labelled list (real Flex names
+  // plus presupuestos created directly in Flex) is loaded lazily when the chooser
+  // opens.
+  const dbCandidatesByDepartment = React.useMemo(() => {
+    const map = new Map<PrintableDepartment, string[]>();
     for (const { department: optionDepartment } of MATERIAL_LIST_DEPARTMENTS) {
-      const list = (job.flex_folders || [])
+      const elementIds = (job.flex_folders || [])
         .filter(
           (folder) =>
             folder.department === optionDepartment &&
             typeof folder.folder_type === "string" &&
-            folderTypes.includes(folder.folder_type) &&
+            PRESUPUESTO_FOLDER_TYPES.has(folder.folder_type) &&
             Boolean(getFolderElementId(folder))
         )
-        .map((folder) => ({
-          elementId: getFolderElementId(folder) as string,
-          folderType: folder.folder_type,
-        }))
-        .sort((a, b) => rankOf(a.folderType) - rankOf(b.folderType));
-      map.set(optionDepartment, list);
+        .map((folder) => getFolderElementId(folder) as string);
+      map.set(optionDepartment, elementIds);
     }
     return map;
-  }, [job.flex_folders, reportType]);
+  }, [job.flex_folders]);
 
   const isDepartmentAvailable = React.useCallback(
-    (optionDepartment: PrintableDepartment) => (candidatesByDepartment.get(optionDepartment)?.length ?? 0) > 0,
-    [candidatesByDepartment]
+    (optionDepartment: PrintableDepartment) => (dbCandidatesByDepartment.get(optionDepartment)?.length ?? 0) > 0,
+    [dbCandidatesByDepartment]
   );
 
   const hasAnyQuote = MATERIAL_LIST_DEPARTMENTS.some(({ department: optionDepartment }) =>
     isDepartmentAvailable(optionDepartment)
   );
 
-  // Only worth fetching Flex names when at least one department offers a choice --
-  // single-candidate menus are labelled by department alone.
-  const needsNames = React.useMemo(
-    () => Array.from(candidatesByDepartment.values()).some((list) => list.length > 1),
-    [candidatesByDepartment]
-  );
-
-  const ensureNamesLoaded = React.useCallback(async () => {
-    if (namesRequestedRef.current) return;
-    namesRequestedRef.current = true;
-    const main = getMainFlexElementIdSync(job);
-    if (!main?.elementId) return;
-    setIsLoadingNames(true);
+  const ensureTargetsLoaded = React.useCallback(async () => {
+    if (targetsRequestedRef.current || !job.id) return;
+    targetsRequestedRef.current = true;
+    setIsLoadingTargets(true);
     try {
-      const tree = await getElementTree(main.elementId);
-      const map: Record<string, ElementNameInfo> = {};
-      const walk = (nodes: FlexElementNode[]) => {
-        for (const node of nodes) {
-          if (node.elementId) {
-            map[node.elementId] = {
-              name: node.displayName && node.displayName !== "Unnamed" ? node.displayName : null,
-              documentNumber: node.documentNumber ?? null,
-            };
-          }
-          if (node.children?.length) walk(node.children);
-        }
-      };
-      walk(tree);
-      setNamesByElementId(map);
+      setTargets(await getJobPresupuestoTargets(job.id));
     } catch (error) {
-      // Names are best-effort -- keep the generic fallback labels if Flex is
-      // unreachable rather than blocking the chooser.
-      console.error("Failed to load Flex presupuesto names:", error);
+      console.error("Failed to load Flex presupuesto targets:", error);
+      // Fall back to the folders we already know about so the chooser still works.
+      const fallback: JobPresupuestoTarget[] = [];
+      for (const { department: optionDepartment, label } of MATERIAL_LIST_DEPARTMENTS) {
+        (dbCandidatesByDepartment.get(optionDepartment) ?? []).forEach((elementId, index, all) => {
+          fallback.push({
+            element_id: elementId,
+            department: optionDepartment,
+            display_name: all.length > 1 ? `Presupuesto ${label} ${index + 1}` : `Presupuesto ${label}`,
+            source: "database",
+          });
+        });
+      }
+      setTargets(fallback);
     } finally {
-      setIsLoadingNames(false);
+      setIsLoadingTargets(false);
     }
-  }, [job]);
+  }, [dbCandidatesByDepartment, job.id]);
 
   const handleOpenChange = React.useCallback(
     (open: boolean) => {
-      if (open && needsNames) void ensureNamesLoaded();
+      if (open) void ensureTargetsLoaded();
     },
-    [ensureNamesLoaded, needsNames]
-  );
-
-  const getCandidateLabel = React.useCallback(
-    (candidate: PresupuestoCandidate, index: number, total: number) => {
-      const info = namesByElementId[candidate.elementId];
-      if (info?.name) {
-        return info.documentNumber ? `${info.name} (${info.documentNumber})` : info.name;
-      }
-      const base = FOLDER_TYPE_LABELS[candidate.folderType] ?? "Presupuesto";
-      if (info?.documentNumber) {
-        return `${base} (${info.documentNumber})`;
-      }
-      return total > 1 ? `${base} ${index + 1}` : base;
-    },
-    [namesByElementId]
+    [ensureTargetsLoaded]
   );
 
   const handlePrintReport = React.useCallback(
     async (printDepartment: PrintableDepartment, label: string, overrideElementId?: string) => {
-      if (!job.id || loadingDepartment || !isDepartmentAvailable(printDepartment)) return;
+      if (!job.id || loadingDepartment) return;
 
       setLoadingDepartment(printDepartment);
       // Open the tab synchronously (still within the click's user-gesture window) so
@@ -274,40 +217,28 @@ export const PrintFlexReportAction = ({
         setLoadingDepartment(null);
       }
     },
-    [copy, isDepartmentAvailable, job.id, loadingDepartment, reportType, toast]
+    [copy, job.id, loadingDepartment, reportType, toast]
   );
 
   const loadingLabel = MATERIAL_LIST_DEPARTMENTS.find(
     (option) => option.department === loadingDepartment
   )?.label;
 
-  const renderCandidateItems = (
-    itemDepartment: PrintableDepartment,
-    label: string,
-    candidates: PresupuestoCandidate[]
-  ) =>
-    candidates.map((candidate, index) => (
-      <DropdownMenuItem
-        key={candidate.elementId}
-        className="gap-2"
-        onSelect={(event) => {
-          event.preventDefault();
-          void handlePrintReport(itemDepartment, label, candidate.elementId);
-        }}
-      >
-        <ReportAvailabilityLight available />
-        {getCandidateLabel(candidate, index, candidates.length)}
-      </DropdownMenuItem>
-    ));
+  const loadingTargetsItem = isLoadingTargets ? (
+    <DropdownMenuItem disabled className="gap-2">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Cargando presupuestos…
+    </DropdownMenuItem>
+  ) : null;
 
   if (scopedDepartmentOption) {
-    const candidates = candidatesByDepartment.get(scopedDepartmentOption.department) ?? [];
-    const isAvailable = candidates.length > 0;
+    const dbCandidates = dbCandidatesByDepartment.get(scopedDepartmentOption.department) ?? [];
+    const isAvailable = dbCandidates.length > 0;
 
-    // Zero or one presupuesto keeps the direct-print button; multiple presupuestos
-    // turn it into a chooser so the user selects which one to print.
-    if (candidates.length <= 1) {
-      const singleCandidate = candidates[0];
+    // Zero or one persisted presupuesto keeps the one-click print button; two or
+    // more turn it into a chooser (loaded from the Flex tree so extras and their
+    // real names show up).
+    if (dbCandidates.length <= 1) {
       return (
         <Button
           variant="outline"
@@ -318,7 +249,7 @@ export const PrintFlexReportAction = ({
             void handlePrintReport(
               scopedDepartmentOption.department,
               scopedDepartmentOption.label,
-              singleCandidate?.elementId
+              dbCandidates[0]
             )
           }
           title={
@@ -337,6 +268,12 @@ export const PrintFlexReportAction = ({
         </Button>
       );
     }
+
+    // A scoped chooser shows this department's presupuestos plus any Flex-only ones
+    // whose department couldn't be determined from the tree.
+    const scopedTargets = (targets ?? []).filter(
+      (target) => target.department === scopedDepartmentOption.department || target.department === null
+    );
 
     return (
       <DropdownMenu onOpenChange={handleOpenChange}>
@@ -359,17 +296,24 @@ export const PrintFlexReportAction = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" onClick={(event) => event.stopPropagation()}>
-          {isLoadingNames && (
-            <DropdownMenuItem disabled className="gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Cargando presupuestos…
+          {loadingTargetsItem}
+          {scopedTargets.map((target) => (
+            <DropdownMenuItem
+              key={target.element_id}
+              className="gap-2"
+              onSelect={(event) => {
+                event.preventDefault();
+                void handlePrintReport(
+                  scopedDepartmentOption.department,
+                  scopedDepartmentOption.label,
+                  target.element_id
+                );
+              }}
+            >
+              <ReportAvailabilityLight available />
+              {targetLabel(target)}
             </DropdownMenuItem>
-          )}
-          {renderCandidateItems(
-            scopedDepartmentOption.department,
-            scopedDepartmentOption.label,
-            candidates
-          )}
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -398,50 +342,57 @@ export const PrintFlexReportAction = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" onClick={(event) => event.stopPropagation()}>
-        {isLoadingNames && (
-          <DropdownMenuItem disabled className="gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando presupuestos…
-          </DropdownMenuItem>
-        )}
-        {MATERIAL_LIST_DEPARTMENTS.map(({ department: optionDepartment, label }) => {
-          const candidates = candidatesByDepartment.get(optionDepartment) ?? [];
-
-          if (candidates.length === 0) {
-            return (
-              <DropdownMenuItem key={optionDepartment} className="gap-2" disabled>
-                <ReportAvailabilityLight available={false} />
-                {label}
-              </DropdownMenuItem>
-            );
-          }
-
-          if (candidates.length === 1) {
-            return (
-              <DropdownMenuItem
-                key={optionDepartment}
-                className="gap-2"
-                onSelect={(event) => {
-                  event.preventDefault();
-                  void handlePrintReport(optionDepartment, label, candidates[0].elementId);
-                }}
-              >
-                <ReportAvailabilityLight available />
-                {label}
-              </DropdownMenuItem>
-            );
-          }
+        {loadingTargetsItem}
+        {MATERIAL_LIST_DEPARTMENTS.map(({ department: optionDepartment, label }, index) => {
+          const departmentTargets = (targets ?? []).filter(
+            (target) => target.department === optionDepartment
+          );
+          const hasItems = departmentTargets.length > 0;
+          // Available if the job card knows of a persisted presupuesto or the Flex
+          // tree surfaced one for this department.
+          const available = isDepartmentAvailable(optionDepartment) || hasItems;
 
           return (
-            <DropdownMenuSub key={optionDepartment}>
-              <DropdownMenuSubTrigger className="gap-2">
-                <ReportAvailabilityLight available />
+            <React.Fragment key={optionDepartment}>
+              {index > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="flex items-center gap-2 text-xs">
+                <ReportAvailabilityLight available={available} />
                 {label}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent onClick={(event) => event.stopPropagation()}>
-                {renderCandidateItems(optionDepartment, label, candidates)}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+              </DropdownMenuLabel>
+              {/* DB says available but the labelled list hasn't resolved a specific
+                  element yet -- let the server resolve the department's presupuesto. */}
+              {available && !hasItems && !isLoadingTargets && (
+                <DropdownMenuItem
+                  className="gap-2"
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    void handlePrintReport(optionDepartment, label);
+                  }}
+                >
+                  <ReportAvailabilityLight available />
+                  {`Presupuesto ${label}`}
+                </DropdownMenuItem>
+              )}
+              {departmentTargets.map((target) => (
+                <DropdownMenuItem
+                  key={target.element_id}
+                  className="gap-2"
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    void handlePrintReport(optionDepartment, label, target.element_id);
+                  }}
+                >
+                  <ReportAvailabilityLight available />
+                  {targetLabel(target)}
+                </DropdownMenuItem>
+              ))}
+              {!available && !isLoadingTargets && (
+                <DropdownMenuItem disabled className="gap-2">
+                  <ReportAvailabilityLight available={false} />
+                  {`Sin presupuesto de ${label}`}
+                </DropdownMenuItem>
+              )}
+            </React.Fragment>
           );
         })}
       </DropdownMenuContent>

@@ -636,3 +636,135 @@ export async function getJobFlexEquipmentTargets(jobId: string): Promise<JobFlex
     return dbTargets;
   }
 }
+
+export interface JobPresupuestoTarget {
+  element_id: string;
+  /** 'sound' | 'lights' when known (from the DB row or inferred from the tree), otherwise null. */
+  department: string | null;
+  display_name: string;
+  document_number?: string;
+  source: 'database' | 'flex_api';
+}
+
+// The Flex tree tags presupuesto folders by name, not by our department enum, so
+// infer the department from the nearest ancestor/self folder name. Matches the
+// Spanish folder labels used when the structure is created (e.g. "Extras … -
+// Sonido", "… - Luces", or the "Sonido" / "Luces" department folders).
+const inferDepartmentFromFlexName = (name?: string | null): 'sound' | 'lights' | null => {
+  if (!name) return null;
+  if (/son(ido)?|sound|audio/i.test(name)) return 'sound';
+  if (/luces|ilumina|lights?/i.test(name)) return 'lights';
+  return null;
+};
+
+interface FlexPresupuestoTreeMatch {
+  element_id: string;
+  department: 'sound' | 'lights' | null;
+  display_name: string;
+  document_number?: string;
+}
+
+function extractPresupuestoTargetsFromTree(
+  node: FlexTreeNode | FlexTreeNode[],
+  inheritedDepartment: 'sound' | 'lights' | null = null,
+  depth: number = 0,
+): FlexPresupuestoTreeMatch[] {
+  if (depth > MAX_TREE_DEPTH || !node) return [];
+  if (Array.isArray(node)) {
+    return node.flatMap((item) => extractPresupuestoTargetsFromTree(item, inheritedDepartment, depth));
+  }
+
+  const name = node.displayName || node.name;
+  const department = inferDepartmentFromFlexName(name) ?? inheritedDepartment;
+
+  const results: FlexPresupuestoTreeMatch[] = [];
+  const elementId = node.elementId || node.nodeId || node.id;
+  const definitionId = node.definitionId || node.elementDefinitionId;
+  if (elementId && definitionId && PRESUPUESTO_DEFINITION_IDS.has(definitionId)) {
+    results.push({
+      element_id: elementId,
+      department,
+      display_name: name || node.documentNumber || 'Presupuesto',
+      document_number: node.documentNumber,
+    });
+  }
+
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      results.push(...extractPresupuestoTargetsFromTree(child, department, depth + 1));
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Lists the presupuesto elements a job can print a Flex report from, merging the
+ * persisted `flex_folders` rows (reliable department) with presupuesto nodes
+ * discovered in the Flex element tree (authoritative for names and for
+ * presupuestos created directly in Flex that were never persisted). Deduplicated
+ * by element_id; the DB row wins on identity but takes its display name from the
+ * tree when available. `presupuestos_recibidos` containers are intentionally
+ * excluded -- they are folders, not printable presupuestos.
+ */
+export async function getJobPresupuestoTargets(jobId: string): Promise<JobPresupuestoTarget[]> {
+  const { data, error } = await supabase
+    .from('flex_folders')
+    .select('element_id, department, created_at, folder_type')
+    .eq('job_id', jobId)
+    .in('folder_type', ['comercial_presupuesto', 'dryhire_presupuesto'])
+    .order('created_at', { ascending: true })
+    .limit(100);
+  if (error) throw new Error(`Failed to query presupuesto targets: ${error.message}`);
+
+  const byElementId = new Map<string, JobPresupuestoTarget>();
+  for (const row of data ?? []) {
+    byElementId.set(row.element_id, {
+      element_id: row.element_id,
+      department: row.department ?? null,
+      display_name: row.department ? `Presupuesto ${row.department}` : 'Presupuesto',
+      source: 'database',
+    });
+  }
+
+  const { data: mainFolder } = await supabase
+    .from('flex_folders')
+    .select('element_id')
+    .eq('job_id', jobId)
+    .or('folder_type.eq.main_event,folder_type.eq.main')
+    .maybeSingle();
+
+  if (mainFolder?.element_id) {
+    try {
+      const response = await flexApiFetch(
+        `/element/${encodeURIComponent(mainFolder.element_id)}/tree`,
+        { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+      );
+      if (response.ok) {
+        const tree = await response.json<FlexTreeNode | FlexTreeNode[]>();
+        for (const match of extractPresupuestoTargetsFromTree(tree)) {
+          const existing = byElementId.get(match.element_id);
+          if (existing) {
+            // Prefer the real Flex name/number over the generic DB label; keep the
+            // DB department (authoritative) but backfill it when it was missing.
+            existing.display_name = match.display_name || existing.display_name;
+            existing.document_number = match.document_number ?? existing.document_number;
+            if (!existing.department && match.department) existing.department = match.department;
+          } else {
+            byElementId.set(match.element_id, {
+              element_id: match.element_id,
+              department: match.department,
+              display_name: match.display_name || 'Presupuesto',
+              document_number: match.document_number,
+              source: 'flex_api',
+            });
+          }
+        }
+      }
+    } catch (fetchError) {
+      console.warn('[FlexPresupuestos] Could not enrich presupuesto targets from Flex tree:', fetchError);
+    }
+  }
+
+  return [...byElementId.values()];
+}

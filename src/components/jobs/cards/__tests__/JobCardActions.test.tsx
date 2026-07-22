@@ -19,6 +19,7 @@ const {
   generateTechnicalPowerSummaryPackMock,
   loadTechnicalPowerSummaryDataMock,
   fetchJobLogoMock,
+  getJobPresupuestoTargetsMock,
   dataLayerFunctionsInvokeMock,
   useIsMobileMock,
   useQueryMock,
@@ -34,6 +35,7 @@ const {
   generateTechnicalPowerSummaryPackMock: vi.fn(),
   loadTechnicalPowerSummaryDataMock: vi.fn(),
   fetchJobLogoMock: vi.fn(),
+  getJobPresupuestoTargetsMock: vi.fn(),
   dataLayerFunctionsInvokeMock: vi.fn(),
   useIsMobileMock: vi.fn(() => false),
   useQueryMock: vi.fn(),
@@ -209,6 +211,14 @@ vi.mock('@/utils/flexMainFolderId', () => ({
   resolveTourFolderForTourdate: vi.fn(),
 }));
 
+vi.mock('@/services/flexPullsheets', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/flexPullsheets')>();
+  return {
+    ...actual,
+    getJobPresupuestoTargets: getJobPresupuestoTargetsMock,
+  };
+});
+
 vi.mock('@/hooks/useFlexUuid', () => ({
   useFlexUuid: vi.fn(),
 }));
@@ -329,6 +339,7 @@ describe('JobCardActions', () => {
     });
     loadTechnicalPowerSummaryDataMock.mockResolvedValue(createTechnicalPowerSummary());
     fetchJobLogoMock.mockResolvedValue(undefined);
+    getJobPresupuestoTargetsMock.mockResolvedValue([]);
     dataLayerFunctionsInvokeMock.mockResolvedValue({ data: null, error: null });
     Object.defineProperty(window.URL, 'createObjectURL', {
       writable: true,
@@ -986,11 +997,19 @@ describe('JobCardActions', () => {
 
     it('prints a Flex material list for the selected production department option', async () => {
       const user = userEvent.setup();
+      getJobPresupuestoTargetsMock.mockResolvedValue([
+        {
+          element_id: 'sound-quote-element',
+          department: 'sound',
+          display_name: 'Presupuesto Sonido',
+          source: 'database',
+        },
+      ]);
       dataLayerFunctionsInvokeMock.mockResolvedValueOnce({
         data: {
           url: 'https://example.test/material-list.pdf',
-          fileName: 'Listado de Material - sound.pdf',
-          elementId: 'flex-element-id',
+          fileName: 'Listado de Material - sound - sound-quote-element.pdf',
+          elementId: 'sound-quote-element',
           folderType: 'comercial_presupuesto',
           elementValidated: true,
           elementJobMismatch: false,
@@ -1018,7 +1037,7 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...props} />);
 
       await user.click(screen.getByRole('button', { name: /Lista Material/i }));
-      await user.click(await screen.findByText('Sonido'));
+      await user.click(await screen.findByText('Presupuesto Sonido'));
 
       await waitFor(() => {
         expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
@@ -1028,6 +1047,7 @@ describe('JobCardActions', () => {
               jobId: 'test-job-id',
               department: 'sound',
               reportType: 'material-list',
+              overrideElementId: 'sound-quote-element',
             }),
           })
         );
@@ -1167,7 +1187,9 @@ describe('JobCardActions', () => {
       );
     });
 
-    it('does not enable scoped quote printing from a Presupuestos Recibidos container', () => {
+    it('does not enable printing from a Presupuestos Recibidos container alone', () => {
+      // `presupuestos_recibidos` is a container folder, not a printable presupuesto,
+      // so neither the material list nor the quote action should be enabled by it.
       const props = {
         ...defaultProps,
         department: 'lights',
@@ -1186,26 +1208,16 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      expect(screen.getByRole('button', { name: /Lista Material/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /Lista Material/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Presupuesto/i })).toBeDisabled();
-      expect(screen.getByTitle('No hay presupuesto de Iluminación en Flex')).toBeTruthy();
+      expect(screen.getAllByTitle('No hay presupuesto de Iluminación en Flex').length).toBeGreaterThan(0);
     });
 
     it('offers a chooser labelled with Flex names when a department has multiple presupuestos', async () => {
       const user = userEvent.setup();
-      vi.spyOn(flexMainFolderId, 'getMainFlexElementIdSync').mockReturnValue({
-        elementId: 'main-element-id',
-        department: 'sound',
-      });
-      getElementTreeMock.mockResolvedValue([
-        {
-          elementId: 'main-element-id',
-          displayName: 'Main',
-          children: [
-            { elementId: 'sound-a', displayName: 'Presupuesto Principal', documentNumber: 'PR01', children: [] },
-            { elementId: 'sound-b', displayName: 'Extras Sonido', documentNumber: 'PR02', children: [] },
-          ],
-        },
+      getJobPresupuestoTargetsMock.mockResolvedValue([
+        { element_id: 'sound-a', department: 'sound', display_name: 'Presupuesto Principal', document_number: 'PR01', source: 'database' },
+        { element_id: 'sound-b', department: 'sound', display_name: 'Extras Sonido', document_number: 'PR02', source: 'flex_api' },
       ]);
       dataLayerFunctionsInvokeMock.mockResolvedValue({
         data: {
@@ -1239,9 +1251,11 @@ describe('JobCardActions', () => {
 
       await user.click(materialButton);
 
-      // Names are fetched from the job's Flex element tree and used as labels.
+      // The chooser is populated from the Flex tree (via getJobPresupuestoTargets),
+      // labelled with each presupuesto's real name and document number.
       const extrasItem = await screen.findByText('Extras Sonido (PR02)');
       expect(screen.getByText('Presupuesto Principal (PR01)')).toBeTruthy();
+      expect(getJobPresupuestoTargetsMock).toHaveBeenCalledWith('test-job-id');
 
       await user.click(extrasItem);
 
@@ -1265,9 +1279,9 @@ describe('JobCardActions', () => {
       );
     });
 
-    it('falls back to generic presupuesto labels when Flex names are unavailable', async () => {
+    it('falls back to generic labels from the job folders when the Flex tree lookup fails', async () => {
       const user = userEvent.setup();
-      // getMainFlexElementIdSync stays null (beforeEach default) -> no name fetch.
+      getJobPresupuestoTargetsMock.mockRejectedValue(new Error('flex down'));
       const props = {
         ...defaultProps,
         department: 'lights',
@@ -1284,8 +1298,8 @@ describe('JobCardActions', () => {
 
       await user.click(screen.getByRole('button', { name: /Lista Material/i }));
 
-      expect(await screen.findByText('Presupuesto comercial 1')).toBeTruthy();
-      const secondOption = screen.getByText('Presupuesto comercial 2');
+      expect(await screen.findByText('Presupuesto Iluminación 1')).toBeTruthy();
+      const secondOption = screen.getByText('Presupuesto Iluminación 2');
 
       await user.click(secondOption);
 
@@ -1301,7 +1315,6 @@ describe('JobCardActions', () => {
           })
         );
       });
-      expect(getElementTreeMock).not.toHaveBeenCalled();
     });
 
     it('should render the technical power summary button for project management managers', () => {
