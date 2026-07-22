@@ -1,8 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { format } from "date-fns";
 import { useReducedMotion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download, Eye, FileText, Loader2, NotebookPen } from "lucide-react";
+import { FileText, Loader2, NotebookPen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,9 +29,9 @@ import type { Department } from "@/types/department";
 
 import { JobCardActions } from "../JobCardActions";
 import { JobCardAssignments } from "../JobCardAssignments";
-import { JobCardDocuments } from "../JobCardDocuments";
 import { JobCardHeader } from "../JobCardHeader";
 import { JobCardProgress } from "../JobCardProgress";
+import { JobCardDocumentSections } from "./JobCardDocumentSections";
 import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
 import { isManagementRole } from "@/utils/permissions";
 
@@ -160,7 +159,6 @@ export interface JobCardNewViewProps {
   flexPickerOptions: any;
   handleFlexPickerConfirm: (opts: any) => void;
 }
-
 export function JobCardNewView({
   job,
   department,
@@ -524,123 +522,25 @@ export function JobCardNewView({
                   />
                 )}
 
-                {documents.length > 0 && (
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDocsCollapsed((prev) => !prev);
-                      }}
-                    >
-                      <span className="text-sm font-medium">Documents ({documents.length})</span>
-                      {docsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {!docsCollapsed && (
-                      <div className="mt-1">
-                        <JobCardDocuments
-                          documents={documents}
-                          userRole={userRole}
-                          onDeleteDocument={(document) => handleDeleteDocument(document)}
-                          showTitle={false}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {tourDocuments.length > 0 && (
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setTourDocsCollapsed((prev) => !prev);
-                      }}
-                    >
-                      <span className="text-sm font-medium">Tour Documents ({tourDocuments.length})</span>
-                      {tourDocsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {!tourDocsCollapsed && (
-                      <div className="mt-1 space-y-2">
-                        {tourDocuments.map((file) => (
-                          <div
-                            key={file.id}
-                            className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{file.file_name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(file.uploaded_at), "MMM d, yyyy")}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              <button className="p-1 hover:bg-accent rounded" title="View" onClick={() => viewTourDocument(file)}>
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button
-                                className="p-1 hover:bg-accent rounded"
-                                title="Download"
-                                onClick={() => downloadTourDocument(file)}
-                              >
-                                <Download className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {riderFiles.length > 0 && (
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRidersCollapsed((prev) => !prev);
-                      }}
-                    >
-                      <span className="text-sm font-medium">Artist Riders ({riderFiles.length})</span>
-                      {ridersCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {!ridersCollapsed && (
-                      <div className="mt-1 space-y-2">
-                        {riderFiles.map((file) => (
-                          <div
-                            key={file.id}
-                            className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{file.file_name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                Artist: {cardArtistNameMap.get(file.artist_id) || "Unknown"}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              <button className="p-1 hover:bg-accent rounded" title="View" onClick={() => viewRider(file)}>
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button
-                                className="p-1 hover:bg-accent rounded"
-                                title="Download"
-                                onClick={() => downloadRider(file)}
-                              >
-                                <Download className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <JobCardDocumentSections
+                  jobType={job.job_type}
+                  userRole={userRole}
+                  documents={documents}
+                  documentsCollapsed={docsCollapsed}
+                  setDocumentsCollapsed={setDocsCollapsed}
+                  onDeleteDocument={handleDeleteDocument}
+                  tourDocuments={tourDocuments}
+                  tourDocumentsCollapsed={tourDocsCollapsed}
+                  setTourDocumentsCollapsed={setTourDocsCollapsed}
+                  onViewTourDocument={viewTourDocument}
+                  onDownloadTourDocument={downloadTourDocument}
+                  riderFiles={riderFiles}
+                  artistNameMap={cardArtistNameMap}
+                  ridersCollapsed={ridersCollapsed}
+                  setRidersCollapsed={setRidersCollapsed}
+                  onViewRider={viewRider}
+                  onDownloadRider={downloadRider}
+                />
               </>
             )}
           </div>

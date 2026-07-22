@@ -17,9 +17,7 @@ import {
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
-  ResponsiveDialogTrigger,
 } from "@/components/ui/responsive-dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -28,36 +26,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Job } from "@/types/job";
-import { User } from "@/types/user";
-import { useEffect, useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AlertCircle, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
-import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQuery } from "@tanstack/react-query";
-import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
+import { roleOptionsForDiscipline } from '@/utils/roles';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
-import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
 import { useDirectJobAssignments } from '@/hooks/useDirectJobAssignments';
 import { queryKeys } from "@/lib/react-query";
-const DEFAULT_JOB_TIME_ZONE = 'Europe/Madrid';
-const formatJobDateKey = (date: Date, timeZone = DEFAULT_JOB_TIME_ZONE) => formatInTimeZone(date, timeZone, "yyyy-MM-dd");
-const parseJobDateKey = (dateKey: string, timeZone = DEFAULT_JOB_TIME_ZONE) => fromZonedTime(`${dateKey}T00:00:00`, timeZone);
-const addDaysToDateKey = (dateKey: string, days: number) => {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
-};
+import {
+  formatAssignmentTechnicianName,
+  formatDepartmentName,
+  formatJobDateLabel,
+} from "@/components/jobs/job-assignment-dialog/formatters";
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -67,15 +55,6 @@ interface JobAssignmentDialogProps {
   department?: string;
   disableCategorySync?: boolean;
 }
-
-type JobDateTypeRow = {
-  date?: string | null;
-  type?: string | null;
-};
-
-type JobWithDateTypes = Job & {
-  job_date_types?: JobDateTypeRow[];
-};
 
 // Helper function to sync timesheet categories when assignment roles change
 const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
@@ -111,65 +90,12 @@ const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
   }
 };
 
-// Helper function to format technician name from assignment
-const formatAssignmentTechnicianName = (assignment: any) => {
-  if (assignment.profiles) {
-    const firstName = assignment.profiles.first_name || '';
-    const lastName = assignment.profiles.last_name || '';
-    const fullName = `${firstName} ${lastName}`.trim();
-    return fullName || 'Unnamed Technician';
-  }
-  return 'Unknown Technician';
-};
-
-// Helper function to format available technician name
-const formatAvailableTechnicianName = (technician: { first_name: string; last_name: string; role: string }) => {
-  const isHouseTech = technician.role === 'house_tech';
-  const isManagement = isDepartmentManagementRole(technician.role);
-  const suffix = isHouseTech ? ' (House Tech)' : isManagement ? ' (Mgmt)' : '';
-  return `${technician.first_name} ${technician.last_name}${suffix}`;
-};
-
-const formatJobDateLabel = (date: string | null | undefined) => {
-  if (!date) return '';
-  try {
-    const dateKey = date.includes('T')
-      ? formatInTimeZone(new Date(date), DEFAULT_JOB_TIME_ZONE, "yyyy-MM-dd")
-      : date;
-    const madridDate = fromZonedTime(`${dateKey}T00:00:00`, DEFAULT_JOB_TIME_ZONE);
-    return new Intl.DateTimeFormat('es-ES', {
-      dateStyle: 'full',
-      timeZone: DEFAULT_JOB_TIME_ZONE,
-    }).format(madridDate);
-  } catch (error) {
-    console.warn('Failed to format job date', error);
-    return date;
-  }
-};
-
-const formatDepartmentName = (department: string) => {
-  const names: Record<string, string> = {
-    'sound': 'Sonido',
-    'lights': 'Luces',
-    'video': 'Video'
-  };
-  return names[department.toLowerCase()] || department;
-};
-
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department, disableCategorySync }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
-  const { user, userRole } = useOptimizedAuth();
-  const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
-  const [soundRole, setSoundRole] = useState<string>("none");
-  const [lightsRole, setLightsRole] = useState<string>("none");
-  const [singleDay, setSingleDay] = useState(false);
-  const [addAsConfirmed, setAddAsConfirmed] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useOptimizedAuth();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [selectedJobDate, setSelectedJobDate] = useState<Date | null>(null);
-  const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
-  const { manageFlexCrewAssignment, useCrewCallData } = useFlexCrewAssignments();
+  const { removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
+  const { useCrewCallData } = useFlexCrewAssignments();
 
   // Get current user's department or use the passed department
   const currentDepartment = department || user?.department || "sound";
@@ -179,7 +105,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   // Filter assignments to only show those for the current department
   const departmentAssignments = useMemo(() => {
-    return (currentAssignments || []).filter((assignment: any) => {
+    return (currentAssignments || []).filter((assignment) => {
       if (currentDepartment === 'sound') {
         return assignment.sound_role && assignment.sound_role !== 'none';
       } else if (currentDepartment === 'lights') {
@@ -191,12 +117,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     });
   }, [currentAssignments, currentDepartment]);
 
-  // Fetch job data to get start/end times for availability checking
-  const { data: jobData, isLoading: isLoadingJob } = useQuery({
+  // Fetch only the fields needed to enforce the assignment closure window.
+  const { data: jobData } = useQuery({
     queryKey: queryKeys.scope("job", jobId),
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from("jobs")
-        .select("id, start_time, end_time, timezone, title, job_date_types(date, type)")
+        .select("id, end_time, timezone")
         .eq("id", jobId)
         .single();
 
@@ -206,251 +132,25 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     enabled: isOpen && !!jobId
   });
 
-  // Use the available technicians hook with proper filtering
-  const {
-    technicians: availableTechnicians,
-    isLoading: isLoadingTechnicians
-  } = useAvailableTechnicians({
-    department: currentDepartment,
-    jobId: jobId,
-    jobStartTime: jobData?.start_time || "",
-    jobEndTime: jobData?.end_time || "", jobTimezone: jobData?.timezone,
-    assignmentDate: singleDay ? (selectedJobDate ? formatJobDateKey(selectedJobDate, jobData?.timezone || undefined) : null) : null,
-    enabled: isOpen && !!jobData && !!jobId
-  });
-
-  // Filter technicians: include technicians, house techs, and flagged admin/management
-  const filteredTechnicians = availableTechnicians.filter(tech =>
-    tech.role === 'technician' || tech.role === 'house_tech' || isManagementRole(tech.role)
-  );
-
   const isClosureLocked = useMemo(
     () => isJobPastClosureWindow(jobData?.end_time, jobData?.timezone || 'Europe/Madrid'),
     [jobData?.end_time, jobData?.timezone]
   );
 
-  const jobDates = useMemo(() => {
-    if (!jobData) return [] as Date[];
-    const jobTimeZone = jobData.timezone || DEFAULT_JOB_TIME_ZONE;
-
-    const dateTypeRows = (jobData as unknown as JobWithDateTypes).job_date_types;
-    const typedDates: Date[] = Array.isArray(dateTypeRows)
-      ? dateTypeRows
-        .filter((dt): dt is JobDateTypeRow & { date: string } => Boolean(dt?.date))
-        .filter((dt) => {
-          const type = (dt?.type || '').toLowerCase();
-          return type !== 'off' && type !== 'travel';
-        })
-        .map((dt) => parseJobDateKey(dt.date, jobTimeZone))
-      : [];
-
-    if (typedDates.length > 0) {
-      return typedDates.sort((a, b) => a.getTime() - b.getTime());
-    }
-
-    if (jobData.start_time) {
-      const startKey = formatJobDateKey(new Date(jobData.start_time), jobTimeZone);
-      if (jobData.end_time) {
-        const endKey = formatJobDateKey(new Date(jobData.end_time), jobTimeZone);
-        const result: Date[] = [];
-        let cursorKey = startKey;
-        while (cursorKey <= endKey) {
-          result.push(parseJobDateKey(cursorKey, jobTimeZone));
-          cursorKey = addDaysToDateKey(cursorKey, 1);
-        }
-        return result;
-      }
-      return [parseJobDateKey(startKey, jobTimeZone)];
-    }
-
-    return [] as Date[];
-  }, [jobData]);
-
-  const allowedJobDateSet = useMemo(() => {
-    return new Set(jobDates.map((date) => formatJobDateKey(date, jobData?.timezone || undefined)));
-  }, [jobDates, jobData?.timezone]);
-
-  useEffect(() => {
-    if (!singleDay) return;
-
-    if (jobDates.length === 0) {
-      setSelectedJobDate(null);
-      return;
-    }
-
-    const currentKey = selectedJobDate ? formatJobDateKey(selectedJobDate, jobData?.timezone || undefined) : null;
-    if (!currentKey || !allowedJobDateSet.has(currentKey)) {
-      setSelectedJobDate(jobDates[0]);
-    }
-  }, [jobDates, singleDay, allowedJobDateSet, selectedJobDate, jobData?.timezone]);
-
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSingleDay(false);
-      setSelectedJobDate(null);
-    }
-  }, [isOpen]);
-
   // Fetch crew call data for the current job and department
-  const { data: crewCallData, isLoading: isLoadingCrewCall } = useCrewCallData(jobId, currentDepartment);
+  const { data: crewCallData } = useCrewCallData(jobId, currentDepartment);
 
   // Required roles summary for this job + department
   const { data: reqSummary = [] } = useRequiredRoleSummary(jobId);
   const reqForDept = useMemo(() => (reqSummary || []).find(r => r.department === currentDepartment) || null, [reqSummary, currentDepartment]);
   const assignedByRole = useMemo(() => {
     const m = new Map<string, number>();
-    (currentAssignments || []).forEach((a: any) => {
+    (currentAssignments || []).forEach((a) => {
       const code = currentDepartment === 'sound' ? a.sound_role : currentDepartment === 'lights' ? a.lights_role : a.video_role;
       if (code) m.set(code, (m.get(code) || 0) + 1);
     });
     return m;
   }, [currentAssignments, currentDepartment]);
-  const remainingByRole = useMemo(() => {
-    const m = new Map<string, number>();
-    const roles = reqForDept?.roles || [];
-    for (const r of roles) {
-      const have = assignedByRole.get(r.role_code) || 0;
-      const left = (r.quantity || 0) - have;
-      m.set(r.role_code, left);
-    }
-    return m;
-  }, [reqForDept, assignedByRole]);
-
-  const handleAddTechnician = async () => {
-    if (isClosureLocked) {
-      toast({
-        title: "Acción no permitida",
-        description: "El período de modificación para este trabajo ha finalizado",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!selectedTechnician) {
-      toast({
-        title: "Advertencia",
-        description: "Por favor selecciona un técnico",
-      });
-      return;
-    }
-
-    const singleDayDateKey = selectedJobDate ? formatJobDateKey(selectedJobDate, jobData?.timezone || undefined) : null;
-    if (singleDay && !singleDayDateKey) {
-      toast({
-        title: "Selecciona una fecha",
-        description: "Elige la fecha del trabajo que debe cubrir esta asignación.",
-      });
-      return;
-    }
-
-    setIsAdding(true);
-
-    try {
-      // Guard against over-assignment when requirements exist and no override
-      const selectedCode = currentDepartment === 'sound' ? soundRole : currentDepartment === 'lights' ? lightsRole : 'none';
-      if (reqForDept && selectedCode && selectedCode !== 'none' && !isManagementRole(userRole)) {
-        const left = remainingByRole.get(selectedCode) ?? 0;
-        if (left <= 0) {
-          toast({ title: 'Role full', description: 'No remaining slots for this role', variant: 'destructive' });
-          setIsAdding(false);
-          return;
-        }
-      }
-      await addAssignment(
-        selectedTechnician,
-        soundRole,
-        lightsRole,
-        singleDay
-          ? {
-            singleDay: true,
-            singleDayDate: singleDayDateKey,
-            addAsConfirmed: addAsConfirmed,
-          }
-          : {
-            addAsConfirmed: addAsConfirmed,
-          }
-      );
-
-      toast({
-        title: "Success",
-        description: "Technician assigned successfully",
-      });
-
-      setSelectedTechnician(null);
-      setSoundRole("none");
-      setLightsRole("none");
-      setSingleDay(false);
-      setAddAsConfirmed(false);
-      setSelectedJobDate(null);
-      onAssignmentChange();
-    } catch (error: any) {
-      console.error("Error adding technician:", error);
-      toast({
-        title: "Error",
-        description: "Could not assign technician",
-        variant: "destructive",
-      });
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  const handleSaveAssignments = async () => {
-    const assignmentsToProcess: Array<{ technician_id: string; sound_role: string; lights_role: string }> = [];
-
-    // Process current assignments for Flex integration
-    assignments.forEach((assignment) => {
-      assignmentsToProcess.push({
-        technician_id: assignment.technician_id,
-        sound_role: assignment.sound_role,
-        lights_role: assignment.lights_role,
-      });
-    });
-
-    if (assignmentsToProcess.length === 0) {
-      toast({
-        title: "Info",
-        description: "No assignments to save",
-      });
-      onClose();
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Process assignments for Flex integration
-      for (const assignment of assignmentsToProcess) {
-        const technicianId = assignment.technician_id;
-
-        // Add to Flex crew calls for sound and lights departments
-        if (assignment.sound_role && assignment.sound_role !== 'none') {
-          await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'add');
-        }
-
-        if (assignment.lights_role && assignment.lights_role !== 'none') {
-          await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'add');
-        }
-      }
-
-      toast({
-        title: "Success",
-        description: "Assignments saved successfully",
-      });
-      onClose();
-      onAssignmentChange();
-    } catch (error: any) {
-      console.error("Error saving assignments:", error);
-      toast({
-        title: "Error",
-        description: "Could not save assignments",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleViewCrewCall = () => {
     if (crewCallData?.flex_element_id) {
@@ -498,19 +198,6 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     } finally {
       setIsSyncing(false);
     }
-  };
-
-  const getDepartmentRoleOptions = () => {
-    const all = roleOptionsForDiscipline(currentDepartment);
-    if (reqForDept && !isManagementRole(userRole)) {
-      const remainingSet = new Set(
-        Array.from(remainingByRole.entries())
-          .filter(([, left]) => left > 0)
-          .map(([code]) => code)
-      );
-      if (remainingSet.size > 0) return all.filter(opt => remainingSet.has(opt.code));
-    }
-    return all;
   };
 
   return (

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGlobalTasks, GlobalTaskFilters, GlobalTask } from '@/hooks/useGlobalTasks';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
+import { useAllEligibleTaskUsers } from '@/hooks/useAllEligibleTaskUsers';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { canAssignTasks, canCreateTasks, canEditTasks, normalizeDept, type Dept } from '@/utils/tasks';
 import { CreateGlobalTaskDialog } from '@/components/tasks/CreateGlobalTaskDialog';
@@ -10,7 +11,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Combobox, ComboboxGroup, ComboboxItem } from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -23,25 +24,15 @@ import {
   Trash2,
   Link2,
   Filter,
-  CheckCircle2,
-  Clock,
-  CircleDashed,
   Pencil,
   Save,
   X,
 } from 'lucide-react';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { resolveTaskDocBucket } from '@/hooks/useGlobalTaskMutations';
-import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { isPast, parseISO } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
-import {
-  formatInJobTimezone,
-  utcToLocalInput,
-  localInputToUTC,
-} from '@/utils/timezoneUtils';
+import { localInputToUTC } from '@/utils/timezoneUtils';
 import { getErrorMessage } from '@/utils/errorMessage';
 import {
   DOCUMENT_UPLOAD_ACCEPT,
@@ -49,97 +40,24 @@ import {
 } from '@/utils/documentUploadValidation';
 
 
-import { queryKeys } from "@/lib/react-query";
-interface DeptUser {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-}
-
-const DEPARTMENT_LABELS: Record<string, string> = {
-  sound: 'Sonido',
-  lights: 'Luces',
-  video: 'Vídeo',
-  production: 'Producción',
-  administrative: 'Administración',
-};
-const DEPARTMENT_OPTIONS: Dept[] = ['sound', 'lights', 'video', 'production', 'administrative'];
-
-const PRIORITY_LABELS: Record<number, { label: string; class: string }> = {
-  1: { label: 'Alta', class: 'bg-red-500/10 text-red-600 border-red-500/20' },
-  2: { label: 'Media', class: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' },
-  3: { label: 'Baja', class: 'bg-green-500/10 text-green-600 border-green-500/20' },
-};
-
-const STATUS_ICONS: Record<string, React.ReactNode> = {
-  not_started: <CircleDashed className="h-4 w-4 text-muted-foreground" />,
-  in_progress: <Clock className="h-4 w-4 text-blue-500" />,
-  completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Sin empezar',
-  in_progress: 'En progreso',
-  completed: 'Completada',
-};
-
-function useAllEligibleUsers(userDepartment: string | null) {
-  return useQuery<{ flat: DeptUser[]; groups: ComboboxGroup[]; items: ComboboxItem[] }>({
-    queryKey: queryKeys.scope('all-eligible-users', userDepartment),
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('profiles')
-        .select('id, first_name, last_name, department')
-        .order('first_name');
-      if (error) throw error;
-      const all = (data || []) as (DeptUser & { department: string | null })[];
-      const mine: ComboboxGroup = { heading: 'Tu departamento', items: [] };
-      const others: ComboboxGroup = { heading: 'Otros departamentos', items: [] };
-      const flat: DeptUser[] = [];
-      const items: ComboboxItem[] = [];
-      for (const u of all) {
-        const label = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.id;
-        flat.push(u);
-        items.push({ value: u.id, label });
-        if (userDepartment && u.department === userDepartment) {
-          mine.items.push({ value: u.id, label });
-        } else {
-          others.items.push({ value: u.id, label });
-        }
-      }
-      const groups: ComboboxGroup[] = [];
-      if (mine.items.length > 0) groups.push(mine);
-      if (others.items.length > 0) groups.push(others);
-      return { flat, groups, items };
-    },
-  });
-}
-
-/** Safe normalizeDept wrapper that defaults to 'sound' for page-level routing. */
-function normalizeDeptOrDefault(raw: string | null): Dept {
-  return normalizeDept(raw) ?? 'sound';
-}
-
-const MADRID_TZ = 'Europe/Madrid';
-
-function formatDateMadrid(isoDate: string): string {
-  return formatInJobTimezone(isoDate, 'dd/MM/yyyy', MADRID_TZ);
-}
-
-function formatDateTimeMadrid(isoDate: string): string {
-  return formatInJobTimezone(isoDate, 'dd/MM/yyyy HH:mm', MADRID_TZ);
-}
-
-function dateInputValue(isoDate: string): string {
-  // utcToLocalInput returns 'yyyy-MM-ddTHH:mm', we only need the date part
-  return utcToLocalInput(isoDate, MADRID_TZ).slice(0, 10);
-}
-
-function isOverdueMadrid(isoDate: string): boolean {
-  // Compare both dates in Madrid timezone to get correct overdue status
-  const madridNow = toZonedTime(new Date(), MADRID_TZ);
-  const madridDue = toZonedTime(parseISO(isoDate), MADRID_TZ);
-  return madridDue < madridNow;
-}
+import {
+  DEPARTMENT_LABELS,
+  DEPARTMENT_OPTIONS,
+  MADRID_TZ,
+  PRIORITY_LABELS,
+  STATUS_ICONS,
+  STATUS_LABELS,
+  dateInputValue,
+  formatDateMadrid,
+  formatDateTimeMadrid,
+  isOverdueMadrid,
+  normalizeDeptOrDefault,
+} from '@/pages/global-tasks/globalTasksSupport';
+import {
+  filterGlobalTasks,
+  getGlobalTaskStats,
+  getGlobalTaskTypeOptions,
+} from '@/pages/global-tasks/globalTaskSelectors';
 
 export default function GlobalTasks() {
   const { user, userRole, userDepartment } = useOptimizedAuth();
@@ -189,35 +107,20 @@ export default function GlobalTasks() {
 
   const { tasks, loading, refetch } = useGlobalTasks(dept, Object.keys(filters).length > 0 ? filters : undefined);
   const mutations = useGlobalTaskMutations(dept);
-  const { data: usersData } = useAllEligibleUsers(userDepartment);
+  const { data: usersData } = useAllEligibleTaskUsers(userDepartment);
   const userGroups = usersData?.groups || [];
   const allUsers = usersData?.flat || [];
   const allUserItems = usersData?.items || [];
 
   // Client-side filter
-  const filteredTasks = React.useMemo(() => {
-    let result = tasks;
-    if (statusFilter === 'active') {
-      result = result.filter((t) => t.status !== 'completed');
-    } else if (statusFilter && statusFilter !== 'all') {
-      result = result.filter((t) => t.status === statusFilter);
-    }
-    if (assigneeFilter === 'unassigned') {
-      result = result.filter((t) => !t.assigned_to);
-    } else if (
-      assigneeFilter &&
-      assigneeFilter !== 'all' &&
-      assigneeFilter !== 'me'
-    ) {
-      // assigneeFilter is an explicit user id
-      result = result.filter((t) => t.assigned_to === assigneeFilter);
-    }
-    return result;
-  }, [tasks, statusFilter, assigneeFilter]);
+  const filteredTasks = React.useMemo(
+    () => filterGlobalTasks(tasks, statusFilter, assigneeFilter),
+    [tasks, statusFilter, assigneeFilter],
+  );
 
   const taskTypeOptions = React.useMemo(
-    () => Array.from(new Set(tasks.map((t) => t.task_type).filter((t): t is string => Boolean(t)))).sort(),
-    [tasks]
+    () => getGlobalTaskTypeOptions(tasks),
+    [tasks],
   );
 
   React.useEffect(() => {
@@ -231,12 +134,7 @@ export default function GlobalTasks() {
   }, [taskTypeOptions, bulkDeleteType]);
 
   // Stats
-  const stats = React.useMemo(() => ({
-    total: tasks.length,
-    notStarted: tasks.filter((t) => t.status === 'not_started').length,
-    inProgress: tasks.filter((t) => t.status === 'in_progress').length,
-    completed: tasks.filter((t) => t.status === 'completed').length,
-  }), [tasks]);
+  const stats = React.useMemo(() => getGlobalTaskStats(tasks), [tasks]);
 
   const onUpload = async (task: GlobalTask, files: File[]) => {
     if (files.length === 0) return;

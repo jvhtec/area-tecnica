@@ -180,4 +180,19 @@ describe('rfIemTablePdfExport helpers', () => {
       }),
     ).toBe('2026-03-11');
   });
+
+  it('does not apply the overnight rollover to invalid clock times', () => {
+    for (const showStart of ['01:60', '24:00', '01:15:60']) {
+      expect(
+        computeRfIemFestivalDayKey({
+          name: 'Invalid Time',
+          stage: 1,
+          date: '2026-03-11',
+          showStart,
+          wirelessSystems: [{ model: 'RF', quantity_ch: 1 }],
+          iemSystems: [],
+        }),
+      ).toBe('2026-03-11');
+    }
+  });
 });

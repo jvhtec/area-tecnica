@@ -1,26 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flexApiFetch } from '@/lib/flex-api-client';
-import { FLEX_FOLDER_IDS, RESPONSIBLE_PERSON_IDS, DEPARTMENT_SUFFIXES } from '@/utils/flex-folders/constants';
+import { FLEX_FOLDER_IDS } from '@/utils/flex-folders/constants';
 import { resourceIdForRole, EXTRA_RESOURCE_IDS } from '@/utils/flex-labor-resources';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 import { formatFlexWorkOrderDate } from '@/services/flexWorkOrderDates';
 
-const WORK_ORDER_DEFINITION_ID = FLEX_FOLDER_IDS.ordenTrabajo;
-const DEFAULT_LOCATION_ID = FLEX_FOLDER_IDS.location;
-const PERSONNEL_RESPONSIBLE_ID = RESPONSIBLE_PERSON_IDS.personnel;
-const CURRENCY_EUR_ID = 'd3d53320-6926-11ea-9bb5-2a0a4490a7fb';
-const PRICING_MODEL_BASE_2025_ID = 'a4307bf9-cd39-4df1-9d6d-48932120c4bd';
-const PRICING_MODEL_DIA_TOUR_ID = '04c62780-c51d-11ea-a087-2a0a4490a7fb';
-
-function technicianDisplayName(profile?: {
-  first_name?: string | null;
-  last_name?: string | null;
-}): string {
-  const first = profile?.first_name?.trim();
-  const last = profile?.last_name?.trim();
-  const combined = [first, last].filter(Boolean).join(' ');
-  return combined || 'Sin nombre';
-}
+import {
+  CURRENCY_EUR_ID,
+  PERSONNEL_RESPONSIBLE_ID,
+  PRICING_MODEL_BASE_2025_ID,
+  PRICING_MODEL_DIA_TOUR_ID,
+  WORK_ORDER_DEFINITION_ID,
+  technicianDisplayName,
+} from '@/services/flex-work-orders/config';
 
 async function createWorkOrderElement(options: {
   parentElementId: string;

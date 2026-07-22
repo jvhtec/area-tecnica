@@ -6,67 +6,27 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, Upload } from 'lucide-react';
-import { GearSetupFormData } from '@/types/festival-gear';
 import { extractFlexElementId } from '@/utils/flexUrlParser';
-import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
+import { pushEquipmentToPullsheet, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
+import type { EquipmentItem } from '@/services/flexPullsheets';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { PA_PRESET_ALLOWED_CATEGORIES, resolveSubsystemForEquipment } from '@/types/equipment';
-import type { EquipmentCategory, PresetSubsystem } from '@/types/equipment';
-
-interface PushToFlexPullsheetDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  gearSetup: GearSetupFormData;
-  jobId: string;
-}
-
-interface EquipmentLookupResult {
-  found: EquipmentItem[];
-  missing: string[];
-}
-
-type PaPresetOption = {
-  id: string;
-  name: string;
-  job_id: string | null;
-};
-
-type PresetEquipmentRow = {
-  id: string;
-  name: string;
-  category: EquipmentCategory | null;
-  resource_id: string | null;
-};
-
-type PresetItemRow = {
-  quantity: number | null;
-  subsystem?: string | null;
-  equipment: PresetEquipmentRow | PresetEquipmentRow[] | null;
-};
-
-const PA_PRESET_CATEGORIES = new Set(PA_PRESET_ALLOWED_CATEGORIES);
-const PRESET_SUBSYSTEMS: PresetSubsystem[] = ['mains', 'outs', 'subs', 'fronts', 'delays', 'other', 'amplification'];
-const isPaPresetCategory = (category: string | null): category is EquipmentCategory =>
-  !!category && PA_PRESET_CATEGORIES.has(category as (typeof PA_PRESET_ALLOWED_CATEGORIES)[number]);
-const normalizePresetSubsystem = (value: string | null | undefined): PresetSubsystem | null =>
-  PRESET_SUBSYSTEMS.includes(value as PresetSubsystem) ? (value as PresetSubsystem) : null;
-
-type GearSection = 'consolas' | 'rf' | 'iem' | 'wired_mics';
-
-const GEAR_SECTIONS: { key: GearSection; label: string }[] = [
-  { key: 'consolas', label: 'Consolas' },
-  { key: 'rf', label: 'Microfonía RF' },
-  { key: 'iem', label: 'IEM' },
-  { key: 'wired_mics', label: 'Microfonía Cableada' },
-];
-
-const ALL_SECTIONS_ENABLED: Record<GearSection, boolean> = {
-  consolas: true, rf: true, iem: true, wired_mics: true,
-};
+import { normalizePresetSubsystem, resolveSubsystemForEquipment } from '@/types/equipment';
+import type { EquipmentCategory } from '@/types/equipment';
+import {
+  ALL_SECTIONS_ENABLED,
+  GEAR_SECTIONS,
+  isPaPresetCategory,
+  type EquipmentLookupResult,
+  type GearSection,
+  type PaPresetOption,
+  type PresetEquipmentRow,
+  type PullsheetPresetItemRow,
+  type PushToFlexPullsheetDialogProps,
+} from '@/components/festival/push-to-flex-pullsheet/model';
 
 export function PushToFlexPullsheetDialog({
   open,
@@ -417,7 +377,7 @@ export function PushToFlexPullsheetDialog({
         const missing: string[] = [];
 
         (data || []).forEach((rawRow) => {
-          const row = rawRow as unknown as PresetItemRow;
+          const row = rawRow as unknown as PullsheetPresetItemRow;
           const equipmentRow = Array.isArray(row.equipment) ? row.equipment[0] : row.equipment;
           if (!equipmentRow) return;
 
