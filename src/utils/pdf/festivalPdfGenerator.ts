@@ -75,7 +75,7 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (artistError) throw artistError;
 
-    const stagePlotUrlsByArtistId = await loadStagePlotUrls(artists || []);
+    const stagePlotUrlsByArtistId = await loadStagePlotUrls(artists || [], pdfConcurrency);
     
     if (options.includeGearSetup && options.gearSetupStages.length > 0) {
       console.log("Starting gear setup PDF generation for stages:", options.gearSetupStages);

@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { fetchJobLogo, fetchLogoUrl } from "@/utils/pdf/logoUtils";
+import {
+  clampPdfConcurrency,
+  DEFAULT_PDF_GENERATION_CONCURRENCY,
+  runWithConcurrency,
+} from "@/utils/pdf/festivalPdfSupport";
 
 export const loadFestivalStageMetadata = async (jobId: string) => {
   const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
@@ -22,9 +27,12 @@ export const loadFestivalStageMetadata = async (jobId: string) => {
 
 export const loadStagePlotUrls = async (
   artists: Array<{ id: string; stage_plot_file_path?: string | null }>,
+  concurrency = DEFAULT_PDF_GENERATION_CONCURRENCY,
 ): Promise<Record<string, string>> => {
   const urls: Record<string, string> = {};
-  await Promise.all(artists.filter((artist) => Boolean(artist.stage_plot_file_path)).map(async (artist) => {
+  const artistsWithStagePlots = artists.filter((artist) => Boolean(artist.stage_plot_file_path));
+
+  await runWithConcurrency(artistsWithStagePlots, async (artist) => {
     try {
       const { data, error } = await supabase.storage
         .from("festival_artist_files")
@@ -33,6 +41,7 @@ export const loadStagePlotUrls = async (
     } catch (error) {
       console.error(`Error signing stage plot for artist ${artist.id}:`, error);
     }
-  }));
+  }, clampPdfConcurrency(concurrency));
+
   return urls;
 };

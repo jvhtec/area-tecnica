@@ -70,6 +70,11 @@ completed batch; it is a ratchet ceiling, not a separate debt inventory.
 - [x] `src/components/department/EnhancedJobDetailsModal.tsx` — 911 → 799 LOC
 - [x] `src/hooks/useOptimizedAuth.tsx` — 842 → 758 LOC
 
+Review hardening for this batch also bounds festival stage-plot URL signing to
+the PDF worker limit and keeps job-document view/download actions inside a
+full-width, touch-sized mobile action row. Both paths have focused regression
+coverage.
+
 ## Remaining queue
 
 Line counts are from the rebased PR #878 branch on 2026-07-22. Re-measure before

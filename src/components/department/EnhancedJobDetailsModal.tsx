@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { getStaticMapUrlForLocation } from '@/lib/mapbox/mapboxClient';
 import { toast } from 'sonner';
-import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon, Euro } from 'lucide-react';
+import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon, Euro } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -22,7 +22,6 @@ import { canManagePayouts, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 import {
     buildEnhancedJobTabs,
-    formatDocumentUploadDate,
     formatJobDate,
     formatWeatherDate,
     getAssignmentDepartment,
@@ -32,6 +31,7 @@ import {
     type StaffAssignment,
     type TabId,
 } from '@/components/department/enhancedJobDetailsModel';
+import { EnhancedJobDocumentRow } from '@/components/department/EnhancedJobDocumentRow';
 import { useJobDocumentActions } from '@/hooks/useJobDocumentActions';
 
 import { queryKeys, createQueryKey } from "@/lib/react-query";
@@ -301,7 +301,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                     ))}
                 </div>
 
-                <ScrollArea className="flex-1 p-5 overflow-x-hidden min-w-0">
+                <ScrollArea className="flex-1 p-5 overflow-x-hidden min-w-0 [&_[data-radix-scroll-area-viewport]>div]:!block [&_[data-radix-scroll-area-viewport]>div]:!min-w-0 [&_[data-radix-scroll-area-viewport]>div]:!w-full">
 
                     {activeTab === 'Info' && (
                         <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
@@ -519,52 +519,16 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                     return visibleDocs.length > 0 ? (
                                         <div className="space-y-2">
                                             {visibleDocs.map((doc) => (
-                                                <div key={doc.id} className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-center justify-between min-w-0`}>
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className={`text-sm font-bold ${theme.textMain} break-words mb-1`}>{doc.file_name}</div>
-                                                        <div className={`text-xs ${theme.textMuted} break-words`}>
-                                                            {doc.uploaded_at && `Subido el ${formatDocumentUploadDate(doc.uploaded_at)}`}
-                                                        </div>
-                                                        <div className="flex gap-1 mt-1 flex-wrap">
-                                                            {doc.template_type === 'soundvision' && (
-                                                                <Badge variant="outline" className="text-[10px]">SoundVision</Badge>
-                                                            )}
-                                                            {doc.read_only && (
-                                                                <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/50">Solo lectura</Badge>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-2 shrink-0">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleViewDocument(doc)}
-                                                            disabled={documentLoading.has(doc.id)}
-                                                        >
-                                                            {documentLoading.has(doc.id) ? (
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                            ) : (
-                                                                <>
-                                                                    <Eye size={14} className="mr-1" /> Ver
-                                                                </>
-                                                            )}
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleDownload(doc)}
-                                                            disabled={documentLoading.has(doc.id)}
-                                                        >
-                                                            {documentLoading.has(doc.id) ? (
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                            ) : (
-                                                                <>
-                                                                    <Download size={14} className="mr-1" /> Descargar
-                                                                </>
-                                                            )}
-                                                        </Button>
-                                                    </div>
-                                                </div>
+                                                <EnhancedJobDocumentRow
+                                                    key={doc.id}
+                                                    doc={doc}
+                                                    isDark={isDark}
+                                                    isLoading={documentLoading.has(doc.id)}
+                                                    onView={() => handleViewDocument(doc)}
+                                                    onDownload={() => handleDownload(doc)}
+                                                    textMainClassName={theme.textMain}
+                                                    textMutedClassName={theme.textMuted}
+                                                />
                                             ))}
                                         </div>
                                     ) : (
