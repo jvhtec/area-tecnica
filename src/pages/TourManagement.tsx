@@ -11,7 +11,6 @@ import {
   Truck,
   Calculator,
   Weight,
-  Upload,
   Clock,
   BarChart3,
   UserCheck,
@@ -46,39 +45,19 @@ import { exportTourPDF } from "@/lib/tourPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
-import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 import { TourManagementHeader } from "@/components/tours/TourManagementHeader";
 import { TourManagementMobileActions } from "@/components/tours/TourManagementMobileActions";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { openFlexElement } from "@/utils/flex-folders";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { TourSchedulingDialog } from "@/components/tours/TourSchedulingDialog";
-import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTourWhatsappGroup } from "@/hooks/tours/useTourWhatsappGroup";
+import { TourWhatsappGroupDialog } from "@/pages/tour-management/TourWhatsappGroupDialog";
+import { TourUpcomingDates } from "@/pages/tour-management/TourUpcomingDates";
+import type { QuickAction, TourManagementProps } from "@/pages/tour-management/tourManagementTypes";
 
-
-import { queryKeys } from "@/lib/react-query";
-interface TourManagementProps {
-  tour: any;
-  tourJobId?: string | null;
-}
-
-type QuickAction = {
-  id?: string;
-  title: string;
-  description: string;
-  icon: typeof Calendar;
-  onClick: () => void;
-  badge: string;
-  viewOnly?: boolean;
-  showForTechnician?: boolean;
-  hasAutoSync?: boolean;
-  disabled?: boolean;
-};
-
-export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
+export const TourManagement = ({ tour }: TourManagementProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userRole } = useOptimizedAuth();
@@ -100,58 +79,20 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const [isSchedulingOpen, setIsSchedulingOpen] = useState(false);
   const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
-  const [isWaDialogOpen, setIsWaDialogOpen] = useState(false);
-  const [waSelectedDateId, setWaSelectedDateId] = useState<string | null>(null);
-  const [waDepartment, setWaDepartment] = useState<'sound'|'lights'|'video'>('sound');
-  const [isCreatingWaGroup, setIsCreatingWaGroup] = useState(false);
-
-  // Check if WhatsApp group already exists for selected date/department
-  // First resolve the job_id from tour_date_id
-  const { data: resolvedJobId } = useQuery({
-    queryKey: queryKeys.scope('tour-date-job-id', waSelectedDateId),
-    enabled: !!waSelectedDateId,
-    queryFn: async () => {
-      if (!waSelectedDateId) return null;
-      const { data, error } = await dataLayerClient.from('jobs')
-        .select('id')
-        .eq('tour_date_id', waSelectedDateId)
-        .maybeSingle();
-      if (error || !data) return null;
-      return data.id;
-    }
-  });
-
-  const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: queryKeys.scope('job-whatsapp-group', resolvedJobId, waDepartment, 0),
-    enabled: !!resolvedJobId && !!waDepartment && isManagementUser,
-    queryFn: async () => {
-      if (!resolvedJobId) return null;
-      const { data, error } = await dataLayerClient.from('job_whatsapp_groups')
-        .select('id, wa_group_id')
-        .eq('job_id', resolvedJobId)
-        .eq('department', waDepartment)
-        .eq('stage_number', 0)
-        .maybeSingle();
-      if (error) return null;
-      return data;
-    }
-  });
-
-  const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: queryKeys.scope('job-whatsapp-group-request', resolvedJobId, waDepartment, 0),
-    enabled: !!resolvedJobId && !!waDepartment && isManagementUser,
-    queryFn: async () => {
-      if (!resolvedJobId) return null;
-      const { data, error } = await dataLayerClient.from('job_whatsapp_group_requests')
-        .select('id, created_at')
-        .eq('job_id', resolvedJobId)
-        .eq('department', waDepartment)
-        .eq('stage_number', 0)
-        .maybeSingle();
-      if (error) return null;
-      return data;
-    }
-  });
+  const {
+    handleCreateWaGroup,
+    isCreatingWaGroup,
+    isWaDialogOpen,
+    openWaDialog,
+    retryWhatsappGroup,
+    setIsWaDialogOpen,
+    setWaDepartment,
+    setWaSelectedDateId,
+    waDepartment,
+    waGroup,
+    waRequest,
+    waSelectedDateId,
+  } = useTourWhatsappGroup({ isManagementUser, tourDates: tour?.tour_dates || [] });
 
   const { assignments } = useTourAssignments(tour?.id);
   const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tour?.id);
@@ -197,149 +138,6 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
   const sortedTourDates = getSortedTourDates();
 
-  const openWaDialog = () => {
-    const sorted = getSortedTourDates();
-    const upcoming = sorted.find(d => new Date(d.date) >= new Date()) || sorted[0];
-    setWaSelectedDateId(upcoming?.id || null);
-    setIsWaDialogOpen(true);
-  };
-
-  const handleCreateWaGroup = async () => {
-    try {
-      if (!waSelectedDateId) {
-        toast({ title: 'Selecciona una fecha', description: 'Por favor elige una fecha de gira como destino.' , variant: 'destructive'});
-        return;
-      }
-      setIsCreatingWaGroup(true);
-      // Resolve job for this tour date
-      const { data: jobRow, error: jobErr } = await dataLayerClient.from('jobs')
-        .select('id, title, start_time, end_time')
-        .eq('tour_date_id', waSelectedDateId)
-        .maybeSingle();
-      if (jobErr || !jobRow) {
-        toast({ title: 'No se encontró trabajo', description: 'No hay trabajo vinculado a la fecha de gira seleccionada.' , variant: 'destructive'});
-        setIsCreatingWaGroup(false);
-        return;
-      }
-
-      // Optional pre-check: warn about missing phones for selected department
-      const { data: rows } = await dataLayerClient.from('job_assignments')
-        .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
-        .eq('job_id', jobRow.id);
-      const deptKey = waDepartment === 'sound' ? 'sound_role' : waDepartment === 'lights' ? 'lights_role' : 'video_role';
-      const crew = (rows || []).filter((r: any) => !!r[deptKey]);
-      const missing: string[] = [];
-      let validPhones = 0;
-      for (const r of crew) {
-        const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
-        const full = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Técnico';
-        const ph = (profile?.phone || '').trim();
-        if (!ph) missing.push(full); else validPhones += 1;
-      }
-      if (validPhones === 0) {
-        toast({ title: 'Sin teléfonos', description: 'No se encontraron números de teléfono válidos para el departamento seleccionado en esta fecha.', variant: 'destructive' });
-        setIsCreatingWaGroup(false);
-        return;
-      }
-      if (missing.length > 0) {
-        toast({ title: 'Faltan algunos teléfonos', description: `Miembros sin teléfono: ${missing.slice(0,3).join(', ')}${missing.length>3?'…':''}` });
-      }
-
-      // Invoke the existing edge function
-      const { data: fnRes, error: fnErr } = await dataLayerClient.functions.invoke('create-whatsapp-group', {
-        body: { job_id: jobRow.id, department: waDepartment, stage_number: 0 }
-      });
-      if (fnErr) {
-        toast({ title: 'Error al crear grupo', description: await extractFunctionErrorMessage(fnErr), variant: 'destructive' });
-      } else {
-        toast({ title: 'Solicitado', description: 'Se solicitó la creación del grupo de WhatsApp. Se finalizará en breve.' });
-        setIsWaDialogOpen(false);
-      }
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-    } finally {
-      setIsCreatingWaGroup(false);
-    }
-  };
-
-  const retryWhatsappGroup = async () => {
-    if (!waSelectedDateId) {
-      toast({ title: 'Error', description: 'Selecciona una fecha primero.', variant: 'destructive' });
-      return;
-    }
-
-    setIsCreatingWaGroup(true);
-    try {
-      // First resolve the job_id from the tour_date_id
-      const { data: jobData, error: jobError } = await dataLayerClient.from('jobs')
-        .select('id')
-        .eq('tour_date_id', waSelectedDateId)
-        .maybeSingle();
-
-      if (jobError || !jobData) {
-        toast({
-          title: 'Error',
-          description: 'No se encontró el trabajo asociado a esta fecha de gira.',
-          variant: 'destructive'
-        });
-        setIsCreatingWaGroup(false);
-        return;
-      }
-
-      const jobId = jobData.id;
-
-      // Clear the failed request using RPC function with correct job_id
-      const { data: clearResult, error: clearError } = await dataLayerClient.rpc(
-        'clear_whatsapp_group_request',
-        { p_job_id: jobId, p_department: waDepartment, p_stage_number: 0 }
-      );
-
-      if (clearError) {
-        toast({
-          title: 'Error',
-          description: `No se pudo limpiar la solicitud: ${clearError.message}`,
-          variant: 'destructive'
-        });
-        setIsCreatingWaGroup(false);
-        return;
-      }
-
-      const result = clearResult as any;
-
-      if (!result.success) {
-        toast({
-          title: 'Aviso',
-          description: result.error || result.message,
-          variant: result.can_retry ? 'default' : 'destructive'
-        });
-        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-        setIsCreatingWaGroup(false);
-        return;
-      }
-
-      toast({
-        title: 'Solicitud limpiada',
-        description: 'Intentando crear el grupo de nuevo...'
-      });
-
-      // Await the refetch to ensure state is updated before retrying
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-
-      // Call the create handler directly (no setTimeout needed)
-      await handleCreateWaGroup();
-
-    } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: `Error al reintentar: ${err.message}`,
-        variant: 'destructive'
-      });
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-      setIsCreatingWaGroup(false);
-    }
-  };
 
   const handlePowerDefaults = () => {
     navigate(`/sound/consumos?tourId=${tour.id}&mode=tour-defaults`);
@@ -881,38 +679,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         </div>
       </div>
 
-      {/* Upcoming Dates Section */}
-      {upcomingDates.length > 0 && (
-        <div>
-          <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">Próximas Fechas de Gira</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
-            {upcomingDates.map((date: any) => (
-              <Card key={date.id}>
-                <CardHeader className="pb-3 px-3 md:px-6 pt-3 md:pt-6">
-                  <div className="flex items-center justify-between">
-                    <Calendar className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground flex-shrink-0" />
-                    <Badge variant="outline" className="text-xs">
-                      {format(new Date(date.date), "d MMM", { locale: es })}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-sm md:text-base mt-2">
-                    {format(new Date(date.date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-                  {date.location?.name && (
-                    <div className="flex items-start gap-2 text-xs md:text-sm text-muted-foreground mb-2">
-                      <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                      <span className="break-words">{date.location.name}</span>
-                    </div>
-                  )}
-                  {!isTechnicianView && <TourDateFlexButton tourDateId={date.id} />}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+      <TourUpcomingDates isTechnicianView={isTechnicianView} upcomingDates={upcomingDates} />
 
       {/* Management Dialogs - Modified for technician view */}
       {!isTechnicianView && (
@@ -1000,85 +767,20 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         />
       )}
 
-      {/* Create WhatsApp Group Dialog */}
-      <Dialog open={isWaDialogOpen} onOpenChange={setIsWaDialogOpen}>
-        <DialogContent className="w-[95vw] md:w-full max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base md:text-lg">Crear Grupo de WhatsApp</DialogTitle>
-            <DialogDescription className="text-xs md:text-sm">
-              Elige una fecha de gira y departamento. El grupo incluirá la tripulación asignada para esa fecha.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <label className="block text-xs md:text-sm font-medium mb-1">Fecha de Gira</label>
-              <select
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={waSelectedDateId || ''}
-                onChange={(e) => setWaSelectedDateId(e.target.value || null)}
-              >
-                {sortedTourDates.map((d: any) => (
-                  <option key={d.id} value={d.id}>
-                    {format(new Date(d.date), "PPPP", { locale: es })}{d.location?.name ? ` · ${d.location.name}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs md:text-sm font-medium mb-1">Departamento</label>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
-                  <input type="radio" name="wa-dept" checked={waDepartment==='sound'} onChange={() => setWaDepartment('sound')} />
-                  <span>Sonido</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
-                  <input type="radio" name="wa-dept" checked={waDepartment==='lights'} onChange={() => setWaDepartment('lights')} />
-                  <span>Luces</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
-                  <input type="radio" name="wa-dept" checked={waDepartment==='video'} onChange={() => setWaDepartment('video')} />
-                  <span>Vídeo</span>
-                </label>
-              </div>
-            </div>
-            {/* Show status if group exists or request pending */}
-            {waGroup && (
-              <div className="rounded-md bg-green-50 border border-green-200 p-3">
-                <p className="text-xs md:text-sm text-green-800 font-medium">
-                  ✓ Grupo ya creado para esta fecha y departamento
-                </p>
-              </div>
-            )}
-            {!waGroup && waRequest && (
-              <div className="rounded-md bg-orange-50 border border-orange-200 p-3">
-                <p className="text-xs md:text-sm text-orange-800 font-medium">
-                  ⚠ Creación fallida. Puedes reintentar.
-                </p>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setIsWaDialogOpen(false)} disabled={isCreatingWaGroup} className="w-full sm:w-auto">Cancelar</Button>
-            {waRequest && !waGroup ? (
-              <Button
-                onClick={retryWhatsappGroup}
-                disabled={isCreatingWaGroup}
-                className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600"
-              >
-                {isCreatingWaGroup ? 'Reintentando…' : 'Reintentar Crear Grupo'}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleCreateWaGroup}
-                disabled={isCreatingWaGroup || !!waGroup}
-                className="w-full sm:w-auto"
-              >
-                {isCreatingWaGroup ? 'Creando…' : waGroup ? 'Grupo Creado' : 'Crear Grupo'}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TourWhatsappGroupDialog
+        handleCreateWaGroup={handleCreateWaGroup}
+        isCreatingWaGroup={isCreatingWaGroup}
+        isWaDialogOpen={isWaDialogOpen}
+        retryWhatsappGroup={retryWhatsappGroup}
+        setIsWaDialogOpen={setIsWaDialogOpen}
+        setWaDepartment={setWaDepartment}
+        setWaSelectedDateId={setWaSelectedDateId}
+        sortedTourDates={sortedTourDates}
+        waDepartment={waDepartment}
+        waGroup={waGroup}
+        waRequest={waRequest}
+        waSelectedDateId={waSelectedDateId}
+      />
     </div>
   );
 };

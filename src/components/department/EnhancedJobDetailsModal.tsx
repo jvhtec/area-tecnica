@@ -3,16 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { getStaticMapUrlForLocation } from '@/lib/mapbox/mapboxClient';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon, Euro } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-restaurant-service';
-import { createSignedUrl } from '@/utils/jobDocuments';
-import { labelForCode } from '@/utils/roles';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
 import type { JobDocument } from '@/types/job';
 import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
@@ -24,46 +20,25 @@ import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
+import {
+    buildEnhancedJobTabs,
+    formatDocumentUploadDate,
+    formatJobDate,
+    formatWeatherDate,
+    getAssignmentDepartment,
+    getAssignmentRole,
+    getWeatherIcon,
+    type EnhancedJobDetailsModalProps,
+    type StaffAssignment,
+    type TabId,
+} from '@/components/department/enhancedJobDetailsModel';
+import { useJobDocumentActions } from '@/hooks/useJobDocumentActions';
 
 import { queryKeys, createQueryKey } from "@/lib/react-query";
-interface EnhancedJobDetailsModalProps {
-    theme: {
-        bg: string;
-        card: string;
-        textMain: string;
-        textMuted: string;
-        divider: string;
-        accent: string;
-        modalOverlay: string;
-    };
-    isDark: boolean;
-    job: any;
-    onClose: () => void;
-    userRole?: string | null;
-    userDepartment?: string | null;
-    userId: string | null;
-    department?: string;
-}
 
-type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima' | 'Tarifas' | 'Extras';
-
-interface StaffAssignment {
-    sound_role?: string | null;
-    lights_role?: string | null;
-    video_role?: string | null;
-    technician: {
-        id: string;
-        first_name: string;
-        last_name: string;
-        email?: string;
-        department?: string | null;
-        profile_picture_url?: string | null;
-    } | null;
-}
-
-export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, userId, department = 'sound' }: EnhancedJobDetailsModalProps) => {
+export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, userId }: EnhancedJobDetailsModalProps) => {
     const [activeTab, setActiveTab] = useState<TabId>('Info');
-    const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
+    const { documentLoading, handleDownload, handleViewDocument } = useJobDocumentActions();
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
     const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
     const [isMapLoading, setIsMapLoading] = useState(false);
@@ -74,7 +49,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const canManageJobPayouts = canManagePayouts(userRole, userDepartment);
     const isHouseTech = userRole === 'house_tech';
 
-    // Fetch full job details with location
     const { data: jobDetails, isLoading: jobDetailsLoading } = useQuery({
         queryKey: createQueryKey.jobDetailsModal.details(job?.id),
         queryFn: async () => {
@@ -94,14 +68,12 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     const resolvedJobId = jobDetails?.id || job?.id;
 
-    // Fetch extras and rates approval status  
     const { data: jobExtras = [] } = useJobExtras(resolvedJobId);
     const { data: jobRatesApproval } = useJobRatesApproval(resolvedJobId);
     const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
     const jobRatesApproved = jobRatesApproval?.rates_approved ?? jobDetails?.rates_approved ?? job?.rates_approved ?? false;
     const isClosureLocked = isJobPastClosureWindow(jobDetails?.end_time ?? job?.end_time, jobDetails?.timezone ?? job?.timezone ?? 'Europe/Madrid');
 
-    // Fetch staff assignments
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
         queryKey: createQueryKey.jobDetailsModal.staff(job?.id),
         queryFn: async () => {
@@ -126,7 +98,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         enabled: !!job?.id,
     });
 
-    // Fetch restaurants
     const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
         queryKey: createQueryKey.jobDetailsModal.restaurants(job?.id, jobDetails?.locations?.formatted_address),
         queryFn: async () => {
@@ -151,7 +122,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         enabled: !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude))
     });
 
-    // Weather setup
     const eventDatesString = (jobDetails?.start_time || job?.start_time) && (jobDetails?.end_time || job?.end_time)
         ? new Date(jobDetails?.start_time || job?.start_time).toLocaleDateString('en-GB').split('/').join('/') +
         (new Date(jobDetails?.start_time || job?.start_time).toDateString() !== new Date(jobDetails?.end_time || job?.end_time).toDateString()
@@ -253,7 +223,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         }
     };
 
-    // Load map
     useEffect(() => {
         const loadStaticMap = async () => {
             try {
@@ -283,39 +252,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         }
     }, [jobDetails?.locations]);
 
-    const handleViewDocument = async (doc: JobDocument) => {
-        const docId = doc.id;
-        setDocumentLoading(prev => new Set(prev).add(docId));
-        try {
-            const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
-            window.open(url, '_blank');
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Error desconocido';
-            toast.error(`No se pudo abrir el documento: ${message}`);
-        } finally {
-            setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
-        }
-    };
-
-    const handleDownload = async (doc: JobDocument) => {
-        const docId = doc.id;
-        setDocumentLoading(prev => new Set(prev).add(docId));
-        try {
-            const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = doc.file_name;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Error desconocido';
-            toast.error(`No se pudo descargar el documento: ${message}`);
-        } finally {
-            setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
-        }
-    };
-
     const handleOpenMaps = () => {
         const address = jobDetails?.locations?.formatted_address || jobDetails?.locations?.name || job?.location?.name || '';
         const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -323,12 +259,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     };
 
     const locationData = jobDetails?.locations || job?.location;
-    const jobStartDate = (jobDetails?.start_time || job?.start_time)
-        ? format(new Date(jobDetails?.start_time || job?.start_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
-        : "Fecha no disponible";
-    const jobEndDate = (jobDetails?.end_time || job?.end_time)
-        ? format(new Date(jobDetails?.end_time || job?.end_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
-        : "Fecha no disponible";
+    const jobStartDate = formatJobDate(jobDetails?.start_time || job?.start_time);
+    const jobEndDate = formatJobDate(jobDetails?.end_time || job?.end_time);
 
     const jobType = jobDetails?.job_type || job?.job_type;
     const isDryhire = jobType === 'dryhire';
@@ -336,53 +268,12 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const showExtrasTab = !isDryhire && (isManager || isHouseTech || (jobRatesApproved && jobExtras.length > 0));
     const canViewAllDocs = isManager || isHouseTech;
 
-    const tabs: { id: TabId; label: string }[] = [
-        { id: 'Info', label: 'Info' },
-        { id: 'Ubicación', label: 'Ubicación' },
-        { id: 'Personal', label: 'Personal' },
-        { id: 'Docs', label: 'Docs' },
-        { id: 'Restau.', label: 'Restau.' },
-        { id: 'Clima', label: 'Clima' },
-    ];
-
-    if (showTourRatesTab) tabs.push({ id: 'Tarifas', label: 'Tarifas' });
-    if (showExtrasTab) tabs.push({ id: 'Extras', label: 'Extras' });
-
-    const getDepartmentFromAssignment = (assignment: StaffAssignment): string => {
-        if (assignment.sound_role) return 'sound';
-        if (assignment.lights_role) return 'lights';
-        if (assignment.video_role) return 'video';
-        return 'unknown';
-    };
-
-    const getRoleFromAssignment = (assignment: StaffAssignment): string => {
-        const role = assignment.sound_role || assignment.lights_role || assignment.video_role;
-        return role ? (labelForCode(role) || role) : 'Técnico';
-    };
-
-    const getWeatherIcon = (condition: string) => {
-        if (condition.toLowerCase().includes('sun')) return '☀️';
-        if (condition.toLowerCase().includes('cloud')) return '☁️';
-        if (condition.toLowerCase().includes('rain')) return '🌧️';
-        if (condition.toLowerCase().includes('snow')) return '❄️';
-        if (condition.toLowerCase().includes('storm')) return '⛈️';
-        return '🌤️';
-    };
-
-    const formatWeatherDate = (dateStr: string) => {
-        try {
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
-        } catch {
-            return dateStr;
-        }
-    };
+    const tabs = buildEnhancedJobTabs(showTourRatesTab, showExtrasTab);
 
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
             <div className={`w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] h-[90dvh] max-h-full ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}>
 
-                {/* Header */}
                 <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>
                     <div className="flex items-center gap-2">
                         <CalendarIcon size={18} className={theme.textMuted} />
@@ -393,7 +284,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                     </button>
                 </div>
 
-                {/* Tab Bar */}
                 <div className={`flex border-b ${theme.divider} ${isDark ? 'bg-[#0a0c10]' : 'bg-slate-50'} overflow-x-auto shrink-0`}>
                     {tabs.map((tab) => (
                         <button
@@ -413,7 +303,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                 <ScrollArea className="flex-1 p-5 overflow-x-hidden min-w-0">
 
-                    {/* TAB: INFO */}
                     {activeTab === 'Info' && (
                         <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             <div>
@@ -500,7 +389,6 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                         </div>
                     )}
 
-                    {/* TAB: UBICACIÓN */}
                     {activeTab === 'Ubicación' && (
                         <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             {jobDetailsLoading ? (
@@ -591,8 +479,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                 <div className="space-y-2">
                                     {(staffAssignments as StaffAssignment[]).map((assignment, idx) => {
                                         const tech = assignment.technician;
-                                        const dept = getDepartmentFromAssignment(assignment);
-                                        const role = getRoleFromAssignment(assignment);
+                                        const dept = getAssignmentDepartment(assignment);
+                                        const role = getAssignmentRole(assignment);
                                         const deptColors: Record<string, string> = {
                                             sound: 'text-blue-400 bg-blue-900/30 border-blue-900/50',
                                             lights: 'text-amber-400 bg-amber-900/30 border-amber-900/50',
@@ -635,7 +523,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                                     <div className="min-w-0 flex-1">
                                                         <div className={`text-sm font-bold ${theme.textMain} break-words mb-1`}>{doc.file_name}</div>
                                                         <div className={`text-xs ${theme.textMuted} break-words`}>
-                                                            {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+                                                            {doc.uploaded_at && `Subido el ${formatDocumentUploadDate(doc.uploaded_at)}`}
                                                         </div>
                                                         <div className="flex gap-1 mt-1 flex-wrap">
                                                             {doc.template_type === 'soundvision' && (

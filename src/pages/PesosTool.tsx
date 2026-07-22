@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { dataLayerClient } from '@/services/dataLayerClient';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { PesosToolView } from './pesos-tool/PesosToolView';
+import { calculateWeightRows, sumWeightRows } from '@/features/technical-tools/weights/weightCalculations';
 import {
-  calculateWeightRows,
-  formatRiggingPoint,
-  sumWeightRows,
-} from '@/features/technical-tools/weights/weightCalculations';
-import { uploadWeightReportAndCompleteTasks } from '@/features/technical-tools/weights/weightPersistence';
-import { getJobTechnicalPdfFileName } from '@/utils/technicalPdfNames';
-import {
-  appendTechnicalStageToFilename,
-  formatTechnicalStageLabel,
   isSameTechnicalStage,
   useSelectedTechnicalStage,
 } from '@/features/technical-tools/stage/stageAllocation';
@@ -41,52 +32,12 @@ import { soundWeightComponents } from '@/features/technical-tools/weights/soundW
 import { useXmlpWeightImport } from '@/features/technical-tools/weights/useXmlpWeightImport';
 
 const soundComponentDatabase = soundWeightComponents;
-
-interface TableRow {
-  id: string;
-  quantity: string;
-  componentId: string;
-  weight: string;
-  componentName?: string;
-  totalWeight?: number;
-}
-
-const createRowId = () =>
-  globalThis.crypto?.randomUUID?.() ?? `row_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-
-const createEmptyRow = (): TableRow => ({
-  id: createRowId(),
-  quantity: "",
-  componentId: "",
-  weight: "",
-});
-
-interface Table {
-  name: string;
-  rows: TableRow[];
-  totalWeight?: number;
-  id?: number;
-  stageNumber?: number | null;
-  stageName?: string | null;
-  dualMotors?: boolean;
-  riggingPoints?: string; // Stores the generated SX suffix(es)
-  clusterId?: string;     // New property to group tables (e.g. mirrored pair)
-  cablePick?: boolean;
-  cablePickWeight?: string;
-  defaultTableId?: string;
-  overrideId?: string;
-  isOverride?: boolean;
-  baseName?: string;
-}
-
-interface SummaryRow {
-  clusterName: string;
-  riggingPoints: string;
-  clusterWeight: number;
-}
+import { assignSuffixes, createEmptyRow, type Table, type TableRow } from "@/pages/pesos-tool/pesosToolModel";
+import { usePesosPdfExport } from "@/pages/pesos-tool/usePesosPdfExport";
+import { usePesosLoadedTables } from "@/pages/pesos-tool/usePesosLoadedTables";
+import { usePesosContext } from "@/features/technical-tools/weights/usePesosContext";
 
 const PesosTool: React.FC = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: jobs } = useJobSelection();
@@ -112,9 +63,12 @@ const PesosTool: React.FC = () => {
   const [cablePickWeight, setCablePickWeight] = useState('100');
   const [currentSetName, setCurrentSetName] = useState('');
 
-  // Job-based override mode detection
-  const [isJobOverrideMode, setIsJobOverrideMode] = useState(false);
-  const [jobTourInfo, setJobTourInfo] = useState<{ tourName: string; date: string; location: string } | null>(null);
+  const { handleBackNavigation, isJobOverrideMode, jobTourInfo, tourDateInfo, tourName } = usePesosContext({
+    selectedJob,
+    isTourContext,
+    tourId,
+    tourDateId,
+  });
   const {
     selectedStage,
     selectedStageNumber,
@@ -130,61 +84,6 @@ const PesosTool: React.FC = () => {
     rows: [createEmptyRow()],
   });
 
-  const deriveBaseName = (name: string) => {
-    const match = name.match(/^(.*?)(?:\s*\(.*\))?$/);
-    return match ? match[1].trim() : name;
-  };
-
-  const formatSuffixNumber = (value: number) => formatRiggingPoint('SX', value);
-
-  const getRiggingPointNumbers = (riggingPoints?: string): number[] =>
-    Array.from(riggingPoints?.matchAll(/SX0*(\d+)/gi) ?? [])
-      .map((match) => Number.parseInt(match[1], 10))
-      .filter((value) => Number.isFinite(value) && value > 0);
-
-  const assignSuffixes = (tablesToAssign: Table[]): Table[] => {
-    const countersByStage = new Map<string, number>();
-
-    return tablesToAssign.map((table) => {
-      const baseName = table.baseName || deriveBaseName(table.name);
-      const stageKey = table.stageNumber != null ? `stage-${table.stageNumber}` : 'default';
-      const counter = countersByStage.get(stageKey) || 1;
-      const persistedRiggingNumbers = getRiggingPointNumbers(table.riggingPoints);
-      const shouldPreservePersistedRigging =
-        Boolean(table.defaultTableId || table.overrideId) && persistedRiggingNumbers.length > 0;
-
-      if (shouldPreservePersistedRigging) {
-        countersByStage.set(stageKey, Math.max(counter, Math.max(...persistedRiggingNumbers) + 1));
-        return {
-          ...table,
-          baseName,
-          name: `${baseName} (${table.riggingPoints})`,
-        };
-      }
-
-      if (table.dualMotors) {
-        const suffixOne = formatSuffixNumber(counter);
-        const suffixTwo = formatSuffixNumber(counter + 1);
-        const riggingPoints = `${suffixOne}, ${suffixTwo}`;
-        countersByStage.set(stageKey, counter + 2);
-        return {
-          ...table,
-          baseName,
-          name: `${baseName} (${riggingPoints})`,
-          riggingPoints,
-        };
-      }
-
-      const suffix = formatSuffixNumber(counter);
-      countersByStage.set(stageKey, counter + 1);
-      return {
-        ...table,
-        baseName,
-        name: `${baseName} (${suffix})`,
-        riggingPoints: suffix,
-      };
-    });
-  };
 
   const updateTablesState = (updater: (prev: Table[]) => Table[]): Table[] => {
     let nextTables: Table[] = [];
@@ -211,7 +110,6 @@ const PesosTool: React.FC = () => {
     createTable: createDefaultTable,
     deleteSet,
     deleteTable: deleteDefaultTable,
-    isLoading: defaultsLoading
   } = useTourDefaultSets(tourId || '', 'sound');
 
   const [selectedDefaultSetId, setSelectedDefaultSetId] = useState<string>('');
@@ -235,7 +133,6 @@ const PesosTool: React.FC = () => {
     weightOverrides,
     createWeightOverride,
     deleteOverride,
-    isLoading: overridesLoading
   } = useTourDateOverrides(tourDateId || '', 'weight');
 
   const syncDefaultDocumentsAfterMutation = async () => {
@@ -266,8 +163,6 @@ const PesosTool: React.FC = () => {
   };
 
   // Get tour name for display
-  const [tourName, setTourName] = useState<string>('');
-  const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
   const activeTables = selectedStage
     ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
     : tables;
@@ -389,155 +284,17 @@ const PesosTool: React.FC = () => {
     await syncDefaultDocumentsAfterMutation();
   };
 
-  // Detect job-based override mode
-  useEffect(() => {
-    if (selectedJob?.tour_date_id && !isTourContext) {
-      setIsJobOverrideMode(true);
-      loadJobTourInfo();
-    } else {
-      setIsJobOverrideMode(false);
-      setJobTourInfo(null);
-    }
-  }, [selectedJob, isTourContext]);
 
-  const loadJobTourInfo = async () => {
-    if (!selectedJob?.tour_date_id) return;
-
-    try {
-      const { data } = await dataLayerClient.from('tour_dates')
-        .select(`
-          date,
-          tour:tours(name),
-          location:locations(name)
-        `)
-        .eq('id', selectedJob.tour_date_id)
-        .single();
-
-      if (data) {
-        setJobTourInfo({
-          tourName: (data.tour as any)?.name || 'Unknown Tour',
-          date: new Date(data.date).toLocaleDateString(),
-          location: (data.location as any)?.name || 'Unknown Location'
-        });
-      }
-    } catch (error) {
-      console.error('Error loading job tour info:', error);
-    }
-  };
-
-  useEffect(() => {
-    const fetchTourInfo = async () => {
-      if (tourId) {
-        const { data } = await dataLayerClient.from('tours')
-          .select('name')
-          .eq('id', tourId)
-          .single();
-
-        if (data) {
-          setTourName(data.name);
-        }
-      }
-
-      if (tourDateId) {
-        const { data } = await dataLayerClient.from('tour_dates')
-          .select(`
-            date,
-            locations (
-              name
-            )
-          `)
-          .eq('id', tourDateId)
-          .single();
-
-        if (data) {
-          setTourDateInfo({
-            date: new Date(data.date).toLocaleDateString(),
-            location: (data.locations as any)?.name || 'Unknown location'
-          });
-        }
-      }
-    };
-
-    fetchTourInfo();
-  }, [tourId, tourDateId]);
-
-  const handleBackNavigation = () => {
-    if (isTourContext) {
-      navigate('/tours');
-    } else {
-      navigate('/sound');
-    }
-  };
-
-  // Load existing tour defaults when in defaults mode.
-  // Also runs for the tour-defaults entry (Tour Management page) so existing
-  // tables are shown and newly generated ones append after them with
-  // continuous SX numbering instead of restarting from the first number.
-  useEffect(() => {
-    if (!isDefaults && !isTourDefaults) return;
-
-    const resolvedDefaultSetId =
-      selectedDefaultSetId || (defaultSets.length === 1 ? defaultSets[0].id : '');
-
-    if (!resolvedDefaultSetId) {
-      setTables([]);
-      return;
-    }
-
-    // Convert only the active set. Loading every set at once makes SX numbering
-    // bleed across packages/default sets; Consumos intentionally gates display
-    // the same way when more than one set exists.
-    const convertedTables = defaultTables
-      .filter(dt => dt.table_type === 'weight' && dt.set_id === resolvedDefaultSetId)
-      .map((dt, index) => ({
-        name: dt.table_name,
-        rows: (dt.table_data?.rows || [{
-          quantity: '1',
-          componentId: '',
-          weight: dt.total_value.toString(),
-          componentName: dt.table_name,
-          totalWeight: dt.total_value
-        }]).map((row: any) => ({ ...row, id: row?.id || createRowId() })),
-        totalWeight: dt.total_value,
-        id: Date.now() + index,
-        clusterId: dt.metadata?.clusterId,
-        dualMotors: dt.metadata?.dualMotors,
-        riggingPoints: dt.metadata?.riggingPoints,
-        cablePick: Boolean(dt.metadata?.cablePick ?? dt.table_data?.cablePick ?? false),
-        cablePickWeight: (dt.metadata?.cablePickWeight ?? dt.table_data?.cablePickWeight ?? "100").toString(),
-        defaultTableId: dt.id,
-        baseName: dt.metadata?.baseName || deriveBaseName(dt.table_name)
-      }));
-    setTables(assignSuffixes(convertedTables));
-  }, [isDefaults, isTourDefaults, defaultSets, defaultTables, selectedDefaultSetId]);
-
-  // Load tour date overrides when in tour date context
-  useEffect(() => {
-    if (isTourDateContext && weightOverrides.length > 0) {
-      const convertedTables = weightOverrides.map((override, index) => ({
-        name: override.item_name,
-        rows: (override.override_data?.tableData?.rows || [{
-          quantity: override.quantity.toString(),
-          componentId: '',
-          weight: override.weight_kg.toString(),
-          componentName: override.item_name,
-          totalWeight: override.weight_kg * override.quantity
-        }]).map((row: any) => ({ ...row, id: row?.id || createRowId() })),
-        totalWeight: override.weight_kg * override.quantity,
-        id: Date.now() + index,
-        clusterId: override.override_data?.tableData?.clusterId,
-        dualMotors: override.override_data?.tableData?.dualMotors,
-        riggingPoints: override.override_data?.tableData?.riggingPoints,
-        cablePick: Boolean(override.override_data?.tableData?.cablePick ?? false),
-        cablePickWeight: (override.override_data?.tableData?.cablePickWeight ?? "100").toString(),
-        overrideId: override.id,
-        baseName:
-          override.override_data?.tableData?.baseName ||
-          deriveBaseName(override.item_name)
-      }));
-      setTables(assignSuffixes(convertedTables));
-    }
-  }, [isTourDateContext, weightOverrides]);
+  usePesosLoadedTables({
+    defaultSets,
+    defaultTables,
+    isDefaults,
+    isTourDefaults,
+    isTourDateContext,
+    selectedDefaultSetId,
+    setTables,
+    weightOverrides,
+  });
 
 
   const addRow = () => {
@@ -919,120 +676,7 @@ const PesosTool: React.FC = () => {
     updateTablesState((prev) => prev.filter((table) => table.id !== tableId));
   };
 
-  const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
-      toast({
-        title: 'No job selected',
-        description: 'Please select a job before exporting.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const getMotorCountLabel = (table: Table) => {
-      const motorCount = getRiggingPointNumbers(table.riggingPoints).length;
-      if (motorCount > 0) return String(motorCount);
-      if (table.dualMotors) return '2';
-      return table.totalWeight > 0 ? '1' : 'N/A';
-    };
-
-    const summaryRows: SummaryRow[] = activeTables.map((table) => {
-      const cleanName = table.name.split('(')[0].trim();
-      return {
-        clusterName: cleanName,
-        riggingPoints: getMotorCountLabel(table),
-        clusterWeight: table.totalWeight || 0,
-      };
-    });
-
-    // Group tables by clusterId to handle cable picks
-    const clusters = activeTables.reduce((acc, table) => {
-      if (table.clusterId) {
-        if (!acc[table.clusterId]) {
-          acc[table.clusterId] = [];
-        }
-        acc[table.clusterId].push(table);
-      }
-      return acc;
-    }, {} as Record<string, Table[]>);
-
-    // If Cable Pick is enabled for a cluster, add one cable pick summary row per cluster
-    let cablePickCounter = 0;
-    Object.values(clusters).forEach((clusterTables) => {
-      const tableWithCablePick = clusterTables.find((table) => table.cablePick);
-      if (!tableWithCablePick) return;
-      cablePickCounter += 1;
-      summaryRows.push({
-        clusterName: 'CABLE PICK',
-        riggingPoints: '—',
-        clusterWeight: parseFloat(tableWithCablePick.cablePickWeight || "0") || 0,
-      });
-    });
-
-    try {
-      let logoUrl: string | undefined = undefined;
-      try {
-        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
-        logoUrl = await fetchJobLogo(selectedJobId);
-        console.log("Logo URL for PDF:", logoUrl);
-      } catch (logoError) {
-        console.error("Error fetching logo:", logoError);
-      }
-
-      const stageLabel = formatTechnicalStageLabel(selectedStage);
-      const reportTitle = stageLabel ? `${selectedJob.title} - ${stageLabel}` : selectedJob.title;
-
-      const pdfBlob = await exportToPDF(
-        reportTitle,
-        activeTables.map((table) => ({ ...table, toolType: 'pesos' })),
-        'weight',
-        reportTitle,
-        selectedJob?.start_time || new Date().toISOString(),
-        summaryRows,
-        undefined,
-        undefined, // FIXED: Remove safety margin for weight reports
-        logoUrl
-      );
-
-      const fileName = appendTechnicalStageToFilename(getJobTechnicalPdfFileName('sound', selectedJob.title, 'weight'), selectedStage);
-      let completedTasksCount = 0;
-
-      // Upload PDF first - only auto-complete tasks if upload succeeds
-      completedTasksCount = await uploadWeightReportAndCompleteTasks({
-        fileName,
-        jobId: selectedJobId,
-        pdfBlob,
-        stage: selectedStage,
-      });
-
-      if (completedTasksCount > 0) {
-        console.log(`Auto-completed ${completedTasksCount} Pesos task(s)`);
-      }
-
-      toast({
-        title: 'Success',
-        description: completedTasksCount > 0
-          ? `PDF uploaded successfully. ${completedTasksCount} Pesos task(s) auto-completed.`
-          : 'PDF has been generated and uploaded successfully.',
-      });
-
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate or upload the PDF.',
-        variant: 'destructive',
-      });
-    }
-  };
+  const handleExportPDF = usePesosPdfExport({ activeTables, selectedJob, selectedJobId, selectedStage });
 
   return (
     <PesosToolView

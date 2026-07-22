@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import type { AnnouncementLevel } from '@/constants/announcementLevels';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
 import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
@@ -38,64 +37,24 @@ import type {
 } from './types';
 import { Ticker } from './components/Ticker';
 import { FooterLogo } from './components/FooterLogo';
-import { CalendarPanel } from './components/panels/CalendarPanel';
-import { CrewAssignmentsPanel } from './components/panels/CrewAssignmentsPanel';
-import { JobsOverviewPanel } from './components/panels/JobsOverviewPanel';
-import { LogisticsPanel } from './components/panels/LogisticsPanel';
-import { PendingActionsPanel } from './components/panels/PendingActionsPanel';
+import { WallboardActivePanel } from './components/WallboardActivePanel';
 import {
-  AlienCalendarPanel,
-  AlienCrewPanel,
-  AlienJobsPanel,
-  AlienLogisticsPanel,
-  AlienPendingPanel,
-} from './components/alien/AlienPanels';
-
-type WallboardJobRow = {
-  id: string;
-  title: string;
-  start_time: string;
-  end_time: string;
-  status: string | null;
-  location_id: string | null;
-  job_type: string | null;
-  tour_id: string | null;
-  timezone?: string | null;
-  color?: string | null;
-};
-
-type TourMetaRow = { id: string; status: string | null };
-type DepartmentRow = { job_id: string; department: string | null };
-type AssignmentRow = {
-  job_id: string;
-  technician_id: string | null;
-  sound_role: string | null;
-  lights_role: string | null;
-  video_role: string | null;
-};
-type RequiredRoleRow = { job_id: string; department: string | null; total_required: number | null };
-type LocationRow = { id: string; name: string | null };
-type DocCountRow = { job_id: string; department: string | null; have: number | null };
-type DocRequirementRow = { department: string | null; need: number | null };
-type ProfileRow = { id: string; first_name: string | null; last_name: string | null; department: string | null };
-type LogisticsEventRow = {
-  id: string;
-  event_date: string;
-  event_time: string;
-  title: string | null;
-  transport_type: string | null;
-  license_plate: string | null;
-  job_id: string | null;
-  event_type: string | null;
-  loading_bay: string | null;
-  color?: string | null;
-  logistics_event_departments?: Array<{ department: string | null }> | null;
-};
-type CrewDraft = CrewAssignmentsFeed['jobs'][number]['crew'][number] & { technician_id: string };
-type CrewJobDraft = Omit<CrewAssignmentsFeed['jobs'][number], 'crew'> & { crew: CrewDraft[] };
-
-const isDept = (value: string | null | undefined): value is Dept =>
-  value === 'sound' || value === 'lights' || value === 'video';
+  isDept,
+  type AssignmentRow,
+  type CrewDraft,
+  type CrewJobDraft,
+  type DepartmentRow,
+  type DocCountRow,
+  type DocRequirementRow,
+  type LocationRow,
+  type LogisticsEventRow,
+  type ProfileRow,
+  type RequiredRoleRow,
+  type TourMetaRow,
+  type WallboardJobRow,
+} from './wallboardDisplayModel';
+import { useWallboardAnnouncements } from './useWallboardAnnouncements';
+import { useWallboardRotation } from './useWallboardRotation';
 
 export function WallboardDisplay({
   presetSlug: propPresetSlug,
@@ -118,7 +77,7 @@ export function WallboardDisplay({
 
   const [isLoading, setIsLoading] = useState(!skipSplash); // Skip loading splash if already shown
   const [isAlien, setIsAlien] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Default to light mode
+  const [theme] = useState<'light' | 'dark'>('light'); // Default to light mode
   const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_PANEL_ORDER]);
   const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({ ...DEFAULT_PANEL_DURATIONS });
   const [rotationFallbackSeconds, setRotationFallbackSeconds] = useState<number>(DEFAULT_ROTATION_FALLBACK_SECONDS);
@@ -131,7 +90,7 @@ export function WallboardDisplay({
   const [overview, setOverview] = useState<JobsOverviewFeed | null>(null);
   const [calendarData, setCalendarData] = useState<CalendarFeed | null>(null);
   const [crew, setCrew] = useState<CrewAssignmentsFeed | null>(null);
-  const [docs, setDocs] = useState<DocProgressFeed | null>(null);
+  const [, setDocs] = useState<DocProgressFeed | null>(null);
   const [pending, setPending] = useState<PendingActionsFeed | null>(null);
   const [logistics, setLogistics] = useState<LogisticsItem[] | null>(null);
   const [tickerMsgs, setTickerMsgs] = useState<TickerMessage[]>([]);
@@ -161,91 +120,19 @@ export function WallboardDisplay({
     setIdx,
   });
 
-  const processAnnouncements = useCallback(
-    (rows: Array<{ id?: string; message?: string | null; level?: string | null; created_at?: string | null }>) => {
-      const regex = /^\s*\[HIGHLIGHT_JOB:([a-f0-9\-]+)\]\s*/i;
-      const now = Date.now();
-      const ttl = Math.max(1000, highlightTtlMs);
-      const staleIds: string[] = [];
-      const messages: TickerMessage[] = [];
-
-      setHighlightJobs((prev) => {
-        const updated = new Map(prev);
-        (rows || []).forEach((a) => {
-          let m = a?.message || '';
-          const levelRaw = (a?.level ?? 'info') as AnnouncementLevel;
-          const level: AnnouncementLevel = ['info', 'warn', 'critical'].includes(levelRaw) ? levelRaw : 'info';
-          const match = m.match(regex);
-          if (match) {
-            const jobId = match[1];
-            const created = a?.created_at ? new Date(a.created_at).getTime() : now;
-            const expireAt = created + ttl;
-            if (expireAt > now) {
-              updated.set(jobId, expireAt);
-            } else if (a?.id) {
-              staleIds.push(a.id);
-            }
-            m = m.replace(regex, '');
-          }
-          if (m.trim()) messages.push({ message: m.trim(), level });
-        });
-        for (const [jid, exp] of updated) {
-          if (exp < now) {
-            updated.delete(jid);
-          }
-        }
-        return updated;
-      });
-
-      setTickerMsgs(messages);
-      return staleIds;
-    },
-    [highlightTtlMs]
-  );
-
-  useEffect(() => {
-    setIdx(0);
-  }, [panelOrder]);
-
-  useEffect(() => {
-    if (!panelOrder.length) return;
-    const activePanels = panelOrder;
-    const currentPanel = activePanels[idx % activePanels.length];
-    const seconds = panelDurations[currentPanel] ?? rotationFallbackSeconds;
-    const durationMs = Math.max(1, seconds) * 1000;
-    const timer = window.setTimeout(() => {
-      // Check if current panel has multiple pages
-      const getCurrentPageCount = () => {
-        if (currentPanel === 'overview') return Math.ceil((overview?.jobs.length ?? 0) / 6);
-        if (currentPanel === 'crew') return Math.ceil((crew?.jobs.length ?? 0) / 4);
-        if (currentPanel === 'logistics') return Math.ceil((logistics?.length ?? 0) / 6);
-        return 1;
-      };
-
-      const pageCount = getCurrentPageCount();
-
-      // If there is only a single panel and a single page (e.g. producción stub with just the calendar),
-      // don't schedule any rotation to avoid unnecessary re-renders.
-      if (activePanels.length === 1 && pageCount <= 1) {
-        return;
-      }
-      const currentPage = panelPages[currentPanel] ?? 0;
-
-      // If there are more pages, go to next page
-      if (currentPage + 1 < pageCount) {
-        setPanelPages((prev) => ({ ...prev, [currentPanel]: currentPage + 1 }));
-      } else {
-        // Reset page and move to next panel
-        setPanelPages((prev) => ({ ...prev, [currentPanel]: 0 }));
-        setIdx((current) => {
-          const total = activePanels.length;
-          if (total <= 0) return 0;
-          return (current + 1) % total;
-        });
-      }
-    }, durationMs);
-    return () => clearTimeout(timer);
-  }, [idx, panelOrder, panelDurations, rotationFallbackSeconds, panelPages, overview, crew, logistics]);
+  const processAnnouncements = useWallboardAnnouncements(highlightTtlMs, setHighlightJobs, setTickerMsgs);
+  useWallboardRotation({
+    crew,
+    idx,
+    logistics,
+    overview,
+    panelDurations,
+    panelOrder,
+    panelPages,
+    rotationFallbackSeconds,
+    setIdx,
+    setPanelPages,
+  });
 
   // Data polling (client-side via RLS-safe views)
   // Note: State declarations moved earlier to avoid temporal dead zone issues
@@ -816,7 +703,7 @@ export function WallboardDisplay({
       if (staleIds.length) {
         try {
           await supabase.from('announcements').update({ active: false }).in('id', staleIds);
-        } catch (e) {
+        } catch {
           // ignore cleanup errors to avoid UI disruption
         }
       }
@@ -856,25 +743,6 @@ export function WallboardDisplay({
     };
   }, [wallboardApiToken, tickerIntervalMs, processAnnouncements, onFatalError]);
 
-  // Periodic cleanup of expired highlights
-  useEffect(() => {
-    const id = setInterval(() => {
-      setHighlightJobs((prev) => {
-        const now = Date.now();
-        const next = new Map(prev);
-        let changed = false;
-        for (const [jid, exp] of next) {
-          if (exp < now) {
-            next.delete(jid);
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    }, 5000);
-    return () => clearInterval(id);
-  }, []);
-
   const activePanels = panelOrder.length ? panelOrder : DEFAULT_PANEL_ORDER;
   const safeIdx = activePanels.length ? idx % activePanels.length : 0;
   const current = activePanels[safeIdx] ?? 'overview';
@@ -897,30 +765,19 @@ export function WallboardDisplay({
         <div className="bg-amber-500/20 text-amber-200 text-sm text-center py-2">{presetMessage}</div>
       )}
       <div className="overflow-hidden" style={{ height: `calc(100vh - ${footerH + tickerH}px)` }}>
-        {/* Subtract measured ticker + footer height */}
-        {current === 'overview' &&
-          (isAlien ? (
-            <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} />
-          ) : (
-            <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} theme={theme} />
-          ))}
-        {current === 'crew' &&
-          (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} theme={theme} />)}
-        {current === 'logistics' &&
-          (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} theme={theme} />)}
-        {current === 'pending' &&
-          (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} theme={theme} />)}
-        {current === 'calendar' &&
-          (isAlien ? (
-            <AlienCalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} />
-          ) : (
-            <CalendarPanel
-              data={calendarData}
-              highlightIds={new Set(highlightJobs.keys())}
-              theme={theme}
-              scrollSpeed={isProduccionPreset ? 20 : 50}
-            />
-          ))}
+        <WallboardActivePanel
+          calendarData={calendarData}
+          crew={crew}
+          current={current}
+          highlightJobs={highlightJobs}
+          isAlien={isAlien}
+          isProduccionPreset={isProduccionPreset}
+          logistics={logistics}
+          overview={overview}
+          panelPages={panelPages}
+          pending={pending}
+          theme={theme}
+        />
       </div>
       <Ticker messages={tickerMsgs} bottomOffset={footerH} theme={theme} onMeasureHeight={setTickerH} />
       <FooterLogo onToggle={() => setIsAlien((v) => !v)} onMeasure={setFooterH} theme={theme} />

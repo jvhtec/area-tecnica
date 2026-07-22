@@ -3,87 +3,31 @@ import { supabase } from "./supabase";
 import { ChannelRetryManager } from "./subscription-retry";
 
 import { queryKeys } from "@/lib/react-query";
-export type SubscriptionDebugEntry = {
-  key: string;
-  ownerRoutes: string[];
-  table: string;
-  queryKey: string[];
-  filter?: RealtimeSubscriptionFilter;
-  priority: SubscriptionPriority;
-  createdAt: number;
-  lastPayloadAt: number | null;
-  invalidationCount: number;
-};
+import {
+  buildSubscriptionKey,
+  createInitialSubscriptionSnapshot,
+  createSubscriptionDebugEntries,
+  forceRefreshManagedSubscriptions,
+  groupSubscriptionsByTable,
+  normalizeQueryKey,
+  type ManagedSubscription,
+  type PendingManagedSubscription,
+  type RealtimeChangePayload,
+  type RealtimePayloadHandler,
+  type RealtimeSubscriptionFilter,
+  type SubscribeToTableOptions,
+  type SubscriptionDebugEntry,
+  type SubscriptionPriority,
+  type SubscriptionSnapshot,
+} from "@/lib/unified-subscription-support";
 
-export type SubscriptionSnapshot = {
-  connectionStatus: 'connected' | 'disconnected' | 'connecting';
-  activeSubscriptions: string[];
-  subscriptionCount: number;
-  subscriptionsByTable: Record<string, string[]>;
-  debugSubscriptions: SubscriptionDebugEntry[];
-  lastRefreshTime: number;
-  activeConnections: number;
-  queuedSubscriptions: number;
-  failedConnections: number;
-  averageResponseTime: number;
-  circuitBreakerOpen: boolean;
-  lastHealthCheck: number;
-};
-
-export type RealtimeSubscriptionFilter = {
-  event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
-  schema?: string;
-  filter?: string;
-};
-
-export type RealtimeChangePayload = {
-  eventType?: 'INSERT' | 'UPDATE' | 'DELETE' | string;
-  schema?: string;
-  table?: string;
-  new?: Record<string, unknown> | null;
-  old?: Record<string, unknown> | null;
-  [key: string]: unknown;
-};
-
-export type RealtimePayloadHandler = (payload: RealtimeChangePayload) => void | Promise<void>;
-
-type SubscriptionPriority = 'high' | 'medium' | 'low';
-
-type SubscriptionOptions = {
-  table: string;
-  queryKey: string | string[];
-  filter?: RealtimeSubscriptionFilter;
-  priority: SubscriptionPriority;
-};
-
-type ManagedSubscription = {
-  key: string;
-  unsubscribe: () => void;
-  options: SubscriptionOptions;
-  ownerRoutes: Set<string>;
-  payloadHandlers: Map<symbol, RealtimePayloadHandler>;
-  payloadHandlerOwners: Map<string, Set<symbol>>;
-  invalidateOnPayload: boolean;
-  createdAt: number;
-  lastPayloadAt: number | null;
-  invalidationCount: number;
-};
-
-type SubscribeToTableOptions = {
-  ownerRoute?: string;
-  onPayload?: RealtimePayloadHandler;
-  invalidateOnPayload?: boolean;
-};
-
-type PendingManagedSubscription = {
-  options: SubscriptionOptions;
-  ownerRoutes: string[];
-  payloadHandlers: Array<{
-    ownerRoute?: string;
-    handler: RealtimePayloadHandler;
-  }>;
-  invalidateOnPayload: boolean;
-};
+export type {
+  RealtimeChangePayload,
+  RealtimePayloadHandler,
+  RealtimeSubscriptionFilter,
+  SubscriptionDebugEntry,
+  SubscriptionSnapshot,
+} from "@/lib/unified-subscription-support";
 
 /**
  * Enhanced subscription manager that centralizes all Supabase realtime subscriptions
@@ -116,20 +60,7 @@ export class UnifiedSubscriptionManager {
     this.invalidationTimers = new Map();
     this.channelRetryManager = new ChannelRetryManager();
     this.listeners = new Set();
-    this.snapshot = {
-      connectionStatus: 'connecting',
-      activeSubscriptions: [],
-      subscriptionCount: 0,
-      subscriptionsByTable: {},
-      debugSubscriptions: [],
-      lastRefreshTime: Date.now(),
-      activeConnections: 0,
-      queuedSubscriptions: 0,
-      failedConnections: 0,
-      averageResponseTime: 0,
-      circuitBreakerOpen: false,
-      lastHealthCheck: Date.now(),
-    };
+    this.snapshot = createInitialSubscriptionSnapshot();
     
     // Initialize connection
     this.setupPingChannel();
@@ -174,18 +105,11 @@ export class UnifiedSubscriptionManager {
   }
 
   private normalizeQueryKey(queryKey: string | string[]) {
-    return Array.isArray(queryKey) ? queryKey : [queryKey];
+    return normalizeQueryKey(queryKey);
   }
 
   private getSubscriptionKey(table: string, queryKey: string | string[], filter?: RealtimeSubscriptionFilter) {
-    const normalizedQueryKey = this.normalizeQueryKey(queryKey);
-    const normalizedFilter = {
-      event: filter?.event ?? '*',
-      schema: filter?.schema ?? 'public',
-      filter: filter?.filter ?? '',
-    };
-
-    return `${table}::${JSON.stringify(normalizedQueryKey)}::${normalizedFilter.event}::${normalizedFilter.schema}::${normalizedFilter.filter}`;
+    return buildSubscriptionKey(table, queryKey, filter);
   }
 
   private addPayloadHandler(
@@ -591,7 +515,7 @@ export class UnifiedSubscriptionManager {
         subscriptionConfig.filter = eventFilter;
       }
       
-      const channelSubscription = channel
+      channel
         .on('postgres_changes', subscriptionConfig, (payload) => {
           // Reduced logging for performance
           if (priority === 'high') {
@@ -812,31 +736,11 @@ export class UnifiedSubscriptionManager {
    * Get all subscriptions grouped by table
    */
   public getSubscriptionsByTable(): Record<string, string[]> {
-    const result: Record<string, string[]> = {};
-    
-    this.subscriptions.forEach((subscription, key) => {
-      const [table] = key.split('::');
-      if (!result[table]) {
-        result[table] = [];
-      }
-      result[table].push(key);
-    });
-    
-    return result;
+    return groupSubscriptionsByTable(this.subscriptions);
   }
 
   public getSubscriptionDebugEntries(): SubscriptionDebugEntry[] {
-    return Array.from(this.subscriptions.values()).map((subscription) => ({
-      key: subscription.key,
-      ownerRoutes: Array.from(subscription.ownerRoutes).sort(),
-      table: subscription.options.table,
-      queryKey: this.normalizeQueryKey(subscription.options.queryKey),
-      filter: subscription.options.filter,
-      priority: subscription.options.priority,
-      createdAt: subscription.createdAt,
-      lastPayloadAt: subscription.lastPayloadAt,
-      invalidationCount: subscription.invalidationCount,
-    }));
+    return createSubscriptionDebugEntries(this.subscriptions);
   }
 
   /**
@@ -877,52 +781,14 @@ export class UnifiedSubscriptionManager {
    */
   public forceRefreshSubscriptions(tables: string[]) {
     console.log(`Forcing refresh of subscriptions for tables: ${tables.join(', ')}`);
-    
-    // For each table, find all related subscriptions
-    tables.forEach(table => {
-      // Get all subscriptions for this table
-      const subscriptionKeys = Array.from(this.subscriptions.keys())
-        .filter(key => key.startsWith(`${table}::`));
-      
-      // For each subscription, unsubscribe and then resubscribe
-      subscriptionKeys.forEach(key => {
-        const subscription = this.subscriptions.get(key);
-        if (subscription) {
-          try {
-            const pendingSubscription = this.snapshotManagedSubscription(subscription);
-            
-            // Unsubscribe
-            subscription.unsubscribe();
-            this.subscriptions.delete(key);
-            
-            // Resubscribe
-            this.replayPendingSubscription(pendingSubscription);
-            
-            // Update activity timestamp to now
-            this.tableLastActivity.set(key, Date.now());
-          } catch (error) {
-            console.error(`Error refreshing subscription ${key}:`, error);
-          }
-        }
-      });
-      
-      // Invalidate queries related to this table
-      // Prefer invalidating the actual query keys used by the subscription(s).
-      // Fall back to invalidating by table name when we can't determine it.
-      const keysForTable = Array.from(this.subscriptions.values())
-        .filter((sub) => sub.options?.table === table)
-        .map((sub) => JSON.stringify(this.normalizeQueryKey(sub.options?.queryKey ?? table)));
-      if (keysForTable.length) {
-        keysForTable.forEach((k) => {
-          try {
-            this.queryClient.invalidateQueries({ queryKey: JSON.parse(k) });
-          } catch {
-            this.queryClient.invalidateQueries({ queryKey: queryKeys.custom(table) });
-          }
-        });
-      } else {
-        this.queryClient.invalidateQueries({ queryKey: queryKeys.custom(table) });
-      }
+    forceRefreshManagedSubscriptions(tables, {
+      subscriptions: this.subscriptions,
+      tableLastActivity: this.tableLastActivity,
+      snapshotSubscription: (subscription) => this.snapshotManagedSubscription(subscription),
+      replaySubscription: (subscription) => this.replayPendingSubscription(subscription),
+      invalidateQuery: (queryKey) => this.queryClient.invalidateQueries({
+        queryKey: queryKey.length === 1 ? queryKeys.custom(queryKey[0]) : queryKey,
+      }),
     });
 
     this.updateSnapshot({ lastRefreshTime: Date.now() });
