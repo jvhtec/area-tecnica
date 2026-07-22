@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_SECTIONS_ENABLED, isPaPresetCategory, normalizePresetSubsystem } from './model';
+import {
+  ALL_SECTIONS_ENABLED,
+  isPaPresetCategory,
+  normalizePresetSubsystem,
+} from '@/components/festival/push-to-flex-pullsheet/model';
 
 describe('push-to-Flex pullsheet model', () => {
   it('accepts only PA preset categories and known subsystems', () => {

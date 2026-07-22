@@ -32,4 +32,12 @@ describe('groupEligibleTaskUsers', () => {
       { heading: 'Otros departamentos', items: [{ value: 'user', label: 'Ada' }] },
     ]);
   });
+
+  it('returns empty collections when no eligible users are available', () => {
+    expect(groupEligibleTaskUsers([], 'sound')).toEqual({
+      flat: [],
+      groups: [],
+      items: [],
+    });
+  });
 });

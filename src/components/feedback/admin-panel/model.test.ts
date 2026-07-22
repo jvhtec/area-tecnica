@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { bugStatusColors, featureStatusColors, severityColors } from './model';
+import {
+  bugStatusColors,
+  featureStatusColors,
+  severityColors,
+} from '@/components/feedback/admin-panel/model';
 
 describe('feedback admin model', () => {
   it('defines a visual treatment for every persisted state', () => {
