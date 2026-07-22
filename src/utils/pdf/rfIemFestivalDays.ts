@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-import type { ArtistRfIemData } from './rfIemTableTypes';
+import type { ArtistRfIemData } from '@/utils/pdf/rfIemTableTypes';
 
 const FESTIVAL_DAY_ROLLOVER_HOUR = 7;
 const MADRID_TIMEZONE = 'Europe/Madrid';
@@ -15,6 +15,7 @@ function parseTimeToMinutes(value: string | null | undefined): number {
   const minute = Number(match[2] || '0');
   const second = Number(match[3] || '0');
   if (![hour, minute, second].every(Number.isFinite)) return Number.NaN;
+  if (hour > 23 || minute > 59 || second > 59) return Number.NaN;
   return hour * 60 + minute + second / 60;
 }
 

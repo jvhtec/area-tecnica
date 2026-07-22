@@ -27,7 +27,7 @@ import {
   type PresetEquipmentRow,
   type PresetItemRow,
   type PushToFlexPullsheetDialogProps,
-} from './push-to-flex-pullsheet/model';
+} from '@/components/festival/push-to-flex-pullsheet/model';
 
 export function PushToFlexPullsheetDialog({
   open,

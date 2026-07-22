@@ -4,7 +4,7 @@ import {
   formatAssignmentTechnicianName,
   formatDepartmentName,
   formatJobDateLabel,
-} from "./formatters";
+} from "@/components/jobs/job-assignment-dialog/formatters";
 
 describe("job assignment dialog formatters", () => {
   it("formats complete, missing, and blank technician profiles", () => {

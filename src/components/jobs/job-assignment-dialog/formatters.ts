@@ -1,4 +1,5 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { es } from "date-fns/locale";
 
 import type { DirectJobAssignment } from "@/hooks/useDirectJobAssignments";
 
@@ -23,10 +24,12 @@ export function formatJobDateLabel(date: string | null | undefined): string {
       : date;
     const madridDate = fromZonedTime(`${dateKey}T00:00:00`, DEFAULT_JOB_TIME_ZONE);
 
-    return new Intl.DateTimeFormat("es-ES", {
-      dateStyle: "full",
-      timeZone: DEFAULT_JOB_TIME_ZONE,
-    }).format(madridDate);
+    return formatInTimeZone(
+      madridDate,
+      DEFAULT_JOB_TIME_ZONE,
+      "EEEE, d 'de' MMMM 'de' yyyy",
+      { locale: es },
+    );
   } catch (error) {
     console.warn("Failed to format job date", error);
     return date;

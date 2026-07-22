@@ -1,6 +1,4 @@
 import { CheckCircle2, CircleDashed, Clock } from 'lucide-react';
-import { parseISO } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
 import { normalizeDept, type Dept } from '@/utils/tasks';
 import { formatInJobTimezone, utcToLocalInput } from '@/utils/timezoneUtils';
 
@@ -58,7 +56,6 @@ export function dateInputValue(isoDate: string): string {
 }
 
 export function isOverdueMadrid(isoDate: string): boolean {
-  const madridNow = toZonedTime(new Date(), MADRID_TZ);
-  const madridDue = toZonedTime(parseISO(isoDate), MADRID_TZ);
-  return madridDue < madridNow;
+  const dueAt = Date.parse(isoDate);
+  return Number.isFinite(dueAt) && dueAt < Date.now();
 }

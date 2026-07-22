@@ -16,7 +16,7 @@ const tourDocument = {
   id: "tour-document",
   file_name: "tour.pdf",
   file_path: "tour/tour.pdf",
-  uploaded_at: "2026-07-20T10:00:00.000Z",
+  uploaded_at: "2026-07-20T23:30:00.000Z",
 };
 
 const riderDocument = {
@@ -77,6 +77,7 @@ describe("JobCardDocumentSections", () => {
 
     expect(screen.getByText("job.pdf")).toBeInTheDocument();
     expect(screen.getByText("tour.pdf")).toBeInTheDocument();
+    expect(screen.getByText("Jul 21, 2026")).toBeInTheDocument();
     expect(screen.getByText("rider.pdf")).toBeInTheDocument();
     expect(screen.getByText("Artist: Banda Uno")).toBeInTheDocument();
 

@@ -53,9 +53,9 @@ import {
   type ExpenseStatus,
   type JobExpensesPanelProps,
   type PermissionRow,
-} from './job-expenses/model';
+} from '@/components/jobs/job-expenses/model';
 
-export type { ExpenseStatus } from './job-expenses/model';
+export type { ExpenseStatus } from '@/components/jobs/job-expenses/model';
 
 export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
   jobId,

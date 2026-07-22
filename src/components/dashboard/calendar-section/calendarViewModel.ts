@@ -1,5 +1,4 @@
 import {
-  addMonths,
   eachDayOfInterval,
   endOfMonth,
   endOfQuarter,
@@ -123,8 +122,10 @@ export function getCalendarExportInterval(
   currentDate: Date,
 ): { startDate: Date; endDate: Date } {
   if (range === 'quarter') {
-    const startDate = startOfQuarter(addMonths(currentDate, 1));
-    return { startDate, endDate: endOfQuarter(addMonths(startDate, 2)) };
+    return {
+      startDate: startOfQuarter(currentDate),
+      endDate: endOfQuarter(currentDate),
+    };
   }
   if (range === 'year') {
     return { startDate: startOfYear(currentDate), endDate: endOfYear(currentDate) };

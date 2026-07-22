@@ -12,7 +12,7 @@ import {
   PRICING_MODEL_DIA_TOUR_ID,
   WORK_ORDER_DEFINITION_ID,
   technicianDisplayName,
-} from './flex-work-orders/config';
+} from '@/services/flex-work-orders/config';
 
 async function createWorkOrderElement(options: {
   parentElementId: string;

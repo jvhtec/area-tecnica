@@ -1,8 +1,8 @@
-import { format } from "date-fns";
 import { ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 
 import { JobCardDocuments, type JobDocument } from "../JobCardDocuments";
+import { formatInJobTimezone, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
 interface StoredDocument {
   id: string;
@@ -124,7 +124,7 @@ export function JobCardDocumentSections({
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{file.file_name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {format(new Date(file.uploaded_at), "MMM d, yyyy")}
+                      {formatInJobTimezone(file.uploaded_at, "MMM d, yyyy", MADRID_TIMEZONE)}
                     </span>
                   </div>
                   <div className="flex gap-2">

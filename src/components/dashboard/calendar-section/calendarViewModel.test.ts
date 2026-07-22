@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCalendarDays,
+  collectCalendarJobIds,
   filterCalendarJobsForDate,
+  formatCalendarDays,
   getCalendarExportInterval,
   prepareCalendarJobs,
-} from './calendarViewModel';
+} from '@/components/dashboard/calendar-section/calendarViewModel';
 
 describe('calendar view model', () => {
   it('builds a stable six-week Monday-first grid', () => {
@@ -52,5 +54,27 @@ describe('calendar view model', () => {
     expect(getCalendarExportInterval('month', currentDate).startDate).toEqual(new Date(2026, 6, 1));
     expect(getCalendarExportInterval('quarter', currentDate).startDate).toEqual(new Date(2026, 6, 1));
     expect(getCalendarExportInterval('year', currentDate).endDate).toEqual(new Date(2026, 11, 31, 23, 59, 59, 999));
+  });
+
+  it('keeps quarter exports in the current quarter at a quarter boundary', () => {
+    const interval = getCalendarExportInterval('quarter', new Date(2026, 5, 30));
+
+    expect(interval.startDate).toEqual(new Date(2026, 3, 1));
+    expect(interval.endDate).toEqual(new Date(2026, 5, 30, 23, 59, 59, 999));
+  });
+
+  it('formats calendar dates and collects each matching job once', () => {
+    const days = [new Date(2026, 6, 21), new Date(2026, 6, 22)];
+    const formattedDays = formatCalendarDays(days);
+
+    expect(formattedDays.map(({ formatted }) => formatted)).toEqual([
+      '2026-07-21',
+      '2026-07-22',
+    ]);
+    expect(collectCalendarJobIds(formattedDays, (date) => (
+      date.getDate() === 21
+        ? [{ id: 'shared' }, { id: 'first-day' }]
+        : [{ id: 'shared' }, { id: 'second-day' }]
+    ))).toEqual(['shared', 'first-day', 'second-day']);
   });
 });

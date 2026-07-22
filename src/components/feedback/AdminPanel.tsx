@@ -54,7 +54,7 @@ import {
   severityColors,
   type BugReport,
   type FeatureRequest,
-} from './admin-panel/model';
+} from '@/components/feedback/admin-panel/model';
 
 export function AdminPanel() {
   const { toast } = useToast();

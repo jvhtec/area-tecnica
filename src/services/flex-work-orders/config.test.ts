@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { technicianDisplayName } from './config';
+import { technicianDisplayName } from '@/services/flex-work-orders/config';
 
 describe('Flex work-order configuration', () => {
   it('builds trimmed technician labels with the existing fallback', () => {

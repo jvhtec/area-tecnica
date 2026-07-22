@@ -1,5 +1,6 @@
 export const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
 export const BAND_TEXT_TOKEN = '__BAND_ITEM__';
+export const MIXED_TEXT_TOKEN = '__MIXED_ITEM__';
 
 interface ArtistInfrastructure {
   infra_cat6?: boolean;
@@ -106,8 +107,16 @@ export function formatWirelessSystemsForPdf(
     if (providedBy !== 'mixed') return modelAndDetails;
 
     const provider = system.provided_by || 'festival';
-    const providerLabel = provider === 'festival' ? 'Festival' : 'Banda';
-    const providerToken = provider === 'festival' ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
+    const providerLabel = provider === 'festival'
+      ? 'Festival'
+      : provider === 'band'
+        ? 'Banda'
+        : 'Mixto';
+    const providerToken = provider === 'festival'
+      ? FESTIVAL_TEXT_TOKEN
+      : provider === 'band'
+        ? BAND_TEXT_TOKEN
+        : MIXED_TEXT_TOKEN;
     return `${providerToken}${providerLabel}: ${modelAndDetails}`;
   }).join(providedBy === 'mixed' ? '\n' : '; ');
 }

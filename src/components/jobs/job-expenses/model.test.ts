@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildTechnicianName, STATUS_ORDER, type ExpenseRow } from './model';
+import {
+  buildTechnicianName,
+  STATUS_ORDER,
+  type ExpenseRow,
+} from '@/components/jobs/job-expenses/model';
 
 const baseExpense = {
   id: 'expense-1',
