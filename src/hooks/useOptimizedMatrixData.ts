@@ -44,6 +44,8 @@ export interface MatrixTimesheetAssignment {
   video_role?: string | null;
   is_schedule_only?: boolean | null;
   source?: string | null;
+  amount_eur?: number | null;
+  timesheet_status?: string | null;
 }
 
 interface OptimizedMatrixDataProps {
@@ -83,6 +85,8 @@ interface TimesheetAssignmentRow {
   date: string;
   is_schedule_only: boolean | null;
   source: string | null;
+  amount_eur: number | null;
+  status: string | null;
 }
 
 type AssignmentMetadataRow = Pick<
@@ -127,7 +131,7 @@ export const fetchMatrixTimesheetAssignments = async ({
     const jobBatch = jobIds.slice(i, i + batchSize);
     let query = supabase
       .from('timesheets')
-      .select('job_id, technician_id, date, is_schedule_only, source')
+      .select('job_id, technician_id, date, is_schedule_only, source, amount_eur, status')
       .eq('is_active', true)
       .in('job_id', jobBatch)
       .in('technician_id', technicianIds)
@@ -226,6 +230,8 @@ export const fetchMatrixTimesheetAssignments = async ({
         video_role: meta?.video_role ?? null,
         is_schedule_only: row.is_schedule_only ?? null,
         source: row.source ?? null,
+        amount_eur: row.amount_eur ?? null,
+        timesheet_status: row.status ?? null,
       });
     });
   });

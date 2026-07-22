@@ -17,15 +17,15 @@ import {
   fetchAssignmentsForWindow,
   fetchAvailabilityForWindow,
   fetchJobsForWindow,
+  fetchStaffingSummaryForJobs,
   formatLabel,
-  parseSummaryRow,
+  MATRIX_STAFFING_SUMMARY_QUERY_SCOPE,
   type Department,
   type MatrixJob,
   type OutstandingJobInfo,
   type OutstandingRoleInfo,
-  type StaffingAssignmentRow,
-  type StaffingSummaryRow,
 } from '@/pages/job-assignment-matrix/utils';
+import { MATRIX_LENS_STORAGE_KEY, type MatrixLens } from '@/components/matrix/lenses/types';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -60,6 +60,30 @@ export default function JobAssignmentMatrix() {
     jobTitle: string;
   }>(null);
   const [lastAcknowledgedHash, setLastAcknowledgedHash] = useState<string | null>(null);
+  const [lens, setLens] = useState<MatrixLens>('default');
+  const canUseCostLens = isManagementRole(userRole);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = window.localStorage.getItem(MATRIX_LENS_STORAGE_KEY) as MatrixLens | null;
+      if (stored === 'default' || stored === 'coverage' || stored === 'workload' || stored === 'cost') {
+        setLens(stored);
+      }
+    } catch (error) {
+      console.warn('Failed to read matrix lens preference', error);
+    }
+  }, []);
+
+  const handleSetLens = React.useCallback((value: MatrixLens) => {
+    setLens(value);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(MATRIX_LENS_STORAGE_KEY, value);
+    } catch (error) {
+      console.warn('Failed to persist matrix lens preference', error);
+    }
+  }, []);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -396,40 +420,8 @@ export default function JobAssignmentMatrix() {
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
 
   const staffingReminderQuery = useQuery({
-    queryKey: queryKeys.scope('matrix-staffing-summary', jobIdsKey),
-    queryFn: async () => {
-      if (!jobIds.length) {
-        return { summaries: [] as StaffingSummaryRow[], assignments: [] as StaffingAssignmentRow[] };
-      }
-
-      const [summaryRes, assignmentsRes] = await Promise.all([
-        dataLayerClient.from('job_required_roles_summary')
-          .select('job_id, department, roles')
-          .in('job_id', jobIds),
-        dataLayerClient.from('job_assignments')
-          .select('job_id, sound_role, lights_role, video_role, production_role, status')
-          .in('job_id', jobIds),
-      ]);
-
-      if (summaryRes.error) throw summaryRes.error;
-      if (assignmentsRes.error) throw assignmentsRes.error;
-
-      const summaries = (summaryRes.data || [])
-        .map(parseSummaryRow)
-        .filter((row): row is StaffingSummaryRow => Boolean(row));
-
-      const assignments = ((assignmentsRes.data || []) as StaffingAssignmentRow[])
-        .filter((row): row is StaffingAssignmentRow => Boolean(row && row.job_id))
-        .map((row) => ({
-          ...row,
-          sound_role: row.sound_role ? String(row.sound_role) : null,
-          lights_role: row.lights_role ? String(row.lights_role) : null,
-          video_role: row.video_role ? String(row.video_role) : null,
-          status: row.status ? String(row.status) : null,
-        }));
-
-      return { summaries, assignments };
-    },
+    queryKey: queryKeys.scope(MATRIX_STAFFING_SUMMARY_QUERY_SCOPE, jobIdsKey),
+    queryFn: () => fetchStaffingSummaryForJobs(jobIds),
     enabled: jobIds.length > 0,
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -664,6 +656,9 @@ export default function JobAssignmentMatrix() {
         handleReminderOpenChange={handleReminderOpenChange}
         outstandingJobsCount={outstandingJobsCount}
         outstandingJobsDescription={outstandingJobsDescription}
+        lens={lens}
+        setLens={handleSetLens}
+        canUseCostLens={canUseCostLens}
       />
 
       {/* Matrix Content */}
@@ -700,6 +695,10 @@ export default function JobAssignmentMatrix() {
             }}
             canExpandBefore={canExpandBefore}
             canExpandAfter={canExpandAfter}
+            lens={lens}
+            onOpenStaffingOrchestrator={(jobId, department, jobTitle) =>
+              setStaffingOrchestratorTarget({ jobId, department, jobTitle })
+            }
           />
         )}
       </div>

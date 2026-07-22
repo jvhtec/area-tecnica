@@ -20,6 +20,8 @@ import { isAdminRole, isManagementRole } from '@/utils/permissions';
 import type { UserRole } from '@/types/user';
 import { getCalendarPeriodDateKeys } from '@/utils/timezoneUtils';
 import { subYears } from 'date-fns';
+import { TechnicianLensSummary } from '@/components/matrix/lenses/TechnicianLensSummary';
+import type { TechnicianLensSummaryData } from '@/components/matrix/lenses/types';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -43,9 +45,10 @@ interface TechnicianRowProps {
   compact?: boolean;
   medalRank?: 'gold' | 'silver' | 'bronze';
   lastYearMedalRank?: 'gold' | 'silver' | 'bronze';
+  lensSummary?: TechnicianLensSummaryData | null;
 }
 
-const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank, lensSummary = null }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isAdmin = isAdminRole(userRole);
   const isManagementUser = isManagementRole(userRole);
@@ -472,6 +475,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                   )}
                 </div>
                 <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
+                {lensSummary && <TechnicianLensSummary data={lensSummary} compact />}
               </div>
             ) : (
               <div className="flex items-center gap-3 h-full">
@@ -504,6 +508,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                       {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
                     </Badge>
                   </div>
+                  {lensSummary && <TechnicianLensSummary data={lensSummary} />}
                 </div>
               </div>
             )}

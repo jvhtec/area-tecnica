@@ -1,3 +1,5 @@
+import type { MatrixLens } from "@/components/matrix/lenses/types";
+
 // Technician sorting method type
 export type TechSortMethod =
   | "default"
@@ -5,7 +7,8 @@ export type TechSortMethod =
   | "name-asc"
   | "name-desc"
   | "surname-asc"
-  | "surname-desc";
+  | "surname-desc"
+  | "workload-desc";
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 export interface MatrixJob {
@@ -74,4 +77,6 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
+  lens?: MatrixLens;
+  onOpenStaffingOrchestrator?: (jobId: string, department: string, jobTitle: string) => void;
 }

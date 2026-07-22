@@ -1,3 +1,6 @@
+import type { CellLensBadgeData } from "@/components/matrix/lenses/types";
+import type { DropValidity } from "@/components/matrix/dnd/dropValidity";
+
 export type MatrixCellAction =
   | 'select-job'
   | 'select-job-for-staffing'
@@ -75,6 +78,19 @@ export interface OptimizedMatrixCellProps {
   staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
+  lensBadge?: CellLensBadgeData | null;
+  dragEnabled?: boolean;
+  isDragSource?: boolean;
+  dropValidity?: DropValidity | null;
+  /** True while any cell is picked up for a mobile tap-to-move (not just this cell). */
+  pickupActive?: boolean;
+  onDragStartCell?: () => void;
+  onDragOverCell?: () => void;
+  onDragLeaveCell?: () => void;
+  onDropCell?: () => void;
+  onDragEndCell?: () => void;
+  /** Fired instead of onDropCell when the drop payload is a job chip dragged from the date header. */
+  onDropJobCell?: (jobId: string) => void;
 }
 
 export type AssignmentLifecycleResult = {

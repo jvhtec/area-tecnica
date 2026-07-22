@@ -19,10 +19,21 @@ import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-ass
 import { useMatrixScrollState } from '@/components/matrix/optimized-assignment-matrix/useMatrixScrollState';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/components/matrix/optimized-assignment-matrix/types';
+import { LENS_HEADER_ROW_HEIGHT, type MatrixLens } from '@/components/matrix/lenses/types';
+import { useMatrixCoverage } from '@/hooks/matrix/useMatrixCoverage';
+import { useMatrixWorkload } from '@/hooks/matrix/useMatrixWorkload';
+import { computeDepartmentPercentiles } from '@/components/matrix/lenses/workload';
+import { aggregateCost, formatEuro, formatEuroRange } from '@/components/matrix/lenses/cost';
+import type { CellLensBadgeData, TechnicianLensSummaryData } from '@/components/matrix/lenses/types';
+import { useMatrixDrag } from '@/components/matrix/dnd/useMatrixDrag';
+import { useMoveAssignment } from '@/components/matrix/dnd/useMoveAssignment';
+import { useMatrixTourRateQuotes, type TourRateQuotePair } from '@/hooks/matrix/useMatrixTourRateQuotes';
+import { useMatrixRateEstimates } from '@/hooks/matrix/useMatrixRateEstimates';
 
 
 import { queryKeys } from "@/lib/react-query";
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+const EMPTY_COST_BY_DATE = new Map<string, { amount: number; approved: number }>();
 
 type ProfileNameRow = {
   id: string;
@@ -63,6 +74,8 @@ export const OptimizedAssignmentMatrix = ({
   staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
+  lens = 'default',
+  onOpenStaffingOrchestrator,
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -77,6 +90,9 @@ export const OptimizedAssignmentMatrix = ({
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
+  // Cost lens exposes payout amounts; defend in depth even if a stale
+  // localStorage preference selected it before a role change.
+  const effectiveLens: MatrixLens = lens === 'cost' && !isManagementUser ? 'default' : lens;
   const qc = useQueryClient();
 
   // Performance monitoring
@@ -91,7 +107,9 @@ export const OptimizedAssignmentMatrix = ({
   const CELL_WIDTH = cellWidth ?? 160;
   const CELL_HEIGHT = cellHeight ?? 60;
   const TECHNICIAN_WIDTH = technicianWidth ?? 256;
-  const HEADER_HEIGHT = headerHeight ?? 80;
+  const BASE_HEADER_HEIGHT = headerHeight ?? 80;
+  const showLensHeaderRow = effectiveLens === 'coverage' || effectiveLens === 'cost';
+  const HEADER_HEIGHT = BASE_HEADER_HEIGHT + (showLensHeaderRow ? LENS_HEADER_ROW_HEIGHT : 0);
 
   // Use optimized data hook
   const {
@@ -106,6 +124,27 @@ export const OptimizedAssignmentMatrix = ({
     isFetching
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
+  // Lens data sources. Each hook is a no-op query when its lens isn't active.
+  const jobIds = useMemo(() => jobs.map((job) => job.id), [jobs]);
+  const technicianIds = useMemo(() => technicians.map((technician) => technician.id), [technicians]);
+  const departmentByTech = useMemo(
+    () => new Map(technicians.map((technician) => [technician.id, technician.department])),
+    [technicians],
+  );
+
+  const { coverageByDate, coverageByJob } = useMatrixCoverage({
+    dates,
+    jobIds,
+    getJobsForDate,
+    enabled: effectiveLens === 'coverage',
+  });
+
+  const { byCell: workloadByCell, byTech: workloadByTech } = useMatrixWorkload({
+    technicianIds,
+    dates,
+    enabled: effectiveLens === 'workload',
+  });
+
   const {
     orderedTechnicians,
     setSortJobId,
@@ -117,7 +156,107 @@ export const OptimizedAssignmentMatrix = ({
     technicians,
     allAssignments,
     mobile,
+    workloadByTech,
   });
+
+  // Tour-date pay is a flat day/tour rate, knowable the moment the assignment
+  // exists — the timesheet itself stays schedule-only/hours-empty for tour
+  // dates by design, so it never gets an amount_eur. Fetch the real rate via
+  // the same RPC the payout/quote UI already uses for every (tour-date job,
+  // technician) pair currently on screen.
+  const tourDateJobIds = useMemo(
+    () => new Set(jobs.filter((job) => job.job_type === 'tourdate').map((job) => job.id)),
+    [jobs],
+  );
+  const tourQuotePairs = useMemo<TourRateQuotePair[]>(() => {
+    if (effectiveLens !== 'cost' || tourDateJobIds.size === 0) return [];
+    const seen = new Set<string>();
+    const pairs: TourRateQuotePair[] = [];
+    allAssignments.forEach((assignment) => {
+      if (!tourDateJobIds.has(assignment.job_id)) return;
+      const key = `${assignment.job_id}:${assignment.technician_id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      pairs.push({ jobId: assignment.job_id, technicianId: assignment.technician_id });
+    });
+    return pairs;
+  }, [effectiveLens, tourDateJobIds, allAssignments]);
+  const tourQuoteAmountByPair = useMatrixTourRateQuotes({
+    pairs: tourQuotePairs,
+    enabled: effectiveLens === 'cost',
+  });
+
+  // Rough day-rate preview for cells with no real amount_eur yet (hours not
+  // logged). See useMatrixRateEstimates for what this deliberately does and
+  // doesn't account for.
+  const rateEstimateByTechCategory = useMatrixRateEstimates({
+    technicianIds,
+    enabled: effectiveLens === 'cost',
+  });
+
+  const costAggregation = useMemo(
+    () => (effectiveLens === 'cost' ? aggregateCost(allAssignments, tourQuoteAmountByPair, rateEstimateByTechCategory) : null),
+    [effectiveLens, allAssignments, tourQuoteAmountByPair, rateEstimateByTechCategory],
+  );
+
+  const lensBadgeByCell = useMemo(() => {
+    const map = new Map<string, CellLensBadgeData>();
+    if (effectiveLens === 'workload') {
+      workloadByCell.forEach((cell, key) => {
+        map.set(key, {
+          label: String(cell.streak),
+          tone: cell.tone,
+          title: `${cell.streak} día${cell.streak === 1 ? '' : 's'} seguidos trabajando`,
+        });
+      });
+    } else if (effectiveLens === 'cost' && costAggregation) {
+      costAggregation.byCell.forEach((cell, key) => {
+        if (cell.amount === null) {
+          map.set(key, cell.estimate
+            ? {
+              label: `~${formatEuroRange(cell.estimate)}`,
+              tone: 'muted',
+              title: 'Estimación aproximada (tarifa base, sin horas registradas todavía): no incluye nocturnidad, festivos ni horas extra reales',
+            }
+            : { label: '—', tone: 'warn', title: 'Sin tarifa asignada' });
+          return;
+        }
+        const title = cell.source === 'tour_quote' ? 'Tarifa de gira' : cell.approved ? 'Aprobado' : 'Pendiente de aprobación';
+        map.set(key, {
+          label: formatEuro(cell.amount),
+          tone: cell.source === 'tour_quote' ? 'neutral' : cell.approved ? 'ok' : 'neutral',
+          title,
+        });
+      });
+    }
+    return map;
+  }, [effectiveLens, workloadByCell, costAggregation]);
+
+  const technicianLensSummaryByTech = useMemo(() => {
+    const map = new Map<string, TechnicianLensSummaryData>();
+    if (effectiveLens === 'workload') {
+      const monthCounts = new Map<string, number>();
+      workloadByTech.forEach((summary, techId) => monthCounts.set(techId, summary.monthCount));
+      const percentiles = computeDepartmentPercentiles(monthCounts, departmentByTech);
+      workloadByTech.forEach((summary, techId) => {
+        const percentile = percentiles.get(techId);
+        map.set(techId, {
+          primary: `↯ ${summary.streakEndingToday} día${summary.streakEndingToday === 1 ? '' : 's'} seguidos`,
+          secondary: `${summary.monthCount} este mes${percentile !== undefined ? ` · p${percentile}` : ''}`,
+          tone: summary.tone,
+        });
+      });
+    } else if (effectiveLens === 'cost' && costAggregation) {
+      costAggregation.byTech.forEach((total, techId) => {
+        map.set(techId, {
+          primary: formatEuro(total.amount),
+          secondary: total.missingRateCount > 0 ? `${total.missingRateCount} sin tarifa` : undefined,
+          tone: total.missingRateCount > 0 ? 'warn' : 'neutral',
+        });
+      });
+    }
+    return map;
+  }, [effectiveLens, workloadByTech, costAggregation, departmentByTech]);
 
   // Listen for assignment updates and refresh data
   useEffect(() => {
@@ -184,6 +323,32 @@ export const OptimizedAssignmentMatrix = ({
     });
     return map;
   }, [allAssignments]);
+
+  // Drag-and-drop: same-date assignment moves. Management + direct-assign mode
+  // only; on mobile this becomes tap-to-pick-up/tap-to-drop instead of native
+  // HTML5 drag, which doesn't work on touch — see OptimizedMatrixCell's
+  // handleCellClick for the tap-mode interception.
+  const dragEnabled = allowDirectAssign && isManagementUser;
+  const { pendingMove, isMoving, requestMove, cancelMove, commitMove } = useMoveAssignment();
+  const {
+    dragSource,
+    dropTarget,
+    beginDrag,
+    dragOverCell,
+    clearDragOver,
+    dropOnCell,
+    endDrag,
+  } = useMatrixDrag({
+    enabled: dragEnabled,
+    mobile,
+    fridgeSet,
+    declinedJobsByTech,
+    getAssignmentForCell,
+    getAvailabilityForCell,
+    onDrop: (source, targetTechnicianId, targetTechnicianName) => {
+      void requestMove(source, targetTechnicianId, targetTechnicianName);
+    },
+  });
 
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
@@ -573,7 +738,7 @@ export const OptimizedAssignmentMatrix = ({
 
   const viewProps = {
     isFetching, isInitialLoading,
-    TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
+    TECHNICIAN_WIDTH, HEADER_HEIGHT, BASE_HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
     dateHeadersRef, technicianScrollRef, mainScrollRef, visibleCols, visibleRows,
     dates, technicians, orderedTechnicians,
     fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, staffingDepartment,
@@ -591,6 +756,12 @@ export const OptimizedAssignmentMatrix = ({
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
+    lens: effectiveLens, onOpenStaffingOrchestrator,
+    coverageByDate, coverageByJob,
+    costWindowTotal: costAggregation?.window ?? null, costByDate: costAggregation?.byDate ?? EMPTY_COST_BY_DATE,
+    lensBadgeByCell, technicianLensSummaryByTech,
+    dragEnabled, dragSource, dropTarget, beginDrag, dragOverCell, clearDragOver, dropOnCell, endDrag,
+    pendingMove, isMoving, cancelMove, commitMove,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;

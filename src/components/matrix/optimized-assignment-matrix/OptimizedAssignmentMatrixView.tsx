@@ -9,6 +9,17 @@ import { TechnicianRow } from "../TechnicianRow";
 import { OptimizedMatrixCell } from "../OptimizedMatrixCell";
 import { DateHeader } from "../DateHeader";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
+import { CoverageDateCell } from "@/components/matrix/lenses/CoverageDateCell";
+import { LENS_HEADER_ROW_HEIGHT, type CellLensBadgeData, type MatrixLens, type TechnicianLensSummaryData } from "@/components/matrix/lenses/types";
+import type { CoverageByDateDept, CoverageByJobDept } from "@/components/matrix/lenses/coverage";
+import { formatEuro, type CostTotal } from "@/components/matrix/lenses/cost";
+import { formatInTimeZone } from "date-fns-tz";
+import type { DragSource } from "@/components/matrix/dnd/useMatrixDrag";
+import type { DropValidity } from "@/components/matrix/dnd/dropValidity";
+import type { PendingMove } from "@/components/matrix/dnd/useMoveAssignment";
+import { MoveAssignmentConfirmDialog } from "@/components/matrix/dnd/MoveAssignmentConfirmDialog";
+
+const MADRID_TIMEZONE = "Europe/Madrid";
 
 export interface OptimizedAssignmentMatrixViewProps {
   isFetching: boolean;
@@ -88,7 +99,46 @@ export interface OptimizedAssignmentMatrixViewProps {
   isGlobalCellSelected: (technicianId: string, date: Date) => boolean;
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
+  BASE_HEADER_HEIGHT: number;
+  lens: MatrixLens;
+  onOpenStaffingOrchestrator?: (jobId: string, department: string, jobTitle: string) => void;
+  coverageByDate: CoverageByDateDept;
+  coverageByJob: CoverageByJobDept;
+  costWindowTotal: CostTotal | null;
+  costByDate: Map<string, CostTotal>;
+  lensBadgeByCell: Map<string, CellLensBadgeData>;
+  technicianLensSummaryByTech: Map<string, TechnicianLensSummaryData>;
+  dragEnabled: boolean;
+  dragSource: DragSource | null;
+  dropTarget: { key: string; validity: DropValidity } | null;
+  beginDrag: (technician: any, date: Date, assignment: any) => void;
+  dragOverCell: (technicianId: string, date: Date) => void;
+  clearDragOver: () => void;
+  dropOnCell: (technician: any, date: Date) => void;
+  endDrag: () => void;
+  pendingMove: PendingMove | null;
+  isMoving: boolean;
+  cancelMove: () => void;
+  commitMove: () => void;
 }
+
+const CostDateTotalCellComp = ({ date, width, costByDate }: { date: Date; width: number; costByDate: Map<string, CostTotal> }) => {
+  const dateKey = formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
+  const total = costByDate.get(dateKey);
+  return (
+    <div className="border-r flex-shrink-0 flex items-center justify-center" style={{ width, height: LENS_HEADER_ROW_HEIGHT }}>
+      {total && total.amount > 0 ? (
+        <span
+          className="text-[10px] font-medium text-muted-foreground"
+          title={`Aprobado: ${formatEuro(total.approved)}`}
+        >
+          {formatEuro(total.amount)}
+        </span>
+      ) : null}
+    </div>
+  );
+};
+const CostDateTotalCell = React.memo(CostDateTotalCellComp);
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
   isFetching,
@@ -167,8 +217,30 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   isGlobalCellSelected: _isGlobalCellSelected,
   techMedalRankings,
   techLastYearMedalRankings,
+  BASE_HEADER_HEIGHT,
+  lens,
+  onOpenStaffingOrchestrator,
+  coverageByDate,
+  coverageByJob,
+  costWindowTotal,
+  costByDate,
+  lensBadgeByCell,
+  technicianLensSummaryByTech,
+  dragEnabled,
+  dragSource,
+  dropTarget,
+  beginDrag,
+  dragOverCell,
+  clearDragOver,
+  dropOnCell,
+  endDrag,
+  pendingMove,
+  isMoving,
+  cancelMove,
+  commitMove,
 }: OptimizedAssignmentMatrixViewProps) => {
   void _isGlobalCellSelected;
+  const showLensHeaderRow = lens === "coverage" || lens === "cost";
 
   return (
     <div className="matrix-layout relative">
@@ -220,6 +292,17 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               </span>
             </div>
           )}
+          {lens === "cost" && costWindowTotal && (
+            <div
+              className="flex items-center justify-center border-t"
+              style={{ height: LENS_HEADER_ROW_HEIGHT }}
+              title="Suma de costes en la ventana visible (técnicos y fechas cargados), no el gasto total de la empresa"
+            >
+              <span className="text-[10px] font-medium text-muted-foreground">
+                Total ventana: {formatEuro(costWindowTotal.amount)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -262,23 +345,48 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
             </button>
           </div>
         )}
-        <div style={{ width: matrixWidth, height: "100%", display: "flex", position: "relative" }}>
-          {/* Leading spacer for virtualized columns */}
-          <div style={{ width: visibleCols.start * CELL_WIDTH }} />
-          {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, idx) => (
-            <DateHeader
-              key={visibleCols.start + idx}
-              date={date}
-              width={CELL_WIDTH}
-              jobs={getJobsForDate(date)}
-              technicianIds={technicians.map((t) => t.id)}
-              onJobClick={(jobId) => {
-                setSortJobId((prev) => (prev === jobId ? null : jobId));
-              }}
-            />
-          ))}
-          {/* Trailing spacer to fill remaining width */}
-          <div style={{ width: Math.max(0, (dates.length - (visibleCols.end + 1)) * CELL_WIDTH) }} />
+        <div style={{ width: matrixWidth, display: "flex", flexDirection: "column" }}>
+          <div style={{ width: matrixWidth, height: BASE_HEADER_HEIGHT, display: "flex", position: "relative" }}>
+            {/* Leading spacer for virtualized columns */}
+            <div style={{ width: visibleCols.start * CELL_WIDTH }} />
+            {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, idx) => (
+              <DateHeader
+                key={visibleCols.start + idx}
+                date={date}
+                width={CELL_WIDTH}
+                jobs={getJobsForDate(date)}
+                technicianIds={technicians.map((t) => t.id)}
+                onJobClick={(jobId) => {
+                  setSortJobId((prev) => (prev === jobId ? null : jobId));
+                }}
+                dragEnabled={dragEnabled}
+              />
+            ))}
+            {/* Trailing spacer to fill remaining width */}
+            <div style={{ width: Math.max(0, (dates.length - (visibleCols.end + 1)) * CELL_WIDTH) }} />
+          </div>
+
+          {showLensHeaderRow && (
+            <div style={{ width: matrixWidth, height: LENS_HEADER_ROW_HEIGHT, display: "flex", position: "relative" }}>
+              <div style={{ width: visibleCols.start * CELL_WIDTH }} />
+              {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, idx) =>
+                lens === "coverage" ? (
+                  <CoverageDateCell
+                    key={visibleCols.start + idx}
+                    date={date}
+                    width={CELL_WIDTH}
+                    coverageByDate={coverageByDate}
+                    coverageByJob={coverageByJob}
+                    getJobsForDate={getJobsForDate}
+                    onOpenStaffing={(jobId, department, jobTitle) => onOpenStaffingOrchestrator?.(jobId, department, jobTitle)}
+                  />
+                ) : (
+                  <CostDateTotalCell key={visibleCols.start + idx} date={date} width={CELL_WIDTH} costByDate={costByDate} />
+                ),
+              )}
+              <div style={{ width: Math.max(0, (dates.length - (visibleCols.end + 1)) * CELL_WIDTH) }} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -305,6 +413,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 compact={mobile}
                 medalRank={techMedalRankings.get(technician.id)}
                 lastYearMedalRank={techLastYearMedalRankings.get(technician.id)}
+                lensSummary={technicianLensSummaryByTech.get(technician.id) ?? null}
               />
             ))}
           </div>
@@ -346,6 +455,15 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                       const providedByDate = staffingMaps?.byDate.get(byDateKey)
                         ? (staffingMaps?.byDate.get(byDateKey) as any)
                         : null;
+                      // Lens maps are keyed on the Madrid calendar day (matches the
+                      // timesheet-backed data they're built from), independent of
+                      // the browser's local timezone used by cellKey/byDateKey above.
+                      const madridDateKey = formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
+                      const lensCellKey = `${technician.id}-${madridDateKey}`;
+                      const lensBadge = lensBadgeByCell.get(lensCellKey) ?? null;
+                      const isDragSourceCell =
+                        dragSource?.technicianId === technician.id && dragSource?.dateKey === madridDateKey;
+                      const dropValidity = dropTarget?.key === lensCellKey ? dropTarget.validity : null;
 
                       return (
                         <div
@@ -386,6 +504,17 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             staffingDepartment={staffingDepartment}
                             hideStaffingEmailButtons={hideStaffingEmailButtons}
                             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
+                            lensBadge={lensBadge}
+                            dragEnabled={dragEnabled}
+                            isDragSource={isDragSourceCell}
+                            dropValidity={dropValidity}
+                            pickupActive={!!dragSource}
+                            onDragStartCell={() => beginDrag(technician, date, assignment)}
+                            onDragOverCell={() => dragOverCell(technician.id, date)}
+                            onDragLeaveCell={() => clearDragOver()}
+                            onDropCell={() => dropOnCell(technician, date)}
+                            onDragEndCell={() => endDrag()}
+                            onDropJobCell={(jobId) => handleCellClick(technician.id, date, "assign", jobId)}
                           />
                         </div>
                       );
@@ -432,6 +561,13 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         createUserOpen={createUserOpen}
         setCreateUserOpen={setCreateUserOpen}
         qc={qc}
+      />
+
+      <MoveAssignmentConfirmDialog
+        pendingMove={pendingMove}
+        isMoving={isMoving}
+        onCancel={cancelMove}
+        onConfirm={commitMove}
       />
     </div>
   );
