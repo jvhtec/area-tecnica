@@ -5,6 +5,9 @@ import {
 } from "./constants";
 import type { AmplifierResults, SpeakerSection } from "./types";
 
+const CHANNELS_PER_AMPLIFIER = 4;
+const AMPLIFIERS_PER_RACK = 3;
+
 export interface SpeakerAmplifierCalculation {
   amps: number;
   details: string;
@@ -34,7 +37,7 @@ export function calculateAmplifiersForSpeaker(
   const actualQuantity = mirrored ? quantity * 2 : quantity;
   const actualMaxLinked = Math.min(maxLinked || amplifierConfig.maxLink, amplifierConfig.maxLink);
   const groupCount = Math.ceil(actualQuantity / actualMaxLinked);
-  const groupsPerAmp = Math.floor(4 / amplifierConfig.channelsRequired);
+  const groupsPerAmp = Math.floor(CHANNELS_PER_AMPLIFIER / amplifierConfig.channelsRequired);
   const totalAmps = Math.ceil(groupCount / groupsPerAmp);
   const mirrorText = mirrored ? " × 2 (mirrored clusters)" : "";
   const ampType = isTFSpeaker(speakerName) ? "PLM20000D" : "LA12X";
@@ -106,10 +109,10 @@ export function calculateAmplifierResults(
     results.totalAmplifiersNeeded += sectionResults.totalAmps;
   });
 
-  results.completeRaks = Math.floor(totalLAAmps / 3);
-  results.looseAmplifiers = totalLAAmps % 3;
-  results.plmRacks = Math.floor(totalPLMAmps / 3);
-  results.loosePLMAmps = totalPLMAmps % 3;
+  results.completeRaks = Math.floor(totalLAAmps / AMPLIFIERS_PER_RACK);
+  results.looseAmplifiers = totalLAAmps % AMPLIFIERS_PER_RACK;
+  results.plmRacks = Math.floor(totalPLMAmps / AMPLIFIERS_PER_RACK);
+  results.loosePLMAmps = totalPLMAmps % AMPLIFIERS_PER_RACK;
   results.laAmpsTotal = totalLAAmps;
   results.plmAmpsTotal = totalPLMAmps;
 

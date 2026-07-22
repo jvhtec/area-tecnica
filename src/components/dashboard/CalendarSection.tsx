@@ -33,7 +33,7 @@ import {
   formatCalendarDays,
   getCalendarExportInterval,
   prepareCalendarJobs,
-} from "./calendar-section/calendarViewModel";
+} from "@/components/dashboard/calendar-section/calendarViewModel";
 
 type PrintableJobType = keyof PrintSettings["jobTypes"];
 

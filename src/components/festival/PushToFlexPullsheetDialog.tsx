@@ -14,18 +14,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { resolveSubsystemForEquipment } from '@/types/equipment';
+import { normalizePresetSubsystem, resolveSubsystemForEquipment } from '@/types/equipment';
 import type { EquipmentCategory } from '@/types/equipment';
 import {
   ALL_SECTIONS_ENABLED,
   GEAR_SECTIONS,
   isPaPresetCategory,
-  normalizePresetSubsystem,
   type EquipmentLookupResult,
   type GearSection,
   type PaPresetOption,
   type PresetEquipmentRow,
-  type PresetItemRow,
+  type PullsheetPresetItemRow,
   type PushToFlexPullsheetDialogProps,
 } from '@/components/festival/push-to-flex-pullsheet/model';
 
@@ -378,7 +377,7 @@ export function PushToFlexPullsheetDialog({
         const missing: string[] = [];
 
         (data || []).forEach((rawRow) => {
-          const row = rawRow as unknown as PresetItemRow;
+          const row = rawRow as unknown as PullsheetPresetItemRow;
           const equipmentRow = Array.isArray(row.equipment) ? row.equipment[0] : row.equipment;
           if (!equipmentRow) return;
 

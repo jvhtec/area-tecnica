@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { JobCardDocumentSections } from "./JobCardDocumentSections";
+import { JobCardDocumentSections } from "@/components/jobs/cards/job-card-new/JobCardDocumentSections";
 
-vi.mock("../JobCardDocuments", () => ({
+vi.mock("@/components/jobs/cards/JobCardDocuments", () => ({
   JobCardDocuments: ({ documents }: { documents: Array<{ file_name: string }> }) => (
     <div>{documents.map((document) => document.file_name).join(", ")}</div>
   ),
@@ -79,12 +79,15 @@ describe("JobCardDocumentSections", () => {
     expect(screen.getByText("tour.pdf")).toBeInTheDocument();
     expect(screen.getByText("Jul 21, 2026")).toBeInTheDocument();
     expect(screen.getByText("rider.pdf")).toBeInTheDocument();
-    expect(screen.getByText("Artist: Banda Uno")).toBeInTheDocument();
+    expect(screen.getByText("Artista: Banda Uno")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Tour Documents (1)" }));
+    const tourDocumentsToggle = screen.getByRole("button", { name: "Documentos de gira (1)" });
+    expect(tourDocumentsToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(tourDocumentsToggle);
     expect(screen.queryByText("tour.pdf")).not.toBeInTheDocument();
+    expect(tourDocumentsToggle).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(screen.getByRole("button", { name: "Tour Documents (1)" }));
+    await user.click(tourDocumentsToggle);
     expect(screen.getByText("tour.pdf")).toBeInTheDocument();
   });
 
@@ -94,8 +97,8 @@ describe("JobCardDocumentSections", () => {
     const onDownloadRider = vi.fn();
     render(<Harness onViewRider={onViewRider} onDownloadRider={onDownloadRider} />);
 
-    const viewButtons = screen.getAllByTitle("View");
-    const downloadButtons = screen.getAllByTitle("Download");
+    const viewButtons = screen.getAllByTitle("Ver");
+    const downloadButtons = screen.getAllByTitle("Descargar");
     await user.click(viewButtons[1]);
     await user.click(downloadButtons[1]);
 

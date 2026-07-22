@@ -8,7 +8,7 @@ import {
   startOfQuarter,
   startOfYear,
 } from 'date-fns';
-import type { CalendarExportRange } from './types';
+import type { CalendarExportRange } from '@/components/dashboard/calendar-section/types';
 import { isJobOnDate } from '@/utils/timezoneUtils';
 
 export interface PreparedCalendarJob {

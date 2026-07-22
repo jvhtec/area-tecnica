@@ -27,9 +27,7 @@ interface WirelessSystemPdf {
 export function formatInfrastructureForPdf(
   infrastructure: ArtistInfrastructure | null | undefined,
 ): string {
-  console.log('formatInfrastructureForPdf called with:', infrastructure);
   if (!infrastructure) {
-    console.log('No infrastructure data provided');
     return 'Ninguno';
   }
 
@@ -54,7 +52,6 @@ export function formatInfrastructureForPdf(
       items.push(infrastructure.other_infrastructure);
     }
 
-    console.log('Infrastructure items found:', items);
     return items.length > 0 ? items.join(', ') : 'Ninguno';
   } catch (error) {
     console.error('Error formatting infrastructure:', error);

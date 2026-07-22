@@ -43,9 +43,15 @@ describe("ArtistRfCard", () => {
     expect(screen.getByText("IEM CH").previousElementSibling).toHaveTextContent("4");
 
     const trigger = screen.getByRole("button", { expanded: false });
+    const details = screen.getByText("Soundcheck").closest("[data-state]");
+    expect(details).toHaveAttribute("data-state", "closed");
+    expect(details).toHaveClass("max-h-0");
+
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(details).toHaveAttribute("data-state", "open");
+    expect(details).toHaveClass("max-h-[800px]");
     expect(screen.getByText("Soundcheck")).toBeInTheDocument();
     expect(screen.getByText("Axient")).toBeInTheDocument();
     expect(screen.getByText("PSM 1000")).toBeInTheDocument();

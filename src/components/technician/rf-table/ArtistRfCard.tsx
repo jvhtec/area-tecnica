@@ -178,9 +178,6 @@ export function ArtistRfCard({ artist, stageName, isDark }: ArtistRfCardProps) {
           <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ backgroundColor: summary.providerColor }} />
 
           <CollapsibleTrigger
-            type="button"
-            aria-expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
             className="w-full text-left transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40"
           >
             <div className="p-4 pl-5">

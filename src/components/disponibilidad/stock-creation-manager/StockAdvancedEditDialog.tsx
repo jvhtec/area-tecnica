@@ -56,8 +56,13 @@ export function StockAdvancedEditDialog({
   onFetchFlex,
   onSave,
 }: StockAdvancedEditDialogProps) {
+  const fieldsDisabled = isFetchingFlex || isSaving;
+
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => !nextOpen && !isSaving && onClose()}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Editar Equipo</DialogTitle>
@@ -71,7 +76,7 @@ export function StockAdvancedEditDialog({
               onChange={(event) => onNameChange(event.target.value)}
               placeholder="Nombre del equipo"
               className="mt-1"
-              disabled={isFetchingFlex}
+              disabled={fieldsDisabled}
             />
           </div>
           <div>
@@ -82,12 +87,12 @@ export function StockAdvancedEditDialog({
               onChange={(event) => onManufacturerChange(event.target.value)}
               placeholder="Fabricante (opcional)"
               className="mt-1"
-              disabled={isFetchingFlex}
+              disabled={fieldsDisabled}
             />
           </div>
           <div>
             <Label>Categoría</Label>
-            <Select value={category} onValueChange={onCategoryChange} disabled={isFetchingFlex}>
+            <Select value={category} onValueChange={onCategoryChange} disabled={fieldsDisabled}>
               <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>
@@ -101,9 +106,18 @@ export function StockAdvancedEditDialog({
             </Select>
           </div>
 
-          <Collapsible open={showFlexSection} onOpenChange={onShowFlexSectionChange}>
+          <Collapsible
+            open={showFlexSection}
+            onOpenChange={(nextOpen) => !isSaving && onShowFlexSectionChange(nextOpen)}
+          >
             <CollapsibleTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="w-full">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={isSaving}
+              >
                 <Link className="mr-2 h-4 w-4" />
                 {showFlexSection ? 'Ocultar integración Flex' : 'Integración con Flex (opcional)'}
               </Button>
@@ -117,7 +131,7 @@ export function StockAdvancedEditDialog({
                   onChange={(event) => onResourceIdChange(event.target.value)}
                   placeholder="UUID del recurso en Flex"
                   className="mt-1"
-                  disabled={isFetchingFlex}
+                  disabled={fieldsDisabled}
                 />
               </div>
               <div>
@@ -127,7 +141,7 @@ export function StockAdvancedEditDialog({
                     value={flexUrl}
                     onChange={(event) => onFlexUrlChange(event.target.value)}
                     placeholder="Pegar URL de Flex"
-                    disabled={isFetchingFlex}
+                    disabled={fieldsDisabled}
                     className="flex-1"
                   />
                   <Button
@@ -135,7 +149,7 @@ export function StockAdvancedEditDialog({
                     variant="outline"
                     size="icon"
                     onClick={onPasteFlexUrl}
-                    disabled={isFetchingFlex}
+                    disabled={fieldsDisabled}
                     title="Pegar URL"
                   >
                     <ClipboardPaste className="h-4 w-4" />
@@ -145,7 +159,7 @@ export function StockAdvancedEditDialog({
                     variant="secondary"
                     size="sm"
                     onClick={onFetchFlex}
-                    disabled={isFetchingFlex || (!resourceId && !flexUrl)}
+                    disabled={fieldsDisabled || (!resourceId && !flexUrl)}
                   >
                     {isFetchingFlex ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -164,14 +178,19 @@ export function StockAdvancedEditDialog({
                   onChange={(event) => onImageIdChange(event.target.value)}
                   placeholder="ID de imagen de Flex"
                   className="mt-1"
-                  disabled={isFetchingFlex}
+                  disabled={fieldsDisabled}
                 />
               </div>
             </CollapsibleContent>
           </Collapsible>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => !isSaving && onClose()}
+            disabled={isSaving}
+          >
             Cancelar
           </Button>
           <Button

@@ -1,7 +1,8 @@
 import { ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 
-import { JobCardDocuments, type JobDocument } from "../JobCardDocuments";
+import { JobCardDocuments, type JobDocument } from "@/components/jobs/cards/JobCardDocuments";
+import { Button } from "@/components/ui/button";
 import { formatInJobTimezone, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
 interface StoredDocument {
@@ -47,9 +48,11 @@ function SectionToggle({
   onToggle: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
-      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
+      variant="ghost"
+      className="w-full h-auto flex items-center justify-between text-left px-2 py-1"
+      aria-expanded={!collapsed}
       onClick={(event) => {
         event.stopPropagation();
         onToggle();
@@ -57,7 +60,7 @@ function SectionToggle({
     >
       <span className="text-sm font-medium">{label} ({count})</span>
       {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-    </button>
+    </Button>
   );
 }
 
@@ -87,7 +90,7 @@ export function JobCardDocumentSections({
       {documents.length > 0 && (
         <div className="mt-2">
           <SectionToggle
-            label="Documents"
+            label="Documentos"
             count={documents.length}
             collapsed={documentsCollapsed}
             onToggle={() => setDocumentsCollapsed((previous) => !previous)}
@@ -108,7 +111,7 @@ export function JobCardDocumentSections({
       {tourDocuments.length > 0 && (
         <div className="mt-2">
           <SectionToggle
-            label="Tour Documents"
+            label="Documentos de gira"
             count={tourDocuments.length}
             collapsed={tourDocumentsCollapsed}
             onToggle={() => setTourDocumentsCollapsed((previous) => !previous)}
@@ -128,12 +131,12 @@ export function JobCardDocumentSections({
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" className="p-1 hover:bg-accent rounded" title="View" onClick={() => onViewTourDocument(file)}>
+                    <Button type="button" variant="ghost" size="icon" title="Ver" onClick={() => onViewTourDocument(file)}>
                       <Eye className="h-4 w-4" />
-                    </button>
-                    <button type="button" className="p-1 hover:bg-accent rounded" title="Download" onClick={() => onDownloadTourDocument(file)}>
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" title="Descargar" onClick={() => onDownloadTourDocument(file)}>
                       <Download className="h-4 w-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -145,7 +148,7 @@ export function JobCardDocumentSections({
       {riderFiles.length > 0 && (
         <div className="mt-2">
           <SectionToggle
-            label="Artist Riders"
+            label="Riders de artistas"
             count={riderFiles.length}
             collapsed={ridersCollapsed}
             onToggle={() => setRidersCollapsed((previous) => !previous)}
@@ -161,16 +164,16 @@ export function JobCardDocumentSections({
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{file.file_name}</span>
                     <span className="text-xs text-muted-foreground">
-                      Artist: {artistNameMap.get(file.artist_id) || "Unknown"}
+                      Artista: {artistNameMap.get(file.artist_id) || "Desconocido"}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" className="p-1 hover:bg-accent rounded" title="View" onClick={() => onViewRider(file)}>
+                    <Button type="button" variant="ghost" size="icon" title="Ver" onClick={() => onViewRider(file)}>
                       <Eye className="h-4 w-4" />
-                    </button>
-                    <button type="button" className="p-1 hover:bg-accent rounded" title="Download" onClick={() => onDownloadRider(file)}>
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" title="Descargar" onClick={() => onDownloadRider(file)}>
                       <Download className="h-4 w-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}

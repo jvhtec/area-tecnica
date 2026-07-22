@@ -231,7 +231,9 @@ type PresetWithItemsRow = Database["public"]["Tables"]["presets"]["Row"] & {
   items: PresetItemRow[];
 };
 
-const normalizePresetSubsystem = (value: string | null): PresetSubsystem | null =>
+export const normalizePresetSubsystem = (
+  value: string | null | undefined,
+): PresetSubsystem | null =>
   PRESET_SUBSYSTEMS.includes(value as PresetSubsystem) ? (value as PresetSubsystem) : null;
 
 export const mapPresetItemRow = (row: PresetItemRow): PresetItem & { equipment: Equipment } => ({

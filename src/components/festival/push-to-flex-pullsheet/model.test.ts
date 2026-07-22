@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL_SECTIONS_ENABLED,
   isPaPresetCategory,
-  normalizePresetSubsystem,
 } from '@/components/festival/push-to-flex-pullsheet/model';
+import { normalizePresetSubsystem } from '@/types/equipment';
 
 describe('push-to-Flex pullsheet model', () => {
   it('accepts only PA preset categories and known subsystems', () => {
@@ -12,6 +12,7 @@ describe('push-to-Flex pullsheet model', () => {
     expect(isPaPresetCategory(null)).toBe(false);
     expect(normalizePresetSubsystem('amplification')).toBe('amplification');
     expect(normalizePresetSubsystem('unknown')).toBeNull();
+    expect(normalizePresetSubsystem(undefined)).toBeNull();
   });
 
   it('enables every gear section by default', () => {

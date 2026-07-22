@@ -3,7 +3,6 @@ import type { GearSetupFormData } from '@/types/festival-gear';
 import {
   PA_PRESET_ALLOWED_CATEGORIES,
   type EquipmentCategory,
-  type PresetSubsystem,
 } from '@/types/equipment';
 
 export interface PushToFlexPullsheetDialogProps {
@@ -31,35 +30,18 @@ export interface PresetEquipmentRow {
   resource_id: string | null;
 }
 
-export interface PresetItemRow {
+export interface PullsheetPresetItemRow {
   quantity: number | null;
   subsystem?: string | null;
   equipment: PresetEquipmentRow | PresetEquipmentRow[] | null;
 }
 
 const PA_PRESET_CATEGORIES = new Set(PA_PRESET_ALLOWED_CATEGORIES);
-const PRESET_SUBSYSTEMS: PresetSubsystem[] = [
-  'mains',
-  'outs',
-  'subs',
-  'fronts',
-  'delays',
-  'other',
-  'amplification',
-];
 
 export function isPaPresetCategory(category: string | null): category is EquipmentCategory {
   return !!category && PA_PRESET_CATEGORIES.has(
     category as (typeof PA_PRESET_ALLOWED_CATEGORIES)[number],
   );
-}
-
-export function normalizePresetSubsystem(
-  value: string | null | undefined,
-): PresetSubsystem | null {
-  return PRESET_SUBSYSTEMS.includes(value as PresetSubsystem)
-    ? (value as PresetSubsystem)
-    : null;
 }
 
 export type GearSection = 'consolas' | 'rf' | 'iem' | 'wired_mics';
