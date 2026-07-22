@@ -55,11 +55,13 @@ describe('StockAdvancedEditDialog', () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onNameChange = vi.fn();
+    const onSave = vi.fn();
     const { props, rerender } = renderDialog({
       isSaving: true,
       showFlexSection: true,
       onClose,
       onNameChange,
+      onSave,
     });
 
     expect(screen.getByLabelText('Nombre del Equipo')).toBeDisabled();
@@ -72,13 +74,16 @@ describe('StockAdvancedEditDialog', () => {
     expect(screen.getByLabelText('Image ID')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Ocultar integración Flex' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled();
 
     await user.keyboard('{Escape}');
     await user.type(screen.getByLabelText('Nombre del Equipo'), ' changed');
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar' }));
 
     expect(onNameChange).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+    expect(onSave).not.toHaveBeenCalled();
 
     rerender(<StockAdvancedEditDialog {...props} isSaving={false} />);
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
