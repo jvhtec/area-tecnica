@@ -2,6 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -10,175 +12,323 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  useJobTransportRequests,
+  type TransportRequestSummary,
+} from "@/hooks/useJobTransportRequests";
 
 interface TransportRequestDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   jobId: string;
   department: string; // 'sound' | 'lights' | 'video'
-  requestId?: string | null;
   onSubmitted?: () => void;
 }
+
+const vehicleItemSchema = z.object({
+  transport_type: z.string().min(1),
+  leftover_space_meters: z.union([
+    z.number().min(0),
+    z.literal(""),
+  ]),
+});
+
+const transportRequestFormSchema = z.object({
+  description: z.string(),
+  items: z.array(vehicleItemSchema).min(1),
+  needed_date: z.string(),
+  note: z.string(),
+  is_hoja_relevant: z.boolean(),
+});
+
+type TransportRequestFormValues = z.infer<typeof transportRequestFormSchema>;
+type VehicleItem = TransportRequestFormValues["items"][number];
+
+const emptyItems = (): VehicleItem[] => [{ transport_type: "trailer", leftover_space_meters: "" }];
+
+const emptyFormValues = (): TransportRequestFormValues => ({
+  description: "",
+  items: emptyItems(),
+  needed_date: "",
+  note: "",
+  is_hoja_relevant: true,
+});
 
 export function TransportRequestDialog({
   open,
   onOpenChange,
   jobId,
   department,
-  requestId,
   onSubmitted,
 }: TransportRequestDialogProps) {
-  const [items, setItems] = useState<{ transport_type: string; leftover_space_meters?: number | '' }[]>([
-    { transport_type: 'trailer', leftover_space_meters: '' },
-  ]);
-  const [note, setNote] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
+  const [view, setView] = useState<"list" | "form">("list");
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const { toast } = useToast();
+  const confirm = useConfirm();
+  const { user } = useOptimizedAuth();
+  const {
+    myTransportRequests: activeRequests,
+    isMyTransportRequestsLoading: isLoading,
+    isMyTransportRequestsError: isError,
+    refetchMyTransportRequests: refetchActiveRequests,
+    cancelRequest,
+    invalidateRequests,
+  } = useJobTransportRequests(jobId, department, false);
+  const {
+    handleSubmit: handleValidatedSubmit,
+    register,
+    reset,
+    setValue,
+    watch,
+  } = useForm<TransportRequestFormValues>({
+    defaultValues: emptyFormValues(),
+  });
+  const items = watch("items");
+  const isHojaRelevant = watch("is_hoja_relevant");
 
+  // Reset to the overview every time the dialog opens
   useEffect(() => {
-    const loadExisting = async () => {
-      if (!requestId) return;
-      const { data, error } = await dataLayerClient.from('transport_requests')
-        .select('id, note, description, items:transport_request_items(id, transport_type, leftover_space_meters)')
-        .eq('id', requestId)
-        .single();
-      if (!error && data) {
-        setNote(data.note || '');
-        setDescription((data as any).description || '');
-        if (Array.isArray((data as any).items) && (data as any).items.length > 0) {
-          const mapped = (data as any).items.map((it: any) => ({
+    if (open) {
+      setView("list");
+      setEditingRequestId(null);
+    }
+  }, [open]);
+
+  // With no active requests there is nothing to list — go straight to creating one
+  useEffect(() => {
+    if (open && !isLoading && !isError && activeRequests.length === 0 && view === "list") {
+      startCreate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isLoading, isError, activeRequests.length]);
+
+  const startCreate = () => {
+    setEditingRequestId(null);
+    reset(emptyFormValues());
+    setView("form");
+  };
+
+  const startEdit = (request: TransportRequestSummary) => {
+    setEditingRequestId(request.id);
+    reset({
+      note: request.note || "",
+      description: request.description || "",
+      is_hoja_relevant: request.is_hoja_relevant ?? true,
+      needed_date: request.needed_date || "",
+      items: request.items.length > 0
+        ? request.items.map((it) => ({
             transport_type: it.transport_type,
-            leftover_space_meters: it.leftover_space_meters ?? '',
-          }));
-          setItems(mapped);
-        } else {
-          setItems([{ transport_type: 'trailer', leftover_space_meters: '' }]);
-        }
-      }
-    };
-    loadExisting();
-  }, [requestId]);
+            leftover_space_meters: it.leftover_space_meters ?? "",
+          }))
+        : emptyItems(),
+    });
+    setView("form");
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const canManageRequest = (request: TransportRequestSummary) =>
+    !request.created_by || request.created_by === user?.id;
+
+  const handleCancelRequest = async (requestId: string) => {
+    const confirmed = await confirm({
+      title: "¿Cancelar esta solicitud?",
+      description: "La solicitud dejará de aparecer como pendiente.",
+      confirmText: "Cancelar solicitud",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    const { error } = await cancelRequest(requestId);
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "Solicitud cancelada" });
+    onSubmitted?.();
+  };
+
+  const saveRequest = async (formValues: TransportRequestFormValues) => {
     try {
-      const { data: { user } } = await dataLayerClient.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const values = transportRequestFormSchema.parse(formValues);
+      const { data: { user: authUser } } = await dataLayerClient.auth.getUser();
+      if (!authUser) throw new Error("No autenticado");
 
-      const payload = {
-        job_id: jobId,
-        department,
-        note: note || null,
-        description: description || null,
-        status: 'requested' as const,
-        created_by: user.id,
-      };
-
-      if (requestId) {
-        const { error } = await dataLayerClient.from('transport_requests')
-          .update(payload)
-          .eq('id', requestId);
-        if (error) throw error;
-
-        // Replace items (do not ignore delete failures)
-        const { error: deleteItemsError } = await dataLayerClient.from('transport_request_items')
-          .delete()
-          .eq('request_id', requestId);
-        if (deleteItemsError) throw deleteItemsError;
-
-        const toInsert = items
-          .filter((it) => !!it.transport_type)
+      const toInsertItems = (requestId: string) =>
+        values.items
           .map((it) => ({
             request_id: requestId,
             transport_type: it.transport_type,
-            leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
+            leftover_space_meters: it.leftover_space_meters === "" ? null : it.leftover_space_meters,
           }));
-        if (toInsert.length > 0) {
-          const { error: itemsErr } = await dataLayerClient.from('transport_request_items').insert(toInsert);
-          if (itemsErr) throw itemsErr;
+
+      if (editingRequestId) {
+        // Only the editable fields — never touch status, so a request cannot be
+        // resurrected or re-owned through an edit.
+        const { error } = await dataLayerClient
+          .from("transport_requests")
+          .update({
+            note: values.note || null,
+            description: values.description || null,
+            is_hoja_relevant: values.is_hoja_relevant,
+            needed_date: values.needed_date || null,
+          } as never)
+          .eq("id", editingRequestId);
+        if (error) throw error;
+
+        const existingItemIds = activeRequests
+          .find((request) => request.id === editingRequestId)
+          ?.items.map((item) => item.id) ?? [];
+        const toInsert = toInsertItems(editingRequestId);
+        const { error: itemsErr } = await dataLayerClient.from("transport_request_items").insert(toInsert);
+        if (itemsErr) throw itemsErr;
+
+        if (existingItemIds.length > 0) {
+          const { error: deleteItemsError } = await dataLayerClient
+            .from("transport_request_items")
+            .delete()
+            .eq("request_id", editingRequestId)
+            .in("id", existingItemIds);
+          if (deleteItemsError) throw deleteItemsError;
         }
       } else {
-        const { data: inserted, error } = await dataLayerClient.from('transport_requests')
-          .insert(payload)
-          .select('id')
+        const { data: inserted, error } = await dataLayerClient
+          .from("transport_requests")
+          .insert({
+            job_id: jobId,
+            department,
+            note: values.note || null,
+            description: values.description || null,
+            status: "requested",
+            created_by: authUser.id,
+            is_hoja_relevant: values.is_hoja_relevant,
+            needed_date: values.needed_date || null,
+          } as never)
+          .select("id")
           .single();
         if (error) throw error;
-        const request_id = inserted.id;
-        const toInsert = items
-          .filter((it) => !!it.transport_type)
-          .map((it) => ({
-            request_id,
-            transport_type: it.transport_type,
-            leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
-          }));
-        if (toInsert.length > 0) {
-          const { error: itemsErr } = await dataLayerClient.from('transport_request_items').insert(toInsert);
-          if (itemsErr) throw itemsErr;
-        }
+        const requestId = (inserted as { id: string }).id;
+        const toInsert = toInsertItems(requestId);
+        const { error: itemsErr } = await dataLayerClient.from("transport_request_items").insert(toInsert);
+        if (itemsErr) throw itemsErr;
         try {
-          const { error: pushError } = await dataLayerClient.functions.invoke('push', {
+          const { error: pushError } = await dataLayerClient.functions.invoke("push", {
             body: {
-              action: 'broadcast',
-              type: 'logistics.transport.requested',
+              action: "broadcast",
+              type: "logistics.transport.requested",
               job_id: jobId,
               department,
-              request_id,
-              description: description || undefined,
+              request_id: requestId,
+              description: values.description || undefined,
             },
           });
-          if (pushError) {
-            console.error('Failed to invoke push notification for transport request', pushError);
-          }
+          if (pushError) throw pushError;
         } catch (pushError) {
-          console.error('Unexpected error invoking push notification for transport request', pushError);
+          console.error("Failed to invoke transport request push", pushError);
         }
       }
 
-      toast({ title: 'Transport request saved' });
+      toast({ title: editingRequestId ? "Solicitud actualizada" : "Solicitud de transporte enviada" });
+      invalidateRequests();
       onSubmitted?.();
-      onOpenChange(false);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to save request', variant: 'destructive' });
+      setView("list");
+      setEditingRequestId(null);
+      if (activeRequests.length === 0 && !editingRequestId) {
+        // First request from the empty state: close, matching the old flow
+        onOpenChange(false);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "No se pudo guardar la solicitud";
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{requestId ? 'Edit Transport Request' : 'Request Transport'}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="E.g., Subrental pickup from ABC Rental, Return equipment to vendor"
-            />
+  const renderList = () => (
+    <div className="space-y-3">
+      {activeRequests.map((request) => (
+        <div key={request.id} className="border rounded p-3 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="space-y-1 min-w-0">
+              <div className="text-sm font-medium truncate">
+                {request.description || "Transporte de material"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {(request.items || [])
+                  .map((it) =>
+                    it.leftover_space_meters != null
+                      ? `${it.transport_type.replace("_", " ")} (${it.leftover_space_meters} m libres)`
+                      : it.transport_type.replace("_", " ")
+                  )
+                  .join(", ") || "Sin vehículos"}
+              </div>
+              {request.needed_date && (
+                <div className="text-xs text-muted-foreground">
+                  Fecha necesaria: {request.needed_date.split("-").reverse().join("/")}
+                </div>
+              )}
+              {request.note && <div className="text-xs text-muted-foreground italic">{request.note}</div>}
+            </div>
+            {request.is_hoja_relevant === false && (
+              <Badge variant="outline" className="shrink-0">Fuera de Hoja de Ruta</Badge>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label>Vehicles</Label>
-            <div className="space-y-2">
-              {items.map((it, idx) => (
-                <div key={idx} className="flex items-center gap-2">
+          {canManageRequest(request) && (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => startEdit(request)}>
+                Editar
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => handleCancelRequest(request.id)}>
+                Cancelar solicitud
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="flex justify-end">
+        <Button type="button" onClick={startCreate}>Nueva solicitud</Button>
+      </div>
+    </div>
+  );
+
+  const renderForm = () => (
+    <form onSubmit={handleValidatedSubmit(saveRequest)} className="space-y-4">
+      <div className="space-y-2">
+        <Label>Descripción</Label>
+        <Input
+          {...register("description")}
+          placeholder="P. ej., Recogida de subalquiler, Devolución de material al proveedor"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Vehículos</Label>
+        <div className="space-y-2">
+          {items.map((item, idx) => {
+            return (
+              <div key={idx} className="space-y-1">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Select
-                    value={it.transport_type}
+                    value={item.transport_type}
                     onValueChange={(val) => {
-                      const next = items.slice();
-                      next[idx] = { ...next[idx], transport_type: val };
-                      setItems(next);
+                      setValue(`items.${idx}.transport_type`, val);
                     }}
                   >
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-full sm:w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {REQUEST_TRANSPORT_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>{opt.replace('_',' ')}</SelectItem>
+                        <SelectItem key={opt} value={opt}>
+                          {opt.replace("_", " ")}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -186,49 +336,114 @@ export function TransportRequestDialog({
                     type="number"
                     min={0}
                     step={0.1}
-                    className="w-52"
-                    placeholder="Leftover space (m) - optional"
-                    value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
+                    className="w-full sm:w-52"
+                    placeholder="Espacio sobrante (m) - opcional"
+                    value={item.leftover_space_meters === "" ? "" : item.leftover_space_meters}
                     onChange={(e) => {
                       const val = e.target.value;
-                      const num = val === '' ? '' : Math.max(0, Number(val));
-                      const next = items.slice();
-                      next[idx] = { ...next[idx], leftover_space_meters: num as any };
-                      setItems(next);
+                      const parsed = Number(val);
+                      const nextValue = val === "" || !Number.isFinite(parsed) ? "" : Math.max(0, parsed);
+                      setValue(`items.${idx}.leftover_space_meters`, nextValue);
                     }}
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      const next = items.slice();
-                      next.splice(idx, 1);
-                      setItems(next.length ? next : [{ transport_type: 'trailer', leftover_space_meters: '' }]);
+                      const nextItems = items.filter((_, itemIndex) => itemIndex !== idx);
+                      setValue("items", nextItems.length ? nextItems : emptyItems());
                     }}
                   >
-                    Remove
+                    Eliminar
                   </Button>
                 </div>
-              ))}
-              <div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setItems([...items, { transport_type: 'trailer', leftover_space_meters: '' }])}
-                >
-                  Add Vehicle
-                </Button>
               </div>
+            );
+          })}
+          <div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setValue("items", [...items, ...emptyItems()])}
+            >
+              Añadir vehículo
+            </Button>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Fecha necesaria</Label>
+        <Input
+          type="date"
+          {...register("needed_date")}
+        />
+        <p className="text-xs text-muted-foreground">
+          Día en que se necesita el transporte (opcional). Se usará como fecha inicial del evento de logística.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label>Nota</Label>
+        <Input {...register("note")} placeholder="Detalles opcionales" />
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="transport-request-hoja-relevant"
+            checked={isHojaRelevant}
+            onCheckedChange={(value) => setValue("is_hoja_relevant", value === true)}
+          />
+          <Label htmlFor="transport-request-hoja-relevant">Incluir en la Hoja de Ruta</Label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Desmárcalo para transportes internos (subalquileres, devoluciones…) que no deben aparecer en la Hoja de Ruta.
+        </p>
+      </div>
+      <div className="flex justify-between">
+        {activeRequests.length > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setView("list");
+              setEditingRequestId(null);
+            }}
+          >
+            Volver
+          </Button>
+        ) : (
+          <span />
+        )}
+        <Button type="submit">{editingRequestId ? "Actualizar solicitud" : "Enviar solicitud"}</Button>
+      </div>
+    </form>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-h-[85vh]">
+        <DialogHeader>
+          <DialogTitle>
+            {view === "list"
+              ? "Solicitudes de transporte"
+              : editingRequestId
+                ? "Editar solicitud de transporte"
+                : "Solicitar transporte"}
+          </DialogTitle>
+        </DialogHeader>
+        {view === "list" ? (
+          isLoading ? (
+            <div className="text-sm text-muted-foreground">Cargando…</div>
+          ) : isError ? (
+            <div className="space-y-3">
+              <div className="text-sm text-destructive">
+                No se pudieron cargar las solicitudes de transporte.
+              </div>
+              <Button type="button" variant="outline" onClick={() => void refetchActiveRequests()}>
+                Reintentar
+              </Button>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Note</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional details" />
-          </div>
-          <div className="flex justify-end">
-            <Button type="submit">{requestId ? 'Update' : 'Submit'} Request</Button>
-          </div>
-        </form>
+          ) : renderList()
+        ) : renderForm()}
       </DialogContent>
     </Dialog>
   );

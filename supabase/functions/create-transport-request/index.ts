@@ -22,7 +22,11 @@ interface CreateTransportRequestBody extends Record<string, unknown> {
   note?: unknown;
   items?: unknown;
   requested_by?: unknown;
+  is_hoja_relevant?: unknown;
+  needed_date?: unknown;
 }
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 type TransportRequestItem = {
   leftover_space_meters: number | null;
@@ -122,6 +126,24 @@ serve(createHttpHandler(async (req) => {
   const noteInput = readOptionalText(body.note, "note", 4_000);
   const items = parseItems(body.items);
 
+  if (body.is_hoja_relevant !== undefined && body.is_hoja_relevant !== null && typeof body.is_hoja_relevant !== "boolean") {
+    throw new HttpError(400, "El campo is_hoja_relevant debe ser booleano", { code: "invalid_is_hoja_relevant" });
+  }
+  const isHojaRelevant = body.is_hoja_relevant === undefined || body.is_hoja_relevant === null
+    ? true
+    : body.is_hoja_relevant;
+
+  let neededDate: string | null = null;
+  if (body.needed_date !== undefined && body.needed_date !== null && body.needed_date !== "") {
+    if (typeof body.needed_date !== "string" || !ISO_DATE_PATTERN.test(body.needed_date)
+      || Number.isNaN(Date.parse(body.needed_date))) {
+      throw new HttpError(400, "El campo needed_date debe ser una fecha con formato YYYY-MM-DD", {
+        code: "invalid_needed_date",
+      });
+    }
+    neededDate = body.needed_date;
+  }
+
   // The anon API key plus the caller JWT keeps these data operations entirely
   // inside PostgREST's authenticated RLS boundary.
   const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -216,7 +238,9 @@ serve(createHttpHandler(async (req) => {
       created_by: user.id,
       department,
       description: description || null,
+      is_hoja_relevant: isHojaRelevant,
       job_id: jobId,
+      needed_date: neededDate,
       note: note || null,
       status: "requested",
       subrental_id: subrentalId,

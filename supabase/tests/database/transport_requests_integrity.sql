@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(3);
+SELECT plan(7);
 
 SELECT ok(
   EXISTS (
@@ -41,6 +41,55 @@ SELECT ok(
       AND indexdef ILIKE '%status <> ''cancelled''%'
   ),
   'only one active transport request can represent a sub-rental'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'transport_requests'
+      AND column_name = 'is_hoja_relevant'
+      AND is_nullable = 'NO'
+      AND column_default = 'true'
+  ),
+  'transport requests carry a non-null hoja de ruta relevance flag defaulting to true'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'transport_requests'
+      AND column_name = 'needed_date'
+      AND data_type = 'date'
+  ),
+  'transport requests can state the date the transport is needed on'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE table_schema = 'public'
+      AND table_name = 'logistics_events'
+      AND constraint_name = 'logistics_events_transport_request_scope_fkey'
+      AND constraint_type = 'FOREIGN KEY'
+  ),
+  'logistics events can only reference a transport request from the same job'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'logistics_events'
+      AND indexname = 'idx_logistics_events_transport_request_id'
+      AND indexdef ILIKE '%(transport_request_id)%'
+  ),
+  'transport request fulfillment lookups on logistics events are indexed'
 );
 
 SELECT * FROM finish();
