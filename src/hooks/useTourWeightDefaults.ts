@@ -54,10 +54,13 @@ export const useTourWeightDefaults = (tourId: string) => {
         description: "Weight default created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create weight default",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to create weight default",
         variant: "destructive",
       });
     },

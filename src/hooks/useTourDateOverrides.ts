@@ -3,6 +3,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/react-query";
 import { useTourDateDefaultDocumentRefresh } from "@/hooks/useTourDateDefaultDocumentRefresh";
+import type { Json } from "@/integrations/supabase/types";
+import type {
+  PhaseMode,
+  PowerTableRow,
+} from "@/features/technical-tools/power/types";
+
+export type TourDatePowerOverrideData = {
+  rows?: PowerTableRow[];
+  safetyMargin?: number;
+  phaseMode?: PhaseMode;
+  voltage?: number;
+  pf?: number;
+  calculation?: unknown;
+};
+
 export interface TourDatePowerOverride {
   id: string;
   tour_date_id: string;
@@ -16,7 +31,7 @@ export interface TourDatePowerOverride {
   current_per_phase: number;
   includes_hoist: boolean;
   department?: string;
-  override_data?: any;
+  override_data?: TourDatePowerOverrideData;
   created_at: string;
   updated_at: string;
 }
@@ -30,7 +45,7 @@ export interface TourDateWeightOverride {
   quantity: number;
   department?: string;
   category?: string;
-  override_data?: any;
+  override_data?: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -86,9 +101,13 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   // Create power override
   const createPowerOverrideMutation = useMutation({
     mutationFn: async (override: Omit<TourDatePowerOverride, "id" | "created_at" | "updated_at">) => {
+      const payload = {
+        ...override,
+        override_data: override.override_data as Json | undefined,
+      };
       const { data, error } = await supabase
         .from("tour_date_power_overrides")
-        .insert(override)
+        .insert(payload)
         .select()
         .single();
 
@@ -104,9 +123,13 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   // Create weight override
   const createWeightOverrideMutation = useMutation({
     mutationFn: async (override: Omit<TourDateWeightOverride, "id" | "created_at" | "updated_at">) => {
+      const payload = {
+        ...override,
+        override_data: override.override_data as Json | undefined,
+      };
       const { data, error } = await supabase
         .from("tour_date_weight_overrides")
-        .insert(override)
+        .insert(payload)
         .select()
         .single();
 
@@ -122,9 +145,15 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   // Update power override
   const updatePowerOverrideMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<TourDatePowerOverride> }) => {
+      const payload = {
+        ...data,
+        ...(data.override_data === undefined
+          ? {}
+          : { override_data: data.override_data as Json }),
+      };
       const { data: result, error } = await supabase
         .from("tour_date_power_overrides")
-        .update(data)
+        .update(payload)
         .eq("id", id)
         .select()
         .single();

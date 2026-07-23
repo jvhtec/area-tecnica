@@ -1,6 +1,6 @@
 # God-file refactor checklist
 
-Updated: 2026-07-22
+Updated: 2026-07-23
 
 This is the live paydown list for authored application modules above the
 `800`-line governance threshold. The executable source of truth is
@@ -14,13 +14,15 @@ exclusions in `scripts/governance/check-file-size-budget.mjs`.
 | Starting count on `origin/main` (`d57be9df`) | 43 |
 | Retired by PR #877 | 15 |
 | Retired by PR #878 | 16 |
-| Current combined branch | 12 |
+| Retired by the final batch | 12 |
+| Current branch | 0 |
 | Target | 0 |
 
-PR #877 and PR #878 touch different source modules. After rebasing #878 onto
-the merged #877, `npm run governance:filesize` reports 12 files over the
-threshold. The governance baseline should match that live count after each
-completed batch; it is a ratchet ceiling, not a separate debt inventory.
+The three batches retire all 43 modules that were above the authored-source
+threshold when the campaign started. `npm run governance:filesize` now reports
+zero files over 800 lines, and the regenerated file-size baseline has an empty
+`files` object. The baseline is a ratchet ceiling, not a separate debt
+inventory.
 
 ## Definition of done for one item
 
@@ -29,6 +31,8 @@ completed batch; it is a ratchet ceiling, not a separate debt inventory.
 - Every new authored module is also below 800 lines.
 - Extracted pure logic receives focused tests, and moved UI keeps a
   characterization test when callback or interaction wiring could drift.
+- Refactored and directly adjacent seams contain no explicit `any`; external
+  JSON and library boundaries are normalized or narrowed into domain types.
 - `npm run governance:filesize`, targeted tests, typecheck, lint, and build pass.
 - The file-size baseline is regenerated so a completed file cannot grow back to
   its former ceiling.
@@ -75,28 +79,101 @@ the PDF worker limit and keeps job-document actions inside full-width,
 touch-sized mobile rows in both Job Details and Project Management (including
 job, tour, and rider documents). These paths have focused regression coverage.
 
+## Completed in the final batch
+
+- [x] `src/features/tour-ops/TourOpsManagementHub.tsx` — 2,116 → 695 LOC.
+  Date overview, management panels, editor dialogs, and view helpers now have
+  focused modules under `src/features/tour-ops/`.
+- [x] `src/features/tour-ops/tourSchedulingService.ts` — 1,885 → 25 LOC.
+  The compatibility entrypoint delegates to typed scheduling models,
+  normalizers, queries, mutations, and guest-link operations.
+- [x] `src/features/technical-tools/power/consumos/useConsumosTool.ts` — 1,820
+  → 758 LOC. Builder state, tour/default loading, and stored-power
+  normalization are separate, typed hooks/helpers.
+- [x] `src/components/tours/TourDefaultsManager.tsx` — 1,706 → 598 LOC.
+  Department tables, PDF export orchestration, and normalization helpers are
+  split from manager state; the data-owning PDF hook lives in
+  `src/features/tour-ops/`.
+- [x] `src/components/jobs/cards/JobCardNew.tsx` — 1,438 → 686 LOC. The view,
+  transport behavior, folder actions, and shared job-card contract are
+  separated; data-owning hooks/contracts live under
+  `src/features/jobs/job-card-new/`, and the details-only path uses the same
+  typed contract.
+- [x] `src/components/matrix/StaffingCampaignPanel.tsx` — 1,299 → 751 LOC.
+  Campaign rendering and its view contract are separated from campaign
+  orchestration.
+- [x] `src/utils/rates-pdf-export.ts` — 1,244 → 4 LOC. The stable entrypoint
+  re-exports dedicated quote, tour-summary, and job-payout generators plus
+  shared typed PDF support.
+- [x] `src/components/matrix/AssignJobDialog.tsx` — 1,238 → 776 LOC. The dialog
+  view, domain contract, and conflict adapter are explicit modules. The typed
+  existing-assignment query now fetches the `response_time` value that its
+  confirmed-status preservation path already consumes.
+- [x] `src/components/timesheet/TimesheetView.tsx` — 1,122 → 800 LOC.
+  Query/mutation/form orchestration is owned by a typed view-model hook.
+- [x] `src/pages/PayoutsDueFortnights.tsx` — 1,112 → 597 LOC. Payout query
+  normalization and grouping live in `src/features/rates/payoutsDueData.ts`.
+- [x] `src/components/technician/TimesheetView.tsx` — 980 → 791 LOC. Prompt
+  dialogs and their timesheet contract are extracted from the main view.
+- [x] `src/components/matrix/TechnicianRow.tsx` — 925 → 775 LOC. Inline editing
+  now lives in a dedicated, typed edit form.
+
+Focused coverage protects stored Consumos snapshots, job-card folder
+normalization, tour-default table conversion, tour scheduling, assignment
+conflicts, technician timesheet behavior, and rates PDF exports. The final
+typing sweep also removes the directly adjacent `any` boundaries in the Tour
+Ops PDF adapter and details-only job card.
+
+## Ratchets after completion
+
+- File size: `43 → 0` authored modules above 800 lines; the baseline is empty.
+- Mobile type floor: `266 → 248` sub-12px utility occurrences. Four existing
+  occurrences moved with Tour Ops/defaults view extraction, while the batch
+  removed 18 occurrences overall; the per-file baseline was regenerated to
+  preserve the lower total.
+- Explicit `any`: zero in the refactored modules and their new typed seams.
+  Supabase JSON, policy metadata, and jsPDF AutoTable inputs are narrowed at
+  their boundaries instead of leaking untyped values through UI code.
+- Source boundaries: extracted UI views do not introduce direct
+  `dataLayerClient` ownership, and scheduling displays use the existing
+  Madrid-aware formatting helper instead of constructing dates inline. The
+  legacy counts improve from `213 → 196` UI data-layer imports and `107 → 83`
+  scheduling-domain date constructions.
+- Lint-warning ratchet: `1,901 → 1,737`. Extracted effects and callbacks list
+  their complete dependencies rather than transferring old
+  `react-hooks/exhaustive-deps` exceptions into new files.
+
 ## Remaining queue
 
-Line counts are from the rebased PR #878 branch on 2026-07-22. Re-measure before
-choosing a batch because parallel PRs can change the ordering.
+None. Re-run `npm run governance:filesize` when adding or materially expanding
+authored modules; CI will reject a new file over 800 lines or any non-empty
+regression to the baseline.
 
-- [ ] `src/features/tour-ops/TourOpsManagementHub.tsx` — 2,116 LOC
-- [ ] `src/features/tour-ops/tourSchedulingService.ts` — 1,885 LOC
-- [ ] `src/features/technical-tools/power/consumos/useConsumosTool.ts` — 1,820 LOC
-- [ ] `src/components/tours/TourDefaultsManager.tsx` — 1,706 LOC
-- [ ] `src/components/jobs/cards/JobCardNew.tsx` — 1,438 LOC
-- [ ] `src/components/matrix/StaffingCampaignPanel.tsx` — 1,299 LOC
-- [ ] `src/utils/rates-pdf-export.ts` — 1,244 LOC
-- [ ] `src/components/matrix/AssignJobDialog.tsx` — 1,238 LOC
-- [ ] `src/components/timesheet/TimesheetView.tsx` — 1,122 LOC
-- [ ] `src/pages/PayoutsDueFortnights.tsx` — 1,112 LOC
-- [ ] `src/components/technician/TimesheetView.tsx` — 980 LOC
-- [ ] `src/components/matrix/TechnicianRow.tsx` — 925 LOC
+## Final verification
 
-## Batching guidance
+The final batch passed:
 
-Continue in coherent tranches: group near-threshold files when each has an
-obvious extraction seam, but give modules above roughly 1,200 lines their own
-domain plan and characterization coverage before separating state, query,
-command, and view responsibilities. Assignment, staffing, timesheet, and Flex
-work must also pass the repository's critical-invariant review.
+- `npm run lint` — 0 errors; 361 grandfathered warnings.
+- `npm run typecheck`.
+- `npm run governance` — including empty file-size baseline, mobile type floor,
+  source boundaries, lint-warning ratchet, Edge exposure, SQL grants, CSP,
+  action pins, migration ordering, and dependency audit.
+- Seven focused suites — 22 tests covering the extracted logic and the highest
+  risk moved UI paths.
+- `npm run test:critical`, including assignment cascade, staffing
+  orchestration, Flex deletion/creation, and timesheet critical paths.
+- `npm run test:run`.
+- `npm run test:e2e` — 22 Chromium smoke tests passed and 3 optional
+  mobile-screenshot cases were skipped by their configured guard.
+- `npm run build`.
+- `npm run budget:bundle` — all budgets pass; total JS gzip is 3.06 MB
+  (`+48.8 kB`, below the 3.32 MB relative ceiling), and the largest entry
+  script is 107.7 kB gzip.
+- `git diff --check`.
+
+The critical-invariant audit found no bypass: assignment removal still prefers
+the existing cascade service, campaign lifecycle transitions still use the
+staffing orchestrator, Flex creation still delegates to
+`createAllFoldersForJob`, and the two timesheet views still delegate writes and
+server-owned payout calculation to the existing hooks/services. No Edge
+Function, migration, RLS, or database authorization surface changed.

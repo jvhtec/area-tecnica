@@ -1,41 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
-import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
@@ -43,87 +6,39 @@ import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
 import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotificationDepartments';
-import { checkTimeConflictEnhanced, ConflictCheckResult } from '@/utils/technicianAvailability';
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
-import { normalizeDateKey, uniqueSortedDateKeys } from '@/utils/assignmentWorkDates';
-import { addMadridCalendarDays, formatMadridDateKey, fromMadridDateKey } from '@/utils/timezoneUtils';
+import { normalizeDateKey } from '@/utils/assignmentWorkDates';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { AssignJobDialogView } from "@/components/matrix/AssignJobDialogView";
+import {
+  checkAssignmentConflicts,
+  type AssignmentConflictWarning,
+} from "@/components/matrix/assignJobConflicts";
+import { addMadridCalendarDays } from "@/utils/timezoneUtils";
+import {
+  formatDateKey,
+  getAssignableJobDateKeys,
+  getErrorCode,
+  getErrorMessage,
+  parseDateKey,
+  sortDateKeys,
+  type AssignableJob,
+  type AssignJobDialogProps,
+  type CoverageMode,
+  type ExistingAssignment,
+  type JobAssignmentUpdate,
+} from "@/components/matrix/assignJobDialogTypes";
 
-type AssignableJobDateType = {
-  date?: string | null;
-  type?: string | null;
-};
-
-type AssignableJob = {
-  id: string;
-  title: string;
-  start_time: string;
-  end_time: string;
-  color?: string | null;
-  status: string;
-  job_date_types?: AssignableJobDateType[] | null;
-};
-
-interface AssignJobDialogProps {
-  open: boolean;
-  onClose: () => void;
-  technicianId: string;
-  date: Date;
-  availableJobs: AssignableJob[];
-  existingAssignment?: any;
-  preSelectedJobId?: string;
-}
-
-const EXCLUDED_ASSIGNABLE_DATE_TYPES = new Set(['off', 'travel']);
-
-const formatDateKey = formatMadridDateKey;
-
-const parseDateKey = fromMadridDateKey;
-
-const sortDateKeys = uniqueSortedDateKeys;
-
-/**
- * Returns every job date that may receive an assignment, including prep/rehearsal
- * typed dates before the main job span while excluding non-work travel/off days.
- */
-export const getAssignableJobDateKeys = (job: AssignableJob | null | undefined) => {
-  if (!job) return [] as string[];
-
-  const keys = new Set<string>();
-  const excludedTypedDates = new Set<string>();
-  const dateTypes = Array.isArray(job.job_date_types) ? job.job_date_types : [];
-
-  dateTypes.forEach((row) => {
-    const key = normalizeDateKey(row?.date);
-    if (!key) return;
-    const type = String(row?.type || '').toLowerCase();
-    if (EXCLUDED_ASSIGNABLE_DATE_TYPES.has(type)) {
-      excludedTypedDates.add(key);
-      return;
-    }
-    keys.add(key);
-  });
-
-  if (job.start_time) {
-    const startKey = normalizeDateKey(job.start_time);
-    const endKey = normalizeDateKey(job.end_time) ?? startKey;
-    if (!startKey) return sortDateKeys(keys);
-    let cursorKey = startKey;
-
-    while (cursorKey <= endKey) {
-      if (!excludedTypedDates.has(cursorKey)) {
-        keys.add(cursorKey);
-      }
-      cursorKey = addMadridCalendarDays(cursorKey, 1);
-    }
-  }
-
-  return sortDateKeys(keys);
-};
+export { getAssignableJobDateKeys } from "@/components/matrix/assignJobDialogTypes";
+export type {
+  AssignableJob,
+  CoverageMode,
+  ExistingAssignment,
+} from "@/components/matrix/assignJobDialogTypes";
 
 export const AssignJobDialog = ({
   open,
@@ -137,17 +52,13 @@ export const AssignJobDialog = ({
   const [selectedJobId, setSelectedJobId] = useState<string>(preSelectedJobId || existingAssignment?.job_id || '');
   const [selectedRole, setSelectedRole] = useState<string>('');
   // Coverage mode: full job span, single day, multiple days
-  const [coverageMode, setCoverageMode] = useState<'full' | 'single' | 'multi'>(existingAssignment?.single_day ? 'single' : 'full');
+  const [coverageMode, setCoverageMode] = useState<CoverageMode>(existingAssignment?.single_day ? 'single' : 'full');
   const [singleDate, setSingleDate] = useState<Date | null>(date);
   const [multiDates, setMultiDates] = useState<Date[]>(date ? [date] : []);
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
-  const [conflictWarning, setConflictWarning] = useState<{
-    result: ConflictCheckResult;
-    targetDate?: string;
-    mode: 'full' | 'single' | 'multi';
-  } | null>(null);
+  const [conflictWarning, setConflictWarning] = useState<AssignmentConflictWarning | null>(null);
   // Modification mode: 'add' adds dates to existing, 'replace' replaces all dates
   const [modificationMode, setModificationMode] = useState<'add' | 'replace'>('add');
 
@@ -244,49 +155,6 @@ export const AssignJobDialog = ({
     }
   }, [preSelectedJobId]);
 
-  const checkForConflicts = async (): Promise<{
-    result: ConflictCheckResult;
-    targetDate?: string;
-    mode: 'full' | 'single' | 'multi';
-  } | null> => {
-    if (!selectedJobId) {
-      return null;
-    }
-
-    if (coverageMode === 'multi') {
-      const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
-      for (const key of uniqueKeys) {
-        const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
-          targetDateIso: key,
-          singleDayOnly: true,
-          includePending: true,
-        });
-        if (result.hasHardConflict || result.hasSoftConflict) {
-          return { result, targetDate: key, mode: 'multi' };
-        }
-      }
-      return null;
-    }
-
-    if (coverageMode === 'single') {
-      const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
-        targetDateIso: assignmentDate,
-        singleDayOnly: true,
-        includePending: true,
-      });
-      return (result.hasHardConflict || result.hasSoftConflict)
-        ? { result, targetDate: assignmentDate, mode: 'single' }
-        : null;
-    }
-
-    const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
-      includePending: true,
-    });
-    return (result.hasHardConflict || result.hasSoftConflict)
-      ? { result, mode: 'full' }
-      : null;
-  };
-
   const attemptAssign = async (skipConflictCheck = false) => {
     if (!selectedJobId || !selectedRole || !technician) {
       toast.error('Por favor selecciona un trabajo y un rol');
@@ -311,7 +179,13 @@ export const AssignJobDialog = ({
     }
 
     if (!skipConflictCheck) {
-      const conflict = await checkForConflicts();
+      const conflict = await checkAssignmentConflicts({
+        technicianId,
+        selectedJobId,
+        coverageMode,
+        multiDates,
+        assignmentDate,
+      });
       if (conflict) {
         setConflictWarning(conflict);
         return;
@@ -422,7 +296,7 @@ export const AssignJobDialog = ({
 
       // Before writing, check if an assignment already exists for this job + technician
       const { data: existingRow } = await dataLayerClient.from('job_assignments')
-        .select('job_id, technician_id, single_day, assignment_date, status')
+        .select('job_id, technician_id, single_day, assignment_date, status, response_time')
         .eq('job_id', selectedJobId)
         .eq('technician_id', technicianId)
         .maybeSingle();
@@ -443,7 +317,7 @@ export const AssignJobDialog = ({
 
       if (existingRow) {
         // Update the existing base row (whole job or single) to align with the requested coverage
-        const updatePayload: any = {
+        const updatePayload: JobAssignmentUpdate = {
           sound_role: basePayload.sound_role,
           lights_role: basePayload.lights_role,
           video_role: basePayload.video_role,
@@ -451,7 +325,7 @@ export const AssignJobDialog = ({
           assigned_at: basePayload.assigned_at,
           // Do not downgrade a confirmed assignment to invited
           status: existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status,
-          response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? (existingRow as any).response_time ?? null : null,
+          response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? existingRow.response_time ?? null : null,
           single_day: nextSingleDay,
           assignment_date: nextAssignmentDate,
           assignment_source: basePayload.assignment_source,
@@ -713,16 +587,17 @@ export const AssignJobDialog = ({
       setTimeout(() => {
         onClose();
       }, 100);
-    } catch (error: any) {
+    } catch (error: unknown) {
       window.clearTimeout(timeoutId);
       console.error('Error assigning job:', error);
 
-      if (error.code === '23505') {
+      const errorMessage = getErrorMessage(error);
+      if (getErrorCode(error) === '23505') {
         toast.error('Este técnico ya está asignado a este trabajo');
-      } else if (error.message?.includes('timeout') || error.message?.includes('network')) {
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
         toast.error('Error de red - por favor verifica tu conexión e intenta de nuevo');
       } else {
-        toast.error(`Error al asignar el trabajo: ${error.message || 'Error desconocido'}`);
+        toast.error(`Error al asignar el trabajo: ${errorMessage}`);
       }
     } finally {
       window.clearTimeout(timeoutId);
@@ -774,8 +649,8 @@ export const AssignJobDialog = ({
       toast.success('Asignación eliminada');
       window.dispatchEvent(new CustomEvent('assignment-updated', { detail: { technicianId, jobId: existingAssignment.job_id } }));
       onClose();
-    } catch (e: any) {
-      toast.error(e?.message || 'Error al eliminar la asignación');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsRemoving(false);
     }
@@ -857,382 +732,45 @@ export const AssignJobDialog = ({
   const conflictTargetDateLabel = formatDateLabel(conflictWarning?.targetDate);
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isReassignment ? 'Reasignar Trabajo' : 'Asignar Trabajo'}</DialogTitle>
-            <DialogDescription>
-              {isReassignment ? 'Reasignar a' : 'Asignar a'} {technician?.first_name} {technician?.last_name} a un trabajo el{' '}
-              {format(date, 'EEEE, d MMMM, yyyy')}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {technician && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Técnico:</span>
-                <span>{technician.first_name} {technician.last_name}</span>
-                <Badge variant="outline">{technician.department}</Badge>
-              </div>
-            )}
-
-            {isReassignment && existingAssignment?.jobs && (
-              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                <div className="text-sm font-medium text-yellow-800">Asignación Actual:</div>
-                <div className="text-sm text-yellow-700">{existingAssignment.jobs.title}</div>
-                <div className="text-xs text-yellow-600">
-                  Estado: <Badge variant="secondary">{existingAssignment.status}</Badge>
-                </div>
-              </div>
-            )}
-
-            {!preSelectedJobId && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Seleccionar Trabajo</label>
-                <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Elige un trabajo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredJobs.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">
-                        No hay trabajos disponibles para esta fecha
-                      </div>
-                    ) : (
-                      filteredJobs.map((job) => (
-                        <SelectItem key={job.id} value={job.id}>
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <div className="font-medium">{job.title}</div>
-                              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
-                              </div>
-                            </div>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {selectedJobId && technician && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Seleccionar Rol ({technician.department})
-                </label>
-                <Select value={selectedRole} onValueChange={setSelectedRole}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Elige un rol..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.map((opt) => (
-                      <SelectItem key={opt.code} value={opt.code}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {selectedJobId && selectedRole && (
-              <div className="space-y-4">
-                {/* Modification mode toggle - only show when modifying the same job */}
-                {isModifyingSelectedJob && coverageMode !== 'full' && existingTimesheets && existingTimesheets.length > 0 && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <label className="text-sm font-medium text-blue-900 block mb-2">
-                      Modo de Modificación
-                    </label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={modificationMode === 'add' ? 'default' : 'outline'}
-                        onClick={() => setModificationMode('add')}
-                        className="flex-1"
-                      >
-                        Añadir Fechas
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={modificationMode === 'replace' ? 'default' : 'outline'}
-                        onClick={() => setModificationMode('replace')}
-                        className="flex-1"
-                      >
-                        Reemplazar Fechas
-                      </Button>
-                    </div>
-                    <p className="text-xs text-blue-700 mt-2">
-                      {modificationMode === 'add'
-                        ? `Añadir: Las fechas seleccionadas se añadirán a las ${existingTimesheets.length} fecha(s) existente(s).`
-                        : `Reemplazar: Las fechas existentes serán reemplazadas por las fechas seleccionadas.`
-                      }
-                    </p>
-                  </div>
-                )}
-
-                <Tabs value={coverageMode} onValueChange={(v) => setCoverageMode(v as any)} className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="full">
-                      <CalendarRange className="h-4 w-4 mr-2" />
-                      Completo
-                    </TabsTrigger>
-                    <TabsTrigger value="single">
-                      <CalendarIcon className="h-4 w-4 mr-2" />
-                      Día Suelto
-                    </TabsTrigger>
-                    <TabsTrigger value="multi">
-                      <CalendarDays className="h-4 w-4 mr-2" />
-                      Varios Días
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="full" className="mt-4">
-                    <div className="p-4 bg-muted/50 rounded-lg border border-border text-sm text-muted-foreground flex items-center gap-3">
-                      <CalendarRange className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium text-foreground">Asignación Completa</p>
-                        <p>El técnico será asignado a todos los días de este trabajo.</p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="single" className="mt-4 space-y-4">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium">Seleccionar Fecha</label>
-                      <div className="flex items-center gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-start text-left font-normal">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {singleDate ? format(singleDate, 'PPP') : <span>Elige una fecha</span>}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarPicker
-                              mode="single"
-                              selected={singleDate ?? undefined}
-                              onSelect={(d) => { if (d && isAllowedDate(d)) setSingleDate(d); }}
-                              disabled={(d) => !isAllowedDate(d)}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Crea una asignación de un solo día para la fecha seleccionada.</p>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="multi" className="mt-4 space-y-4">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium">Seleccionar Días</label>
-                      <div className="border rounded-md p-2 flex justify-center">
-                        <CalendarPicker
-                          mode="multiple"
-                          selected={multiDates}
-                          onSelect={(ds) => setMultiDates((ds || []).filter(d => isAllowedDate(d)))}
-                          disabled={(d) => !isAllowedDate(d)}
-                          className="rounded-md border-none shadow-none"
-                          numberOfMonths={1}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">Selecciona varios días para esta asignación.</p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="flex items-center space-x-2 pt-2 border-t">
-                  <Checkbox
-                    id="confirm-assignment"
-                    checked={assignAsConfirmed}
-                    onCheckedChange={handleCheckboxChange}
-                  />
-                  <label
-                    htmlFor="confirm-assignment"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Asignar como confirmado (omitir invitación)
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {selectedJob && (
-              <div className="bg-muted p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  <span className="font-medium">{selectedJob.title}</span>
-                  <Badge variant="secondary">{selectedJob.status}</Badge>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {format(new Date(selectedJob.start_time), 'HH:mm')} - {format(new Date(selectedJob.end_time), 'HH:mm')}
-                  </div>
-                </div>
-                {selectedRole && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Role: {labelForCode(selectedRole)}
-                  </div>
-                )}
-                {assignAsConfirmed && (
-                  <div className="text-xs text-green-600 mt-1 font-medium">
-                    Se asignará como confirmado
-                  </div>
-                )}
-                {coverageMode === 'single' && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Cobertura de un solo día para {singleDate ? format(singleDate, 'PPP') : format(date, 'PPP')}
-                  </div>
-                )}
-                {coverageMode === 'multi' && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {multiDates.length} día(s) seleccionado(s) para cobertura de un solo día
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex items-center justify-between gap-2">
-            <div className="mr-auto">
-              {isReassignment && (
-                <Button
-                  variant="destructive"
-                  onClick={handleRemoveAssignment}
-                  disabled={isRemoving}
-                >
-                  {isRemoving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Eliminando...
-                    </>
-                  ) : (
-                    'Eliminar Asignación'
-                  )}
-                </Button>
-              )}
-            </div>
-            <Button variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleAssign}
-              disabled={!selectedJobId || !selectedRole || isAssigning}
-            >
-              {isAssigning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Asignando...
-                </>
-              ) : (
-                `${isReassignment ? 'Reasignar' : 'Asignar'} Trabajo`
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <AlertDialog
-        open={!!conflictWarning}
-        onOpenChange={(openState) => {
-          if (!openState) {
-            setConflictWarning(null);
-          }
-        }}
-      >
-        <AlertDialogContent className="max-w-2xl max-h-[calc(80vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {conflictWarning?.result.hasHardConflict ? '⛔ Conflicto de Horario' : '⚠️ Conflicto Potencial'}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                {conflictWarning && (
-                  <>
-                    <p className="text-sm">
-                      {technician ? `${technician.first_name} ${technician.last_name}` : 'Este técnico'} tiene conflictos
-                      con <strong>{selectedJob?.title}</strong>
-                      {conflictWarning.mode === 'full' && targetJobRange ? ` (${targetJobRange})` : ''}
-                      {conflictWarning.mode !== 'full' && conflictTargetDateLabel ? ` el ${conflictTargetDateLabel}` : ''}:
-                    </p>
-
-                    {/* Hard Conflicts */}
-                    {conflictWarning.result.hardConflicts.length > 0 && (
-                      <div className="bg-red-50 border border-red-200 rounded p-3">
-                        <div className="font-semibold text-red-900 mb-2">Asignaciones Confirmadas:</div>
-                        <ul className="list-disc list-inside space-y-1">
-                          {conflictWarning.result.hardConflicts.map((conflict, idx) => (
-                            <li key={idx} className="text-red-800 text-sm">
-                              <strong>{conflict.title}</strong>
-                              {' '}({formatJobRange(conflict.start_time, conflict.end_time)})
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Soft Conflicts */}
-                    {conflictWarning.result.softConflicts.length > 0 && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-                        <div className="font-semibold text-yellow-900 mb-2">Invitaciones Pendientes:</div>
-                        <ul className="list-disc list-inside space-y-1">
-                          {conflictWarning.result.softConflicts.map((conflict, idx) => (
-                            <li key={idx} className="text-yellow-800 text-sm">
-                              <strong>{conflict.title}</strong>
-                              {' '}({formatJobRange(conflict.start_time, conflict.end_time)})
-                            </li>
-                          ))}
-                        </ul>
-                        <p className="text-xs text-yellow-700 mt-2">
-                          El técnico aún no ha respondido a estas invitaciones.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Unavailability */}
-                    {conflictWarning.result.unavailabilityConflicts.length > 0 && (
-                      <div className="bg-red-50 border border-red-200 rounded p-3">
-                        <div className="font-semibold text-red-900 mb-2">Fechas No Disponibles:</div>
-                        <ul className="list-disc list-inside space-y-1">
-                          {conflictWarning.result.unavailabilityConflicts.map((unav, idx) => (
-                            <li key={idx} className="text-red-800 text-sm">
-                              {formatDateLabel(unav.date)} - {unav.reason}
-                              {unav.notes && <span className="text-xs"> ({unav.notes})</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    <div className="text-sm text-gray-600 mt-3">
-                      {conflictWarning.result.hasHardConflict
-                        ? 'Continuar creará una doble reserva. ¿Estás seguro?'
-                        : 'El técnico podría no estar disponible. ¿Quieres continuar de todos modos?'}
-                    </div>
-                  </>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConflictWarning(null)}>Volver</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setConflictWarning(null);
-                void attemptAssign(true);
-              }}
-              className={conflictWarning?.result.hasHardConflict ? 'bg-red-600 hover:bg-red-700' : ''}
-            >
-              {conflictWarning?.result.hasHardConflict ? 'Forzar asignación de todos modos' : 'Continuar de todos modos'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <AssignJobDialogView
+      open={open}
+      onClose={onClose}
+      isReassignment={isReassignment}
+      technician={technician}
+      date={date}
+      existingAssignment={existingAssignment}
+      preSelectedJobId={preSelectedJobId}
+      selectedJobId={selectedJobId}
+      setSelectedJobId={setSelectedJobId}
+      filteredJobs={filteredJobs}
+      selectedRole={selectedRole}
+      setSelectedRole={setSelectedRole}
+      roleOptions={roleOptions}
+      isModifyingSelectedJob={isModifyingSelectedJob}
+      coverageMode={coverageMode}
+      setCoverageMode={setCoverageMode}
+      existingTimesheets={existingTimesheets}
+      modificationMode={modificationMode}
+      setModificationMode={setModificationMode}
+      singleDate={singleDate}
+      setSingleDate={setSingleDate}
+      isAllowedDate={isAllowedDate}
+      multiDates={multiDates}
+      setMultiDates={setMultiDates}
+      assignAsConfirmed={assignAsConfirmed}
+      handleCheckboxChange={handleCheckboxChange}
+      selectedJob={selectedJob}
+      isRemoving={isRemoving}
+      handleRemoveAssignment={handleRemoveAssignment}
+      handleAssign={handleAssign}
+      isAssigning={isAssigning}
+      conflictWarning={conflictWarning}
+      setConflictWarning={setConflictWarning}
+      targetJobRange={targetJobRange}
+      conflictTargetDateLabel={conflictTargetDateLabel}
+      formatJobRange={formatJobRange}
+      formatDateLabel={formatDateLabel}
+      attemptAssign={attemptAssign}
+    />
   );
 };

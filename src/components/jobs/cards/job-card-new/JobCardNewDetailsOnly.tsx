@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import type { Department } from "@/types/department";
 import { getCalendarArtistNamesForDate } from "@/utils/calendarArtists";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 
 export interface JobCardNewDetailsOnlyProps {
-  job: any;
+  job: JobCardJob;
   department: Department;
   appliedBorderColor: string;
   isJobBeingDeleted: boolean;

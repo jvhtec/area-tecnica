@@ -1,20 +1,7 @@
 {
   "version": 1,
   "threshold": 800,
-  "generatedAt": "2026-07-22T21:38:47.666Z",
+  "generatedAt": "2026-07-23T18:31:46.715Z",
   "note": "Line-count ceilings for files over the threshold. CI fails when a file exceeds its ceiling or a new file crosses the threshold. Regenerate with: npm run governance:filesize -- --write-baseline",
-  "files": {
-    "src/features/tour-ops/TourOpsManagementHub.tsx": 2116,
-    "src/features/tour-ops/tourSchedulingService.ts": 1885,
-    "src/features/technical-tools/power/consumos/useConsumosTool.ts": 1820,
-    "src/components/tours/TourDefaultsManager.tsx": 1706,
-    "src/components/jobs/cards/JobCardNew.tsx": 1438,
-    "src/components/matrix/StaffingCampaignPanel.tsx": 1299,
-    "src/utils/rates-pdf-export.ts": 1244,
-    "src/components/matrix/AssignJobDialog.tsx": 1238,
-    "src/components/timesheet/TimesheetView.tsx": 1122,
-    "src/pages/PayoutsDueFortnights.tsx": 1112,
-    "src/components/technician/TimesheetView.tsx": 980,
-    "src/components/matrix/TechnicianRow.tsx": 925
-  }
+  "files": {}
 }

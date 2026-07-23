@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { useReducedMotion } from "framer-motion";
 import { FileText, Loader2, NotebookPen } from "lucide-react";
+import type { QueryClient } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,10 +35,26 @@ import { JobCardProgress } from "../JobCardProgress";
 import { JobCardDocumentSections } from "./JobCardDocumentSections";
 import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
 import { isManagementRole } from "@/utils/permissions";
+import type { CreateFoldersOptions } from "@/utils/flex-folders";
 
 import { queryKeys } from "@/lib/react-query";
+import type {
+  JobCardAssignmentRows,
+  JobCardDocuments,
+  JobCardJob,
+  JobCardRequiredSummary,
+  JobCardRequiredVsAssigned,
+  JobCardSoundTasks,
+  JobTimesheetStatus,
+  SelectedTransportRequest,
+  TransportButtonTone,
+  TransportRequestSummary,
+  WhatsappGroupSummary,
+  WhatsappRequestSummary,
+} from "@/features/jobs/job-card-new/jobCardNewTypes";
+
 export interface JobCardNewViewProps {
-  job: any;
+  job: JobCardJob;
   department: Department;
   userRole?: string | null;
   isProjectManagementPage: boolean;
@@ -76,12 +93,12 @@ export interface JobCardNewViewProps {
   isCreatingLocalFolders: boolean;
 
   techName?: string;
-  assignments: any[];
-  jobTimesheets?: any[];
-  documents: any[];
+  assignments: JobCardAssignmentRows;
+  jobTimesheets?: JobTimesheetStatus[];
+  documents: JobCardDocuments;
   docsCollapsed: boolean;
   setDocsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-  handleDeleteDocument: (document: any) => void;
+  handleDeleteDocument: (document: JobCardDocuments[number]) => void;
 
   riderFiles: Array<{ id: string; file_name: string; file_path: string; uploaded_at: string; artist_id: string }>;
   cardArtistNameMap: Map<string, string>;
@@ -96,9 +113,9 @@ export interface JobCardNewViewProps {
   viewTourDocument: (file: { file_path: string }) => void | Promise<void>;
   downloadTourDocument: (file: { file_path: string; file_name: string }) => void | Promise<void>;
 
-  soundTasks: any;
-  reqSummary: any;
-  requiredVsAssigned: any;
+  soundTasks: JobCardSoundTasks;
+  reqSummary: JobCardRequiredSummary;
+  requiredVsAssigned: JobCardRequiredVsAssigned;
   setRequirementsDialogOpen: (open: boolean) => void;
 
   refreshData: (e: React.MouseEvent) => void;
@@ -112,12 +129,12 @@ export interface JobCardNewViewProps {
   syncStatusToFlex: (e: React.MouseEvent) => void;
 
   transportButtonLabel?: string;
-  transportButtonTone?: any;
+  transportButtonTone?: TransportButtonTone;
   handleTransportClick: (e: React.MouseEvent) => void;
   handleCreateWhatsappGroup: (e: React.MouseEvent) => void;
   handleRetryWhatsappGroup: (e: React.MouseEvent) => void;
-  waGroup?: any;
-  waRequest?: any;
+  waGroup?: WhatsappGroupSummary | null;
+  waRequest?: WhatsappRequestSummary | null;
 
   setTaskManagerOpen: (open: boolean) => void;
   taskManagerOpen: boolean;
@@ -140,24 +157,24 @@ export interface JobCardNewViewProps {
   setTransportDialogOpen: (open: boolean) => void;
   logisticsDialogOpen: boolean;
   setLogisticsDialogOpen: (open: boolean) => void;
-  selectedTransportRequest: any | null;
-  setSelectedTransportRequest: (value: any | null) => void;
+  selectedTransportRequest: SelectedTransportRequest | null;
+  setSelectedTransportRequest: (value: SelectedTransportRequest | null) => void;
   logisticsInitialEventType: "load" | "unload" | undefined;
   setLogisticsInitialEventType: (value: "load" | "unload" | undefined) => void;
 
   isTechDept: boolean;
   userDepartment: string | null;
-  myTransportRequest: any | null;
-  allRequests: any[];
-  queryClient: any;
+  myTransportRequest: TransportRequestSummary | null | undefined;
+  allRequests: TransportRequestSummary[];
+  queryClient: QueryClient;
   checkAndFulfillRequest: (requestId: string, dept: string) => Promise<void>;
 
   requirementsDialogOpen: boolean;
 
   flexPickerOpen: boolean;
   setFlexPickerOpen: (open: boolean) => void;
-  flexPickerOptions: any;
-  handleFlexPickerConfirm: (opts: any) => void;
+  flexPickerOptions: CreateFoldersOptions | undefined;
+  handleFlexPickerConfirm: (options?: CreateFoldersOptions) => void | Promise<void>;
 }
 export function JobCardNewView({
   job,
@@ -471,9 +488,9 @@ export function JobCardNewView({
         {job.job_type !== "dryhire" && Array.isArray(job.job_departments) && job.job_departments.length > 0 && (
           <div className="px-6 mt-2 flex items-center justify-between">
             <div className="flex gap-3 flex-wrap text-sm">
-              {job.job_departments.map((d: any) => {
-                const dept = d.department as "sound" | "lights" | "video";
-                const stats = (requiredVsAssigned as any)[dept] || { required: 0, assigned: 0 };
+              {job.job_departments.map((departmentRef) => {
+                const dept = departmentRef.department ?? "unknown";
+                const stats = requiredVsAssigned[dept] || { required: 0, assigned: 0 };
                 const need = stats.required || 0;
                 const have = stats.assigned || 0;
                 const cls =
@@ -627,7 +644,7 @@ export function JobCardNewView({
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {allRequests.map((req: any) => (
+                        {allRequests.map((req) => (
                           <div key={req.id} className="border rounded p-2 space-y-2">
                             <div className="flex items-center justify-between">
                               <div>
@@ -647,7 +664,7 @@ export function JobCardNewView({
                               </button>
                             </div>
                             <div className="space-y-1">
-                              {(req.items || []).map((it: any) => (
+                              {(req.items || []).map((it) => (
                                 <div key={it.id} className="flex items-center justify-between pl-2">
                                   <div className="text-sm text-muted-foreground">
                                     {it.transport_type.replace("_", " ")}
@@ -710,7 +727,9 @@ export function JobCardNewView({
               open={requirementsDialogOpen}
               onOpenChange={setRequirementsDialogOpen}
               jobId={job.id}
-              departments={(job.job_departments || []).map((d: any) => d.department)}
+              departments={(job.job_departments || [])
+                .map((departmentRef) => departmentRef.department)
+                .filter((value): value is string => Boolean(value))}
             />
           )}
 

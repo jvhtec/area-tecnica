@@ -20,21 +20,24 @@ import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/stora
 
 
 import { queryKeys } from "@/lib/react-query";
-type UseOptimizedJobCardOptions = {
+export type UseOptimizedJobCardOptions = {
   enableRoleSummary?: boolean;
   enableSoundTasks?: boolean;
   refreshAssignmentsOnMount?: boolean;
 };
 
-type JobDocumentRow = {
+export type JobDocumentRow = {
   id: string;
-  file_name?: string | null;
+  file_name: string;
   file_path: string;
-  read_only?: boolean | null;
+  uploaded_at: string;
+  visible_to_tech?: boolean;
+  read_only?: boolean;
+  template_type?: string | null;
   [key: string]: unknown;
 };
 
-type JobProfileRef = {
+export type JobProfileRef = {
   first_name?: string | null;
   nickname?: string | null;
   last_name?: string | null;
@@ -42,7 +45,7 @@ type JobProfileRef = {
   [key: string]: unknown;
 };
 
-type JobAssignmentForCard = {
+export type JobAssignmentForCard = {
   job_id?: string | null;
   technician_id: string;
   profiles?: JobProfileRef | JobProfileRef[] | null;
@@ -58,18 +61,18 @@ type JobAssignmentForCard = {
   [key: string]: unknown;
 };
 
-type TimesheetForCard = {
+export type TimesheetForCard = {
   technician_id?: string | null;
   date?: string | null;
   profiles?: JobProfileRef | JobProfileRef[] | null;
 };
 
-type JobDateTypeForCard = {
+export type JobDateTypeForCard = {
   date?: string | null;
   type?: string | null;
 };
 
-type OptimizedJobCardJob = {
+export type OptimizedJobCardJob = {
   id: string;
   color?: string | null;
   darkColor?: string | null;
