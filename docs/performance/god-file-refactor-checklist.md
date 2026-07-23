@@ -71,9 +71,9 @@ completed batch; it is a ratchet ceiling, not a separate debt inventory.
 - [x] `src/hooks/useOptimizedAuth.tsx` — 842 → 758 LOC
 
 Review hardening for this batch also bounds festival stage-plot URL signing to
-the PDF worker limit and keeps job-document view/download actions inside a
-full-width, touch-sized mobile action row. Both paths have focused regression
-coverage.
+the PDF worker limit and keeps job-document actions inside full-width,
+touch-sized mobile rows in both Job Details and Project Management (including
+job, tour, and rider documents). These paths have focused regression coverage.
 
 ## Remaining queue
 
