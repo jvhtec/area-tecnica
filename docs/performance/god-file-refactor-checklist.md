@@ -99,9 +99,12 @@ job, tour, and rider documents). These paths have focused regression coverage.
   separated; data-owning hooks/contracts live under
   `src/features/jobs/job-card-new/`, and the details-only path uses the same
   typed contract.
-- [x] `src/components/matrix/StaffingCampaignPanel.tsx` — 1,299 → 751 LOC.
+- [x] `src/components/matrix/StaffingCampaignPanel.tsx` — 1,299 → 655 LOC.
   Campaign rendering and its view contract are separated from campaign
-  orchestration.
+  orchestration. Persisted policy normalization now lives in a fully typed
+  feature helper that preserves the snake_case rate-penalty contract consumed
+  by the staffing Edge Function and SQL scorer while accepting camelCase
+  values written by older clients.
 - [x] `src/utils/rates-pdf-export.ts` — 1,244 → 4 LOC. The stable entrypoint
   re-exports dedicated quote, tour-summary, and job-payout generators plus
   shared typed PDF support.
@@ -122,7 +125,9 @@ Focused coverage protects stored Consumos snapshots, job-card folder
 normalization, tour-default table conversion, tour scheduling, assignment
 conflicts, technician timesheet behavior, and rates PDF exports. The final
 typing sweep also removes the directly adjacent `any` boundaries in the Tour
-Ops PDF adapter and details-only job card.
+Ops PDF adapter and details-only job card. Review hardening adds policy
+normalization and serialization coverage so reopening and saving a staffing
+campaign cannot reset its configured rate penalty.
 
 ## Ratchets after completion
 
@@ -160,9 +165,12 @@ The final batch passed:
   action pins, migration ordering, and dependency audit.
 - Seven focused suites — 22 tests covering the extracted logic and the highest
   risk moved UI paths.
+- Two staffing policy suites — 8 tests, including canonical snake_case
+  serialization and persisted-policy compatibility.
 - `npm run test:critical`, including assignment cascade, staffing
   orchestration, Flex deletion/creation, and timesheet critical paths.
 - `npm run test:run`.
+- Staffing recommendations Playwright smoke — 1 Chromium test passed.
 - `npm run test:e2e` — 22 Chromium smoke tests passed and 3 optional
   mobile-screenshot cases were skipped by their configured guard.
 - `npm run build`.

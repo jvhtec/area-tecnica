@@ -37,6 +37,8 @@ boundaries.
 - Staffing and matrix:
   - `StaffingCampaignPanel.tsx` delegates rendering to
     `StaffingCampaignView.tsx`
+  - `src/features/staffing/storedCampaignPolicy.ts` owns typed normalization
+    of persisted campaign JSON, including legacy camelCase recovery
   - `AssignJobDialog.tsx` delegates presentation and conflict adaptation to
     `AssignJobDialogView.tsx` and `assignJobConflicts.ts`
   - `TechnicianRow.tsx` delegates editing to `TechnicianRowEditForm.tsx`
@@ -81,6 +83,11 @@ boundaries.
   truthiness.
 - Regenerate the mobile type-floor baseline because extraction relocates four
   existing occurrences while reducing the repository total from 266 to 248.
+- Preserve the staffing scorer's persisted snake_case contract in both
+  directions. The loader accepts canonical `penalty_strength` /
+  `max_rate_penalty` values and normalizes camelCase values written by older
+  clients; `buildCampaignPolicy` always writes the canonical keys consumed by
+  the Edge Function and SQL scorer.
 
 ## Focused coverage
 
@@ -89,6 +96,9 @@ boundaries.
 - `tourDefaultsManagerSupport.test.ts` covers default-table normalization.
 - Existing focused suites cover tour scheduling, assignment dialog/conflicts,
   technician timesheet behavior, and rates PDF exports.
+- `storedCampaignPolicy.test.ts` protects canonical rate-penalty loading and
+  camelCase compatibility; `crewingProfiles.test.ts` asserts canonical
+  snake_case policy serialization.
 
 ## Validation
 
@@ -98,9 +108,12 @@ boundaries.
   source boundaries add no new violations, and governed lint warnings improve
   from 1,901 to 1,737.
 - Focused Vitest selection: 7 files and 22 tests pass.
+- Review hardening selection: 2 staffing policy files and 8 tests pass,
+  including snake_case load/write compatibility.
 - `npm run test:critical`: pass, including the assignment, staffing, Flex, and
   timesheet invariant suites plus the coverage gate.
 - `npm run test:run`: pass.
+- Staffing recommendations Playwright smoke: 1 Chromium test passes.
 - `npm run test:e2e`: pass with 22 Chromium tests and 3 guarded mobile
   screenshot cases skipped.
 - `npm run build`: pass (5,929 modules transformed).

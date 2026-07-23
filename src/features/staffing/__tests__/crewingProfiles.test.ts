@@ -90,7 +90,11 @@ describe('crewing profile inference', () => {
     expect(policy.role_profiles.Runner.selected_profile).toBe('training_friendly');
     expect(policy.weights.skills).toBe(0.4);
     expect(policy.weights.cost_efficiency).toBe(0.03);
-    expect(policy.cost_scoring.enabled).toBe(true);
+    expect(policy.cost_scoring).toEqual({
+      enabled: true,
+      penalty_strength: 'normal',
+      max_rate_penalty: 10,
+    });
     expect(policy.surrounding_jobs).toEqual({
       enabled: true,
       max_location_distance_km: 25,

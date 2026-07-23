@@ -10,7 +10,6 @@ import { format } from 'date-fns'
 import {
   JOB_PROFILE_LABELS,
   PROFILE_DEFAULTS,
-  PROFILE_OPTIONS,
   RatePenaltyStrength,
   SoftConflictPolicy,
   StaffingChannel,
@@ -25,107 +24,12 @@ import {
   CARLOS_AUTO_MODE_LABEL,
 } from '@/features/staffing/carlos'
 import { canResumeStaffingCampaign, staffingCampaignResumeLabel } from '@/features/staffing/campaignLifecycle'
+import {
+  normalizeStoredCampaignPolicy,
+  type StoredCampaignPolicy,
+} from '@/features/staffing/storedCampaignPolicy'
 
 import { queryKeys } from "@/lib/react-query";
-import type { Json } from "@/integrations/supabase/types";
-
-interface StoredRoleProfile {
-  selected_profile?: JobProfileName
-  inferred_profile?: JobProfileName
-}
-
-interface StoredCampaignPolicy {
-  profile?: {
-    selected_job_profile?: JobProfileName
-    infer_from_job_type?: boolean
-    override_reason?: string | null
-  }
-  role_profiles?: Record<string, StoredRoleProfile>
-  weights?: { proximity?: number; reliability?: number }
-  soft_conflict_policy?: SoftConflictPolicy
-  exclude_fridge?: boolean
-  availability_ttl_hours?: number
-  offer_ttl_hours?: number
-  tick_interval_seconds?: number
-  channel?: StaffingChannel
-  cost_scoring?: {
-    enabled?: boolean
-    penaltyStrength?: RatePenaltyStrength
-    maxRatePenalty?: number
-  }
-  waves?: {
-    mode?: WaveMode
-    buffer?: number
-    wait_minutes?: number
-    max_waves?: number
-    auto_send_next_wave?: boolean
-  }
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-
-const isJobProfileName = (value: unknown): value is JobProfileName =>
-  typeof value === 'string' && PROFILE_OPTIONS.some((profile) => profile === value)
-
-const normalizeStoredCampaignPolicy = (value: Json): StoredCampaignPolicy => {
-  if (!isRecord(value)) return {}
-  const profile = isRecord(value.profile) ? value.profile : {}
-  const weights = isRecord(value.weights) ? value.weights : {}
-  const costScoring = isRecord(value.cost_scoring) ? value.cost_scoring : {}
-  const waves = isRecord(value.waves) ? value.waves : {}
-  const rawRoleProfiles = isRecord(value.role_profiles) ? value.role_profiles : {}
-  const roleProfiles = Object.fromEntries(
-    Object.entries(rawRoleProfiles).flatMap(([roleCode, rawProfile]) => {
-      if (!isRecord(rawProfile)) return []
-      const selected = isJobProfileName(rawProfile.selected_profile)
-        ? rawProfile.selected_profile
-        : undefined
-      const inferred = isJobProfileName(rawProfile.inferred_profile)
-        ? rawProfile.inferred_profile
-        : undefined
-      return [[roleCode, { selected_profile: selected, inferred_profile: inferred }]]
-    }),
-  )
-  const selectedProfile = isJobProfileName(profile.selected_job_profile)
-    ? profile.selected_job_profile
-    : undefined
-
-  return {
-    profile: {
-      selected_job_profile: selectedProfile,
-      infer_from_job_type: typeof profile.infer_from_job_type === 'boolean' ? profile.infer_from_job_type : undefined,
-      override_reason: typeof profile.override_reason === 'string' ? profile.override_reason : null,
-    },
-    role_profiles: roleProfiles,
-    weights: {
-      proximity: typeof weights.proximity === 'number' ? weights.proximity : undefined,
-      reliability: typeof weights.reliability === 'number' ? weights.reliability : undefined,
-    },
-    soft_conflict_policy: typeof value.soft_conflict_policy === 'string'
-      ? value.soft_conflict_policy as SoftConflictPolicy
-      : undefined,
-    exclude_fridge: typeof value.exclude_fridge === 'boolean' ? value.exclude_fridge : undefined,
-    availability_ttl_hours: typeof value.availability_ttl_hours === 'number' ? value.availability_ttl_hours : undefined,
-    offer_ttl_hours: typeof value.offer_ttl_hours === 'number' ? value.offer_ttl_hours : undefined,
-    tick_interval_seconds: typeof value.tick_interval_seconds === 'number' ? value.tick_interval_seconds : undefined,
-    channel: value.channel === 'whatsapp' ? 'whatsapp' : value.channel === 'email' ? 'email' : undefined,
-    cost_scoring: {
-      enabled: typeof costScoring.enabled === 'boolean' ? costScoring.enabled : undefined,
-      penaltyStrength: typeof costScoring.penaltyStrength === 'string'
-        ? costScoring.penaltyStrength as RatePenaltyStrength
-        : undefined,
-      maxRatePenalty: typeof costScoring.maxRatePenalty === 'number' ? costScoring.maxRatePenalty : undefined,
-    },
-    waves: {
-      mode: typeof waves.mode === 'string' ? waves.mode as WaveMode : undefined,
-      buffer: typeof waves.buffer === 'number' ? waves.buffer : undefined,
-      wait_minutes: typeof waves.wait_minutes === 'number' ? waves.wait_minutes : undefined,
-      max_waves: typeof waves.max_waves === 'number' ? waves.max_waves : undefined,
-      auto_send_next_wave: typeof waves.auto_send_next_wave === 'boolean' ? waves.auto_send_next_wave : undefined,
-    },
-  }
-}
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Error desconocido'
@@ -391,8 +295,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         profileOverrideReason: campaign.policy?.profile?.override_reason ?? '',
         roleProfileOverrides,
         costScoringEnabled: campaign.policy?.cost_scoring?.enabled ?? true,
-        ratePenaltyStrength: campaign.policy?.cost_scoring?.penaltyStrength ?? 'normal',
-        maxRatePenalty: campaign.policy?.cost_scoring?.maxRatePenalty ?? 10,
+        ratePenaltyStrength: campaign.policy?.cost_scoring?.penalty_strength ?? 'normal',
+        maxRatePenalty: campaign.policy?.cost_scoring?.max_rate_penalty ?? 10,
         waveMode: (campaign.policy?.waves?.mode ?? 'controlled_waves') as WaveMode,
         waveBuffer: campaign.policy?.waves?.buffer ?? selectedDefaults.waveBuffer,
         waveWaitMinutes: campaign.policy?.waves?.wait_minutes ?? selectedDefaults.waveWaitMinutes,

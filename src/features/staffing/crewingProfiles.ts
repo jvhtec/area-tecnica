@@ -449,7 +449,11 @@ export function buildCampaignPolicy(input: BuildCampaignPolicyInput) {
     tick_interval_seconds: input.tickIntervalSeconds,
     channel: input.sendChannel,
     assisted_handoff_priority: true,
-    cost_scoring: input.costScoring,
+    cost_scoring: {
+      enabled: input.costScoring.enabled,
+      penalty_strength: input.costScoring.penaltyStrength,
+      max_rate_penalty: input.costScoring.maxRatePenalty,
+    },
     waves: {
       mode: input.waves.mode,
       size_mode: input.waves.mode === 'blast_all_eligible' ? 'all' : 'required_plus_buffer',
