@@ -127,7 +127,14 @@ conflicts, technician timesheet behavior, and rates PDF exports. The final
 typing sweep also removes the directly adjacent `any` boundaries in the Tour
 Ops PDF adapter and details-only job card. Review hardening adds policy
 normalization and serialization coverage so reopening and saving a staffing
-campaign cannot reset its configured rate penalty.
+campaign cannot reset its configured rate penalty. It also protects Madrid
+multi-day conflict keys and Spanish staffing/Tour Ops state labels.
+
+The final review pass resolved all eight actionable threads and all three
+nitpicks: async Flex push failures are handled, timesheet PII/debug logs are
+removed, guest-link expiry and assignment keys use Madrid semantics, extracted
+UI copy is Spanish, assignment view types come from their source modules, and
+the rates summary PDF uses the shared multiplier-display helper.
 
 ## Ratchets after completion
 
@@ -167,6 +174,9 @@ The final batch passed:
   risk moved UI paths.
 - Two staffing policy suites — 8 tests, including canonical snake_case
   serialization and persisted-policy compatibility.
+- Complete review selection — 8 files / 23 tests, including Madrid conflict
+  dates, translated status labels, assignment flow, Flex folder parsing, and
+  rates PDFs.
 - `npm run test:critical`, including assignment cascade, staffing
   orchestration, Flex deletion/creation, and timesheet critical paths.
 - `npm run test:run`.

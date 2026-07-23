@@ -99,6 +99,29 @@ boundaries.
 - `storedCampaignPolicy.test.ts` protects canonical rate-penalty loading and
   camelCase compatibility; `crewingProfiles.test.ts` asserts canonical
   snake_case policy serialization.
+- `assignJobConflicts.test.ts` protects Europe/Madrid date keys for multi-day
+  conflict checks.
+- `tourOpsManagementUtils.test.ts` and the staffing lifecycle suite protect
+  Spanish labels for extracted status/source/state mappings.
+
+## Review hardening
+
+The final review pass addressed all eight actionable CodeRabbit threads and
+all three summary nitpicks:
+
+- Multi-day assignment conflict checks now use `formatMadridDateKey`.
+- The extracted timesheet view-model no longer emits render/bulk debug logs or
+  user email/ID values to the browser console.
+- The job-card Flex push uses promise rejection handling instead of a
+  synchronous `try/catch` around a discarded promise.
+- Tour Ops guest-link expiry uses Europe/Madrid formatting.
+- Extracted staffing, Tour Ops, package-default, technician-edit, and Consumos
+  user-facing copy is Spanish, including persisted campaign/role status labels.
+- `AssignJobDialogView` imports its contracts directly from the typed source
+  modules, avoiding a type-only cycle and a duplicate conflict shape.
+- The tour-rates summary PDF reuses the shared multiplier-display helper.
+- Staffing policy load/save preserves the server's canonical snake_case
+  rate-penalty contract and remains compatible with older camelCase writes.
 
 ## Validation
 
@@ -110,6 +133,9 @@ boundaries.
 - Focused Vitest selection: 7 files and 22 tests pass.
 - Review hardening selection: 2 staffing policy files and 8 tests pass,
   including snake_case load/write compatibility.
+- Complete review selection: 8 files and 23 tests pass, including Madrid
+  conflict dates, Spanish status labels, assignment flow, policy
+  normalization, Flex folder parsing, and rates PDFs.
 - `npm run test:critical`: pass, including the assignment, staffing, Flex, and
   timesheet invariant suites plus the coverage gate.
 - `npm run test:run`: pass.

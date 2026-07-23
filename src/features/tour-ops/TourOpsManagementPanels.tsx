@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -276,8 +275,8 @@ export const SharePanel = ({ model }: { model: TourOpsModel }) => {
             <Select value={accessLevel} onValueChange={(value) => setAccessLevel(value as "view" | "edit")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="view">View only</SelectItem>
-                <SelectItem value="edit">Can edit</SelectItem>
+                <SelectItem value="view">Solo lectura</SelectItem>
+                <SelectItem value="edit">Puede editar</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -315,12 +314,12 @@ export const SharePanel = ({ model }: { model: TourOpsModel }) => {
                     <div>
                     <div className="font-medium">{link.label}</div>
                     <div className="text-xs text-muted-foreground">
-                      {link.expires_at ? `Caduca ${format(new Date(link.expires_at), "d MMM yyyy HH:mm", { locale: es })}` : "Sin caducidad"}
+                      {link.expires_at ? `Caduca ${formatInTimeZone(link.expires_at, MADRID_TIMEZONE, "d MMM yyyy HH:mm", { locale: es })}` : "Sin caducidad"}
                     </div>
                     {link.revoked_at && <Badge variant="destructive" className="mt-1">Revocado</Badge>}
                     {!link.revoked_at && (
                       <Badge variant={link.access_level === "edit" ? "default" : "outline"} className="mt-1">
-                        {link.access_level === "edit" ? "Can edit" : "View only"}
+                        {link.access_level === "edit" ? "Puede editar" : "Solo lectura"}
                       </Badge>
                     )}
                     {!link.token && !link.revoked_at && (
@@ -343,9 +342,9 @@ export const SharePanel = ({ model }: { model: TourOpsModel }) => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="disabled">Disabled</SelectItem>
-                          <SelectItem value="view">View only</SelectItem>
-                          <SelectItem value="edit">Can edit</SelectItem>
+                          <SelectItem value="disabled">Desactivado</SelectItem>
+                          <SelectItem value="view">Solo lectura</SelectItem>
+                          <SelectItem value="edit">Puede editar</SelectItem>
                         </SelectContent>
                       </Select>
                       {guestLinkUrl(link) && !link.revoked_at && (

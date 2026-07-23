@@ -37,7 +37,6 @@ import {
 import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
 import { format } from 'date-fns';
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
-import type { ConflictCheckResult } from '@/utils/technicianAvailability';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
 import type { Dispatch, SetStateAction } from "react";
 import type { Database } from "@/integrations/supabase/types";
@@ -45,10 +44,10 @@ import type {
   AssignableJob,
   CoverageMode,
   ExistingAssignment,
-} from "@/components/matrix/AssignJobDialog";
+} from "@/components/matrix/assignJobDialogTypes";
+import type { AssignmentConflictWarning } from "@/components/matrix/assignJobConflicts";
 
 type TechnicianSummary = Pick<Database["public"]["Tables"]["profiles"]["Row"], "first_name" | "last_name" | "department">;
-type ConflictWarning = { result: ConflictCheckResult; targetDate?: string; mode: CoverageMode };
 
 interface AssignJobDialogViewProps {
   open: boolean;
@@ -82,8 +81,8 @@ interface AssignJobDialogViewProps {
   handleRemoveAssignment: () => Promise<void>;
   handleAssign: () => void;
   isAssigning: boolean;
-  conflictWarning: ConflictWarning | null;
-  setConflictWarning: Dispatch<SetStateAction<ConflictWarning | null>>;
+  conflictWarning: AssignmentConflictWarning | null;
+  setConflictWarning: Dispatch<SetStateAction<AssignmentConflictWarning | null>>;
   targetJobRange: string | null;
   conflictTargetDateLabel: string | null;
   formatJobRange: (start?: string | null, end?: string | null) => string | null;

@@ -138,8 +138,6 @@ export const getTechNameFactory = (profiles: TechnicianProfile[]) => {
 export const formatJobDate = (date: string) => format(new Date(date), 'PPP', { locale: es });
 
 export const BASE_VALUE_EPSILON = 0.5; // tolerate rounding differences when comparing backend totals
-export const MULTIPLIER_DISPLAY_EPSILON = 0.0001;
-
 export const roundCurrency = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 export const computeEffectiveBase = (quote: TourJobRateQuote) => {

@@ -351,17 +351,17 @@ export function useJobCardFolderActions({
         console.error("Error updating job record:", updateError);
       }
 
-      try {
-        void dataLayerClient.functions.invoke("push", {
+      void dataLayerClient.functions
+        .invoke("push", {
           body: {
             action: "broadcast",
             type: "flex.folders.created",
             job_id: job.id,
           },
+        })
+        .catch((pushError: unknown) => {
+          console.error("Error sending push notification:", pushError);
         });
-      } catch (pushError: unknown) {
-        console.error("Error sending push notification:", pushError);
-      }
 
       toast({
         title: mode === "create" ? "Success!" : "Updated!",

@@ -113,7 +113,7 @@ export const DateList = ({
         <div className="mt-1 font-medium">{formatDate(date.date)}</div>
         <div className="mt-1 flex items-start gap-1 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5 mt-0.5" />
-          <span className="line-clamp-2">{date.venueName || date.location?.name || "Venue pendiente"}</span>
+          <span className="line-clamp-2">{date.venueName || date.location?.name || "Recinto pendiente"}</span>
         </div>
       </button>
     ))}
@@ -153,7 +153,7 @@ export const ActiveDateSelector = ({
             <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span className="line-clamp-2">
               {selectedDate
-                ? selectedDate.venueName || selectedDate.location?.name || "Venue pendiente"
+                ? selectedDate.venueName || selectedDate.location?.name || "Recinto pendiente"
                 : `${dates.length} fechas en la gira`}
             </span>
           </div>
@@ -229,10 +229,10 @@ export const DateContextHeader = ({
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={selectedDate.jobId ? "default" : "outline"}>
-              {selectedDate.jobId ? "Job linked" : "No job"}
+              {selectedDate.jobId ? "Trabajo vinculado" : "Sin trabajo"}
             </Badge>
             <Badge variant={selectedDate.hojaDeRutaId ? "default" : "outline"}>
-              {selectedDate.hojaDeRutaId ? "Hoja linked" : "No Hoja for date"}
+              {selectedDate.hojaDeRutaId ? "Hoja vinculada" : "Sin hoja para la fecha"}
             </Badge>
             <Badge variant={travelCount ? "secondary" : "outline"}>{travelCount} viajes</Badge>
             <Badge variant={hotelCount ? "secondary" : "outline"}>{hotelCount} hoteles</Badge>
@@ -244,14 +244,14 @@ export const DateContextHeader = ({
             )}
           </div>
           <div className="text-sm text-muted-foreground">
-            {selectedDate.venueName || selectedDate.location?.name || "Venue pendiente"}
+            {selectedDate.venueName || selectedDate.location?.name || "Recinto pendiente"}
             {selectedDate.jobTitle ? ` · ${selectedDate.jobTitle}` : ""}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => generateTourOpsPdf(model, "management", { dateId: selectedDate.id })}>
             <Download className="h-4 w-4 mr-1" />
-            Day sheet
+            Hoja del día
           </Button>
           <Button variant="outline" size="sm" onClick={onOpenHoja} disabled={!selectedDate.jobId}>
             <ExternalLink className="h-4 w-4 mr-1" />
@@ -295,7 +295,7 @@ export const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOps
                 {formatDate(date.date)}
               </CardTitle>
               <div className="mt-1 text-sm text-muted-foreground">
-                {date.venueName || date.location?.name || "Venue pendiente"}
+                {date.venueName || date.location?.name || "Recinto pendiente"}
               </div>
             </div>
             <Button variant="outline" onClick={() => generateTourOpsPdf(model, "management", { dateId: date.id })}>

@@ -138,7 +138,7 @@ export function TourDepartmentDefaults({
                   id={`${department}-new-set-name`}
                   value={newSetName}
                   onChange={(event) => setNewSetName(event.target.value)}
-                  placeholder={`${DEPARTMENT_PACKAGE_LABELS[department]} package`}
+                  placeholder={`Paquete de ${DEPARTMENT_PACKAGE_LABELS[department]}`}
                 />
               </div>
               <div className="space-y-2 md:col-span-1">
@@ -147,11 +147,11 @@ export function TourDepartmentDefaults({
                   id={`${department}-new-set-description`}
                   value={newSetDescription}
                   onChange={(event) => setNewSetDescription(event.target.value)}
-                  placeholder="Optional"
+                  placeholder="Opcional"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Package size</Label>
+                <Label>Tamaño del paquete</Label>
                 <Select
                   value={newSetPackageSize || 'unassigned'}
                   onValueChange={(value) =>
@@ -159,10 +159,10 @@ export function TourDepartmentDefaults({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Package size" />
+                    <SelectValue placeholder="Tamaño del paquete" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Sin asignar</SelectItem>
                     {TOUR_PACKAGE_SIZES.map((size) => (
                       <SelectItem key={size} value={size}>
                         {TOUR_PACKAGE_LABELS[size]}

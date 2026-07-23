@@ -49,22 +49,22 @@ export const finiteNumberOrNull = (value: string) => {
 };
 
 export const sourceLabel = (source?: string) =>
-  source === "hoja" ? "Hoja import" : source === "legacy" ? "Legacy" : "Ops";
+  source === "hoja" ? "Importado de hoja" : source === "legacy" ? "Heredado" : "Operaciones";
 
 export const syncStatusLabel = (status?: string) => {
   switch (status) {
     case "synced":
-      return "Synced";
+      return "Sincronizado";
     case "needs_sync":
-      return "Needs sync";
+      return "Requiere sincronización";
     case "no_hoja":
-      return "No Hoja for date";
+      return "Sin hoja para la fecha";
     case "imported":
-      return "Hoja import";
+      return "Importado de hoja";
     case "legacy":
-      return "Legacy";
+      return "Heredado";
     default:
-      return "Needs sync";
+      return "Requiere sincronización";
   }
 };
 

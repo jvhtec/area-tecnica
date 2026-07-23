@@ -15,8 +15,14 @@ import {
   CARLOS_AGENT_NAME,
   CARLOS_AUTO_MODE_LABEL,
 } from '@/features/staffing/carlos'
-import { canResumeStaffingCampaign, staffingCampaignResumeLabel } from '@/features/staffing/campaignLifecycle'
+import {
+  canResumeStaffingCampaign,
+  staffingCampaignResumeLabel,
+  staffingCampaignRoleStageLabel,
+  staffingCampaignStatusLabel,
+} from '@/features/staffing/campaignLifecycle'
 import { formatInJobTimezone } from '@/utils/timezoneUtils'
+import { getDepartmentLabel } from '@/types/department'
 import type { StaffingCampaignViewProps } from "@/components/matrix/staffingCampaignViewTypes";
 
 const isSoftConflictPolicy = (value: string): value is SoftConflictPolicy =>
@@ -48,13 +54,14 @@ export const StaffingCampaignView = ({
   resumeMutation,
   stopMutation,
 }: StaffingCampaignViewProps) => {
+  const departmentLabel = getDepartmentLabel(department)
   const renderCrewingProfileSettings = () => (
     <div className="space-y-4 rounded border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold">Perfil automático</p>
           <p className="text-xs text-muted-foreground">
-            Tipo de trabajo {jobMeta?.job_type || 'single'}: perfil sugerido {JOB_PROFILE_LABELS[inferredJobProfile]}.
+            Tipo de trabajo {jobMeta?.job_type || 'individual'}: perfil sugerido {JOB_PROFILE_LABELS[inferredJobProfile]}.
           </p>
         </div>
         {profileOverrideActive && (
@@ -264,28 +271,28 @@ export const StaffingCampaignView = ({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Campaign Management</CardTitle>
+          <CardTitle>Gestión de campaña</CardTitle>
           <CardDescription>
-            {jobTitle ? `${jobTitle} - ${department}` : `${department} Department`}
+            {jobTitle ? `${jobTitle} - ${departmentLabel}` : `Departamento de ${departmentLabel}`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-gray-600">No active campaign for this job.</p>
-          <Button onClick={() => setShowStartDialog(true)}>Start Campaign</Button>
+          <p className="text-sm text-gray-600">No hay ninguna campaña activa para este trabajo.</p>
+          <Button onClick={() => setShowStartDialog(true)}>Iniciar campaña</Button>
 
           <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
             <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Start Staffing Campaign</DialogTitle>
+                <DialogTitle>Iniciar campaña de personal</DialogTitle>
                 <DialogDescription>
-                  Configure campaign settings for {department} department
+                  Configura la campaña para el departamento de {departmentLabel}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6 py-4">
                 {/* Mode Selection */}
                 <div>
-                  <label className="text-sm font-medium">Mode</label>
+                  <label className="text-sm font-medium">Modo</label>
                   <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-4">
                     <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                       <input
@@ -296,7 +303,7 @@ export const StaffingCampaignView = ({
                         checked={formData.mode === 'assisted'}
                         onChange={() => updateMode('assisted')}
                       />
-                      <span className="text-sm">Assisted (Manager-controlled)</span>
+                      <span className="text-sm">Asistido (controlado por gestión)</span>
                     </label>
                     <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                       <input
@@ -314,7 +321,7 @@ export const StaffingCampaignView = ({
 
                 {/* Scope Selection */}
                 <div>
-                  <label className="text-sm font-medium">Scope</label>
+                  <label className="text-sm font-medium">Alcance</label>
                   <div className="flex gap-4 mt-2">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -324,7 +331,7 @@ export const StaffingCampaignView = ({
                         checked={formData.scope === 'outstanding'}
                         onChange={() => setFormData({ ...formData, scope: 'outstanding' })}
                       />
-                      <span className="text-sm">Outstanding roles only</span>
+                      <span className="text-sm">Solo roles pendientes</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -334,7 +341,7 @@ export const StaffingCampaignView = ({
                         checked={formData.scope === 'all'}
                         onChange={() => setFormData({ ...formData, scope: 'all' })}
                       />
-                      <span className="text-sm">All required roles</span>
+                      <span className="text-sm">Todos los roles requeridos</span>
                     </label>
                   </div>
                 </div>
@@ -344,7 +351,7 @@ export const StaffingCampaignView = ({
                 {/* Weights */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Proximity Weight</label>
+                    <label className="text-sm font-medium">Peso de proximidad</label>
                     <input
                       type="number"
                       step="0.05"
@@ -356,7 +363,7 @@ export const StaffingCampaignView = ({
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">History Weight</label>
+                    <label className="text-sm font-medium">Peso del historial</label>
                     <input
                       type="number"
                       step="0.05"
@@ -372,7 +379,7 @@ export const StaffingCampaignView = ({
                 {/* TTLs */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Availability TTL (hours)</label>
+                    <label className="text-sm font-medium">Vigencia de disponibilidad (horas)</label>
                     <input
                       type="number"
                       min="1"
@@ -383,7 +390,7 @@ export const StaffingCampaignView = ({
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Offer TTL (hours)</label>
+                    <label className="text-sm font-medium">Vigencia de la oferta (horas)</label>
                     <input
                       type="number"
                       min="1"
@@ -399,7 +406,7 @@ export const StaffingCampaignView = ({
 
                 {/* Conflict policy */}
                 <div>
-                  <label className="text-sm font-medium">Soft Conflict Policy</label>
+                  <label className="text-sm font-medium">Política de conflictos leves</label>
                   <select
                     value={formData.softConflictPolicy}
                     onChange={(e) => {
@@ -418,7 +425,7 @@ export const StaffingCampaignView = ({
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Send Channel</label>
+                  <label className="text-sm font-medium">Canal de envío</label>
                   <select
                     value={formData.channel}
                     onChange={(e) => setFormData({ ...formData, channel: e.target.value as StaffingChannel })}
@@ -436,23 +443,23 @@ export const StaffingCampaignView = ({
                     checked={formData.excludeFridge}
                     onChange={(e) => setFormData({ ...formData, excludeFridge: e.target.checked })}
                   />
-                  <span className="text-sm">Exclude fridge techs (check by default)</span>
+                  <span className="text-sm">Excluir técnicos en nevera (activado por defecto)</span>
                 </label>
 
                 {/* Offer message */}
                 <div>
-                  <label className="text-sm font-medium">Offer Message (optional)</label>
+                  <label className="text-sm font-medium">Mensaje de oferta (opcional)</label>
                   <textarea
                     value={formData.offerMessage}
                     onChange={(e) => setFormData({ ...formData, offerMessage: e.target.value })}
-                    placeholder="Personal note to include in offer emails..."
+                    placeholder="Nota personal para incluir en los correos de oferta..."
                     className="w-full mt-1 px-2 py-1 border rounded text-sm h-20 bg-background"
                   />
                 </div>
 
                 {formData.mode === 'auto' && (
                   <div>
-                    <label className="text-sm font-medium">Tick Interval (seconds)</label>
+                    <label className="text-sm font-medium">Intervalo de ejecución (segundos)</label>
                     <input
                       type="number"
                       min="60"
@@ -468,10 +475,10 @@ export const StaffingCampaignView = ({
 
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setShowStartDialog(false)}>
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
-                  {startMutation.isPending ? 'Starting...' : 'Start Campaign'}
+                  {startMutation.isPending ? 'Iniciando...' : 'Iniciar campaña'}
                 </Button>
               </div>
             </DialogContent>
@@ -486,13 +493,13 @@ export const StaffingCampaignView = ({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Active Campaign</CardTitle>
+            <CardTitle>Campaña activa</CardTitle>
             <CardDescription>
-              {jobTitle ? `${jobTitle} - ${department}` : `${department} Department`}
+              {jobTitle ? `${jobTitle} - ${departmentLabel}` : `Departamento de ${departmentLabel}`}
             </CardDescription>
           </div>
           <Badge className={getStatusColor(campaign.status)}>
-            {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+            {staffingCampaignStatusLabel(campaign.status)}
           </Badge>
         </div>
       </CardHeader>
@@ -501,22 +508,22 @@ export const StaffingCampaignView = ({
         {/* Campaign info */}
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-gray-600">Mode</p>
+            <p className="text-gray-600">Modo</p>
             <p className="font-medium">{campaign.mode === 'assisted' ? 'Asistido' : CARLOS_AGENT_NAME}</p>
           </div>
           <div>
-            <p className="text-gray-600">Created</p>
+            <p className="text-gray-600">Creada</p>
             <p className="font-medium">{formatInJobTimezone(campaign.created_at, 'PPp')}</p>
           </div>
           {campaign.last_run_at && (
             <div>
-              <p className="text-gray-600">Last Run</p>
+              <p className="text-gray-600">Última ejecución</p>
               <p className="font-medium">{formatInJobTimezone(campaign.last_run_at, 'PPp')}</p>
             </div>
           )}
           {campaign.next_run_at && (
             <div>
-              <p className="text-gray-600">Next Run</p>
+              <p className="text-gray-600">Próxima ejecución</p>
               <p className="font-medium">{formatInJobTimezone(campaign.next_run_at, 'PPp')}</p>
             </div>
           )}
@@ -525,18 +532,18 @@ export const StaffingCampaignView = ({
         {/* Roles status */}
         {campaignRoles && campaignRoles.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold mb-2">Role Progress</h4>
+            <h4 className="text-sm font-semibold mb-2">Progreso por rol</h4>
             <div className="space-y-2">
               {campaignRoles.map((role) => (
                 <div key={role.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                   <div className="flex-1">
                     <p className="text-sm font-medium">{role.role_code}</p>
                     <p className="text-xs text-gray-600">
-                      Assigned: {role.assigned_count} | Availability: {role.confirmed_availability} | Offers: {role.accepted_offers}
+                      Asignados: {role.assigned_count} | Disponibles: {role.confirmed_availability} | Ofertas: {role.accepted_offers}
                     </p>
                   </div>
                   <Badge className={getStageColor(role.stage)}>
-                    {role.stage}
+                    {staffingCampaignRoleStageLabel(role.stage)}
                   </Badge>
                 </div>
               ))}
@@ -546,12 +553,12 @@ export const StaffingCampaignView = ({
 
         {/* Editable Settings form */}
         <div className="border-t pt-4 space-y-6">
-          <h4 className="text-sm font-semibold">Campaign Settings</h4>
+          <h4 className="text-sm font-semibold">Configuración de campaña</h4>
 
           <div className="space-y-6">
             {/* Mode Selection */}
             <div>
-              <label className="text-sm font-medium">Mode</label>
+              <label className="text-sm font-medium">Modo</label>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-4">
                 <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                   <input
@@ -562,7 +569,7 @@ export const StaffingCampaignView = ({
                     checked={formData.mode === 'assisted'}
                     onChange={() => updateMode('assisted')}
                   />
-                  <span className="text-sm">Assisted (Manager-controlled)</span>
+                  <span className="text-sm">Asistido (controlado por gestión)</span>
                 </label>
                 <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                   <input
@@ -583,7 +590,7 @@ export const StaffingCampaignView = ({
             {/* Weights */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Proximity Weight</label>
+                <label className="text-sm font-medium">Peso de proximidad</label>
                 <input
                   type="number"
                   step="0.05"
@@ -595,7 +602,7 @@ export const StaffingCampaignView = ({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">History Weight (Reliability)</label>
+                <label className="text-sm font-medium">Peso del historial (fiabilidad)</label>
                 <input
                   type="number"
                   step="0.05"
@@ -611,7 +618,7 @@ export const StaffingCampaignView = ({
             {/* TTLs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Availability TTL (hours)</label>
+                <label className="text-sm font-medium">Vigencia de disponibilidad (horas)</label>
                 <input
                   type="number"
                   min="1"
@@ -622,7 +629,7 @@ export const StaffingCampaignView = ({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Offer TTL (hours)</label>
+                <label className="text-sm font-medium">Vigencia de la oferta (horas)</label>
                 <input
                   type="number"
                   min="1"
@@ -638,7 +645,7 @@ export const StaffingCampaignView = ({
 
             {/* Conflict policy */}
             <div>
-              <label className="text-sm font-medium">Soft Conflict Policy</label>
+              <label className="text-sm font-medium">Política de conflictos leves</label>
               <select
                 value={formData.softConflictPolicy}
                 onChange={(e) => {
@@ -657,7 +664,7 @@ export const StaffingCampaignView = ({
             </div>
 
             <div>
-              <label className="text-sm font-medium">Send Channel</label>
+              <label className="text-sm font-medium">Canal de envío</label>
               <select
                 value={formData.channel}
                 onChange={(e) => setFormData({ ...formData, channel: e.target.value as StaffingChannel })}
@@ -680,23 +687,23 @@ export const StaffingCampaignView = ({
                 checked={formData.excludeFridge}
                 onChange={(e) => setFormData({ ...formData, excludeFridge: e.target.checked })}
               />
-              <span className="text-sm">Exclude fridge techs</span>
+              <span className="text-sm">Excluir técnicos en nevera</span>
             </label>
 
             {/* Offer message */}
             <div>
-              <label className="text-sm font-medium">Offer Message</label>
+              <label className="text-sm font-medium">Mensaje de oferta</label>
               <textarea
                 value={formData.offerMessage}
                 onChange={(e) => setFormData({ ...formData, offerMessage: e.target.value })}
-                placeholder="Personal note to include in offer emails..."
+                placeholder="Nota personal para incluir en los correos de oferta..."
                 className="w-full mt-1 px-2 py-1 border rounded text-sm h-20 bg-background"
               />
             </div>
 
             {formData.mode === 'auto' && (
               <div>
-                <label className="text-sm font-medium">Tick Interval (seconds)</label>
+                <label className="text-sm font-medium">Intervalo de ejecución (segundos)</label>
                 <input
                   type="number"
                   min="60"
@@ -715,7 +722,7 @@ export const StaffingCampaignView = ({
               onClick={() => updateMutation.mutate()}
               disabled={updateMutation.isPending}
             >
-              {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
+              {updateMutation.isPending ? 'Guardando...' : 'Guardar configuración'}
             </Button>
           </div>
         </div>
@@ -730,7 +737,7 @@ export const StaffingCampaignView = ({
                 onClick={() => pauseMutation.mutate()}
                 disabled={pauseMutation.isPending}
               >
-                Pause
+                Pausar
               </Button>
               <Button
                 variant="outline"
@@ -738,7 +745,7 @@ export const StaffingCampaignView = ({
                 onClick={() => stopMutation.mutate()}
                 disabled={stopMutation.isPending}
               >
-                Stop
+                Detener
               </Button>
             </>
           ) : campaign.status === 'paused' ? (
@@ -748,7 +755,7 @@ export const StaffingCampaignView = ({
                 onClick={() => resumeMutation.mutate()}
                 disabled={resumeMutation.isPending}
               >
-                Resume
+                Reanudar
               </Button>
               <Button
                 variant="outline"
@@ -756,7 +763,7 @@ export const StaffingCampaignView = ({
                 onClick={() => stopMutation.mutate()}
                 disabled={stopMutation.isPending}
               >
-                Stop
+                Detener
               </Button>
             </>
           ) : canResumeStaffingCampaign(campaign.status) ? (

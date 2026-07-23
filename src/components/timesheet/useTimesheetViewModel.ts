@@ -322,10 +322,6 @@ export const useTimesheetViewModel = ({
 
   const handleBulkEdit = async () => {
     if (isClosureLocked) return;
-    console.log('Bulk edit starting with:', {
-      selectedTimesheets: Array.from(selectedTimesheets),
-      bulkFormData
-    });
 
     setIsBulkUpdating(true);
 
@@ -347,13 +343,11 @@ export const useTimesheetViewModel = ({
           updates.category = bulkFormData.category;
         }
 
-        console.log('Updating timesheet', timesheetId, 'with:', updates);
         // Skip refetch for bulk operations
         return updateTimesheet(timesheetId, updates, true);
       });
 
-      const results = await Promise.all(promises);
-      console.log('Bulk edit results:', results);
+      await Promise.all(promises);
 
       // Now refetch once to get all updated data
       await refetch();
@@ -370,7 +364,6 @@ export const useTimesheetViewModel = ({
         ends_next_day: false
       });
 
-      console.log('Bulk edit completed successfully');
     } catch (error) {
       console.error('Error in bulk edit:', error);
     } finally {
@@ -411,16 +404,6 @@ export const useTimesheetViewModel = ({
   const isManagementUser = isManagementRole(userRole);
   const isTechnician = isTechnicianRole(userRole);
   const isHouseTech = userRole === 'house_tech';
-
-  console.log('TimesheetView Debug:', {
-    userRole,
-    isManagementUser,
-    isTechnician,
-    canManage,
-    filteredTimesheetsLength: filteredTimesheets.length,
-    user: user?.email,
-    userId: user?.id
-  });
 
   // Expense section in TimesheetView is management-only.
   // Technicians access expenses via AssignmentCard dialog.

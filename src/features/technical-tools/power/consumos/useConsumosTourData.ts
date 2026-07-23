@@ -173,7 +173,7 @@ export function useConsumosTourData({
 
     const trimmedSetName = newDefaultSetName.trim();
     if (!trimmedSetName) {
-      throw new Error("Select an existing default set or enter a name to create one.");
+      throw new Error("Selecciona un conjunto predeterminado existente o introduce un nombre para crear uno.");
     }
 
     const creation = createSet({

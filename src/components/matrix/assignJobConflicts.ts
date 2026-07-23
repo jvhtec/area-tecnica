@@ -1,8 +1,8 @@
-import { format } from "date-fns";
 import {
   checkTimeConflictEnhanced,
   type ConflictCheckResult,
 } from "@/utils/technicianAvailability";
+import { formatMadridDateKey } from "@/utils/timezoneUtils";
 import type { CoverageMode } from "@/components/matrix/assignJobDialogTypes";
 
 export interface AssignmentConflictWarning {
@@ -29,7 +29,7 @@ export const checkAssignmentConflicts = async ({
   if (!selectedJobId) return null;
 
   if (coverageMode === "multi") {
-    const uniqueKeys = Array.from(new Set(multiDates.map((date) => format(date, "yyyy-MM-dd"))));
+    const uniqueKeys = Array.from(new Set(multiDates.map(formatMadridDateKey)));
     for (const key of uniqueKeys) {
       const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
         targetDateIso: key,

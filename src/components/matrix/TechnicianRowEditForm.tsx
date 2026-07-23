@@ -86,7 +86,7 @@ export const TechnicianRowEditForm = ({
                     value={editedData.phone}
                     onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
                     className="h-8"
-                    placeholder="Optional"
+                    placeholder="Opcional"
                   />
                 </div>
 

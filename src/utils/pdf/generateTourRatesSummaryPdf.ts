@@ -34,7 +34,6 @@ import {
   NON_AUTONOMO_DEDUCTION_EUR,
   PREP_DAY_DISCLAIMER_TEXT,
   TOUR_DEDUCTION_DISCLAIMER_TEXT,
-  MULTIPLIER_DISPLAY_EPSILON,
   computeEffectiveBase,
   formatJobDate,
   getTechNameFactory,
@@ -227,9 +226,9 @@ export async function generateTourRatesSummaryPDF(
           'ERROR: ' + quote.breakdown.error;
         baseText = errorMsg;
       } else {
-        const shouldDisplayMultiplier =
-          !usedFallbackBase && rawMultiplier != null && Math.abs(rawMultiplier - 1) >= MULTIPLIER_DISPLAY_EPSILON;
-        baseText = shouldDisplayMultiplier
+        const displayMultiplier =
+          !usedFallbackBase && shouldDisplayMultiplier(rawMultiplier);
+        baseText = displayMultiplier
           ? `${formatCurrency(preMultiplierBase)} ${formatMultiplier(rawMultiplier)} = ${formatCurrency(effectiveBase)}`
           : formatCurrency(effectiveBase);
       }
