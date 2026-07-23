@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeComparison } from "@/features/tour-ops/tourSchedulingNormalizers";
 import { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingService";
 
 const rawTour: Record<string, unknown> = {
@@ -118,6 +119,10 @@ const rawPayload: Record<string, unknown> = {
 };
 
 describe("tour ops normalization", () => {
+  it("ignores surrounding whitespace in sync comparisons", () => {
+    expect(normalizeComparison("  BCN Airport  ")).toBe("bcn airport");
+  });
+
   it("merges tour dates, jobs, hoja schedule, crew, accommodation, and legacy travel", () => {
     const model = normalizeTourOpsModel(rawPayload, "management");
 

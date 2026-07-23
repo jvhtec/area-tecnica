@@ -1,43 +1,42 @@
-import React from "react";
-import { createPortal } from "react-dom";
+import type { QueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
 import { FileText, Loader2, NotebookPen } from "lucide-react";
-import type { QueryClient } from "@tanstack/react-query";
+import React from "react";
+import { createPortal } from "react-dom";
 
+import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
+import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
+import { getHojaDeRutaDialogClassName } from "@/components/hoja-de-ruta/hojaDeRutaDialogClassName";
+import { EditJobDialog } from "@/components/jobs/EditJobDialog";
+import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
+import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
+import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
+import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
+import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
+import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
+import { ProjectNotesDialog } from "@/components/project-management/ProjectNotesDialog";
+import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
+import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
-import { getHojaDeRutaDialogClassName } from "@/components/hoja-de-ruta/hojaDeRutaDialogClassName";
-import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
-import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
-import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
-import { EditJobDialog } from "@/components/jobs/EditJobDialog";
-import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
-import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
-import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
-import { ProjectNotesDialog } from "@/components/project-management/ProjectNotesDialog";
-import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
-import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
-import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
-import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Department } from "@/types/department";
 
+import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
+import type { CreateFoldersOptions } from "@/utils/flex-folders";
+import { isManagementRole } from "@/utils/permissions";
 import { JobCardActions } from "../JobCardActions";
 import { JobCardAssignments } from "../JobCardAssignments";
 import { JobCardHeader } from "../JobCardHeader";
 import { JobCardProgress } from "../JobCardProgress";
 import { JobCardDocumentSections } from "./JobCardDocumentSections";
-import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
-import { isManagementRole } from "@/utils/permissions";
-import type { CreateFoldersOptions } from "@/utils/flex-folders";
 
-import { queryKeys } from "@/lib/react-query";
 import type {
   JobCardAssignmentRows,
   JobCardDocuments,
@@ -52,6 +51,7 @@ import type {
   WhatsappGroupSummary,
   WhatsappRequestSummary,
 } from "@/features/jobs/job-card-new/jobCardNewTypes";
+import { queryKeys } from "@/lib/react-query";
 
 export interface JobCardNewViewProps {
   job: JobCardJob;

@@ -1,8 +1,4 @@
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
-import { formatInTimeZone } from "date-fns-tz";
 import type {
-  TourGuestLink,
   TourOpsAccommodation,
   TourOpsAllowedSections,
   TourOpsContact,
@@ -11,13 +7,12 @@ import type {
   TourOpsDocument,
   TourOpsHealthIssue,
   TourOpsLocation,
-  TourOpsModel,
   TourOpsProgramDay,
   TourOpsProjection,
   TourOpsRoomAssignment,
   TourOpsSyncStatus,
   TourOpsTimelineEvent,
-  TourOpsTravelSegment,
+  TourOpsTravelSegment
 } from "@/features/tour-ops/types";
 import { DEFAULT_TOUR_OPS_SECTIONS } from "@/features/tour-ops/types";
 
@@ -662,7 +657,7 @@ export const buildDateHealth = (date: TourOpsDate): TourOpsHealthIssue[] => {
 export const shouldIncludeSection = (allowed: TourOpsAllowedSections, section: keyof TourOpsAllowedSections) =>
   allowed[section] !== false;
 
-export const normalizeComparison = (value: unknown) => textOrNull(value)?.toLowerCase() ?? "";
+export const normalizeComparison = (value: unknown) => textOrNull(value)?.trim().toLowerCase() ?? "";
 
 export const mergeTravelSegments = (segments: TourOpsTravelSegment[]) => {
   const byKey = new Map<string, TourOpsTravelSegment>();

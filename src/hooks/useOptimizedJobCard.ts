@@ -1,22 +1,22 @@
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useTheme } from 'next-themes';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { createQueryKey } from '@/lib/optimized-react-query';
+import { useToast } from '@/hooks/use-toast';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
-import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import { createQueryKey } from '@/lib/optimized-react-query';
+import { supabase } from '@/lib/supabase';
 import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
+import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
+import { resolveJobDocLocation } from '@/utils/jobDocuments';
 import {
   canCreateFolders,
   canEditJobs as canEditJobsForRole,
   canManageFestivalArtists,
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
-import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/storageUpload';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTheme } from 'next-themes';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -96,9 +96,9 @@ export const useOptimizedJobCard = (
   job: OptimizedJobCardJob,
   department: string,
   userRole: string | null,
-  onEditClick: (job: OptimizedJobCardJob) => void,
-  onDeleteClick: (jobId: string) => void,
-  onJobClick: (jobId: string) => void,
+  _onEditClick: (job: OptimizedJobCardJob) => void,
+  _onDeleteClick: (jobId: string) => void,
+  _onJobClick: (jobId: string) => void,
   options?: UseOptimizedJobCardOptions
 ) => {
   const { theme } = useTheme();

@@ -1,37 +1,34 @@
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { TourJobRateQuote } from '@/types/tourRates';
 import {
   formatMultiplier,
-  getPerJobMultiplier,
-  shouldDisplayMultiplier,
+  shouldDisplayMultiplier
 } from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
+import { TourJobRateQuote } from '@/types/tourRates';
 import { appendAutonomoLabel } from '@/utils/autonomo';
-import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
-import { labelForJobExtraType } from '@/types/jobExtras';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import {
   CORPORATE_RED,
-  TEXT_PRIMARY,
-  TEXT_MUTED,
   SUMMARY_BACKGROUND,
-  CORPORATE_FOOTER_RESERVED,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
   buildPdfFilename,
   corporateTableDefaults,
   drawCorporateFooter,
   drawCorporateHeader,
   resolveHeaderLogo,
-  type CorporateHeaderOptions,
+  type CorporateHeaderOptions
 } from '@/utils/pdf/shared/pdfExportShared';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
+import type {
+  JobDetails,
+  TechnicianProfile,
+  TimesheetLine
+} from "@/utils/pdf/ratesPdfSupport";
 import {
-  DEDUCTION_DISCLAIMER_TEXT,
-  EVENTO_DISCLAIMER_TEXT,
-  FIXED_TRAVEL_RATE_DISCLAIMER_TEXT,
-  NON_AUTONOMO_DEDUCTION_EUR,
   PREP_DAY_DISCLAIMER_TEXT,
   TOUR_DEDUCTION_DISCLAIMER_TEXT,
   computeEffectiveBase,
@@ -39,14 +36,7 @@ import {
   getTechNameFactory,
   normalizeVehicleDisclaimerText,
   resolveEffectiveTotal,
-  withLpo,
-} from "@/utils/pdf/ratesPdfSupport";
-import type {
-  JobDetails,
-  PayoutData,
-  TechnicianProfile,
-  TimesheetLine,
-  TourSummaryJob,
+  withLpo
 } from "@/utils/pdf/ratesPdfSupport";
 
 export async function generateRateQuotePDF(

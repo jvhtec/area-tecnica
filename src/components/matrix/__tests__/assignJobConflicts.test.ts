@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability'
-import { checkAssignmentConflicts } from '@/components/matrix/assignJobConflicts'
+import { checkAssignmentConflicts } from '@/components/matrix/assignJobConflicts';
+import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/utils/technicianAvailability', () => ({
   checkTimeConflictEnhanced: vi.fn(),

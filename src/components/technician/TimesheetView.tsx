@@ -1,30 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
-import {
-  Loader2,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Save,
-  ChevronLeft,
-  Calendar as CalendarIcon,
-  MapPin,
-  Play,
-  Coffee,
-  PenTool,
-  Euro,
-  X,
-  Check,
-  AlertCircle,
-  Moon,
-  RefreshCw,
-} from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -32,19 +10,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useTimesheets } from '@/hooks/useTimesheets';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { Textarea } from '@/components/ui/textarea';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
+import { useTimesheets } from '@/hooks/useTimesheets';
 import { formatCurrency } from '@/lib/utils';
+import { Timesheet, TimesheetFormData } from '@/types/timesheet';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { isTechnicianRole } from '@/utils/permissions';
 import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from '@/utils/timesheetPrepDays';
-import { Timesheet, TimesheetFormData } from '@/types/timesheet';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Calendar as CalendarIcon,
+  CheckCircle2,
+  ChevronLeft,
+  Clock,
+  Euro,
+  Loader2,
+  MapPin,
+  Moon,
+  PenTool,
+  RefreshCw,
+  Save
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import { Theme } from './types';
+import { toast } from 'sonner';
 import {
   calculateHours,
   getStatusBadge,
@@ -54,7 +48,6 @@ import {
 
 import { TechnicianTimesheetPrompts } from "./TechnicianTimesheetPrompts";
 export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }: TechnicianTimesheetViewProps) => {
-  const { user } = useOptimizedAuth();
   const {
     timesheets,
     isLoading,

@@ -1,26 +1,10 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, getDaysInMonth, subDays } from "date-fns";
-import { es } from "date-fns/locale";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
-import { AlertTriangle, CalendarDays, FileDown, Loader2, Wallet } from "lucide-react";
+import { es } from "date-fns/locale";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { createQueryKey } from "@/lib/optimized-react-query";
-import { canManagePayouts } from "@/utils/permissions";
-import { PayoutDueResponsiveList } from "@/components/payouts/PayoutDueMobileList";
 
 
-import { queryKeys } from "@/lib/react-query";
 
 export const MADRID_TIMEZONE = "Europe/Madrid";
 export const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;

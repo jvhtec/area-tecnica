@@ -1,29 +1,25 @@
 
-import React from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X, Medal, ChevronDown, ChevronUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { useQueryClient } from '@tanstack/react-query';
-import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast';
-import { formatUserName } from '@/utils/userName';
-import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
-import { isAdminRole, isManagementRole } from '@/utils/permissions';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import type { UserRole } from '@/types/user';
+import { isAdminRole, isManagementRole } from '@/utils/permissions';
 import { getCalendarPeriodDateKeys } from '@/utils/timezoneUtils';
+import { formatUserName } from '@/utils/userName';
+import { useQueryClient } from '@tanstack/react-query';
 import { subYears } from 'date-fns';
+import { Building, ChevronDown, ChevronUp, Edit, IdCard, Mail, MapPin, Medal, Phone, Plus, Refrigerator, User } from 'lucide-react';
+import React from 'react';
 
 
-import { queryKeys } from "@/lib/react-query";
 import { TechnicianRowEditForm, type TechnicianEditData } from "@/components/matrix/TechnicianRowEditForm";
+import { queryKeys } from "@/lib/react-query";
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Error desconocido";

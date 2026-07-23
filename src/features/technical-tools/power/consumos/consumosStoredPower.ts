@@ -1,9 +1,9 @@
 import type {
-  PowerTableRow,
-} from "@/features/technical-tools/power/types";
-import type {
   StoredPowerSnapshot,
 } from "@/features/technical-tools/power/powerTableHydration";
+import type {
+  PowerTableRow,
+} from "@/features/technical-tools/power/types";
 
 type JsonRecord = Record<string, unknown>;
 

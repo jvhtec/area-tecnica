@@ -1,102 +1,45 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { useJobSelection } from "@/hooks/useJobSelection";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { useTourDefaultSets, type TourDefaultTable } from "@/hooks/useTourDefaultSets";
-import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
-import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
-import { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
-import type { TourPackageSize } from "@/utils/tourPackages";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { optimizedInvalidation, queryKeys } from "@/lib/react-query";
-import { exportToPDF } from "@/utils/pdfExport";
-import { syncTourDefaultDocuments, toastTourDefaultDocumentNoUpdate } from "@/utils/tourDefaultDocumentSync";
 import {
-  CUSTOM_POWER_POSITION_VALUE,
-  NO_POWER_POSITION_VALUE,
-} from "@/utils/powerPositions";
+  type ConsumosJob
+} from "@/features/technical-tools/power/consumos/consumosUtils";
 import type {
-  PhaseMode,
-  PowerElectricalSettings,
-  PowerTable,
-  PowerTableRow,
+  PowerTable
 } from "@/features/technical-tools/power/types";
 import {
-  calculateMixedLoadApparentPower,
-  createCalculatedPowerTable,
-  getPowerPduOptions,
-  getVoltageForPhase,
-  PowerCalculationValidationError,
-} from "@/features/technical-tools/power/powerCalculations";
-import { parsePowerCalculationSnapshot } from "@/features/technical-tools/power/powerSnapshots";
-import {
-  hydratePowerTable,
-  mergeStoredPowerSnapshot,
-  type ReadOnlyPowerDefault,
-} from "@/features/technical-tools/power/powerTableHydration";
-import { aggregatePowerCalculations } from "@/features/technical-tools/power/powerAggregation";
-import {
-  buildPowerOverridePayload,
-  buildPowerTableData,
-  buildPowerTableMetadata,
-  buildTourPowerDefaultTable,
-  saveJobPowerRequirementTablesGeneration,
-  uploadPowerReportAndCompleteTask,
-} from "@/features/technical-tools/power/powerPersistence";
-import {
-  appendTechnicalStageToFilename,
-  formatTechnicalStageLabel,
-  isSameTechnicalStage,
-  useSelectedTechnicalStage,
+  useSelectedTechnicalStage
 } from "@/features/technical-tools/stage/stageAllocation";
+import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
 import {
-  DEFAULT_FIXTURE_TYPE,
-  FIXTURE_PF,
-  type ConsumosDepartmentConfig,
-  type FixtureType,
-} from "./config";
-import {
-  jobPowerRequirementTablesQueryKey,
-  mapPowerRequirementRowToTable,
-  useJobPowerRequirementTables,
-} from "./useJobPowerRequirementTables";
-import {
-  cloneTableToStage,
   cloneTablesToStage,
+  cloneTableToStage,
   toPresetSnapshot,
 } from "@/features/technical-tools/table-presets/stageCopy";
 import {
   useQuickPresets,
   type QuickPreset,
 } from "@/features/technical-tools/table-presets/useQuickPresets";
-import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
+import { useToast } from "@/hooks/use-toast";
+import { useJobSelection } from "@/hooks/useJobSelection";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
+import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
+import { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
+import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
+import { optimizedInvalidation, queryKeys } from "@/lib/react-query";
+import { dataLayerClient } from "@/services/dataLayerClient";
+import { syncTourDefaultDocuments, toastTourDefaultDocumentNoUpdate } from "@/utils/tourDefaultDocumentSync";
+import type { TourPackageSize } from "@/utils/tourPackages";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  type CustomPowerComponentInput,
-  useCustomPowerComponents,
-} from "./useCustomPowerComponents";
-import { useConsumosComponents } from "./useConsumosComponents";
+  type ConsumosDepartmentConfig,
+} from "./config";
 import { useConsumosBuilder } from "./useConsumosBuilder";
+import { useConsumosComponents } from "./useConsumosComponents";
 import { useConsumosTourData } from "./useConsumosTourData";
 import {
-  downloadPdfBlob,
-  type ConsumosJob,
-} from "@/features/technical-tools/power/consumos/consumosUtils";
-
-const DEFAULT_PDU_SELECT_VALUE = "default";
-const CUSTOM_PDU_SELECT_VALUE = "Custom";
-
-type EditingTarget = { kind: "table"; id: number | string }
-  | { kind: "default"; id: string }
-  | { kind: "override"; id: string };
-
-const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "unknown error";
-
-const getRecommendedFixturePf = (fixtureType?: string) =>
-  FIXTURE_PF[(fixtureType as FixtureType) || DEFAULT_FIXTURE_TYPE]?.pf ??
-  FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf;
+  useCustomPowerComponents
+} from "./useCustomPowerComponents";
 
 export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const navigate = useNavigate();
@@ -499,8 +442,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     fohSchukoRequired,
     fohSchukoSetting,
     getTableSnapshotSettings,
-    isCreatingDefaultSet,
-    isNormalMode,
+      isNormalMode,
     isOverrideMode,
     isTourDefaults,
     isUrlOverrideMode,

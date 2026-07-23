@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
 import {
   sourceLabel,
   syncStatusLabel,
-} from '@/features/tour-ops/tourOpsManagementUtils'
+} from '@/features/tour-ops/tourOpsManagementUtils';
+import { describe, expect, it } from 'vitest';
 
 describe('tour ops management labels', () => {
   it('renders persisted source labels in Spanish', () => {

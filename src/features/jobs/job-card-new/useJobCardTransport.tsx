@@ -1,10 +1,10 @@
-import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
 
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 import { queryKeys } from "@/lib/react-query";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Department } from "@/types/department";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 import type {
   JobCardTransportDependencies,

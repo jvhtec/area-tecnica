@@ -1,6 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import type {
+  JobCardJob,
+  SelectedTransportRequest,
+} from "@/features/jobs/job-card-new/jobCardNewTypes";
+import { useJobCardFolderActions } from "@/features/jobs/job-card-new/useJobCardFolderActions";
+import { useJobCardTransport } from "@/features/jobs/job-card-new/useJobCardTransport";
+import { useToast } from "@/hooks/use-toast";
+import { useDeletionState } from '@/hooks/useDeletionState';
+import { useFolderExistence } from "@/hooks/useFolderExistence";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
+import { dataLayerClient } from "@/services/dataLayerClient";
+import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
 import { Department } from "@/types/department";
+import { CreateFoldersOptions } from "@/utils/flex-folders";
+import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
+import { isFestivalLikeJobType } from "@/utils/jobType";
+import {
+  isAdminRole,
+  isDepartmentManagementRole,
+  isManagementRole,
+} from "@/utils/permissions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from "react-router-dom";
+import type { JobDocument } from './JobCardDocuments';
+import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
+import { JobCardNewView } from "./job-card-new/JobCardNewView";
 
 // File System Access API types
 declare global {
@@ -8,33 +35,6 @@ declare global {
     showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
   }
 }
-import { useNavigate } from "react-router-dom";
-import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
-import { useDeletionState } from '@/hooks/useDeletionState';
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
-import { dataLayerClient } from "@/services/dataLayerClient";
-import type { JobDocument } from './JobCardDocuments';
-import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
-import { JobCardNewView } from "./job-card-new/JobCardNewView";
-import type {
-  JobCardJob,
-  SelectedTransportRequest,
-} from "@/features/jobs/job-card-new/jobCardNewTypes";
-import { useJobCardFolderActions } from "@/features/jobs/job-card-new/useJobCardFolderActions";
-import { useJobCardTransport } from "@/features/jobs/job-card-new/useJobCardTransport";
-import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
-import { useToast } from "@/hooks/use-toast";
-import { useConfirm } from "@/components/ui/confirm-dialog";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreateFoldersOptions } from "@/utils/flex-folders";
-import { isFestivalLikeJobType } from "@/utils/jobType";
-import {
-  isAdminRole,
-  isDepartmentManagementRole,
-  isManagementRole,
-} from "@/utils/permissions";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -95,12 +95,9 @@ function JobCardNewFull({
   onEditClick,
   onDeleteClick,
   onJobClick,
-  showAssignments = false,
   department = "sound",
   userRole,
-  onDeleteDocument,
   showUpload = false,
-  showManageArtists = false,
   isProjectManagementPage = false,
   hideTasks = false,
   openHojaDeRuta = false,

@@ -1,4 +1,3 @@
-import type { Json } from '@/integrations/supabase/types'
 import {
   PROFILE_OPTIONS,
   type JobProfileName,
@@ -6,7 +5,8 @@ import {
   type SoftConflictPolicy,
   type StaffingChannel,
   type WaveMode,
-} from '@/features/staffing/crewingProfiles'
+} from '@/features/staffing/crewingProfiles';
+import type { Json } from '@/integrations/supabase/types';
 
 interface StoredRoleProfile {
   selected_profile?: JobProfileName

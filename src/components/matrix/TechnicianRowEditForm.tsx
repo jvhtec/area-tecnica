@@ -1,10 +1,10 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
 import { Save, X } from 'lucide-react';
+import type { Dispatch, SetStateAction } from 'react';
 
 export interface TechnicianEditData {
   first_name: string;

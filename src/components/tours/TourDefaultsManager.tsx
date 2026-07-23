@@ -1,20 +1,17 @@
 
-import React, { useState } from 'react';
-import { useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/react-query";
-import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/ui/responsive-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTourDefaultsPdfExports } from "@/features/tour-ops/useTourDefaultsPdfExports";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, AlertTriangle, UploadCloud } from "lucide-react";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { useTourDefaultSets, type TourDefaultTable } from "@/hooks/useTourDefaultSets";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
-import { useTourDefaultSets, type TourDefaultTable } from "@/hooks/useTourDefaultSets";
+import { queryKeys } from "@/lib/react-query";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { getTourDefaultDocumentNoUpdateToast, syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 import {
   DEPARTMENT_PACKAGE_LABELS,
@@ -27,6 +24,9 @@ import {
   type PackageDepartment,
   type TourPackageSize,
 } from "@/utils/tourPackages";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Calendar, UploadCloud } from "lucide-react";
+import React, { useState } from 'react';
 import { TourDepartmentDefaults } from "./TourDepartmentDefaults";
 import {
   getTourDateLocationName,
@@ -37,7 +37,6 @@ import {
   type TourDateWithLocation,
   type TourDefaultsTour,
 } from "./tourDefaultsManagerSupport";
-import { useTourDefaultsPdfExports } from "@/features/tour-ops/useTourDefaultsPdfExports";
 
 interface TourDefaultsManagerProps {
   open: boolean;

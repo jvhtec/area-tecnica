@@ -1,15 +1,15 @@
-import type { Dispatch, SetStateAction } from "react";
-import type {
-  JobProfileName,
-  ProfileDefaults,
-  RoleProfilePolicy,
-} from "@/features/staffing/crewingProfiles";
 import type {
   Campaign,
   CampaignRole,
   JobMeta,
   StaffingCampaignFormData,
 } from "@/components/matrix/StaffingCampaignPanel";
+import type {
+  JobProfileName,
+  ProfileDefaults,
+  RoleProfilePolicy,
+} from "@/features/staffing/crewingProfiles";
+import type { Dispatch, SetStateAction } from "react";
 
 type MutationControl = {
   mutate: () => void;

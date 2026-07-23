@@ -81,25 +81,25 @@ job, tour, and rider documents). These paths have focused regression coverage.
 
 ## Completed in the final batch
 
-- [x] `src/features/tour-ops/TourOpsManagementHub.tsx` — 2,116 → 695 LOC.
+- [x] `src/features/tour-ops/TourOpsManagementHub.tsx` — 2,116 → 666 LOC.
   Date overview, management panels, editor dialogs, and view helpers now have
   focused modules under `src/features/tour-ops/`.
 - [x] `src/features/tour-ops/tourSchedulingService.ts` — 1,885 → 25 LOC.
   The compatibility entrypoint delegates to typed scheduling models,
   normalizers, queries, mutations, and guest-link operations.
 - [x] `src/features/technical-tools/power/consumos/useConsumosTool.ts` — 1,820
-  → 758 LOC. Builder state, tour/default loading, and stored-power
+  → 706 LOC. Builder state, tour/default loading, and stored-power
   normalization are separate, typed hooks/helpers.
-- [x] `src/components/tours/TourDefaultsManager.tsx` — 1,706 → 598 LOC.
+- [x] `src/components/tours/TourDefaultsManager.tsx` — 1,706 → 597 LOC.
   Department tables, PDF export orchestration, and normalization helpers are
   split from manager state; the data-owning PDF hook lives in
   `src/features/tour-ops/`.
-- [x] `src/components/jobs/cards/JobCardNew.tsx` — 1,438 → 686 LOC. The view,
+- [x] `src/components/jobs/cards/JobCardNew.tsx` — 1,438 → 683 LOC. The view,
   transport behavior, folder actions, and shared job-card contract are
   separated; data-owning hooks/contracts live under
   `src/features/jobs/job-card-new/`, and the details-only path uses the same
   typed contract.
-- [x] `src/components/matrix/StaffingCampaignPanel.tsx` — 1,299 → 655 LOC.
+- [x] `src/components/matrix/StaffingCampaignPanel.tsx` — 1,299 → 646 LOC.
   Campaign rendering and its view contract are separated from campaign
   orchestration. Persisted policy normalization now lives in a fully typed
   feature helper that preserves the snake_case rate-penalty contract consumed
@@ -108,17 +108,17 @@ job, tour, and rider documents). These paths have focused regression coverage.
 - [x] `src/utils/rates-pdf-export.ts` — 1,244 → 4 LOC. The stable entrypoint
   re-exports dedicated quote, tour-summary, and job-payout generators plus
   shared typed PDF support.
-- [x] `src/components/matrix/AssignJobDialog.tsx` — 1,238 → 776 LOC. The dialog
+- [x] `src/components/matrix/AssignJobDialog.tsx` — 1,238 → 774 LOC. The dialog
   view, domain contract, and conflict adapter are explicit modules. The typed
   existing-assignment query now fetches the `response_time` value that its
   confirmed-status preservation path already consumes.
-- [x] `src/components/timesheet/TimesheetView.tsx` — 1,122 → 800 LOC.
+- [x] `src/components/timesheet/TimesheetView.tsx` — 1,122 → 798 LOC.
   Query/mutation/form orchestration is owned by a typed view-model hook.
-- [x] `src/pages/PayoutsDueFortnights.tsx` — 1,112 → 597 LOC. Payout query
+- [x] `src/pages/PayoutsDueFortnights.tsx` — 1,112 → 596 LOC. Payout query
   normalization and grouping live in `src/features/rates/payoutsDueData.ts`.
-- [x] `src/components/technician/TimesheetView.tsx` — 980 → 791 LOC. Prompt
+- [x] `src/components/technician/TimesheetView.tsx` — 980 → 783 LOC. Prompt
   dialogs and their timesheet contract are extracted from the main view.
-- [x] `src/components/matrix/TechnicianRow.tsx` — 925 → 775 LOC. Inline editing
+- [x] `src/components/matrix/TechnicianRow.tsx` — 925 → 771 LOC. Inline editing
   now lives in a dedicated, typed edit form.
 
 Focused coverage protects stored Consumos snapshots, job-card folder
@@ -136,6 +136,14 @@ removed, guest-link expiry and assignment keys use Madrid semantics, extracted
 UI copy is Spanish, assignment view types come from their source modules, and
 the rates summary PDF uses the shared multiplier-display helper.
 
+The deliberate high-risk second read then found and fixed one extraction
+regression: Tour Ops comparison normalization had stopped trimming surrounding
+whitespace, which could produce false sync mismatches or duplicate normalized
+travel/accommodation rows. A fail-then-pass regression test now protects that
+behavior. The same pass removed copied import debris from the extracted
+modules, reducing changed-file TypeScript no-unused diagnostics from 404 to
+zero without changing the public entrypoints.
+
 ## Ratchets after completion
 
 - File size: `43 → 0` authored modules above 800 lines; the baseline is empty.
@@ -146,6 +154,8 @@ the rates summary PDF uses the shared multiplier-display helper.
 - Explicit `any`: zero in the refactored modules and their new typed seams.
   Supabase JSON, policy metadata, and jsPDF AutoTable inputs are narrowed at
   their boundaries instead of leaking untyped values through UI code.
+- Changed-file unused declarations/imports: `404 → 0` during the deliberate
+  second-read cleanup.
 - Source boundaries: extracted UI views do not introduce direct
   `dataLayerClient` ownership, and scheduling displays use the existing
   Madrid-aware formatting helper instead of constructing dates inline. The
@@ -177,6 +187,8 @@ The final batch passed:
 - Complete review selection — 8 files / 23 tests, including Madrid conflict
   dates, translated status labels, assignment flow, Flex folder parsing, and
   rates PDFs.
+- Deliberate second-read selection — 12 files / 46 tests, including the Tour
+  Ops whitespace negative control and all high-risk moved paths.
 - `npm run test:critical`, including assignment cascade, staffing
   orchestration, Flex deletion/creation, and timesheet critical paths.
 - `npm run test:run`.
@@ -185,7 +197,7 @@ The final batch passed:
   mobile-screenshot cases were skipped by their configured guard.
 - `npm run build`.
 - `npm run budget:bundle` — all budgets pass; total JS gzip is 3.06 MB
-  (`+48.8 kB`, below the 3.32 MB relative ceiling), and the largest entry
+  (`+49.4 kB`, below the 3.32 MB relative ceiling), and the largest entry
   script is 107.7 kB gzip.
 - `git diff --check`.
 
@@ -195,3 +207,7 @@ staffing orchestrator, Flex creation still delegates to
 `createAllFoldersForJob`, and the two timesheet views still delegate writes and
 server-owned payout calculation to the existing hooks/services. No Edge
 Function, migration, RLS, or database authorization surface changed.
+
+The next type-debt campaign should also replace the two pre-existing `any[]`
+query-key annotations in `tests/assignments/critical-paths.test.ts`. They are
+test-mock debt; the refactored production modules remain explicit-`any` free.

@@ -1,12 +1,12 @@
-import { es } from "date-fns/locale";
-import { formatInTimeZone } from "date-fns-tz";
-import type jsPDF from "jspdf";
-import type { HookData, UserOptions } from "jspdf-autotable";
-import { loadPdfLibs, type AutoTableFn } from "@/utils/pdf/lazyPdf";
+import type { TourOpsDate, TourOpsModel, TourOpsProjection } from "@/features/tour-ops/types";
 import { buildReadableFilename } from "@/utils/fileName";
+import { loadPdfLibs, type AutoTableFn } from "@/utils/pdf/lazyPdf";
 import { fetchTourLogo, getCompanyLogo } from "@/utils/pdf/logoUtils";
 import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
-import type { TourOpsDate, TourOpsModel, TourOpsProjection } from "@/features/tour-ops/types";
+import { formatInTimeZone } from "date-fns-tz";
+import { es } from "date-fns/locale";
+import type jsPDF from "jspdf";
+import type { HookData, UserOptions } from "jspdf-autotable";
 
 const RED: [number, number, number] = [125, 1, 1];
 const INK: [number, number, number] = [32, 36, 42];

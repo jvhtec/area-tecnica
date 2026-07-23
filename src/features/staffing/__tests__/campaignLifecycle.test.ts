@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
 import {
   canResumeStaffingCampaign,
-  staffingCampaignRoleStageLabel,
   staffingCampaignResumeLabel,
   staffingCampaignResumeToastTitle,
+  staffingCampaignRoleStageLabel,
   staffingCampaignStatusLabel,
-} from '../campaignLifecycle'
+} from '../campaignLifecycle';
 
 describe('staffing campaign lifecycle helpers', () => {
   it('treats completed campaigns as restartable', () => {

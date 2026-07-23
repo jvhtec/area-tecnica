@@ -1,9 +1,9 @@
-import { useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { queryKeys } from "@/lib/react-query";
 import type { TechnicalDepartment } from "@/features/technical-tools/power/types";
+import { queryKeys } from "@/lib/react-query";
+import { dataLayerClient } from "@/services/dataLayerClient";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import type { ConsumosComponent, ConsumosDepartmentConfig, FixtureType } from "./config";
 import type { CustomPowerComponentInput } from "./useCustomPowerComponents";
 

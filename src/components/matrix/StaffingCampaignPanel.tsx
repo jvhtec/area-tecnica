@@ -1,39 +1,31 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { dataLayerClient } from '@/services/dataLayerClient';
-import { useToast } from '@/hooks/use-toast'
-import { format } from 'date-fns'
 import {
-  JOB_PROFILE_LABELS,
-  PROFILE_DEFAULTS,
-  RatePenaltyStrength,
-  SoftConflictPolicy,
-  StaffingChannel,
-  WaveMode,
+  CARLOS_AGENT_NAME
+} from '@/features/staffing/carlos';
+import {
   buildCampaignPolicy,
   buildRoleProfiles,
   inferJobProfile,
   JobProfileName,
-} from '@/features/staffing/crewingProfiles'
-import {
-  CARLOS_AGENT_NAME,
-  CARLOS_AUTO_MODE_LABEL,
-} from '@/features/staffing/carlos'
-import { canResumeStaffingCampaign, staffingCampaignResumeLabel } from '@/features/staffing/campaignLifecycle'
+  PROFILE_DEFAULTS,
+  RatePenaltyStrength,
+  SoftConflictPolicy,
+  StaffingChannel,
+  WaveMode
+} from '@/features/staffing/crewingProfiles';
 import {
   normalizeStoredCampaignPolicy,
   type StoredCampaignPolicy,
-} from '@/features/staffing/storedCampaignPolicy'
+} from '@/features/staffing/storedCampaignPolicy';
+import { useToast } from '@/hooks/use-toast';
+import { dataLayerClient } from '@/services/dataLayerClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState } from 'react';
 
+import { StaffingCampaignView } from "@/components/matrix/StaffingCampaignView";
 import { queryKeys } from "@/lib/react-query";
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Error desconocido'
-import { StaffingCampaignView } from "@/components/matrix/StaffingCampaignView";
 
 interface StaffingCampaignPanelProps {
   jobId: string
@@ -111,13 +103,12 @@ export interface StaffingCampaignFormData {
   autoSendNextWave: boolean
 }
 
-export type { Campaign, CampaignRole, JobMeta }
+export type { Campaign, CampaignRole, JobMeta };
 
 export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
   jobId,
   department,
-  jobTitle,
-  onClose
+  jobTitle
 }) => {
   const { toast } = useToast()
   const queryClient = useQueryClient()

@@ -1,24 +1,18 @@
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { TourJobRateQuote } from '@/types/tourRates';
 import {
   formatMultiplier,
-  getPerJobMultiplier,
-  shouldDisplayMultiplier,
+  shouldDisplayMultiplier
 } from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { appendAutonomoLabel } from '@/utils/autonomo';
+import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
-import { labelForJobExtraType } from '@/types/jobExtras';
-import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import {
-  CORPORATE_RED,
-  TEXT_PRIMARY,
-  TEXT_MUTED,
-  SUMMARY_BACKGROUND,
   CORPORATE_FOOTER_RESERVED,
+  CORPORATE_RED,
+  SUMMARY_BACKGROUND,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
   buildPdfFilename,
   corporateTableDefaults,
   drawCorporateFooter,
@@ -26,28 +20,20 @@ import {
   resolveHeaderLogo,
   type CorporateHeaderOptions,
 } from '@/utils/pdf/shared/pdfExportShared';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
+import type {
+  TechnicianNameInfo,
+  TechnicianProfile,
+  TourSummaryJob
+} from "@/utils/pdf/ratesPdfSupport";
 import {
-  DEDUCTION_DISCLAIMER_TEXT,
-  EVENTO_DISCLAIMER_TEXT,
-  FIXED_TRAVEL_RATE_DISCLAIMER_TEXT,
-  NON_AUTONOMO_DEDUCTION_EUR,
-  PREP_DAY_DISCLAIMER_TEXT,
-  TOUR_DEDUCTION_DISCLAIMER_TEXT,
   computeEffectiveBase,
   formatJobDate,
   getTechNameFactory,
-  normalizeVehicleDisclaimerText,
   resolveEffectiveTotal,
-  withLpo,
-} from "@/utils/pdf/ratesPdfSupport";
-import type {
-  JobDetails,
-  PayoutData,
-  TechnicianProfile,
-  TechnicianNameInfo,
-  TimesheetLine,
-  TourSummaryJob,
+  withLpo
 } from "@/utils/pdf/ratesPdfSupport";
 
 export async function generateTourRatesSummaryPDF(
@@ -178,7 +164,7 @@ export async function generateTourRatesSummaryPDF(
   let breakdownY = headerOffset + 8;
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  sortedJobs.forEach((item, index) => {
+  sortedJobs.forEach((item) => {
     if (!item.quotes.length) return;
 
     if (breakdownY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {

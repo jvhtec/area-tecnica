@@ -1,45 +1,44 @@
-import { useCallback, useMemo, useRef } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import type { Dispatch, SetStateAction } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
-import type { useToast } from "@/hooks/use-toast";
-import type { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
-import type { useTourDefaultSets, TourDefaultSet, TourDefaultTable } from "@/hooks/useTourDefaultSets";
-import type { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
-import type { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { exportToPDF } from "@/utils/pdfExport";
 import { aggregatePowerCalculations } from "@/features/technical-tools/power/powerAggregation";
-import {
-  hydratePowerTable,
-  mergeStoredPowerSnapshot,
-  type ReadOnlyPowerDefault,
-} from "@/features/technical-tools/power/powerTableHydration";
 import {
   buildTourPowerDefaultTable,
   saveJobPowerRequirementTablesGeneration,
   uploadPowerReportAndCompleteTask,
 } from "@/features/technical-tools/power/powerPersistence";
 import {
+  hydratePowerTable,
+  mergeStoredPowerSnapshot,
+  type ReadOnlyPowerDefault,
+} from "@/features/technical-tools/power/powerTableHydration";
+import type { PhaseMode, PowerTable, PowerTableRow } from "@/features/technical-tools/power/types";
+import {
   appendTechnicalStageToFilename,
   formatTechnicalStageLabel,
 } from "@/features/technical-tools/stage/stageAllocation";
 import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
-import type { PhaseMode, PowerTable, PowerTableRow } from "@/features/technical-tools/power/types";
+import type { useToast } from "@/hooks/use-toast";
+import type { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
+import type { TourDefaultSet, TourDefaultTable, useTourDefaultSets } from "@/hooks/useTourDefaultSets";
+import type { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
+import type { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
+import { dataLayerClient } from "@/services/dataLayerClient";
+import { exportToPDF } from "@/utils/pdfExport";
 import type { TourPackageSize } from "@/utils/tourPackages";
-import { queryKeys } from "@/lib/react-query";
-import {
-  downloadPdfBlob,
-  type ConsumosJob,
-} from "./consumosUtils";
 import type { ConsumosDepartmentConfig } from "./config";
-import { jobPowerRequirementTablesQueryKey } from "./useJobPowerRequirementTables";
 import {
   getBooleanField,
   getPowerTableRows,
   getStringField,
   toStoredPowerFields,
 } from "./consumosStoredPower";
+import {
+  downloadPdfBlob,
+  type ConsumosJob,
+} from "./consumosUtils";
+import { jobPowerRequirementTablesQueryKey } from "./useJobPowerRequirementTables";
 
 type EditingTarget =
   | { kind: "table"; id: number | string }
@@ -74,7 +73,6 @@ interface UseConsumosTourDataOptions {
   getTableSnapshotSettings: (
     table: PowerTable,
   ) => import("@/features/technical-tools/power/types").PowerElectricalSettings;
-  isCreatingDefaultSet: boolean;
   isNormalMode: boolean;
   isOverrideMode: boolean;
   isTourDefaults: boolean;
@@ -129,7 +127,6 @@ export function useConsumosTourData({
   fohSchukoRequired,
   fohSchukoSetting,
   getTableSnapshotSettings,
-  isCreatingDefaultSet,
   isNormalMode,
   isOverrideMode,
   isTourDefaults,

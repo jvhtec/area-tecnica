@@ -1,29 +1,9 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import type { AssignmentConflictWarning } from "@/components/matrix/assignJobConflicts";
+import type {
+  AssignableJob,
+  CoverageMode,
+  ExistingAssignment,
+} from "@/components/matrix/assignJobDialogTypes";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,18 +14,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
-import { format } from 'date-fns';
-import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
-import { formatInJobTimezone } from '@/utils/timezoneUtils';
-import type { Dispatch, SetStateAction } from "react";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import type { Database } from "@/integrations/supabase/types";
-import type {
-  AssignableJob,
-  CoverageMode,
-  ExistingAssignment,
-} from "@/components/matrix/assignJobDialogTypes";
-import type { AssignmentConflictWarning } from "@/components/matrix/assignJobConflicts";
+import { labelForCode, roleOptionsForDiscipline } from '@/utils/roles';
+import { formatInJobTimezone } from '@/utils/timezoneUtils';
+import { format } from 'date-fns';
+import { CalendarDays, Calendar as CalendarIcon, CalendarRange, Clock, Loader2 } from 'lucide-react';
+import type { Dispatch, SetStateAction } from "react";
 
 type TechnicianSummary = Pick<Database["public"]["Tables"]["profiles"]["Row"], "first_name" | "last_name" | "department">;
 

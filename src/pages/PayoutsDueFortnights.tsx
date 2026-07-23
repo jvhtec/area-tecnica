@@ -1,26 +1,24 @@
-import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addDays, getDaysInMonth, subDays } from "date-fns";
-import { es } from "date-fns/locale";
-import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { addDays } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { AlertTriangle, CalendarDays, FileDown, Loader2, Wallet } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PayoutDueResponsiveList } from "@/components/payouts/PayoutDueMobileList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import { createQueryKey } from "@/lib/optimized-react-query";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { canManagePayouts } from "@/utils/permissions";
-import { PayoutDueResponsiveList } from "@/components/payouts/PayoutDueMobileList";
 
 
-import { queryKeys } from "@/lib/react-query";
 import {
   LOOKAHEAD_DAYS,
   MADRID_TIMEZONE,
@@ -28,9 +26,9 @@ import {
   fetchFortnightPayoutsDue,
   formatAutonomoCellValue,
   formatCurrency,
+  formatDateInputValue,
   formatEstimateText,
   formatLongDate,
-  formatDateInputValue,
   formatPaymentWindowDate,
   getSuggestedPaymentWindow,
   isInvoiceApplicable,
@@ -40,6 +38,7 @@ import {
   type SortColumn,
   type SortDirection,
 } from "@/features/rates/payoutsDueData";
+import { queryKeys } from "@/lib/react-query";
 
 export default function PayoutsDueFortnights() {
   const { toast } = useToast();

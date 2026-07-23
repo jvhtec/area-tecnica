@@ -1,29 +1,29 @@
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  JOB_PROFILE_LABELS,
-  PROFILE_OPTIONS,
-  RatePenaltyStrength,
-  SoftConflictPolicy,
-  StaffingChannel,
-  WaveMode,
-  JobProfileName,
-} from '@/features/staffing/crewingProfiles'
-import {
-  CARLOS_AGENT_NAME,
-  CARLOS_AUTO_MODE_LABEL,
-} from '@/features/staffing/carlos'
+import type { StaffingCampaignViewProps } from "@/components/matrix/staffingCampaignViewTypes";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   canResumeStaffingCampaign,
   staffingCampaignResumeLabel,
   staffingCampaignRoleStageLabel,
   staffingCampaignStatusLabel,
-} from '@/features/staffing/campaignLifecycle'
-import { formatInJobTimezone } from '@/utils/timezoneUtils'
-import { getDepartmentLabel } from '@/types/department'
-import type { StaffingCampaignViewProps } from "@/components/matrix/staffingCampaignViewTypes";
+} from '@/features/staffing/campaignLifecycle';
+import {
+  CARLOS_AGENT_NAME,
+  CARLOS_AUTO_MODE_LABEL,
+} from '@/features/staffing/carlos';
+import {
+  JOB_PROFILE_LABELS,
+  JobProfileName,
+  PROFILE_OPTIONS,
+  RatePenaltyStrength,
+  SoftConflictPolicy,
+  StaffingChannel,
+  WaveMode,
+} from '@/features/staffing/crewingProfiles';
+import { getDepartmentLabel } from '@/types/department';
+import { formatInJobTimezone } from '@/utils/timezoneUtils';
 
 const isSoftConflictPolicy = (value: string): value is SoftConflictPolicy =>
   ['block', 'warn', 'manager_approval', 'ignore', 'allow'].includes(value)

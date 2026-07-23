@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import type { Department } from "@/types/department";
+import type { JobCardJob as JobCardActionsJob } from "@/components/jobs/cards/job-card-actions/types";
 import type {
   JobAssignmentForCard,
   JobDateTypeForCard,
@@ -9,13 +9,12 @@ import type {
   useOptimizedJobCard,
 } from "@/hooks/useOptimizedJobCard";
 import type { Database } from "@/integrations/supabase/types";
-import type { CreateFoldersOptions } from "@/utils/flex-folders";
-import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
+import type { Department } from "@/types/department";
 import type { TourDateLike } from "@/utils/assignmentWorkDates";
 import type { CalendarArtist } from "@/utils/calendarArtists";
-import type { JobCardJob as JobCardActionsJob } from "@/components/jobs/cards/job-card-actions/types";
+import type { CreateFoldersOptions } from "@/utils/flex-folders";
+import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 
-type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 type TransportRequestRow = Database["public"]["Tables"]["transport_requests"]["Row"];
 type TransportRequestItemRow = Database["public"]["Tables"]["transport_request_items"]["Row"];
 type WhatsappGroupRow = Database["public"]["Tables"]["job_whatsapp_groups"]["Row"];

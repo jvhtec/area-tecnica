@@ -1,31 +1,9 @@
+import {
+  getPerJobMultiplier
+} from '@/lib/tourRateMath';
+import { TourJobRateQuote } from '@/types/tourRates';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { TourJobRateQuote } from '@/types/tourRates';
-import {
-  formatMultiplier,
-  getPerJobMultiplier,
-  shouldDisplayMultiplier,
-} from '@/lib/tourRateMath';
-import { formatCurrency } from '@/lib/utils';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
-import { appendAutonomoLabel } from '@/utils/autonomo';
-import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
-import { labelForJobExtraType } from '@/types/jobExtras';
-import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
-import {
-  CORPORATE_RED,
-  TEXT_PRIMARY,
-  TEXT_MUTED,
-  SUMMARY_BACKGROUND,
-  CORPORATE_FOOTER_RESERVED,
-  buildPdfFilename,
-  corporateTableDefaults,
-  drawCorporateFooter,
-  drawCorporateHeader,
-  resolveHeaderLogo,
-  type CorporateHeaderOptions,
-} from '@/utils/pdf/shared/pdfExportShared';
 
 
 export const NON_AUTONOMO_DEDUCTION_EUR = 30;

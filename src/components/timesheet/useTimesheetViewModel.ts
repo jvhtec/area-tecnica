@@ -1,45 +1,17 @@
 
-import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle, Mail, Receipt } from "lucide-react";
-import { useTimesheets } from "@/hooks/useTimesheets";
-import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { Timesheet, TimesheetFormData } from "@/types/timesheet";
-import { TimesheetSignature } from "./TimesheetSignature";
-import { MyJobTotal } from "./MyJobTotal";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
-import { formatCurrency } from "@/lib/utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
+import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useTimesheets } from "@/hooks/useTimesheets";
+import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
+import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
+import { format } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
 
-import { TimesheetEditForm } from "./TimesheetEditForm";
-import { TimesheetRejectDialog } from "./TimesheetRejectDialog";
 import { useJobClosureLock } from "@/hooks/useJobClosureLock";
-import { calculateHours } from "./utils";
-import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from "@/utils/timesheetPrepDays";
+import { isPrepDayTimesheet } from "@/utils/timesheetPrepDays";
 
 
 export interface TimesheetViewProps {

@@ -1,10 +1,11 @@
 export {
-  normalizeProgramDays,
-  normalizeTourOpsLocation,
-  normalizeTravelSegment,
-} from "@/features/tour-ops/tourSchedulingNormalizers";
+  createTourGuestLink,
+  fetchTourGuestLinks,
+  revokeTourGuestLink,
+  setTourGuestLinkAccess,
+  updateTourDocumentGuestVisibility
+} from "@/features/tour-ops/tourGuestLinkService";
 export { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingModel";
-export { fetchTourOpsModel, fetchTourOpsShare } from "@/features/tour-ops/tourSchedulingQueries";
 export {
   deleteAccommodation,
   deleteTimelineEvent,
@@ -14,12 +15,11 @@ export {
   saveProgramSchedule,
   saveTimelineEvent,
   saveTravelSegment,
-  syncHojaRutaOpsData,
+  syncHojaRutaOpsData
 } from "@/features/tour-ops/tourSchedulingMutations";
 export {
-  createTourGuestLink,
-  fetchTourGuestLinks,
-  revokeTourGuestLink,
-  setTourGuestLinkAccess,
-  updateTourDocumentGuestVisibility,
-} from "@/features/tour-ops/tourGuestLinkService";
+  normalizeProgramDays,
+  normalizeTourOpsLocation,
+  normalizeTravelSegment
+} from "@/features/tour-ops/tourSchedulingNormalizers";
+export { fetchTourOpsModel, fetchTourOpsShare } from "@/features/tour-ops/tourSchedulingQueries";

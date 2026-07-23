@@ -1,28 +1,12 @@
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
-import { formatInTimeZone } from "date-fns-tz";
-import type {
-  TourGuestLink,
-  TourOpsAccommodation,
-  TourOpsAllowedSections,
-  TourOpsContact,
-  TourOpsCrewMember,
-  TourOpsDate,
-  TourOpsDocument,
-  TourOpsHealthIssue,
-  TourOpsLocation,
-  TourOpsModel,
-  TourOpsProgramDay,
-  TourOpsProjection,
-  TourOpsRoomAssignment,
-  TourOpsSyncStatus,
-  TourOpsTimelineEvent,
-  TourOpsTravelSegment,
-} from "@/features/tour-ops/types";
-import { DEFAULT_TOUR_OPS_SECTIONS } from "@/features/tour-ops/types";
+import { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingModel";
 import type { UnknownRecord } from "@/features/tour-ops/tourSchedulingNormalizers";
 import { TOUR_SELECT, asArray, isRecord, textOrNull } from "@/features/tour-ops/tourSchedulingNormalizers";
-import { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingModel";
+import type {
+  TourOpsAllowedSections,
+  TourOpsModel,
+  TourOpsProjection
+} from "@/features/tour-ops/types";
+import { dataLayerClient } from "@/services/dataLayerClient";
 
 const client = dataLayerClient;
 

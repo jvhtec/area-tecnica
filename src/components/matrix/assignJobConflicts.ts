@@ -1,9 +1,9 @@
+import type { CoverageMode } from "@/components/matrix/assignJobDialogTypes";
 import {
   checkTimeConflictEnhanced,
   type ConflictCheckResult,
 } from "@/utils/technicianAvailability";
 import { formatMadridDateKey } from "@/utils/timezoneUtils";
-import type { CoverageMode } from "@/components/matrix/assignJobDialogTypes";
 
 export interface AssignmentConflictWarning {
   result: ConflictCheckResult;

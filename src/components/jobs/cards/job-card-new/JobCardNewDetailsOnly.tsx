@@ -1,14 +1,13 @@
-import React from "react";
 import { format, isValid } from "date-fns";
 
+import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 import { cn } from "@/lib/utils";
-import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import type { Department } from "@/types/department";
 import { getCalendarArtistNamesForDate } from "@/utils/calendarArtists";
-import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 
 export interface JobCardNewDetailsOnlyProps {
   job: JobCardJob;

@@ -1,24 +1,22 @@
-import React, { useMemo, useState } from 'react';
-import { format } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
-import { toast } from 'sonner';
-import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
-import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
-import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotificationDepartments';
-import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
+import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
+import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotificationDepartments';
 import { normalizeDateKey } from '@/utils/assignmentWorkDates';
+import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
+import { codeForLabel, isRoleCode, roleOptionsForDiscipline } from '@/utils/roles';
+import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import React, { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 
-import { queryKeys } from "@/lib/react-query";
 import { AssignJobDialogView } from "@/components/matrix/AssignJobDialogView";
 import {
   checkAssignmentConflicts,
   type AssignmentConflictWarning,
 } from "@/components/matrix/assignJobConflicts";
-import { addMadridCalendarDays } from "@/utils/timezoneUtils";
 import {
   formatDateKey,
   getAssignableJobDateKeys,
@@ -26,18 +24,18 @@ import {
   getErrorMessage,
   parseDateKey,
   sortDateKeys,
-  type AssignableJob,
   type AssignJobDialogProps,
   type CoverageMode,
-  type ExistingAssignment,
-  type JobAssignmentUpdate,
+  type JobAssignmentUpdate
 } from "@/components/matrix/assignJobDialogTypes";
+import { queryKeys } from "@/lib/react-query";
+import { addMadridCalendarDays } from "@/utils/timezoneUtils";
 
 export { getAssignableJobDateKeys } from "@/components/matrix/assignJobDialogTypes";
 export type {
   AssignableJob,
   CoverageMode,
-  ExistingAssignment,
+  ExistingAssignment
 } from "@/components/matrix/assignJobDialogTypes";
 
 export const AssignJobDialog = ({

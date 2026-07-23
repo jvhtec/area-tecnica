@@ -1,17 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Clock, FileText, Plus, User, Trash2, AlertTriangle, Mail, Receipt } from "lucide-react";
-import { Timesheet } from "@/types/timesheet";
-import { TimesheetSignature } from "./TimesheetSignature";
-import { MyJobTotal } from "./MyJobTotal";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
-import { formatCurrency } from "@/lib/utils";
+import { ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,12 +11,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { formatCurrency } from "@/lib/utils";
+import { Timesheet } from "@/types/timesheet";
+import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from "@/utils/timesheetPrepDays";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
+import { AlertTriangle, CalendarDays, Clock, FileText, Mail, Receipt, Trash2, User } from "lucide-react";
+import { MyJobTotal } from "./MyJobTotal";
 import { TimesheetEditForm } from "./TimesheetEditForm";
 import { TimesheetRejectDialog } from "./TimesheetRejectDialog";
+import { TimesheetSignature } from "./TimesheetSignature";
 import { calculateHours } from "./utils";
-import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from "@/utils/timesheetPrepDays";
 
 import { useTimesheetViewModel, type TimesheetViewProps } from "./useTimesheetViewModel";
 
@@ -39,7 +38,6 @@ export const TimesheetView = (props: TimesheetViewProps) => {
     filterTechnicianId,
     user,
     userRole,
-    timesheets,
     isLoading,
     submitTimesheet,
     approveTimesheet,

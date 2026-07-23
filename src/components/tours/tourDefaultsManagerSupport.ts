@@ -1,4 +1,3 @@
-import type { Database } from "@/integrations/supabase/types";
 import type {
   TourDefaultTable,
 } from "@/hooks/useTourDefaultSets";
@@ -8,6 +7,7 @@ import type {
 import type {
   TourWeightDefault as StoredTourWeightDefault,
 } from "@/hooks/useTourWeightDefaults";
+import type { Database } from "@/integrations/supabase/types";
 import type { TourPackageSize } from "@/utils/tourPackages";
 
 const UNKNOWN_LOCATION_LABEL = "Ubicación desconocida";

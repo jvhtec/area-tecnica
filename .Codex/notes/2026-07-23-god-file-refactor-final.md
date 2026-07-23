@@ -123,13 +123,50 @@ all three summary nitpicks:
 - Staffing policy load/save preserves the server's canonical snake_case
   rate-penalty contract and remains compatible with older camelCase writes.
 
+## Deliberate high-risk second read
+
+The repository-mandated second read was performed independently after the
+review-fix batch, with money paths and critical invariants reviewed before the
+remaining extraction wiring.
+
+- Runtime-equivalence checks against `origin/main` found the payout query
+  pipeline, rate-quote PDF, and job-payout PDF logic unchanged. The tour-rate
+  summary differs only by the reviewed shared multiplier-display helper.
+- The read found one semantic regression in
+  `tourSchedulingNormalizers.ts`: the extracted comparison normalizer no
+  longer trimmed surrounding whitespace. That could make otherwise equivalent
+  travel or accommodation rows look unsynchronized and permit duplicate sync
+  writes.
+- A negative-control test first demonstrated the defect by receiving
+  `"  bcn airport  "` instead of `"bcn airport"`. Restoring `trim()` made the
+  test pass, and the assertion remains in
+  `tourSchedulingService.test.ts`.
+- Staffing lifecycle transitions still go through `staffing-orchestrator`;
+  assignment removal still prefers the established cascade service; Flex
+  folder creation still delegates to `createAllFoldersForJob` and preserves
+  parent-before-child ordering; and timesheet payout calculation remains
+  server-owned. No Edge Function exposure surface changed.
+- A TypeScript no-unused audit found 404 copied declarations/imports in the
+  changed files. Organizing the extracted modules removed the dead imports;
+  the same audit now reports zero findings in changed files.
+- The refactored production modules and new typed seams still contain zero
+  explicit `any` matches and no TODO/FIXME/HACK markers. Two pre-existing
+  `any[]` mock annotations remain in `tests/assignments/critical-paths.test.ts`
+  and are tracked as low-priority test debt rather than production debt.
+
 ## Validation
 
 - `npm run lint`: pass with 0 errors and 361 grandfathered warnings.
 - `npm run typecheck`: pass.
+- Changed-file TypeScript no-unused audit: 0 findings after cleanup
+  (404 before cleanup).
 - `npm run governance`: pass. File size is 0/0, mobile type floor is 248/248,
   source boundaries add no new violations, and governed lint warnings improve
   from 1,901 to 1,737.
+- Deliberate second-read selection: 12 files and 46 tests pass, covering the
+  Tour Ops whitespace regression, money PDFs, assignment flows, staffing
+  policy, Flex folder parsing, Consumos, Tour defaults, and technician
+  timesheets.
 - Focused Vitest selection: 7 files and 22 tests pass.
 - Review hardening selection: 2 staffing policy files and 8 tests pass,
   including snake_case load/write compatibility.
@@ -142,8 +179,8 @@ all three summary nitpicks:
 - Staffing recommendations Playwright smoke: 1 Chromium test passes.
 - `npm run test:e2e`: pass with 22 Chromium tests and 3 guarded mobile
   screenshot cases skipped.
-- `npm run build`: pass (5,929 modules transformed).
-- `npm run budget:bundle`: pass. JS gzip total is 3.06 MB (+48.8 kB versus the
+- `npm run build`: pass (5,930 modules transformed).
+- `npm run budget:bundle`: pass. JS gzip total is 3.06 MB (+49.4 kB versus the
   performance baseline), and every relative/absolute asset budget remains
   below its ceiling.
 - `git diff --check`: pass.
@@ -170,5 +207,13 @@ Edge Function, migration, RLS policy, database grant, or authorization test.
 - The next planned campaign is repository-wide explicit-`any` debt. Existing
   untouched modules remain in scope, but new refactor modules should continue
   to enter that campaign at zero.
+- Replace the two `any[]` query-key annotations in
+  `tests/assignments/critical-paths.test.ts` during the test-debt portion of
+  that campaign.
+- Several successfully split modules remain close to the 800-line ceiling
+  (`TimesheetView.tsx` at 798 lines, `useConsumosBuilder.ts` at 785, and the
+  technician `TimesheetView.tsx` at 783). Governance prevents regression;
+  future feature work should extend their existing responsibility boundaries
+  instead of growing those files.
 - No new repository-wide operating rule was discovered, so `AGENTS.md` does
   not need an update for this batch.

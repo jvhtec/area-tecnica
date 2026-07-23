@@ -1,56 +1,17 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Timesheet } from '@/types/timesheet';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-  Loader2,
-  Clock,
-  CheckCircle2,
   AlertTriangle,
-  Save,
-  ChevronLeft,
-  Calendar as CalendarIcon,
-  MapPin,
-  Play,
-  Coffee,
-  PenTool,
-  Euro,
-  X,
   Check,
-  AlertCircle,
-  Moon,
-  RefreshCw,
+  CheckCircle2,
+  Loader2,
+  PenTool,
+  X
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useTimesheets } from '@/hooks/useTimesheets';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
-import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
-import { formatCurrency } from '@/lib/utils';
-import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { isTechnicianRole } from '@/utils/permissions';
-import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from '@/utils/timesheetPrepDays';
-import { Timesheet, TimesheetFormData } from '@/types/timesheet';
 import SignatureCanvas from 'react-signature-canvas';
 import { Theme } from './types';
-import {
-  calculateHours,
-  getStatusBadge,
-  SENDABLE_TIMESHEET_STATUSES,
-  type TechnicianTimesheetViewProps,
-} from "./technicianTimesheetTypes";
 
 import type { Dispatch, RefObject, SetStateAction } from "react";
 

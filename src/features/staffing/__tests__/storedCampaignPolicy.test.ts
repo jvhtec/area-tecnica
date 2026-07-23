@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { normalizeStoredCampaignPolicy } from '../storedCampaignPolicy'
+import { describe, expect, it } from 'vitest';
+import { normalizeStoredCampaignPolicy } from '../storedCampaignPolicy';
 
 describe('normalizeStoredCampaignPolicy', () => {
   it('preserves canonical snake_case rate penalty settings', () => {

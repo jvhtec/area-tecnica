@@ -1,86 +1,32 @@
-import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { formatInTimeZone } from "date-fns-tz";
-import {
-  AlertTriangle,
-  Bed,
-  Calendar,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Download,
-  Eye,
-  ExternalLink,
-  FileText,
-  Hotel,
-  Loader2,
-  Map as MapIcon,
-  MapPin,
-  Plus,
-  Route,
-  Save,
-  Send,
-  Share2,
-  Trash2,
-  Users,
-  X,
-} from "lucide-react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
-import { TourContactsManager } from "@/components/tours/scheduling/TourContactsManager";
-import { TourMapViewMapbox } from "@/components/tours/scheduling/TourMapViewMapbox";
-import { TourSettingsPanel } from "@/components/tours/scheduling/TourSettingsPanel";
-import { MultiDayScheduleBuilder } from "@/components/schedule/MultiDayScheduleBuilder";
-import { cn } from "@/lib/utils";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { MADRID_TIMEZONE, utcToLocalInput } from "@/utils/timezoneUtils";
-import type { ProgramDay as HojaProgramDay } from "@/types/hoja-de-ruta";
+import {
+  dateTimeInputValue,
+  EVENT_TYPE_OPTIONS,
+  finiteNumberOrNull,
+  formatDate,
+  TRANSPORT_OPTIONS
+} from "@/features/tour-ops/tourOpsManagementUtils";
 import type {
-  TourGuestLink,
-  TourOpsAllowedSections,
   TourOpsAccommodation,
   TourOpsDate,
   TourOpsModel,
-  TourOpsProgramDay,
   TourOpsRoomAssignment,
   TourOpsTimelineEvent,
-  TourOpsTravelSegment,
+  TourOpsTravelSegment
 } from "@/features/tour-ops/types";
-import { DEFAULT_TOUR_OPS_SECTIONS } from "@/features/tour-ops/types";
 import {
-  useTourGuestLinkMutations,
-  useTourGuestLinks,
-  useTourOps,
-  useTourOpsMutations,
-} from "@/features/tour-ops/useTourOps";
-import { generateTourOpsPdf } from "@/features/tour-ops/tourOpsPdf";
-import {
-  dateTimeInputValue,
-  finiteNumberOrNull,
-  formatDate,
-  formatTime,
-  guestLinkUrl,
-  hasTourHomeBase,
-  roomOccupants,
-  sourceLabel,
-  syncStatusLabel,
-  syncStatusVariant,
-  EVENT_TYPE_OPTIONS,
-  TRANSPORT_OPTIONS,
-} from "@/features/tour-ops/tourOpsManagementUtils";
+  Plus,
+  Save,
+  Trash2
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export const EventDialog = ({
   model,

@@ -1,6 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { Dispatch, SetStateAction } from "react";
+import {
+  calculateMixedLoadApparentPower,
+  createCalculatedPowerTable,
+  getPowerPduOptions,
+  getVoltageForPhase,
+  PowerCalculationValidationError,
+} from "@/features/technical-tools/power/powerCalculations";
+import {
+  buildPowerOverridePayload,
+  buildPowerTableData,
+  buildPowerTableMetadata,
+} from "@/features/technical-tools/power/powerPersistence";
+import { parsePowerCalculationSnapshot } from "@/features/technical-tools/power/powerSnapshots";
+import type {
+  PhaseMode,
+  PowerElectricalSettings,
+  PowerTable,
+  PowerTableRow,
+} from "@/features/technical-tools/power/types";
+import { isSameTechnicalStage } from "@/features/technical-tools/stage/stageAllocation";
+import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
 import type { useToast } from "@/hooks/use-toast";
 import type {
   TourDatePowerOverrideData,
@@ -12,27 +32,7 @@ import {
   CUSTOM_POWER_POSITION_VALUE,
   NO_POWER_POSITION_VALUE,
 } from "@/utils/powerPositions";
-import type {
-  PhaseMode,
-  PowerElectricalSettings,
-  PowerTable,
-  PowerTableRow,
-} from "@/features/technical-tools/power/types";
-import {
-  calculateMixedLoadApparentPower,
-  createCalculatedPowerTable,
-  getPowerPduOptions,
-  getVoltageForPhase,
-  PowerCalculationValidationError,
-} from "@/features/technical-tools/power/powerCalculations";
-import { parsePowerCalculationSnapshot } from "@/features/technical-tools/power/powerSnapshots";
-import {
-  buildPowerOverridePayload,
-  buildPowerTableData,
-  buildPowerTableMetadata,
-} from "@/features/technical-tools/power/powerPersistence";
-import { isSameTechnicalStage } from "@/features/technical-tools/stage/stageAllocation";
-import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
+import type { Dispatch, SetStateAction } from "react";
 import {
   DEFAULT_FIXTURE_TYPE,
   FIXTURE_PF,
@@ -40,13 +40,13 @@ import {
   type ConsumosDepartmentConfig,
   type FixtureType,
 } from "./config";
+import type { ConsumosJob } from "./consumosUtils";
+import type { CustomPowerComponentInput } from "./useCustomPowerComponents";
 import {
   mapPowerRequirementRowToTable,
   useJobPowerRequirementTables,
 } from "./useJobPowerRequirementTables";
-import type { CustomPowerComponentInput } from "./useCustomPowerComponents";
 import { useXmlpPowerImport } from "./useXmlpPowerImport";
-import type { ConsumosJob } from "./consumosUtils";
 
 const DEFAULT_PDU_SELECT_VALUE = "default";
 const CUSTOM_PDU_SELECT_VALUE = "Custom";

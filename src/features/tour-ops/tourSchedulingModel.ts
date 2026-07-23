@@ -1,25 +1,3 @@
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
-import { formatInTimeZone } from "date-fns-tz";
-import type {
-  TourGuestLink,
-  TourOpsAccommodation,
-  TourOpsAllowedSections,
-  TourOpsContact,
-  TourOpsCrewMember,
-  TourOpsDate,
-  TourOpsDocument,
-  TourOpsHealthIssue,
-  TourOpsLocation,
-  TourOpsModel,
-  TourOpsProgramDay,
-  TourOpsProjection,
-  TourOpsRoomAssignment,
-  TourOpsSyncStatus,
-  TourOpsTimelineEvent,
-  TourOpsTravelSegment,
-} from "@/features/tour-ops/types";
-import { DEFAULT_TOUR_OPS_SECTIONS } from "@/features/tour-ops/types";
 import type { UnknownRecord } from "@/features/tour-ops/tourSchedulingNormalizers";
 import {
   annotateAccommodationSyncStatus,
@@ -51,6 +29,17 @@ import {
   textOrNull,
   toNumber,
 } from "@/features/tour-ops/tourSchedulingNormalizers";
+import type {
+  TourOpsAllowedSections,
+  TourOpsCrewMember,
+  TourOpsDate,
+  TourOpsHealthIssue,
+  TourOpsLocation,
+  TourOpsModel,
+  TourOpsProjection
+} from "@/features/tour-ops/types";
+import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
+import { formatInTimeZone } from "date-fns-tz";
 
 export function normalizeTourOpsModel(
   raw: UnknownRecord,

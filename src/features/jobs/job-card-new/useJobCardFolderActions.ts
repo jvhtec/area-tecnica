@@ -1,13 +1,13 @@
 import { format } from "date-fns";
 
+import { queryKeys } from "@/lib/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { queryKeys } from "@/lib/react-query";
+import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
-import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 import { canUseCustomFolderStructure } from "@/utils/permissions";
-import type { CreateFoldersOptions } from "@/utils/flex-folders";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 import type {
   FlexPickerMode,

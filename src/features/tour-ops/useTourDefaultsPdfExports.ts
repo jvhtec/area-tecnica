@@ -1,16 +1,16 @@
-import { exportToPDF } from "@/utils/pdfExport";
-import { fetchTourLogo } from "@/utils/pdf/logoUtils";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import type { Database } from "@/integrations/supabase/types";
-import type { TourDefaultSet, TourDefaultTable } from "@/hooks/useTourDefaultSets";
-import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tourPowerTables";
 import { aggregatePowerCalculations } from "@/features/technical-tools/power/powerAggregation";
+import type { useToast } from "@/hooks/use-toast";
+import type { TourDefaultSet, TourDefaultTable } from "@/hooks/useTourDefaultSets";
+import type { Database } from "@/integrations/supabase/types";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { getDepartmentLabel } from "@/types/department";
-import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
+import { fetchTourLogo } from "@/utils/pdf/logoUtils";
+import { exportToPDF } from "@/utils/pdfExport";
 import {
-  getTourDateTechnicalPdfFileName as getTourDatePdfFilename,
   getTourDefaultsPdfFileName as getDefaultsPdfFilename,
+  getTourDateTechnicalPdfFileName as getTourDatePdfFilename,
 } from "@/utils/technicalPdfNames";
+import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 import {
   getDepartmentPackageSize,
   getPackageResolutionMessage,
@@ -18,7 +18,7 @@ import {
   isPackageDepartment,
   resolveDefaultSetForTourDate,
 } from "@/utils/tourPackages";
-import type { useToast } from "@/hooks/use-toast";
+import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tourPowerTables";
 
 import {
   getLegacyWeightQuantity,
