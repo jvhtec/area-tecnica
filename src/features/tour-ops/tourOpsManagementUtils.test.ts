@@ -15,5 +15,8 @@ describe('tour ops management labels', () => {
     expect(syncStatusLabel('synced')).toBe('Sincronizado')
     expect(syncStatusLabel('needs_sync')).toBe('Requiere sincronización')
     expect(syncStatusLabel('no_hoja')).toBe('Sin hoja para la fecha')
+    expect(syncStatusLabel('imported')).toBe('Importado de hoja')
+    expect(syncStatusLabel('legacy')).toBe('Heredado')
+    expect(syncStatusLabel('unknown')).toBe('Requiere sincronización')
   })
 })

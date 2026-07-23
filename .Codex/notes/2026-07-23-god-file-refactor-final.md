@@ -153,6 +153,10 @@ remaining extraction wiring.
   explicit `any` matches and no TODO/FIXME/HACK markers. Two pre-existing
   `any[]` mock annotations remain in `tests/assignments/critical-paths.test.ts`
   and are tracked as low-priority test debt rather than production debt.
+- CodeRabbit's incremental second-read pass completed successfully and raised
+  one valid nitpick: the Spanish Tour Ops sync-label test did not exercise the
+  `imported`, `legacy`, or fallback branches. Those assertions now protect the
+  helper's complete mapping.
 
 ## Validation
 
@@ -173,6 +177,8 @@ remaining extraction wiring.
 - Complete review selection: 8 files and 23 tests pass, including Madrid
   conflict dates, Spanish status labels, assignment flow, policy
   normalization, Flex folder parsing, and rates PDFs.
+- Incremental CodeRabbit follow-up: the complete Tour Ops sync-status mapping
+  passes its focused test after adding the three missing branch assertions.
 - `npm run test:critical`: pass, including the assignment, staffing, Flex, and
   timesheet invariant suites plus the coverage gate.
 - `npm run test:run`: pass.

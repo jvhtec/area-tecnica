@@ -144,6 +144,11 @@ behavior. The same pass removed copied import debris from the extracted
 modules, reducing changed-file TypeScript no-unused diagnostics from 404 to
 zero without changing the public entrypoints.
 
+CodeRabbit's incremental review of that second-read commit completed with one
+test-coverage nitpick. The Tour Ops Spanish sync-status test now covers
+`imported`, `legacy`, and the unknown-status fallback as well as the original
+three states.
+
 ## Ratchets after completion
 
 - File size: `43 → 0` authored modules above 800 lines; the baseline is empty.
@@ -189,6 +194,8 @@ The final batch passed:
   rates PDFs.
 - Deliberate second-read selection — 12 files / 46 tests, including the Tour
   Ops whitespace negative control and all high-risk moved paths.
+- Focused incremental-review follow-up — the complete Tour Ops sync-status
+  label mapping passes, including `imported`, `legacy`, and fallback branches.
 - `npm run test:critical`, including assignment cascade, staffing
   orchestration, Flex deletion/creation, and timesheet critical paths.
 - `npm run test:run`.
