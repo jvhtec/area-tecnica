@@ -22,7 +22,7 @@ describe("JobCardDocuments", () => {
           id: "document-1",
           file_name: fileName,
           file_path: "sound/report.pdf",
-          uploaded_at: "2026-06-30T10:00:00Z",
+          uploaded_at: "2026-06-30T22:30:00Z",
           visible_to_tech: true,
         }]}
         userRole="management"
@@ -35,8 +35,8 @@ describe("JobCardDocuments", () => {
     const viewButton = screen.getByRole("button", { name: `Ver ${fileName}` });
     const downloadButton = screen.getByRole("button", { name: `Descargar ${fileName}` });
     const deleteButton = screen.getByRole("button", { name: `Eliminar ${fileName}` });
-    const visibilityBadge = screen.getByText("Tech-visible");
-    const uploadDate = screen.getByText("Uploaded Jun 30, 2026");
+    const visibilityBadge = screen.getAllByText("Visible para técnicos")[0];
+    const uploadDate = screen.getByText("Subido el Jul 1, 2026");
     const actionStrip = viewButton.parentElement;
     const actionArea = actionStrip?.parentElement;
     const row = fileNameElement.parentElement?.parentElement;

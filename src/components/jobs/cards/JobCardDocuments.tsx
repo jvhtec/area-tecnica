@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { JobCardDocumentActions } from "@/components/jobs/cards/JobCardDocumentActions";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { isManagementRole } from "@/utils/permissions";
+import { formatInJobTimezone, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
 export interface JobDocument {
   id: string;
@@ -54,7 +54,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       window.open(data.signedUrl, "_blank", "noopener");
     } catch (err: any) {
       console.error("Error in handleViewDocument:", err);
-      alert(`Error viewing document: ${err.message}`);
+      alert(`Error al visualizar el documento: ${err.message}`);
     }
   };
   
@@ -80,7 +80,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       
     } catch (err: any) {
       console.error('Error in handleDownload:', err);
-      alert(`Error downloading document: ${err.message}`);
+      alert(`Error al descargar el documento: ${err.message}`);
     }
   };
 
@@ -108,13 +108,13 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       } catch { /* best-effort push notification; ignore delivery failures */ }
     } catch (err: any) {
       console.error('Error toggling document visibility:', err);
-      alert(`Error updating visibility: ${err.message}`);
+      alert(`Error al actualizar la visibilidad: ${err.message}`);
     }
   };
 
   return (
     <div className="mt-2 space-y-2">
-      {showTitle && <div className="text-sm font-medium">Documents</div>}
+      {showTitle && <div className="text-sm font-medium">Documentos</div>}
       <div className="space-y-2">
         {documents.map((doc) => {
           const isTemplate = doc.template_type === 'soundvision';
@@ -132,17 +132,19 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                   {isTemplate && (
                     <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wide">
-                      Template SoundVision File
+                      Plantilla SoundVision
                     </Badge>
                   )}
                   {canManageDocuments && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${doc.visible_to_tech ? 'bg-green-500/20 text-green-800 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                      {doc.visible_to_tech ? 'Tech-visible' : 'Hidden from tech'}
+                      {doc.visible_to_tech ? 'Visible para técnicos' : 'Oculto para técnicos'}
                     </span>
                   )}
-                  <span>Uploaded {format(new Date(doc.uploaded_at), "MMM d, yyyy")}</span>
+                  <span>
+                    Subido el {formatInJobTimezone(doc.uploaded_at, "MMM d, yyyy", MADRID_TIMEZONE)}
+                  </span>
                   {isReadOnly && (
-                    <span className="italic">Read-only</span>
+                    <span className="italic">Solo lectura</span>
                   )}
                 </div>
               </div>
@@ -153,7 +155,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
                 onDelete={canManageDocuments && !isReadOnly ? () => onDeleteDocument(doc) : undefined}
                 visibilityControl={canManageDocuments ? (
                   <div className="mr-auto flex min-w-0 items-center gap-2">
-                    <span className="text-xs text-muted-foreground select-none">Tech can view</span>
+                    <span className="text-xs text-muted-foreground select-none">Visible para técnicos</span>
                     <Switch
                       className="shrink-0"
                       checked={Boolean(doc.visible_to_tech)}
