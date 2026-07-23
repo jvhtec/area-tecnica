@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, ExternalLink, ImageOff, ImagePlus, Loader2 } from "lucide-react";
-import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   DropdownMenu,
@@ -27,109 +27,20 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
-import { getOfflineFileBlob, isBrowserOnline } from "@/lib/offline";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { OutdatedRiderBadge } from "./OutdatedRiderBadge";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { buildReadableFilename } from "@/utils/fileName";
-import { optimizeImageForUpload, validateImageFile } from "@/utils/imageOptimization";
 import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 import { ArtistActionButtons } from "./ArtistActionButtons";
 import { buildArtistPdfData } from "@/utils/artistPdfDataMapper";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 
-interface Artist {
-  id: string;
-  name: string;
-  stage: number;
-  date: string;
-  show_start: string;
-  show_end: string;
-  soundcheck: boolean;
-  soundcheck_start?: string;
-  soundcheck_end?: string;
-  line_check?: boolean;
-  line_check_start?: string;
-  line_check_end?: string;
-  load_in_time?: string;
-  foh_console: string;
-  foh_console_provided_by?: 'festival' | 'band' | 'mixed';
-  foh_drive?: string;
-  foh_drive_position?: string;
-  mon_console: string;
-  mon_console_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_position?: string;
-  monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
-  foh_outboard?: string;
-  foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_waves_models?: any[];
-  mon_outboard?: string;
-  mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  wireless_systems: any[];
-  wireless_provided_by?: 'festival' | 'band' | 'mixed';
-  iem_systems: any[];
-  iem_provided_by?: 'festival' | 'band' | 'mixed';
-  monitors_enabled: boolean;
-  monitors_quantity: number;
-  extras_sf: boolean;
-  extras_df: boolean;
-  extras_djbooth: boolean;
-  notes?: string;
-  rider_missing?: boolean;
-  rider_copied_from_date?: string | null;
-  rider_outdated?: boolean;
-  rider_outdated_dismissed?: boolean;
-  foh_tech?: boolean;
-  mon_tech?: boolean;
-  isaftermidnight?: boolean;
-  mic_kit?: 'festival' | 'band' | 'mixed';
-  wired_mics?: Array<{
-    model: string;
-    quantity: number;
-    exclusive_use?: boolean;
-    notes?: string;
-  }>;
-  job_id?: string;
-  // Infrastructure fields
-  infra_cat6?: boolean;
-  infra_cat6_quantity?: number;
-  infra_hma?: boolean;
-  infra_hma_quantity?: number;
-  infra_coax?: boolean;
-  infra_coax_quantity?: number;
-  infra_opticalcon_duo?: boolean;
-  infra_opticalcon_duo_quantity?: number;
-  infra_analog?: number;
-  other_infrastructure?: string;
-  infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
-  artist_submitted?: boolean;
-  form_language?: "es" | "en";
-  stage_plot_file_path?: string | null;
-  stage_plot_file_name?: string | null;
-  stage_plot_file_type?: string | null;
-  stage_plot_uploaded_at?: string | null;
-}
-
-interface ArtistTableProps {
-  artists: Artist[];
-  isLoading: boolean;
-  onEditArtist: (artist: Artist) => void;
-  onDeleteArtist: (artist: Artist) => void;
-  searchTerm: string;
-  stageFilter: string;
-  riderFilter: string;
-  dayStartTime: string;
-  jobId?: string;
-  selectedDate?: string;
-  /** True while the search box is matching artists across every festival date, not just `selectedDate`. */
-  crossDateSearch?: boolean;
-  onArtistStagePlotUpdated?: () => void;
-  canDelete: boolean;
-  canCreateExtras: boolean;
-}
+import type { Artist, ArtistTableProps } from "@/components/festival/artistTableTypes";
+import { useArtistStagePlots } from "@/hooks/festival/useArtistStagePlots";
+import { formatInfrastructure, formatNotes, formatTime, formatTimeRange, formatWiredMics, formatWirelessSystems, renderProviderBadge } from "@/components/festival/artistTableFormatters";
 
 export const ArtistTable = ({
   artists,
@@ -139,7 +50,6 @@ export const ArtistTable = ({
   searchTerm,
   stageFilter,
   riderFilter,
-  dayStartTime,
   jobId,
   selectedDate,
   crossDateSearch = false,
@@ -160,13 +70,6 @@ export const ArtistTable = ({
   const [gearComparisons, setGearComparisons] = useState<Record<string, ArtistGearComparison>>({});
   const [festivalGearSetup, setFestivalGearSetup] = useState<FestivalGearSetup | null>(null);
   const [stageGearSetups, setStageGearSetups] = useState<Record<number, StageGearSetup>>({});
-  const [stagePlotUrls, setStagePlotUrls] = useState<Record<string, string>>({});
-  const [selectedStagePlotArtist, setSelectedStagePlotArtist] = useState<Artist | null>(null);
-  const [stagePlotDialogOpen, setStagePlotDialogOpen] = useState(false);
-  const [uploadingStagePlotArtistId, setUploadingStagePlotArtistId] = useState<string | null>(null);
-  const [deletingStagePlotArtistId, setDeletingStagePlotArtistId] = useState<string | null>(null);
-  const [isClipboardReading, setIsClipboardReading] = useState(false);
-  const stagePlotInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fetch custom stage names
   useEffect(() => {
@@ -296,287 +199,26 @@ export const ArtistTable = ({
     return stageNames[stageNumber] || `Stage ${stageNumber}`;
   };
 
-  useEffect(() => {
-    let isCancelled = false;
-    const objectUrls: string[] = [];
-
-    const loadStagePlotUrls = async () => {
-      const artistsWithPlot = artists.filter((artist) => Boolean(artist.stage_plot_file_path));
-
-      if (artistsWithPlot.length === 0) {
-        if (!isCancelled) {
-          setStagePlotUrls({});
-        }
-        return;
-      }
-
-      const nextUrls: Record<string, string> = {};
-
-      await Promise.all(
-        artistsWithPlot.map(async (artist) => {
-          if (!artist.stage_plot_file_path) return;
-
-          // Cached blob first: renders offline and skips the signed-URL
-          // round-trip when the festival was downloaded.
-          const cachedBlob = await getOfflineFileBlob("festival_artist_files", artist.stage_plot_file_path);
-          // Cleanup may have already revoked the tracked URLs; creating one
-          // now would leak it
-          if (isCancelled) return;
-          if (cachedBlob) {
-            const objectUrl = URL.createObjectURL(cachedBlob);
-            objectUrls.push(objectUrl);
-            nextUrls[artist.id] = objectUrl;
-            return;
-          }
-
-          if (!isBrowserOnline()) return;
-          const { data, error } = await dataLayerClient.storage
-            .from("festival_artist_files")
-            .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
-
-          if (!error && data?.signedUrl) {
-            nextUrls[artist.id] = data.signedUrl;
-          }
-        })
-      );
-
-      if (!isCancelled) {
-        setStagePlotUrls(nextUrls);
-      }
-    };
-
-    loadStagePlotUrls();
-
-    return () => {
-      isCancelled = true;
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [artists]);
-
-  const handleOpenStagePlotCapture = (artist: Artist) => {
-    setSelectedStagePlotArtist(artist);
-    setStagePlotDialogOpen(true);
-  };
-
-  const uploadStagePlotFile = async (artist: Artist, file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast.error("El stage plot debe ser una imagen.");
-      return;
-    }
-
-    const validation = validateImageFile(file, 10);
-    if (!validation.valid) {
-      toast.error(validation.error || "El stage plot no es válido.");
-      return;
-    }
-
-    setUploadingStagePlotArtistId(artist.id);
-
-    try {
-      const uploadFile = await optimizeImageForUpload(file, {
-        maxWidth: 1800,
-        maxHeight: 1800,
-        quality: 0.82,
-        outputFormat: "image/webp",
-      });
-      const fileExtension = uploadFile.name.split(".").pop() || "webp";
-      const nextFilePath = `${artist.id}/stage-plots/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
-
-      const { error: uploadError } = await dataLayerClient.storage
-        .from("festival_artist_files")
-        .upload(nextFilePath, uploadFile, {
-          contentType: uploadFile.type || file.type,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { error: updateError } = await dataLayerClient.from("festival_artists")
-        .update({
-          stage_plot_file_path: nextFilePath,
-          stage_plot_file_name: file.name,
-          stage_plot_file_type: uploadFile.type || file.type,
-          stage_plot_uploaded_at: new Date().toISOString(),
-        })
-        .eq("id", artist.id);
-
-      if (updateError) {
-        await dataLayerClient.storage.from("festival_artist_files").remove([nextFilePath]);
-        throw updateError;
-      }
-
-      if (
-        artist.stage_plot_file_path &&
-        artist.stage_plot_file_path !== nextFilePath
-      ) {
-        await dataLayerClient.storage
-          .from("festival_artist_files")
-          .remove([artist.stage_plot_file_path]);
-      }
-
-      onArtistStagePlotUpdated?.();
-      toast.success(`Stage plot actualizado para ${artist.name}.`);
-      setStagePlotDialogOpen(false);
-      setSelectedStagePlotArtist(null);
-    } catch (error) {
-      console.error("Error uploading stage plot:", error);
-      toast.error("No se pudo cargar el stage plot.");
-    } finally {
-      setUploadingStagePlotArtistId(null);
-    }
-  };
-
-  const handleStagePlotUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || !selectedStagePlotArtist) return;
-    await uploadStagePlotFile(selectedStagePlotArtist, file);
-  };
-
-  const handleStagePlotPaste = async (event: ReactClipboardEvent<HTMLDivElement>) => {
-    if (!selectedStagePlotArtist) return;
-    const imageItem = Array.from(event.clipboardData.items).find((item) =>
-      item.type.startsWith("image/")
-    );
-    if (!imageItem) {
-      toast.error("No se detectó ninguna imagen en el portapapeles.");
-      return;
-    }
-
-    const imageFile = imageItem.getAsFile();
-    if (!imageFile) {
-      toast.error("No se pudo leer la imagen del portapapeles.");
-      return;
-    }
-
-    event.preventDefault();
-    await uploadStagePlotFile(selectedStagePlotArtist, imageFile);
-  };
-
-  const handleReadClipboardImage = async () => {
-    if (!selectedStagePlotArtist) return;
-
-    if (!navigator.clipboard?.read) {
-      toast.error("Tu navegador no permite leer imágenes del portapapeles en este contexto.");
-      return;
-    }
-
-    setIsClipboardReading(true);
-    try {
-      const clipboardItems = await navigator.clipboard.read();
-      for (const item of clipboardItems) {
-        const imageType = item.types.find((type) => type.startsWith("image/"));
-        if (!imageType) continue;
-        const blob = await item.getType(imageType);
-        const clipboardFile = new File([blob], `stage-plot-${Date.now()}.png`, { type: blob.type });
-        await uploadStagePlotFile(selectedStagePlotArtist, clipboardFile);
-        return;
-      }
-
-      toast.error("No se encontró ninguna imagen en el portapapeles.");
-    } catch (error) {
-      console.error("Error reading image from clipboard:", error);
-      toast.error("No se pudo leer la imagen del portapapeles.");
-    } finally {
-      setIsClipboardReading(false);
-    }
-  };
-
-  const handleDeleteStagePlot = async (artist: Artist) => {
-    if (!artist.stage_plot_file_path) return;
-
-    const confirmed = await confirm({
-      title: "Eliminar stage plot",
-      description: `¿Eliminar el stage plot de ${artist.name}?`,
-      confirmText: "Eliminar",
-      destructive: true,
-    });
-    if (!confirmed) {
-      return;
-    }
-
-    setDeletingStagePlotArtistId(artist.id);
-    try {
-      const currentPath = artist.stage_plot_file_path;
-
-      const { error: updateError } = await dataLayerClient.from("festival_artists")
-        .update({
-          stage_plot_file_path: null,
-          stage_plot_file_name: null,
-          stage_plot_file_type: null,
-          stage_plot_uploaded_at: null,
-        })
-        .eq("id", artist.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      await dataLayerClient.storage.from("festival_artist_files").remove([currentPath]);
-
-      setStagePlotUrls((previous) => {
-        const updated = { ...previous };
-        delete updated[artist.id];
-        return updated;
-      });
-
-      onArtistStagePlotUpdated?.();
-      if (selectedStagePlotArtist?.id === artist.id) {
-        setStagePlotDialogOpen(false);
-        setSelectedStagePlotArtist(null);
-      }
-      toast.success(`Stage plot eliminado para ${artist.name}.`);
-    } catch (error) {
-      console.error("Error deleting stage plot:", error);
-      toast.error("No se pudo eliminar el stage plot.");
-    } finally {
-      setDeletingStagePlotArtistId(null);
-    }
-  };
+  const {
+    deletingStagePlotArtistId,
+    handleDeleteStagePlot,
+    handleOpenStagePlotCapture,
+    handleReadClipboardImage,
+    handleStagePlotPaste,
+    handleStagePlotUpload,
+    isClipboardReading,
+    selectedStagePlotArtist,
+    setSelectedStagePlotArtist,
+    setStagePlotDialogOpen,
+    stagePlotDialogOpen,
+    stagePlotInputRef,
+    stagePlotUrls,
+    uploadingStagePlotArtistId,
+  } = useArtistStagePlots(artists, onArtistStagePlotUpdated);
 
 
-  // Helper function to format infrastructure requirements
-  const formatInfrastructure = (artist: Artist) => {
-    const infraItems: string[] = [];
-    
-    if (artist.infra_cat6 && artist.infra_cat6_quantity) {
-      infraItems.push(`${artist.infra_cat6_quantity}x CAT6`);
-    }
-    if (artist.infra_hma && artist.infra_hma_quantity) {
-      infraItems.push(`${artist.infra_hma_quantity}x HMA`);
-    }
-    if (artist.infra_coax && artist.infra_coax_quantity) {
-      infraItems.push(`${artist.infra_coax_quantity}x Coax`);
-    }
-    if (artist.infra_opticalcon_duo && artist.infra_opticalcon_duo_quantity) {
-      infraItems.push(`${artist.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
-    }
-    if (artist.infra_analog && artist.infra_analog > 0) {
-      infraItems.push(`${artist.infra_analog}x Analog`);
-    }
-    if (artist.other_infrastructure) {
-      infraItems.push(artist.other_infrastructure);
-    }
-
-
-    return infraItems.length > 0 ? infraItems.join(", ") : "Ninguno";
-  };
-
-  // Helper function to truncate notes for display
-  const formatNotes = (notes?: string) => {
-    if (!notes || notes.trim() === '') return "Sin notas";
-    return notes.length > 50 ? `${notes.substring(0, 50)}...` : notes;
-  };
 
   // Filtering logic
-  const isTimeAfterDayStart = (time: string, date: string) => {
-    const [hours, minutes] = dayStartTime.split(':').map(Number);
-    const dayStart = setHours(setMinutes(parseISO(date), minutes), hours);
-    const artistTime = parseISO(`${date}T${time}`);
-    return isAfter(artistTime, dayStart);
-  };
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = stageFilter === "all" || artist.stage?.toString() === stageFilter;
@@ -606,77 +248,6 @@ export const ArtistTable = ({
       setDeletingArtistId(null);
     }
   };
-  const formatWiredMics = (mics: Array<{
-    model: string;
-    quantity: number;
-    exclusive_use?: boolean;
-  }> = []) => {
-    if (mics.length === 0) return "Ninguno";
-    return mics.map(mic => {
-      const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
-      return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
-    }).join(", ");
-  };
-  const formatWirelessSystems = (systems: any[] = [], isIEM = false) => {
-    if (systems.length === 0) return "Ninguno";
-    return systems.map(system => {
-      if (isIEM) {
-        // For IEM: show channels and beltpacks
-        const channels = system.quantity_hh || system.quantity || 0;
-        const beltpacks = system.quantity_bp || 0;
-        return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
-      } else {
-        // For wireless: show channels plus HH and BP
-        const channels = system.quantity_ch || 0;
-        const hh = system.quantity_hh || 0;
-        const bp = system.quantity_bp || 0;
-        const total = hh + bp;
-        const channelPart = channels > 0 ? `${channels} ch` : '';
-        if (hh > 0 && bp > 0) {
-          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${hh}x HH, ${bp}x BP`;
-        } else if (total > 0) {
-          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x`;
-        } else if (channels > 0) {
-          return `${system.model}: ${channels} ch`;
-        }
-        return system.model;
-      }
-    }).join("; ");
-  };
-  const getProviderBadge = (provider: 'festival' | 'band' | 'mixed') => {
-    const colors = {
-      festival: "bg-blue-100 text-blue-800",
-      band: "bg-green-100 text-green-800",
-      mixed: "bg-purple-100 text-purple-800",
-      artist: "bg-orange-100 text-orange-800"
-    };
-    return colors[provider] || "bg-gray-100 text-gray-800";
-  };
-
-  const PROVIDER_LABELS: Record<'festival' | 'band' | 'mixed', string> = {
-    festival: "Festival",
-    band: "Banda",
-    mixed: "Mixto",
-  };
-
-  const renderProviderBadge = (provider?: 'festival' | 'band' | 'mixed') => {
-    if (!provider) return null;
-    return (
-      <Badge variant="outline" className={`text-[10px] px-1 py-0 ${getProviderBadge(provider)}`}>
-        {PROVIDER_LABELS[provider] || provider}
-      </Badge>
-    );
-  };
-
-  // DB time columns come back as HH:MM:SS; the table only shows HH:MM
-  const formatTime = (value?: string | null) => {
-    if (!value) return "";
-    const trimmed = String(value).trim();
-    return trimmed.length >= 5 && trimmed.includes(":") ? trimmed.slice(0, 5) : trimmed;
-  };
-
-  const formatTimeRange = (start?: string | null, end?: string | null) =>
-    `${formatTime(start) || "--:--"} - ${formatTime(end) || "--:--"}`;
 
   const handlePrintArtist = async (artist: Artist) => {
     setPrintingArtistId(artist.id);

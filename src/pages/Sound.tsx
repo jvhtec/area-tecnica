@@ -590,7 +590,6 @@ const Sound = () => {
           userRole={userRole}
           userDepartment={userDepartment}
           userId={user?.id ?? null}
-          department={currentDepartment}
         />
       )}
       {!isMobile && selectedJobForDetails && (

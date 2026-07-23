@@ -81,6 +81,11 @@ describe("JobCardDocumentSections", () => {
     expect(screen.getByText("rider.pdf")).toBeInTheDocument();
     expect(screen.getByText("Artista: Banda Uno")).toBeInTheDocument();
 
+    const tourViewButton = screen.getByRole("button", { name: "Ver tour.pdf" });
+    expect(tourViewButton.parentElement).toHaveClass("flex", "shrink-0", "items-center", "gap-1");
+    expect(tourViewButton.parentElement?.parentElement).toHaveClass("w-full", "items-center", "justify-end", "md:w-auto");
+    expect(screen.getByText("tour.pdf")).toHaveClass("[overflow-wrap:anywhere]");
+
     const tourDocumentsToggle = screen.getByRole("button", { name: "Documentos de gira (1)" });
     expect(tourDocumentsToggle).toHaveAttribute("aria-expanded", "true");
     await user.click(tourDocumentsToggle);

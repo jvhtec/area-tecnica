@@ -14,170 +14,31 @@ import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSecti
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
-import { ConsoleSetup, FestivalGearSetup } from "@/types/festival";
-import { ArtistSectionProps } from "@/types/artist-form";
+import { FestivalGearSetup } from "@/types/festival";
 import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
-import { normalizeWirelessSystem, normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
+import { normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 import { mapFestivalGearSetup } from "@/utils/festivalGearMappers";
 import { normalizeWavesModelSelections } from "@/constants/wavesModels";
 import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
+import { usePublicArtistRiderFiles } from "@/hooks/festival/usePublicArtistRiderFiles";
+import { usePublicArtistFormSubmit } from "@/hooks/festival/usePublicArtistFormSubmit";
+
 import {
-  type PublicRiderFileRecord,
-  uploadPublicArtistRiderFiles,
-} from "@/utils/publicArtistRiderUpload";
-
-interface ArtistRequirementsFormProps {
-  isBlank?: boolean;
-}
-interface PublicFormContextResponse {
-  ok: boolean;
-  error?: string;
-  status?: string;
-  artist?: Record<string, unknown>;
-  gear_setup?: FestivalGearSetup | null;
-  logo_file_path?: string | null;
-  stage_names?: Array<{ number?: number; name?: string }>;
-  rider_files?: Array<Record<string, unknown>>;
-}
-
-interface PublicSubmitResponse {
-  ok: boolean;
-  error?: string;
-  status?: string;
-}
-
-type ArtistFormState = ArtistSectionProps["formData"];
-type RiderFileRecord = PublicRiderFileRecord;
-
-const makeBlankWirelessSystem = () =>
-  normalizeWirelessSystem(
-    {
-      model: "",
-      quantity: 0,
-      quantity_ch: 0,
-      quantity_hh: 0,
-      quantity_bp: 0,
-      band: undefined,
-      provided_by: "festival",
-    },
-    "wireless",
-  );
-
-const makeBlankIemSystem = () =>
-  normalizeWirelessSystem(
-    {
-      model: "",
-      quantity: 0,
-      quantity_hh: 0,
-      quantity_bp: 0,
-      band: undefined,
-      provided_by: "festival",
-    },
-    "iem",
-  );
-
-const normalizeTime = (value: string | null | undefined) => {
-  if (!value) return "";
-  return value.length >= 5 ? value.slice(0, 5) : value;
-};
-
-const asString = (value: unknown) => (typeof value === "string" ? value : "");
-const asBoolean = (value: unknown) => (typeof value === "boolean" ? value : false);
-const asNumber = (value: unknown) => (typeof value === "number" ? value : 0);
-const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
-const hasText = (value: unknown) => asString(value).trim().length > 0;
-const hasPositiveNumber = (value: unknown) => asNumber(value) > 0;
-
-const asFiniteNumber = (value: unknown) => {
-  const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : 0;
-  return Number.isFinite(numeric) ? numeric : 0;
-};
-
-const normalizeConsoleSetups = (value: unknown): ConsoleSetup[] =>
-  asArray<Record<string, unknown>>(value)
-    .map((consoleSetup) => ({
-      model: asString(consoleSetup.model),
-      quantity: asFiniteNumber(consoleSetup.quantity),
-      notes: asString(consoleSetup.notes) || undefined,
-    }))
-    .filter((consoleSetup) =>
-      consoleSetup.model.trim().length > 0 ||
-      consoleSetup.quantity > 0 ||
-      Boolean(consoleSetup.notes?.trim())
-    );
-
-const hasConsoleSetups = (value: unknown) => normalizeConsoleSetups(value).length > 0;
-
-const normalizeFestivalLogoPath = (filePath: string) => {
-  let normalized = filePath.trim();
-  if (!normalized) return "";
-  if (normalized.startsWith("http")) return normalized;
-  if (normalized.startsWith("/")) normalized = normalized.slice(1);
-  if (normalized.startsWith("festival-logos/")) {
-    normalized = normalized.slice("festival-logos/".length);
-  }
-  return normalized;
-};
-
-const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormState => ({
-  name: "",
-  max_stages: 1,
-  stage: 1,
-  date: blankDate,
-  show_start: "",
-  show_end: "",
-  soundcheck: false,
-  soundcheck_start: "",
-  soundcheck_end: "",
-  line_check: false,
-  line_check_start: "",
-  line_check_end: "",
-  load_in_time: "",
-  foh_console: "",
-  foh_consoles: [],
-  foh_console_provided_by: "festival",
-  foh_drive: "",
-  foh_drive_position: "",
-  foh_tech: false,
-  mon_console: "",
-  mon_consoles: [],
-  mon_console_provided_by: "festival",
-  mon_position: "",
-  monitors_from_foh: false,
-  foh_waves_models: [],
-  foh_outboard: "",
-  foh_waves_provided_by: "festival",
-  mon_waves_models: [],
-  mon_outboard: "",
-  mon_waves_provided_by: "festival",
-  mon_tech: false,
-  wireless_systems: isBlank ? [makeBlankWirelessSystem()] : [],
-  iem_systems: isBlank ? [makeBlankIemSystem()] : [],
-  wireless_provided_by: "festival",
-  iem_provided_by: "festival",
-  monitors_enabled: false,
-  monitors_quantity: 0,
-  extras_sf: false,
-  extras_df: false,
-  extras_djbooth: false,
-  extras_wired: "",
-  infra_cat6: false,
-  infra_cat6_quantity: 0,
-  infra_hma: false,
-  infra_hma_quantity: 0,
-  infra_coax: false,
-  infra_coax_quantity: 0,
-  infra_opticalcon_duo: false,
-  infra_opticalcon_duo_quantity: 0,
-  infra_analog: 0,
-  infrastructure_provided_by: "festival",
-  other_infrastructure: "",
-  notes: "",
-  rider_missing: false,
-  isaftermidnight: false,
-  mic_kit: "band",
-  wired_mics: [],
-});
+  asArray,
+  asBoolean,
+  asNumber,
+  asString,
+  createInitialFormData,
+  hasConsoleSetups,
+  hasPositiveNumber,
+  hasText,
+  normalizeConsoleSetups,
+  normalizeFestivalLogoPath,
+  normalizeTime,
+  type ArtistFormState,
+  type ArtistRequirementsFormProps,
+  type PublicFormContextResponse,
+} from "@/components/festival/artistRequirementsFormModel";
 
 export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFormProps) => {
   const { token } = useParams();
@@ -191,17 +52,25 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const tx = useCallback((es: string, en: string) => (formLanguage === "en" ? en : es), [formLanguage]);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
   const [stageNames, setStageNames] = useState<Record<number, string>>({});
   const [festivalLogo, setFestivalLogo] = useState<string | null>(null);
   const [companyLogo, setCompanyLogo] = useState("/sector pro logo.png");
   const [lockedFields, setLockedFields] = useState<Set<string>>(new Set());
   const [publicArtistId, setPublicArtistId] = useState<string | null>(null);
-  const [riderFiles, setRiderFiles] = useState<RiderFileRecord[]>([]);
-  const [isUploadingRider, setIsUploadingRider] = useState(false);
-  const [deletingRiderId, setDeletingRiderId] = useState<string | null>(null);
   const [formData, setFormData] = useState<ArtistFormState>(() => createInitialFormData(isBlank, blankDate));
+  const {
+    deletingRiderId,
+    downloadRiderFile,
+    formatFileSize,
+    formatUploadedAt,
+    handleDeleteRider,
+    handleRiderUpload,
+    isUploadingRider,
+    openRiderFile,
+    riderFiles,
+    setRiderFiles,
+  } = usePublicArtistRiderFiles({ token, publicArtistId, formLanguage, tx });
 
   const resolveFestivalLogoUrl = useCallback(async (rawFilePath: string | null | undefined) => {
     if (!rawFilePath) {
@@ -588,73 +457,15 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
     return () => {
       cancelled = true;
     };
-  }, [blankDate, blankJobId, isBlank, navigate, resolveFestivalLogoUrl, token, toast, tx]);
+  }, [blankDate, blankJobId, formLanguage, isBlank, navigate, resolveFestivalLogoUrl, setRiderFiles, token, toast, tx]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isBlank) return;
-
-    if (!token) {
-      toast({
-        title: tx("Error", "Error"),
-        description: tx("Token de formulario inválido", "Invalid form token"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const { data, error } = await dataLayerClient.functions.invoke("submit-public-artist-form", {
-        body: {
-          token,
-          formData,
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      const result = data as PublicSubmitResponse;
-      if (!result?.ok) {
-        if (result?.status === "submitted") {
-          navigate(`/festival/form-submitted?lang=${formLanguage}`, { replace: true });
-          return;
-        }
-
-        const description =
-          result?.error === "form_expired"
-            ? tx("Este enlace ha expirado.", "This link has expired.")
-            : result?.error === "already_submitted"
-              ? tx("Este artista ya envió el formulario.", "This artist has already submitted the form.")
-              : tx("No se pudo enviar el formulario.", "Could not submit the form.");
-
-        toast({
-          title: tx("Formulario no disponible", "Form unavailable"),
-          description,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: tx("Éxito", "Success"),
-        description: tx("Sus requerimientos técnicos han sido enviados correctamente.", "Your technical requirements were submitted successfully."),
-      });
-
-      navigate(`/festival/form-submitted?lang=${formLanguage}`);
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      toast({
-        title: tx("Error", "Error"),
-        description: tx("No se pudo enviar el formulario. Por favor intente más tarde.", "Could not submit the form. Please try again later."),
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const { handleSubmit, isSubmitting } = usePublicArtistFormSubmit({
+    formData,
+    formLanguage,
+    isBlank,
+    token,
+    tx,
+  });
 
   const handleFormChange = (changes: Partial<ArtistFormState>) => {
     if (isBlank || lockedFields.size === 0) {
@@ -676,179 +487,6 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const isFieldLocked = useCallback(
     (field: string) => !isBlank && lockedFields.has(field),
     [isBlank, lockedFields]
-  );
-
-  const formatUploadedAt = useCallback(
-    (uploadedAt: string | null) => {
-      if (!uploadedAt) return tx("Fecha desconocida", "Unknown date");
-      const date = new Date(uploadedAt);
-      if (Number.isNaN(date.getTime())) return tx("Fecha desconocida", "Unknown date");
-      return new Intl.DateTimeFormat(formLanguage === "en" ? "en-GB" : "es-ES", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "Europe/Madrid",
-      }).format(date);
-    },
-    [formLanguage, tx]
-  );
-
-  const formatFileSize = useCallback(
-    (value: number | null) => {
-      if (!value || value <= 0) return tx("Tamaño desconocido", "Unknown size");
-      if (value < 1024) return `${value} B`;
-      if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-      return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-    },
-    [tx]
-  );
-
-  const openRiderFile = useCallback(
-    async (file: RiderFileRecord) => {
-      try {
-        const { data, error } = await dataLayerClient.storage
-          .from("festival_artist_files")
-          .createSignedUrl(file.file_path, 60 * 60);
-
-        if (error || !data?.signedUrl) {
-          throw error ?? new Error("Could not create signed URL");
-        }
-
-        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-      } catch (error) {
-        console.error("Error opening rider file:", error);
-        toast({
-          title: tx("Error", "Error"),
-          description: tx("No se pudo abrir el rider.", "Could not open rider file."),
-          variant: "destructive",
-        });
-      }
-    },
-    [toast, tx]
-  );
-
-  const downloadRiderFile = useCallback(
-    async (file: RiderFileRecord) => {
-      try {
-        const { data, error } = await dataLayerClient.storage
-          .from("festival_artist_files")
-          .download(file.file_path);
-
-        if (error || !data) {
-          throw error ?? new Error("Could not download file");
-        }
-
-        const url = window.URL.createObjectURL(data);
-        const anchor = window.document.createElement("a");
-        anchor.href = url;
-        anchor.download = file.file_name;
-        window.document.body.appendChild(anchor);
-        anchor.click();
-        window.document.body.removeChild(anchor);
-        window.URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error("Error downloading rider file:", error);
-        toast({
-          title: tx("Error", "Error"),
-          description: tx("No se pudo descargar el rider.", "Could not download rider file."),
-          variant: "destructive",
-        });
-      }
-    },
-    [toast, tx]
-  );
-
-  const handleRiderUpload = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const input = event.target;
-      const selectedFiles = Array.from(input.files || []);
-      if (selectedFiles.length === 0) return;
-
-      if (!token || !publicArtistId) {
-        toast({
-          title: tx("Error", "Error"),
-          description: tx("No se pudo identificar este formulario público.", "Could not identify this public form."),
-          variant: "destructive",
-        });
-        input.value = "";
-        return;
-      }
-
-      setIsUploadingRider(true);
-
-      try {
-        const uploaded = await uploadPublicArtistRiderFiles(token, selectedFiles);
-
-        setRiderFiles((prev) => {
-          const deduped = prev.filter((existing) => !uploaded.some((nextFile) => nextFile.id === existing.id));
-          return [...uploaded, ...deduped];
-        });
-
-        toast({
-          title: tx("Éxito", "Success"),
-          description:
-            uploaded.length > 1
-              ? tx("Riders cargados correctamente.", "Rider files uploaded successfully.")
-              : tx("Rider cargado correctamente.", "Rider uploaded successfully."),
-        });
-      } catch (error) {
-        console.error("Error uploading rider file:", error);
-        const uploadErrorMessage = error instanceof Error ? error.message : "";
-        toast({
-          title: tx("Error", "Error"),
-          description: uploadErrorMessage || tx(
-            "No se pudo cargar el rider. Inténtalo de nuevo.",
-            "Could not upload rider file. Please try again."
-          ),
-          variant: "destructive",
-        });
-      } finally {
-        setIsUploadingRider(false);
-        input.value = "";
-      }
-    },
-    [publicArtistId, toast, token, tx]
-  );
-
-  const handleDeleteRider = useCallback(
-    async (file: RiderFileRecord) => {
-      if (!token || !file.id) return;
-      setDeletingRiderId(file.id);
-
-      try {
-        const { data, error } = await dataLayerClient.functions.invoke("delete-public-artist-rider", {
-          body: {
-            token,
-            fileId: file.id,
-          },
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        const response = data as { ok?: boolean; error?: string } | null;
-        if (!response?.ok) {
-          throw new Error(response?.error || "delete_failed");
-        }
-
-        setRiderFiles((prev) => prev.filter((item) => item.id !== file.id));
-
-        toast({
-          title: tx("Éxito", "Success"),
-          description: tx("Rider eliminado.", "Rider file deleted."),
-        });
-      } catch (error) {
-        console.error("Error deleting rider file:", error);
-        toast({
-          title: tx("Error", "Error"),
-          description: tx("No se pudo eliminar el rider.", "Could not delete rider file."),
-          variant: "destructive",
-        });
-      } finally {
-        setDeletingRiderId(null);
-      }
-    },
-    [toast, token, tx]
   );
 
   const shouldShowRiderSection = !isBlank && (formData.rider_missing || riderFiles.length > 0);

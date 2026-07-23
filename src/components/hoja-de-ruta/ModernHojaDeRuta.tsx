@@ -1,12 +1,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -16,25 +12,15 @@ import {
   Calendar,
   MapPin,
   Users,
-  Plane,
-  Hotel,
-  Image,
-  Settings,
-  Upload,
   Sparkles,
   CheckCircle2,
   Clock,
-  AlertTriangle,
   Eye,
-  FileCheck,
-  Zap,
   Building2,
   Phone,
   Car,
   Bed,
   Activity,
-  Palette,
-  RefreshCw,
   Database,
   UtensilsCrossed,
   AlertCircle,
@@ -55,7 +41,6 @@ import { ModernTravelSection } from "./sections/ModernTravelSection";
 import { ModernAccommodationSection } from "./sections/ModernAccommodationSection";
 import { ModernLogisticsSection } from "./sections/ModernLogisticsSection";
 import { ModernScheduleSection } from "./sections/ModernScheduleSection";
-import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { HojaDeRutaHeaderActions } from "@/components/hoja-de-ruta/components/HojaDeRutaHeaderActions";
 import { MobileSectionSwitcher } from "@/components/hoja-de-ruta/components/MobileSectionSwitcher";
@@ -63,25 +48,17 @@ import { MobileSaveBar } from "@/components/hoja-de-ruta/components/MobileSaveBa
 import { QuickNavigationSidebar } from "@/components/hoja-de-ruta/components/QuickNavigationSidebar";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
-import {
-  HojaDeRutaPrintDialog,
-  type HojaDeRutaPrintPreviewTarget,
-} from "./HojaDeRutaPrintDialog";
-import {
-  HojaDeRutaPdfPreviewDialog,
-  type HojaDeRutaPdfPreview,
-} from "./HojaDeRutaPdfPreviewDialog";
-import { generateHojaDeRutaXLS } from "@/utils/hojaDeRutaExport";
+import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
+import { HojaDeRutaPdfPreviewDialog } from "./HojaDeRutaPdfPreviewDialog";
 import {
   getHojaDeRutaPdfSectionLabel,
-  type GeneratedHojaDeRutaPdf,
   type HojaDeRutaPdfSectionId,
   type HojaDeRutaPrintSectionId,
   normalizeHojaDeRutaPrintSections,
 } from "@/utils/hoja-de-ruta/pdf";
-import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { LucideIcon } from "lucide-react";
 import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
+import { useHojaDeRutaExports } from "@/components/hoja-de-ruta/useHojaDeRutaExports";
 
 type ModernHojaDeRutaProps = {
   jobId?: string;
@@ -98,13 +75,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
   const routedJobId = jobId ?? searchParams.get("jobId") ?? searchParams.get("openHojaDeRuta") ?? undefined;
   const [activeTab, setActiveTab] = useState("event");
   const [completionProgress, setCompletionProgress] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [generatingSectionId, setGeneratingSectionId] = useState<HojaDeRutaPdfSectionId | null>(null);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const [previewingTarget, setPreviewingTarget] = useState<HojaDeRutaPrintPreviewTarget>(null);
-  const [showPdfPreviewDialog, setShowPdfPreviewDialog] = useState(false);
-  const [pdfPreview, setPdfPreview] = useState<HojaDeRutaPdfPreview | null>(null);
 
   // Get image management functions first (needed for form hook)
   const {
@@ -148,7 +118,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     selectedJobId,
     setSelectedJobId,
     travelArrangements,
-    setTravelArrangements,
     accommodations,
     setAccommodations,
     isLoadingJobs,
@@ -160,10 +129,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     isInitialized,
     hasSavedData,
     hasBasicJobData,
-    dataSource,
     isDirty,
     autoPopulateFromJob,
-    refreshData,
     // Form handlers
     handleContactChange,
     addContact,
@@ -174,7 +141,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     updateTravelArrangement,
     addTravelArrangement,
     removeTravelArrangement,
-    updateAccommodation,
     addAccommodation,
     removeAccommodation,
     updateRoom,
@@ -192,14 +158,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
       setSelectedJobId(routedJobId);
     }
   }, [routedJobId, selectedJobId, setSelectedJobId]);
-
-  useEffect(() => {
-    return () => {
-      if (pdfPreview?.url) {
-        URL.revokeObjectURL(pdfPreview.url);
-      }
-    };
-  }, [pdfPreview?.url]);
 
   // Calculate completion progress including weather and restaurants
   useEffect(() => {
@@ -225,333 +183,39 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     calculateProgress();
   }, [eventData, travelArrangements, accommodations]);
 
-  const normalizeHojaStatus = (status?: string | null): HojaDeRutaMetadata["status"] => {
-    if (status === "draft" || status === "review" || status === "approved" || status === "final") {
-      return status;
-    }
-    return "draft";
-  };
-
-  const buildPdfEventData = (): EventData => ({
-    ...eventData,
-    metadata: hojaDeRuta ? {
-      id: hojaDeRuta.id,
-      document_version: hojaDeRuta.document_version || 1,
-      status: normalizeHojaStatus(hojaDeRuta.status),
-      created_at: hojaDeRuta.created_at || new Date().toISOString(),
-      updated_at: hojaDeRuta.updated_at || new Date().toISOString(),
-      last_modified: hojaDeRuta.last_modified || new Date().toISOString(),
-    } : undefined
+  const {
+    generatingSectionId,
+    handleDownloadPdfPreview,
+    handleGenerateDriverCertificatePDF,
+    handleGeneratePDF,
+    handleGenerateSectionPDF,
+    handleGenerateXLS,
+    handleOpenPdfPreviewInNewTab,
+    handlePdfPreviewOpenChange,
+    handlePreviewDriverCertificatePDF,
+    handlePreviewPDF,
+    handlePrintExclusionChange,
+    isGenerating,
+    isPreviewing,
+    pdfPreview,
+    previewingTarget,
+    setShowPrintDialog,
+    showPdfPreviewDialog,
+    showPrintDialog,
+  } = useHojaDeRutaExports({
+    accommodations,
+    eventData,
+    handleSaveAll,
+    hasSavedData,
+    hojaDeRuta,
+    imagePreviews,
+    isDirty,
+    jobs,
+    selectedJobId,
+    setEventData,
+    travelArrangements,
+    venueMapPreview,
   });
-
-  const getRequiredSelectedJobId = () => {
-    if (selectedJobId) return selectedJobId;
-
-    toast({
-      title: "Error",
-      description: "Por favor, seleccione un trabajo antes de generar el documento.",
-      variant: "destructive",
-    });
-    return null;
-  };
-
-  const getSelectedJobDetails = (jobIdToFind = selectedJobId) => jobs?.find(job => job.id === jobIdToFind);
-
-  const saveBeforePdfGeneration = async () => {
-    if (isDirty || hasSavedData) {
-      await handleSaveAll();
-    }
-  };
-
-  const buildFullDocumentPdfOptions = () => {
-    const excludedSections = normalizeHojaDeRutaPrintSections(eventData.printExcludedSections);
-    return excludedSections.length > 0 ? { excludedSections } : undefined;
-  };
-
-  const handlePrintExclusionChange = (
-    sectionId: HojaDeRutaPrintSectionId,
-    isExcluded: boolean
-  ) => {
-    setEventData((prev) => {
-      const currentSections = normalizeHojaDeRutaPrintSections(prev.printExcludedSections);
-      const nextSections = isExcluded
-        ? Array.from(new Set([...currentSections, sectionId]))
-        : currentSections.filter((id) => id !== sectionId);
-
-      return {
-        ...prev,
-        printExcludedSections: nextSections,
-      };
-    });
-  };
-
-  const openGeneratedPdfPreview = (generatedPdf: GeneratedHojaDeRutaPdf) => {
-    setPdfPreview({
-      url: URL.createObjectURL(generatedPdf.blob),
-      filename: generatedPdf.filename,
-      title: generatedPdf.title,
-    });
-    setShowPrintDialog(false);
-    setShowPdfPreviewDialog(true);
-  };
-
-  const handlePdfPreviewOpenChange = (open: boolean) => {
-    setShowPdfPreviewDialog(open);
-  };
-
-  const handleDownloadPdfPreview = () => {
-    if (!pdfPreview) return;
-
-    const link = document.createElement("a");
-    link.href = pdfPreview.url;
-    link.download = pdfPreview.filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  };
-
-  const handleOpenPdfPreviewInNewTab = () => {
-    if (!pdfPreview) return;
-    window.open(pdfPreview.url, "_blank", "noopener,noreferrer");
-  };
-
-  // Enhanced PDF generation using the working functionality
-  const handleGeneratePDF = async () => {
-    const currentJobId = getRequiredSelectedJobId();
-    if (!currentJobId) return;
-
-    setGeneratingSectionId(null);
-    setIsGenerating(true);
-    try {
-      // Save data first if there are changes
-      await saveBeforePdfGeneration();
-
-      const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
-      const enhancedEventData = buildPdfEventData();
-
-      const jobDetails = getSelectedJobDetails(currentJobId);
-      // Convert accommodations to legacy room assignments for PDF generation
-      const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
-      
-      await generatePDF(
-        enhancedEventData,
-        travelArrangements,
-        legacyRoomAssignments,
-        imagePreviews,
-        venueMapPreview,
-        currentJobId,
-        jobDetails?.title || "",
-        jobDetails?.start_time || undefined,
-        toast,
-        accommodations,
-        buildFullDocumentPdfOptions()
-      );
-
-      // PDF generation and download is handled within the generatePDF function
-
-      toast({
-        title: "✅ Documento generado",
-        description: "La hoja de ruta ha sido generada correctamente.",
-      });
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({
-        title: "❌ Error",
-        description: "Hubo un problema al generar el documento.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleGenerateSectionPDF = async (sectionId: HojaDeRutaPdfSectionId) => {
-    const currentJobId = getRequiredSelectedJobId();
-    if (!currentJobId) return;
-
-    setGeneratingSectionId(sectionId);
-    setIsGenerating(true);
-    try {
-      await saveBeforePdfGeneration();
-
-      const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
-      const jobDetails = getSelectedJobDetails(currentJobId);
-      const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
-
-      await generatePDF(
-        buildPdfEventData(),
-        travelArrangements,
-        legacyRoomAssignments,
-        imagePreviews,
-        venueMapPreview,
-        currentJobId,
-        jobDetails?.title || "",
-        jobDetails?.start_time || undefined,
-        toast,
-        accommodations,
-        { sections: [sectionId] }
-      );
-    } catch (error) {
-      console.error("Error generating section PDF:", error);
-      toast({
-        title: "❌ Error",
-        description: "Hubo un problema al generar la sección seleccionada.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-      setGeneratingSectionId(null);
-    }
-  };
-
-  const handlePreviewPDF = async (sectionId?: HojaDeRutaPdfSectionId) => {
-    const currentJobId = getRequiredSelectedJobId();
-    if (!currentJobId) return;
-
-    const target = sectionId ?? "full";
-    setPdfPreview(null);
-    setPreviewingTarget(target);
-    setIsPreviewing(true);
-    try {
-      await saveBeforePdfGeneration();
-
-      const { generatePDFPreview } = await import("@/utils/hoja-de-ruta/pdf");
-      const jobDetails = getSelectedJobDetails(currentJobId);
-      const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
-
-      const generatedPdf = await generatePDFPreview(
-        buildPdfEventData(),
-        travelArrangements,
-        legacyRoomAssignments,
-        imagePreviews,
-        venueMapPreview,
-        currentJobId,
-        jobDetails?.title || "",
-        jobDetails?.start_time || undefined,
-        undefined,
-        accommodations,
-        sectionId ? { sections: [sectionId] } : buildFullDocumentPdfOptions()
-      );
-
-      openGeneratedPdfPreview(generatedPdf);
-    } catch (error) {
-      console.error("Error previewing PDF:", error);
-      toast({
-        title: "❌ Error",
-        description: "Hubo un problema al preparar la vista previa.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsPreviewing(false);
-      setPreviewingTarget(null);
-    }
-  };
-
-  const handleGenerateDriverCertificatePDF = async () => {
-    const currentJobId = getRequiredSelectedJobId();
-    if (!currentJobId) return;
-
-    setGeneratingSectionId(null);
-    setIsGenerating(true);
-    try {
-      await saveBeforePdfGeneration();
-
-      const { generateDriverCertificatePDF } = await import("@/utils/hoja-de-ruta/pdf");
-
-      const jobDetails = getSelectedJobDetails(currentJobId);
-
-      await generateDriverCertificatePDF({
-        eventData,
-        selectedJobId: currentJobId,
-        jobTitle: jobDetails?.title || "",
-        jobDate: jobDetails?.start_time || undefined,
-        venueMapPreview,
-        toast,
-      });
-    } catch (error) {
-      console.error("Error generating driver certificate PDF:", error);
-      toast({
-        title: "❌ Error",
-        description: "Hubo un problema al generar la hoja de transportes.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handlePreviewDriverCertificatePDF = async () => {
-    const currentJobId = getRequiredSelectedJobId();
-    if (!currentJobId) return;
-
-    setPdfPreview(null);
-    setPreviewingTarget("driver-certificate");
-    setIsPreviewing(true);
-    try {
-      await saveBeforePdfGeneration();
-
-      const { generateDriverCertificatePDFPreview } = await import("@/utils/hoja-de-ruta/pdf");
-      const jobDetails = getSelectedJobDetails(currentJobId);
-
-      const generatedPdf = await generateDriverCertificatePDFPreview({
-        eventData,
-        selectedJobId: currentJobId,
-        jobTitle: jobDetails?.title || "",
-        jobDate: jobDetails?.start_time || undefined,
-        venueMapPreview,
-      });
-
-      openGeneratedPdfPreview(generatedPdf);
-    } catch (error) {
-      console.error("Error previewing driver certificate PDF:", error);
-      toast({
-        title: "❌ Error",
-        description: "Hubo un problema al preparar la vista previa de transportes.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsPreviewing(false);
-      setPreviewingTarget(null);
-    }
-  };
-
-  // Excel export handler
-  const handleGenerateXLS = async () => {
-    if (!selectedJobId) {
-      toast({
-        title: "Error",
-        description: "Por favor, seleccione un trabajo antes de exportar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setGeneratingSectionId(null);
-    try {
-      const jobDetails = jobs?.find(job => job.id === selectedJobId);
-
-      await generateHojaDeRutaXLS({
-        eventData,
-        travelArrangements,
-        accommodations,
-        jobTitle: jobDetails?.title || "",
-        jobDate: jobDetails?.start_time || undefined,
-      });
-
-      toast({
-        title: "✅ Exportado correctamente",
-        description: "La hoja de ruta ha sido exportada a Excel.",
-      });
-      setShowPrintDialog(false);
-    } catch (error) {
-      console.error("Error generating Excel:", error);
-      toast({
-        title: "❌ Error",
-        description: "Hubo un problema al exportar a Excel.",
-        variant: "destructive",
-      });
-    }
-  };
 
   // Enhanced load job data function
   const handleLoadJobData = async () => {

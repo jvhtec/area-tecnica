@@ -8,6 +8,7 @@ import {
   getJobCardBackground,
   translateTimesheetStatus,
 } from '../../utils';
+import { WALLBOARD_PANEL_PAGE_SIZES } from '../../panelPageSizes';
 import { AutoScrollWrapper, PanelContainer } from '../shared';
 
 export const CrewAssignmentsPanel: React.FC<{
@@ -15,7 +16,7 @@ export const CrewAssignmentsPanel: React.FC<{
   page?: number;
   pageSize?: number;
   theme?: 'light' | 'dark';
-}> = ({ data, page = 0, pageSize = 4, theme = 'light' }) => {
+}> = ({ data, page = 0, pageSize = WALLBOARD_PANEL_PAGE_SIZES.crew, theme = 'light' }) => {
   const jobs = data?.jobs ?? [];
   const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(jobs.length / pageSize);

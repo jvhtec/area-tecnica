@@ -1,15 +1,12 @@
-import { PDFArray, PDFDocument, PDFName } from 'pdf-lib';
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
-import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
-import { fetchJobLogo, fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
-import { generateTableOfContents, TocLinkRegion, TocSection } from './tocGenerator';
+import { generateTableOfContents, TocSection } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
@@ -23,141 +20,25 @@ import {
   resolveHojaVenue,
 } from '@/utils/hoja-de-ruta/venue-resolution';
 import {
-  attachShiftAssignmentsAndProfiles,
   buildArtistTableArtists,
   buildInfrastructureArtists,
   buildRfIemArtists,
   sortArtistsChronologically,
 } from './festivalPdfSectionBuilders';
+import {
+  addTableOfContentsLinks,
+  clampPdfConcurrency,
+  getPdfPageCount,
+  getTotalPages,
+  isNonEmptyBlob,
+  runWithConcurrency,
+  type FestivalPdfGenerationOptions,
+  type FestivalPdfProgress,
+} from "@/utils/pdf/festivalPdfSupport";
+import { generateFestivalShiftPdfs } from "@/utils/pdf/festivalPdfShiftSection";
+import { loadFestivalStageMetadata, loadStagePlotUrls } from "@/utils/pdf/festivalPdfContext";
+export type { FestivalPdfGenerationOptions, FestivalPdfProgress, FestivalPdfProgressPhase } from "@/utils/pdf/festivalPdfSupport";
 
-
-const addTableOfContentsLinks = async (mergedBlob: Blob, links: TocLinkRegion[]): Promise<Blob> => {
-  if (links.length === 0) return mergedBlob;
-
-  const mergedBytes = await mergedBlob.arrayBuffer();
-  const mergedPdf = await PDFDocument.load(mergedBytes, {
-    ignoreEncryption: true,
-    throwOnInvalidObject: false,
-    updateMetadata: false,
-  });
-
-  for (const link of links) {
-    const tocPage = mergedPdf.getPage(1 + link.pageIndex);
-    const destinationPage = mergedPdf.getPage(link.targetPage - 1);
-
-    if (!tocPage || !destinationPage) continue;
-
-    const context = mergedPdf.context;
-    const destination = context.obj([
-      destinationPage.ref,
-      PDFName.of('XYZ'),
-      null,
-      null,
-      null,
-    ]);
-
-    const action = context.obj({
-      Type: 'Action',
-      S: 'GoTo',
-      D: destination,
-    });
-
-    const annotation = context.obj({
-      Type: 'Annot',
-      Subtype: 'Link',
-      Rect: [link.x, link.y, link.x + link.width, link.y + link.height],
-      Border: [0, 0, 0],
-      A: action,
-    });
-
-    const pageNode = tocPage.node;
-    const existingAnnots = pageNode.lookupMaybe(PDFName.of('Annots'), PDFArray);
-
-    if (existingAnnots) {
-      existingAnnots.push(annotation);
-    } else {
-      pageNode.set(PDFName.of('Annots'), context.obj([annotation]));
-    }
-  }
-
-  const linkedPdfBytes = await mergedPdf.save();
-  return new Blob([new Uint8Array(linkedPdfBytes)], { type: 'application/pdf' });
-};
-
-const getPdfPageCount = async (pdf: Blob): Promise<number> => {
-  try {
-    const bytes = await pdf.arrayBuffer();
-    const doc = await PDFDocument.load(bytes, {
-      ignoreEncryption: true,
-      throwOnInvalidObject: false,
-      updateMetadata: false,
-    });
-    return doc.getPageCount();
-  } catch (error) {
-    console.error('Error counting PDF pages:', error);
-    return 0;
-  }
-};
-
-const getTotalPages = (pageCounts: number[]): number =>
-  pageCounts.reduce((total, count) => total + count, 0);
-
-export type FestivalPdfProgressPhase =
-  | "gear-setup"
-  | "shift-schedules"
-  | "artist-tables"
-  | "artist-requirements"
-  | "merge";
-
-export interface FestivalPdfProgress {
-  phase: FestivalPdfProgressPhase;
-  completed: number;
-  total: number;
-  label: string;
-}
-
-export interface FestivalPdfGenerationOptions {
-  concurrency?: number;
-  onProgress?: (progress: FestivalPdfProgress) => void;
-}
-
-const DEFAULT_PDF_GENERATION_CONCURRENCY = 4;
-const MAX_PDF_GENERATION_CONCURRENCY = 6;
-
-const clampPdfConcurrency = (value?: number) => {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return DEFAULT_PDF_GENERATION_CONCURRENCY;
-  }
-  return Math.max(1, Math.min(MAX_PDF_GENERATION_CONCURRENCY, Math.floor(value)));
-};
-
-const runWithConcurrency = async <T, R>(
-  items: readonly T[],
-  worker: (item: T, index: number) => Promise<R>,
-  concurrency: number,
-): Promise<R[]> => {
-  if (items.length === 0) return [];
-
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (nextIndex < items.length) {
-        const currentIndex = nextIndex;
-        nextIndex += 1;
-        results[currentIndex] = await worker(items[currentIndex], currentIndex);
-      }
-    },
-  );
-
-  await Promise.all(workers);
-  return results;
-};
-
-const isNonEmptyBlob = (value: Blob | null | undefined): value is Blob =>
-  Boolean(value && value.size > 0);
 
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
@@ -172,28 +53,8 @@ export const generateAndMergeFestivalPDFs = async (
     generationOptions.onProgress?.(progress);
   };
 
-  const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+  const { getStageNameByNumber, logoUrl, stageNamesByNumber } = await loadFestivalStageMetadata(jobId);
   console.log("Logo URL for PDFs:", logoUrl);
-  
-  // Fetch stage names for consistent usage
-  const { data: stageNames, error: stageError } = await supabase
-    .from("festival_stages")
-    .select("number, name")
-    .eq("job_id", jobId)
-    .order("number");
-  
-  if (stageError) {
-    console.error("Error fetching stage names:", stageError);
-  }
-  
-  const getStageNameByNumber = (stageNumber: number): string => {
-    const stage = stageNames?.find(s => s.number === stageNumber);
-    return stage?.name || `Stage ${stageNumber}`;
-  };
-  const stageNamesByNumber = (stageNames || []).reduce((acc, stage) => {
-    acc[Number(stage.number)] = stage.name || `Escenario ${stage.number}`;
-    return acc;
-  }, {} as Record<number, string>);
   
   const gearPdfs: Blob[] = [];
   const shiftPdfs: Blob[] = [];
@@ -214,26 +75,7 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (artistError) throw artistError;
 
-    const stagePlotUrlsByArtistId: Record<string, string> = {};
-    const artistsWithStagePlot = (artists || []).filter((artist) => Boolean(artist.stage_plot_file_path));
-
-    if (artistsWithStagePlot.length > 0) {
-      await Promise.all(
-        artistsWithStagePlot.map(async (artist) => {
-          try {
-            const { data: signedData, error: signedError } = await supabase.storage
-              .from("festival_artist_files")
-              .createSignedUrl(String(artist.stage_plot_file_path), 60 * 60);
-
-            if (!signedError && signedData?.signedUrl) {
-              stagePlotUrlsByArtistId[String(artist.id)] = signedData.signedUrl;
-            }
-          } catch (stagePlotError) {
-            console.error(`Error signing stage plot for artist ${artist.id}:`, stagePlotError);
-          }
-        })
-      );
-    }
+    const stagePlotUrlsByArtistId = await loadStagePlotUrls(artists || [], pdfConcurrency);
     
     if (options.includeGearSetup && options.gearSetupStages.length > 0) {
       console.log("Starting gear setup PDF generation for stages:", options.gearSetupStages);
@@ -274,136 +116,14 @@ export const generateAndMergeFestivalPDFs = async (
       gearPdfs.push(...generatedGearPdfs.filter(isNonEmptyBlob));
     }
     
-    if (options.includeShiftSchedules) {
-      console.log("Starting shift table PDF generation");
-      
-      // Get all dates from job_date_types instead of only artist dates
-      const { data: jobDates, error: jobDatesError } = await supabase
-        .from("job_date_types")
-        .select("date")
-        .eq("job_id", jobId)
-        .order("date");
-      
-      if (jobDatesError) {
-        console.error("Error fetching job dates:", jobDatesError);
-      } else {
-        const allJobDates = [...new Set(jobDates?.map(d => d.date) || [])];
-        console.log("Processing shift schedules for all job dates:", allJobDates);
-        const selectedJobDates = allJobDates.filter((date): date is string => Boolean(date));
-        let completedShiftPdfs = 0;
-        reportProgress({
-          phase: "shift-schedules",
-          completed: completedShiftPdfs,
-          total: selectedJobDates.length,
-          label: "Preparando horarios de turnos",
-        });
-        
-        const generatedShiftPdfs = await runWithConcurrency(selectedJobDates, async (date) => {
-          try {
-          const { data: shiftsData, error: shiftsError } = await supabase
-            .from("festival_shifts")
-            .select(`
-              id, job_id, name, date, start_time, end_time, department, stage
-            `)
-            .eq("job_id", jobId)
-            .eq("date", date);
-          
-          if (shiftsError) {
-            return null;
-          }
-          
-          const filteredShifts = shiftsData?.filter(shift => 
-            !shift.stage || options.shiftScheduleStages.includes(Number(shift.stage))
-          );
-          
-          if (filteredShifts && filteredShifts.length > 0) {
-            try {
-              console.log(`Generating shifts PDF for date ${date} with ${filteredShifts.length} shifts`);
-              const shiftIds = filteredShifts.map((shift) => shift.id);
-              const { data: assignmentsData, error: assignmentsError } = await supabase
-                .from("festival_shift_assignments")
-                .select("id, shift_id, technician_id, external_technician_name, role")
-                .in("shift_id", shiftIds);
-
-              if (assignmentsError) {
-                console.error(`Error fetching assignments for date ${date}:`, assignmentsError);
-                return null;
-              }
-
-              const technicianIds = Array.from(
-                new Set(
-                  (assignmentsData || [])
-                    .map((assignment) => assignment.technician_id)
-                    .filter((technicianId): technicianId is string => Boolean(technicianId)),
-                ),
-              );
-
-              let profilesById = new Map<string, {
-                id: string;
-                first_name: string | null;
-                last_name: string | null;
-                email: string | null;
-                department: string | null;
-                role: string | null;
-              }>();
-
-              if (technicianIds.length > 0) {
-                const { data: profilesData, error: profilesError } = await supabase
-                  .from("profiles")
-                  .select("id, first_name, last_name, email, department, role")
-                  .in("id", technicianIds);
-
-                if (profilesError) {
-                  console.error(`Error fetching profiles for date ${date}:`, profilesError);
-                } else {
-                  profilesById = new Map((profilesData || []).map((profile) => [profile.id, profile]));
-                }
-              }
-
-              const typedShifts = attachShiftAssignmentsAndProfiles(
-                filteredShifts,
-                assignmentsData || [],
-                profilesById,
-              );
-            
-              const shiftsTableData: ShiftsTablePdfData = {
-                jobTitle: jobTitle || 'Festival',
-                date: date,
-                jobId: jobId,
-                shifts: typedShifts,
-                logoUrl
-              };
-            
-              console.log(`Creating shifts table PDF with ${typedShifts.length} shifts and logoUrl: ${logoUrl}`);
-              const shiftPdf = await exportShiftsTablePDF(shiftsTableData);
-            
-              console.log(`Generated shifts PDF for date ${date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
-              if (shiftPdf && shiftPdf.size > 0) {
-                return shiftPdf;
-              } else {
-                console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
-              }
-            } catch (err) {
-              console.error(`Error generating shifts PDF for date ${date}:`, err);
-            }
-          } else {
-            console.log(`No shifts found for date ${date}, skipping shifts PDF generation`);
-          }
-          return null;
-          } finally {
-          completedShiftPdfs += 1;
-          reportProgress({
-            phase: "shift-schedules",
-            completed: completedShiftPdfs,
-            total: selectedJobDates.length,
-            label: "Generando horarios de turnos",
-          });
-          }
-        }, pdfConcurrency);
-
-        shiftPdfs.push(...generatedShiftPdfs.filter(isNonEmptyBlob));
-      }
-    }
+    shiftPdfs.push(...await generateFestivalShiftPdfs({
+      jobId,
+      jobTitle,
+      logoUrl,
+      options,
+      pdfConcurrency,
+      reportProgress,
+    }));
     
     if (options.includeArtistTables) {
       // Filter artists by selected stages first

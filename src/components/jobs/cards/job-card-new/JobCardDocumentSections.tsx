@@ -1,6 +1,7 @@
-import { ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 
+import { JobCardDocumentActions } from "@/components/jobs/cards/JobCardDocumentActions";
 import { JobCardDocuments, type JobDocument } from "@/components/jobs/cards/JobCardDocuments";
 import { Button } from "@/components/ui/button";
 import { formatInJobTimezone, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
@@ -121,23 +122,20 @@ export function JobCardDocumentSections({
               {tourDocuments.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
+                  className="flex min-w-0 max-w-full flex-col gap-2 overflow-hidden rounded-md bg-accent/20 p-2 transition-colors hover:bg-accent/30 md:flex-row md:items-center md:justify-between"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{file.file_name}</span>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="text-sm font-medium [overflow-wrap:anywhere]">{file.file_name}</span>
                     <span className="text-xs text-muted-foreground">
                       {formatInJobTimezone(file.uploaded_at, "MMM d, yyyy", MADRID_TIMEZONE)}
                     </span>
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="ghost" size="icon" title="Ver" onClick={() => onViewTourDocument(file)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button type="button" variant="ghost" size="icon" title="Descargar" onClick={() => onDownloadTourDocument(file)}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <JobCardDocumentActions
+                    fileName={file.file_name}
+                    onView={() => onViewTourDocument(file)}
+                    onDownload={() => onDownloadTourDocument(file)}
+                  />
                 </div>
               ))}
             </div>
@@ -158,23 +156,20 @@ export function JobCardDocumentSections({
               {riderFiles.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
+                  className="flex min-w-0 max-w-full flex-col gap-2 overflow-hidden rounded-md bg-accent/20 p-2 transition-colors hover:bg-accent/30 md:flex-row md:items-center md:justify-between"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{file.file_name}</span>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="text-sm font-medium [overflow-wrap:anywhere]">{file.file_name}</span>
                     <span className="text-xs text-muted-foreground">
                       Artista: {artistNameMap.get(file.artist_id) || "Desconocido"}
                     </span>
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="ghost" size="icon" title="Ver" onClick={() => onViewRider(file)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button type="button" variant="ghost" size="icon" title="Descargar" onClick={() => onDownloadRider(file)}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <JobCardDocumentActions
+                    fileName={file.file_name}
+                    onView={() => onViewRider(file)}
+                    onDownload={() => onDownloadRider(file)}
+                  />
                 </div>
               ))}
             </div>

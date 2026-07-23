@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Copy, Edit, FileText, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Trash2 } from "lucide-react";
 import { TourOverrideModeHeader } from "@/components/tours/TourOverrideModeHeader";
 import { TechnicalStageSelector } from "@/features/technical-tools/stage/stageAllocation";
 import {
@@ -30,12 +30,8 @@ import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/Quick
 import type { PowerTable } from "@/features/technical-tools/power/types";
 import { GeneratedPowerTableCard } from "@/features/technical-tools/power/consumos/GeneratedPowerTableCard";
 import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
-import { PowerTableSummary } from "@/features/technical-tools/power/consumos/PowerTableSummary";
-import {
-  TOUR_PACKAGE_LABELS,
-  TOUR_PACKAGE_SIZES,
-  type TourPackageSize,
-} from "@/utils/tourPackages";
+import { ConsumosDefaultSetPanel } from "@/features/technical-tools/power/consumos/ConsumosDefaultSetPanel";
+import { ConsumosSavedTables } from "@/features/technical-tools/power/consumos/ConsumosSavedTables";
 
 export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = ({
   config,
@@ -55,24 +51,6 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     overrideLoading,
     overrideData,
     isCreatingOverride,
-    defaultSets,
-    selectedDefaultSet,
-    selectedDefaultSetId,
-    setSelectedDefaultSetId,
-    selectedDefaultPackageSize,
-    setSelectedDefaultPackageSize,
-    newDefaultSetName,
-    setNewDefaultSetName,
-    createEmptyDefaultSet,
-    copySourceSetId,
-    setCopySourceSetId,
-    copySourceTables,
-    selectedCopyTableIds,
-    selectedCopyTableCount,
-    allCopySourceTablesSelected,
-    toggleCopyTableSelection,
-    toggleAllCopySourceTables,
-    copySelectedDefaultTables,
     tourName,
     tourInfo,
     selectedStage,
@@ -114,13 +92,8 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     removeTable,
     updateTableSettings,
     startEditingTable,
-    startEditingDefaultTable,
-    startEditingOverride,
     saveTourDefault,
     saveDefaultTables,
-    handleDeleteDefaultTable,
-    handleDeleteOverride,
-    tourDefaultDisplayTables,
     readOnlyDefaultTables,
     overrideDisplayTables,
     handleExportPDF,
@@ -158,14 +131,6 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
 
   const firstColumnTables = activeTables.slice(0, Math.ceil(activeTables.length / 2));
   const secondColumnTables = activeTables.slice(Math.ceil(activeTables.length / 2));
-  const copyButtonLabel = selectedDefaultSetId
-    ? copySourceSetId === selectedDefaultSetId
-      ? "Duplicar seleccionadas en este conjunto"
-      : "Copiar seleccionadas al conjunto en edición"
-    : "Crear conjunto y copiar seleccionadas";
-  const canCreateOrCopyDefaultSet =
-    Boolean(selectedDefaultSetId) || newDefaultSetName.trim().length > 0;
-
   const renderGeneratedTable = (table: PowerTable) => (
     <GeneratedPowerTableCard
       key={table.id}
@@ -341,209 +306,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                   </div>
                 )}
 
-                {isTourDefaults && (
-                  <div className="space-y-3 rounded-lg border p-4">
-                    <h3 className="text-sm font-semibold">Conjunto por defecto</h3>
-                    {selectedDefaultSet ? (
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          Editando:{" "}
-                          <span className="font-medium text-foreground">
-                            {selectedDefaultSet.name}
-                            {selectedDefaultSet.package_size
-                              ? ` (${TOUR_PACKAGE_LABELS[selectedDefaultSet.package_size]})`
-                              : " (Sin asignar)"}
-                          </span>
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="w-full gap-2 sm:w-auto"
-                          onClick={() => {
-                            setSelectedDefaultSetId("");
-                            setNewDefaultSetName("");
-                          }}
-                        >
-                          <Plus className="h-4 w-4" />
-                          Crear otro conjunto
-                        </Button>
-                      </div>
-                    ) : defaultSets.length > 1 ? (
-                      <p className="text-sm text-amber-700">
-                        Selecciona un conjunto para ver, editar o añadir tablas a ese paquete.
-                      </p>
-                    ) : null}
-                    <div className="space-y-2">
-                      <Label>Conjunto existente</Label>
-                      <Select
-                        value={selectedDefaultSetId || "new"}
-                        onValueChange={(value) => setSelectedDefaultSetId(value === "new" ? "" : value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un conjunto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">Crear nuevo conjunto</SelectItem>
-                          {defaultSets.map((set) => (
-                            <SelectItem key={set.id} value={set.id}>
-                              {set.name}
-                              {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size]})` : " (Sin asignar)"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {!selectedDefaultSetId && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="newDefaultSetName">Nombre del nuevo conjunto</Label>
-                          <Input
-                            id="newDefaultSetName"
-                            value={newDefaultSetName}
-                            onChange={(event) => setNewDefaultSetName(event.target.value)}
-                            placeholder={`${tourName || "Tour"} ${labels.defaultBadge}`}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Tamaño de paquete</Label>
-                          <Select
-                            value={selectedDefaultPackageSize}
-                            onValueChange={(value) =>
-                              setSelectedDefaultPackageSize(value as TourPackageSize | "unassigned")
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Tamaño de paquete" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="unassigned">Sin asignar</SelectItem>
-                              {TOUR_PACKAGE_SIZES.map((size) => (
-                                <SelectItem key={size} value={size}>
-                                  {TOUR_PACKAGE_LABELS[size]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-                    {!selectedDefaultSetId && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full gap-2"
-                        onClick={createEmptyDefaultSet}
-                        disabled={!newDefaultSetName.trim()}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Crear conjunto vacío
-                      </Button>
-                    )}
-                    {defaultSets.length > 0 && (
-                      <div className="space-y-3 rounded-md border border-dashed p-3">
-                        <div>
-                          <h4 className="text-sm font-medium">Reutilizar tablas existentes</h4>
-                          <p className="text-xs text-muted-foreground">
-                            Elige un conjunto origen y copia solo las tablas que quieras al conjunto en edición.
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Copiar tablas desde</Label>
-                          <Select
-                            value={copySourceSetId}
-                            onValueChange={setCopySourceSetId}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecciona conjunto origen" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {defaultSets.map((set) => (
-                                <SelectItem key={set.id} value={set.id}>
-                                  {set.name}
-                                  {set.package_size
-                                    ? ` (${TOUR_PACKAGE_LABELS[set.package_size]})`
-                                    : " (Sin asignar)"}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {copySourceTables.length > 0 ? (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3 text-sm">
-                              <label className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={allCopySourceTablesSelected}
-                                  onCheckedChange={(checked) =>
-                                    toggleAllCopySourceTables(checked === true)
-                                  }
-                                />
-                                Seleccionar todas
-                              </label>
-                              <span className="text-xs text-muted-foreground">
-                                {selectedCopyTableCount}/{copySourceTables.length}
-                              </span>
-                            </div>
-                            <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
-                              {copySourceTables.map((table) => (
-                                <label
-                                  key={table.defaultTableId || table.id}
-                                  className="flex items-start gap-2 rounded-md border bg-background p-2 text-sm"
-                                >
-                                  <Checkbox
-                                    checked={
-                                      Boolean(table.defaultTableId) &&
-                                      selectedCopyTableIds.includes(table.defaultTableId!)
-                                    }
-                                    onCheckedChange={(checked) =>
-                                      table.defaultTableId &&
-                                      toggleCopyTableSelection(
-                                        table.defaultTableId,
-                                        checked === true,
-                                      )
-                                    }
-                                  />
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate font-medium">
-                                      {table.name}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {table.totalVa !== undefined
-                                        ? `${(table.totalVa / 1000).toFixed(2)} kVA`
-                                        : labels.notAvailable}
-                                    </span>
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full gap-2"
-                              onClick={copySelectedDefaultTables}
-                              disabled={
-                                selectedCopyTableCount === 0 || !canCreateOrCopyDefaultSet
-                              }
-                            >
-                              <Copy className="h-4 w-4" />
-                              {copyButtonLabel}
-                            </Button>
-                            {!canCreateOrCopyDefaultSet && (
-                              <p className="text-xs text-amber-700">
-                                Selecciona un conjunto destino o escribe un nombre para crear uno nuevo.
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            El conjunto origen seleccionado no tiene tablas de potencia guardadas.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <ConsumosDefaultSetPanel config={config} state={state} />
 
                 {/* Supply / Voltage / PF controls */}
                 <div
@@ -650,164 +413,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                   />
                 )}
 
-                {/* Existing tour defaults */}
-                {isTourDefaults && !selectedDefaultSetId && defaultSets.length > 1 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                    Selecciona un conjunto por defecto para ver sus tablas. No se mezclan tablas de paquetes distintos.
-                  </div>
-                )}
-                {isTourDefaults && tourDefaultDisplayTables.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-blue-900">
-                      {selectedDefaultSet
-                        ? `${labels.existingDefaultsHeading}: ${selectedDefaultSet.name}`
-                        : labels.existingDefaultsHeading}
-                    </h3>
-                    {tourDefaultDisplayTables.map((table) => (
-                      <div
-                        key={table.id}
-                        className="border rounded-lg overflow-hidden bg-blue-50/30"
-                      >
-                        <div className="bg-blue-100 px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-blue-900">{table.name}</h4>
-                            <Badge
-                              variant="outline"
-                              className="bg-green-50 text-green-700 border-green-200"
-                            >
-                              {labels.defaultBadge}
-                            </Badge>
-                          </div>
-                          {table.defaultTableId && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => startEditingDefaultTable(table)}
-                                className="gap-2"
-                              >
-                                <Edit className="h-4 w-4" />
-                                {labels.edit}
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() =>
-                                  table.defaultTableId &&
-                                  handleDeleteDefaultTable(table.defaultTableId)
-                                }
-                                className="gap-2"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                {labels.deleteAction}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-4">
-                          <PowerTableSummary
-                            table={table}
-                            labels={labels}
-                            phaseMode={phaseMode}
-                            showPosition={false}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Read-only defaults in URL override mode */}
-                {isUrlOverrideMode && readOnlyDefaultTables.length > 0 && (
-                  <div className="border rounded-lg p-4 bg-green-50 space-y-4">
-                    <h3 className="font-semibold text-green-800">
-                      {labels.readOnlyDefaultsHeading}
-                    </h3>
-                    {readOnlyDefaultTables.map((table) => (
-                      <div key={table.id} className="border rounded-lg overflow-hidden bg-white">
-                        <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">{table.name}</h4>
-                            <Badge variant="outline" className="bg-green-50 text-green-700">
-                              {labels.defaultBadge}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <PowerTableSummary table={table} labels={labels} phaseMode={phaseMode} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Existing overrides */}
-                {isOverrideMode && !isTourDefaults && overrideDisplayTables.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-orange-900">
-                      {labels.existingOverridesHeading}
-                    </h3>
-                    {overrideDisplayTables.map((table) => (
-                      <div
-                        key={table.id}
-                        className="border rounded-lg overflow-hidden bg-orange-50/30"
-                      >
-                        <div className="bg-orange-100 px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-orange-900">{table.name}</h4>
-                            <Badge
-                              variant="outline"
-                              className="bg-orange-50 text-orange-700 border-orange-200"
-                            >
-                              {labels.overrideTableBadge}
-                            </Badge>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                table.overrideId &&
-                                startEditingOverride({
-                                  id: table.overrideId,
-                                  table_name: table.name,
-                                  total_watts: table.totalWatts || 0,
-                                  position: table.position,
-                                  custom_position: table.customPosition,
-                                  custom_pdu_type: table.customPduType,
-                                  pdu_type: table.pduType,
-                                  includes_hoist: table.includesHoist,
-                                  override_data: {
-                                    rows: table.rows,
-                                    calculation: table.calculation,
-                                  },
-                                })
-                              }
-                              className="gap-2"
-                            >
-                              <Edit className="h-4 w-4" />
-                              {labels.edit}
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() =>
-                                table.overrideId && handleDeleteOverride(table.overrideId)
-                              }
-                              className="gap-2"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              {labels.deleteAction}
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <PowerTableSummary table={table} labels={labels} phaseMode={phaseMode} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <ConsumosSavedTables config={config} state={state} />
 
                 <div className="space-y-2">
                   <Label htmlFor="tableName">

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "threshold": 800,
-  "generatedAt": "2026-07-21T23:13:40.338Z",
+  "generatedAt": "2026-07-22T21:38:47.666Z",
   "note": "Line-count ceilings for files over the threshold. CI fails when a file exceeds its ceiling or a new file crosses the threshold. Regenerate with: npm run governance:filesize -- --write-baseline",
   "files": {
     "src/features/tour-ops/TourOpsManagementHub.tsx": 2116,
@@ -9,28 +9,12 @@
     "src/features/technical-tools/power/consumos/useConsumosTool.ts": 1820,
     "src/components/tours/TourDefaultsManager.tsx": 1706,
     "src/components/jobs/cards/JobCardNew.tsx": 1438,
-    "src/routes/app-route-manifest.tsx": 1410,
-    "src/components/tours/TourDateManagementDialog.tsx": 1342,
     "src/components/matrix/StaffingCampaignPanel.tsx": 1299,
-    "src/components/soundvision/SoundVisionInteractiveMap.tsx": 1293,
     "src/utils/rates-pdf-export.ts": 1244,
     "src/components/matrix/AssignJobDialog.tsx": 1238,
-    "src/components/festival/pdf/PrintOptionsDialog.tsx": 1224,
-    "src/components/festival/ArtistTable.tsx": 1221,
-    "src/pages/PesosTool.tsx": 1130,
     "src/components/timesheet/TimesheetView.tsx": 1122,
-    "src/components/festival/ArtistRequirementsForm.tsx": 1119,
     "src/pages/PayoutsDueFortnights.tsx": 1112,
-    "src/pages/TourManagement.tsx": 1086,
-    "src/utils/pdf/festivalPdfGenerator.ts": 1076,
-    "src/features/technical-tools/power/consumos/ConsumosToolPage.tsx": 1058,
-    "src/components/hoja-de-ruta/ModernHojaDeRuta.tsx": 992,
-    "src/components/technician/details-modal/DetailsModalTabs.tsx": 991,
     "src/components/technician/TimesheetView.tsx": 980,
-    "src/features/wallboard/WallboardDisplay.tsx": 930,
-    "src/lib/unified-subscription-manager.ts": 930,
-    "src/components/matrix/TechnicianRow.tsx": 925,
-    "src/components/department/EnhancedJobDetailsModal.tsx": 911,
-    "src/hooks/useOptimizedAuth.tsx": 842
+    "src/components/matrix/TechnicianRow.tsx": 925
   }
 }
