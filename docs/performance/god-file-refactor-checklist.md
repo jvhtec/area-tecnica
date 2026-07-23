@@ -149,6 +149,15 @@ test-coverage nitpick. The Tour Ops Spanish sync-status test now covers
 `imported`, `legacy`, and the unknown-status fallback as well as the original
 three states.
 
+The final CI rerun then exposed three React Router advisories published after
+the preceding governance pass. This branch upgrades
+`react-router-dom`/`react-router` from 6.30.4 to 7.18.1, removing those
+advisories instead of adding security exceptions. The app already met the v7
+Node 20 and React 18 requirements, and its declarative router has no
+multi-segment splat routes. Existing `react-router-dom` imports remain on the
+supported v7 re-export to keep this already broad refactor stable; obsolete
+test-only v7 future flags were removed because the behavior is now default.
+
 ## Ratchets after completion
 
 - File size: `43 → 0` authored modules above 800 lines; the baseline is empty.
@@ -196,6 +205,9 @@ The final batch passed:
   Ops whitespace negative control and all high-risk moved paths.
 - Focused incremental-review follow-up — the complete Tour Ops sync-status
   label mapping passes, including `imported`, `legacy`, and fallback branches.
+- React Router 7 migration selection — 5 files / 33 tests pass across root
+  routing, auth guards, the authenticated shell, project management, and the
+  technician app.
 - `npm run test:critical`, including assignment cascade, staffing
   orchestration, Flex deletion/creation, and timesheet critical paths.
 - `npm run test:run`.
@@ -203,9 +215,11 @@ The final batch passed:
 - `npm run test:e2e` — 22 Chromium smoke tests passed and 3 optional
   mobile-screenshot cases were skipped by their configured guard.
 - `npm run build`.
-- `npm run budget:bundle` — all budgets pass; total JS gzip is 3.06 MB
-  (`+49.4 kB`, below the 3.32 MB relative ceiling), and the largest entry
+- `npm run budget:bundle` — all budgets pass; total JS gzip is 3.07 MB
+  (`+55.4 kB`, below the 3.32 MB relative ceiling), and the largest entry
   script is 107.7 kB gzip.
+- `npm ci --legacy-peer-deps` and `npm run cap:sync` — pass with the updated
+  lockfile and the Android/iOS/web sync paths.
 - `git diff --check`.
 
 The critical-invariant audit found no bypass: assignment removal still prefers

@@ -157,6 +157,15 @@ remaining extraction wiring.
   one valid nitpick: the Spanish Tour Ops sync-label test did not exercise the
   `imported`, `legacy`, or fallback branches. Those assertions now protect the
   helper's complete mapping.
+- A final CI rerun surfaced three newly published React Router advisories after
+  the prior governance pass. The branch now uses
+  `react-router-dom@7.18.1`/`react-router@7.18.1`, which removes all three
+  advisory IDs and returns the audit to the existing 11-advisory baseline.
+  The app already met the v7 Node 20 and React 18 minimums, uses declarative
+  routing without multi-segment splats, and keeps lazy route declarations at
+  module scope. The supported v7 `react-router-dom` re-export preserves the
+  existing import surface; only obsolete `MemoryRouter` v7 future flags were
+  removed because those behaviors are now the default.
 
 ## Validation
 
@@ -179,16 +188,22 @@ remaining extraction wiring.
   normalization, Flex folder parsing, and rates PDFs.
 - Incremental CodeRabbit follow-up: the complete Tour Ops sync-status mapping
   passes its focused test after adding the three missing branch assertions.
+- React Router 7 migration selection: 5 files and 33 tests pass across the app
+  root, protected routes, authenticated shell, project management, and the
+  technician app.
 - `npm run test:critical`: pass, including the assignment, staffing, Flex, and
   timesheet invariant suites plus the coverage gate.
 - `npm run test:run`: pass.
 - Staffing recommendations Playwright smoke: 1 Chromium test passes.
 - `npm run test:e2e`: pass with 22 Chromium tests and 3 guarded mobile
   screenshot cases skipped.
-- `npm run build`: pass (5,930 modules transformed).
-- `npm run budget:bundle`: pass. JS gzip total is 3.06 MB (+49.4 kB versus the
+- `npm run build`: pass (5,938 modules transformed).
+- `npm run budget:bundle`: pass. JS gzip total is 3.07 MB (+55.4 kB versus the
   performance baseline), and every relative/absolute asset budget remains
   below its ceiling.
+- `npm ci --legacy-peer-deps`: pass from the updated deterministic lockfile.
+- `npm run cap:sync`: pass for Android, iOS, and web; generated native manifest
+  noise unrelated to the router upgrade was not retained.
 - `git diff --check`: pass.
 
 The read-only critical-invariant review found no bypasses. The batch changes no
