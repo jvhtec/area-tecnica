@@ -35,6 +35,7 @@ import {
 } from "@/routes/app-route-manifest"
 
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { isChunkLoadError } from "@/utils/errorUtils"
 import { AboutCard } from "./AboutCard"
 import { AppBreadcrumbs } from "./AppBreadcrumbs"
 import { HelpButton } from "./HelpButton"
@@ -529,28 +530,38 @@ const Layout = () => {
             <ErrorBoundary
               boundaryName="route"
               resetKeys={[location.pathname, location.search]}
-              fallback={({ error, reset, reload }) => (
-                <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-                  <h2 className="text-xl font-semibold">No pudimos cargar esta página</h2>
-                  <p className="max-w-md text-sm text-muted-foreground">
-                    Se produjo un error al mostrar el contenido. Puedes intentar recargar esta sección
-                    o volver a abrirla más tarde. El resto de la aplicación sigue funcionando.
-                  </p>
-                  {error?.message && (
-                    <p className="max-w-md truncate text-xs text-muted-foreground" title={error.message}>
-                      {error.message}
+              fallback={({ error, reset, reload }) => {
+                const isChunkError = isChunkLoadError(error)
+
+                return (
+                  <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                    <h2 className="text-xl font-semibold">
+                      {isChunkError ? "Nueva versión disponible" : "No pudimos cargar esta página"}
+                    </h2>
+                    <p className="max-w-md text-sm text-muted-foreground">
+                      {isChunkError
+                        ? "La aplicación se ha actualizado. Recarga la página para obtener la última versión."
+                        : "Se produjo un error al mostrar el contenido. Puedes intentar recargar esta sección " +
+                          "o volver a abrirla más tarde. El resto de la aplicación sigue funcionando."}
                     </p>
-                  )}
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button onClick={reset} variant="secondary">
-                      Intentar de nuevo
-                    </Button>
-                    <Button onClick={reload}>
-                      Recargar página
-                    </Button>
+                    {error?.message && !isChunkError && (
+                      <p className="max-w-md truncate text-xs text-muted-foreground" title={error.message}>
+                        {error.message}
+                      </p>
+                    )}
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      {!isChunkError && (
+                        <Button onClick={reset} variant="secondary">
+                          Intentar de nuevo
+                        </Button>
+                      )}
+                      <Button onClick={reload}>
+                        Recargar página
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              }}
             >
               <Outlet />
             </ErrorBoundary>
