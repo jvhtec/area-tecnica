@@ -66,7 +66,7 @@ export const fitImageWithin = (
 const readImageDimensions = (dataUrl: string): Promise<{ width: number; height: number }> =>
   new Promise((resolve, reject) => {
     if (typeof Image === 'undefined') {
-      reject(new Error('Image dimensions can only be read in a browser.'));
+      reject(new Error('Las dimensiones de imagen solo se pueden leer en un navegador.'));
       return;
     }
 
@@ -227,6 +227,7 @@ const drawHeader = (
   assets: SoundvisionReportAssets,
 ): void => {
   const brand = SOUNDVISION_REPORT_BRANDS[model.system];
+  const predictionLogoX = PAGE_WIDTH - RIGHT - 8;
   const company = drawImage(pdf, assets.companyLogo, {
     x: LEFT,
     y: 14.3,
@@ -240,19 +241,26 @@ const drawHeader = (
     pdf.text('SECTOR-PRO', LEFT, 20);
   }
 
-  drawImage(pdf, assets.predictionLogo, {
-    x: PAGE_WIDTH - RIGHT - 8,
+  const hasPredictionLogo = drawImage(pdf, assets.predictionLogo, {
+    x: predictionLogoX,
     y: 13.5,
     width: 8,
     height: 8,
   });
+  const predictionName = brand.reportLabel.replace(/^Informe\s+/i, '').toUpperCase();
   setMono(pdf, 'bold');
-  pdf.setFontSize(5.8);
+  pdf.setFontSize(5.2);
   pdf.setTextColor(...SOFT);
-  pdf.text(brand.predictionLabel.toUpperCase(), PAGE_WIDTH - RIGHT - 12, 18.7, {
-    align: 'right',
-    charSpace: 0.75,
-  });
+  pdf.text(
+    [predictionName, 'PREDICCIÓN'],
+    hasPredictionLogo ? predictionLogoX - 6 : PAGE_WIDTH - RIGHT,
+    16.3,
+    {
+      align: 'right',
+      charSpace: 0.55,
+      lineHeightFactor: 1.35,
+    },
+  );
 
   pdf.setDrawColor(...GOLD);
   pdf.setLineWidth(0.4);
@@ -280,7 +288,7 @@ const drawFooter = (
   setMono(pdf, 'normal');
   pdf.setFontSize(5.8);
   pdf.setTextColor(...SOFT);
-  pdf.text(`SECTOR-PRO | SYSTEM DESIGN & ${predictionLabel.toUpperCase()}`, LEFT, FOOTER_Y + 5, {
+  pdf.text(`SECTOR-PRO | DISEÑO DE SISTEMA | ${predictionLabel.toUpperCase()}`, LEFT, FOOTER_Y + 5, {
     charSpace: 0.45,
   });
   pdf.setFontSize(8.5);
@@ -300,6 +308,8 @@ const drawSectionHeading = (
   title: string,
   y: number,
 ): void => {
+  const heading = title.toUpperCase();
+  const headingCharSpace = 0.55;
   setMono(pdf, 'bold');
   pdf.setFontSize(6.8);
   pdf.setTextColor(...GOLD);
@@ -307,19 +317,21 @@ const drawSectionHeading = (
   setSans(pdf, 'bold');
   pdf.setFontSize(7.8);
   pdf.setTextColor(...INK);
-  pdf.text(title.toUpperCase(), LEFT + 9, y, { charSpace: 0.7 });
+  pdf.text(heading, LEFT + 9, y, { charSpace: headingCharSpace });
   pdf.setDrawColor(...RULE);
   pdf.setLineWidth(0.25);
-  const ruleStart = LEFT + 9 + Math.min(55, pdf.getTextWidth(title.toUpperCase()) + 7);
+  const headingWidth =
+    pdf.getTextWidth(heading) + Math.max(0, heading.length - 1) * headingCharSpace;
+  const ruleStart = Math.min(PAGE_WIDTH - RIGHT - 12, LEFT + 9 + headingWidth + 7);
   pdf.line(ruleStart, y - 1, PAGE_WIDTH - RIGHT, y - 1);
 };
 
 const conditionValues = (conditions: SoundvisionReportConditions) => [
-  ['Temperature', `${conditions.temperatureC} °C`],
-  ['Relative humidity', `${conditions.humidityPercent} %`],
-  ['Input level', `${conditions.inputLevelDbu} dBu`],
-  ['Air absorption', 'Applied'],
-  ['Audience plane', `${conditions.audiencePlaneM} m AGL`],
+  ['Temperatura', `${conditions.temperatureC} °C`],
+  ['Humedad relativa', `${conditions.humidityPercent} %`],
+  ['Nivel de entrada', `${conditions.inputLevelDbu} dBu`],
+  ['Absorción del aire', 'Aplicada'],
+  ['Plano de audiencia', `${conditions.audiencePlaneM} m sobre suelo`],
 ];
 
 const drawConditions = (
@@ -365,7 +377,7 @@ const drawTitlePage = (
   setMono(pdf, 'bold');
   pdf.setFontSize(6.5);
   pdf.setTextColor(...GOLD);
-  pdf.text(`SYSTEM PREDICTION | REV ${model.revision.toUpperCase()}`, LEFT, 42, {
+  pdf.text(`PREDICCIÓN DE SISTEMA | REV ${model.revision.toUpperCase()}`, LEFT, 42, {
     charSpace: 0.85,
   });
 
@@ -402,10 +414,10 @@ const drawTitlePage = (
   pdf.line(LEFT, metaTop + 19, PAGE_WIDTH - RIGHT, metaTop + 19);
 
   const metadata = [
-    ['Issued', model.issuedDate],
-    ['System', brand.manufacturer],
-    ['Prediction', brand.reportLabel.replace(/ report$/i, '')],
-    ['Designed by', 'Sector-Pro'],
+    ['Emitido', model.issuedDate],
+    ['Sistema', brand.manufacturer],
+    ['Predicción', brand.reportLabel.replace(/^Informe\s+/i, '')],
+    ['Diseñado por', 'Sector-Pro'],
   ];
   const columnWidth = CONTENT_WIDTH / metadata.length;
   metadata.forEach(([label, value], index) => {
@@ -421,7 +433,7 @@ const drawTitlePage = (
   });
 
   const scheduleHeadingY = metaTop + 34;
-  drawSectionHeading(pdf, '01', 'System schedule', scheduleHeadingY);
+  drawSectionHeading(pdf, '01', 'Configuración del sistema', scheduleHeadingY);
   let rowY = scheduleHeadingY + 8;
   model.equipment.forEach((row) => {
     setMono(pdf, 'bold');
@@ -443,7 +455,7 @@ const drawTitlePage = (
   });
 
   const conditionsHeadingY = Math.min(258, rowY + 11);
-  drawSectionHeading(pdf, '02', 'Prediction conditions', conditionsHeadingY);
+  drawSectionHeading(pdf, '02', 'Condiciones de predicción', conditionsHeadingY);
   drawConditions(pdf, model.conditions, conditionsHeadingY + 5.5, false);
   drawFooter(pdf, 1, 4, brand.predictionLabel);
 };
@@ -459,16 +471,16 @@ const drawParameterPanel = (
   setMono(pdf, 'bold');
   pdf.setFontSize(6);
   pdf.setTextColor(...GOLD);
-  pdf.text('PARAMETERS', x, y, { charSpace: 0.7 });
+  pdf.text('PARÁMETROS', x, y, { charSpace: 0.7 });
   pdf.setDrawColor(...RULE);
   pdf.line(x, y + 2.5, x + width, y + 2.5);
 
   const rows = [
-    ['Weighting', plot.weighting],
-    ['Band', plot.band],
-    ['Temperature', `${conditions.temperatureC} °C`],
-    ['Rel. humidity', `${conditions.humidityPercent} %`],
-    ['Audience plane', `${conditions.audiencePlaneM} m`],
+    ['Ponderación', plot.weighting],
+    ['Banda', plot.band],
+    ['Temperatura', `${conditions.temperatureC} °C`],
+    ['Humedad rel.', `${conditions.humidityPercent} %`],
+    ['Plano audiencia', `${conditions.audiencePlaneM} m`],
   ];
   rows.forEach(([label, value], index) => {
     const rowY = y + 8 + index * 6.2;
@@ -500,7 +512,9 @@ const drawPlotPage = (
   setMono(pdf, 'bold');
   pdf.setFontSize(6.5);
   pdf.setTextColor(...GOLD);
-  pdf.text(`PLOT ${String(pageNumber - 1).padStart(2, '0')}`, LEFT, 42, { charSpace: 0.9 });
+  pdf.text(`GRÁFICO ${String(pageNumber - 1).padStart(2, '0')}`, LEFT, 42, {
+    charSpace: 0.9,
+  });
   setSans(pdf, 'bold');
   pdf.setFontSize(22);
   pdf.setTextColor(...INK);
@@ -522,9 +536,12 @@ const drawPlotPage = (
     setMono(pdf, 'normal');
     pdf.setFontSize(6);
     pdf.setTextColor(...SOFT);
-    pdf.text(`PLAN VIEW | AUDIENCE PLANE AT ${model.conditions.audiencePlaneM} M`, main.x, main.y + main.height + 5, {
-      charSpace: 0.45,
-    });
+    pdf.text(
+      `VISTA EN PLANTA | PLANO DE AUDIENCIA A ${model.conditions.audiencePlaneM} M`,
+      main.x,
+      main.y + main.height + 5,
+      { charSpace: 0.45 },
+    );
   }
 
   if (hasIso) {
@@ -538,7 +555,7 @@ const drawPlotPage = (
       setMono(pdf, 'normal');
       pdf.setFontSize(6);
       pdf.setTextColor(...SOFT);
-      pdf.text('ISOMETRIC | FULL SITE', support.x, support.y + support.height + 5, {
+      pdf.text('ISOMÉTRICA | RECINTO COMPLETO', support.x, support.y + support.height + 5, {
         charSpace: 0.45,
       });
     }
@@ -559,7 +576,7 @@ export const createSoundvisionReportDocument = async (
   const pdf = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   pdf.setProperties({
     title: `${SOUNDVISION_REPORT_BRANDS[model.system].reportLabel} - ${model.eventTitle}`,
-    subject: 'Acoustic prediction report',
+    subject: 'Informe de predicción acústica',
     author: 'Sector-Pro',
     creator: 'Sector-Pro',
   });

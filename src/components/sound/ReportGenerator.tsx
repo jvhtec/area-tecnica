@@ -63,8 +63,8 @@ const DIRECTORY_INPUT_PROPS: DirectoryInputProps = { webkitdirectory: '' };
 const COMPANY_LOGO_PATH = '/sector pro logo.png';
 
 const DEFAULT_CONDITIONS: SoundvisionReportConditions = {
-  temperatureC: '15',
-  humidityPercent: '70',
+  temperatureC: '20',
+  humidityPercent: '50',
   inputLevelDbu: '0',
   audiencePlaneM: '1.60',
 };
@@ -138,7 +138,7 @@ export const ReportGenerator = () => {
         if (active) setJobLogo(logo);
       })
       .catch((error) => {
-        console.error('Error loading job logo:', error);
+        console.error('Error al cargar el logotipo del trabajo:', error);
         if (active) setJobLogo(undefined);
       });
 
@@ -293,7 +293,7 @@ export const ReportGenerator = () => {
           });
         })
         .catch((error) => {
-          console.error('Error uploading prediction report:', error);
+          console.error('Error al subir el informe de predicción:', error);
           toast({
             title: 'Subida fallida',
             description: 'El PDF se descargó, pero no se pudo guardar en el trabajo.',
@@ -419,7 +419,7 @@ export const ReportGenerator = () => {
               id="equipment"
               value={equipment}
               onChange={(event) => setEquipment(event.target.value)}
-              placeholder={"24 K2 (Main hang)\n12 KS28 (Subwoofer)\n8 X12 (Front fill)"}
+              placeholder={"24 K2 (Sistema principal)\n12 KS28 (Subgraves)\n8 X12 (Relleno frontal)"}
               className="min-h-[120px] bg-background text-foreground"
             />
             <p className="text-xs text-muted-foreground">

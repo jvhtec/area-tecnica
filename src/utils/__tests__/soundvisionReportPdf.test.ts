@@ -24,16 +24,16 @@ const makeModel = (): SoundvisionReportModel => ({
   system: 'LA',
   eventTitle: 'Festival Rio Babel',
   stageLabel: 'Escenario Principal',
-  eventDate: '02-04 July 2026',
-  issuedDate: '01 July 2026',
+  eventDate: '02-04 julio 2026',
+  issuedDate: '01 julio 2026',
   revision: 'A',
   equipment: [
-    { quantity: '20', model: 'K2', role: 'Main hang' },
-    { quantity: '12', model: 'KS28', role: 'Subwoofer' },
+    { quantity: '20', model: 'K2', role: 'Sistema principal' },
+    { quantity: '12', model: 'KS28', role: 'Subgraves' },
   ],
   conditions: {
-    temperatureC: '15',
-    humidityPercent: '70',
+    temperatureC: '20',
+    humidityPercent: '50',
     inputLevelDbu: '0',
     audiencePlaneM: '1.60',
   },
@@ -51,13 +51,13 @@ const makeModel = (): SoundvisionReportModel => ({
 describe('soundvision report model', () => {
   it('parses quantity, model and optional role without losing free-form lines', () => {
     expect(parseSoundvisionEquipment([
-      '24 K2 (Main hang)',
-      '12 x KS28 (Subwoofer)',
+      '24 K2 (Sistema principal)',
+      '12 x KS28 (Subgraves)',
       'GALAXY 816',
       '',
     ].join('\n'))).toEqual([
-      { quantity: '24', model: 'K2', role: 'Main hang' },
-      { quantity: '12', model: 'KS28', role: 'Subwoofer' },
+      { quantity: '24', model: 'K2', role: 'Sistema principal' },
+      { quantity: '12', model: 'KS28', role: 'Subgraves' },
       { quantity: '-', model: 'GALAXY 816', role: '' },
     ]);
   });
@@ -66,11 +66,11 @@ describe('soundvision report model', () => {
     expect(formatSoundvisionDateRange(
       '2026-07-02T10:00:00.000Z',
       '2026-07-02T22:00:00.000Z',
-    )).toBe('02 July 2026');
+    )).toBe('02 julio 2026');
     expect(formatSoundvisionDateRange(
       '2026-07-02T10:00:00.000Z',
       '2026-07-04T18:00:00.000Z',
-    )).toBe('02-04 July 2026');
+    )).toBe('02-04 julio 2026');
   });
 
   it('builds a stable, filesystem-safe filename', () => {
@@ -78,7 +78,7 @@ describe('soundvision report model', () => {
       'LA',
       'Río Babel / 2026',
       'Escenario Principal',
-    )).toBe('Soundvision_Report_Rio_Babel_2026_-_Escenario_Principal.pdf');
+    )).toBe('Soundvision_Informe_Rio_Babel_2026_-_Escenario_Principal.pdf');
   });
 
   it('reports missing required content before rendering', () => {

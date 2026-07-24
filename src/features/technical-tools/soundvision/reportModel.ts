@@ -1,4 +1,4 @@
-import { enGB } from 'date-fns/locale';
+import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 
@@ -70,15 +70,15 @@ export const MAX_SOUNDVISION_SCHEDULE_ROWS = 10;
 
 export const SOUNDVISION_REPORT_BRANDS: Record<SoundvisionReportSystem, SoundvisionReportBrand> = {
   LA: {
-    reportLabel: 'Soundvision report',
-    predictionLabel: 'Soundvision prediction',
+    reportLabel: 'Informe Soundvision',
+    predictionLabel: 'Predicción Soundvision',
     manufacturer: "L-Acoustics",
     filenamePrefix: 'Soundvision',
     logoPath: '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png',
   },
   Turbo: {
-    reportLabel: 'EASE Focus report',
-    predictionLabel: 'EASE Focus prediction',
+    reportLabel: 'Informe EASE Focus',
+    predictionLabel: 'Predicción EASE Focus',
     manufacturer: 'Turbosound',
     filenamePrefix: 'EaseFocus',
     logoPath: '/lovable-uploads/e78ab52e-aa81-4770-a6bb-f802a5ff651e.png',
@@ -88,27 +88,27 @@ export const SOUNDVISION_REPORT_BRANDS: Record<SoundvisionReportSystem, Soundvis
 export const SOUNDVISION_PLOT_DEFINITIONS: SoundvisionPlotDefinition[] = [
   {
     id: 'spl-a',
-    title: 'SPL(A) Broadband',
-    descriptor: 'A-weighted | full range',
-    weighting: 'A-weighted',
-    band: 'Broadband',
+    title: 'SPL(A) Banda ancha',
+    descriptor: 'Ponderación A | rango completo',
+    weighting: 'Ponderación A',
+    band: 'Banda ancha',
     topFileBase: 'TOP_A',
     isoFileBase: 'ISO_A',
   },
   {
     id: 'spl-z',
     title: 'SPL(Z) 250 Hz - 16 kHz',
-    descriptor: 'Linear (Z) | 250 Hz - 16 kHz',
-    weighting: 'Linear (Z)',
+    descriptor: 'Lineal (Z) | 250 Hz - 16 kHz',
+    weighting: 'Lineal (Z)',
     band: '250 Hz - 16 kHz',
     topFileBase: 'TOP_C',
     isoFileBase: 'ISO_C',
   },
   {
     id: 'subs',
-    title: 'Subs SPL(Z) 32 - 80 Hz',
-    descriptor: 'Unweighted | 32 - 80 Hz',
-    weighting: 'Linear (Z)',
+    title: 'Subgraves SPL(Z) 32 - 80 Hz',
+    descriptor: 'Sin ponderación | 32 - 80 Hz',
+    weighting: 'Lineal (Z)',
     band: '32 - 80 Hz',
     topFileBase: 'SUB',
   },
@@ -147,7 +147,7 @@ const validDate = (value: string | Date): Date | null => {
 };
 
 const formatReportDate = (date: Date, pattern: string): string =>
-  formatInTimeZone(date, MADRID_TIMEZONE, pattern, { locale: enGB });
+  formatInTimeZone(date, MADRID_TIMEZONE, pattern, { locale: es });
 
 export const formatSoundvisionDateRange = (
   startValue: string | Date,
@@ -199,7 +199,7 @@ export const buildSoundvisionReportFilename = (
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\s/g, '_');
-  return `${SOUNDVISION_REPORT_BRANDS[system].filenamePrefix}_Report_${safeName || 'Sin_nombre'}.pdf`;
+  return `${SOUNDVISION_REPORT_BRANDS[system].filenamePrefix}_Informe_${safeName || 'Sin_nombre'}.pdf`;
 };
 
 export const validateSoundvisionReport = (model: SoundvisionReportModel): string[] => {
