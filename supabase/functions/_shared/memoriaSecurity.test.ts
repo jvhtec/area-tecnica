@@ -121,9 +121,70 @@ describe("memoria PDF security boundary", () => {
       maxBytes: MAX_MEMORIA_PDF_BYTES,
       message: "El documento «Informe SoundVision» supera el límite de 20 MB",
       measurement: "content-length",
+      originalMessage: "El archivo de origen es demasiado grande",
+      originalStack: expect.any(String),
       status: 413,
       usedBytes: undefined,
     });
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain("opaque-token");
+  });
+
+  it("labels and records the combined source limit", () => {
+    const budget = new SourceByteBudget();
+    budget.reserve((50 * 1024 * 1024) - 1);
+    const sourceError = (() => {
+      try {
+        budget.reserve(2);
+      } catch (error) {
+        return error;
+      }
+    })();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const reported = reportMemoriaDocumentFailure(
+      "generate-video-memoria-tecnica",
+      "pixel",
+      "Pixel Map",
+      sourceError,
+    );
+
+    expect(reported).toMatchObject({
+      status: 413,
+      code: "source_total_too_large",
+      message: "Los documentos de origen superan el límite total de 50 MB al procesar «Pixel Map»",
+    });
+    expect(consoleError).toHaveBeenCalledWith("memoria_document_rejected", expect.objectContaining({
+      attemptedBytes: 2,
+      documentKey: "pixel",
+      maxBytes: 50 * 1024 * 1024,
+      status: 413,
+      usedBytes: (50 * 1024 * 1024) - 1,
+    }));
+  });
+
+  it("preserves redacted parser diagnostics while returning a safe unreadable message", () => {
+    const parserError = new Error(`Parser failed for ${signedSource}`);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const reported = reportMemoriaDocumentFailure(
+      "generate-lights-memoria-tecnica",
+      "rigging",
+      "Plano de Rigging",
+      parserError,
+    );
+
+    expect(reported).toMatchObject({
+      status: 422,
+      code: "invalid_pdf_source",
+      message: "No se puede leer el documento «Plano de Rigging» como PDF",
+    });
+    expect(consoleError).toHaveBeenCalledWith("memoria_document_rejected", expect.objectContaining({
+      code: "invalid_pdf_source",
+      documentKey: "rigging",
+      originalMessage: expect.stringContaining("token=[redacted]"),
+      originalStack: expect.stringContaining("token=[redacted]"),
+      status: 422,
+    }));
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain("opaque-token");
   });
 });

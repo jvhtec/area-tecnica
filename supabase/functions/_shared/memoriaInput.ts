@@ -229,6 +229,14 @@ const getLimitInMiB = (value: unknown, fallback: number) => {
   return Math.round(bytes / (1024 * 1024));
 };
 
+const sanitizeMemoriaDiagnostic = (value: unknown) => {
+  if (typeof value !== "string") return undefined;
+
+  return value
+    .replace(/([?&](?:token|access_token|apikey)=)[^&\s]+/gi, "$1[redacted]")
+    .slice(0, 2_000);
+};
+
 /**
  * Converts a source-processing failure into a document-labelled client error and
  * emits a token-free structured record for Supabase Function logs.
@@ -239,6 +247,12 @@ export function reportMemoriaDocumentFailure(
   documentLabel: string,
   error: unknown,
 ): HttpError {
+  const originalMessage = error instanceof Error
+    ? sanitizeMemoriaDiagnostic(error.message)
+    : undefined;
+  const originalStack = error instanceof Error
+    ? sanitizeMemoriaDiagnostic(error.stack)
+    : undefined;
   const original = error instanceof HttpError
     ? error
     : new HttpError(422, getMemoriaPdfValidationMessage(documentLabel, "unreadable"), {
@@ -276,6 +290,8 @@ export function reportMemoriaDocumentFailure(
     maxBytes: details.maxBytes,
     message: normalized.message,
     measurement: details.measurement,
+    originalMessage,
+    originalStack,
     status: normalized.status,
     usedBytes: details.usedBytes,
   });
