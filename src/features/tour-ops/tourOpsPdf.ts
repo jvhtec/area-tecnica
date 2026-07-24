@@ -1,11 +1,12 @@
-import { es } from "date-fns/locale";
-import { formatInTimeZone } from "date-fns-tz";
-import type jsPDF from "jspdf";
-import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
+import type { TourOpsDate, TourOpsModel, TourOpsProjection } from "@/features/tour-ops/types";
 import { buildReadableFilename } from "@/utils/fileName";
+import { loadPdfLibs, type AutoTableFn } from "@/utils/pdf/lazyPdf";
 import { fetchTourLogo, getCompanyLogo } from "@/utils/pdf/logoUtils";
 import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
-import type { TourOpsDate, TourOpsModel, TourOpsProjection } from "@/features/tour-ops/types";
+import { formatInTimeZone } from "date-fns-tz";
+import { es } from "date-fns/locale";
+import type jsPDF from "jspdf";
+import type { HookData, UserOptions } from "jspdf-autotable";
 
 const RED: [number, number, number] = [125, 1, 1];
 const INK: [number, number, number] = [32, 36, 42];
@@ -147,19 +148,23 @@ const sectionTitle = (pdf: jsPDF, title: string, y: number) => {
 
 const runAutoTable = (
   pdf: jsPDF,
-  autoTable: any,
+  autoTable: AutoTableFn,
   pageRef: { value: number },
   title: string,
   subtitle: string,
   branding: PdfBranding | undefined,
-  options: Record<string, any>,
+  options: UserOptions,
 ) => {
   const userDidDrawPage = options.didDrawPage;
+  const objectMargin =
+    typeof options.margin === "object" && !Array.isArray(options.margin)
+      ? options.margin
+      : {};
   autoTable(pdf, {
     ...options,
-    margin: { top: 34, left: 12, right: 12, ...(options.margin ?? {}) },
-    didDrawPage: (data: any) => {
-      const currentPage = (pdf.internal as any).getCurrentPageInfo?.().pageNumber ?? pdf.getNumberOfPages();
+    margin: { top: 34, left: 12, right: 12, ...objectMargin },
+    didDrawPage: (data: HookData) => {
+      const currentPage = pdf.getCurrentPageInfo().pageNumber;
       pageRef.value = Math.max(pageRef.value, pdf.getNumberOfPages());
       header(pdf, title, subtitle, branding);
       footer(pdf, currentPage, branding);
@@ -171,7 +176,7 @@ const runAutoTable = (
 
 const addDatePage = (
   pdf: jsPDF,
-  autoTable: any,
+  autoTable: AutoTableFn,
   model: TourOpsModel,
   tourDate: TourOpsDate,
   pageRef: { value: number },

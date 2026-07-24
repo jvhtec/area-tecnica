@@ -17,13 +17,7 @@ export function renderWithProviders(
   function Wrapper({ children }: PropsWithChildren) {
     return (
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter
-          initialEntries={[route]}
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
+        <MemoryRouter initialEntries={[route]}>
           {children}
         </MemoryRouter>
       </QueryClientProvider>

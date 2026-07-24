@@ -50,6 +50,13 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 - 2026-06-04: Deeper-audit Phase B completed by moving active app route ownership into `src/routes/app-route-manifest.tsx`. `src/App.tsx` is now a 91-line provider and manifest renderer; route access uses named policies; route-owned subscription profiles, shortcut metadata, route chrome flags, and breadcrumb metadata live with the manifest; and focused route tests cover uniqueness, policy/layout consistency, dynamic subscription lookup, shortcut targets, and breadcrumb resolution. The source-boundary governance scan now reports `10` direct `ProtectedRoute allowedRoles` matches versus the `64`-match legacy baseline.
 - 2026-06-04: Deeper-audit Phase C/D started by adding a single app runtime event coordinator for online/offline and visibility/resume recovery, removing duplicate runtime recovery listeners from auth, route subscriptions, tab leadership, and subscription-manager refresh wiring, and making follower subscription requests leader-owned with route, table, query-key, priority, payload, and invalidation metadata. Management settings now include a realtime diagnostics panel backed by the unified subscription snapshot.
 - 2026-07-22: After PR #877 retired 15 near-threshold modules, PR #878 retired another 16 across routes, tours, SoundVision, festival workflows, technical tools, Hoja de Ruta, wallboard, subscriptions, job details, and auth. The rebased branch reduces the live governance count from the original `43` files over 800 lines to `12`; the living count and remaining queue are tracked in `docs/performance/god-file-refactor-checklist.md`.
+- 2026-07-23: The final 12-module batch completes the authored god-file
+  campaign at `43 → 0`. Tour Ops, scheduling, Consumos, tour defaults, job
+  cards, staffing, rates PDFs, assignment, both timesheet surfaces, payouts,
+  and technician rows now split state, data, commands, and views along typed
+  responsibility boundaries. The file-size baseline is empty, the mobile type
+  floor improves from `266` to `248`, and the final module/test map is recorded
+  in `docs/performance/god-file-refactor-checklist.md`.
 
 ## Phase 0: Safety and Type Baseline
 

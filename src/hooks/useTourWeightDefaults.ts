@@ -1,7 +1,7 @@
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -54,10 +54,13 @@ export const useTourWeightDefaults = (tourId: string) => {
         description: "Weight default created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create weight default",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to create weight default",
         variant: "destructive",
       });
     },

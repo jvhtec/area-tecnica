@@ -1,7 +1,8 @@
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import type { Json } from "@/integrations/supabase/types";
+import { supabase } from "@/lib/supabase";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -20,17 +21,66 @@ export interface TourDefaultSet {
   updated_at: string;
 }
 
+type JsonObject = Extract<Json, { [key: string]: Json | undefined }>;
+
+export type TourDefaultTableRow = JsonObject & {
+  quantity?: string;
+  lineName?: string;
+  componentName?: string;
+  weight?: string;
+  watts?: string;
+  totalWeight?: number;
+  totalWatts?: number;
+  x?: number;
+  reactionKg?: number;
+  hoistName?: string;
+};
+
+export type TourDefaultTableData = JsonObject & {
+  rows?: TourDefaultTableRow[];
+  safetyMargin?: number;
+};
+
+export type TourDefaultTableMetadata = JsonObject & {
+  current_per_phase?: number;
+  custom_position?: string | null;
+  dualMotors?: boolean;
+  foh_schuko?: boolean;
+  includes_hoist?: boolean;
+  order_index?: number;
+  position?: string | null;
+  riggingPoint?: string;
+  safetyMargin?: number;
+};
+
 export interface TourDefaultTable {
   id: string;
   set_id: string;
   table_name: string;
-  table_data: any; // The complete table structure with rows
+  table_data: TourDefaultTableData;
   table_type: 'power' | 'weight';
   total_value: number;
-  metadata: any;
+  metadata: TourDefaultTableMetadata;
   created_at: string;
   updated_at: string;
 }
+
+export type TourDefaultTableWrite = Omit<
+  TourDefaultTable,
+  "id" | "created_at" | "updated_at" | "table_data" | "metadata"
+> & {
+  table_data: unknown;
+  metadata: unknown;
+};
+
+export type TourDefaultTableUpdates = Partial<
+  Omit<TourDefaultTable, "table_data" | "metadata">
+> & {
+  table_data?: unknown;
+  metadata?: unknown;
+};
+
+const toJson = (value: unknown): Json => value as Json;
 
 const getMutationErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof Error && error.message) return error.message;
@@ -147,10 +197,14 @@ export const useTourDefaultSets = (tourId: string, department?: TourDefaultDepar
 
   // Create default table
   const createTableMutation = useMutation({
-    mutationFn: async (tableData: Omit<TourDefaultTable, "id" | "created_at" | "updated_at">) => {
+    mutationFn: async (tableData: TourDefaultTableWrite) => {
       const { data, error } = await supabase
         .from("tour_default_tables")
-        .insert(tableData)
+        .insert({
+          ...tableData,
+          table_data: toJson(tableData.table_data),
+          metadata: toJson(tableData.metadata),
+        })
         .select()
         .single();
 
@@ -175,10 +229,25 @@ export const useTourDefaultSets = (tourId: string, department?: TourDefaultDepar
 
   // Update default table
   const updateTableMutation = useMutation({
-    mutationFn: async ({ tableId, updates }: { tableId: string, updates: Partial<TourDefaultTable> }) => {
+    mutationFn: async ({
+      tableId,
+      updates,
+    }: {
+      tableId: string;
+      updates: TourDefaultTableUpdates;
+    }) => {
+      const normalizedUpdates = {
+        ...updates,
+        ...(updates.table_data === undefined
+          ? {}
+          : { table_data: toJson(updates.table_data) }),
+        ...(updates.metadata === undefined
+          ? {}
+          : { metadata: toJson(updates.metadata) }),
+      };
       const { data, error } = await supabase
         .from("tour_default_tables")
-        .update(updates)
+        .update(normalizedUpdates)
         .eq("id", tableId)
         .select()
         .single();

@@ -1,40 +1,43 @@
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useTheme } from 'next-themes';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { createQueryKey } from '@/lib/optimized-react-query';
+import { useToast } from '@/hooks/use-toast';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
-import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import { createQueryKey } from '@/lib/optimized-react-query';
+import { supabase } from '@/lib/supabase';
 import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
+import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
+import { resolveJobDocLocation } from '@/utils/jobDocuments';
 import {
   canCreateFolders,
   canEditJobs as canEditJobsForRole,
   canManageFestivalArtists,
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
-import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/storageUpload';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTheme } from 'next-themes';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 
 import { queryKeys } from "@/lib/react-query";
-type UseOptimizedJobCardOptions = {
+export type UseOptimizedJobCardOptions = {
   enableRoleSummary?: boolean;
   enableSoundTasks?: boolean;
   refreshAssignmentsOnMount?: boolean;
 };
 
-type JobDocumentRow = {
+export type JobDocumentRow = {
   id: string;
-  file_name?: string | null;
+  file_name: string;
   file_path: string;
-  read_only?: boolean | null;
+  uploaded_at: string;
+  visible_to_tech?: boolean;
+  read_only?: boolean;
+  template_type?: string | null;
   [key: string]: unknown;
 };
 
-type JobProfileRef = {
+export type JobProfileRef = {
   first_name?: string | null;
   nickname?: string | null;
   last_name?: string | null;
@@ -42,7 +45,7 @@ type JobProfileRef = {
   [key: string]: unknown;
 };
 
-type JobAssignmentForCard = {
+export type JobAssignmentForCard = {
   job_id?: string | null;
   technician_id: string;
   profiles?: JobProfileRef | JobProfileRef[] | null;
@@ -58,18 +61,18 @@ type JobAssignmentForCard = {
   [key: string]: unknown;
 };
 
-type TimesheetForCard = {
+export type TimesheetForCard = {
   technician_id?: string | null;
   date?: string | null;
   profiles?: JobProfileRef | JobProfileRef[] | null;
 };
 
-type JobDateTypeForCard = {
+export type JobDateTypeForCard = {
   date?: string | null;
   type?: string | null;
 };
 
-type OptimizedJobCardJob = {
+export type OptimizedJobCardJob = {
   id: string;
   color?: string | null;
   darkColor?: string | null;
@@ -93,9 +96,9 @@ export const useOptimizedJobCard = (
   job: OptimizedJobCardJob,
   department: string,
   userRole: string | null,
-  onEditClick: (job: OptimizedJobCardJob) => void,
-  onDeleteClick: (jobId: string) => void,
-  onJobClick: (jobId: string) => void,
+  _onEditClick: (job: OptimizedJobCardJob) => void,
+  _onDeleteClick: (jobId: string) => void,
+  _onJobClick: (jobId: string) => void,
   options?: UseOptimizedJobCardOptions
 ) => {
   const { theme } = useTheme();

@@ -1,6 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import type {
+  JobCardJob,
+  SelectedTransportRequest,
+} from "@/features/jobs/job-card-new/jobCardNewTypes";
+import { useJobCardFolderActions } from "@/features/jobs/job-card-new/useJobCardFolderActions";
+import { useJobCardTransport } from "@/features/jobs/job-card-new/useJobCardTransport";
+import { useToast } from "@/hooks/use-toast";
+import { useDeletionState } from '@/hooks/useDeletionState';
+import { useFolderExistence } from "@/hooks/useFolderExistence";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
+import { dataLayerClient } from "@/services/dataLayerClient";
+import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
 import { Department } from "@/types/department";
+import { CreateFoldersOptions } from "@/utils/flex-folders";
+import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
+import { isFestivalLikeJobType } from "@/utils/jobType";
+import {
+  isAdminRole,
+  isDepartmentManagementRole,
+  isManagementRole,
+} from "@/utils/permissions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from "react-router-dom";
+import type { JobDocument } from './JobCardDocuments';
+import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
+import { JobCardNewView } from "./job-card-new/JobCardNewView";
 
 // File System Access API types
 declare global {
@@ -8,143 +35,12 @@ declare global {
     showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
   }
 }
-import { useNavigate } from "react-router-dom";
-import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
-import { useDeletionState } from '@/hooks/useDeletionState';
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { createAllFoldersForJob } from "@/utils/flex-folders";
-import { format } from "date-fns";
-import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
-import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
-import type { JobDocument } from './JobCardDocuments';
-import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
-import { JobCardNewView } from "./job-card-new/JobCardNewView";
-import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
-import { useToast } from "@/hooks/use-toast";
-import { useConfirm } from "@/components/ui/confirm-dialog";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreateFoldersOptions } from "@/utils/flex-folders";
-import { isFestivalLikeJobType } from "@/utils/jobType";
-import {
-  canUseCustomFolderStructure,
-  isAdminRole,
-  isDepartmentManagementRole,
-  isManagementRole,
-} from "@/utils/permissions";
 
 
 import { queryKeys } from "@/lib/react-query";
-type ProfileContact = {
-  first_name?: string | null;
-  nickname?: string | null;
-  last_name?: string | null;
-  phone?: string | null;
-};
-
-type AssignmentWithProfile = {
-  technician_id?: string | null;
-  profiles?: ProfileContact | ProfileContact[] | null;
-};
-
-type AssignmentRoleKey = "sound_role" | "lights_role" | "video_role";
-const ASSIGNMENT_ROLE_BY_DEPARTMENT: Partial<Record<Department, AssignmentRoleKey>> = {
-  sound: "sound_role",
-  lights: "lights_role",
-  video: "video_role",
-};
-
-type JobAssignmentContactRow = {
-  sound_role?: string | null;
-  lights_role?: string | null;
-  video_role?: string | null;
-  profiles?: ProfileContact | ProfileContact[] | null;
-};
-
-type CreateWhatsappGroupResult = {
-  wa_group_id?: string | null;
-  note?: string | null;
-  warnings?: {
-    missing?: unknown[];
-    invalid?: unknown[];
-  };
-};
-
-type ClearWhatsappGroupResult = {
-  success?: boolean;
-  error?: string;
-  message?: string;
-  can_retry?: boolean;
-};
-
-type LogisticsEventWithDepartments = {
-  id?: string;
-  event_type?: string | null;
-  logistics_event_departments?: Array<{ department?: string | null }> | null;
-};
-
-type FlexFolderRow = {
-  id: string;
-  parent_id?: string | null;
-  department?: string | null;
-  folder_type?: string | null;
-};
-
-type FlexStatusCascade = {
-  attempted?: number;
-  succeeded?: number;
-  failed?: number;
-};
-
-type FlexStatusResponse = {
-  success?: boolean;
-  error?: string;
-  response?: {
-    exceptionMessage?: string;
-    primaryMessage?: string;
-    message?: string;
-  };
-  cascade?: FlexStatusCascade;
-};
-
-type LocalFolderStructureItem =
-  | string
-  | {
-      name: string;
-      subfolders?: string[];
-    };
-
-const parseLocalFolderStructure = (value: unknown): LocalFolderStructureItem[] | null => {
-  if (!Array.isArray(value)) return null;
-
-  const parsed: LocalFolderStructureItem[] = [];
-  for (const item of value) {
-    if (typeof item === "string") {
-      parsed.push(item);
-      continue;
-    }
-
-    if (item && typeof item === "object" && !Array.isArray(item) && "name" in item) {
-      const candidate = item as { name?: unknown; subfolders?: unknown };
-      if (typeof candidate.name !== "string") continue;
-      parsed.push({
-        name: candidate.name,
-        subfolders: Array.isArray(candidate.subfolders)
-          ? candidate.subfolders.filter((subfolder): subfolder is string => typeof subfolder === "string")
-          : undefined,
-      });
-    }
-  }
-
-  return parsed.length > 0 ? parsed : null;
-};
-
 export interface JobCardNewProps {
-  job: any;
-  onEditClick: (job: any) => void;
+  job: JobCardJob;
+  onEditClick: (job: JobCardJob) => void;
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
   showAssignments?: boolean;
@@ -199,12 +95,9 @@ function JobCardNewFull({
   onEditClick,
   onDeleteClick,
   onJobClick,
-  showAssignments = false,
   department = "sound",
   userRole,
-  onDeleteDocument,
   showUpload = false,
-  showManageArtists = false,
   isProjectManagementPage = false,
   hideTasks = false,
   openHojaDeRuta = false,
@@ -375,7 +268,8 @@ function JobCardNewFull({
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
   const [logisticsDialogOpen, setLogisticsDialogOpen] = useState(false);
   const [requirementsDialogOpen, setRequirementsDialogOpen] = useState(false);
-  const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
+  const [selectedTransportRequest, setSelectedTransportRequest] =
+    useState<SelectedTransportRequest | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
   const { user, userDepartment: currentUserDepartment } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
@@ -438,7 +332,7 @@ function JobCardNewFull({
     const currentUserId = user?.id;
     if (!currentUserId) return "";
 
-    const assignmentRows = Array.isArray(assignments) ? (assignments as AssignmentWithProfile[]) : [];
+    const assignmentRows = assignments;
     const match =
       assignmentRows.find((a) => a?.technician_id === currentUserId && a?.profiles) ||
       assignmentRows.find((a) => a?.profiles);
@@ -474,723 +368,62 @@ function JobCardNewFull({
     });
   }
 
-  // Queries for transport requests and logistics events
-  const { data: myTransportRequest } = useQuery({
-    queryKey: queryKeys.scope('transport-request', job.id, currentUserDepartment),
-    queryFn: async () => {
-      if (!currentUserDepartment || !['sound', 'lights', 'video'].includes(currentUserDepartment)) return null;
-      const { data, error } = await dataLayerClient.from('transport_requests')
-        .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
-        .eq('job_id', job.id)
-        .eq('department', currentUserDepartment)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) return null;
-      return data;
-    },
-    enabled: !!job?.id && !!currentUserDepartment,
+  const {
+    allRequests,
+    checkAndFulfillRequest,
+    handleCreateWhatsappGroup,
+    handleRetryWhatsappGroup,
+    handleTransportClick,
+    isTechDept,
+    jobTimesheets,
+    myTransportRequest,
+    transportButtonLabel,
+    transportButtonTone,
+    waGroup,
+    waRequest,
+  } = useJobCardTransport({
+    assignments,
+    confirm,
+    currentUserDepartment,
+    department,
+    isFestivalLike,
+    isManagementUser,
+    job,
+    queryClient,
+    setLogisticsDialogOpen,
+    setLogisticsInitialEventType,
+    setSelectedTransportRequest,
+    setTransportDialogOpen,
+    toast,
   });
 
-  const { data: allRequests = [], isLoading: isAllRequestsLoading } = useQuery({
-    queryKey: queryKeys.scope('transport-requests-all', job.id),
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('transport_requests')
-        .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
-        .eq('job_id', job.id)
-        .eq('status', 'requested')
-        .order('created_at', { ascending: false });
-      if (error) return [];
-      return data || [];
-    },
-    enabled: !!job?.id && ((currentUserDepartment === 'logistics') || isManagementUser),
+  const {
+    addFlexFoldersHandler,
+    createFlexFoldersHandler,
+    createLocalFoldersHandler,
+    handleDeleteClick,
+    handleFlexPickerConfirm,
+    syncStatusToFlex,
+  } = useJobCardFolderActions({
+    actualFoldersExist,
+    addDeletingJob,
+    confirm,
+    flexPickerMode,
+    isCreatingFolders,
+    isCreatingLocalFolders,
+    isJobBeingDeleted,
+    isManagementUser,
+    job,
+    onDeleteClick,
+    queryClient,
+    removeDeletingJob,
+    setFlexPickerMode,
+    setFlexPickerOpen,
+    setFlexPickerOptions,
+    setIsCreatingFolders,
+    setIsCreatingLocalFolders,
+    toast,
   });
-
-  const { data: jobEvents = [] } = useQuery({
-    queryKey: queryKeys.scope('logistics-events-for-job', job.id),
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('logistics_events')
-        .select('id')
-        .eq('job_id', job.id);
-      if (error) return [];
-      return data || [];
-    },
-    enabled: !!job?.id && job.job_type !== 'dryhire',
-  });
-
-  const isScheduled = (jobEvents?.length || 0) > 0;
-  const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
-  const isTechDept = !!currentUserDepartment && ['sound', 'lights', 'video'].includes(currentUserDepartment);
-  const canManageTransportRequests = (currentUserDepartment === 'logistics') || isManagementUser;
-
-  const handleCancelTransportRequest = React.useCallback(
-    async (requestId: string) => {
-      if (!requestId) return;
-      const { error } = await dataLayerClient.from("transport_requests").update({ status: "cancelled" }).eq("id", requestId);
-      if (error) {
-        console.error("[JobCardNew] Failed to cancel transport request:", error);
-        toast({
-          title: "No se pudo cancelar",
-          description: error.message || "Error cancelando la solicitud de transporte",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "Solicitud cancelada",
-        description: "La solicitud de transporte se ha cancelado correctamente",
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
-    },
-    [job.id, queryClient, toast]
-  );
-
-  const transportButtonLabel = (() => {
-    if (isScheduled) return 'Transport Scheduled';
-    if (canManageTransportRequests) {
-      return allRequests.length > 0 ? `Requests (${allRequests.length})` : 'Logistics';
-    }
-    if (isTechDept) {
-      return myTransportRequest ? 'Transport Requested' : 'Request Transport';
-    }
-    return undefined;
-  })();
-
-  const transportButtonTone = isScheduled ? 'default' : hasRequest ? 'secondary' : 'outline';
-
-  const handleTransportClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (canManageTransportRequests) {
-      // If there are no pending requests, allow creating a logistics event directly.
-      if (!isAllRequestsLoading && allRequests.length === 0) {
-        setSelectedTransportRequest(null);
-        setLogisticsInitialEventType("load");
-        setTransportDialogOpen(false);
-        setLogisticsDialogOpen(true);
-        return;
-      }
-      setTransportDialogOpen(true); // open requests manager
-    } else if (isTechDept && currentUserDepartment) {
-      setTransportDialogOpen(true); // open request creator
-    }
-  };
-
-  // WhatsApp group existence for this job + department (for management only)
-  const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: queryKeys.scope('job-whatsapp-group', job.id, department, 0),
-    enabled: !!job?.id && !!department && isManagementUser && !isFestivalLike,
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('job_whatsapp_groups')
-        .select('id, wa_group_id')
-        .eq('job_id', job.id)
-        .eq('department', department)
-        .eq('stage_number', 0)
-        .maybeSingle();
-      if (error) return null;
-      return data;
-    }
-  });
-
-  const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: queryKeys.scope('job-whatsapp-group-request', job.id, department, 0),
-    enabled: !!job?.id && !!department && isManagementUser && !isFestivalLike,
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('job_whatsapp_group_requests')
-        .select('id, created_at')
-        .eq('job_id', job.id)
-        .eq('department', department)
-        .eq('stage_number', 0)
-        .maybeSingle();
-      if (error) return null;
-      return data;
-    }
-  });
-
-  const hasAssignedTechnicians = React.useMemo(
-    () => Array.isArray(assignments) && assignments.some((a: any) => !!a?.technician_id),
-    [assignments]
-  );
-
-  // Fetch active timesheet rows per technician for badge color coding and exact date display.
-  const { data: jobTimesheets } = useQuery({
-    queryKey: queryKeys.scope("job-timesheets-status", job.id),
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('timesheets')
-        .select('technician_id, status, date')
-        .eq('job_id', job.id)
-        .eq('is_active', true);
-      if (error) throw error;
-      return data as { technician_id: string; status: string; date: string | null }[];
-    },
-    enabled: hasAssignedTechnicians && job.job_type !== 'dryhire',
-    staleTime: 60_000
-  });
-
-  // Realtime invalidation when timesheets change
-  useEffect(() => {
-    if (!hasAssignedTechnicians) return;
-    if (job.job_type === 'dryhire') return;
-
-    const channel = dataLayerClient.channel(`job-timesheets-${job.id}`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'timesheets', filter: `job_id=eq.${job.id}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-timesheets-status", job.id) });
-        }
-      )
-      .subscribe();
-
-    return () => { dataLayerClient.removeChannel(channel); };
-  }, [hasAssignedTechnicians, job.id, job.job_type, queryClient]);
-
-  // Core group creation logic (shared by initial creation and retry)
-  const createWhatsappGroupCore = async () => {
-    if (!isManagementUser) return;
-    try {
-      // Pre-check: warn for missing phones
-      const { data: rows } = await dataLayerClient.from('job_assignments')
-        .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
-        .eq('job_id', job.id);
-      const deptKey = ASSIGNMENT_ROLE_BY_DEPARTMENT[department];
-      if (!deptKey) {
-        toast({ title: 'Departamento no soportado', description: 'Solo sonido, luces o vídeo pueden crear grupos de WhatsApp.', variant: 'destructive' });
-        return;
-      }
-      const assignmentRows = (rows || []) as JobAssignmentContactRow[];
-      const crew = assignmentRows.filter((r) => !!r[deptKey]);
-      const missing: string[] = [];
-      let validPhones = 0;
-      for (const r of crew) {
-        const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
-        const full = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Técnico';
-        const ph = (profile?.phone || '').trim();
-        if (!ph) missing.push(full); else validPhones += 1;
-      }
-      if (validPhones === 0) {
-        toast({ title: 'Sin teléfonos', description: 'No hay teléfonos válidos para el equipo asignado.', variant: 'destructive' });
-        return;
-      }
-      if (missing.length > 0) {
-        const proceed = await confirm({
-          title: 'Crear grupo de WhatsApp',
-          description: (
-            <span className="whitespace-pre-line">
-              {`Faltan teléfonos para ${missing.length} técnico(s):\n- ${missing.slice(0, 5).join('\n- ')}${missing.length > 5 ? '\n...' : ''}\n\n¿Crear el grupo igualmente?`}
-            </span>
-          ),
-          confirmText: 'Crear grupo',
-        });
-        if (!proceed) return;
-      }
-
-      const { data, error } = await dataLayerClient.functions.invoke('create-whatsapp-group', {
-        body: { job_id: job.id as string, department, stage_number: 0 }
-      });
-      if (error) {
-        toast({
-          title: 'Error al crear grupo',
-          description: await extractFunctionErrorMessage(error),
-          variant: 'destructive',
-        });
-      } else {
-        const result = data as CreateWhatsappGroupResult | null;
-        const warnings = result?.warnings;
-        toast({
-          title: result?.wa_group_id ? 'Grupo creado' : 'Grupo solicitado',
-          description: warnings && (warnings.missing?.length || warnings.invalid?.length)
-            ? `Avisos: sin teléfono ${warnings.missing?.length || 0}, inválidos ${warnings.invalid?.length || 0}`
-            : (result?.note || 'Operación realizada.')
-        });
-      }
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-    } catch (err: any) {
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-      toast({
-        title: 'Error al crear grupo',
-        description: err?.message || String(err),
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await createWhatsappGroupCore();
-  };
-
-  const handleRetryWhatsappGroup = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isManagementUser) return;
-
-    try {
-      // Clear the failed request using RPC function
-      const { data: clearResult, error: clearError } = await dataLayerClient.rpc(
-        'clear_whatsapp_group_request',
-        { p_job_id: job.id, p_department: department, p_stage_number: 0 }
-      );
-
-      if (clearError) {
-        toast({
-          title: 'Error',
-          description: `No se pudo limpiar la solicitud: ${clearError.message}`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const result = clearResult as ClearWhatsappGroupResult;
-
-      if (!result.success) {
-        toast({
-          title: 'Aviso',
-          description: result.error || result.message,
-          variant: result.can_retry ? 'default' : 'destructive'
-        });
-        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-        return;
-      }
-
-      toast({
-        title: 'Solicitud limpiada',
-        description: 'Intentando crear el grupo de nuevo...'
-      });
-
-      // Await refetch to ensure state is updated before retrying
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-
-      // Call the core creation logic directly (no setTimeout or event needed)
-      await createWhatsappGroupCore();
-
-    } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: `Error al reintentar: ${err.message}`,
-        variant: 'destructive'
-      });
-      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-    }
-  };
-
-  // Auto-fulfill request when both load and unload exist for the request's department
-  const checkAndFulfillRequest = async (requestId: string, departmentForReq: string) => {
-    try {
-      const { data: events } = await dataLayerClient.from('logistics_events')
-        .select('id, event_type, logistics_event_departments(department)')
-        .eq('job_id', job.id)
-        .eq('logistics_event_departments.department', departmentForReq);
-      const logisticsEvents = (events || []) as LogisticsEventWithDepartments[];
-      const hasLoad = logisticsEvents.some((e) => e.event_type === 'load');
-      const hasUnload = logisticsEvents.some((e) => e.event_type === 'unload');
-      if (hasLoad && hasUnload) {
-        await dataLayerClient.from('transport_requests').update({ status: 'fulfilled' }).eq('id', requestId);
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-request', job.id, departmentForReq) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-requests-all', job.id) });
-      }
-    } catch (err) {
-      console.error('checkAndFulfillRequest failed', err);
-    }
-  };
-
-  // Manual Flex sync handler
-  const syncStatusToFlex = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const mapStatus = (s: string | null | undefined): 'tentativa' | 'confirmado' | 'cancelado' | null => {
-        switch (s) {
-          case 'Tentativa':
-            return 'tentativa';
-          case 'Confirmado':
-            return 'confirmado';
-          case 'Cancelado':
-            return 'cancelado';
-          default:
-            return null; // skip 'Completado' and others
-        }
-      };
-      const flexStatus = mapStatus(job.status);
-      if (!flexStatus) {
-        toast({ title: 'Not applicable', description: 'Only Tentativa/Confirmado/Cancelado are synced to Flex.' });
-        return;
-      }
-      const { data: folders, error: fErr } = await dataLayerClient.from('flex_folders')
-        .select('id, parent_id, department, folder_type')
-        .eq('job_id', job.id);
-	      if (fErr || !folders || folders.length === 0) {
-	        toast({ title: 'No Flex folders', description: 'Create Flex folders before syncing status.', variant: 'destructive' });
-	        return;
-	      }
-	      const folderRows = (folders || []) as FlexFolderRow[];
-	      const master =
-	        folderRows.find((f) => !f.parent_id && String(f.folder_type || '').toLowerCase() === 'main_event')
-	        || folderRows.find((f) => !f.parent_id)
-	        || null;
-
-	      if (!master?.id) {
-	        toast({ title: 'Flex sync failed', description: 'No Flex master folder found for this job.', variant: 'destructive' });
-	        return;
-	      }
-
-	      const { data: res, error } = await dataLayerClient.functions.invoke('apply-flex-status', {
-	        body: { folder_id: master.id, status: flexStatus, cascade: true }
-	      });
-	      const result = res as FlexStatusResponse | null;
-	      if (error || !result?.success) {
-	        const msg =
-	          result?.error
-	          || result?.response?.exceptionMessage
-	          || result?.response?.primaryMessage
-	          || result?.response?.message
-	          || (error ? await extractFunctionErrorMessage(error, '') : undefined)
-	          || undefined;
-	        toast({ title: 'Flex sync failed', description: msg || 'See logs for details.', variant: 'destructive' });
-	      } else {
-	        const cascade = result?.cascade;
-	        const attempted = typeof cascade?.attempted === 'number' ? cascade.attempted : null;
-	        const succeeded = typeof cascade?.succeeded === 'number' ? cascade.succeeded : null;
-	        const failed = typeof cascade?.failed === 'number' ? cascade.failed : null;
-
-	        if (attempted !== null && attempted > 0) {
-	          if (failed === 0) {
-	            toast({
-	              title: 'Flex synced',
-	              description: `Status synchronized with Flex (root + ${attempted} subfolder${attempted === 1 ? '' : 's'}).`
-	            });
-	          } else if (typeof failed === 'number' && failed > 0) {
-	            toast({
-	              title: 'Flex sync warning',
-	              description: `Root synced, but only ${succeeded ?? 0}/${attempted} subfolders updated. Check Flex logs.`
-	            });
-	          } else {
-	            toast({ title: 'Flex synced', description: 'Status synchronized with Flex.' });
-	          }
-	        } else if (attempted === 0) {
-	          toast({ title: 'Flex synced', description: 'Status synchronized with Flex (root only; no subfolders found).' });
-	        } else {
-	          toast({ title: 'Flex synced', description: 'Status synchronized with Flex.' });
-	        }
-	      }
-	    } catch (err: any) {
-	      toast({ title: 'Error', description: err?.message || String(err), variant: 'destructive' });
-	    }
-	  };
-
-  // Optimistic delete handler with instant UI feedback
-  const handleDeleteClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isJobBeingDeleted) {
-      console.log("JobCardNew: Job deletion already in progress");
-      return;
-    }
-
-    if (!isManagementUser) {
-      toast({
-        title: "Permission denied",
-        description: "Only admin and management users can delete jobs",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const confirmedDelete = await confirm({
-      title: 'Eliminar trabajo',
-      description: '¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.',
-      confirmText: 'Eliminar',
-      destructive: true,
-    });
-    if (!confirmedDelete) {
-      return;
-    }
-
-    try {
-      console.log("JobCardNew: Starting optimistic job deletion for:", job.id);
-
-      addDeletingJob(job.id);
-
-      const result = await deleteJobOptimistically(job.id);
-
-      if (result.success) {
-        toast({
-          title: "Job deleted",
-          description: result.details || "The job has been removed and cleanup is running in background."
-        });
-
-        onDeleteClick(job.id);
-
-        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
-        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
-      } else {
-        throw new Error(result.error || "Unknown deletion error");
-      }
-    } catch (error: any) {
-      console.error("JobCardNew: Error in optimistic job deletion:", error);
-      toast({
-        title: "Error deleting job",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      removeDeletingJob(job.id);
-    }
-  };
-
-  const createFlexFoldersHandler = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isCreatingFolders) {
-      console.log("JobCardNew: Folder creation already in progress");
-      return;
-    }
-
-    // For dryhire jobs, the structure is fixed — create directly without opening the picker
-    if (job.job_type === 'dryhire') {
-      console.log("JobCardNew: Dryhire detected — creating folders directly without picker", job.id);
-      void handleFlexPickerConfirm(undefined, 'create');
-      return;
-    }
-
-    if (actualFoldersExist) {
-      console.log("JobCardNew: Folders already exist — opening picker in add mode", job.id);
-      setFlexPickerMode('add');
-      setFlexPickerOpen(true);
-      return;
-    }
-
-    // Open the modal instead of creating immediately
-    console.log("JobCardNew: Opening folder picker modal for job:", job.id);
-    setFlexPickerMode('create');
-    setFlexPickerOpen(true);
-  };
-
-  const addFlexFoldersHandler = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isCreatingFolders) {
-      console.log("JobCardNew: Folder creation already in progress");
-      return;
-    }
-
-    if (job.job_type === 'dryhire') {
-      console.log("JobCardNew: Dryhire detected — add mode not applicable", job.id);
-      return;
-    }
-
-    console.log("JobCardNew: Opening folder picker modal in add mode for job:", job.id);
-    setFlexPickerMode('add');
-    setFlexPickerOpen(true);
-  };
-
-  const handleFlexPickerConfirm = async (
-    options?: CreateFoldersOptions,
-    modeOverride?: 'create' | 'add'
-  ) => {
-    const mode = modeOverride ?? flexPickerMode;
-    console.log("JobCardNew: Flex picker confirmed with options:", options);
-    setFlexPickerOptions(options);
-    setFlexPickerOpen(false);
-
-    try {
-      setIsCreatingFolders(true);
-
-      if (mode === 'create') {
-        // Double-check folders don't exist (create-only)
-        const existingFoldersQuery = dataLayerClient.from("flex_folders")
-          .select("id")
-          .limit(1);
-
-        const { data: existingFolders } =
-          job.job_type === "tourdate" && job.tour_date_id
-            ? await existingFoldersQuery.or(`job_id.eq.${job.id},tour_date_id.eq.${job.tour_date_id}`)
-            : await existingFoldersQuery.eq("job_id", job.id);
-
-        if (existingFolders && existingFolders.length > 0) {
-          console.log("JobCardNew: Found existing folders in final check:", existingFolders);
-          toast({
-            title: "Folders already exist",
-            description: "Flex folders have already been created for this job.",
-            variant: "destructive"
-          });
-          return;
-        }
-      }
-
-      const startDate = new Date(job.start_time);
-      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
-
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
-
-      toast({
-        title: mode === 'create' ? "Creating folders..." : "Adding folders...",
-        description:
-          mode === 'create'
-            ? "Setting up Flex folder structure for this job."
-            : "Creating the selected Flex folders."
-      });
-
-      // Pass options to the creation function
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber, options);
-
-      // Ensure the job is marked as having Flex folders (idempotent).
-      const { error: updateError } = await dataLayerClient.from('jobs')
-        .update({ flex_folders_created: true })
-        .eq('id', job.id);
-
-      if (updateError) console.error("Error updating job record:", updateError);
-
-      // Broadcast push notification: Flex folders created for job
-      try {
-        void dataLayerClient.functions.invoke('push', {
-          body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
-        });
-      } catch (pushError) {
-        console.error('Error sending push notification:', pushError);
-      }
-
-      toast({
-        title: mode === 'create' ? "Success!" : "Updated!",
-        description:
-          mode === 'create'
-            ? "Flex folders have been created successfully."
-            : "Selected Flex folders have been added successfully."
-      });
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("folder-existence", job.id) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("folder-existence") }),
-      ]);
-
-    } catch (error: any) {
-      console.error("JobCardNew: Error creating flex folders:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create Flex folders",
-        variant: "destructive"
-      });
-    } finally {
-      setIsCreatingFolders(false);
-    }
-  };
-
-  const createLocalFoldersHandler = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (isCreatingLocalFolders) {
-      console.log("JobCardNew: Local folder creation already in progress");
-      return;
-    }
-
-    // Check if File System Access API is supported
-    if (!('showDirectoryPicker' in window)) {
-      toast({
-        title: "Not supported",
-        description: "Your browser doesn't support local folder creation. Please use Chrome, Edge, or another Chromium-based browser.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setIsCreatingLocalFolders(true);
-
-      // Ask user to pick a base folder
-      const baseDirHandle = await window.showDirectoryPicker();
-
-      // Format the start date as yymmdd
-      const startDate = new Date(job.start_time);
-      const formattedDate = format(startDate, "yyMMdd");
-
-      // Create safe folder name
-      const { name: rootFolderName, wasSanitized } = createSafeFolderName(job.title, formattedDate);
-
-      if (wasSanitized) {
-        console.log('JobCardNew: Folder name was sanitized for safety:', { original: `${formattedDate} - ${job.title}`, sanitized: rootFolderName });
-      }
-
-      // Create root folder
-      const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
-
-      // Get current user's custom folder structure or use default
-      const { data: { user } } = await dataLayerClient.auth.getUser();
-      let folderStructure: LocalFolderStructureItem[] | null = null;
-
-      if (user) {
-        const { data: profile } = await dataLayerClient.from('profiles')
-          .select('custom_folder_structure, role')
-          .eq('id', user.id)
-          .single();
-
-        // Only use custom structure for management users
-        if (profile && canUseCustomFolderStructure(profile.role) && profile.custom_folder_structure) {
-          folderStructure = parseLocalFolderStructure(profile.custom_folder_structure);
-        }
-      }
-
-      // Default structure if no custom one exists
-      if (!folderStructure) {
-        folderStructure = [
-          "CAD",
-          "QT",
-          "Material",
-          "Documentación",
-          "Rentals",
-          "Compras",
-          "Rider",
-          "Predicciones"
-        ];
-      }
-
-      // Create folders based on structure
-      if (Array.isArray(folderStructure)) {
-        for (const folder of folderStructure) {
-          if (typeof folder === 'string') {
-            // Simple string structure
-            const safeFolderName = sanitizeFolderName(folder);
-            const subDirHandle = await rootDirHandle.getDirectoryHandle(safeFolderName, { create: true });
-            await subDirHandle.getDirectoryHandle("OLD", { create: true });
-          } else if (folder && typeof folder === 'object' && folder.name) {
-            // Object structure with subfolders
-            const safeFolderName = sanitizeFolderName(folder.name);
-            const subDirHandle = await rootDirHandle.getDirectoryHandle(safeFolderName, { create: true });
-
-            // Create subfolders if they exist
-            if (folder.subfolders && Array.isArray(folder.subfolders)) {
-              for (const subfolder of folder.subfolders) {
-                const safeSubfolderName = sanitizeFolderName(subfolder);
-                await subDirHandle.getDirectoryHandle(safeSubfolderName, { create: true });
-              }
-            } else {
-              // Default to OLD subfolder if no subfolders specified
-              await subDirHandle.getDirectoryHandle("OLD", { create: true });
-            }
-          }
-        }
-      }
-
-      const isCustom = user && folderStructure !== null;
-      toast({
-        title: "Success!",
-        description: `${isCustom ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
-      });
-
-    } catch (error: any) {
-      console.error("JobCardNew: Error creating local folders:", error);
-      if (error.name === 'AbortError') {
-        // User cancelled, don't show error
-        return;
-      }
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create local folder structure",
-        variant: "destructive"
-      });
-    } finally {
-      setIsCreatingLocalFolders(false);
-    }
-  };
 
   const handleJobCardClick = (e?: React.MouseEvent) => {
     console.log('[JobCard] Click detected:', {
@@ -1291,7 +524,19 @@ function JobCardNewFull({
     setIsGeneratingCrewReportPdf(true);
     try {
       const { downloadProjectCrewReportPdf } = await import("@/utils/pdf/projectCrewReportPdf");
-      const result = await downloadProjectCrewReportPdf(job);
+      const result = await downloadProjectCrewReportPdf({
+        id: job.id,
+        title: job.title,
+        start_time: job.start_time,
+        end_time: job.end_time,
+        timezone: job.timezone,
+        job_date_types: job.job_date_types,
+        tour_date: job.tour_date,
+        location:
+          job.location && typeof job.location === "object"
+            ? job.location
+            : null,
+      });
 
       toast({
         title: "PDF de personal generado",

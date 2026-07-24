@@ -128,7 +128,10 @@ const configureDialogSupabase = ({
     if (table === "job_assignments") {
       return {
         select: vi.fn((columns: string) => {
-          if (columns === "job_id, technician_id, single_day, assignment_date, status") {
+          if (
+            columns ===
+            "job_id, technician_id, single_day, assignment_date, status, response_time"
+          ) {
             return createMockQueryBuilder({
               data: existingAssignmentRow,
               error: null,

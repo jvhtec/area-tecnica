@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
 import {
   canResumeStaffingCampaign,
   staffingCampaignResumeLabel,
   staffingCampaignResumeToastTitle,
-} from '../campaignLifecycle'
+  staffingCampaignRoleStageLabel,
+  staffingCampaignStatusLabel,
+} from '../campaignLifecycle';
 
 describe('staffing campaign lifecycle helpers', () => {
   it('treats completed campaigns as restartable', () => {
@@ -23,5 +25,12 @@ describe('staffing campaign lifecycle helpers', () => {
 
     expect(staffingCampaignResumeToastTitle('Carlos', 'paused')).toBe('Carlos reanudado')
     expect(staffingCampaignResumeToastTitle('Carlos', 'completed')).toBe('Carlos reiniciado')
+  })
+
+  it('provides Spanish labels for campaign and role states', () => {
+    expect(staffingCampaignStatusLabel('active')).toBe('Activa')
+    expect(staffingCampaignStatusLabel('completed')).toBe('Completada')
+    expect(staffingCampaignRoleStageLabel('availability')).toBe('Disponibilidad')
+    expect(staffingCampaignRoleStageLabel('filled')).toBe('Cubierto')
   })
 })
