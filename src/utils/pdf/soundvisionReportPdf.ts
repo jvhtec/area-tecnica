@@ -4,6 +4,7 @@ import {
   validateSoundvisionReport,
   type SoundvisionPdfImage,
   type SoundvisionReportConditions,
+  type SoundvisionEquipmentRow,
   type SoundvisionReportModel,
   type SoundvisionReportPlot,
 } from '@/features/technical-tools/soundvision/reportModel';
@@ -25,7 +26,6 @@ const SOFT: PdfRgb = [122, 115, 106];
 const GOLD: PdfRgb = [160, 122, 51];
 const RULE: PdfRgb = [228, 223, 214];
 const PLOT_BORDER: PdfRgb = [221, 217, 209];
-const WATERMARK: PdfRgb = [244, 239, 226];
 
 export interface SoundvisionReportAssets {
   companyLogo?: SoundvisionPdfImage | null;
@@ -145,71 +145,6 @@ const drawImage = (
     pdf.rect(fitted.x, fitted.y, fitted.width, fitted.height);
   }
   return fitted;
-};
-
-const rotatedPoint = (
-  centerX: number,
-  centerY: number,
-  localX: number,
-  localY: number,
-  angle: number,
-): [number, number] => {
-  const radians = angle * Math.PI / 180;
-  return [
-    centerX + localX * Math.cos(radians) - localY * Math.sin(radians),
-    centerY + localX * Math.sin(radians) + localY * Math.cos(radians),
-  ];
-};
-
-const drawCabinet = (
-  pdf: jsPDF,
-  centerX: number,
-  centerY: number,
-  width: number,
-  height: number,
-  angle: number,
-): void => {
-  const corners = [
-    rotatedPoint(centerX, centerY, -width / 2, -height / 2, angle),
-    rotatedPoint(centerX, centerY, width / 2, -height / 2, angle),
-    rotatedPoint(centerX, centerY, width / 2, height / 2, angle),
-    rotatedPoint(centerX, centerY, -width / 2, height / 2, angle),
-  ];
-  corners.forEach((point, index) => {
-    const next = corners[(index + 1) % corners.length];
-    pdf.line(point[0], point[1], next[0], next[1]);
-  });
-  const faceStart = rotatedPoint(centerX, centerY, width * 0.28, -height * 0.18, angle);
-  const faceEnd = rotatedPoint(centerX, centerY, width * 0.28, height * 0.18, angle);
-  pdf.line(faceStart[0], faceStart[1], faceEnd[0], faceEnd[1]);
-};
-
-const drawArrayWatermark = (
-  pdf: jsPDF,
-  x: number,
-  y: number,
-  scale = 1,
-): void => {
-  pdf.setDrawColor(...WATERMARK);
-  pdf.setLineWidth(0.32);
-
-  const drawHang = (baseX: number, cabinets: number, cabinetScale: number) => {
-    const width = 15 * scale * cabinetScale;
-    const height = 6.2 * scale * cabinetScale;
-    pdf.rect(baseX - width / 2, y - 5 * scale, width, 3.2 * scale);
-    pdf.line(baseX, y - 8 * scale, baseX, y - 5 * scale);
-
-    for (let index = 0; index < cabinets; index += 1) {
-      const progress = cabinets === 1 ? 0 : index / (cabinets - 1);
-      const angle = progress * progress * 24;
-      const centerX = baseX + progress * progress * 7 * scale;
-      const centerY = y + index * height * 0.92;
-      drawCabinet(pdf, centerX, centerY, width, height, angle);
-    }
-  };
-
-  drawHang(x, 12, 0.86);
-  drawHang(x + 18 * scale, 9, 0.72);
 };
 
 const truncateText = (pdf: jsPDF, value: string, maxWidth: number): string => {
@@ -364,6 +299,158 @@ const drawConditions = (
   });
 };
 
+const normalizeEquipmentText = (row: SoundvisionEquipmentRow): string =>
+  `${row.model} ${row.role}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const equipmentQuantity = (row: SoundvisionEquipmentRow): number => {
+  const quantity = Number.parseInt(row.quantity, 10);
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+};
+
+const splitQuantity = (quantity: number): [number, number] => [
+  Math.ceil(quantity / 2),
+  Math.floor(quantity / 2),
+];
+
+const drawLineArray = (
+  pdf: jsPDF,
+  centerX: number,
+  topY: number,
+  quantity: number,
+  label: string,
+): void => {
+  const visibleModules = Math.min(quantity, 12);
+  const cabinetWidth = 8.4;
+  const cabinetHeight = Math.min(2.1, 22 / visibleModules);
+  const arrayHeight = cabinetHeight * visibleModules;
+  const left = centerX - cabinetWidth / 2;
+
+  pdf.setDrawColor(...SOFT);
+  pdf.setLineWidth(0.22);
+  pdf.line(centerX, topY - 3.2, centerX, topY - 1);
+  pdf.line(centerX - 5.2, topY - 1, centerX + 5.2, topY - 1);
+  for (let index = 0; index < visibleModules; index += 1) {
+    const y = topY + index * cabinetHeight;
+    pdf.rect(left, y, cabinetWidth, cabinetHeight);
+    pdf.line(centerX - 0.75, y, centerX - 0.75, y + cabinetHeight);
+    pdf.line(centerX + 0.75, y, centerX + 0.75, y + cabinetHeight);
+  }
+
+  setMono(pdf, 'bold');
+  pdf.setFontSize(5.2);
+  pdf.setTextColor(...INK);
+  pdf.text(label.toUpperCase(), centerX, topY + arrayHeight + 4, { align: 'center' });
+};
+
+const drawSubStack = (
+  pdf: jsPDF,
+  centerX: number,
+  topY: number,
+  quantity: number,
+  label: string,
+): void => {
+  const visibleModules = Math.min(quantity, 8);
+  const columns = Math.min(4, Math.max(1, Math.ceil(visibleModules / 2)));
+  const rows = Math.ceil(visibleModules / columns);
+  const cabinetWidth = 6.2;
+  const cabinetHeight = 3.5;
+  const stackWidth = columns * cabinetWidth;
+  const left = centerX - stackWidth / 2;
+
+  pdf.setDrawColor(...SOFT);
+  pdf.setLineWidth(0.22);
+  for (let index = 0; index < visibleModules; index += 1) {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const x = left + column * cabinetWidth;
+    const y = topY + row * cabinetHeight;
+    pdf.rect(x, y, cabinetWidth, cabinetHeight);
+    pdf.line(x + cabinetWidth * 0.42, y + 0.7, x + cabinetWidth * 0.42, y + cabinetHeight - 0.7);
+    pdf.line(x + cabinetWidth * 0.58, y + 0.7, x + cabinetWidth * 0.58, y + cabinetHeight - 0.7);
+  }
+
+  setMono(pdf, 'bold');
+  pdf.setFontSize(5.2);
+  pdf.setTextColor(...INK);
+  pdf.text(label.toUpperCase(), centerX, topY + rows * cabinetHeight + 4, {
+    align: 'center',
+  });
+};
+
+const drawFrontFills = (
+  pdf: jsPDF,
+  centerX: number,
+  y: number,
+  row: SoundvisionEquipmentRow,
+): void => {
+  const quantity = equipmentQuantity(row);
+  const visibleModules = Math.min(quantity, 12);
+  const cabinetWidth = Math.min(5.4, 48 / visibleModules);
+  const left = centerX - visibleModules * cabinetWidth / 2;
+
+  pdf.setDrawColor(...SOFT);
+  pdf.setLineWidth(0.22);
+  for (let index = 0; index < visibleModules; index += 1) {
+    const x = left + index * cabinetWidth;
+    pdf.rect(x, y, cabinetWidth, 3.2);
+    pdf.line(x + cabinetWidth / 2, y + 0.8, x + cabinetWidth / 2, y + 2.4);
+  }
+
+  setMono(pdf, 'bold');
+  pdf.setFontSize(5.2);
+  pdf.setTextColor(...INK);
+  pdf.text(`${row.quantity} ${row.model} · RELLENO FRONTAL`.toUpperCase(), centerX, y + 7.1, {
+    align: 'center',
+  });
+};
+
+const drawSystemConfiguration = (
+  pdf: jsPDF,
+  equipment: SoundvisionEquipmentRow[],
+  y: number,
+  height: number,
+): void => {
+  if (height < 46 || equipment.length === 0) return;
+
+  const subs = equipment.find((row) => /\b(sub|grave|ks28|sb)\b/.test(normalizeEquipmentText(row)));
+  const fills = equipment.find((row) => /\b(fill|relleno|front|x12)\b/.test(normalizeEquipmentText(row)));
+  const main = equipment.find((row) => row !== subs && row !== fills);
+  if (!main) return;
+
+  drawSectionHeading(pdf, '03', 'Esquema de configuración', y);
+  setMono(pdf, 'normal');
+  pdf.setFontSize(5.2);
+  pdf.setTextColor(...SOFT);
+  pdf.text('ELEVACIÓN CONCEPTUAL · CANTIDADES DISTRIBUIDAS ENTRE IZQUIERDA Y DERECHA', LEFT + 9, y + 5, {
+    charSpace: 0.18,
+  });
+
+  const drawingTop = y + 10;
+  const leftX = LEFT + 46;
+  const rightX = PAGE_WIDTH - RIGHT - 46;
+  const mainQuantity = equipmentQuantity(main);
+  const [leftMain, rightMain] = splitQuantity(mainQuantity);
+  drawLineArray(pdf, leftX, drawingTop + 3, leftMain, `${leftMain} ${main.model} · Izq.`);
+  drawLineArray(pdf, rightX, drawingTop + 3, rightMain, `${rightMain} ${main.model} · Dcha.`);
+
+  const arrayHeight = Math.min(12, leftMain) * Math.min(2.1, 22 / Math.min(12, leftMain));
+  const arrayBottom = drawingTop + 3 + arrayHeight;
+  const subTop = Math.min(y + height - 13, arrayBottom + 8);
+  if (subs) {
+    const [leftSubs, rightSubs] = splitQuantity(equipmentQuantity(subs));
+    drawSubStack(pdf, leftX, subTop, leftSubs, `${leftSubs} ${subs.model} · Izq.`);
+    drawSubStack(pdf, rightX, subTop, rightSubs, `${rightSubs} ${subs.model} · Dcha.`);
+  }
+
+  if (fills) {
+    const centerX = (leftX + rightX) / 2;
+    drawFrontFills(pdf, centerX, Math.min(y + height - 11, subTop + 1), fills);
+  }
+};
+
 const drawTitlePage = (
   pdf: jsPDF,
   model: SoundvisionReportModel,
@@ -372,7 +459,6 @@ const drawTitlePage = (
   const brand = SOUNDVISION_REPORT_BRANDS[model.system];
   drawHeader(pdf, model, assets);
   drawRail(pdf, model);
-  drawArrayWatermark(pdf, 199, 43, 0.72);
 
   setMono(pdf, 'bold');
   pdf.setFontSize(6.5);
@@ -457,6 +543,8 @@ const drawTitlePage = (
   const conditionsHeadingY = Math.min(258, rowY + 11);
   drawSectionHeading(pdf, '02', 'Condiciones de predicción', conditionsHeadingY);
   drawConditions(pdf, model.conditions, conditionsHeadingY + 5.5, false);
+  const diagramY = conditionsHeadingY + 19;
+  drawSystemConfiguration(pdf, model.equipment, diagramY, FOOTER_Y - diagramY - 6);
   drawFooter(pdf, 1, 4, brand.predictionLabel);
 };
 
@@ -507,7 +595,6 @@ const drawPlotPage = (
   const brand = SOUNDVISION_REPORT_BRANDS[model.system];
   drawHeader(pdf, model, assets);
   drawRail(pdf, model);
-  drawArrayWatermark(pdf, 202, 174, 0.62);
 
   setMono(pdf, 'bold');
   pdf.setFontSize(6.5);
