@@ -3,9 +3,9 @@ import { HttpError } from "./http.ts";
 const MAX_PROJECT_NAME_LENGTH = 160;
 const MAX_SOURCE_URL_LENGTH = 4 * 1024;
 const MAX_DOCUMENTS = 5;
-const MAX_SINGLE_PDF_BYTES = 15 * 1024 * 1024;
+export const MAX_MEMORIA_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_LOGO_BYTES = 3 * 1024 * 1024;
-const MAX_TOTAL_SOURCE_BYTES = 50 * 1024 * 1024;
+export const MAX_MEMORIA_TOTAL_SOURCE_BYTES = 50 * 1024 * 1024;
 const SOURCE_TIMEOUT_MS = 12_000;
 
 type UnknownRecord = Record<string, unknown>;
@@ -19,12 +19,17 @@ export interface MemoriaRequestInput {
 export class SourceByteBudget {
   private usedBytes = 0;
 
-  constructor(private readonly limitBytes = MAX_TOTAL_SOURCE_BYTES) {}
+  constructor(private readonly limitBytes = MAX_MEMORIA_TOTAL_SOURCE_BYTES) {}
 
   reserve(bytes: number) {
     if (bytes > this.limitBytes - this.usedBytes) {
       throw new HttpError(413, "Los documentos de origen superan el tamaño total permitido", {
         code: "source_total_too_large",
+        details: {
+          attemptedBytes: bytes,
+          maxBytes: this.limitBytes,
+          usedBytes: this.usedBytes,
+        },
       });
     }
     this.usedBytes += bytes;
@@ -124,7 +129,14 @@ export function parseMemoriaRequestInput(
 const readBoundedResponse = async (response: Response, maxBytes: number, budget: SourceByteBudget) => {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
-    throw new HttpError(413, "El archivo de origen es demasiado grande", { code: "source_too_large" });
+    throw new HttpError(413, "El archivo de origen es demasiado grande", {
+      code: "source_too_large",
+      details: {
+        actualBytes: declaredLength,
+        maxBytes,
+        measurement: "content-length",
+      },
+    });
   }
   if (!response.body) {
     throw new HttpError(422, "El archivo de origen no contiene datos", { code: "empty_source" });
@@ -139,7 +151,14 @@ const readBoundedResponse = async (response: Response, maxBytes: number, budget:
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      throw new HttpError(413, "El archivo de origen es demasiado grande", { code: "source_too_large" });
+      throw new HttpError(413, "El archivo de origen es demasiado grande", {
+        code: "source_too_large",
+        details: {
+          actualBytes: total,
+          maxBytes,
+          measurement: "stream",
+        },
+      });
     }
     chunks.push(value);
   }
@@ -171,7 +190,7 @@ export async function fetchMemoriaSource(
     if (!response.ok) {
       throw new HttpError(422, "No se pudo cargar el archivo de origen", { code: "source_fetch_failed" });
     }
-    return await readBoundedResponse(response, options.maxBytes ?? MAX_SINGLE_PDF_BYTES, budget);
+    return await readBoundedResponse(response, options.maxBytes ?? MAX_MEMORIA_PDF_BYTES, budget);
   } catch (error) {
     if (error instanceof HttpError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -201,6 +220,68 @@ export const getMemoriaPdfValidationMessage = (
       return `No se puede leer el documento «${documentLabel}» como PDF`;
   }
 };
+
+const getErrorDetails = (error: HttpError): UnknownRecord =>
+  isRecord(error.details) ? error.details : {};
+
+const getLimitInMiB = (value: unknown, fallback: number) => {
+  const bytes = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.round(bytes / (1024 * 1024));
+};
+
+/**
+ * Converts a source-processing failure into a document-labelled client error and
+ * emits a token-free structured record for Supabase Function logs.
+ */
+export function reportMemoriaDocumentFailure(
+  functionName: string,
+  documentKey: string,
+  documentLabel: string,
+  error: unknown,
+): HttpError {
+  const original = error instanceof HttpError
+    ? error
+    : new HttpError(422, getMemoriaPdfValidationMessage(documentLabel, "unreadable"), {
+      code: "invalid_pdf_source",
+    });
+  const details = getErrorDetails(original);
+
+  let normalized = original;
+
+  if (original.code === "source_too_large") {
+    normalized = new HttpError(
+      413,
+      `El documento «${documentLabel}» supera el límite de ${
+        getLimitInMiB(details.maxBytes, MAX_MEMORIA_PDF_BYTES)
+      } MB`,
+      { code: original.code },
+    );
+  } else if (original.code === "source_total_too_large") {
+    normalized = new HttpError(
+      413,
+      `Los documentos de origen superan el límite total de ${
+        getLimitInMiB(details.maxBytes, MAX_MEMORIA_TOTAL_SOURCE_BYTES)
+      } MB al procesar «${documentLabel}»`,
+      { code: original.code },
+    );
+  }
+
+  console.error("memoria_document_rejected", {
+    actualBytes: details.actualBytes,
+    attemptedBytes: details.attemptedBytes,
+    code: normalized.code ?? "unknown",
+    documentKey,
+    documentLabel,
+    functionName,
+    maxBytes: details.maxBytes,
+    message: normalized.message,
+    measurement: details.measurement,
+    status: normalized.status,
+    usedBytes: details.usedBytes,
+  });
+
+  return normalized;
+}
 
 export const getSupportedImageFormat = (bytes: Uint8Array): "png" | "jpg" | null => {
   const isPng =

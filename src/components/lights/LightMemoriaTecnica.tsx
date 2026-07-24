@@ -21,6 +21,7 @@ import { TechnicalStageSelector } from "@/features/technical-tools/stage/stageAl
 import { upsertMemoriaTecnicaDocument } from "@/utils/memoriaTecnicaDocuments";
 import { fetchFlexMaterialReport } from "@/utils/flexMaterialReport";
 import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 const AUTO_FILL_CATEGORIES: Record<string, MemoriaAutoFillCategorySpec> = {
   material: "calculators/lista-material/lights",
@@ -346,7 +347,10 @@ export const LightMemoriaTecnica = () => {
 
       if (response.error) {
         console.error('Error from edge function:', response.error);
-        throw new Error(response.error.message || 'Error al generar la memoria técnica');
+        throw new Error(await extractFunctionErrorMessage(
+          response.error,
+          "Error al generar la memoria técnica",
+        ));
       }
 
       setProgress(80);
@@ -379,7 +383,9 @@ export const LightMemoriaTecnica = () => {
       console.error("Error generating memoria tecnica:", error);
       toast({
         title: "Error",
-        description: error.message || "Error al generar la memoria técnica",
+        description: error instanceof Error && error.message
+          ? error.message
+          : "Error al generar la memoria técnica",
         variant: "destructive",
       });
     } finally {

@@ -6,6 +6,7 @@ import {
   fetchOptionalMemoriaLogo,
   getMemoriaPdfValidationMessage,
   isPdfBytes,
+  reportMemoriaDocumentFailure,
   requireMemoriaContext,
   SourceByteBudget,
   uploadGeneratedMemoriaPdf,
@@ -130,21 +131,22 @@ serve(createHttpHandler(async (req) => {
       try {
         const sourceBytes = await fetchMemoriaSource(documentUrls.memoria_completa, sourceBudget);
         if (!isPdfBytes(sourceBytes)) {
-          throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "invalid"), { code: "invalid_pdf_source" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage("Memoria técnica completa", "invalid"), { code: "invalid_pdf_source" });
         }
         const pdf = await PDFDocument.load(sourceBytes);
         if (pdf.getPageCount() > 150) {
-          throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "page_limit"), { code: "pdf_page_limit" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage("Memoria técnica completa", "page_limit"), { code: "pdf_page_limit" });
         }
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach(page => mergedPdf.addPage(page));
         console.log(`Added ${pages.length} pages from complete memoria`);
       } catch (error) {
-        if (error instanceof HttpError) throw error;
-        console.warn("Lights memoria rejected complete PDF");
-        throw new HttpError(422, getMemoriaPdfValidationMessage("memoria técnica completa", "unreadable"), {
-          code: "invalid_pdf_source",
-        });
+        throw reportMemoriaDocumentFailure(
+          "generate-lights-memoria-tecnica",
+          "memoria_completa",
+          "Memoria técnica completa",
+          error,
+        );
       }
     } else {
       // For regular memoria, create table of contents and append individual documents
@@ -194,21 +196,22 @@ serve(createHttpHandler(async (req) => {
         try {
           const sourceBytes = await fetchMemoriaSource(url, sourceBudget);
           if (!isPdfBytes(sourceBytes)) {
-            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "invalid"), { code: "invalid_pdf_source" });
+            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.title, "invalid"), { code: "invalid_pdf_source" });
           }
           const pdf = await PDFDocument.load(sourceBytes);
           if (pdf.getPageCount() > 150) {
-            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "page_limit"), { code: "pdf_page_limit" });
+            throw new HttpError(422, getMemoriaPdfValidationMessage(doc.title, "page_limit"), { code: "pdf_page_limit" });
           }
           const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
           pages.forEach(page => mergedPdf.addPage(page));
           console.log(`Added ${pages.length} pages from ${doc.id}`);
         } catch (error) {
-          if (error instanceof HttpError) throw error;
-          console.warn("Lights memoria rejected PDF", { key: doc.id });
-          throw new HttpError(422, getMemoriaPdfValidationMessage(doc.id, "unreadable"), {
-            code: "invalid_pdf_source",
-          });
+          throw reportMemoriaDocumentFailure(
+            "generate-lights-memoria-tecnica",
+            doc.id,
+            doc.title,
+            error,
+          );
         }
       }
     }

@@ -6,6 +6,7 @@ import {
   fetchOptionalMemoriaLogo,
   getMemoriaPdfValidationMessage,
   isPdfBytes,
+  reportMemoriaDocumentFailure,
   requireMemoriaContext,
   SourceByteBudget,
   uploadGeneratedMemoriaPdf,
@@ -211,7 +212,7 @@ serve(createHttpHandler(async (req) => {
       weight: "Informe de Pesos",
       power: "Informe de Consumos",
       rigging: "Plano de Rigging"
-    };
+    } as Record<string, string>;
 
     // Add index items
     let yOffset = height - 100;
@@ -233,24 +234,26 @@ serve(createHttpHandler(async (req) => {
     // Append every requested document. A malformed or unavailable document is
     // an explicit request failure rather than a silently incomplete PDF.
     for (const [key, url] of Object.entries(documentUrls)) {
+      const documentLabel = titles[key] ?? key;
       try {
         const sourceBytes = await fetchMemoriaSource(url, sourceBudget);
         if (!isPdfBytes(sourceBytes)) {
-          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "invalid"), { code: "invalid_pdf_source" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage(documentLabel, "invalid"), { code: "invalid_pdf_source" });
         }
         const pdfBytes = sourceBytes;
         const pdf = await PDFDocument.load(pdfBytes);
         if (pdf.getPageCount() > 150) {
-          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "page_limit"), { code: "pdf_page_limit" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage(documentLabel, "page_limit"), { code: "pdf_page_limit" });
         }
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach((page) => mergedPdf.addPage(page));
       } catch (error) {
-        if (error instanceof HttpError) throw error;
-        console.warn("Sound memoria rejected PDF", { key });
-        throw new HttpError(422, getMemoriaPdfValidationMessage(key, "unreadable"), {
-          code: "invalid_pdf_source",
-        });
+        throw reportMemoriaDocumentFailure(
+          "generate-memoria-tecnica",
+          key,
+          documentLabel,
+          error,
+        );
       }
     }
 
