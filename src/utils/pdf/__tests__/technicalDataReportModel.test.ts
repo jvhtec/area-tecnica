@@ -12,6 +12,8 @@ describe("technicalDataReportModel", () => {
     expect(formatTechnicalReportNumber(42100, 0)).toBe("42.100");
     expect(formatTechnicalReportNumber(49.53, 2)).toBe("49,53");
     expect(formatTechnicalReportDate("2026-07-10")).toBe("10 julio 2026");
+    expect(formatTechnicalReportDate("24/07/2026")).toBe("24 julio 2026");
+    expect(formatTechnicalReportDate("31/02/2026")).toBe("No disponible");
     expect(formatTechnicalReportDate("not-a-date")).toBe("No disponible");
   });
 

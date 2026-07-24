@@ -432,7 +432,7 @@ export const exportTechnicalDataReportPdf = async ({
       .map((circuit) => circuit.margin)
       .filter((value): value is number => value !== null) ?? [],
   );
-  y = drawMetaGrid(
+  drawMetaGrid(
     doc,
     type === "power"
       ? [
