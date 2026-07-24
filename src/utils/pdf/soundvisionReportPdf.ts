@@ -15,7 +15,6 @@ import {
 import { loadJsPDF } from '@/utils/pdf/lazyPdf';
 
 const PAGE_WIDTH = 210;
-const PAGE_HEIGHT = 297;
 const LEFT = 25.4;
 const RIGHT = 16.4;
 const CONTENT_WIDTH = PAGE_WIDTH - LEFT - RIGHT;
