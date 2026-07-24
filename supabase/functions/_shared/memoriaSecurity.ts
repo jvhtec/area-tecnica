@@ -11,7 +11,10 @@ export {
   getMemoriaPdfValidationMessage,
   getSupportedImageFormat,
   isPdfBytes,
+  MAX_MEMORIA_PDF_BYTES,
+  MAX_MEMORIA_TOTAL_SOURCE_BYTES,
   parseMemoriaRequestInput,
+  reportMemoriaDocumentFailure,
   SourceByteBudget,
 } from "./memoriaInput.ts";
 

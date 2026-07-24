@@ -6,6 +6,7 @@ import {
   fetchOptionalMemoriaLogo,
   getMemoriaPdfValidationMessage,
   isPdfBytes,
+  reportMemoriaDocumentFailure,
   requireMemoriaContext,
   SourceByteBudget,
   uploadGeneratedMemoriaPdf,
@@ -239,24 +240,26 @@ serve(createHttpHandler(async (req) => {
     for (const key of preferredOrder) {
       const url = documentUrls[key];
       if (!url) continue;
+      const documentLabel = titles[key] ?? key;
 
       try {
         const sourceBytes = await fetchMemoriaSource(url, sourceBudget);
         if (!isPdfBytes(sourceBytes)) {
-          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "invalid"), { code: "invalid_pdf_source" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage(documentLabel, "invalid"), { code: "invalid_pdf_source" });
         }
         const pdf = await PDFDocument.load(sourceBytes);
         if (pdf.getPageCount() > 150) {
-          throw new HttpError(422, getMemoriaPdfValidationMessage(key, "page_limit"), { code: "pdf_page_limit" });
+          throw new HttpError(422, getMemoriaPdfValidationMessage(documentLabel, "page_limit"), { code: "pdf_page_limit" });
         }
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach((page) => mergedPdf.addPage(page));
       } catch (error) {
-        if (error instanceof HttpError) throw error;
-        console.warn("Video memoria rejected PDF", { key });
-        throw new HttpError(422, getMemoriaPdfValidationMessage(key, "unreadable"), {
-          code: "invalid_pdf_source",
-        });
+        throw reportMemoriaDocumentFailure(
+          "generate-video-memoria-tecnica",
+          key,
+          documentLabel,
+          error,
+        );
       }
     }
 
