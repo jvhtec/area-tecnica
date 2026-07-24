@@ -1,7 +1,22 @@
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import { generateQRCode } from '@/utils/qrcode';
+import {
+  FESTIVAL_INK,
+  FESTIVAL_SOFT,
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalSectionHeading,
+  drawFestivalTitleBlock,
+  festivalTableTheme,
+  setFestivalMonoText,
+  setFestivalText,
+} from '@/utils/pdf/festival-report';
 
 export interface MissingRiderArtist {
   id: string;
@@ -24,352 +39,163 @@ export interface MissingRiderReportData {
   jobTitle: string;
   logoUrl?: string;
   artists: MissingRiderArtist[];
+  /** False when the document is bound into a set that stamps its own folios. */
+  paginate?: boolean;
 }
+
+const ACTION_ITEMS = [
+  'Contactar con el artista para solicitar su rider técnico.',
+  'Escanear el código QR para abrir su formulario técnico público.',
+  'Hacer seguimiento con management o booking si no hay respuesta.',
+  'Actualizar el sistema en cuanto se reciba cada rider.',
+];
+
+const formatShowDate = (value: string): string => {
+  if (!value) return 'Sin fecha';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Sin fecha' : format(parsed, 'EEE, d MMM', { locale: es });
+};
+
+const formatStatus = (artist: MissingRiderArtist): string => {
+  if (artist.status !== 'outdated') return 'Pendiente';
+  if (!artist.copiedFromDate) return 'Desactualizado';
+  const parsed = parseISO(artist.copiedFromDate);
+  return Number.isNaN(parsed.getTime())
+    ? 'Desactualizado'
+    : `Desactualizado (de ${format(parsed, 'd MMM', { locale: es })})`;
+};
 
 export const exportMissingRiderReportPDF = async (data: MissingRiderReportData): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const marginLeft = 20;
-  const marginRight = 20;
-  const footerReserve = 24;
-  const topMarginForContinuedPages = 30;
-  const contentBottomY = pageHeight - footerReserve;
-  const contentPageNumbers = new Set<number>();
-  const markCurrentPageAsContent = () => {
-    contentPageNumbers.add(doc.getCurrentPageInfo().pageNumber);
-  };
-  const getLastAutoTableFinalY = (fallback: number) => {
-    const docWithTable = doc as unknown as { lastAutoTable?: { finalY?: number } };
-    return docWithTable.lastAutoTable?.finalY ?? fallback;
-  };
-  interface LoadedImage {
-    dataUrl: string;
-    width: number;
-    height: number;
-  }
-  const imageTypeFromDataUrl = (dataUrl: string) => (dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG');
-  const addDataUrlImage = (dataUrl: string, x: number, y: number, w: number, h: number) => {
-    doc.addImage(dataUrl, imageTypeFromDataUrl(dataUrl), x, y, w, h);
-  };
-  const toLoadedImage = async (url?: string): Promise<LoadedImage | undefined> => {
-    if (!url || typeof Image === 'undefined') return undefined;
-    try {
-      const response = await fetch(url);
-      if (!response.ok) return undefined;
-      const blob = await response.blob();
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
-        const image = new Image();
-        image.onload = () => resolve({ width: image.width || 1, height: image.height || 1 });
-        image.onerror = () => resolve({ width: 1, height: 1 });
-        image.src = dataUrl;
-      });
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
 
-      return {
-        dataUrl,
-        width: dimensions.width,
-        height: dimensions.height,
-      };
-    } catch {
-      return undefined;
-    }
-  };
-  const fitDimensions = (
-    image: LoadedImage,
-    maxWidth: number,
-    maxHeight: number,
-  ): { width: number; height: number } => {
-    const ratio = image.width / image.height || 1;
-    let width = maxWidth;
-    let height = width / ratio;
-    if (height > maxHeight) {
-      height = maxHeight;
-      width = height * ratio;
-    }
-    return { width, height };
-  };
+  const chrome = () =>
+    drawFestivalChrome(doc, {
+      kind: 'riders',
+      eventTitle: data.jobTitle,
+      contextLabel: 'Riders pendientes',
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      paginate: false,
+    });
 
-  const festivalLogo = await toLoadedImage(data.logoUrl);
-  const sectorLogo =
-    (await toLoadedImage('/sector pro logo.png')) ||
-    (await toLoadedImage('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png'));
+  const geo = chrome();
+  const { mm } = geo;
 
-  const drawRunningHeader = (pageNumber: number) => {
-    doc.setFillColor(125, 1, 1);
-    doc.rect(0, 0, pageWidth, 24, 'F');
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'Riders pendientes  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: 'Riders técnicos no recibidos o copiados de una fecha anterior',
+    clientLogo,
+  });
 
-    if (festivalLogo) {
-      try {
-        const dims = fitDimensions(festivalLogo, 24, 16);
-        addDataUrlImage(
-          festivalLogo.dataUrl,
-          8,
-          4 + (16 - dims.height) / 2,
-          dims.width,
-          dims.height,
-        );
-      } catch (error) {
-        console.warn('Could not render festival logo in missing rider header:', error);
-      }
-    }
+  const missing = data.artists.filter((artist) => artist.status !== 'outdated').length;
+  const outdated = data.artists.length - missing;
 
-    doc.setTextColor('#ffffff');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Reporte de Riders Faltantes', pageWidth / 2, 10, { align: 'center' });
-    doc.setFontSize(9);
-    doc.text(data.jobTitle, pageWidth / 2, 17, { align: 'center' });
+  y = drawFestivalMetaGrid(doc, geo, [
+    { label: 'Pendientes', value: String(missing) },
+    { label: 'Desactualizados', value: String(outdated) },
+    { label: 'Total', value: String(data.artists.length) },
+    { label: 'Emitido', value: format(new Date(), 'dd/MM/yyyy') },
+  ], y);
 
-    if (pageNumber > 1) {
-      doc.setFontSize(8);
-      doc.text(`Página ${pageNumber}`, pageWidth - marginRight, 10, { align: 'right' });
-    }
-  };
-  
-  // Set up fonts and colors
-  const primaryColor = '#7d0101';
-  const textColor = '#1f2937';
-  const warningColor = '#dc2626';
-  
-  let yPosition = 34;
-  
-  // Header
-  doc.setFontSize(18);
-  doc.setTextColor(primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Reporte de Riders Faltantes', marginLeft, yPosition);
-  
-  yPosition += 15;
-  
-  // Job title
-  doc.setFontSize(16);
-  doc.setTextColor(textColor);
-  doc.setFont('helvetica', 'normal');
-  doc.text(data.jobTitle, 20, yPosition);
-  
-  yPosition += 10;
-  
-  // Generated date
-  doc.setFontSize(10);
-  doc.setTextColor('#6b7280');
-  doc.text(`Generado el: ${format(new Date(), 'PPP', { locale: es })}`, 20, yPosition);
-  
-  yPosition += 20;
-  
-  // Warning message
-  doc.setFontSize(12);
-  doc.setTextColor(warningColor);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Riders pendientes o desactualizados de los siguientes artistas:', 20, yPosition);
-  markCurrentPageAsContent();
-  
-  yPosition += 15;
-  
   if (data.artists.length === 0) {
-    doc.setFontSize(12);
-    doc.setTextColor('#059669');
-    doc.setFont('helvetica', 'normal');
-    doc.text('Todos los artistas tienen su rider técnico completo.', 20, yPosition);
-    markCurrentPageAsContent();
+    drawFestivalNilState(
+      doc,
+      geo,
+      y,
+      'Todos los artistas tienen su rider técnico completo y vigente. No hay ninguna acción pendiente.',
+    );
   } else {
-    const qrByRowIndex = await Promise.all(
+    const qrCodes = await Promise.all(
       data.artists.map(async (artist) => {
         if (!artist.formUrl) return null;
         try {
           return await generateQRCode(artist.formUrl);
         } catch (error) {
-          console.warn(`Could not generate QR for artist ${artist.name}:`, error);
+          console.warn(`No se pudo generar el QR de ${artist.name}:`, error);
           return null;
         }
       }),
     );
 
-    // Create table data
-    const tableData = data.artists.map((artist, index) => {
-      // Safely format date
-      let dateText = 'TBA';
-      try {
-        if (artist.date) {
-          const d = new Date(artist.date);
-          if (!isNaN(d.getTime())) {
-            dateText = format(d, 'EEE, d MMM', { locale: es });
-          }
-        }
-      } catch {
-        dateText = 'TBA';
-      }
+    y = drawFestivalSectionHeading(doc, geo, 'Artistas afectados', y, 1);
 
-      let estadoText = 'Faltante';
-      if (artist.status === 'outdated') {
-        let sourceText = '';
-        try {
-          if (artist.copiedFromDate) {
-            const d = parseISO(artist.copiedFromDate);
-            if (!isNaN(d.getTime())) {
-              sourceText = format(d, 'd MMM', { locale: es });
-            }
-          }
-        } catch {
-          sourceText = '';
-        }
-        estadoText = sourceText ? `Desactualizado\n(de ${sourceText})` : 'Desactualizado';
-      }
+    const rows = data.artists.map((artist, index) => [
+      artist.name,
+      artist.stageName || `Escenario ${artist.stage}`,
+      formatShowDate(artist.date),
+      formatStatus(artist),
+      qrCodes[index] ? '' : 'Sin formulario',
+    ]);
 
-      return [
-        artist.name,
-        artist.stageName || `Escenario ${artist.stage}`,
-        dateText,
-        estadoText,
-        qrByRowIndex[index] ? '' : 'N/A'
-      ];
-    });
-    
-    // Add table
     autoTable(doc, {
-      startY: yPosition,
-      head: [['Artista', 'Escenario', 'Fecha', 'Estado', 'QR Formulario Público']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [125, 1, 1], // Red color for missing riders
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 11
+      head: [['Artista', 'Escenario', 'Fecha', 'Estado', 'Formulario']],
+      body: rows,
+      startY: y,
+      ...festivalTableTheme(geo, { fontSize: 7.8 }),
+      bodyStyles: { minCellHeight: 16 * mm },
+      columnStyles: distributeColumnWidths([30, 24, 18, 28, 22], geo.contentWidth),
+      margin: {
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
       },
-      bodyStyles: {
-        textColor: [31, 41, 55],
-        fontSize: 10,
-        minCellHeight: 24
-      },
-      alternateRowStyles: {
-        fillColor: [254, 242, 242] // Light red background
-      },
-      margin: { left: marginLeft, right: marginRight, top: topMarginForContinuedPages, bottom: footerReserve },
       rowPageBreak: 'avoid',
-      columnStyles: {
-        0: { cellWidth: 44 }, // Artist
-        1: { cellWidth: 36, overflow: 'ellipsize' }, // Escenario (no wrap)
-        2: { cellWidth: 22 }, // Fecha
-        3: { cellWidth: 28 }, // Estado
-        4: { cellWidth: 34 }  // QR
-      },
       didDrawPage: () => {
-        const pageNumber = doc.getCurrentPageInfo().pageNumber;
-        drawRunningHeader(pageNumber);
+        chrome();
       },
-      didDrawCell: (hookData: {
-        section: string;
-        column: { index: number };
-        row: { index: number };
-        cell: { x: number; y: number; width: number; height: number };
-      }) => {
-        if (hookData.section !== 'body') return;
-        markCurrentPageAsContent();
-
-        if (hookData.column.index !== 4) return;
-
-        const qrDataUrl = qrByRowIndex[hookData.row.index];
-        const formUrl = data.artists[hookData.row.index]?.formUrl;
+      didDrawCell: (hookData) => {
+        if (hookData.section !== 'body' || hookData.column.index !== 4) return;
+        const qrDataUrl = qrCodes[hookData.row.index];
         if (!qrDataUrl) return;
 
-        const maxSize = Math.min(hookData.cell.width - 4, hookData.cell.height - 4, 18);
-        const x = hookData.cell.x + (hookData.cell.width - maxSize) / 2;
-        const y = hookData.cell.y + (hookData.cell.height - maxSize) / 2;
-        doc.addImage(qrDataUrl, 'PNG', x, y, maxSize, maxSize);
-        if (formUrl) {
-          doc.link(x, y, maxSize, maxSize, { url: formUrl });
-        }
+        const size = Math.min(hookData.cell.width - 4 * mm, hookData.cell.height - 3 * mm, 14 * mm);
+        const x = hookData.cell.x + (hookData.cell.width - size) / 2;
+        const qrY = hookData.cell.y + 1.5 * mm;
+        doc.addImage(qrDataUrl, 'PNG', x, qrY, size, size);
+
+        const formUrl = data.artists[hookData.row.index]?.formUrl;
+        if (formUrl) doc.link(x, qrY, size, size, { url: formUrl });
       },
     });
-    
-    // Add footer with action items
-    let currentY = getLastAutoTableFinalY(yPosition) + 12;
 
-    if (currentY + 8 > contentBottomY) {
+    y = getLastAutoTableY(doc, y) + 10 * mm;
+
+    if (y + 34 * mm > geo.contentBottom) {
       doc.addPage();
-      currentY = topMarginForContinuedPages;
-      drawRunningHeader(doc.getCurrentPageInfo().pageNumber);
+      chrome();
+      y = geo.contentTop;
     }
-    
-    doc.setFontSize(11);
-    doc.setTextColor(textColor);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Acción Requerida:', marginLeft, currentY);
-    markCurrentPageAsContent();
-    currentY += 8;
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    
-    const actionItems = [
-      '• Contacta con los artistas listados para solicitar su rider técnico',
-      '• Escanea cada QR para abrir el formulario técnico público del artista',
-      '• Haz seguimiento con management o booking del artista',
-      '• Asegura que todos los riders se reciban antes de la planificación de producción',
-      '• Actualiza el sistema cuando se reciba cada rider'
-    ];
-    
-    actionItems.forEach((item) => {
-      const wrappedItem = doc.splitTextToSize(item, pageWidth - marginLeft - marginRight - 5);
-      const itemHeight = wrappedItem.length * 5 + 2;
 
-      if (currentY + itemHeight > contentBottomY) {
-        doc.addPage();
-        currentY = topMarginForContinuedPages;
-        drawRunningHeader(doc.getCurrentPageInfo().pageNumber);
-      }
-
-      doc.text(wrappedItem, marginLeft + 5, currentY);
-      markCurrentPageAsContent();
-      currentY += itemHeight;
+    y = drawFestivalSectionHeading(doc, geo, 'Acción requerida', y, 2);
+    ACTION_ITEMS.forEach((item, index) => {
+      setFestivalMonoText(doc, FESTIVAL_SOFT, 6, 'bold');
+      doc.text(String(index + 1).padStart(2, '0'), geo.left, y);
+      setFestivalText(doc, FESTIVAL_INK, 7.6);
+      const lines = doc.splitTextToSize(item, geo.contentWidth - 9 * mm) as string[];
+      doc.text(lines, geo.left + 9 * mm, y, { lineHeightFactor: 1.25 });
+      y += lines.length * 3.4 * mm + 2.4 * mm;
     });
   }
 
-  // Remove trailing pages that have header/footer but no report body content.
-  while (doc.getNumberOfPages() > 1) {
-    const lastPageNumber = doc.getNumberOfPages();
-    if (contentPageNumbers.has(lastPageNumber)) break;
-    doc.deletePage(lastPageNumber);
-  }
-  
-  // Add consistent footer on every page with final page count
   const totalPages = doc.getNumberOfPages();
-  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-    doc.setPage(pageNumber);
-    drawRunningHeader(pageNumber);
-    doc.setFontSize(8);
-    doc.setTextColor('#9ca3af');
-
-    if (sectorLogo) {
-      try {
-        const dims = fitDimensions(sectorLogo, 22, 8);
-        addDataUrlImage(
-          sectorLogo.dataUrl,
-          pageWidth / 2 - dims.width / 2,
-          pageHeight - 16 + (8 - dims.height) / 2,
-          dims.width,
-          dims.height,
-        );
-      } catch (error) {
-        console.warn('Could not render Sector Pro logo in missing rider footer:', error);
-      }
-    }
-
-    doc.text(
-      `Página ${pageNumber} de ${totalPages} - Generado por Festival Management System`,
-      marginLeft,
-      pageHeight - 8,
-    );
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'riders',
+      eventTitle: data.jobTitle,
+      contextLabel: 'Riders pendientes',
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber: page,
+      totalPages,
+      paginate: data.paginate !== false,
+    });
   }
-  
-  return new Promise((resolve) => {
-    resolve(doc.output('blob'));
-  });
+
+  return pdfToBlob(doc);
 };

@@ -1,412 +1,297 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
+import {
+  FESTIVAL_ACCENT,
+  FESTIVAL_FAINT,
+  FESTIVAL_MATRIX_ZERO,
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalSectionHeading,
+  drawFestivalTitleBlock,
+  festivalTableTheme,
+} from '@/utils/pdf/festival-report';
 
 export interface WiredMicrophoneMatrixData {
-  jobTitle: string;  
+  jobTitle: string;
   logoUrl?: string;
   artistsByDateAndStage: Map<string, Map<number, any[]>>;
+  /** False when the document is bound into a set that stamps its own folios. */
+  paginate?: boolean;
 }
 
-export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrixData): Promise<Blob> => {
-  const { jsPDF, autoTable } = await loadPdfLibs();
-  const pdf = new jsPDF('landscape', 'pt', 'a4');
-  const pageWidth = pdf.internal.pageSize.width;
-  const pageHeight = pdf.internal.pageSize.height;
-  const margin = 20;
-  const footerReserve = 28;
-  
-  // Festival document styling
-  const primaryColor: [number, number, number] = [139, 21, 33]; // Burgundy/red
-  const secondaryColor: [number, number, number] = [52, 73, 94]; // Dark gray
-  const lightGray: [number, number, number] = [240, 240, 240];
-  const headerGray: [number, number, number] = [248, 249, 250];
-
-  type HeaderLogo = {
-    dataUrl: string;
-    format: 'PNG' | 'JPEG';
-    width: number;
-    height: number;
-  };
-  const loadHeaderLogo = async (url?: string): Promise<HeaderLogo | undefined> => {
-    if (!url) return undefined;
-    try {
-      const logoResponse = await fetch(url);
-      if (!logoResponse.ok) return undefined;
-      const logoBlob = await logoResponse.blob();
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(logoBlob);
-      });
-      const dimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
-        const image = new Image();
-        image.onload = () => resolve({ width: image.width, height: image.height });
-        image.onerror = () => resolve(undefined);
-        image.src = dataUrl;
-      });
-      if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) return undefined;
-      return {
-        dataUrl,
-        format: logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG',
-        width: dimensions.width,
-        height: dimensions.height,
-      };
-    } catch {
-      return undefined;
-    }
-  };
-
-  const headerLogo = await loadHeaderLogo(data.logoUrl);
-  
-  let isFirstPage = true;
-  
-  console.log('🚀 FRESH START: Starting simplified PDF generation');
-  console.log('📊 Input data:', {
-    totalDates: data.artistsByDateAndStage.size,
-    dateStructure: Array.from(data.artistsByDateAndStage.entries()).map(([date, stages]) => ({
-      date,
-      stageCount: stages.size,
-      totalArtists: Array.from(stages.values()).reduce((sum, artists) => sum + artists.length, 0)
-    }))
-  });
-  
-  // Process each date and stage
-  const dateEntries = Array.from(data.artistsByDateAndStage.entries());
-  for (let i = 0; i < dateEntries.length; i++) {
-    const [date, stagesMap] = dateEntries[i];
-    const stageEntries = Array.from(stagesMap.entries());
-    for (let j = 0; j < stageEntries.length; j++) {
-      const [stage, artists] = stageEntries[j];
-      console.log(`\n📋 Processing: ${date} - Stage ${stage} (${artists.length} artists)`);
-
-      if (!isFirstPage) {
-        pdf.addPage();
-      }
-      isFirstPage = false;
-
-      const formattedDate = formatDateSimply(date);
-      const drawSectionHeader = (): number => {
-        let yPosition = 20;
-
-        if (headerLogo) {
-          const maxLogoWidth = 50;
-          const maxLogoHeight = 25;
-          const scale = Math.min(maxLogoWidth / headerLogo.width, maxLogoHeight / headerLogo.height);
-          const drawWidth = headerLogo.width * scale;
-          const drawHeight = headerLogo.height * scale;
-          pdf.addImage(
-            headerLogo.dataUrl,
-            headerLogo.format,
-            margin,
-            yPosition,
-            drawWidth,
-            drawHeight,
-          );
-          yPosition += 35;
-        }
-
-        pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        pdf.rect(0, yPosition, pageWidth, 25, 'F');
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(16);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Matriz de Microfonia Cableada', pageWidth / 2, yPosition + 16, { align: 'center' });
-        yPosition += 35;
-
-        pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-        pdf.setFontSize(14);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(data.jobTitle, pageWidth / 2, yPosition, { align: 'center' });
-        yPosition += 20;
-
-        pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
-        pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`${formattedDate} - Escenario ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
-        return yPosition + 30;
-      };
-
-      let yPosition = drawSectionHeader();
-      
-      // Generate matrix data with simple approach
-      const matrixData = generateSimplifiedMatrixData(artists);
-      
-      console.log('📊 Matrix generated:', {
-        micModels: matrixData.micModels,
-        artists: matrixData.artistNames,
-        sampleData: matrixData.micModels.slice(0, 2).map(model => ({
-          model,
-          artistValues: matrixData.artistNames.slice(0, 3).map(artist => 
-            `${artist}: ${matrixData.individualMatrix[model]?.[artist] || 0}`
-          ),
-          peak: matrixData.peakMatrix[model]
-        }))
-      });
-      
-      if (matrixData.micModels.length === 0) {
-        pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-        pdf.setFontSize(11);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text('Sin requerimientos de microfonia cableada para este escenario.', margin, yPosition);
-        continue;
-      }
-      
-      // Add note
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'italic');
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('Las celdas individuales muestran cantidades exactas por artista. Pico muestra el uso maximo concurrente.', margin, yPosition);
-      yPosition += 20;
-      
-      // Create table
-      const headers = ['Modelo Microfono', ...matrixData.artistNames, 'Pico'];
-      const tableBody = matrixData.micModels.map(micModel => {
-        const row = [micModel];
-        
-        // Add individual artist quantities
-        matrixData.artistNames.forEach(artistName => {
-          const quantity = matrixData.individualMatrix[micModel]?.[artistName] || 0;
-          row.push(quantity.toString());
-        });
-        
-        // Add peak quantity
-        const peakQuantity = matrixData.peakMatrix[micModel] || 0;
-        row.push(peakQuantity.toString());
-        return row;
-      });
-      
-      // Table styling
-      const availableWidth = pageWidth - (margin * 2);
-      const micModelColumnWidth = Math.min(availableWidth * 0.25, 150);
-      const peakColumnWidth = 80;
-      const artistColumnsWidth = availableWidth - micModelColumnWidth - peakColumnWidth;
-      const artistColumnWidth = Math.max(artistColumnsWidth / matrixData.artistNames.length, 60);
-      
-      // Generate table
-      autoTable(pdf, {
-        startY: yPosition,
-        head: [headers],
-        body: tableBody,
-        theme: 'grid',
-        headStyles: {
-          fillColor: primaryColor as [number, number, number],
-          textColor: [255, 255, 255] as [number, number, number],
-          fontSize: 10,
-          fontStyle: 'bold',
-          halign: 'center',
-          valign: 'middle'
-        },
-        bodyStyles: {
-          fontSize: 9,
-          textColor: secondaryColor as [number, number, number],
-          cellPadding: 3,
-          halign: 'center',
-          valign: 'middle'
-        },
-        alternateRowStyles: {
-          fillColor: lightGray as [number, number, number]
-        },
-        styles: {
-          cellPadding: 3,
-          lineColor: [200, 200, 200] as [number, number, number],
-          lineWidth: 0.5,
-          overflow: 'linebreak'
-        },
-        rowPageBreak: 'avoid',
-        margin: { left: margin, right: margin, top: yPosition, bottom: footerReserve },
-        didDrawPage: () => {
-          drawSectionHeader();
-        },
-        columnStyles: {
-          0: {
-            cellWidth: micModelColumnWidth,
-            fontStyle: 'bold',
-            halign: 'left'
-          },
-          [headers.length - 1]: {
-            cellWidth: peakColumnWidth,
-            fillColor: [255, 240, 240] as [number, number, number],
-            fontStyle: 'bold',
-            textColor: primaryColor as [number, number, number]
-          }
-        },
-        didParseCell: function(data: any) {
-          // Style artist columns
-          if (data.column.index > 0 && data.column.index < headers.length - 1) {
-            data.cell.styles.cellWidth = artistColumnWidth;
-
-            // Highlight non-zero quantities
-            if (data.section === 'body' && parseInt(data.cell.text[0]) > 0) {
-              data.cell.styles.fillColor = [235, 255, 235] as [number, number, number];
-              data.cell.styles.fontStyle = 'bold';
-            }
-          }
-        },
-      });
-    }
-  }
-  
-  // Add footer on all pages
-  const timestamp = new Date().toLocaleString();
-  const pageCount = pdf.getNumberOfPages();
-  
-  for (let i = 1; i <= pageCount; i++) {
-    pdf.setPage(i);
-    
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(128, 128, 128);
-    
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-    
-    pdf.text(`Generado: ${timestamp}`, margin, pageHeight - 10);
-    pdf.text(`${data.jobTitle} - Matriz Microfonia Cableada`, pageWidth - margin, pageHeight - 10, { align: 'right' });
-    pdf.text(`Pagina ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-  }
-  
-  return new Blob([pdf.output('blob')], { type: 'application/pdf' });
-};
-
-// Simple date formatting - no complex timezone handling
-const formatDateSimply = (dateString: string): string => {
-  console.log(`📅 Formatting date: "${dateString}"`);
-  
-  // Handle YYYY-MM-DD format
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    const [year, month, day] = dateString.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    
-    const weekdays = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    
-    const formatted = `${weekdays[date.getDay()]}, ${parseInt(day)} de ${months[date.getMonth()]} ${year}`;
-    console.log(`📅 Formatted: "${dateString}" -> "${formatted}"`);
-    return formatted;
-  }
-  
-  return dateString; // Fallback to original
-};
-
-interface SimplifiedMatrixData {
+interface MatrixData {
   micModels: string[];
   artistNames: string[];
-  individualMatrix: Record<string, Record<string, number>>;
-  peakMatrix: Record<string, number>;
+  quantities: Record<string, Record<string, number>>;
+  /** Largest single-artist requirement — the constraint when shows are sequential. */
+  peak: Record<string, number>;
+  /** Sum across the whole day — the constraint only if everything is out at once. */
+  total: Record<string, number>;
 }
 
-// Completely simplified matrix generation - direct database mapping
-const generateSimplifiedMatrixData = (artists: any[]): SimplifiedMatrixData => {
-  console.log('\n🔄 SIMPLIFIED MATRIX GENERATION START');
-  console.log('🎭 Artists input:', artists.map(a => ({
-    name: a.name,
-    wiredMicsCount: a.wired_mics?.length || 0,
-    wiredMicsPreview: a.wired_mics?.slice(0, 2)
-  })));
-  
-  const micModelsSet = new Set<string>();
-  const artistNamesSet = new Set<string>();
-  const individualMatrix: Record<string, Record<string, number>> = {};
-  
-  // Step 1: Direct database mapping - no accumulation bugs
-  artists.forEach((artist, artistIndex) => {
-    const artistName = artist.name || `Artist ${artistIndex + 1}`;
-    artistNamesSet.add(artistName);
-    
-    console.log(`\n👤 Processing artist: ${artistName}`);
-    console.log(`🎤 Raw wired_mics:`, artist.wired_mics);
-    
-    if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) {
-      console.log(`⚠️ No wired_mics array for ${artistName}`);
-      return;
-    }
-    
-    // Process each mic entry directly
-    artist.wired_mics.forEach((micEntry: any, micIndex: number) => {
-      console.log(`🎤 Processing mic ${micIndex}:`, micEntry);
-      
-      if (!micEntry || typeof micEntry !== 'object') {
-        console.log(`❌ Invalid mic entry ${micIndex}`);
-        return;
-      }
-      
-      const micModel = String(micEntry.model || '').trim();
-      const quantity = parseInt(String(micEntry.quantity || 0));
-      
-      if (!micModel || quantity <= 0) {
-        console.log(`❌ Invalid mic: model="${micModel}", quantity=${quantity}`);
-        return;
-      }
-      
-      console.log(`✅ VALID MIC: ${artistName} needs ${quantity}x ${micModel}`);
-      
-      micModelsSet.add(micModel);
-      
-      // Initialize if needed
-      if (!individualMatrix[micModel]) {
-        individualMatrix[micModel] = {};
-      }
-      
-      // CRITICAL FIX: Direct assignment, no accumulation
-      individualMatrix[micModel][artistName] = quantity;
-      
-      console.log(`📝 STORED: ${micModel}[${artistName}] = ${quantity}`);
-    });
-  });
-  
-  // Step 2: Simple peak calculation - just sum all requirements
-  const peakMatrix: Record<string, number> = {};
-  
-  console.log('\n⚡ CALCULATING PEAKS');
-  micModelsSet.forEach(micModel => {
-    const artistRequirements = individualMatrix[micModel] || {};
-    const peak = Object.values(artistRequirements).reduce((sum, qty) => sum + (qty || 0), 0);
-    peakMatrix[micModel] = peak;
-    
-    console.log(`📊 Peak for ${micModel}: ${peak} (from ${Object.entries(artistRequirements).map(([artist, qty]) => `${artist}:${qty}`).join(', ')})`);
-  });
-  
-  const result = {
-    micModels: Array.from(micModelsSet).sort(),
-    artistNames: Array.from(artistNamesSet).sort(),
-    individualMatrix,
-    peakMatrix
-  };
-  
-  console.log('\n🎯 FINAL SIMPLIFIED RESULT:');
-  console.log(`🎤 Mic models (${result.micModels.length}):`, result.micModels);
-  console.log(`👥 Artists (${result.artistNames.length}):`, result.artistNames);
-  console.log('📊 Individual matrix sample:', Object.entries(result.individualMatrix).slice(0, 2));
-  console.log('⚡ Peak matrix sample:', Object.entries(result.peakMatrix).slice(0, 3));
-  
-  return result;
+const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MONTHS = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+const formatMatrixDate = (dateString: string): string => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString;
+  const [year, month, day] = dateString.split('-');
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return `${WEEKDAYS[date.getDay()]}, ${Number(day)} de ${MONTHS[date.getMonth()]} de ${year}`;
 };
 
-// Helper function to organize artists by date and stage - fixed date handling
-export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<number, any[]>> => {
+/**
+ * Builds the model × artist matrix.
+ *
+ * Two bases are reported because they differ by a lot and a reader cannot tell
+ * which one they are looking at: `peak` is the largest single-artist demand
+ * (shows are sequential, so this is what the stage must hold at any moment) and
+ * `total` is the sum across the day.
+ */
+export const buildWiredMicrophoneMatrix = (artists: any[]): MatrixData => {
+  const micModels = new Set<string>();
+  const artistNames: string[] = [];
+  const quantities: Record<string, Record<string, number>> = {};
+
+  artists.forEach((artist, index) => {
+    const artistName = artist?.name || `Artista ${index + 1}`;
+    if (!artistNames.includes(artistName)) artistNames.push(artistName);
+    if (!Array.isArray(artist?.wired_mics)) return;
+
+    for (const entry of artist.wired_mics) {
+      if (!entry || typeof entry !== 'object') continue;
+      const model = String(entry.model ?? '').trim();
+      const quantity = Number.parseInt(String(entry.quantity ?? 0), 10);
+      if (!model || !Number.isFinite(quantity) || quantity <= 0) continue;
+
+      micModels.add(model);
+      quantities[model] ??= {};
+      quantities[model][artistName] = (quantities[model][artistName] ?? 0) + quantity;
+    }
+  });
+
+  const peak: Record<string, number> = {};
+  const total: Record<string, number> = {};
+  for (const model of micModels) {
+    const perArtist = Object.values(quantities[model] ?? {});
+    peak[model] = perArtist.length > 0 ? Math.max(...perArtist) : 0;
+    total[model] = perArtist.reduce((sum, quantity) => sum + quantity, 0);
+  }
+
+  return {
+    micModels: [...micModels].sort(),
+    artistNames: artistNames.sort(),
+    quantities,
+    peak,
+    total,
+  };
+};
+
+export const exportWiredMicrophoneMatrixPDF = async (
+  data: WiredMicrophoneMatrixData,
+): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
+
+  let context = '';
+  const chrome = () =>
+    drawFestivalChrome(doc, {
+      kind: 'mics',
+      eventTitle: data.jobTitle,
+      contextLabel: context,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      paginate: false,
+    });
+
+  const geo = chrome();
+  const { mm } = geo;
+
+  const sections = [...data.artistsByDateAndStage.entries()].flatMap(([date, stages]) =>
+    [...stages.entries()].map(([stage, artists]) => ({ date, stage, artists })),
+  );
+
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'Microfonía cableada  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: 'Matriz de necesidades por modelo y artista',
+    clientLogo,
+  });
+
+  const allArtists = sections.reduce((sum, section) => sum + section.artists.length, 0);
+  y = drawFestivalMetaGrid(doc, geo, [
+    { label: 'Jornadas', value: String(data.artistsByDateAndStage.size) },
+    { label: 'Bloques', value: String(sections.length) },
+    { label: 'Artistas', value: String(allArtists) },
+    { label: 'Base', value: 'Pico y total' },
+  ], y);
+
+  if (sections.length === 0) {
+    drawFestivalNilState(
+      doc,
+      geo,
+      y,
+      'Ningún artista solicita microfonía cableada del festival. Requerimiento confirmado como ninguno, no pendiente de rider.',
+    );
+  }
+
+  sections.forEach((section, index) => {
+    context = `${formatMatrixDate(section.date)} · Escenario ${section.stage}`;
+
+    if (index > 0) {
+      doc.addPage();
+      chrome();
+      y = geo.contentTop;
+    }
+
+    y = drawFestivalSectionHeading(doc, geo, context, y, index + 1);
+
+    const matrix = buildWiredMicrophoneMatrix(section.artists);
+
+    if (matrix.micModels.length === 0) {
+      y = drawFestivalNilState(
+        doc,
+        geo,
+        y,
+        'Sin requerimientos de microfonía cableada en este bloque. Requerimiento confirmado como ninguno.',
+      );
+      return;
+    }
+
+    const head = ['Modelo', ...matrix.artistNames, 'Pico', 'Total'];
+    const rows = matrix.micModels.map((model) => [
+      model,
+      ...matrix.artistNames.map((artist) => {
+        const quantity = matrix.quantities[model]?.[artist] ?? 0;
+        return quantity > 0 ? String(quantity) : FESTIVAL_MATRIX_ZERO;
+      }),
+      String(matrix.peak[model] ?? 0),
+      String(matrix.total[model] ?? 0),
+    ]);
+
+    const peakColumn = head.length - 2;
+    const totalColumn = head.length - 1;
+    const highestPeak = Math.max(1, ...matrix.micModels.map((model) => matrix.peak[model] ?? 0));
+
+    const artistWeight = Math.max(8, 90 / Math.max(matrix.artistNames.length, 1));
+    const weights = [34, ...matrix.artistNames.map(() => artistWeight), 14, 14];
+
+    const theme = festivalTableTheme(geo, {
+      fontSize: 7,
+      numericColumns: [
+        ...matrix.artistNames.map((_, column) => column + 1),
+        peakColumn,
+        totalColumn,
+      ],
+    });
+
+    autoTable(doc, {
+      head: [head],
+      body: rows,
+      startY: y,
+      ...theme,
+      columnStyles: distributeColumnWidths(weights, geo.contentWidth),
+      margin: {
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
+      },
+      rowPageBreak: 'avoid',
+      didParseCell: (hookData) => {
+        theme.didParseCell(hookData);
+        if (hookData.section === 'body' && hookData.cell.text[0] === FESTIVAL_MATRIX_ZERO) {
+          hookData.cell.styles.textColor = FESTIVAL_FAINT as unknown as [number, number, number];
+        }
+      },
+      willDrawCell: (hookData) => {
+        // The peak bar is the one place the accent fills an area here, and it
+        // earns it because the length of the fill is itself the datum.
+        if (hookData.section !== 'body' || hookData.column.index !== peakColumn) return;
+        const value = Number.parseInt(hookData.cell.text[0] ?? '0', 10);
+        if (!Number.isFinite(value) || value <= 0) return;
+
+        const barWidth = (hookData.cell.width - 2 * mm) * (value / highestPeak);
+        doc.setFillColor(238, 214, 214);
+        doc.rect(
+          hookData.cell.x + hookData.cell.width - 1 * mm - barWidth,
+          hookData.cell.y + 0.8 * mm,
+          barWidth,
+          hookData.cell.height - 1.6 * mm,
+          'F',
+        );
+      },
+      didDrawCell: (hookData) => {
+        theme.didDrawCell(hookData);
+        // A 1 px rule separates the summary columns from the artist columns.
+        if (hookData.column.index === peakColumn) {
+          doc.setDrawColor(...FESTIVAL_ACCENT);
+          doc.setLineWidth(0.25 * mm);
+          doc.line(
+            hookData.cell.x,
+            hookData.cell.y,
+            hookData.cell.x,
+            hookData.cell.y + hookData.cell.height,
+          );
+        }
+      },
+      didDrawPage: () => {
+        chrome();
+      },
+    });
+
+    y = getLastAutoTableY(doc, y) + 2 * mm;
+    y = drawFestivalConstantsLine(doc, geo, [
+      { label: 'Pico', value: 'mayor demanda de un solo artista — los shows son consecutivos' },
+      { label: 'Total', value: 'suma de la jornada' },
+    ], y);
+  });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'mics',
+      eventTitle: data.jobTitle,
+      contextLabel: 'Microfonía cableada',
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber: page,
+      totalPages,
+      paginate: data.paginate !== false,
+    });
+  }
+
+  return pdfToBlob(doc);
+};
+
+/** Groups artists by date and then by stage, skipping records with no date. */
+export const organizeArtistsByDateAndStage = (
+  artists: any[],
+): Map<string, Map<number, any[]>> => {
   const organized = new Map<string, Map<number, any[]>>();
 
-  for (let i = 0; i < artists.length; i++) {
-    const artist = artists[i];
-    const date = artist.date;
-    const stage = artist.stage || 1;
-
+  for (const artist of artists) {
+    const date = artist?.date;
     if (!date) {
-      console.warn(`⚠️ Skipping "${artist.name}" - no date field`);
+      console.warn(`Se omite "${artist?.name}" en la matriz de microfonía: no tiene fecha.`);
       continue;
     }
 
-    // Initialize structures
-    if (!organized.has(date)) {
-      organized.set(date, new Map());
-    }
-    if (!organized.get(date)!.has(stage)) {
-      organized.get(date)!.set(stage, []);
-    }
-
-    organized.get(date)!.get(stage)!.push(artist);
+    const stage = artist.stage || 1;
+    if (!organized.has(date)) organized.set(date, new Map());
+    const stages = organized.get(date)!;
+    if (!stages.has(stage)) stages.set(stage, []);
+    stages.get(stage)!.push(artist);
   }
-  
+
   return organized;
 };

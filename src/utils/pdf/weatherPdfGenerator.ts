@@ -2,6 +2,18 @@ import { getWeatherForJob } from '@/utils/weather/weatherApi';
 import { WeatherData } from '@/types/hoja-de-ruta';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { createWeatherTableIconHooks } from '@/utils/pdf/weatherPdfIcons';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
+import {
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalSectionHeading,
+  drawFestivalTitleBlock,
+  festivalTableTheme,
+} from '@/utils/pdf/festival-report';
 
 export interface WeatherPdfData {
   jobTitle: string;
@@ -92,183 +104,130 @@ const formatDateRangeForWeather = (jobDates: Date[]): string => {
   return `${toInputDate(sortedDates[0])} - ${toInputDate(sortedDates[sortedDates.length - 1])}`;
 };
 
-export const generateWeatherPDF = async (data: WeatherPdfData): Promise<Blob> => {
+export const generateWeatherPDF = async (
+  data: WeatherPdfData & { paginate?: boolean },
+): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const pdf = new jsPDF();
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const leftMargin = 10;
-  const rightMargin = 10;
-  const contentTop = 40;
-  const footerReserve = 24;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  const festivalLogo = await loadImageFromUrl(data.logoUrl);
-  const sectorLogo =
-    (await loadImageFromUrl('/sector pro logo.png')) ||
-    (await loadImageFromUrl('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png'));
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
 
-  const drawRunningHeader = (): void => {
-    pdf.setFillColor(125, 1, 1);
-    pdf.rect(0, 0, pageWidth, 30, 'F');
+  const chrome = () =>
+    drawFestivalChrome(doc, {
+      kind: 'weather',
+      eventTitle: data.jobTitle,
+      contextLabel: 'Previsión meteorológica',
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      paginate: false,
+    });
 
-    if (festivalLogo) {
-      const dims = fitDimensions(festivalLogo, 40, 18);
-      pdf.addImage(
-        festivalLogo.dataUrl,
-        festivalLogo.format,
-        pageWidth - dims.width - rightMargin,
-        6,
-        dims.width,
-        dims.height,
-      );
-    }
-
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Prevision Meteorologica', pageWidth / 2, 13, { align: 'center' });
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(data.jobTitle, pageWidth / 2, 23, { align: 'center' });
-  };
-
-  drawRunningHeader();
-
-  let yPosition = contentTop;
+  const geo = chrome();
+  const { mm } = geo;
   const eventDatesString = formatDateRangeForWeather(data.jobDates);
-  
+
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'Previsión meteorológica  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: eventDatesString || 'Fechas del evento sin definir',
+    clientLogo,
+  });
+
   let weatherData: WeatherData[] | null = null;
-  
   if (data.venue && eventDatesString) {
     try {
       weatherData = await getWeatherForJob(data.venue, eventDatesString);
     } catch (error) {
-      console.error('Error fetching weather data for PDF:', error);
+      console.error('No se pudo obtener la previsión meteorológica:', error);
     }
   }
-  
-  if (weatherData && weatherData.length > 0) {
-    pdf.setFontSize(10);
-    pdf.setTextColor(80);
-    pdf.setFont('helvetica', 'normal');
-    if (eventDatesString) {
-      pdf.text(`Fechas del evento: ${eventDatesString}`, leftMargin, yPosition);
-      yPosition += 8;
-    }
 
-    // Create weather table
-    const tableData = weatherData.map(weather => {
-      const date = new Date(weather.date).toLocaleDateString('es-ES', {
+  if (weatherData && weatherData.length > 0) {
+    const temperatures = weatherData.flatMap((weather) => [weather.maxTemp, weather.minTemp]);
+    const wettest = weatherData.reduce((worst, weather) =>
+      weather.precipitationProbability > worst.precipitationProbability ? weather : worst,
+    );
+
+    y = drawFestivalMetaGrid(doc, geo, [
+      { label: 'Jornadas', value: String(weatherData.length) },
+      { label: 'Máxima', value: `${Math.round(Math.max(...temperatures))} °C` },
+      { label: 'Mínima', value: `${Math.round(Math.min(...temperatures))} °C` },
+      {
+        label: 'Mayor prob. lluvia',
+        value: wettest.precipitationProbability > 0 ? `${wettest.precipitationProbability} %` : 'Sin lluvia',
+      },
+    ], y);
+
+    y = drawFestivalSectionHeading(doc, geo, 'Previsión por jornada', y, 1);
+
+    const rows = weatherData.map((weather) => [
+      new Date(weather.date).toLocaleDateString('es-ES', {
         weekday: 'long',
         month: 'long',
-        day: 'numeric'
-      });
-      
-      const temp = `${Math.round(weather.maxTemp)}°C / ${Math.round(weather.minTemp)}°C`;
-      const precipitation = weather.precipitationProbability > 0 
-        ? `${weather.precipitationProbability}%`
-        : '-';
-      
-      return [date, weather.condition, temp, precipitation];
-    });
-    const weatherIconHooks = createWeatherTableIconHooks(pdf, weatherData);
-    
-    autoTable(pdf, {
-      startY: yPosition,
-      head: [['Fecha', 'Condicion', 'Temperatura', 'Prob. Lluvia']],
-      body: tableData,
-      theme: 'grid',
-      margin: { left: leftMargin, right: rightMargin, top: contentTop, bottom: footerReserve },
+        day: 'numeric',
+      }),
+      weather.condition,
+      `${Math.round(weather.maxTemp)} / ${Math.round(weather.minTemp)}`,
+      weather.precipitationProbability > 0 ? String(weather.precipitationProbability) : '·',
+    ]);
+
+    const weatherIconHooks = createWeatherTableIconHooks(doc, weatherData);
+    const theme = festivalTableTheme(geo, { fontSize: 7.8, numericColumns: [2, 3] });
+
+    autoTable(doc, {
+      head: [['Fecha', 'Condición', 'Máx. / mín. (°C)', 'Prob. lluvia (%)']],
+      body: rows,
+      startY: y,
+      ...theme,
+      columnStyles: distributeColumnWidths([38, 30, 22, 22], geo.contentWidth),
+      margin: {
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
+      },
       rowPageBreak: 'avoid',
-      styles: {
-        fontSize: 10,
-        cellPadding: 2.5,
-        overflow: 'linebreak',
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      columnStyles: {
-        0: { cellWidth: 62 },
-        1: { cellWidth: 58 },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 32 },
-      },
       didDrawPage: () => {
-        drawRunningHeader();
+        chrome();
       },
       ...weatherIconHooks,
     });
-    
-    yPosition = (pdf as any).lastAutoTable.finalY + 20;
-    
-    // Add weather source info
-    if (yPosition > pageHeight - footerReserve - 10) {
-      pdf.addPage();
-      drawRunningHeader();
-      yPosition = contentTop;
-    }
 
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(80);
-    pdf.text('Datos meteorologicos proporcionados por Open-Meteo (open-meteo.com)', leftMargin, yPosition);
-    
+    y = getLastAutoTableY(doc, y) + 4 * mm;
+    // Units are stated once, under the table, rather than on every cell.
+    drawFestivalConstantsLine(doc, geo, [
+      { label: 'Temperaturas', value: 'grados Celsius, máxima y mínima diarias' },
+      { label: 'Fuente', value: 'Open-Meteo (open-meteo.com)' },
+    ], y);
   } else {
-    // No weather data available
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(20);
-    const unavailableLines = pdf.splitTextToSize(
-      'Datos meteorologicos no disponibles para las fechas y ubicacion seleccionadas.',
-      pageWidth - leftMargin - rightMargin,
+    const missing: string[] = [];
+    if (!data.venue?.address && !data.venue?.coordinates) missing.push('la ubicación del recinto');
+    if (data.jobDates.length === 0) missing.push('las fechas del evento');
+
+    drawFestivalNilState(
+      doc,
+      geo,
+      y,
+      missing.length > 0
+        ? `Previsión no disponible: falta ${missing.join(' y ')}. Añádelo en la ficha del trabajo y vuelve a generar el documento.`
+        : 'Previsión no disponible para las fechas y la ubicación indicadas. El proveedor no devolvió datos para este rango.',
     );
-    pdf.text(unavailableLines, leftMargin, yPosition);
-    yPosition += unavailableLines.length * 6 + 8;
-    
-    if (!data.venue?.address && !data.venue?.coordinates) {
-      const venueLines = pdf.splitTextToSize(
-        'Por favor, añada la ubicacion del recinto para habilitar la prevision meteorologica.',
-        pageWidth - leftMargin - rightMargin,
-      );
-      pdf.text(venueLines, leftMargin, yPosition);
-      yPosition += venueLines.length * 6 + 8;
-    }
-    
-    if (data.jobDates.length === 0) {
-      const dateLines = pdf.splitTextToSize(
-        'Por favor, añada las fechas del evento para habilitar la prevision meteorologica.',
-        pageWidth - leftMargin - rightMargin,
-      );
-      pdf.text(dateLines, leftMargin, yPosition);
-    }
   }
 
-  const totalPages = pdf.getNumberOfPages();
-  const generatedDate = new Date().toLocaleDateString('es-ES');
-  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-    pdf.setPage(pageNumber);
-    drawRunningHeader();
-
-    pdf.setFontSize(8);
-    pdf.setTextColor(100);
-    pdf.text(`Generado: ${generatedDate}`, leftMargin, pageHeight - 8);
-    pdf.text(`Pagina ${pageNumber} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
-
-    if (sectorLogo) {
-      const dims = fitDimensions(sectorLogo, 24, 8);
-      pdf.addImage(
-        sectorLogo.dataUrl,
-        sectorLogo.format,
-        pageWidth / 2 - dims.width / 2,
-        pageHeight - 16 + (8 - dims.height) / 2,
-        dims.width,
-        dims.height,
-      );
-    }
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'weather',
+      eventTitle: data.jobTitle,
+      contextLabel: 'Previsión meteorológica',
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber: page,
+      totalPages,
+      paginate: data.paginate !== false,
+    });
   }
 
-  return pdf.output('blob');
+  return pdfToBlob(doc);
 };

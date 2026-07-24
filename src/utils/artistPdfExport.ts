@@ -1,22 +1,20 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { formatFrequencyBand } from '@/lib/frequencyBands';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
-  CORPORATE_RED,
-  TEXT_DARK,
-  FALLBACK_BRAND_LOGO_PATH,
-  FESTIVAL_TABLE_BODY_STYLES,
-  FESTIVAL_TABLE_HEAD_STYLES,
-  addLogoConstrainedToHeight,
-  drawCenteredFooterLogo,
-  drawFestivalHeaderBand,
-  drawFestivalHeaderText,
-  drawFooterMetaText,
-  inferPdfImageFormat,
-  loadImageWithTimeout,
-  loadSectorProFooterLogo,
-} from '@/utils/pdf/shared/pdfExportShared';
+  FESTIVAL_ACCENT,
+  FESTIVAL_INK,
+  FESTIVAL_SOFT,
+  drawFestivalChrome,
+  drawFestivalMetaGrid,
+  drawFestivalTitleBlock,
+  festivalTableTheme,
+  setFestivalText,
+  type FestivalGeometry,
+} from '@/utils/pdf/festival-report';
 import { drawArtistScheduleSection } from '@/utils/pdf/artistScheduleSection';
+import { buildFestivalOptionChecklistRows } from '@/utils/pdf/artistTemplateChecklist';
 import type { ArtistPdfData, ArtistPdfOptions } from '@/utils/pdf/artistPdfTypes';
 
 export type {
@@ -52,133 +50,85 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     if (value === "mixed") return tx("Mixto", "Mixed");
     return tx("Festival", "Festival");
   };
-  const doc = new jsPDF();
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const createdDate = new Date().toLocaleDateString(language === "en" ? "en-GB" : "es-ES");
 
-  // === HEADER SECTION ===
-  drawFestivalHeaderBand(doc);
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'festival logo')
+    : null;
 
-  // Load festival logo if provided
-  let festivalLogoLoaded = false;
-  if (data.logoUrl) {
-    console.log("Attempting to load festival logo:", data.logoUrl);
-
-    const festivalImg = await loadImageWithTimeout(data.logoUrl, 'festival logo');
-    if (festivalImg) {
-      try {
-        console.log("Festival logo loaded, dimensions:", festivalImg.width, "x", festivalImg.height);
-        addLogoConstrainedToHeight(
-          doc,
-          festivalImg,
-          inferPdfImageFormat(data.logoUrl, 'JPEG'),
-          5,
-          5,
-          18,
-        );
-        festivalLogoLoaded = true;
-        console.log("Festival logo added successfully to PDF");
-      } catch (error) {
-        console.error('Error adding festival logo to PDF:', error);
-      }
-    }
-  }
-
-  // If festival logo failed, try fallback logo
-  if (!festivalLogoLoaded) {
-    console.log("Trying fallback logo");
-    const fallbackImg = await loadImageWithTimeout(FALLBACK_BRAND_LOGO_PATH, 'fallback logo');
-    if (fallbackImg) {
-      try {
-        addLogoConstrainedToHeight(doc, fallbackImg, 'PNG', 5, 5, 18);
-        console.log("Fallback logo added successfully");
-      } catch (error) {
-        console.error('Error adding fallback logo to PDF:', error);
-      }
-    }
-  }
-
-  // Add title and date
   const headerDate = data.date
     ? new Date(data.date).toLocaleDateString(language === "en" ? "en-GB" : "es-ES")
     : '';
-  drawFestivalHeaderText(doc, `${data.name} - ${tx("Escenario", "Stage")} ${data.stage}`, headerDate);
+  const stageLabel = `${tx("Escenario", "Stage")} ${data.stage}`;
 
-  let yPosition = 40;
+  const chrome = (): FestivalGeometry =>
+    drawFestivalChrome(doc, {
+      kind: 'artist',
+      kindLabel: tx('Ficha de artista', 'Artist datasheet'),
+      eventTitle: data.name,
+      contextLabel: [stageLabel, headerDate].filter(Boolean).join('  ·  '),
+      issuer: `Sector-Pro  ·  ${data.name}`,
+      paginate: false,
+    });
+
+  const geo = chrome();
+  const { mm } = geo;
+
+  const tableTheme = festivalTableTheme(geo, { fontSize: 7.8 });
+  const tableMargin = {
+    left: geo.left,
+    right: geo.pageWidth - geo.right,
+    top: geo.contentTop,
+    bottom: geo.pageHeight - geo.contentBottom,
+  };
+
+  let yPosition = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: templateMode
+      ? tx('Formulario técnico  ·  Rev. A', 'Technical form  ·  Rev. A')
+      : tx('Ficha de artista  ·  Rev. A', 'Artist datasheet  ·  Rev. A'),
+    title: data.name,
+    subtitle: [stageLabel, headerDate].filter(Boolean).join('  ·  '),
+    clientLogo,
+  });
+
+  yPosition = drawFestivalMetaGrid(doc, geo, [
+    { label: tx('Escenario', 'Stage'), value: String(data.stage) },
+    { label: tx('Fecha', 'Date'), value: headerDate || tx('Sin fecha', 'No date') },
+    {
+      label: tx('Show', 'Show'),
+      value: data.schedule?.show?.start
+        ? `${data.schedule.show.start} – ${data.schedule.show.end || '—'}`
+        : '—',
+    },
+    {
+      label: tx('Kit de micros', 'Mic kit'),
+      value: data.micKit === 'band'
+        ? tx('Banda', 'Band')
+        : data.micKit === 'mixed'
+          ? tx('Mixto', 'Mixed')
+          : tx('Festival', 'Festival'),
+    },
+  ], yPosition);
+
 
   yPosition = drawArtistScheduleSection(doc, data.schedule, yPosition, language, templateMode);
 
   if (templateMode && data.festivalOptions) {
-    const checklistRows: string[][] = [];
-
-    const pushOptionRows = (
-      categoryLabel: string,
-      optionsList: Array<{ label: string; availability: string }>,
-    ) => {
-      if (optionsList.length === 0) {
-        checklistRows.push([categoryLabel, tx("Sin opciones cargadas", "No options loaded"), "-"]);
-        return;
-      }
-
-      optionsList.forEach((option, index) => {
-        checklistRows.push([
-          index === 0 ? categoryLabel : "",
-          `${checklist} ${option.label}`,
-          option.availability,
-        ]);
-      });
-    };
-
-    pushOptionRows(
-      tx("Consolas FOH", "FOH Consoles"),
-      (data.festivalOptions.fohConsoles || []).map((consoleItem) => ({
-        label: consoleItem.model,
-        availability:
-          consoleItem.quantity > 0
-            ? `${tx("Disponibles", "Available")}: ${consoleItem.quantity}`
-            : tx("Sin stock", "Out of stock"),
-      })),
-    );
-
-    pushOptionRows(
-      tx("Consolas MON", "MON Consoles"),
-      (data.festivalOptions.monConsoles || []).map((consoleItem) => ({
-        label: consoleItem.model,
-        availability:
-          consoleItem.quantity > 0
-            ? `${tx("Disponibles", "Available")}: ${consoleItem.quantity}`
-            : tx("Sin stock", "Out of stock"),
-      })),
-    );
-
-    pushOptionRows(
-      tx("Sistemas RF", "Wireless Systems"),
-      (data.festivalOptions.wirelessSystems || []).map((system) => ({
-        label: system.model,
-        availability: `${tx("Canales", "Channels")} ${system.quantity_ch || 0} / ${tx("HH", "HH")} ${system.quantity_hh || 0} / ${tx("BP", "BP")} ${system.quantity_bp || 0}${formatFrequencyBand(system.band) ? ` | ${formatFrequencyBand(system.band)}` : ""}`,
-      })),
-    );
-
-    pushOptionRows(
-      tx("Sistemas IEM", "IEM Systems"),
-      (data.festivalOptions.iemSystems || []).map((system) => ({
-        label: system.model,
-        availability: `${tx("Canales", "Channels")} ${system.quantity_hh || 0} / ${tx("Petacas", "Bodypacks")} ${system.quantity_bp || 0}${formatFrequencyBand(system.band) ? ` | ${formatFrequencyBand(system.band)}` : ""}`,
-      })),
-    );
+    const checklistRows = buildFestivalOptionChecklistRows(data.festivalOptions, tx, checklist);
 
     autoTable(doc, {
       head: [[tx("Categoría", "Category"), tx("Opciones disponibles", "Available options"), tx("Disponibilidad", "Availability")]],
       body: checklistRows,
       startY: yPosition,
-      theme: "grid",
       showHead: showHeadMode,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2.5,
+      ...festivalTableTheme(geo, { fontSize: 7.4 }),
+      margin: tableMargin,
+      didDrawPage: () => {
+        chrome();
       },
-      headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
       columnStyles: {
         0: { cellWidth: 32 },
         1: { cellWidth: 90 },
@@ -204,10 +154,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     head: [[tx("Puesto", "Position"), tx("Requiere Técnico", "Tech Required")]],
     body: technicalStaffRows,
     startY: yPosition,
-    theme: 'grid',
     showHead: showHeadMode,
-    styles: { ...FESTIVAL_TABLE_BODY_STYLES },
-    headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
+    ...tableTheme,
+    margin: tableMargin,
+    didDrawPage: () => {
+      chrome();
+    },
     columnStyles: {
       0: { cellWidth: 80 },
       1: { cellWidth: 40 }
@@ -282,10 +234,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     ]],
     body: consoleRows,
     startY: yPosition,
-    theme: 'grid',
     showHead: showHeadMode,
-    styles: { ...FESTIVAL_TABLE_BODY_STYLES },
-    headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
+    ...tableTheme,
+    margin: tableMargin,
+    didDrawPage: () => {
+      chrome();
+    },
   });
 
   yPosition = getLastAutoTableY(doc, yPosition) + 8;
@@ -302,7 +256,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bolditalic');
-    doc.setTextColor(...CORPORATE_RED);
+    doc.setTextColor(...FESTIVAL_ACCENT);
     let disclaimerText = '';
     if (data.micKit === 'band') {
       disclaimerText = tx(
@@ -315,11 +269,11 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         'Note: Mixed wired microphone setup - some provided by the band and some by the festival.'
       );
     }
-    const disclaimerLines = doc.splitTextToSize(disclaimerText, pageWidth - 28);
-    doc.text(disclaimerLines, 14, yPosition);
+    const disclaimerLines = doc.splitTextToSize(disclaimerText, geo.contentWidth);
+    doc.text(disclaimerLines, geo.left, yPosition);
     yPosition += disclaimerLines.length * 5 + 4;
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...TEXT_DARK);
+    doc.setTextColor(...FESTIVAL_INK);
   }
 
   // === WIRED MICROPHONES ===
@@ -351,10 +305,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       ]],
       body: wiredMicRows,
       startY: yPosition,
-      theme: 'grid',
       showHead: showHeadMode,
-      styles: { ...FESTIVAL_TABLE_BODY_STYLES },
-      headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
+      ...tableTheme,
+      margin: tableMargin,
+      didDrawPage: () => {
+        chrome();
+      },
       columnStyles: {
         0: { cellWidth: 60 },
         1: { cellWidth: 25, halign: 'center' },
@@ -544,10 +500,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       ]],
       body: wirelessRows,
       startY: yPosition,
-      theme: 'grid',
       showHead: showHeadMode,
-      styles: { ...FESTIVAL_TABLE_BODY_STYLES },
-      headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
+      ...tableTheme,
+      margin: tableMargin,
+      didDrawPage: () => {
+        chrome();
+      },
     });
 
     yPosition = getLastAutoTableY(doc, yPosition) + 8;
@@ -568,10 +526,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       head: [[tx('Tipo', 'Type'), tx('Cantidad', 'Quantity')]],
       body: monitorRows,
       startY: yPosition,
-      theme: 'grid',
       showHead: showHeadMode,
-      styles: { ...FESTIVAL_TABLE_BODY_STYLES },
-      headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
+      ...tableTheme,
+      margin: tableMargin,
+      didDrawPage: () => {
+        chrome();
+      },
     });
 
     yPosition = getLastAutoTableY(doc, yPosition) + 8;
@@ -600,10 +560,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       head: [[tx('Tipo', 'Type'), tx('Cantidad', 'Quantity')]],
       body: infrastructureRows,
       startY: yPosition,
-      theme: 'grid',
       showHead: showHeadMode,
-      styles: { ...FESTIVAL_TABLE_BODY_STYLES },
-      headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
+      ...tableTheme,
+      margin: tableMargin,
+      didDrawPage: () => {
+        chrome();
+      },
     });
 
     yPosition = getLastAutoTableY(doc, yPosition) + 8;
@@ -635,10 +597,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         : [[tx('Requerimientos Adicionales', 'Extra Requirements'), tx('Detalle', 'Details')]],
       body: extraRows,
       startY: yPosition,
-      theme: 'grid',
       showHead: showHeadMode,
-      styles: { ...FESTIVAL_TABLE_BODY_STYLES },
-      headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES },
+      ...tableTheme,
+      margin: tableMargin,
+      didDrawPage: () => {
+        chrome();
+      },
     });
 
     yPosition = getLastAutoTableY(doc, yPosition) + 8;
@@ -647,7 +611,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
   // === NOTES ===
   if (templateMode || data.notes) {
     doc.setFontSize(12);
-    doc.setTextColor(...CORPORATE_RED);
+    doc.setTextColor(...FESTIVAL_ACCENT);
     doc.text(tx("Notas", "Notes"), 14, yPosition);
     yPosition += 8;
 
@@ -658,9 +622,9 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       yPosition += notesBoxHeight + 6;
     } else {
       doc.setFontSize(9);
-      doc.setTextColor(...TEXT_DARK);
-      const splitNotes = doc.splitTextToSize(data.notes, pageWidth - 28);
-      doc.text(splitNotes, 14, yPosition);
+      doc.setTextColor(...FESTIVAL_INK);
+      const splitNotes = doc.splitTextToSize(data.notes, geo.contentWidth);
+      doc.text(splitNotes, geo.left, yPosition);
       yPosition += splitNotes.length * 5 + 10;
     }
   }
@@ -673,7 +637,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     }
 
     doc.setFontSize(10);
-    doc.setTextColor(...CORPORATE_RED);
+    doc.setTextColor(...FESTIVAL_ACCENT);
     doc.text(
       tx(
         "Recomendado: completar este formulario de forma electrónica",
@@ -685,12 +649,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     yPosition += 5;
 
     doc.setFontSize(8);
-    doc.setTextColor(...TEXT_DARK);
+    doc.setTextColor(...FESTIVAL_INK);
     const electronicSuggestion = tx(
       "Sugerencia: usa el enlace público para evitar errores de transcripción en papel.",
       "Suggestion: use the public link to avoid paper transcription errors.",
     );
-    const suggestionLines = doc.splitTextToSize(electronicSuggestion, pageWidth - 28);
+    const suggestionLines = doc.splitTextToSize(electronicSuggestion, geo.contentWidth);
     doc.text(suggestionLines, 14, yPosition);
     yPosition += suggestionLines.length * 4 + 2;
 
@@ -725,28 +689,11 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         ? tx("No se pudo incrustar el QR. Usa el enlace en panel de gestión.", "Could not embed QR. Use the link from management panel.")
         : tx("QR no disponible: genera/copía el enlace desde panel de gestión.", "QR unavailable: generate/copy link from management panel.");
 
-      const fallbackLines = doc.splitTextToSize(fallbackText, pageWidth - 28);
+      const fallbackLines = doc.splitTextToSize(fallbackText, geo.contentWidth);
       doc.text(fallbackLines, 14, yPosition);
       yPosition += fallbackLines.length * 4 + 2;
     }
   }
-
-  // === COMPANY LOGO + FOOTER ===
-  console.log("Attempting to load Sector Pro logo");
-  const footerLogoImage = await loadSectorProFooterLogo();
-
-  const drawPageFooter = (targetPageWidth: number, targetPageHeight: number, includeArtistInfo = false) => {
-    drawCenteredFooterLogo(doc, footerLogoImage, targetPageWidth, targetPageHeight, 6);
-    drawFooterMetaText(
-      doc,
-      targetPageWidth,
-      targetPageHeight,
-      `${tx("Generado", "Generated")}: ${createdDate}`,
-      includeArtistInfo ? `${tx("Artista", "Artist")}: ${data.name}` : undefined,
-    );
-  };
-
-  drawPageFooter(pageWidth, pageHeight);
 
   if (!templateMode && data.stagePlotUrl) {
     const stagePlotImage = await loadImageWithTimeout(data.stagePlotUrl, "stage plot");
@@ -776,13 +723,26 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         const y = Math.max(margin, (stagePlotPageHeight - footerReserve - renderHeight) / 2);
 
         doc.addImage(stagePlotDataUrl, "JPEG", x, y, renderWidth, renderHeight);
-        drawPageFooter(stagePlotPageWidth, stagePlotPageHeight, true);
       } catch (stagePlotError) {
         console.error("Error adding stage plot page to PDF:", stagePlotError);
       }
     }
   }
   
-  console.log('Individual artist PDF generation completed');
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'artist',
+      kindLabel: tx('Ficha de artista', 'Artist datasheet'),
+      eventTitle: data.name,
+      contextLabel: [stageLabel, headerDate].filter(Boolean).join('  ·  '),
+      issuer: `Sector-Pro  ·  ${tx('Emitido', 'Issued')} ${createdDate}`,
+      pageNumber: page,
+      totalPages,
+      paginate: options.paginate !== false,
+    });
+  }
+
   return pdfToBlob(doc);
 };

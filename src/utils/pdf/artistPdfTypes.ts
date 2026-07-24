@@ -111,4 +111,6 @@ export interface ArtistPdfData {
 export interface ArtistPdfOptions {
   templateMode?: boolean;
   language?: 'es' | 'en';
+  /** False when the document is bound into a set that stamps its own folios. */
+  paginate?: boolean;
 }

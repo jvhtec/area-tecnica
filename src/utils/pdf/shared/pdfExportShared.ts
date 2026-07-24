@@ -27,9 +27,6 @@ export const CORPORATE_HEADER_CONTENT_OFFSET = CORPORATE_HEADER_HEIGHT + 18;
 /** Reserved space at the bottom for the corporate footer so tables/text never collide with it. */
 export const CORPORATE_FOOTER_RESERVED = 38; // px, keep enough room for logo + page text
 
-/** Height of the festival (artist-style) header band. */
-export const FESTIVAL_HEADER_BAND_HEIGHT = 30;
-
 // ---------------------------------------------------------------------------
 // Logo asset paths
 // ---------------------------------------------------------------------------
@@ -319,29 +316,13 @@ export const corporateTableDefaults = (
 });
 
 // ---------------------------------------------------------------------------
-// Festival (artist-style) header & footer
+// Festival documents
 // ---------------------------------------------------------------------------
-
-/** Fills the 30px festival header band in corporate red. */
-export const drawFestivalHeaderBand = (doc: jsPDF): void => {
-  const pageWidth = doc.internal.pageSize.width;
-  doc.setFillColor(...CORPORATE_RED);
-  doc.rect(0, 0, pageWidth, FESTIVAL_HEADER_BAND_HEIGHT, 'F');
-};
-
-/** Draws the centered white title and second line over the festival header band. */
-export const drawFestivalHeaderText = (
-  doc: jsPDF,
-  title: string,
-  secondLine: string,
-): void => {
-  const pageWidth = doc.internal.pageSize.width;
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  doc.text(title, pageWidth / 2, 15, { align: 'center' });
-  doc.setFontSize(12);
-  doc.text(secondLine, pageWidth / 2, 25, { align: 'center' });
-};
+//
+// The festival set no longer draws a filled header band or a red-filled table
+// head. Its chrome, ledger tables and components live in
+// `@/utils/pdf/festival-report`; the helpers below remain for the corporate
+// (rates-style) documents that still use the banded layout.
 
 /**
  * Draws a horizontally centered footer logo (20px wide, aspect preserved) at
@@ -390,16 +371,4 @@ export const drawFooterMetaText = (
   if (rightText) {
     doc.text(rightText, pageWidth - 10, pageHeight - 10, { align: 'right' });
   }
-};
-
-/** Shared head styles for festival/artist autotables. */
-export const FESTIVAL_TABLE_HEAD_STYLES = {
-  fillColor: CORPORATE_RED,
-  textColor: [255, 255, 255] as PdfRgb,
-};
-
-/** Shared body styles for festival/artist autotables. */
-export const FESTIVAL_TABLE_BODY_STYLES = {
-  fontSize: 9,
-  cellPadding: 3,
 };
