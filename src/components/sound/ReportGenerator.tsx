@@ -1,85 +1,112 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { useJobSelection } from "@/hooks/useJobSelection";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { format } from "date-fns";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { FolderOpen, Check, X, Upload } from "lucide-react";
-import { loadJsPDF } from "@/utils/pdf/lazyPdf";
-import type jsPDF from "jspdf";
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Check, FolderOpen, Loader2, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import {
   formatTechnicalStageLabel,
   TechnicalStageSelector,
   useSelectedTechnicalStage,
-} from "@/features/technical-tools/stage/stageAllocation";
-import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
-import { uploadJobPdfWithCleanup } from "@/utils/jobDocumentsUpload";
-import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
+} from '@/features/technical-tools/stage/stageAllocation';
+import { getTechnicalStageStorageScope } from '@/features/technical-tools/stage/stageUtils';
+import {
+  buildSoundvisionReportFilename,
+  formatSoundvisionDateRange,
+  formatSoundvisionIssueDate,
+  MAX_SOUNDVISION_SCHEDULE_ROWS,
+  parseSoundvisionEquipment,
+  SOUNDVISION_PLOT_DEFINITIONS,
+  SOUNDVISION_REPORT_BRANDS,
+  soundvisionPlotImageKey,
+  validateSoundvisionReport,
+  type SoundvisionPlotId,
+  type SoundvisionReportConditions,
+  type SoundvisionReportModel,
+  type SoundvisionReportSystem,
+  type SoundvisionPlotView,
+} from '@/features/technical-tools/soundvision/reportModel';
+import { DocumentationJobPicker } from '@/features/technical-tools/jobs/DocumentationJobPicker';
+import { useJobSelection } from '@/hooks/useJobSelection';
+import { useToast } from '@/hooks/use-toast';
+import { queryKeys } from '@/lib/react-query';
+import { uploadJobPdfWithCleanup } from '@/utils/jobDocumentsUpload';
+import { fetchJobLogo } from '@/utils/pdf/logoUtils';
+import {
+  blobToSoundvisionPdfImage,
+  generateSoundvisionReportPdf,
+  loadSoundvisionPdfImage,
+} from '@/utils/pdf/soundvisionReportPdf';
 
-const reportSections = [
-  {
-    pageNumber: 1,
-    title: "EQUIPAMIENTO",
-    type: "text"
-  },
-  {
-    pageNumber: 2,
-    title: "SPL(A) Broadband",
-    hasIsoView: true
-  },
-  {
-    pageNumber: 3,
-    title: "SPL(Z) 250-16k",
-    hasIsoView: true
-  },
-  {
-    pageNumber: 4,
-    title: "SUBS SPL(Z) 32-80Hz",
-    hasIsoView: false
-  }
-];
+type ImageFiles = Record<string, File | null>;
+type IsoSelection = Partial<Record<SoundvisionPlotId, boolean>>;
 
-// Filename mapping for auto-import
-const FILENAME_MAPPING = {
-  'ISO_A': { section: 'SPL(A) Broadband', view: 'ISO View' },
-  'TOP_A': { section: 'SPL(A) Broadband', view: 'Top View' },
-  'ISO_C': { section: 'SPL(Z) 250-16k', view: 'ISO View' },
-  'TOP_C': { section: 'SPL(Z) 250-16k', view: 'Top View' },
-  'SUB': { section: 'SUBS SPL(Z) 32-80Hz', view: 'Top View' }
+type MappingItem = {
+  filename: string;
+  plotTitle: string;
+  viewLabel: string;
 };
 
-const downloadPdfBlob = (blob: Blob, filename: string) => {
+type MappingResult = {
+  found: MappingItem[];
+  missing: MappingItem[];
+};
+
+type DirectoryInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+  webkitdirectory: string;
+};
+
+const DIRECTORY_INPUT_PROPS: DirectoryInputProps = { webkitdirectory: '' };
+const COMPANY_LOGO_PATH = '/sector pro logo.png';
+
+const DEFAULT_CONDITIONS: SoundvisionReportConditions = {
+  temperatureC: '20',
+  humidityPercent: '50',
+  inputLevelDbu: '0',
+  audiencePlaneM: '1.60',
+};
+
+const VIEW_LABELS: Record<SoundvisionPlotView, string> = {
+  top: 'Vista en planta',
+  iso: 'Vista isométrica',
+};
+
+const expectedFiles = SOUNDVISION_PLOT_DEFINITIONS.flatMap((plot) => [
+  { fileBase: plot.topFileBase, plotId: plot.id, plotTitle: plot.title, view: 'top' as const },
+  ...(plot.isoFileBase
+    ? [{ fileBase: plot.isoFileBase, plotId: plot.id, plotTitle: plot.title, view: 'iso' as const }]
+    : []),
+]);
+
+const downloadPdfBlob = (blob: Blob, filename: string): void => {
   const downloadUrl = window.URL.createObjectURL(blob);
   const link = window.document.createElement('a');
   link.href = downloadUrl;
   link.download = filename;
   link.click();
-  window.URL.revokeObjectURL(downloadUrl);
+  window.setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 0);
 };
 
-type MappingResult = {
-  found: { filename: string; section: string; view: string }[];
-  missing: { filename: string; section: string; view: string }[];
-};
+const baseFilename = (file: File): string =>
+  file.name.replace(/\.[^.]+$/, '').trim().toUpperCase();
 
 export const ReportGenerator = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
-  const [selectedJobId, setSelectedJobId] = useState<string>("");
-  const [reportSystem, setReportSystem] = useState<"LA" | "Turbo">("LA");
-  const [equipamiento, setEquipamiento] = useState("");
-  const [images, setImages] = useState<{ [key: string]: File | null }>({});
-  const [isoViewEnabled, setIsoViewEnabled] = useState<{ [key: string]: boolean }>({});
-  const [jobLogo, setJobLogo] = useState<string | undefined>(undefined);
+  const [selectedJobId, setSelectedJobId] = useState('');
+  const [reportSystem, setReportSystem] = useState<SoundvisionReportSystem>('LA');
+  const [revision, setRevision] = useState('A');
+  const [equipment, setEquipment] = useState('');
+  const [conditions, setConditions] = useState(DEFAULT_CONDITIONS);
+  const [images, setImages] = useState<ImageFiles>({});
+  const [isoSelection, setIsoSelection] = useState<IsoSelection>({});
   const [mappingResult, setMappingResult] = useState<MappingResult | null>(null);
-  const [showMappingPreview, setShowMappingPreview] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const {
     hasMultipleStages,
@@ -93,360 +120,198 @@ export const ReportGenerator = () => {
     jobId: selectedJobId,
   });
 
-  useEffect(() => {
-    const loadJobLogo = async () => {
-      if (selectedJobId) {
-        try {
-          const logoUrl = await fetchJobLogo(selectedJobId);
-          setJobLogo(logoUrl);
-          console.log("Job logo loaded:", logoUrl);
-        } catch (error) {
-          console.error("Error loading job logo:", error);
-          setJobLogo(undefined);
-        }
-      } else {
-        setJobLogo(undefined);
-      }
-    };
+  const selectedJob = useMemo(
+    () => jobs?.find((job) => job.id === selectedJobId),
+    [jobs, selectedJobId],
+  );
 
-    loadJobLogo();
-  }, [selectedJobId]);
+  const { data: jobLogo, isLoading: isLoadingJobLogo } = useQuery({
+    queryKey: queryKeys.scope('soundvision-job-logo', selectedJobId),
+    queryFn: () => fetchJobLogo(selectedJobId),
+    enabled: Boolean(selectedJobId),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const handleImageChange = (section: string, view: string, file: File | null) => {
-    const key = `${section}-${view}`;
-    setImages(prev => ({ ...prev, [key]: file }));
+  const setCondition = (key: keyof SoundvisionReportConditions, value: string) => {
+    setConditions((current) => ({ ...current, [key]: value }));
   };
 
-  const toggleIsoView = (section: string) => {
-    setIsoViewEnabled(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+  const handleImageChange = (
+    plotId: SoundvisionPlotId,
+    view: SoundvisionPlotView,
+    file: File | null,
+  ) => {
+    setImages((current) => ({ ...current, [soundvisionPlotImageKey(plotId, view)]: file }));
   };
 
-  const handleFolderSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const handleFolderSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    if (selectedFiles.length === 0) return;
 
-    const found: { filename: string; section: string; view: string }[] = [];
-    const missing: { filename: string; section: string; view: string }[] = [];
-    const newImages: { [key: string]: File | null } = { ...images };
-    const newIsoEnabled = { ...isoViewEnabled };
+    const found: MappingItem[] = [];
+    const missing: MappingItem[] = [];
+    const mappedImages: ImageFiles = { ...images };
+    const mappedIso: IsoSelection = { ...isoSelection };
 
-    // Check each expected filename
-    Object.entries(FILENAME_MAPPING).forEach(([filename, mapping]) => {
-      const matchingFile = Array.from(files).find(file => {
-        const fileBaseName = file.name.toLowerCase().split('.')[0];
-        return fileBaseName === filename.toLowerCase();
-      });
+    expectedFiles.forEach((expected) => {
+      const match = selectedFiles.find((file) => baseFilename(file) === expected.fileBase);
+      const item = {
+        filename: match?.name ?? `${expected.fileBase}.png`,
+        plotTitle: expected.plotTitle,
+        viewLabel: VIEW_LABELS[expected.view],
+      };
 
-      if (matchingFile) {
-        found.push({ filename: matchingFile.name, section: mapping.section, view: mapping.view });
-        const key = `${mapping.section}-${mapping.view}`;
-        newImages[key] = matchingFile;
-        
-        // Auto-enable ISO view if ISO file is found
-        if (mapping.view === 'ISO View') {
-          newIsoEnabled[mapping.section] = true;
-        }
+      if (match) {
+        found.push(item);
+        mappedImages[soundvisionPlotImageKey(expected.plotId, expected.view)] = match;
+        if (expected.view === 'iso') mappedIso[expected.plotId] = true;
       } else {
-        missing.push({ filename: `${filename}.png`, section: mapping.section, view: mapping.view });
+        missing.push(item);
       }
     });
 
-    setImages(newImages);
-    setIsoViewEnabled(newIsoEnabled);
+    setImages(mappedImages);
+    setIsoSelection(mappedIso);
     setMappingResult({ found, missing });
-    setShowMappingPreview(true);
-
-    // Show toast with results
-    toast({
-      title: "Auto-mapping Complete",
-      description: `Found ${found.length} files, ${missing.length} missing`,
-    });
-
-    // Reset the input
     event.target.value = '';
+    toast({
+      title: 'Importación completada',
+      description: `${found.length} archivos asignados; ${missing.length} no encontrados.`,
+    });
   };
 
   const clearAutoMapping = () => {
     setImages({});
-    setIsoViewEnabled({});
+    setIsoSelection({});
     setMappingResult(null);
-    setShowMappingPreview(false);
     toast({
-      title: "Mapping Cleared",
-      description: "All auto-mapped files have been cleared",
+      title: 'Asignación eliminada',
+      description: 'Se han retirado todas las imágenes del informe.',
     });
   };
 
-  const addPageHeader = async (pdf: jsPDF, pageNumber: number, jobTitle: string, jobDate: string) => {
-    return new Promise<void>((resolve) => {
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      
-      // Select the appropriate logo based on the report system
-      const logoPath = reportSystem === "LA" 
-        ? '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png'
-        : '/lovable-uploads/e78ab52e-aa81-4770-a6bb-f802a5ff651e.png';
-      
-      // Purple header background
-      pdf.setFillColor(125, 1, 1);
-      pdf.rect(0, 0, pageWidth, 40, 'F');
+  const buildReportModel = async (): Promise<SoundvisionReportModel> => {
+    if (!selectedJob) throw new Error('Seleccione un trabajo antes de generar el informe.');
 
-      // White text for header
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(24);
-      
-      // Use different header text based on selection
-      const headerText = reportSystem === "LA" ? "SOUNDVISION REPORT" : "EASE FOCUS REPORT";
-      pdf.text(headerText, pageWidth / 2, 15, { align: 'center' });
+    const plots = await Promise.all(SOUNDVISION_PLOT_DEFINITIONS.map(async (definition) => {
+      const topFile = images[soundvisionPlotImageKey(definition.id, 'top')];
+      const isoFile = isoSelection[definition.id]
+        ? images[soundvisionPlotImageKey(definition.id, 'iso')]
+        : null;
+      return {
+        id: definition.id,
+        title: definition.title,
+        descriptor: definition.descriptor,
+        weighting: definition.weighting,
+        band: definition.band,
+        topView: topFile ? await blobToSoundvisionPdfImage(topFile) : null,
+        isoView: isoFile ? await blobToSoundvisionPdfImage(isoFile) : null,
+      };
+    }));
 
-      // Job title and date
-      pdf.setFontSize(14);
-      pdf.text(jobTitle, pageWidth / 2, 25, { align: 'center' });
-      pdf.text(jobDate, pageWidth / 2, 33, { align: 'center' });
-
-      // Page number
-      pdf.setFontSize(12);
-      pdf.text(pageNumber.toString(), pageWidth - 10, 15, { align: 'right' });
-
-      const promises = [];
-      
-      // Add the job logo if available (left-aligned, smaller)
-      if (jobLogo) {
-        promises.push(
-          new Promise<void>((resolveLogo) => {
-            const jobLogoImg = new Image();
-            jobLogoImg.crossOrigin = 'anonymous';
-            jobLogoImg.src = jobLogo;
-            
-            jobLogoImg.onload = () => {
-              const logoHeight = 7.5; // 1/4 of original size
-              const logoWidth = logoHeight * (jobLogoImg.width / jobLogoImg.height);
-              const logoX = 10; // Left position
-              const logoY = 5;
-              
-              try {
-                pdf.addImage(jobLogoImg, 'PNG', logoX, logoY, logoWidth, logoHeight);
-              } catch (error) {
-                console.error('Error adding job logo:', error);
-              }
-              resolveLogo();
-            };
-            
-            jobLogoImg.onerror = () => {
-              console.error('Failed to load job logo');
-              resolveLogo();
-            };
-          })
-        );
-      }
-
-      // Add the standard logo (right-aligned)
-      promises.push(
-        new Promise<void>((resolveLogo) => {
-          const logo = new Image();
-          logo.crossOrigin = 'anonymous';
-          logo.src = logoPath;
-
-          logo.onload = () => {
-            const logoWidth = 30;
-            const logoHeight = logoWidth * (logo.height / logo.width);
-            const logoX = pageWidth - logoWidth - 10;
-            const logoY = 5;
-
-            try {
-              pdf.addImage(logo, 'PNG', logoX, logoY, logoWidth, logoHeight);
-            } catch (error) {
-              console.error('Error adding header logo:', error);
-            }
-            resolveLogo();
-          };
-
-          logo.onerror = () => {
-            console.error('Failed to load header logo');
-            resolveLogo();
-          };
-        })
-      );
-
-      Promise.all(promises).then(() => resolve());
-    });
+    return {
+      system: reportSystem,
+      eventTitle: selectedJob.title || 'Trabajo sin nombre',
+      stageLabel: formatTechnicalStageLabel(selectedStage) ?? '',
+      eventDate: formatSoundvisionDateRange(selectedJob.start_time, selectedJob.end_time),
+      issuedDate: formatSoundvisionIssueDate(new Date()),
+      revision: revision.trim() || 'A',
+      equipment: parseSoundvisionEquipment(equipment),
+      conditions,
+      plots,
+    };
   };
 
-  const generatePDF = async () => {
-    if (!selectedJobId) {
+  const generateReport = async () => {
+    if (isLoadingJobLogo) {
       toast({
-        title: "Error",
-        description: "Seleccione un trabajo antes de generar el informe.",
-        variant: "destructive",
+        title: 'Preparando recursos',
+        description: 'Espere a que termine la carga del logotipo antes de generar el informe.',
       });
       return;
     }
-
     if (isLoadingStages) {
       toast({
-        title: "Cargando escenarios",
-        description: "Espere a que se carguen los escenarios antes de generar el informe.",
+        title: 'Cargando escenarios',
+        description: 'Espere a que termine la carga antes de generar el informe.',
       });
       return;
     }
-
     if (hasMultipleStages && selectedStageNumber == null) {
       toast({
-        title: "Error",
-        description: "Seleccione un escenario antes de generar el informe.",
-        variant: "destructive",
+        title: 'Falta el escenario',
+        description: 'Seleccione un escenario antes de generar el informe.',
+        variant: 'destructive',
       });
       return;
     }
 
-    const selectedJob = jobs?.find(job => job.id === selectedJobId);
-    const stageLabel = formatTechnicalStageLabel(selectedStage);
-    const jobTitle = stageLabel
-      ? `${selectedJob?.title || "Trabajo_sin_nombre"} - ${stageLabel}`
-      : selectedJob?.title || "Trabajo_sin_nombre";
-    const jobDate = selectedJob?.start_time 
-      ? format(new Date(selectedJob.start_time), "MMMM dd, yyyy")
-      : format(new Date(), "MMMM dd, yyyy");
+    setIsGenerating(true);
+    try {
+      const model = await buildReportModel();
+      const validationErrors = validateSoundvisionReport(model);
+      if (validationErrors.length > 0) throw new Error(validationErrors.join(' '));
 
-    const jsPDF = await loadJsPDF();
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4"
-    });
-
-    const margin = 20;
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const contentWidth = pageWidth - (2 * margin);
-
-    // Page 1: Equipment
-    await addPageHeader(pdf, 1, jobTitle, jobDate);
-    pdf.setFontSize(14);
-    pdf.setTextColor(51, 51, 51);
-    pdf.setFont(undefined, 'bold');
-    pdf.text("EQUIPAMIENTO:", margin, margin + 45);
-    pdf.setFont(undefined, 'normal');
-    
-    const equipLines = equipamiento.split('\n').filter(line => line.trim());
-    let yPos = margin + 55;
-    
-    equipLines.forEach(line => {
-      pdf.setFontSize(11);
-      pdf.text(line.trim(), margin, yPos);
-      yPos += 7;
-    });
-
-    // Add disclaimer text
-    pdf.setFontSize(9);
-    pdf.text("ALL PLOTS CALCULATED FOR 15º C / 70% REL HUMIDITY @ 0dbU INPUT LEVEL", margin, yPos + 10);
-
-    // Image pages
-    for (let i = 1; i < reportSections.length; i++) {
-      const section = reportSections[i];
-      pdf.addPage();
-      await addPageHeader(pdf, section.pageNumber, jobTitle, jobDate);
-      
-      // Bold section title
-      pdf.setFontSize(14);
-      pdf.setFont(undefined, 'bold');
-      pdf.setTextColor(51, 51, 51);
-      pdf.text(section.title, margin, 50);
-      pdf.setFont(undefined, 'normal');
-      
-      const topViewKey = `${section.title}-Top View`;
-      if (images[topViewKey]) {
-        await addImageToPDF(pdf, images[topViewKey], "Top View", margin, 60, contentWidth);
-      }
-
-      if (section.hasIsoView && isoViewEnabled[section.title]) {
-        const isoViewKey = `${section.title}-ISO View`;
-        if (images[isoViewKey]) {
-          await addImageToPDF(pdf, images[isoViewKey], "ISO View", margin, 160, contentWidth);
-        }
-      }
-    }
-
-    // Add footer logo (Sector Pro)
-    await new Promise<void>((resolve) => {
-      const footerLogo = new Image();
-      footerLogo.crossOrigin = 'anonymous';
-      footerLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-
-      footerLogo.onload = () => {
-        pdf.setPage(pdf.getNumberOfPages());
-        const logoWidth = 50;
-        const logoHeight = logoWidth * (footerLogo.height / footerLogo.width);
-        const xPosition = (pageWidth - logoWidth) / 2;
-        const yPosition = pageHeight - 20;
-
-        try {
-          pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding footer logo:', error);
-        }
-        resolve();
-      };
-
-      footerLogo.onerror = () => {
-        console.error('Failed to load footer logo');
-        resolve();
-      };
-    });
-
-    const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-    const blob = pdf.output('blob');
-
-    downloadPdfBlob(blob, filename);
-    toast({
-      title: "Descarga iniciada",
-      description: "El informe se está subiendo a los documentos del trabajo en segundo plano.",
-    });
-
-    void uploadJobPdfWithCleanup(selectedJobId, blob, filename, "calculators/sv-report", {
-      cleanupScope: getTechnicalStageStorageScope(selectedStage),
-    })
-      .then(() => {
-        toast({
-          title: "Informe guardado",
-          description: "La descarga local se inició y el informe se guardó en los documentos del trabajo.",
-        });
-      })
-      .catch((error) => {
-        console.error('Error uploading SV report:', error);
-        toast({
-          title: "Subida fallida",
-          description: "El informe se descargó localmente, pero no se pudo guardar en los documentos del trabajo.",
-          variant: "destructive",
-        });
+      const brand = SOUNDVISION_REPORT_BRANDS[model.system];
+      const [companyLogo, clientLogo, predictionLogo] = await Promise.all([
+        loadSoundvisionPdfImage(COMPANY_LOGO_PATH),
+        loadSoundvisionPdfImage(jobLogo),
+        loadSoundvisionPdfImage(brand.logoPath),
+      ]);
+      const blob = await generateSoundvisionReportPdf(model, {
+        companyLogo,
+        clientLogo,
+        predictionLogo,
       });
-  };
+      const filename = buildSoundvisionReportFilename(
+        model.system,
+        model.eventTitle,
+        model.stageLabel,
+      );
 
-  const addImageToPDF = async (pdf: jsPDF, file: File, viewType: string, x: number, y: number, width: number) => {
-    return new Promise<void>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imgData = e.target?.result as string;
-        const height = width * 0.6; // Maintain aspect ratio
-        pdf.addImage(imgData, "JPEG", x, y, width, height);
-        resolve();
-      };
-      reader.readAsDataURL(file);
-    });
+      downloadPdfBlob(blob, filename);
+      toast({
+        title: 'Descarga iniciada',
+        description: 'El informe se está guardando también en los documentos del trabajo.',
+      });
+
+      void uploadJobPdfWithCleanup(selectedJobId, blob, filename, 'calculators/sv-report', {
+        cleanupScope: getTechnicalStageStorageScope(selectedStage),
+      })
+        .then(() => {
+          toast({
+            title: 'Informe guardado',
+            description: 'El PDF está disponible en los documentos del trabajo.',
+          });
+        })
+        .catch((error) => {
+          console.error('Error al subir el informe de predicción:', error);
+          toast({
+            title: 'Subida fallida',
+            description: 'El PDF se descargó, pero no se pudo guardar en el trabajo.',
+            variant: 'destructive',
+          });
+        });
+    } catch (error) {
+      toast({
+        title: 'No se pudo generar el informe',
+        description: error instanceof Error ? error.message : 'Revise los datos del informe.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto my-6">
+    <Card className="mx-auto my-6 w-full max-w-4xl">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">
-          SoundVision Report Generator
+        <CardTitle className="text-center text-2xl font-bold">
+          Informe de predicción acústica
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {/* Job Selection */}
           <div className="space-y-2">
             <Label htmlFor="jobSelect">Trabajo</Label>
             <DocumentationJobPicker
@@ -464,164 +329,208 @@ export const ReportGenerator = () => {
             onChange={setSelectedStageNumber}
           />
 
-          {/* Report System Selection */}
-          <div className="space-y-2">
-            <Label className="mb-2">Sistema del informe</Label>
-            <RadioGroup 
-              value={reportSystem}
-              onValueChange={(value) => setReportSystem(value as "LA" | "Turbo")}
-              className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="LA" id="r-la" />
-                <Label htmlFor="r-la" className="cursor-pointer">L'Acoustics</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Turbo" id="r-turbo" />
-                <Label htmlFor="r-turbo" className="cursor-pointer">Turbosound</Label>
-              </div>
-            </RadioGroup>
+          <div className="grid gap-4 md:grid-cols-[1fr_120px]">
+            <div className="space-y-2">
+              <Label>Sistema del informe</Label>
+              <RadioGroup
+                value={reportSystem}
+                onValueChange={(value) => setReportSystem(value as SoundvisionReportSystem)}
+                className="flex flex-col gap-3 sm:flex-row sm:gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="LA" id="report-la" />
+                  <Label htmlFor="report-la" className="cursor-pointer">L&apos;Acoustics</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Turbo" id="report-turbo" />
+                  <Label htmlFor="report-turbo" className="cursor-pointer">Turbosound</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="report-revision">Revisión</Label>
+              <Input
+                id="report-revision"
+                value={revision}
+                onChange={(event) => setRevision(event.target.value)}
+                maxLength={4}
+              />
+            </div>
           </div>
 
-          {/* Equipment List */}
+          <div className="space-y-3 rounded-lg border p-4">
+            <div>
+              <h3 className="text-sm font-semibold">Condiciones de predicción</h3>
+              <p className="text-xs text-muted-foreground">
+                Estos valores aparecerán en todas las páginas de gráficos.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-2">
+                <Label htmlFor="temperature">Temperatura (°C)</Label>
+                <Input
+                  id="temperature"
+                  inputMode="decimal"
+                  value={conditions.temperatureC}
+                  onChange={(event) => setCondition('temperatureC', event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="humidity">Humedad relativa (%)</Label>
+                <Input
+                  id="humidity"
+                  inputMode="decimal"
+                  value={conditions.humidityPercent}
+                  onChange={(event) => setCondition('humidityPercent', event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="input-level">Nivel de entrada (dBu)</Label>
+                <Input
+                  id="input-level"
+                  inputMode="decimal"
+                  value={conditions.inputLevelDbu}
+                  onChange={(event) => setCondition('inputLevelDbu', event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="audience-plane">Plano de audiencia (m)</Label>
+                <Input
+                  id="audience-plane"
+                  inputMode="decimal"
+                  value={conditions.audiencePlaneM}
+                  onChange={(event) => setCondition('audiencePlaneM', event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="equipamiento">Listado de equipo</Label>
+            <Label htmlFor="equipment">Listado de equipo</Label>
             <Textarea
-              id="equipamiento"
-              value={equipamiento}
-              onChange={(e) => setEquipamiento(e.target.value)}
-              placeholder="24 L'ACOUSTICS K1 (MAIN ARRAYS)&#10;06 L'ACOUSTICS KARA (DOWNFILLS)"
-              className="min-h-[96px] bg-background text-foreground"
+              id="equipment"
+              value={equipment}
+              onChange={(event) => setEquipment(event.target.value)}
+              placeholder={"24 K2 (Sistema principal)\n12 KS28 (Subgraves)\n8 X12 (Relleno frontal)"}
+              className="min-h-[120px] bg-background text-foreground"
             />
+            <p className="text-xs text-muted-foreground">
+              Una línea por modelo: cantidad, modelo y función entre paréntesis. Máximo{' '}
+              {MAX_SOUNDVISION_SCHEDULE_ROWS} líneas.
+            </p>
           </div>
 
-          {/* Auto-mapping section */}
-          <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <Label className="text-sm font-medium">Auto-map Images from Folder</Label>
+          <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Importación automática</h3>
+                <p className="text-xs text-muted-foreground">
+                  Busca TOP_A, ISO_A, TOP_C, ISO_C y SUB dentro de una carpeta.
+                </p>
+              </div>
               {mappingResult && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearAutoMapping}
-                  className="text-xs w-full sm:w-auto"
-                >
-                  Clear Mapping
+                <Button variant="outline" size="sm" onClick={clearAutoMapping}>
+                  Limpiar imágenes
                 </Button>
               )}
             </div>
-            
-            <div className="flex items-center gap-2">
-              <Label htmlFor="folderSelect" className="cursor-pointer flex-1 sm:flex-initial">
-                <div className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 border rounded-md hover:bg-background transition-colors">
-                  <FolderOpen className="h-4 w-4" />
-                  <span className="text-sm">Select Folder</span>
+            <Label htmlFor="report-folder" className="inline-flex cursor-pointer">
+              <span className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent">
+                <FolderOpen className="h-4 w-4" />
+                Seleccionar carpeta
+              </span>
+            </Label>
+            <input
+              id="report-folder"
+              type="file"
+              accept="image/png,image/jpeg"
+              {...DIRECTORY_INPUT_PROPS}
+              multiple
+              onChange={handleFolderSelection}
+              className="hidden"
+            />
+
+            {mappingResult && (
+              <ScrollArea className="max-h-44">
+                <div className="space-y-1 pr-4">
+                  {mappingResult.found.map((item) => (
+                    <div key={`${item.filename}-${item.viewLabel}`} className="flex items-center gap-2 text-xs">
+                      <Check className="h-3 w-3 shrink-0 text-green-600" />
+                      <span className="font-mono">{item.filename}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span>{item.plotTitle} · {item.viewLabel}</span>
+                    </div>
+                  ))}
+                  {mappingResult.missing.map((item) => (
+                    <div key={`${item.filename}-${item.viewLabel}`} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <X className="h-3 w-3 shrink-0 text-red-600" />
+                      <span className="font-mono">{item.filename}</span>
+                      <span>→</span>
+                      <span>{item.plotTitle} · {item.viewLabel}</span>
+                    </div>
+                  ))}
                 </div>
-              </Label>
-              <input
-                id="folderSelect"
-                type="file"
-                {...({ webkitdirectory: "" } as any)}
-                multiple
-                onChange={handleFolderSelection}
-                className="hidden"
-              />
-            </div>
-
-            <div className="text-xs text-muted-foreground">
-              Expected files: ISO_A.png, TOP_A.png, ISO_C.png, TOP_C.png, SUB.png
-            </div>
-
-            {/* Mapping preview */}
-            {showMappingPreview && mappingResult && (
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Mapping Results:</Label>
-                <ScrollArea className="max-h-48">
-                  <div className="space-y-1 pr-4">
-                    {mappingResult.found.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2 text-xs">
-                        <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
-                        <span className="font-mono text-xs break-all">{item.filename}</span>
-                        <span className="text-muted-foreground flex-shrink-0">→</span>
-                        <span className="text-xs">{item.section} ({item.view})</span>
-                      </div>
-                    ))}
-                    {mappingResult.missing.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2 text-xs">
-                        <X className="h-3 w-3 text-red-600 flex-shrink-0" />
-                        <span className="font-mono text-muted-foreground text-xs break-all">{item.filename}</span>
-                        <span className="text-muted-foreground flex-shrink-0">→</span>
-                        <span className="text-muted-foreground text-xs">{item.section} ({item.view})</span>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
+              </ScrollArea>
             )}
           </div>
 
-          {/* Image Upload Sections */}
           <div className="space-y-4">
-            {reportSections.slice(1).map((section) => {
-              const topViewKey = `${section.title}-Top View`;
-              const isoViewKey = `${section.title}-ISO View`;
-              const hasTopImage = images[topViewKey];
-              const hasIsoImage = images[isoViewKey];
-
+            {SOUNDVISION_PLOT_DEFINITIONS.map((plot) => {
+              const topFile = images[soundvisionPlotImageKey(plot.id, 'top')];
+              const isoFile = images[soundvisionPlotImageKey(plot.id, 'iso')];
               return (
-                <div key={section.title} className="border rounded-lg p-4 bg-muted/30">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                    <Label className="text-sm font-medium">{section.title}</Label>
-                    {section.hasIsoView && (
+                <div key={plot.id} className="rounded-lg border bg-muted/20 p-4">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <Label className="text-sm font-semibold">{plot.title}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        PNG recomendado, 1800 px de ancho o más.
+                      </p>
+                    </div>
+                    {plot.isoFileBase && (
                       <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`iso-${section.title}`}
-                          checked={isoViewEnabled[section.title]}
-                          onCheckedChange={() => toggleIsoView(section.title)}
+                        <Checkbox
+                          id={`iso-${plot.id}`}
+                          checked={Boolean(isoSelection[plot.id])}
+                          onCheckedChange={(checked) => {
+                            setIsoSelection((current) => ({ ...current, [plot.id]: checked === true }));
+                          }}
                         />
-                        <Label htmlFor={`iso-${section.title}`} className="text-xs cursor-pointer">
-                          Include ISO View
+                        <Label htmlFor={`iso-${plot.id}`} className="cursor-pointer text-xs">
+                          Incluir vista isométrica
                         </Label>
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs font-medium">Top View</Label>
-                        {hasTopImage && <Check className="h-3 w-3 text-green-600" />}
+                        <Label htmlFor={`top-${plot.id}`} className="text-xs">Vista en planta</Label>
+                        {topFile && <Check className="h-3 w-3 text-green-600" />}
                       </div>
                       <Input
+                        id={`top-${plot.id}`}
                         type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageChange(section.title, "Top View", e.target.files?.[0] || null)}
-                        className="text-sm"
+                        accept="image/png,image/jpeg"
+                        onChange={(event) => handleImageChange(plot.id, 'top', event.target.files?.[0] ?? null)}
                       />
-                      {hasTopImage && (
-                        <div className="text-xs text-muted-foreground">
-                          📁 {hasTopImage.name}
-                        </div>
-                      )}
+                      {topFile && <p className="text-xs text-muted-foreground">{topFile.name}</p>}
                     </div>
 
-                    {section.hasIsoView && isoViewEnabled[section.title] && (
+                    {plot.isoFileBase && isoSelection[plot.id] && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Label className="text-xs font-medium">ISO View</Label>
-                          {hasIsoImage && <Check className="h-3 w-3 text-green-600" />}
+                          <Label htmlFor={`iso-file-${plot.id}`} className="text-xs">Vista isométrica</Label>
+                          {isoFile && <Check className="h-3 w-3 text-green-600" />}
                         </div>
                         <Input
+                          id={`iso-file-${plot.id}`}
                           type="file"
-                          accept="image/*"
-                          onChange={(e) => handleImageChange(section.title, "ISO View", e.target.files?.[0] || null)}
-                          className="text-sm"
+                          accept="image/png,image/jpeg"
+                          onChange={(event) => handleImageChange(plot.id, 'iso', event.target.files?.[0] ?? null)}
                         />
-                        {hasIsoImage && (
-                          <div className="text-xs text-muted-foreground">
-                            📁 {hasIsoImage.name}
-                          </div>
-                        )}
+                        {isoFile && <p className="text-xs text-muted-foreground">{isoFile.name}</p>}
                       </div>
                     )}
                   </div>
@@ -630,12 +539,20 @@ export const ReportGenerator = () => {
             })}
           </div>
 
-          {/* Generate Button */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={generatePDF} className="w-full">
-              Generate Report
-            </Button>
-          </div>
+          <Button
+            onClick={generateReport}
+            className="w-full"
+            disabled={isGenerating || isLoadingJobLogo}
+          >
+            {isGenerating || isLoadingJobLogo ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isGenerating ? 'Generando informe…' : 'Preparando recursos…'}
+              </>
+            ) : (
+              `Generar ${SOUNDVISION_REPORT_BRANDS[reportSystem].reportLabel}`
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>
