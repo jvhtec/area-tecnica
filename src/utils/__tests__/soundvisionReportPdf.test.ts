@@ -53,11 +53,13 @@ describe('soundvision report model', () => {
     expect(parseSoundvisionEquipment([
       '24 K2 (Sistema principal)',
       '12 x KS28 (Subgraves)',
+      '8 X12 (Relleno frontal)',
       'GALAXY 816',
       '',
     ].join('\n'))).toEqual([
       { quantity: '24', model: 'K2', role: 'Sistema principal' },
       { quantity: '12', model: 'KS28', role: 'Subgraves' },
+      { quantity: '8', model: 'X12', role: 'Relleno frontal' },
       { quantity: '-', model: 'GALAXY 816', role: '' },
     ]);
   });

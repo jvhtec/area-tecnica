@@ -128,7 +128,7 @@ export const parseSoundvisionEquipment = (value: string): SoundvisionEquipmentRo
       const roleMatch = line.match(/\s*\(([^()]*)\)\s*$/);
       const role = roleMatch?.[1]?.trim() ?? '';
       const withoutRole = roleMatch ? line.slice(0, roleMatch.index).trim() : line;
-      const quantityMatch = withoutRole.match(/^(\d+)\s*(?:x\s*)?(.+)$/i);
+      const quantityMatch = withoutRole.match(/^(\d+)\s*(?:x\s+)?(.+)$/i);
 
       if (!quantityMatch) {
         return { quantity: '-', model: withoutRole, role };

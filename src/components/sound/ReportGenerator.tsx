@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Check, FolderOpen, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,7 @@ import {
 import { DocumentationJobPicker } from '@/features/technical-tools/jobs/DocumentationJobPicker';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
+import { queryKeys } from '@/lib/react-query';
 import { uploadJobPdfWithCleanup } from '@/utils/jobDocumentsUpload';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 import {
@@ -103,7 +105,6 @@ export const ReportGenerator = () => {
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS);
   const [images, setImages] = useState<ImageFiles>({});
   const [isoSelection, setIsoSelection] = useState<IsoSelection>({});
-  const [jobLogo, setJobLogo] = useState<string>();
   const [mappingResult, setMappingResult] = useState<MappingResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -124,28 +125,12 @@ export const ReportGenerator = () => {
     [jobs, selectedJobId],
   );
 
-  useEffect(() => {
-    let active = true;
-    if (!selectedJobId) {
-      setJobLogo(undefined);
-      return () => {
-        active = false;
-      };
-    }
-
-    void fetchJobLogo(selectedJobId)
-      .then((logo) => {
-        if (active) setJobLogo(logo);
-      })
-      .catch((error) => {
-        console.error('Error al cargar el logotipo del trabajo:', error);
-        if (active) setJobLogo(undefined);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [selectedJobId]);
+  const { data: jobLogo, isLoading: isLoadingJobLogo } = useQuery({
+    queryKey: queryKeys.scope('soundvision-job-logo', selectedJobId),
+    queryFn: () => fetchJobLogo(selectedJobId),
+    enabled: Boolean(selectedJobId),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const setCondition = (key: keyof SoundvisionReportConditions, value: string) => {
     setConditions((current) => ({ ...current, [key]: value }));
@@ -238,6 +223,13 @@ export const ReportGenerator = () => {
   };
 
   const generateReport = async () => {
+    if (isLoadingJobLogo) {
+      toast({
+        title: 'Preparando recursos',
+        description: 'Espere a que termine la carga del logotipo antes de generar el informe.',
+      });
+      return;
+    }
     if (isLoadingStages) {
       toast({
         title: 'Cargando escenarios',
@@ -547,11 +539,15 @@ export const ReportGenerator = () => {
             })}
           </div>
 
-          <Button onClick={generateReport} className="w-full" disabled={isGenerating}>
-            {isGenerating ? (
+          <Button
+            onClick={generateReport}
+            className="w-full"
+            disabled={isGenerating || isLoadingJobLogo}
+          >
+            {isGenerating || isLoadingJobLogo ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generando informe…
+                {isGenerating ? 'Generando informe…' : 'Preparando recursos…'}
               </>
             ) : (
               `Generar ${SOUNDVISION_REPORT_BRANDS[reportSystem].reportLabel}`
