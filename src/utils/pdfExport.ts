@@ -13,8 +13,9 @@ import {
 import type {
   PowerCalculationSnapshot,
 } from '@/features/technical-tools/power/types';
+import { exportTechnicalDataReportPdf } from '@/utils/pdf/technicalDataReportPdf';
 
-interface ExportTableRow {
+export interface ExportTableRow {
   quantity?: string;
   lineName?: string;
   componentName?: string;
@@ -29,7 +30,7 @@ interface ExportTableRow {
   hoistName?: string;
 }
 
-interface ExportTable {
+export interface ExportTable {
   name: string;
   rows: ExportTableRow[];
   totalWeight?: number;
@@ -91,6 +92,21 @@ export const exportToPDF = async (
   customLogoUrl?: string,
   fohSchukoRequired?: boolean
 ): Promise<Blob> => {
+  if (['power', 'weight'].includes(type)) {
+    return exportTechnicalDataReportPdf({
+      customLogoUrl,
+      fohSchukoRequired,
+      jobDate,
+      jobName,
+      powerSummary,
+      projectName,
+      safetyMargin,
+      summaryRows,
+      tables,
+      type: type as 'power' | 'weight',
+    });
+  }
+
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const unicodeFontFamily =
