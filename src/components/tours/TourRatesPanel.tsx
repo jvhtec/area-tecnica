@@ -170,7 +170,9 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('timesheets')
         .select('job_id, technician_id, approved_by_manager')
-        .in('job_id', jobIds);
+        .in('job_id', jobIds)
+        // Voided timesheets must not skew the per-tech approval indicator.
+        .eq('is_active', true);
 
       if (error) throw error;
 
