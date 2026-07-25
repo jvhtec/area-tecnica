@@ -18,7 +18,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { canManagePayouts, isManagementRole } from '@/utils/permissions';
+import { canManagePayouts, canUploadDocuments, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 import {
     buildEnhancedJobTabs,
@@ -266,7 +266,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const isDryhire = jobType === 'dryhire';
     const showTourRatesTab = !isDryhire && jobType === 'tourdate' && (isManager || jobRatesApproved) && !isHouseTech;
     const showExtrasTab = !isDryhire && (isManager || isHouseTech || (jobRatesApproved && jobExtras.length > 0));
-    const canViewAllDocs = isManager || isHouseTech;
+    const canViewAllDocs = canUploadDocuments(userRole) || isHouseTech;
 
     const tabs = buildEnhancedJobTabs(showTourRatesTab, showExtrasTab);
 

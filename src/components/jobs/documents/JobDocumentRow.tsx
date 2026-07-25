@@ -50,7 +50,7 @@ export const JobDocumentRow = ({
         <div className="min-w-0 flex-1">
           <div className={`mb-1 break-words text-sm font-bold ${textMainClassName}`}>{doc.file_name}</div>
           <div className={`break-words text-xs ${textMutedClassName}`}>
-            {doc.uploaded_at && `Subido el ${formatDocumentUploadDate(doc.uploaded_at)}`}
+            {`Subido el ${formatDocumentUploadDate(doc.uploaded_at)}`}
             {isReadOnly && <span className="ml-2 italic">Solo lectura</span>}
           </div>
           {(isTemplate || statusBadge) && (
