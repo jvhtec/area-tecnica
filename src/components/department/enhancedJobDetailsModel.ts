@@ -100,6 +100,3 @@ const formatMadridDate = (value: string | null | undefined, pattern: string): st
 
 export const formatJobDate = (value?: string | null): string =>
   formatMadridDate(value, "d 'de' MMMM 'de' yyyy 'a las' HH:mm");
-
-export const formatDocumentUploadDate = (value: string): string =>
-  formatMadridDate(value, "d 'de' MMMM 'de' yyyy");
