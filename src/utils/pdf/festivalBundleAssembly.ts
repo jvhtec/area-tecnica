@@ -5,6 +5,7 @@ import { mergePDFs } from './pdfMerge';
 import { stampContinuousPagination } from '@/utils/pdf/festival-report';
 import {
   addTableOfContentsLinks,
+  getPdfPageCount,
   type FestivalPdfProgress,
 } from '@/utils/pdf/festivalPdfSupport';
 
@@ -44,7 +45,25 @@ export const assembleFestivalBundle = async ({
   reportProgress,
   sections,
 }: FestivalBundleInput): Promise<Blob> => {
-  const tocSections: TocSection[] = sections.map((section) => ({
+  // Every folio in this bundle is derived from these counts, so they are measured
+  // from the blobs themselves rather than trusted from the caller. A section whose
+  // declared count is wrong would shift every page after it and misdirect the
+  // contents links, with nothing to signal it at generation time.
+  const measured = await Promise.all(
+    sections.map(async (section) => {
+      const pageCount = (await Promise.all(section.pdfs.map(getPdfPageCount)))
+        .reduce((total, count) => total + count, 0);
+
+      if (pageCount !== section.pageCount) {
+        console.warn(
+          `La sección "${section.title}" declaró ${section.pageCount} páginas y contiene ${pageCount}; se usa el recuento real.`,
+        );
+      }
+      return { ...section, pageCount };
+    }),
+  );
+
+  const tocSections: TocSection[] = measured.map((section) => ({
     title: section.title,
     pageCount: section.pageCount,
     children: section.children,
@@ -54,8 +73,13 @@ export const assembleFestivalBundle = async ({
   const { blob: tableOfContents, links: tocLinks, pageCount: tocPageCount } =
     await generateTableOfContents(tocSections, logoUrl);
 
+  // `stage` is nullable in the schema, and Number(null) is a finite 0 — which
+  // would report a stage that does not exist.
   const stageCount = new Set(
-    artists.map((artist) => Number(artist.stage)).filter((stage) => Number.isFinite(stage)),
+    artists
+      .filter((artist) => artist.stage !== null && artist.stage !== undefined && artist.stage !== '')
+      .map((artist) => Number(artist.stage))
+      .filter((stage) => Number.isInteger(stage) && stage > 0),
   ).size;
   const dayCount = new Set(artists.map((artist) => artist.date).filter(Boolean)).size;
 
@@ -70,7 +94,7 @@ export const assembleFestivalBundle = async ({
   const dividerPageNumbers: number[] = [];
   const dividers: Blob[] = [];
 
-  for (const [index, section] of sections.entries()) {
+  for (const [index, section] of measured.entries()) {
     dividerPageNumbers.push(nextPageNumber);
 
     dividers.push(await generateSectionDivider({
@@ -85,11 +109,22 @@ export const assembleFestivalBundle = async ({
 
   reportProgress({ phase: 'merge', completed: 2, total: 3, label: 'Combinando PDFs' });
 
+  const expectedPages =
+    1 + tocPageCount + measured.reduce((total, section) => total + section.pageCount + 1, 0);
+
   const merged = await mergePDFs([
     coverPage,
     tableOfContents,
-    ...sections.flatMap((section, index) => [dividers[index], ...section.pdfs]),
+    ...measured.flatMap((section, index) => [dividers[index], ...section.pdfs]),
   ]);
+
+  // A page dropped during the merge would desynchronise every folio from here on.
+  const mergedPages = await getPdfPageCount(merged);
+  if (mergedPages !== expectedPages) {
+    throw new Error(
+      `El documento combinado tiene ${mergedPages} páginas y se esperaban ${expectedPages}. No se emite un juego con la numeración descuadrada.`,
+    );
+  }
   const linked = await addTableOfContentsLinks(merged, tocLinks);
   // The cover and the dividers are counted but carry no folio.
   const paginated = await stampContinuousPagination(linked, {

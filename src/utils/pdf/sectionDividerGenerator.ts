@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, StandardFonts, rgb } from 'pdf-lib';
 import { getFestivalIssuerMarkDataUrl } from '@/utils/pdf/festival-report';
 
 const PAGE_WIDTH = 595.28;
@@ -25,6 +25,29 @@ export interface SectionDividerSpec {
  * stack of concatenated reports into a book you can navigate by thumbing the
  * edge of the paper.
  */
+const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+
+/** Shrinks a line until it fits, then truncates if it still cannot. */
+const fitText = (
+  text: string,
+  font: PDFFont,
+  maxSize: number,
+  minSize: number,
+  maxWidth: number,
+): { text: string; size: number } => {
+  let size = maxSize;
+  while (size > minSize && font.widthOfTextAtSize(text, size) > maxWidth) {
+    size -= 1;
+  }
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return { text, size };
+
+  let truncated = text;
+  while (truncated.length > 1 && font.widthOfTextAtSize(`${truncated}...`, size) > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return { text: `${truncated.trimEnd()}...`, size };
+};
+
 export const generateSectionDivider = async (spec: SectionDividerSpec): Promise<Blob> => {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -55,11 +78,11 @@ export const generateSectionDivider = async (spec: SectionDividerSpec): Promise<
     color: ACCENT,
   });
 
-  const titleSize = spec.title.length > 34 ? 24 : 30;
-  page.drawText(spec.title, {
+  const title = fitText(spec.title, display, 30, 14, CONTENT_WIDTH);
+  page.drawText(title.text, {
     x: MARGIN,
     y: PAGE_HEIGHT / 2 - 6,
-    size: titleSize,
+    size: title.size,
     font: display,
     color: PAPER,
   });
@@ -73,7 +96,8 @@ export const generateSectionDivider = async (spec: SectionDividerSpec): Promise<
 
   let y = PAGE_HEIGHT / 2 - 52;
   for (const item of (spec.contents ?? []).slice(0, 10)) {
-    page.drawText(item, { x: MARGIN, y, size: 9, font: body, color: SOFT });
+    const line = fitText(item, body, 9, 7, CONTENT_WIDTH);
+    page.drawText(line.text, { x: MARGIN, y, size: line.size, font: body, color: SOFT });
     y -= 15;
   }
 

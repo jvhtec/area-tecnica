@@ -13,17 +13,22 @@ import type { PDFContext, PDFObject } from 'pdf-lib';
  * repoints every reference at it and deletes the rest.
  */
 
-const FNV_OFFSET = 0xcbf29ce484222325n;
-const FNV_PRIME = 0x100000001b3n;
-const MASK_64 = 0xffffffffffffffffn;
-
-/** FNV-1a over the byte stream. Chunked so long buffers stay cheap. */
+/**
+ * Two independent 32-bit FNV-1a lanes, kept in Number space.
+ *
+ * This runs over whole image bitmaps — megabytes per bundle — on the same
+ * thread that is generating the document, so it stays in `Math.imul` rather
+ * than allocating a BigInt per byte. Combined with the byte length in the key,
+ * two lanes are ample for telling embedded images apart.
+ */
 const hashBytes = (bytes: Uint8Array): string => {
-  let hash = FNV_OFFSET;
-  for (let index = 0; index < bytes.length; index += 1) {
-    hash = ((hash ^ BigInt(bytes[index])) * FNV_PRIME) & MASK_64;
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (const byte of bytes) {
+    a = Math.imul(a ^ byte, 0x01000193) >>> 0;
+    b = Math.imul(b ^ byte, 0x85ebca6b) >>> 0;
   }
-  return `${bytes.length}:${hash.toString(16)}`;
+  return `${bytes.length}:${a.toString(16)}:${b.toString(16)}`;
 };
 
 /**
@@ -31,25 +36,34 @@ const hashBytes = (bytes: Uint8Array): string => {
  * images differing only in object numbers still compare equal. Streams are
  * hashed by content, which is what makes duplicate soft masks match.
  */
-const canonicalKey = (context: PDFContext, value: PDFObject | undefined, depth = 0): string => {
+const canonicalKey = (
+  context: PDFContext,
+  value: PDFObject | undefined,
+  depth = 0,
+  cache?: Map<string, string>,
+): string => {
   if (!value) return 'null';
   if (depth > 4) return 'deep';
 
   if (value instanceof PDFRef) {
-    return canonicalKey(context, context.lookup(value), depth + 1);
+    const cached = cache?.get(value.toString());
+    if (cached !== undefined) return cached;
+    const key = canonicalKey(context, context.lookup(value), depth + 1, cache);
+    cache?.set(value.toString(), key);
+    return key;
   }
   if (value instanceof PDFRawStream) {
-    return `stream(${canonicalKey(context, value.dict, depth + 1)},${hashBytes(value.getContents())})`;
+    return `stream(${canonicalKey(context, value.dict, depth + 1, cache)},${hashBytes(value.getContents())})`;
   }
   if (value instanceof PDFStream) {
     return `stream(${value.toString()})`;
   }
   if (value instanceof PDFArray) {
-    return `[${value.asArray().map((entry) => canonicalKey(context, entry, depth + 1)).join(',')}]`;
+    return `[${value.asArray().map((entry) => canonicalKey(context, entry, depth + 1, cache)).join(',')}]`;
   }
   if (value instanceof PDFDict) {
     return `<<${[...value.entries()]
-      .map(([key, entry]) => `${key.toString()} ${canonicalKey(context, entry, depth + 1)}`)
+      .map(([key, entry]) => `${key.toString()} ${canonicalKey(context, entry, depth + 1, cache)}`)
       .sort()
       .join(' ')}>>`;
   }
@@ -114,6 +128,8 @@ export const deduplicateContextImages = (context: PDFContext): ImageDedupResult 
   let kept = 0;
 
   for (let pass = 0; pass < 3; pass += 1) {
+    // Refs are remapped between passes, so the cache is per pass.
+    const keyCache = new Map<string, string>();
     const canonical = new Map<string, PDFRef>();
     const replacements = new Map<string, PDFRef>();
     const duplicates: PDFRef[] = [];
@@ -121,7 +137,7 @@ export const deduplicateContextImages = (context: PDFContext): ImageDedupResult 
     for (const [ref, object] of context.enumerateIndirectObjects()) {
       if (!isImageStream(object)) continue;
 
-      const key = canonicalKey(context, object);
+      const key = canonicalKey(context, object, 0, keyCache);
       const existing = canonical.get(key);
       if (existing) {
         replacements.set(ref.toString(), existing);

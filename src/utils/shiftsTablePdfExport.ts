@@ -37,8 +37,9 @@ const DEPARTMENT_LABELS: Record<string, string> = {
 const technicianName = (assignment: ShiftWithAssignments['assignments'][number]): string => {
   if (assignment.external_technician_name) return assignment.external_technician_name;
   const profile = assignment.profiles;
-  if (profile?.first_name && profile?.last_name) return `${profile.first_name} ${profile.last_name}`;
-  return 'Sin nombre';
+  // A partial name is more use to a crew chief than "Sin nombre".
+  const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim();
+  return name || 'Sin nombre';
 };
 
 export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Blob> => {

@@ -244,6 +244,16 @@ export const exportInfrastructureTablePDF = async (
 
     y = getLastAutoTableY(doc, y);
 
+    // AutoTable stops within its own bottom margin, but the totals rule, the
+    // totals line and the constants below it are drawn unconditionally — so
+    // they get their own space check before anything is put on the page.
+    const totalsBlockHeight = 18 * mm;
+    if (y + totalsBlockHeight > geo.contentBottom) {
+      doc.addPage();
+      chrome();
+      y = geo.contentTop;
+    }
+
     // Totals row: units are stated once here, never on every cell.
     const totals = {
       cat6: stageArtists.reduce((sum, artist) => sum + (artist.cat6.enabled ? artist.cat6.quantity : 0), 0),

@@ -176,6 +176,8 @@ export const generateWeatherPDF = async (
 
     const weatherIconHooks = createWeatherTableIconHooks(doc, weatherData);
     const theme = festivalTableTheme(geo, { fontSize: 7.8, numericColumns: [2, 3] });
+    // Both the theme and the icon hooks define didParseCell/didDrawCell, so they
+    // are composed explicitly — spreading one after the other silently drops it.
 
     autoTable(doc, {
       head: [['Fecha', 'Condición', 'Máx. / mín. (°C)', 'Prob. lluvia (%)']],
@@ -193,7 +195,14 @@ export const generateWeatherPDF = async (
       didDrawPage: () => {
         chrome();
       },
-      ...weatherIconHooks,
+      didParseCell: (hookData) => {
+        theme.didParseCell(hookData);
+        weatherIconHooks.didParseCell?.(hookData);
+      },
+      didDrawCell: (hookData) => {
+        theme.didDrawCell(hookData);
+        weatherIconHooks.didDrawCell?.(hookData);
+      },
     });
 
     y = getLastAutoTableY(doc, y) + 4 * mm;

@@ -134,12 +134,15 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
       qrCodes[index] ? '' : 'Sin formulario',
     ]);
 
+    const theme = festivalTableTheme(geo, { fontSize: 7.8 });
+
     autoTable(doc, {
       head: [['Artista', 'Escenario', 'Fecha', 'Estado', 'Formulario']],
       body: rows,
       startY: y,
-      ...festivalTableTheme(geo, { fontSize: 7.8 }),
-      bodyStyles: { minCellHeight: 16 * mm },
+      ...theme,
+      // Merged, not replaced: the theme's `fillColor: false` keeps the rows unfilled.
+      bodyStyles: { ...theme.bodyStyles, minCellHeight: 16 * mm },
       columnStyles: distributeColumnWidths([30, 24, 18, 28, 22], geo.contentWidth),
       margin: {
         left: geo.left,
@@ -152,6 +155,8 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
         chrome();
       },
       didDrawCell: (hookData) => {
+        // Delegate first so the ledger hairlines survive this override.
+        theme.didDrawCell(hookData);
         if (hookData.section !== 'body' || hookData.column.index !== 4) return;
         const qrDataUrl = qrCodes[hookData.row.index];
         if (!qrDataUrl) return;

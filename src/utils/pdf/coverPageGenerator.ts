@@ -1,6 +1,9 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import { supabase } from '@/lib/supabase';
+import { formatInTimeZone } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { getFestivalIssuerMarkDataUrl } from '@/utils/pdf/festival-report';
+import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -78,17 +81,24 @@ const wrapText = (text: string, font: PDFFont, fontSize: number, maxWidth: numbe
   return lines;
 };
 
+const COVER_DATE_FORMAT = "d 'de' MMMM 'de' yyyy";
+
+/**
+ * Job timestamps are rendered in Europe/Madrid, not in whoever's browser
+ * generated the bundle — a late-night show boundary would otherwise print a
+ * different festival day depending on who pressed the button.
+ */
 const formatDateRange = (start?: string | null, end?: string | null): string => {
   if (!start) return '';
-  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
   const startDate = new Date(start);
-  const endDate = end ? new Date(end) : startDate;
   if (Number.isNaN(startDate.getTime())) return '';
 
-  if (Number.isNaN(endDate.getTime()) || startDate.toDateString() === endDate.toDateString()) {
-    return startDate.toLocaleDateString('es-ES', options);
-  }
-  return `${startDate.toLocaleDateString('es-ES', options)} — ${endDate.toLocaleDateString('es-ES', options)}`;
+  const startText = formatInTimeZone(startDate, MADRID_TIMEZONE, COVER_DATE_FORMAT, { locale: es });
+  const endDate = end ? new Date(end) : startDate;
+  if (Number.isNaN(endDate.getTime())) return startText;
+
+  const endText = formatInTimeZone(endDate, MADRID_TIMEZONE, COVER_DATE_FORMAT, { locale: es });
+  return startText === endText ? startText : `${startText} — ${endText}`;
 };
 
 const embedLogo = async (pdfDoc: PDFDocument, logoUrl: string) => {
@@ -226,7 +236,9 @@ export const generateCoverPage = async (
   });
 
   const strip: Array<[string, string]> = [
-    ['REVISIÓN', (stats.revision ?? 'A').toUpperCase()],
+    // Never assert a first issue we cannot vouch for: an unknown revision prints
+    // as a dash, because this is the field a crew checks a set against.
+    ['REVISIÓN', stats.revision ? stats.revision.toUpperCase() : '—'],
     ['JORNADAS', stats.dayCount ? String(stats.dayCount) : '—'],
     ['ESCENARIOS', stats.stageCount ? String(stats.stageCount) : '—'],
     ['ARTISTAS', stats.artistCount ? String(stats.artistCount) : '—'],
@@ -239,7 +251,7 @@ export const generateCoverPage = async (
   });
 
   page.drawText(
-    `Emitido ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}. Esta edición sustituye a todas las anteriores.`,
+    `Emitido ${formatInTimeZone(new Date(), MADRID_TIMEZONE, COVER_DATE_FORMAT, { locale: es })}. Esta edición sustituye a todas las anteriores.`,
     { x: MARGIN, y: 62, size: 7.5, font: body, color: COVER_SOFT },
   );
 

@@ -5,7 +5,7 @@ import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
-import { assembleFestivalBundle, type FestivalBundleSection } from './festivalBundleAssembly';
+import { assembleFestivalBundle, type FestivalBundleSection } from '@/utils/pdf/festivalBundleAssembly';
 import { mergePDFs } from './pdfMerge';
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
@@ -56,6 +56,7 @@ export const generateAndMergeFestivalPDFs = async (
   console.log("Logo URL for PDFs:", logoUrl);
   
   const gearPdfs: Blob[] = [];
+  const gearStagesWithPdfs: number[] = [];
   const shiftPdfs: Blob[] = [];
   const artistTablePdfs: Blob[] = [];
   const individualArtistPdfs: Blob[] = [];
@@ -113,6 +114,11 @@ export const generateAndMergeFestivalPDFs = async (
       }, pdfConcurrency);
 
       gearPdfs.push(...generatedGearPdfs.filter(isNonEmptyBlob));
+      // `generatedGearPdfs` is ordered like `gearSetupStages`, so a null entry
+      // marks a stage that had no gear setup and produced no page.
+      gearStagesWithPdfs.push(
+        ...options.gearSetupStages.filter((_, index) => isNonEmptyBlob(generatedGearPdfs[index])),
+      );
     }
     
     shiftPdfs.push(...await generateFestivalShiftPdfs({
@@ -683,7 +689,7 @@ export const generateAndMergeFestivalPDFs = async (
         title: "Dotación por escenario",
         pdfs: gearPdfs,
         pageCount: totalGearPages,
-        contents: options.gearSetupStages.map((stageNum) => getStageNameByNumber(stageNum)),
+        contents: gearStagesWithPdfs.map((stageNum) => getStageNameByNumber(stageNum)),
       });
     }
     if (options.includeArtistTables && totalArtistTablePages > 0) {

@@ -6,6 +6,7 @@ import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
   drawFestivalChrome,
   drawFestivalMetaGrid,
+  drawFestivalSectionHeading,
   drawFestivalTitleBlock,
   FESTIVAL_ACCENT,
   FESTIVAL_INK,
@@ -81,7 +82,6 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     });
 
   const geo = chrome();
-  const { mm } = geo;
 
   const tableTheme = festivalTableTheme(geo, { fontSize: 7.8 });
   const tableMargin = {
@@ -252,13 +252,11 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
   // === MIC KIT DISCLAIMER ===
   if (!templateMode && data.micKit && (data.micKit === 'band' || data.micKit === 'mixed')) {
-    const checkPageSpace = (needed: number) => {
-      if (yPosition + needed > pageHeight - 25) {
-        doc.addPage();
-        yPosition = 20;
-      }
-    };
-    checkPageSpace(18);
+    if (yPosition + 18 > geo.contentBottom) {
+      doc.addPage();
+      chrome();
+      yPosition = geo.contentTop;
+    }
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bolditalic');
@@ -616,15 +614,13 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
   // === NOTES ===
   if (templateMode || data.notes) {
-    doc.setFontSize(12);
-    doc.setTextColor(...FESTIVAL_ACCENT);
-    doc.text(tx("Notas", "Notes"), 14, yPosition);
-    yPosition += 8;
+    yPosition = drawFestivalSectionHeading(doc, geo, tx("Notas", "Notes"), yPosition, 2);
 
     if (templateMode) {
       const notesBoxHeight = 35;
-      doc.setDrawColor(180, 180, 180);
-      doc.rect(14, yPosition - 4, pageWidth - 28, notesBoxHeight);
+      doc.setDrawColor(...FESTIVAL_RULE);
+      doc.setLineWidth(0.25);
+      doc.rect(geo.left, yPosition - 4, geo.contentWidth, notesBoxHeight);
       yPosition += notesBoxHeight + 6;
     } else {
       doc.setFontSize(9);
@@ -637,9 +633,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
   if (templateMode) {
     const blockHeight = 42;
-    if (yPosition + blockHeight > pageHeight - 20) {
+    // Manual overflow pages start at the content top, not at the old 20 mm —
+    // the running head is painted over that band on every page.
+    if (yPosition + blockHeight > geo.contentBottom) {
       doc.addPage();
-      yPosition = 20;
+      chrome();
+      yPosition = geo.contentTop;
     }
 
     doc.setFontSize(10);
@@ -753,7 +752,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       kindLabel: tx('Ficha de artista', 'Artist datasheet'),
       eventTitle: data.name,
       contextLabel: [stageLabel, headerDate].filter(Boolean).join('  ·  '),
-      issuer: `Sector-Pro  ·  ${tx('Emitido', 'Issued')} ${createdDate}`,
+      issuer: `Sector-Pro  ·  ${data.name}`,
       pageNumber: page,
       totalPages,
       paginate: options.paginate !== false,

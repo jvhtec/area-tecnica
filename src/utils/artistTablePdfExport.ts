@@ -30,6 +30,7 @@ import {
   setFestivalText,
   toWindowOffset,
   type FestivalGeometry,
+  type TimelineFinding,
 } from '@/utils/pdf/festival-report';
 
 export interface ArtistTablePdfData {
@@ -214,6 +215,13 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     { label: 'Riders pendientes', value: pendingRiders > 0 ? String(pendingRiders) : 'Ninguno' },
   ], y);
 
+  const ensureSpace = (required: number, current: number): number => {
+    if (current + required <= geo.contentBottom) return current;
+    doc.addPage();
+    chrome();
+    return geo.contentTop;
+  };
+
   // --- 01 · Day programme -------------------------------------------------
   y = drawFestivalSectionHeading(doc, geo, 'Programa de la jornada', y, 1);
 
@@ -225,28 +233,54 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       'No hay artistas programados en este escenario para esta fecha. Confirmado como jornada sin actividad, no pendiente de datos.',
     );
   } else {
-    const timeline = drawFestivalTimeline(doc, geo, {
-      entries: data.artists.map((artist) => ({
-        name: artist.name,
-        show: artist.showTime,
-        soundcheck: artist.soundcheck,
-      })),
-      y,
-      laneHeight: data.artists.length > 12 ? 4.4 : 5.4,
-    });
-    y = timeline.y;
+    const laneHeight = data.artists.length > 12 ? 4.4 : 5.4;
+    // Hour scale above the lanes and the key below, neither of which scales
+    // with the number of artists.
+    const timelineFurniture = 12 * mm;
 
-    for (const finding of timeline.findings) {
+    let remaining = data.artists.map((artist) => ({
+      name: artist.name,
+      show: artist.showTime,
+      soundcheck: artist.soundcheck,
+    }));
+    const findings: TimelineFinding[] = [];
+    const skipped: string[] = [];
+
+    // A day with many artists is drawn across as many pages as it needs rather
+    // than running the lanes down through the footer.
+    while (remaining.length > 0) {
+      const available = geo.contentBottom - y - timelineFurniture;
+      const lanesThatFit = Math.floor(available / (laneHeight * mm));
+
+      if (lanesThatFit < 1) {
+        doc.addPage();
+        chrome();
+        y = geo.contentTop;
+        continue;
+      }
+
+      const chunk = remaining.slice(0, lanesThatFit);
+      remaining = remaining.slice(lanesThatFit);
+
+      const timeline = drawFestivalTimeline(doc, geo, { entries: chunk, y, laneHeight });
+      y = timeline.y;
+      findings.push(...timeline.findings);
+      skipped.push(...timeline.skipped);
+    }
+
+    for (const finding of findings) {
+      y = ensureSpace(18 * mm, y);
       y = drawFestivalFlag(doc, geo, y, {
         label: finding.label,
         text: `${finding.name}: ${finding.message}`,
       });
     }
 
-    if (timeline.skipped.length > 0) {
+    if (skipped.length > 0) {
+      y = ensureSpace(18 * mm, y);
       y = drawFestivalFlag(doc, geo, y, {
         label: 'Revisar',
-        text: `Sin horarios registrados: ${timeline.skipped.join(', ')}. No aparecen en el gráfico hasta que se introduzcan.`,
+        text: `Sin horarios registrados: ${skipped.join(', ')}. No aparecen en el gráfico hasta que se introduzcan.`,
       });
     }
   }
@@ -305,13 +339,6 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   }
 
   // --- 03 · Conflicts and shortfalls --------------------------------------
-  const ensureSpace = (required: number, current: number): number => {
-    if (current + required <= geo.contentBottom) return current;
-    doc.addPage();
-    chrome();
-    return geo.contentTop;
-  };
-
   if (data.includeGearConflicts) {
     const withConflicts = data.artists.filter(
       (artist) => (artist.gearMismatches?.length ?? 0) > 0,
@@ -354,7 +381,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     }
 
     if (data.equipmentNeeds) {
-      y = drawEquipmentNeedsSection(
+      drawEquipmentNeedsSection(
         doc,
         geo,
         data.equipmentNeeds,
