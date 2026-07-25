@@ -5,13 +5,26 @@ import type { JobDocument } from "@/types/job";
 import { createSignedUrl, resolveJobDocLocation } from "@/utils/jobDocuments";
 import type { RiderFile } from "@/components/technician/details-modal/types";
 
-const appendAndClickDownload = (href: string, fileName: string) => {
+/**
+ * `link.click()` only *starts* the download; the browser fetches the resource
+ * afterwards. Removing the anchor or revoking the object URL in the same tick
+ * pulls the resource out from under it, and WebKit (Safari, iOS) and Firefox
+ * respond by cancelling the download or writing a corrupt file. There is no
+ * event that says the download has begun, so cleanup is deferred instead.
+ */
+const DOWNLOAD_CLEANUP_DELAY_MS = 1000;
+
+const appendAndClickDownload = (href: string, fileName: string, onCleanup?: () => void) => {
   const link = document.createElement("a");
   link.href = href;
   link.download = fileName;
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+
+  window.setTimeout(() => {
+    link.remove();
+    onCleanup?.();
+  }, DOWNLOAD_CLEANUP_DELAY_MS);
 };
 
 const downloadBlob = async (supabase: SupabaseClient, bucket: string, path: string, fileName: string) => {
@@ -21,8 +34,7 @@ const downloadBlob = async (supabase: SupabaseClient, bucket: string, path: stri
   }
 
   const url = window.URL.createObjectURL(data);
-  appendAndClickDownload(url, fileName);
-  window.URL.revokeObjectURL(url);
+  appendAndClickDownload(url, fileName, () => window.URL.revokeObjectURL(url));
 };
 
 export const openJobDocument = async (supabase: SupabaseClient, doc: JobDocument) => {

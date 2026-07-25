@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -43,6 +43,12 @@ describe("technician details modal document actions", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     vi.spyOn(window.URL, "createObjectURL").mockReturnValue("blob:download");
     vi.spyOn(window.URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.useFakeTimers();
+    document.body.innerHTML = "";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("opens job documents through the resolved job document bucket", async () => {
@@ -113,6 +119,46 @@ describe("technician details modal document actions", () => {
     expect(storage.createSignedUrl).toHaveBeenCalledWith("artist/Rider.pdf", 60);
     expect(storage.download).toHaveBeenCalledWith("artist/Rider.pdf");
     expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);
+
+    vi.runAllTimers();
     expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:download");
+  });
+
+  // `link.click()` starts the download asynchronously; revoking the object URL
+  // or removing the anchor in the same tick makes WebKit and Firefox cancel it.
+  it("keeps the object URL alive until after the download has been started", async () => {
+    const storage = createStorageClient();
+
+    await downloadRider(storage.client as unknown as SupabaseClient, {
+      id: "rider-1",
+      file_name: "Rider.pdf",
+      file_path: "artist/Rider.pdf",
+      uploaded_at: "2026-01-01T00:00:00Z",
+      artist_id: "artist-1",
+    });
+
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(1);
+    expect(window.URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:download");
+  });
+
+  it("leaves the anchor in the document until the deferred cleanup runs", async () => {
+    const storage = createStorageClient();
+
+    await downloadTourDocument(storage.client as unknown as SupabaseClient, {
+      id: "tour-doc-1",
+      tour_id: "tour-1",
+      file_name: "Tour.pdf",
+      file_path: "tour/Tour.pdf",
+      uploaded_at: "2026-01-01T00:00:00Z",
+      file_type: "application/pdf",
+    });
+
+    expect(document.querySelectorAll("a[download]")).toHaveLength(1);
+
+    vi.runAllTimers();
+    expect(document.querySelectorAll("a[download]")).toHaveLength(0);
   });
 });
