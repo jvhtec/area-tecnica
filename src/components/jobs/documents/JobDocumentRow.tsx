@@ -56,7 +56,7 @@ export const JobDocumentRow = ({
           {(isTemplate || statusBadge) && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {isTemplate && (
-                <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wide">
+                <Badge variant="outline" className="text-xs font-semibold uppercase tracking-wide">
                   Plantilla SoundVision
                 </Badge>
               )}
