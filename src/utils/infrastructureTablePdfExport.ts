@@ -1,4 +1,24 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
+import {
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalSectionHeading,
+  drawFestivalTitleBlock,
+  drawFestivalTotalsRule,
+  dropConstantColumns,
+  FESTIVAL_INK,
+  FESTIVAL_MATRIX_ZERO,
+  FESTIVAL_SOFT,
+  festivalTableTheme,
+  loadFestivalIssuerMark,
+  setFestivalMonoText,
+  setFestivalText,
+} from '@/utils/pdf/festival-report';
 
 export interface InfrastructureItemData {
   type: 'cat6' | 'hma' | 'coax' | 'opticalcon_duo' | 'analog';
@@ -90,7 +110,31 @@ export const hasInfrastructureContent = (artist: ArtistInfrastructureData): bool
   );
 };
 
-export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfData): Promise<Blob> => {
+export interface InfrastructureTablePdfOptions {
+  /** False when the document is bound into a set that stamps its own folios. */
+  paginate?: boolean;
+}
+
+const TABLE_HEAD = [
+  'Artista',
+  'Escenario',
+  'Proporcionado por',
+  'CAT6',
+  'HMA',
+  'Coax',
+  'OpticalCON DUO',
+  'Analógicas',
+  'Otros',
+];
+const TABLE_WEIGHTS = [26, 12, 15, 8, 8, 8, 13, 10, 16];
+const NUMERIC_HEADS = new Set(['CAT6', 'HMA', 'Coax', 'OpticalCON DUO', 'Analógicas']);
+
+const quantityCell = (enabled: boolean, quantity: number): string =>
+  enabled && quantity > 0 ? String(quantity) : FESTIVAL_MATRIX_ZERO;
+
+export const exportInfrastructureTablePDF = async (
+  data: InfrastructureTablePdfData & InfrastructureTablePdfOptions,
+): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const normalizedArtists = (data.artists || []).map((artist) =>
     normalizeInfrastructureArtistInput(artist as RawInfrastructureArtist),
@@ -100,195 +144,156 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     throw new Error('No hay artistas para generar la tabla de infraestructura.');
   }
 
-  const artistsByStage = normalizedArtists.reduce((acc, artist) => {
-    const stageNum = artist.stage;
-    if (!acc[stageNum]) {
-      acc[stageNum] = [];
-    }
-    acc[stageNum].push(artist);
-    return acc;
-  }, {} as Record<number, ArtistInfrastructureData[]>);
-
-  const stageNumbers = Object.keys(artistsByStage).map(Number).sort((a, b) => a - b);
-
-  const pdf = new jsPDF({
-    orientation: 'landscape',
-    unit: 'mm',
-    format: 'a4'
-  });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const leftMargin = 10;
-  const rightMargin = 10;
-  const headerStartY = 30;
-  const bottomMargin = 24;
-
-  type HeaderLogo = {
-    objectUrl: string;
-    format: 'PNG' | 'JPEG';
-    width: number;
-    height: number;
-  };
-  let headerLogo: HeaderLogo | undefined;
-
-  if (data.logoUrl) {
-    try {
-      const response = await fetch(data.logoUrl);
-      if (response.ok) {
-        const logoBlob = await response.blob();
-        const objectUrl = URL.createObjectURL(logoBlob);
-        const dimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
-          const image = new Image();
-          image.onload = () => resolve({ width: image.width, height: image.height });
-          image.onerror = () => resolve(undefined);
-          image.src = objectUrl;
-        });
-        if (dimensions && dimensions.width > 0 && dimensions.height > 0) {
-          headerLogo = {
-            objectUrl,
-            format: logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG',
-            width: dimensions.width,
-            height: dimensions.height,
-          };
-        } else {
-          URL.revokeObjectURL(objectUrl);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading logo:', err);
-    }
+  const artistsByStage = new Map<number, ArtistInfrastructureData[]>();
+  for (const artist of normalizedArtists) {
+    if (!artistsByStage.has(artist.stage)) artistsByStage.set(artist.stage, []);
+    artistsByStage.get(artist.stage)?.push(artist);
   }
+  const stageNumbers = [...artistsByStage.keys()].sort((a, b) => a - b);
 
-  const drawStageHeader = (stageNum: number): void => {
-    if (headerLogo) {
-      const maxLogoWidth = 40;
-      const maxLogoHeight = 15;
-      const scale = Math.min(maxLogoWidth / headerLogo.width, maxLogoHeight / headerLogo.height);
-      const drawWidth = headerLogo.width * scale;
-      const drawHeight = headerLogo.height * scale;
-      pdf.addImage(
-        headerLogo.objectUrl,
-        headerLogo.format,
-        pageWidth - drawWidth - rightMargin,
-        10,
-        drawWidth,
-        drawHeight,
-      );
-    }
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  await loadFestivalIssuerMark();
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
 
-    pdf.setTextColor(0);
-    pdf.setFontSize(18);
-    pdf.text(`${data.jobTitle} - Infraestructura - Escenario ${stageNum}`, leftMargin, 20);
-  };
-
-  let isFirstPage = true;
-
-  for (const stageNum of stageNumbers) {
-    const stageArtists = artistsByStage[stageNum];
-
-    if (!isFirstPage) {
-      pdf.addPage();
-    }
-    isFirstPage = false;
-
-    const tableData = stageArtists.map(artist => {
-      return [
-        artist.name,
-        `Escenario ${artist.stage}`,
-        artist.providedBy,
-        artist.cat6.enabled ? artist.cat6.quantity : '-',
-        artist.hma.enabled ? artist.hma.quantity : '-',
-        artist.coax.enabled ? artist.coax.quantity : '-',
-        artist.opticalconDuo.enabled ? artist.opticalconDuo.quantity : '-',
-        artist.analog > 0 ? artist.analog : '-',
-        artist.other || '-'
-      ];
+  let currentStage = stageNumbers[0];
+  const chrome = () =>
+    drawFestivalChrome(doc, {
+      kind: 'infra',
+      eventTitle: data.jobTitle,
+      contextLabel: `Escenario ${currentStage}`,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      paginate: false,
     });
 
-    const availableWidth = pageWidth - leftMargin - rightMargin;
-    const ratios = [0.26, 0.10, 0.12, 0.07, 0.07, 0.07, 0.12, 0.07, 0.12];
-    const ratioSum = ratios.reduce((sum, ratio) => sum + ratio, 0) || 1;
-    const columnStyles = ratios.reduce((acc, ratio, index) => {
-      acc[index] = { cellWidth: availableWidth * (ratio / ratioSum) };
-      return acc;
-    }, {} as Record<number, { cellWidth: number }>);
+  const geo = chrome();
+  const { mm } = geo;
 
-    autoTable(pdf, {
-      head: [[
-        'Artista',
-        'Escenario',
-        'Proporcionado por',
-        'CAT6',
-        'HMA',
-        'Coax',
-        'OpticalCon Duo',
-        'Lineas Analogicas',
-        'Otros'
-      ]],
-      body: tableData,
-      startY: headerStartY,
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'Infraestructura  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: 'Necesidades de tiradas por artista',
+    clientLogo,
+  });
+
+  const withRequirements = normalizedArtists.filter(hasInfrastructureContent);
+  y = drawFestivalMetaGrid(doc, geo, [
+    { label: 'Artistas', value: String(normalizedArtists.length) },
+    { label: 'Escenarios', value: String(stageNumbers.length) },
+    { label: 'Con tiradas', value: String(withRequirements.length) },
+    { label: 'Sin tiradas', value: String(normalizedArtists.length - withRequirements.length) },
+  ], y);
+
+  if (withRequirements.length === 0) {
+    y = drawFestivalNilState(
+      doc,
+      geo,
+      y,
+      'Ningún artista solicita tiradas de infraestructura. Requerimiento confirmado como ninguno, no pendiente de rider.',
+    );
+  }
+
+  stageNumbers.forEach((stageNum, index) => {
+    currentStage = stageNum;
+    const stageArtists = artistsByStage.get(stageNum) ?? [];
+
+    if (index > 0) {
+      doc.addPage();
+      chrome();
+      y = geo.contentTop;
+    }
+
+    y = drawFestivalSectionHeading(doc, geo, `Escenario ${stageNum}`, y, index + 1);
+
+    const rows = stageArtists.map((artist) => [
+      artist.name,
+      `Escenario ${artist.stage}`,
+      artist.providedBy,
+      quantityCell(artist.cat6.enabled, artist.cat6.quantity),
+      quantityCell(artist.hma.enabled, artist.hma.quantity),
+      quantityCell(artist.coax.enabled, artist.coax.quantity),
+      quantityCell(artist.opticalconDuo.enabled, artist.opticalconDuo.quantity),
+      artist.analog > 0 ? String(artist.analog) : FESTIVAL_MATRIX_ZERO,
+      artist.other || FESTIVAL_MATRIX_ZERO,
+    ]);
+
+    const trimmed = dropConstantColumns(TABLE_HEAD, rows, { protect: [0] });
+    const weights = trimmed.keptIndexes.map((column) => TABLE_WEIGHTS[column]);
+    const numericColumns = trimmed.head
+      .map((head, column) => (NUMERIC_HEADS.has(head) ? column : -1))
+      .filter((column) => column >= 0);
+
+    autoTable(doc, {
+      head: [trimmed.head],
+      body: trimmed.rows,
+      startY: y,
+      ...festivalTableTheme(geo, { fontSize: 7.6, numericColumns }),
+      columnStyles: distributeColumnWidths(weights, geo.contentWidth),
       margin: {
-        left: leftMargin,
-        right: rightMargin,
-        top: headerStartY,
-        bottom: bottomMargin,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [240, 240, 245]
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 2.5,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.1,
-        overflow: 'linebreak',
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
       },
       rowPageBreak: 'avoid',
-      columnStyles,
       didDrawPage: () => {
-        drawStageHeader(stageNum);
+        chrome();
       },
+    });
+
+    y = getLastAutoTableY(doc, y);
+
+    // AutoTable stops within its own bottom margin, but the totals rule, the
+    // totals line and the constants below it are drawn unconditionally — so
+    // they get their own space check before anything is put on the page.
+    const totalsBlockHeight = 18 * mm;
+    if (y + totalsBlockHeight > geo.contentBottom) {
+      doc.addPage();
+      chrome();
+      y = geo.contentTop;
+    }
+
+    // Totals row: units are stated once here, never on every cell.
+    const totals = {
+      cat6: stageArtists.reduce((sum, artist) => sum + (artist.cat6.enabled ? artist.cat6.quantity : 0), 0),
+      hma: stageArtists.reduce((sum, artist) => sum + (artist.hma.enabled ? artist.hma.quantity : 0), 0),
+      coax: stageArtists.reduce((sum, artist) => sum + (artist.coax.enabled ? artist.coax.quantity : 0), 0),
+      optical: stageArtists.reduce((sum, artist) => sum + (artist.opticalconDuo.enabled ? artist.opticalconDuo.quantity : 0), 0),
+      analog: stageArtists.reduce((sum, artist) => sum + artist.analog, 0),
+    };
+
+    drawFestivalTotalsRule(doc, geo, y);
+    setFestivalText(doc, FESTIVAL_INK, 7.6, 'bold');
+    doc.text('Total de tiradas', geo.left, y + 4.6 * mm);
+    setFestivalMonoText(doc, FESTIVAL_INK, 7.4, 'bold');
+    doc.text(
+      `CAT6 ${totals.cat6}   ·   HMA ${totals.hma}   ·   COAX ${totals.coax}   ·   OPTICALCON ${totals.optical}   ·   ANALÓGICAS ${totals.analog}`,
+      geo.right,
+      y + 4.6 * mm,
+      { align: 'right' },
+    );
+    y += 8 * mm;
+
+    y = drawFestivalConstantsLine(doc, geo, trimmed.constants, y);
+    y += 4 * mm;
+  });
+
+  setFestivalMonoText(doc, FESTIVAL_SOFT, 5.6);
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'infra',
+      eventTitle: data.jobTitle,
+      contextLabel: 'Infraestructura',
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber: page,
+      totalPages,
+      paginate: data.paginate !== false,
     });
   }
 
-  const sectorLogo = new Image();
-  sectorLogo.crossOrigin = 'anonymous';
-  sectorLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-  await new Promise<void>((resolve) => {
-    sectorLogo.onload = () => resolve();
-    sectorLogo.onerror = () => resolve();
-  });
-
-  const totalPages = pdf.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    pdf.setPage(i);
-    pdf.setFontSize(8);
-    pdf.setTextColor(100);
-    const date = new Date().toLocaleDateString('es-ES');
-    pdf.text(`Generado: ${date}`, leftMargin, pageHeight - 8);
-    pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
-
-    if (sectorLogo.width > 0 && sectorLogo.height > 0) {
-      const logoWidth = 50;
-      const logoHeight = logoWidth * (sectorLogo.height / sectorLogo.width);
-      const xPosition = (pageWidth - logoWidth) / 2;
-      const yLogo = pageHeight - 5 - logoHeight;
-      try {
-        pdf.addImage(sectorLogo, 'PNG', xPosition, yLogo, logoWidth, logoHeight);
-      } catch (error) {
-        console.error(`Error adding footer logo on page ${i}:`, error);
-      }
-    }
-  }
-
-  if (headerLogo) {
-    URL.revokeObjectURL(headerLogo.objectUrl);
-  }
-
-  return pdf.output('blob');
+  return pdfToBlob(doc);
 };

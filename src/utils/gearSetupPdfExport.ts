@@ -1,14 +1,34 @@
-import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import { formatFrequencyBand } from '@/lib/frequencyBands';
 import { combineWavesDisplay } from '@/constants/wavesModels';
+import {
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalSectionHeading,
+  drawFestivalTitleBlock,
+  FESTIVAL_INK,
+  FESTIVAL_MATRIX_ZERO,
+  FESTIVAL_SOFT,
+  festivalTableTheme,
+  loadFestivalIssuerMark,
+  setFestivalText,
+  type FestivalGeometry,
+} from '@/utils/pdf/festival-report';
+
+const yesNo = (value: unknown): string => (value ? 'Sí' : 'No');
 
 export const generateStageGearPDF = async (
   jobId: string,
   stageNumber: number,
   stageName?: string,
   logoUrl?: string,
+  options: { paginate?: boolean } = {},
 ): Promise<Blob> => {
   return new Promise<Blob>((resolve, reject) => {
     // The work is async, so it runs in an IIFE rather than an async Promise
@@ -87,440 +107,236 @@ export const generateStageGearPDF = async (
       
       console.log(`Using ${isStageSpecific ? 'stage-specific' : 'global'} setup data for stage ${stageNumber}:`, setupToUse);
 
-      const doc = new jsPDF({ orientation: 'portrait' });
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      const footerHeight = 50; // Reserve space for logo and footer
-      const maxContentHeight = pageHeight - footerHeight;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      await loadFestivalIssuerMark();
+      const clientLogo = logoUrl
+        ? await loadImageWithTimeout(logoUrl, 'logotipo del festival')
+        : null;
 
-      // Page management functions
-      const checkPageBreak = (requiredHeight: number, currentY: number): number => {
-        if (currentY + requiredHeight > maxContentHeight) {
-          doc.addPage();
-          addPageHeader();
-          return 30; // Return new Y position after header
-        }
-        return currentY;
-      };
+      const chrome = (): FestivalGeometry =>
+        drawFestivalChrome(doc, {
+          kind: 'gear',
+          eventTitle: jobData.title,
+          contextLabel: actualStageName,
+          issuer: `Sector-Pro  ·  ${jobData.title}`,
+          paginate: false,
+        });
 
-      const addPageHeader = () => {
-        // Header with corporate red color
-        doc.setFillColor(125, 1, 1);
-        doc.rect(0, 0, pageWidth, 20, 'F');
+      const geo = chrome();
+      const { mm } = geo;
 
-        // Title with custom stage name
-        doc.setFontSize(16);
-        doc.setTextColor(255, 255, 255);
-        doc.text(`${jobData.title} - ${actualStageName}`, pageWidth / 2, 8, { align: 'center' });
-        doc.text(`Equipamiento`, pageWidth / 2, 15, { align: 'center' });
-      };
-
-      // Initial header
-      addPageHeader();
-
-      // Load logo from provided URL first, then fall back to legacy path.
-      const loadLogoPromise = new Promise<void>((resolveLogoLoad) => {
-        const logoCandidates = [logoUrl, `/logos/${jobId}.jpg`].filter(
-          (candidate): candidate is string => Boolean(candidate),
-        );
-
-        if (logoCandidates.length === 0) {
-          resolveLogoLoad();
-          return;
-        }
-
-        const tryLoadAt = (index: number) => {
-          if (index >= logoCandidates.length) {
-            resolveLogoLoad();
-            return;
-          }
-
-          const currentLogo = logoCandidates[index];
-          const img = new Image();
-          img.crossOrigin = 'Anonymous';
-          img.onload = () => {
-            try {
-              const maxHeight = 18;
-              const ratio = img.width / img.height;
-              const logoHeight = Math.min(maxHeight, img.height);
-              const logoWidth = logoHeight * ratio;
-
-              doc.addImage(
-                img,
-                'JPEG',
-                5,
-                1,
-                logoWidth,
-                logoHeight
-              );
-            } catch (err) {
-              console.warn('Error adding logo to PDF:', err);
-            }
-            resolveLogoLoad();
-          };
-          img.onerror = () => {
-            tryLoadAt(index + 1);
-          };
-          img.src = currentLogo;
-        };
-
-        tryLoadAt(0);
+      let y = drawFestivalTitleBlock(doc, geo, {
+        eyebrow: 'Dotación de escenario  ·  Rev. A',
+        title: actualStageName,
+        subtitle: jobData.title,
+        clientLogo,
       });
 
-      await loadLogoPromise;
+      const monitorQuantity = setupToUse.monitors_quantity
+        || (isStageSpecific ? 0 : setupToUse.available_monitors || 0);
+      const wirelessCount = setupToUse.wireless_systems?.length || 0;
+      const iemCount = setupToUse.iem_systems?.length || 0;
 
-      let yPosition = 30;
+      y = drawFestivalMetaGrid(doc, geo, [
+        { label: 'Configuración', value: isStageSpecific ? 'Específica del escenario' : 'General del festival' },
+        { label: 'Monitores', value: String(monitorQuantity) },
+        { label: 'Sistemas RF', value: String(wirelessCount) },
+        { label: 'Sistemas IEM', value: String(iemCount) },
+      ], y);
 
-      // Add configuration note if using stage-specific setup
-      if (isStageSpecific) {
-        yPosition = checkPageBreak(10, yPosition);
-        doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Configuracion especifica para ${actualStageName}`, 14, yPosition);
-        yPosition += 10;
-      }
+      const ensureSpace = (required: number, current: number): number => {
+        if (current + required <= geo.contentBottom) return current;
+        doc.addPage();
+        chrome();
+        return geo.contentTop;
+      };
 
-      // Equipment sections
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
+      const tableMargin = {
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
+      };
 
-      // FOH Consoles
-      if (setupToUse.foh_consoles && setupToUse.foh_consoles.length > 0) {
-        yPosition = checkPageBreak(60, yPosition);
-        
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Consolas FOH', 14, yPosition);
-        yPosition += 10;
-
-        const fohData = setupToUse.foh_consoles.map((console: any) => [
-          console.model || 'N/A',
-          console.quantity?.toString() || '1',
-          console.notes || ''
-        ]);
-
+      const drawTable = (
+        head: string[],
+        rows: string[][],
+        weights: number[],
+        numericColumns: number[],
+        startY: number,
+      ): number => {
         autoTable(doc, {
-          startY: yPosition,
-          head: [['Modelo', 'Cantidad', 'Notas']],
-          body: fohData,
-          theme: 'grid',
-          headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 },
-          pageBreak: 'auto',
+          head: [head],
+          body: rows,
+          startY,
+          ...festivalTableTheme(geo, { fontSize: 7.6, numericColumns }),
+          columnStyles: distributeColumnWidths(weights, geo.contentWidth),
+          margin: tableMargin,
+          rowPageBreak: 'avoid',
           showHead: 'everyPage',
           didDrawPage: () => {
-            if (doc.internal.pages.length > 2) { // More than 1 page (pages array includes empty first element)
-              addPageHeader();
-            }
-          }
+            chrome();
+          },
         });
+        return getLastAutoTableY(doc, startY) + 8 * mm;
+      };
 
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      let sectionNumber = 1;
+
+      // --- Consoles ---------------------------------------------------------
+      const consoleRows: string[][] = [
+        ...(setupToUse.foh_consoles ?? []).map((console: any) => [
+          'FOH',
+          console.model || 'Sin modelo',
+          String(console.quantity ?? 1),
+          console.notes || FESTIVAL_MATRIX_ZERO,
+        ]),
+        ...(setupToUse.mon_consoles ?? []).map((console: any) => [
+          'Monitores',
+          console.model || 'Sin modelo',
+          String(console.quantity ?? 1),
+          console.notes || FESTIVAL_MATRIX_ZERO,
+        ]),
+      ];
+
+      y = ensureSpace(26 * mm, y);
+      y = drawFestivalSectionHeading(doc, geo, 'Consolas', y, sectionNumber);
+      sectionNumber += 1;
+
+      if (consoleRows.length === 0) {
+        y = drawFestivalNilState(doc, geo, y, 'No hay consolas registradas en la dotación de este escenario.');
+      } else {
+        y = drawTable(['Posición', 'Modelo', 'Cantidad', 'Notas'], consoleRows, [18, 34, 14, 34], [2], y);
       }
 
-      const fohWavesDisplay = combineWavesDisplay(setupToUse.foh_waves_models, setupToUse.foh_outboard);
-      if (fohWavesDisplay.length > 0) {
-        yPosition = checkPageBreak(14, yPosition);
-        doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`FOH Waves/Outboard: ${fohWavesDisplay}`, 14, yPosition);
-        yPosition += 10;
+      const wavesLines = [
+        combineWavesDisplay(setupToUse.foh_waves_models, setupToUse.foh_outboard)
+          ? { label: 'FOH Waves / outboard', value: combineWavesDisplay(setupToUse.foh_waves_models, setupToUse.foh_outboard) }
+          : null,
+        combineWavesDisplay(setupToUse.mon_waves_models, setupToUse.mon_outboard)
+          ? { label: 'MON Waves / outboard', value: combineWavesDisplay(setupToUse.mon_waves_models, setupToUse.mon_outboard) }
+          : null,
+      ].filter((entry): entry is { label: string; value: string } => entry !== null);
+      if (wavesLines.length > 0) {
+        y = drawFestivalConstantsLine(doc, geo, wavesLines, y - 4 * mm) + 4 * mm;
       }
 
-      // Monitor Consoles
-      if (setupToUse.mon_consoles && setupToUse.mon_consoles.length > 0) {
-        yPosition = checkPageBreak(60, yPosition);
-        
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Consolas de Monitor', 14, yPosition);
-        yPosition += 10;
+      // --- Wireless and IEM -------------------------------------------------
+      const rfRows: string[][] = [
+        ...(setupToUse.wireless_systems ?? []).map((system: any) => [
+          'RF',
+          system.model || 'Sin modelo',
+          String(system.quantity_ch ?? 0),
+          String(system.quantity_hh ?? 0),
+          String(system.quantity_bp ?? 0),
+          formatFrequencyBand(system.band) || FESTIVAL_MATRIX_ZERO,
+        ]),
+        ...(setupToUse.iem_systems ?? []).map((system: any) => [
+          'IEM',
+          system.model || 'Sin modelo',
+          String(system.quantity_hh ?? system.quantity ?? 0),
+          FESTIVAL_MATRIX_ZERO,
+          String(system.quantity_bp ?? 0),
+          formatFrequencyBand(system.band) || FESTIVAL_MATRIX_ZERO,
+        ]),
+      ];
 
-        const monData = setupToUse.mon_consoles.map((console: any) => [
-          console.model || 'N/A',
-          console.quantity?.toString() || '1',
-          console.notes || ''
-        ]);
+      y = ensureSpace(26 * mm, y);
+      y = drawFestivalSectionHeading(doc, geo, 'Sistemas inalámbricos e IEM', y, sectionNumber);
+      sectionNumber += 1;
 
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Modelo', 'Cantidad', 'Notas']],
-          body: monData,
-          theme: 'grid',
-          headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 },
-          pageBreak: 'auto',
-          showHead: 'everyPage',
-          didDrawPage: () => {
-            if (doc.internal.pages.length > 2) {
-              addPageHeader();
-            }
-          }
-        });
-
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      if (rfRows.length === 0) {
+        y = drawFestivalNilState(
+          doc,
+          geo,
+          y,
+          'Sin sistemas inalámbricos ni IEM en la dotación. Confirmado como ninguno, no pendiente de definir.',
+        );
+      } else {
+        y = drawTable(
+          ['Tipo', 'Modelo', 'Canales', 'De mano', 'Petacas', 'Banda'],
+          rfRows,
+          [12, 30, 13, 13, 13, 19],
+          [2, 3, 4],
+          y,
+        );
       }
 
-      const monWavesDisplay = combineWavesDisplay(setupToUse.mon_waves_models, setupToUse.mon_outboard);
-      if (monWavesDisplay.length > 0) {
-        yPosition = checkPageBreak(14, yPosition);
-        doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`MON Waves/Outboard: ${monWavesDisplay}`, 14, yPosition);
-        yPosition += 10;
+      // --- Wired microphones -------------------------------------------------
+      const micRows = (setupToUse.wired_mics ?? []).map((mic: any) => [
+        mic.model || 'Sin modelo',
+        String(mic.quantity ?? 1),
+        yesNo(mic.exclusive_use),
+        mic.notes || FESTIVAL_MATRIX_ZERO,
+      ]);
+
+      y = ensureSpace(26 * mm, y);
+      y = drawFestivalSectionHeading(doc, geo, 'Microfonía cableada', y, sectionNumber);
+      sectionNumber += 1;
+
+      if (micRows.length === 0) {
+        y = drawFestivalNilState(doc, geo, y, 'Sin microfonía cableada registrada para este escenario.');
+      } else {
+        y = drawTable(['Modelo', 'Cantidad', 'Uso exclusivo', 'Notas'], micRows, [34, 14, 18, 34], [1], y);
       }
 
-      // Monitors
-      yPosition = checkPageBreak(20, yPosition);
-      
-      doc.setFontSize(14);
-      doc.setTextColor(125, 1, 1);
-      doc.text('Monitores', 14, yPosition);
-      yPosition += 10;
+      // --- Infrastructure ----------------------------------------------------
+      const pick = (specific: unknown, fallback: unknown): number =>
+        specific !== undefined && specific !== null ? Number(specific) || 0 : Number(fallback) || 0;
 
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      const monitorQuantity = setupToUse.monitors_quantity || (isStageSpecific ? 0 : setupToUse.available_monitors || 0);
-      doc.text(`Monitores disponibles: ${monitorQuantity}`, 14, yPosition);
-      yPosition += 10;
+      const infraRows = [
+        ['CAT6', String(pick(setupToUse.infra_cat6_quantity, setupToUse.available_cat6_runs))],
+        ['HMA', String(pick(setupToUse.infra_hma_quantity, setupToUse.available_hma_runs))],
+        ['Coaxial', String(pick(setupToUse.infra_coax_quantity, setupToUse.available_coax_runs))],
+        ['Analógicas', String(pick(setupToUse.infra_analog, setupToUse.available_analog_runs))],
+        ['OpticalCON DUO', String(pick(setupToUse.infra_opticalcon_duo_quantity, setupToUse.available_opticalcon_duo_runs))],
+      ];
 
-      // Wireless
-      if (setupToUse.wireless_systems && setupToUse.wireless_systems.length > 0) {
-        yPosition = checkPageBreak(60, yPosition);
-        
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Sistemas Inalambricos', 14, yPosition);
-        yPosition += 10;
+      y = ensureSpace(30 * mm, y);
+      y = drawFestivalSectionHeading(doc, geo, 'Infraestructura disponible', y, sectionNumber);
+      sectionNumber += 1;
+      y = drawTable(['Tirada', 'Cantidad'], infraRows, [60, 40], [1], y);
 
-        const wirelessData = setupToUse.wireless_systems.map((system: any) => [
-          system.model || 'N/A',
-          system.quantity_ch?.toString() || '0',
-          system.quantity_hh?.toString() || '0',
-          system.quantity_bp?.toString() || '0',
-          formatFrequencyBand(system.band) || 'N/A',
-          system.notes || ''
-        ]);
+      // --- Extras ------------------------------------------------------------
+      const extras = [
+        ['Side fills', yesNo(setupToUse.extras_sf ?? setupToUse.has_side_fills)],
+        ['Drum fills', yesNo(setupToUse.extras_df ?? setupToUse.has_drum_fills)],
+        ['Cabina de DJ', yesNo(setupToUse.extras_djbooth ?? setupToUse.has_dj_booths)],
+        ['Monitores disponibles', String(monitorQuantity)],
+      ];
 
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Modelo', 'Canales', 'Cant. HH', 'Cant. BP', 'Banda', 'Notas']],
-          body: wirelessData,
-          theme: 'grid',
-          headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 },
-          pageBreak: 'auto',
-          showHead: 'everyPage',
-          didDrawPage: () => {
-            if (doc.internal.pages.length > 2) {
-              addPageHeader();
-            }
-          }
-        });
+      y = ensureSpace(28 * mm, y);
+      y = drawFestivalSectionHeading(doc, geo, 'Extras', y, sectionNumber);
+      sectionNumber += 1;
+      y = drawTable(['Elemento', 'Disponible'], extras, [60, 40], [], y);
 
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
-      }
-
-      // IEM
-      if (setupToUse.iem_systems && setupToUse.iem_systems.length > 0) {
-        yPosition = checkPageBreak(60, yPosition);
-        
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Sistemas IEM', 14, yPosition);
-        yPosition += 10;
-
-        const iemData = setupToUse.iem_systems.map((system: any) => [
-          system.model || 'N/A',
-          system.quantity_hh?.toString() || '0',
-          system.quantity_bp?.toString() || '0',
-          formatFrequencyBand(system.band) || 'N/A',
-          system.notes || ''
-        ]);
-
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Modelo', 'Cant. HH', 'Cant. BP', 'Banda', 'Notas']],
-          body: iemData,
-          theme: 'grid',
-          headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 },
-          pageBreak: 'auto',
-          showHead: 'everyPage',
-          didDrawPage: () => {
-            if (doc.internal.pages.length > 2) {
-              addPageHeader();
-            }
-          }
-        });
-
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
-      }
-
-      // Wired Microphones
-      if (setupToUse.wired_mics && setupToUse.wired_mics.length > 0) {
-        yPosition = checkPageBreak(60, yPosition);
-        
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Microfonia Cableada', 14, yPosition);
-        yPosition += 10;
-
-        const wiredMicData = setupToUse.wired_mics.map((mic: any) => [
-          mic.model || 'N/A',
-          mic.quantity?.toString() || '1',
-          mic.exclusive_use ? 'Si' : 'No',
-          mic.notes || ''
-        ]);
-
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Modelo', 'Cantidad', 'Uso Exclusivo', 'Notas']],
-          body: wiredMicData,
-          theme: 'grid',
-          headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 },
-          pageBreak: 'auto',
-          showHead: 'everyPage',
-          didDrawPage: () => {
-            if (doc.internal.pages.length > 2) {
-              addPageHeader();
-            }
-          }
-        });
-
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
-      }
-
-      // Infrastructure
-      yPosition = checkPageBreak(50, yPosition);
-      
-      doc.setFontSize(14);
-      doc.setTextColor(125, 1, 1);
-      doc.text('Infraestructura', 14, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      
-      // Use stage-specific infrastructure if available, otherwise fall back to global
-      const cat6Runs = setupToUse.infra_cat6_quantity !== undefined ? setupToUse.infra_cat6_quantity : (setupToUse.available_cat6_runs || 0);
-      const hmaRuns = setupToUse.infra_hma_quantity !== undefined ? setupToUse.infra_hma_quantity : (setupToUse.available_hma_runs || 0);
-      const coaxRuns = setupToUse.infra_coax_quantity !== undefined ? setupToUse.infra_coax_quantity : (setupToUse.available_coax_runs || 0);
-      const analogRuns = setupToUse.infra_analog !== undefined ? setupToUse.infra_analog : (setupToUse.available_analog_runs || 0);
-      const opticalconRuns = setupToUse.infra_opticalcon_duo_quantity !== undefined ? setupToUse.infra_opticalcon_duo_quantity : (setupToUse.available_opticalcon_duo_runs || 0);
-      
-      yPosition = checkPageBreak(40, yPosition);
-      doc.text(`Tiradas CAT6 disponibles: ${cat6Runs}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Tiradas HMA disponibles: ${hmaRuns}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Tiradas Coax disponibles: ${coaxRuns}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Tiradas Analogicas disponibles: ${analogRuns}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Tiradas Opticalcon Duo disponibles: ${opticalconRuns}`, 14, yPosition);
-      yPosition += 10;
-
-      // Extras
-      yPosition = checkPageBreak(30, yPosition);
-      
-      doc.setFontSize(14);
-      doc.setTextColor(125, 1, 1);
-      doc.text('Extras', 14, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      
-      // Use stage-specific extras if available, otherwise fall back to global
-      const sideFills = setupToUse.extras_sf !== undefined ? setupToUse.extras_sf : (setupToUse.has_side_fills || false);
-      const drumFills = setupToUse.extras_df !== undefined ? setupToUse.extras_df : (setupToUse.has_drum_fills || false);
-      const djBooths = setupToUse.extras_djbooth !== undefined ? setupToUse.extras_djbooth : (setupToUse.has_dj_booths || false);
-      
-      doc.text(`Side Fills: ${sideFills ? 'Si' : 'No'}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Drum Fills: ${drumFills ? 'Si' : 'No'}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`DJ Booths: ${djBooths ? 'Si' : 'No'}`, 14, yPosition);
-      yPosition += 10;
-
-      // Notes
+      // --- Notes -------------------------------------------------------------
       if (setupToUse.notes) {
-        yPosition = checkPageBreak(30, yPosition);
-        
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Notas', 14, yPosition);
-        yPosition += 10;
-
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        const notes = doc.splitTextToSize(setupToUse.notes, pageWidth - 28);
-        const notesHeight = notes.length * 6;
-        yPosition = checkPageBreak(notesHeight, yPosition);
-        doc.text(notes, 14, yPosition);
-        yPosition += notesHeight;
+        setFestivalText(doc, FESTIVAL_INK, 7.8);
+        const notes = doc.splitTextToSize(String(setupToUse.notes), geo.contentWidth) as string[];
+        y = ensureSpace(notes.length * 3.6 * mm + 14 * mm, y);
+        y = drawFestivalSectionHeading(doc, geo, 'Notas', y, sectionNumber);
+        setFestivalText(doc, FESTIVAL_INK, 7.8);
+        doc.text(notes, geo.left, y, { lineHeightFactor: 1.35 });
       }
 
-      // Add footer and logo to all pages
-      const totalPages = doc.internal.pages.length - 1; // Subtract 1 because pages array includes empty first element
-      
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        
-        // Footer text
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        const generatedDate = format(new Date(), 'dd/MM/yyyy HH:mm');
-        doc.text(`Generado: ${generatedDate}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
-        doc.text(`${actualStageName} - Equipamiento`, 14, pageHeight - 10);
+      setFestivalText(doc, FESTIVAL_SOFT, 7);
+
+      const totalPages = doc.getNumberOfPages();
+      for (let page = 1; page <= totalPages; page += 1) {
+        doc.setPage(page);
+        drawFestivalChrome(doc, {
+          kind: 'gear',
+          eventTitle: jobData.title,
+          contextLabel: actualStageName,
+          issuer: `Sector-Pro  ·  ${jobData.title}`,
+          pageNumber: page,
+          totalPages,
+          paginate: options.paginate !== false,
+        });
       }
 
-      // Add Sector Pro logo at bottom center of last page
-      try {
-        const sectorLogoPath = '/sector pro logo.png';
-        const sectorImg = new Image();
-        sectorImg.onload = () => {
-          try {
-            const logoWidth = 30;
-            const ratio = sectorImg.width / sectorImg.height;
-            const logoHeight = logoWidth / ratio;
-            
-            // Add logo to all pages
-            for (let i = 1; i <= totalPages; i++) {
-              doc.setPage(i);
-              doc.addImage(
-                sectorImg, 
-                'PNG', 
-                pageWidth/2 - logoWidth/2,
-                pageHeight - logoHeight - 15,
-                logoWidth,
-                logoHeight
-              );
-            }
-            
-            const blob = doc.output('blob');
-            console.log(`PDF generated successfully for ${actualStageName}`);
-            resolve(blob);
-          } catch (err) {
-            console.error('Error adding Sector Pro logo:', err);
-            const blob = doc.output('blob');
-            resolve(blob);
-          }
-        };
-        
-        sectorImg.onerror = () => {
-          const blob = doc.output('blob');
-          resolve(blob);
-        };
-        
-        sectorImg.src = sectorLogoPath;
-      } catch (logoErr) {
-        console.error('Error loading Sector Pro logo:', logoErr);
-        const blob = doc.output('blob');
-        resolve(blob);
-      }
+      resolve(pdfToBlob(doc));
     } catch (error) {
       console.error('Error generating stage gear PDF:', error);
       reject(error);

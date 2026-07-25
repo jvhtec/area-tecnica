@@ -1,4 +1,18 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
+import {
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalMetaGrid,
+  drawFestivalSectionHeading,
+  drawFestivalTitleBlock,
+  FESTIVAL_ACCENT,
+  FESTIVAL_RULE,
+  festivalTableTheme,
+  loadFestivalIssuerMark,
+} from '@/utils/pdf/festival-report';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 import { extractRfIemScheduleFields, formatRfIemScheduleCell } from '@/utils/rfIemScheduleFields';
 import { groupArtistsByFestivalDay } from '@/utils/pdf/rfIemFestivalDays';
@@ -299,17 +313,6 @@ export const formatMetricBreakdownByProvider = (
   return `${text} (${total})`;
 };
 
-const getProviderCellColor = (provider: string): [number, number, number] => {
-  const normalized = provider.toLowerCase();
-  if (normalized === 'festival') {
-    return [214, 232, 255];
-  }
-  if (normalized === 'banda' || normalized === 'band') {
-    return [255, 226, 204];
-  }
-  return [232, 232, 232];
-};
-
 export const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
 export const BAND_TEXT_TOKEN = '__BAND_ITEM__';
 export const MIXED_TEXT_TOKEN = '__MIXED_ITEM__';
@@ -318,163 +321,96 @@ export const hasProviderTextToken = (value: string): boolean =>
   value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN) || value.includes(MIXED_TEXT_TOKEN);
 
 export const stripProviderTextTokens = (value: string): string =>
-  value.split(FESTIVAL_TEXT_TOKEN).join('').split(BAND_TEXT_TOKEN).join('').split(MIXED_TEXT_TOKEN).join('');
-
-const getProviderTokenType = (line: string): 'festival' | 'band' | 'mixed' | 'default' => {
-  if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';
-  if (line.includes(BAND_TEXT_TOKEN)) return 'band';
-  if (line.includes(MIXED_TEXT_TOKEN)) return 'mixed';
-  return 'default';
-};
+  value
+    .split(FESTIVAL_TEXT_TOKEN).join('')
+    .split(BAND_TEXT_TOKEN).join('')
+    .split(MIXED_TEXT_TOKEN).join('');
 
 export const splitTokenizedSegments = (
   value: string,
 ): Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }> => {
+  const pattern = new RegExp(`(${FESTIVAL_TEXT_TOKEN}|${BAND_TEXT_TOKEN}|${MIXED_TEXT_TOKEN})`);
+  const parts = value.split(pattern).filter((part) => part.length > 0);
   const segments: Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }> = [];
-  const tokenPattern = /(__FESTIVAL_ITEM__|__BAND_ITEM__|__MIXED_ITEM__)/g;
-  let activeProvider: 'festival' | 'band' | 'mixed' | 'default' = 'default';
-  let lastIndex = 0;
+  let provider: 'festival' | 'band' | 'mixed' | 'default' = 'default';
 
-  for (const match of value.matchAll(tokenPattern)) {
-    const token = match[0];
-    const startIndex = match.index ?? 0;
-    const textBeforeToken = value.slice(lastIndex, startIndex);
-    if (textBeforeToken) {
-      segments.push({ text: textBeforeToken, provider: activeProvider });
+  for (const part of parts) {
+    if (part === FESTIVAL_TEXT_TOKEN) {
+      provider = 'festival';
+    } else if (part === BAND_TEXT_TOKEN) {
+      provider = 'band';
+    } else if (part === MIXED_TEXT_TOKEN) {
+      provider = 'mixed';
+    } else {
+      segments.push({ text: part, provider });
+      provider = 'default';
     }
-
-    activeProvider = token === FESTIVAL_TEXT_TOKEN ? 'festival' : token === BAND_TEXT_TOKEN ? 'band' : token === MIXED_TEXT_TOKEN ? 'mixed' : 'default';
-    lastIndex = startIndex + token.length;
   }
 
-  const trailingText = value.slice(lastIndex);
-  if (trailingText) {
-    segments.push({ text: trailingText, provider: activeProvider });
-  }
-
-  return segments.filter((segment) => segment.text.length > 0);
+  return segments;
 };
 
-const isMixedMetricValue = (value: string): boolean =>
-  hasProviderTextToken(value) || /^\d+[FBM](?:\+\d+[FBM])+ \(\d+\)$/.test(value.trim());
+/** Numeric metrics stay numbers so callers can total them; only tokens are stripped. */
+const stripTokens = (value: string | number): string | number =>
+  typeof value === 'number' ? value : stripProviderTextTokens(value);
 
-const splitMixedMetricSegments = (value: string): Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }> => {
-  return splitTokenizedSegments(value);
-};
+export const buildRfIemTableRow = (artist: ArtistRfIemData): Array<string | number> => [
+  artist.name,
+  `Escenario ${artist.stage}`,
+  formatRfIemScheduleCell(artist),
+  getProviderSummary(artist.wirelessSystems),
+  stripProviderTextTokens(formatModelWithCounts(artist.wirelessSystems)),
+  stripProviderTextTokens(getUniqueFormattedBands(artist.wirelessSystems)),
+  stripTokens((formatMetricBreakdownByProvider(artist.wirelessSystems, getRfSystemChannels))),
+  stripTokens((formatMetricBreakdownByProvider(artist.wirelessSystems, (system) => system.quantity_hh || 0))),
+  stripTokens((formatMetricBreakdownByProvider(artist.wirelessSystems, (system) => system.quantity_bp || 0))),
+  getProviderSummary(artist.iemSystems),
+  stripProviderTextTokens(formatModelWithCounts(artist.iemSystems)),
+  stripProviderTextTokens(getUniqueFormattedBands(artist.iemSystems)),
+  stripTokens((formatMetricBreakdownByProvider(artist.iemSystems, (system) => system.quantity_hh || system.quantity || 0))),
+  stripTokens((formatMetricBreakdownByProvider(artist.iemSystems, (system) => system.quantity_bp || 0))),
+];
 
-const getStageCellColor = (stageLabel: string): [number, number, number] => {
-  const match = stageLabel.match(/\d+/);
-  const stageNumber = match ? parseInt(match[0], 10) : 0;
-  const palette: Array<[number, number, number]> = [
-    [238, 244, 252], // light blue
-    [242, 250, 238], // light green
-    [252, 245, 236], // light orange
-    [245, 240, 252], // light lavender
-    [239, 250, 250], // light cyan
-  ];
-  if (!Number.isFinite(stageNumber) || stageNumber <= 0) {
-    return [245, 245, 245];
-  }
-  return palette[(stageNumber - 1) % palette.length];
-};
+/**
+ * Eleven columns read as two groups of five are far easier than eleven columns,
+ * so RF and IEM sit under spanning headers with a rule between the groups. The
+ * page is already landscape — the last resort, not the first.
+ */
+const GROUP_HEAD = [
+  { content: '', colSpan: 3, styles: { halign: 'left' as const } },
+  { content: 'Radiofrecuencia', colSpan: 6, styles: { halign: 'left' as const } },
+  { content: 'IEM', colSpan: 5, styles: { halign: 'left' as const } },
+];
+const COLUMN_HEAD = [
+  'Artista',
+  'Escenario',
+  'Horario',
+  'Proveedor',
+  'Modelos',
+  'Bandas',
+  'Canales',
+  'Mano',
+  'Petacas',
+  'Proveedor',
+  'Modelos',
+  'Bandas',
+  'Canales',
+  'Petacas',
+];
+const COLUMN_WEIGHTS = [11, 6, 10, 6, 10, 8, 5.5, 4.5, 5, 6, 10, 8, 5.5, 5];
+/** First column of the IEM group — it carries the divider rule. */
+const IEM_GROUP_START = 9;
+const NUMERIC_COLUMNS = [6, 7, 8, 12, 13];
 
-export const buildRfIemTableRow = (artist: ArtistRfIemData): Array<string | number> => {
-  const totalRfChannels = formatMetricBreakdownByProvider(artist.wirelessSystems, getRfSystemChannels);
-  const totalRfHH = formatMetricBreakdownByProvider(artist.wirelessSystems, (sys) => sys.quantity_hh || 0);
-  const totalRfBP = formatMetricBreakdownByProvider(artist.wirelessSystems, (sys) => sys.quantity_bp || 0);
-  const totalIemChannels = formatMetricBreakdownByProvider(artist.iemSystems, (sys) => sys.quantity_hh || sys.quantity || 0);
-  const totalIemBodpacks = formatMetricBreakdownByProvider(artist.iemSystems, (sys) => sys.quantity_bp || 0);
-  const rfModels = formatModelWithCounts(artist.wirelessSystems);
-  const rfBands = getUniqueFormattedBands(artist.wirelessSystems);
-  const iemModels = formatModelWithCounts(artist.iemSystems);
-  const iemBands = getUniqueFormattedBands(artist.iemSystems);
-  const rfProvidedBy = getProviderSummary(artist.wirelessSystems);
-  const iemProvidedBy = getProviderSummary(artist.iemSystems);
-  return [
-    artist.name,
-    `Escenario ${artist.stage}`,
-    formatRfIemScheduleCell(artist),
-    rfProvidedBy,
-    rfModels,
-    rfBands,
-    totalRfChannels,
-    totalRfHH,
-    totalRfBP,
-    iemProvidedBy,
-    iemModels,
-    iemBands,
-    totalIemChannels,
-    totalIemBodpacks
-  ];
-};
-
-export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob> => {
+export const exportRfIemTablePDF = async (
+  data: RfIemTablePdfData & { paginate?: boolean },
+): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const pdf = new jsPDF({
-    orientation: 'landscape',
-    unit: 'mm',
-    format: 'a4'
-  });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const leftMargin = 10;
-  const rightMargin = leftMargin;
-  const tableStartY = 30;
-  const footerBandHeight = 22;
-
-  let headerLogoObjectUrl: string | undefined;
-  let headerLogoFormat: 'PNG' | 'JPEG' = 'PNG';
-  let headerLogoDimensions: { width: number; height: number } | undefined;
-  if (data.logoUrl) {
-    try {
-      const response = await fetch(data.logoUrl);
-      const logoBlob = await response.blob();
-      headerLogoObjectUrl = URL.createObjectURL(logoBlob);
-      headerLogoFormat = logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG';
-
-      headerLogoDimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
-        const image = new Image();
-        image.onload = () => {
-          resolve({ width: image.width, height: image.height });
-        };
-        image.onerror = () => resolve(undefined);
-        image.src = headerLogoObjectUrl as string;
-      });
-    } catch (err) {
-      console.error('Error loading logo:', err);
-    }
-  }
-
-  const drawPageHeader = (festivalDayLabel: string): void => {
-    if (headerLogoObjectUrl && headerLogoDimensions && headerLogoDimensions.width > 0 && headerLogoDimensions.height > 0) {
-      const maxLogoWidth = 40;
-      const maxLogoHeight = 15;
-      const scale = Math.min(
-        maxLogoWidth / headerLogoDimensions.width,
-        maxLogoHeight / headerLogoDimensions.height,
-      );
-      const drawWidth = headerLogoDimensions.width * scale;
-      const drawHeight = headerLogoDimensions.height * scale;
-      pdf.addImage(
-        headerLogoObjectUrl,
-        headerLogoFormat,
-        pageWidth - drawWidth - rightMargin,
-        10,
-        drawWidth,
-        drawHeight
-      );
-    }
-
-    pdf.setTextColor(0);
-    pdf.setFontSize(18);
-    pdf.text(`${data.jobTitle} - Resumen RF e IEM`, leftMargin, 18);
-    pdf.setFontSize(11);
-    pdf.setTextColor(80);
-    pdf.text(`Día festival: ${festivalDayLabel}`, leftMargin, 25);
-  };
-
-  const normalizedArtists = (data.artists || []).map((artist) => normalizeRfIemArtistInput(artist as RawArtistLike));
+  const normalizedArtists = (data.artists || []).map((artist) =>
+    normalizeRfIemArtistInput(artist as RawArtistLike),
+  );
   const filteredArtists = normalizedArtists.filter(hasRfIemContent);
 
   if (filteredArtists.length === 0) {
@@ -482,287 +418,117 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   }
 
   const dayGroups = groupArtistsByFestivalDay(filteredArtists);
-
   if (dayGroups.length === 0) {
     throw new Error('No hay datos RF/IEM para los escenarios seleccionados.');
   }
 
-  const availableWidth = pageWidth - leftMargin - rightMargin;
-  const ratios = [0.10, 0.05, 0.09, 0.06, 0.095, 0.075, 0.05, 0.04, 0.04, 0.06, 0.095, 0.075, 0.06, 0.06];
-  const ratioSum = ratios.reduce((sum, ratio) => sum + ratio, 0) || 1;
-  const columnStyles = ratios.reduce((acc, ratio, index) => {
-    acc[index] = { cellWidth: availableWidth * (ratio / ratioSum) };
-    return acc;
-  }, {} as Record<number, { cellWidth: number }>);
+  await loadFestivalIssuerMark();
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
 
-  for (let index = 0; index < dayGroups.length; index += 1) {
-    const group = dayGroups[index];
-    const tableData = group.artists.map(buildRfIemTableRow);
-    const tokenizedCellText = new Map<string, string>();
-    const mixedMetricText = new Map<string, string>();
+  let dayLabel = dayGroups[0].label;
+  const chrome = () =>
+    drawFestivalChrome(doc, {
+      kind: 'rf',
+      eventTitle: data.jobTitle,
+      contextLabel: dayLabel,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      paginate: false,
+    });
+
+  const geo = chrome();
+  const { mm } = geo;
+
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'RF e IEM  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: 'Resumen de radiofrecuencia y monitorización personal',
+    clientLogo,
+  });
+
+  y = drawFestivalMetaGrid(doc, geo, [
+    { label: 'Artistas', value: String(filteredArtists.length) },
+    { label: 'Jornadas', value: String(dayGroups.length) },
+    { label: 'Sin RF ni IEM', value: String(normalizedArtists.length - filteredArtists.length) },
+    { label: 'Emitido', value: new Date().toLocaleDateString('es-ES') },
+  ], y);
+
+  dayGroups.forEach((group, index) => {
+    dayLabel = group.label;
 
     if (index > 0) {
-      pdf.addPage('a4', 'landscape');
+      doc.addPage('a4', 'landscape');
+      chrome();
+      y = geo.contentTop;
     }
 
-    autoTable(pdf, {
-      head: [[
-        'Artista',
-        'Esc.',
-        'Horario',
-        'RF Prov.',
-        'Modelos RF',
-        'Bandas RF',
-        'Can RF',
-        'HH',
-        'BP',
-        'IEM Prov.',
-        'Modelos IEM',
-        'Bandas IEM',
-        'Can IEM',
-        'BP IEM'
-      ]],
-      body: tableData,
-      startY: tableStartY,
+    y = drawFestivalSectionHeading(doc, geo, group.label, y, index + 1);
+
+    const rows = group.artists.map(buildRfIemTableRow);
+    const theme = festivalTableTheme(geo, { fontSize: 6.6, numericColumns: NUMERIC_COLUMNS });
+
+    autoTable(doc, {
+      head: [GROUP_HEAD, COLUMN_HEAD],
+      body: rows,
+      startY: y,
+      ...theme,
+      columnStyles: distributeColumnWidths(COLUMN_WEIGHTS, geo.contentWidth),
       margin: {
-        left: leftMargin,
-        right: rightMargin,
-        top: tableStartY,
-        bottom: footerBandHeight,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 8.5,
-      },
-      alternateRowStyles: {
-        fillColor: [240, 240, 245]
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 2.5,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.1,
-        overflow: 'linebreak',
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
       },
       rowPageBreak: 'avoid',
-      columnStyles,
-      didDrawPage: () => {
-        drawPageHeader(group.label);
-      },
-      didParseCell: (cellData) => {
-        if (cellData.section !== 'body') return;
-        const rowValues = tableData[cellData.row.index];
-        if (!rowValues) return;
-
-        const rfProvider = String(rowValues[3] || '');
-        const iemProvider = String(rowValues[9] || '');
-        const stageLabel = String(rowValues[1] || '');
-        const rfColor = getProviderCellColor(rfProvider);
-        const iemColor = getProviderCellColor(iemProvider);
-        const stageColor = getStageCellColor(stageLabel);
-
-        if (cellData.column.index >= 0 && cellData.column.index <= 2) {
-          cellData.cell.styles.fillColor = stageColor;
-          cellData.cell.styles.textColor = [30, 30, 30];
-        }
-
-        if (cellData.column.index >= 3 && cellData.column.index <= 8) {
-          cellData.cell.styles.fillColor = rfColor;
-          cellData.cell.styles.textColor = [35, 35, 35];
-        }
-
-        if (cellData.column.index >= 9 && cellData.column.index <= 13) {
-          cellData.cell.styles.fillColor = iemColor;
-          cellData.cell.styles.textColor = [35, 35, 35];
-        }
-
-        const cellText = Array.isArray(cellData.cell.text)
-          ? cellData.cell.text.join('\n')
-          : String(cellData.cell.text || '');
-        const isMixedDetailColumn = (
-          cellData.column.index === 4 ||
-          cellData.column.index === 5 ||
-          cellData.column.index === 10 ||
-          cellData.column.index === 11
-        );
-        if (isMixedDetailColumn && hasProviderTextToken(cellText)) {
-          tokenizedCellText.set(`${cellData.row.index}-${cellData.column.index}`, cellText);
-          const visibleText = stripProviderTextTokens(cellText);
-          cellData.cell.text = visibleText.split('\n');
-          const fillColor = cellData.cell.styles.fillColor;
-          if (Array.isArray(fillColor)) {
-            cellData.cell.styles.textColor = [fillColor[0], fillColor[1], fillColor[2]];
-          }
-        }
-
-        const isMetricColumn = (
-          cellData.column.index === 6 ||
-          cellData.column.index === 7 ||
-          cellData.column.index === 8 ||
-          cellData.column.index === 12 ||
-          cellData.column.index === 13
-        );
-        if (isMetricColumn && isMixedMetricValue(cellText)) {
-          mixedMetricText.set(`${cellData.row.index}-${cellData.column.index}`, cellText);
-          const fillColor = cellData.cell.styles.fillColor;
-          cellData.cell.text = [''];
-          if (Array.isArray(fillColor)) {
-            cellData.cell.styles.textColor = [fillColor[0], fillColor[1], fillColor[2]];
-          }
-        }
-      },
-      didDrawCell: (cellData) => {
-        if (cellData.section !== 'body') return;
-        const key = `${cellData.row.index}-${cellData.column.index}`;
-        const metricText = mixedMetricText.get(key);
-        if (metricText) {
-          const docInstance = (cellData as any).doc;
-          const cellPadding = typeof cellData.cell.styles.cellPadding === 'number'
-            ? cellData.cell.styles.cellPadding
-            : 2;
-          const maxTextWidth = Math.max(0, cellData.cell.width - (cellPadding * 2));
-          const maxTextHeight = Math.max(0, cellData.cell.height - (cellPadding * 2));
-          const minFontSize = 7;
-          let fontSize = Number(cellData.cell.styles.fontSize || 9);
-          const lines = metricText
-            .split('\n')
-            .map((line) => line.trim())
-            .filter(Boolean);
-
-          if (lines.length === 0) return;
-
-          const lineSegments = lines.map((line) => splitMixedMetricSegments(line));
-          const computeLineWidth = (segments: Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }>): number =>
-            segments.reduce((sum, segment) => sum + docInstance.getTextWidth(segment.text), 0);
-
-          while (fontSize > minFontSize) {
-            docInstance.setFontSize(fontSize);
-            const tooWide = lineSegments.some((segments) => computeLineWidth(segments) > maxTextWidth);
-            const lineHeight = fontSize * 0.5;
-            const tooTall = (lineHeight * lineSegments.length) > maxTextHeight;
-            if (!tooWide && !tooTall) break;
-            fontSize -= 0.3;
-          }
-
-          docInstance.setFontSize(fontSize);
-          const lineHeight = fontSize * 0.5;
-          const firstBaselineY = cellData.cell.y + cellPadding + (fontSize * 0.35);
-
-          lineSegments.forEach((segments, lineIndex) => {
-            const startX = cellData.cell.x + cellPadding;
-            const baselineY = firstBaselineY + (lineIndex * lineHeight);
-            let cursorX = startX;
-
-            for (const segment of segments) {
-              if (segment.provider === 'festival') {
-                docInstance.setTextColor(72, 105, 136);
-              } else if (segment.provider === 'band') {
-                docInstance.setTextColor(217, 119, 6);
-              } else if (segment.provider === 'mixed') {
-                docInstance.setTextColor(22, 163, 74);
-              } else {
-                docInstance.setTextColor(35, 35, 35);
-              }
-              docInstance.text(segment.text, cursorX, baselineY);
-              cursorX += docInstance.getTextWidth(segment.text);
-            }
-          });
+      didParseCell: (hookData) => {
+        // The spanning row names the groups; it is set in the accent and is not
+        // a column header, so it keeps its own left alignment.
+        if (hookData.section === 'head' && hookData.row.index === 0) {
+          hookData.cell.styles.textColor = FESTIVAL_ACCENT as unknown as [number, number, number];
+          hookData.cell.styles.halign = 'left';
           return;
         }
-
-        const tokenizedText = tokenizedCellText.get(key);
-        if (!tokenizedText) return;
-
-        const docInstance = (cellData as any).doc;
-        const cellPadding = typeof cellData.cell.styles.cellPadding === 'number'
-          ? cellData.cell.styles.cellPadding
-          : 2;
-        const textX = cellData.cell.x + cellPadding;
-        const maxTextWidth = Math.max(0, cellData.cell.width - (cellPadding * 2));
-        const wrappedWithProvider: Array<{ providerType: 'festival' | 'band' | 'mixed' | 'default'; text: string }> = [];
-        for (const rawLine of tokenizedText.split('\n')) {
-          const providerType = getProviderTokenType(rawLine);
-          const visibleLine = stripProviderTextTokens(rawLine);
-          const wrappedLines: string[] = docInstance.splitTextToSize(visibleLine, maxTextWidth);
-          for (const wrappedLine of wrappedLines) {
-            wrappedWithProvider.push({ providerType, text: wrappedLine });
-          }
-        }
-
-        if (wrappedWithProvider.length === 0) return;
-        const usableHeight = Math.max(2, cellData.cell.height - (cellPadding * 2));
-        const lineStep = usableHeight / wrappedWithProvider.length;
-        let textY = cellData.cell.y + cellPadding + (lineStep * 0.8);
-        const cellBottomLimit = cellData.cell.y + cellData.cell.height - 1;
-
-        for (const line of wrappedWithProvider) {
-          if (textY > cellBottomLimit) break;
-          if (line.providerType === 'festival') {
-            docInstance.setTextColor(72, 105, 136);
-          } else if (line.providerType === 'band') {
-            docInstance.setTextColor(217, 119, 6);
-          } else if (line.providerType === 'mixed') {
-            docInstance.setTextColor(22, 163, 74);
-          } else {
-            docInstance.setTextColor(35, 35, 35);
-          }
-          docInstance.text(line.text, textX, textY);
-          textY += lineStep;
+        theme.didParseCell(hookData);
+      },
+      didDrawCell: (hookData) => {
+        theme.didDrawCell(hookData);
+        if (hookData.column.index === IEM_GROUP_START && hookData.section !== 'head') {
+          doc.setDrawColor(...FESTIVAL_RULE);
+          doc.setLineWidth(0.25 * mm);
+          doc.line(
+            hookData.cell.x - 1 * mm,
+            hookData.cell.y,
+            hookData.cell.x - 1 * mm,
+            hookData.cell.y + hookData.cell.height,
+          );
         }
       },
+      didDrawPage: () => {
+        chrome();
+      },
+    });
+
+    y = getLastAutoTableY(doc, y) + 2 * mm;
+    y = drawFestivalConstantsLine(doc, geo, [
+      { label: 'Bandas', value: 'según la declaración del rider, pendientes de coordinación en obra' },
+    ], y);
+    y += 4 * mm;
+  });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'rf',
+      eventTitle: data.jobTitle,
+      contextLabel: 'RF e IEM',
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber: page,
+      totalPages,
+      paginate: data.paginate !== false,
     });
   }
 
-  const addFooter = async () => {
-    return new Promise<void>((resolve) => {
-      const totalPages = pdf.getNumberOfPages();
-
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-
-        pdf.setFontSize(8);
-        pdf.setTextColor(100);
-
-        const date = new Date().toLocaleDateString('es-ES');
-        pdf.text(`Generado: ${date}`, leftMargin, pageHeight - 8);
-        pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
-      }
-
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-
-      logo.onload = () => {
-        const logoWidth = 50;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-
-        for (let i = 1; i <= totalPages; i++) {
-          pdf.setPage(i);
-          const xPosition = (pageWidth - logoWidth) / 2;
-          const yPosition = pageHeight - 5 - logoHeight;
-
-          try {
-            pdf.addImage(logo, 'PNG', xPosition, yPosition, logoWidth, logoHeight);
-          } catch (error) {
-            console.error(`Error adding logo on page ${i}:`, error);
-          }
-        }
-
-        resolve();
-      };
-
-      logo.onerror = () => {
-        resolve();
-      };
-    });
-  };
-
-  await addFooter();
-  if (headerLogoObjectUrl) {
-    URL.revokeObjectURL(headerLogoObjectUrl);
-  }
-
-  return pdf.output('blob');
+  return pdfToBlob(doc);
 };

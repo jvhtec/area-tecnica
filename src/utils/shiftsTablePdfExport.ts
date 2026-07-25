@@ -1,231 +1,175 @@
 import { format } from 'date-fns';
 import { ShiftWithAssignments } from '@/types/festival-scheduling';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
+import {
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalSectionHeading,
+  drawFestivalTitleBlock,
+  festivalTableTheme,
+  loadFestivalIssuerMark,
+} from '@/utils/pdf/festival-report';
 
 export interface ShiftsTablePdfData {
   jobTitle: string;
   date: string;
   jobId?: string;
   shifts: ShiftWithAssignments[];
-  logoUrl?: string; // Logo URL option
+  logoUrl?: string;
+  /** False when the document is bound into a set that stamps its own folios. */
+  paginate?: boolean;
 }
+
+const DEPARTMENT_LABELS: Record<string, string> = {
+  sound: 'Sonido',
+  lights: 'Iluminación',
+  video: 'Vídeo',
+  logistics: 'Logística',
+  production: 'Producción',
+  administrative: 'Administración',
+};
+
+const technicianName = (assignment: ShiftWithAssignments['assignments'][number]): string => {
+  if (assignment.external_technician_name) return assignment.external_technician_name;
+  const profile = assignment.profiles;
+  // A partial name is more use to a crew chief than "Sin nombre".
+  const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim();
+  return name || 'Sin nombre';
+};
 
 export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  return new Promise((resolve, reject) => {
-    try {
-      // Create PDF in landscape
-      const doc = new jsPDF({ orientation: 'landscape' });
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      const createdDate = format(new Date(), 'dd/MM/yyyy');
-      const leftMargin = 10;
-      const rightMargin = 10;
-      const tableTopMargin = 25;
-      const footerReserve = 24;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-      let headerLogoImg: HTMLImageElement | null = null;
-      let headerLogoFormat: 'PNG' | 'JPEG' = 'JPEG';
+  const shiftDate = new Date(data.date);
+  const dateLabel = Number.isNaN(shiftDate.getTime())
+    ? data.date
+    : format(shiftDate, 'dd/MM/yyyy');
 
-      // Logo loading promise
-      const loadLogoPromise = data.logoUrl 
-        ? new Promise<void>((resolveLogoLoad, rejectLogoLoad) => {
-            console.log("Attempting to load logo from URL:", data.logoUrl);
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
-              try {
-                console.log("Logo loaded successfully, dimensions:", img.width, "x", img.height);
-                headerLogoImg = img;
-                headerLogoFormat = (data.logoUrl || '').toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-                resolveLogoLoad();
-              } catch (err) {
-                console.error('Error adding logo to PDF:', err);
-                resolveLogoLoad(); // Resolve anyway to continue PDF generation
-              }
-            };
-            img.onerror = (e) => {
-              console.error('Error loading logo image:', e);
-              resolveLogoLoad(); // Resolve anyway to continue PDF generation
-            };
-            img.src = data.logoUrl;
-          })
-        : Promise.resolve();
+  await loadFestivalIssuerMark();
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
 
-      loadLogoPromise.then(() => {
-        const drawRunningHeader = () => {
-          doc.setFillColor(125, 1, 1);  // Corporate red
-          doc.rect(0, 0, pageWidth, 20, 'F');
+  const chrome = () =>
+    drawFestivalChrome(doc, {
+      kind: 'shifts',
+      eventTitle: data.jobTitle,
+      contextLabel: dateLabel,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      paginate: false,
+    });
 
-          if (headerLogoImg && headerLogoImg.width > 0 && headerLogoImg.height > 0) {
-            const maxLogoWidth = 40;
-            const maxLogoHeight = 18;
-            const scale = Math.min(maxLogoWidth / headerLogoImg.width, maxLogoHeight / headerLogoImg.height);
-            const drawWidth = headerLogoImg.width * scale;
-            const drawHeight = headerLogoImg.height * scale;
-            doc.addImage(
-              headerLogoImg,
-              headerLogoFormat,
-              pageWidth - drawWidth - rightMargin,
-              1,
-              drawWidth,
-              drawHeight,
-            );
-          }
+  const geo = chrome();
+  const { mm } = geo;
 
-          doc.setFontSize(14);
-          doc.setTextColor(255, 255, 255);  // White
-          doc.text(`${data.jobTitle} - Turnos de Personal`, pageWidth / 2, 12, { align: 'center' });
-          doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
-        };
-
-        // Continue with PDF generation
-        drawRunningHeader();
-
-        // Group shifts by department
-        const departmentShifts: { [key: string]: ShiftWithAssignments[] } = {};
-        
-        data.shifts.forEach(shift => {
-          const dept = shift.department || 'General';
-          if (!departmentShifts[dept]) {
-            departmentShifts[dept] = [];
-          }
-          departmentShifts[dept].push(shift);
-        });
-
-        let yPosition = 25;
-
-        // Process each department
-        for (const [department, shifts] of Object.entries(departmentShifts)) {
-          // Department header
-          doc.setFontSize(12);
-          doc.setTextColor(125, 1, 1);
-          doc.text(`Departamento ${department}`, 14, yPosition);
-          yPosition += 8;
-
-          // Sort shifts by start time
-          shifts.sort((a, b) => {
-            const timeA = a.start_time;
-            const timeB = b.start_time;
-            return timeA.localeCompare(timeB);
-          });
-
-          // Create table rows for shifts
-          const tableRows = shifts.map(shift => {
-            const assignments = shift.assignments || [];
-            const technicians = assignments.map(a => {
-              let technicianName;
-              
-              // First check for external technician name
-              if (a.external_technician_name) {
-                technicianName = a.external_technician_name;
-              }
-              // Then fall back to profile data if available
-              else if (a.profiles?.first_name && a.profiles?.last_name) {
-                technicianName = `${a.profiles.first_name} ${a.profiles.last_name}`;
-              }
-              // Last resort fallback
-              else {
-                technicianName = 'Sin nombre';
-                console.warn('Missing technician name data for assignment:', a);
-              }
-              
-              return `${technicianName} (${a.role || 'N/A'})`;
-            }).join('\n');
-
-            return [
-              shift.name,
-              shift.stage ? `Escenario ${shift.stage}` : 'N/A',
-              `${shift.start_time.substring(0, 5)} - ${shift.end_time.substring(0, 5)}`,
-              technicians || 'Ninguno'
-            ];
-          });
-
-          // Add table to PDF with consistent corporate red color
-          autoTable(doc, {
-            startY: yPosition,
-            head: [['Turno', 'Escenario', 'Horario', 'Tecnicos Asignados']],
-            body: tableRows,
-            theme: 'grid',
-            styles: {
-              fontSize: 9,
-              cellPadding: 3,
-              overflow: 'linebreak',
-              lineWidth: 0.1,
-            },
-            headStyles: {
-              fillColor: [125, 1, 1],
-              textColor: [255, 255, 255],
-              fontSize: 9,
-              fontStyle: 'bold',
-              halign: 'left',
-              cellPadding: 4
-            },
-            margin: { left: leftMargin, right: rightMargin, top: tableTopMargin, bottom: footerReserve },
-            rowPageBreak: 'avoid',
-            didDrawPage: () => {
-              drawRunningHeader();
-            },
-            columnStyles: {
-              0: { cellWidth: 40 },
-              1: { cellWidth: 30 },
-              2: { cellWidth: 30 },
-              3: { cellWidth: 'auto' }
-            }
-          });
-
-          yPosition = (doc as any).lastAutoTable.finalY + 15;
-
-          // Add page break if needed
-          if (yPosition > pageHeight - 40 && Object.entries(departmentShifts).indexOf([department, shifts]) < Object.entries(departmentShifts).length - 1) {
-            doc.addPage();
-            yPosition = 20;
-          }
-        }
-
-        const applyFooterAndResolve = (sectorImg?: HTMLImageElement) => {
-          const totalPages = doc.getNumberOfPages();
-          for (let i = 1; i <= totalPages; i += 1) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(51, 51, 51);
-            doc.text(`Generado: ${createdDate}`, leftMargin, pageHeight - 10);
-            doc.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 10, { align: 'right' });
-
-            if (sectorImg && sectorImg.width > 0 && sectorImg.height > 0) {
-              try {
-                const logoWidth = 30;
-                const logoHeight = logoWidth * (sectorImg.height / sectorImg.width);
-                doc.addImage(
-                  sectorImg,
-                  'PNG',
-                  pageWidth / 2 - logoWidth / 2,
-                  pageHeight - logoHeight - 10,
-                  logoWidth,
-                  logoHeight,
-                );
-              } catch (err) {
-                console.error('Error adding Sector Pro logo to shifts footer:', err);
-              }
-            }
-          }
-
-          const blob = doc.output('blob');
-          console.log(`Shifts PDF generated successfully, blob size: ${blob.size}`);
-          resolve(blob);
-        };
-
-        const sectorImg = new Image();
-        sectorImg.onload = () => applyFooterAndResolve(sectorImg);
-        sectorImg.onerror = () => applyFooterAndResolve();
-        sectorImg.src = '/sector pro logo.png';
-      }).catch(err => {
-        console.error("Error in PDF generation:", err);
-        reject(err);
-      });
-    } catch (error) {
-      console.error("Exception in PDF export:", error);
-      reject(error);
-    }
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'Turnos de personal  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: `Jornada del ${dateLabel}`,
+    clientLogo,
   });
+
+  const byDepartment = new Map<string, ShiftWithAssignments[]>();
+  for (const shift of data.shifts) {
+    const department = shift.department || 'General';
+    if (!byDepartment.has(department)) byDepartment.set(department, []);
+    byDepartment.get(department)?.push(shift);
+  }
+
+  const assignedCount = data.shifts.reduce(
+    (total, shift) => total + (shift.assignments?.length ?? 0),
+    0,
+  );
+  const unstaffed = data.shifts.filter((shift) => (shift.assignments?.length ?? 0) === 0).length;
+
+  y = drawFestivalMetaGrid(doc, geo, [
+    { label: 'Turnos', value: String(data.shifts.length) },
+    { label: 'Departamentos', value: String(byDepartment.size) },
+    { label: 'Asignaciones', value: String(assignedCount) },
+    { label: 'Sin cubrir', value: unstaffed > 0 ? String(unstaffed) : 'Ninguno' },
+  ], y);
+
+  if (data.shifts.length === 0) {
+    drawFestivalNilState(
+      doc,
+      geo,
+      y,
+      'No hay turnos definidos para esta jornada. Confirmado como jornada sin personal asignado, no pendiente de planificación.',
+    );
+  }
+
+  let sectionNumber = 1;
+  for (const [department, shifts] of byDepartment.entries()) {
+    const sorted = [...shifts].sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+    if (y + 26 * mm > geo.contentBottom) {
+      doc.addPage();
+      chrome();
+      y = geo.contentTop;
+    }
+
+    y = drawFestivalSectionHeading(
+      doc,
+      geo,
+      DEPARTMENT_LABELS[department] ?? department,
+      y,
+      sectionNumber,
+    );
+    sectionNumber += 1;
+
+    const rows = sorted.map((shift) => [
+      shift.name,
+      shift.stage ? `Escenario ${shift.stage}` : '—',
+      `${shift.start_time.substring(0, 5)} – ${shift.end_time.substring(0, 5)}`,
+      (shift.assignments ?? [])
+        .map((assignment) => `${technicianName(assignment)} (${assignment.role || 'sin rol'})`)
+        .join('\n') || 'Sin asignar',
+    ]);
+
+    autoTable(doc, {
+      head: [['Turno', 'Escenario', 'Horario', 'Técnicos asignados']],
+      body: rows,
+      startY: y,
+      ...festivalTableTheme(geo, { fontSize: 7.6 }),
+      columnStyles: distributeColumnWidths([26, 20, 20, 60], geo.contentWidth),
+      margin: {
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
+      },
+      rowPageBreak: 'avoid',
+      didDrawPage: () => {
+        chrome();
+      },
+    });
+
+    y = getLastAutoTableY(doc, y) + 10 * mm;
+  }
+
+  if (data.shifts.length > 0) {
+    drawFestivalConstantsLine(doc, geo, [{ label: 'Jornada', value: dateLabel }], y - 6 * mm);
+  }
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'shifts',
+      eventTitle: data.jobTitle,
+      contextLabel: dateLabel,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber: page,
+      totalPages,
+      paginate: data.paginate !== false,
+    });
+  }
+
+  return pdfToBlob(doc);
 };

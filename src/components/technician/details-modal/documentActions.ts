@@ -2,16 +2,39 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { TourDocument } from "@/hooks/useTourDocuments";
 import type { JobDocument } from "@/types/job";
-import { createSignedUrl } from "@/utils/jobDocuments";
+import { createSignedUrl, resolveJobDocLocation } from "@/utils/jobDocuments";
 import type { RiderFile } from "@/components/technician/details-modal/types";
 
-const appendAndClickDownload = (href: string, fileName: string) => {
+/**
+ * `link.click()` only *starts* the download; the browser fetches the resource
+ * afterwards. Removing the anchor or revoking the object URL in the same tick
+ * pulls the resource out from under it, and WebKit (Safari, iOS) and Firefox
+ * respond by cancelling the download or writing a corrupt file. There is no
+ * event that says the download has begun, so cleanup is deferred instead.
+ */
+const DOWNLOAD_CLEANUP_DELAY_MS = 1000;
+
+const appendAndClickDownload = (href: string, fileName: string, onCleanup?: () => void) => {
   const link = document.createElement("a");
   link.href = href;
   link.download = fileName;
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+
+  window.setTimeout(() => {
+    link.remove();
+    onCleanup?.();
+  }, DOWNLOAD_CLEANUP_DELAY_MS);
+};
+
+const downloadBlob = async (supabase: SupabaseClient, bucket: string, path: string, fileName: string) => {
+  const { data, error } = await supabase.storage.from(bucket).download(path);
+  if (error || !data) {
+    throw error || new Error("No se pudo descargar el archivo");
+  }
+
+  const url = window.URL.createObjectURL(data);
+  appendAndClickDownload(url, fileName, () => window.URL.revokeObjectURL(url));
 };
 
 export const openJobDocument = async (supabase: SupabaseClient, doc: JobDocument) => {
@@ -20,8 +43,11 @@ export const openJobDocument = async (supabase: SupabaseClient, doc: JobDocument
 };
 
 export const downloadJobDocument = async (supabase: SupabaseClient, doc: JobDocument) => {
-  const url = await createSignedUrl(supabase, doc.file_path, 60);
-  appendAndClickDownload(url, doc.file_name);
+  // Fetch as a blob rather than assigning a signed (cross-origin) URL to an
+  // anchor's `download` attribute: browsers ignore that attribute across
+  // origins, so it would open/navigate instead of downloading.
+  const { bucket, path } = resolveJobDocLocation(doc.file_path);
+  await downloadBlob(supabase, bucket, path, doc.file_name);
 };
 
 export const openTourDocument = async (supabase: SupabaseClient, doc: TourDocument) => {
@@ -37,15 +63,7 @@ export const openTourDocument = async (supabase: SupabaseClient, doc: TourDocume
 };
 
 export const downloadTourDocument = async (supabase: SupabaseClient, doc: TourDocument) => {
-  const { data, error } = await supabase.storage
-    .from("tour-documents")
-    .createSignedUrl(doc.file_path, 60);
-
-  if (error || !data?.signedUrl) {
-    throw error || new Error("No se pudo generar la URL");
-  }
-
-  appendAndClickDownload(data.signedUrl, doc.file_name);
+  await downloadBlob(supabase, "tour-documents", doc.file_path, doc.file_name);
 };
 
 export const openRider = async (supabase: SupabaseClient, file: RiderFile) => {
@@ -61,15 +79,5 @@ export const openRider = async (supabase: SupabaseClient, file: RiderFile) => {
 };
 
 export const downloadRider = async (supabase: SupabaseClient, file: RiderFile) => {
-  const { data, error } = await supabase.storage
-    .from("festival_artist_files")
-    .download(file.file_path);
-
-  if (error || !data) {
-    throw error || new Error("No se pudo descargar el archivo");
-  }
-
-  const url = window.URL.createObjectURL(data);
-  appendAndClickDownload(url, file.file_name);
-  window.URL.revokeObjectURL(url);
+  await downloadBlob(supabase, "festival_artist_files", file.file_path, file.file_name);
 };

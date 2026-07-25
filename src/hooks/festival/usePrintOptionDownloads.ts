@@ -30,7 +30,7 @@ import {
 } from "@/utils/wiredMicrophoneNeedsPdfExport";
 import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 import { mergePDFs } from "@/utils/pdf/pdfMerge";
-import { fetchJobLogo, fetchLogoUrl } from "@/utils/pdf/logoUtils";
+import { fetchPreparedFestivalLogo } from "@/utils/pdf/logoOptimization";
 import { ensurePublicArtistFormLinks } from "@/utils/publicArtistFormLinks";
 import { buildReadableFilename } from "@/utils/fileName";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
@@ -152,7 +152,7 @@ export const usePrintOptionDownloads = ({
     );
 
     // Fetch logo (festival first, fallback to tour/job resolution)
-    const logoUrl = (await fetchJobLogo(jobId)) || "";
+    const logoUrl = (await fetchPreparedFestivalLogo(jobId)) || "";
 
     // Prepare data for PDF
     const missingRiderData: MissingRiderReportData = {
@@ -284,8 +284,7 @@ export const usePrintOptionDownloads = ({
     try {
       console.log("Downloading Gear Setup for job:", jobId);
 
-      const logoUrl =
-        (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+      const logoUrl = await fetchPreparedFestivalLogo(jobId);
 
       // Generate gear setup PDF for selected stages
       const stagePromises = options.gearSetupStages.map(async (stageNumber) => {
@@ -337,8 +336,7 @@ export const usePrintOptionDownloads = ({
     try {
       console.log("Downloading Shift Schedules for job:", jobId);
 
-      const logoUrl =
-        (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+      const logoUrl = await fetchPreparedFestivalLogo(jobId);
 
       const { data: shifts, error } = await dataLayerClient
         .from("festival_shifts")
@@ -463,8 +461,7 @@ export const usePrintOptionDownloads = ({
     try {
       console.log("Downloading Artist Tables for job:", jobId);
 
-      const logoUrl =
-        (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+      const logoUrl = await fetchPreparedFestivalLogo(jobId);
 
       // Fetch artists data
       const { data: artists, error } = await dataLayerClient
@@ -557,8 +554,7 @@ export const usePrintOptionDownloads = ({
     try {
       console.log("Downloading RF/IEM Table for job:", jobId);
 
-      const logoUrl =
-        (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+      const logoUrl = await fetchPreparedFestivalLogo(jobId);
 
       // Fetch artists data
       const { data: artists, error } = await dataLayerClient
@@ -615,8 +611,7 @@ export const usePrintOptionDownloads = ({
     try {
       console.log("Downloading Infrastructure Table for job:", jobId);
 
-      const logoUrl =
-        (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+      const logoUrl = await fetchPreparedFestivalLogo(jobId);
 
       // Fetch artists data
       const { data: artists, error } = await dataLayerClient
@@ -679,7 +674,7 @@ export const usePrintOptionDownloads = ({
     try {
       console.log("Downloading Wired Microphone Needs for job:", jobId);
 
-      const logoUrl = await fetchLogoUrl(jobId);
+      const logoUrl = await fetchPreparedFestivalLogo(jobId);
 
       // Fetch artists data
       const { data: artists, error } = await dataLayerClient

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { fetchJobLogo, fetchLogoUrl } from "@/utils/pdf/logoUtils";
+import { fetchPreparedFestivalLogo } from "@/utils/pdf/logoOptimization";
 import {
   clampPdfConcurrency,
   DEFAULT_PDF_GENERATION_CONCURRENCY,
@@ -7,7 +7,9 @@ import {
 } from "@/utils/pdf/festivalPdfSupport";
 
 export const loadFestivalStageMetadata = async (jobId: string) => {
-  const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+  // Every document in the bundle embeds this, so it is downscaled once here to
+  // the size it is actually placed rather than shipped at upload resolution.
+  const logoUrl = await fetchPreparedFestivalLogo(jobId);
   const { data: stageNames, error } = await supabase
     .from("festival_stages")
     .select("number, name")

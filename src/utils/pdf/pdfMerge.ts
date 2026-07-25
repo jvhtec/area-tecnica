@@ -1,81 +1,78 @@
-
 import { PDFDocument } from 'pdf-lib';
+import { deduplicateContextImages } from '@/utils/pdf/pdfImageDedup';
 
-export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
+export interface MergeOptions {
+  /**
+   * Collapse identical images after merging. The festival bundle embeds the
+   * same logo once per source document, so this is where most of its weight
+   * comes from. Defaults to true.
+   */
+  deduplicateImages?: boolean;
+}
+
+export const mergePDFs = async (
+  pdfBlobs: Blob[],
+  options: MergeOptions = {},
+): Promise<Blob> => {
   try {
-    console.log(`Attempting to merge ${pdfBlobs.length} PDF documents`);
-    
     if (pdfBlobs.length === 0) {
       throw new Error('No PDFs provided for merging');
     }
-    
+
     if (pdfBlobs.length === 1) {
-      console.log('Only one PDF provided, returning it directly');
       return pdfBlobs[0];
     }
-    
+
     const mergedPdf = await PDFDocument.create();
-    
-    for (let i = 0; i < pdfBlobs.length; i++) {
-      try {
-        const pdfBlob = pdfBlobs[i];
-        console.log(`Processing PDF ${i+1}/${pdfBlobs.length}, size: ${pdfBlob.size} bytes`);
-        
-        if (!pdfBlob || pdfBlob.size === 0) {
-          console.warn(`Skipping empty PDF at index ${i}`);
-          continue;
-        }
-        
-        const arrayBuffer = await pdfBlob.arrayBuffer();
-        
-        try {
-          const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-            ignoreEncryption: true,
-            throwOnInvalidObject: false,
-            updateMetadata: false
-          });
-          
-          const pageIndices = pdfDoc.getPageIndices();
-          console.log(`PDF ${i+1} has ${pageIndices.length} pages`);
-          
-          if (pageIndices.length === 0) {
-            console.warn(`PDF ${i+1} has no pages, skipping`);
-            continue;
-          }
-          
-          for (const pageIndex of pageIndices) {
-            try {
-              const [copiedPage] = await mergedPdf.copyPages(pdfDoc, [pageIndex]);
-              mergedPdf.addPage(copiedPage);
-              console.log(`Copied page ${pageIndex+1} from PDF ${i+1}`);
-            } catch (pageError) {
-              console.error(`Error copying page ${pageIndex+1} from PDF ${i+1}:`, pageError);
-              continue;
-            }
-          }
-        } catch (pdfError) {
-          console.error(`Error processing PDF content at index ${i}:`, pdfError);
-          console.log(`Problematic PDF size: ${pdfBlob.size} bytes`);
-          continue;
-        }
-      } catch (err) {
-        console.error(`Error processing PDF at index ${i}:`, err);
+
+    for (const [index, pdfBlob] of pdfBlobs.entries()) {
+      if (!pdfBlob || pdfBlob.size === 0) {
+        console.warn(`Se omite un PDF vacío en la posición ${index}.`);
         continue;
       }
+
+      try {
+        const sourcePdf = await PDFDocument.load(await pdfBlob.arrayBuffer(), {
+          ignoreEncryption: true,
+          throwOnInvalidObject: false,
+          updateMetadata: false,
+        });
+
+        const pageIndices = sourcePdf.getPageIndices();
+        if (pageIndices.length === 0) {
+          console.warn(`El PDF en la posición ${index} no tiene páginas.`);
+          continue;
+        }
+
+        // One copy call per source document, not one per page: pdf-lib's copier
+        // caches by reference within a single call, so all pages of a source
+        // share its embedded fonts and images instead of duplicating them page
+        // by page.
+        const copiedPages = await mergedPdf.copyPages(sourcePdf, pageIndices);
+        for (const page of copiedPages) {
+          mergedPdf.addPage(page);
+        }
+      } catch (error) {
+        console.error(`No se pudo procesar el PDF en la posición ${index}:`, error);
+      }
     }
-    
+
     const pageCount = mergedPdf.getPageCount();
-    console.log(`Merged document has ${pageCount} pages`);
-    
     if (pageCount === 0) {
       throw new Error('No valid pages found in the provided PDFs');
     }
-    
-    console.log(`Successfully merged ${pageCount} pages`);
+
+    if (options.deduplicateImages !== false) {
+      const { kept, removed } = deduplicateContextImages(mergedPdf.context);
+      if (removed > 0) {
+        console.log(`Imágenes del PDF combinado: ${kept} únicas, ${removed} copias eliminadas.`);
+      }
+    }
+
     const mergedPdfBytes = await mergedPdf.save();
     return new Blob([new Uint8Array(mergedPdfBytes)], { type: 'application/pdf' });
   } catch (error) {
     console.error('Error merging PDFs:', error);
-    throw new Error(`Failed to merge PDF documents: ${error.message}`);
+    throw new Error(`Failed to merge PDF documents: ${(error as Error).message}`);
   }
 };

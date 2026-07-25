@@ -159,6 +159,7 @@ export const generateFestivalShiftPdfs = async ({
                   jobId: jobId,
                   shifts: typedShifts,
                   logoUrl,
+                  paginate: false,
                 };
 
                 console.log(

@@ -1,17 +1,7 @@
 import { GearMismatch, EquipmentNeeds } from './gearComparisonService';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import type jsPDF from 'jspdf';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
-import {
-  FALLBACK_BRAND_LOGO_PATH,
-  FESTIVAL_TABLE_HEAD_STYLES,
-  drawCenteredFooterLogo,
-  drawFestivalHeaderBand,
-  drawFestivalHeaderText,
-  drawFooterMetaText,
-  loadImageWithTimeout,
-  loadSectorProFooterLogo,
-} from '@/utils/pdf/shared/pdfExportShared';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
   BAND_TEXT_TOKEN,
   FESTIVAL_TEXT_TOKEN,
@@ -20,6 +10,28 @@ import {
   formatWiredMicsForPdf,
   formatWirelessSystemsForPdf,
 } from '@/utils/pdf/artistTableFormatters';
+import {
+  distributeColumnWidths,
+  drawEquipmentNeedsSection,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalFlag,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalSectionHeading,
+  drawFestivalTimeline,
+  drawFestivalTitleBlock,
+  dropConstantColumns,
+  FESTIVAL_INK,
+  FESTIVAL_SOFT,
+  festivalTableTheme,
+  loadFestivalIssuerMark,
+  setFestivalMonoText,
+  setFestivalText,
+  toWindowOffset,
+  type FestivalGeometry,
+  type TimelineFinding,
+} from '@/utils/pdf/festival-report';
 
 export interface ArtistTablePdfData {
   jobTitle: string;
@@ -30,55 +42,25 @@ export interface ArtistTablePdfData {
     name: string;
     stage: number;
     loadInTime?: string;
-    showTime: {
-      start: string;
-      end: string;
-    };
-    soundcheck?: {
-      start: string;
-      end: string;
-    };
+    showTime: { start: string; end: string };
+    soundcheck?: { start: string; end: string };
     lineCheck?: { start: string; end: string };
     technical: {
       fohTech: boolean;
       monTech: boolean;
-      fohConsole: {
-        model: string;
-        providedBy: string;
-      };
-      monConsole: {
-        model: string;
-        providedBy: string;
-      };
+      fohConsole: { model: string; providedBy: string };
+      monConsole: { model: string; providedBy: string };
       monitorsFromFoh?: boolean;
       fohWavesOutboard?: string;
       monWavesOutboard?: string;
-      wireless: {
-        systems: any[];
-        providedBy: string;
-      };
-      iem: {
-        systems: any[];
-        providedBy: string;
-      };
-      monitors: {
-        enabled: boolean;
-        quantity: number;
-      };
+      wireless: { systems: any[]; providedBy: string };
+      iem: { systems: any[]; providedBy: string };
+      monitors: { enabled: boolean; quantity: number };
     };
-    extras: {
-      sideFill: boolean;
-      drumFill: boolean;
-      djBooth: boolean;
-    };
+    extras: { sideFill: boolean; drumFill: boolean; djBooth: boolean };
     notes?: string;
     micKit: 'festival' | 'band' | 'mixed';
-    wiredMics: Array<{
-      model: string;
-      quantity: number;
-      exclusive_use?: boolean;
-      notes?: string;
-    }>;
+    wiredMics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }>;
     infrastructure: {
       infra_cat6?: boolean;
       infra_cat6_quantity?: number;
@@ -98,682 +80,331 @@ export interface ArtistTablePdfData {
   logoUrl?: string;
   includeGearConflicts?: boolean;
   equipmentNeeds?: EquipmentNeeds;
+  /** False when the document is bound into a set that stamps its own folios. */
+  paginate?: boolean;
 }
 
-const formatConsolesWithTech = (console: { model: string; providedBy: string }, techRequired: boolean, position: string) => {
-  const techIndicator = techRequired ? " + Tec" : "";
-  const providerDisplay = console.providedBy === "mixed" ? "(Mixto)" : `(${console.providedBy})`;
-  return `${position}: ${console.model} ${providerDisplay}${techIndicator}`;
+const PROVIDER_LABELS: Record<string, string> = {
+  festival: 'Festival',
+  band: 'Banda',
+  mixed: 'Mixto',
 };
 
-const formatConsoleSectionForPdf = (technical: ArtistTablePdfData["artists"][number]["technical"]) => {
-  const lines: string[] = [];
-  lines.push(formatConsolesWithTech(technical.fohConsole, technical.fohTech, "FOH"));
-
-  if (technical.fohWavesOutboard && technical.fohWavesOutboard.trim().length > 0) {
-    lines.push(`FOH W/O: ${technical.fohWavesOutboard.trim()}`);
-  }
-
-  if (technical.monitorsFromFoh) {
-    lines.push("MON: Desde FOH");
-  } else {
-    lines.push(formatConsolesWithTech(technical.monConsole, technical.monTech, "MON"));
-    if (technical.monWavesOutboard && technical.monWavesOutboard.trim().length > 0) {
-      lines.push(`MON W/O: ${technical.monWavesOutboard.trim()}`);
-    }
-  }
-
-  return lines.join("\n");
-};
-
-const formatTimeRangeForPdf = (range?: { start: string; end: string }) =>
-  range ? `${range.start || '-'} - ${range.end || '-'}` : '-';
-
-// Simplified gear mismatch formatting without emoji icons
-const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
-  if (mismatches.length === 0) return "OK";
-  
-  const errors = mismatches.filter(m => m.severity === 'error');
-  const warnings = mismatches.filter(m => m.severity === 'warning');
-  
-  const parts: string[] = [];
-  if (errors.length > 0) {
-    parts.push(`${errors.length} Error${errors.length !== 1 ? 'es' : ''}`);
-  }
-  if (warnings.length > 0) {
-    parts.push(`${warnings.length} Aviso${warnings.length !== 1 ? 's' : ''}`);
-  }
-  
-  return parts.join(', ');
-};
-
-const normalizeProviderToken = (value: string | undefined): 'festival' | 'band' | 'mixed' => {
-  const normalized = (value || '').toLowerCase().trim();
-  if (normalized === 'festival') return 'festival';
-  if (normalized === 'banda' || normalized === 'band') return 'band';
-  if (normalized === 'mixto' || normalized === 'mixed') return 'mixed';
-  return 'festival';
-};
-
-const summarizeProvider = (values: Array<string | undefined>): 'festival' | 'band' | 'mixed' => {
-  const unique = new Set(values.map(normalizeProviderToken));
-  if (unique.size === 1) {
-    return unique.values().next().value || 'festival';
-  }
-  return 'mixed';
-};
-
-const getProviderCellColor = (provider: 'festival' | 'band' | 'mixed'): [number, number, number] => {
-  if (provider === 'festival') return [214, 232, 255];
-  if (provider === 'band') return [255, 226, 204];
-  return [232, 232, 232];
-};
-
-const hasProviderTextToken = (value: string): boolean =>
-  value.includes(FESTIVAL_TEXT_TOKEN)
-  || value.includes(BAND_TEXT_TOKEN)
-  || value.includes(MIXED_TEXT_TOKEN);
-
-const stripProviderTextTokens = (value: string): string =>
+const stripProviderTokens = (value: string): string =>
   value
     .split(FESTIVAL_TEXT_TOKEN).join('')
     .split(BAND_TEXT_TOKEN).join('')
     .split(MIXED_TEXT_TOKEN).join('');
 
-const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => {
-  if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';
-  if (line.includes(BAND_TEXT_TOKEN)) return 'band';
-  return 'default';
+const formatConsole = (
+  console: { model: string; providedBy: string },
+  techRequired: boolean,
+  position: string,
+): string => {
+  const provider = PROVIDER_LABELS[console.providedBy] ?? console.providedBy;
+  const tech = techRequired ? ' + técnico' : '';
+  return `${position}: ${console.model || '—'} (${provider})${tech}`;
 };
 
-const getStageCellColor = (stageNumber: number): [number, number, number] => {
-  const palette: Array<[number, number, number]> = [
-    [238, 244, 252],
-    [242, 250, 238],
-    [252, 245, 236],
-    [245, 240, 252],
-    [239, 250, 250],
-  ];
-  if (!Number.isFinite(stageNumber) || stageNumber <= 0) {
-    return [245, 245, 245];
+const formatConsoleSection = (technical: ArtistTablePdfData['artists'][number]['technical']): string => {
+  const lines = [formatConsole(technical.fohConsole, technical.fohTech, 'FOH')];
+  if (technical.fohWavesOutboard?.trim()) lines.push(`FOH W/O: ${technical.fohWavesOutboard.trim()}`);
+
+  if (technical.monitorsFromFoh) {
+    lines.push('MON: desde FOH');
+  } else {
+    lines.push(formatConsole(technical.monConsole, technical.monTech, 'MON'));
+    if (technical.monWavesOutboard?.trim()) lines.push(`MON W/O: ${technical.monWavesOutboard.trim()}`);
   }
-  return palette[(stageNumber - 1) % palette.length];
+  return lines.join('\n');
 };
 
-const formatEquipmentNeedsForPdf = (
-  needs: EquipmentNeeds,
-  doc: jsPDF,
-  startY: number,
-  onAddPage?: () => void,
-): number => {
-  let currentY = startY;
-  const pageHeight = doc.internal.pageSize.height;
-  const pageWidth = doc.internal.pageSize.width;
+const formatTimeRange = (range?: { start: string; end: string }): string =>
+  range && (range.start || range.end) ? `${range.start || '—'} – ${range.end || '—'}` : '—';
 
-  // Helper function to check if we need a new page
-  const checkPageBreak = (requiredSpace: number) => {
-    if (currentY + requiredSpace > pageHeight - 20) {
-      doc.addPage();
-      onAddPage?.();
-      currentY = 40;
-    }
-  };
-
-  // Header
-  doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Equipamiento Adicional Necesario para Cubrir Todos los Riders', 10, currentY);
-  currentY += 10;
-
-  let hasAnyNeeds = false;
-
-  // Critical Equipment Section
-  doc.setFontSize(12);
-  doc.setTextColor(200, 0, 0); // Red for critical
-  
-  const criticalItems: string[] = [];
-  
-  // FOH Consoles
-  if (needs.consoles.foh.length > 0) {
-    needs.consoles.foh.forEach(console => {
-      criticalItems.push(`Consola FOH - ${console.model}: ${console.additionalQuantity} unidades adicionales (${console.requiredBy.join(', ')})`);
-    });
-  }
-  
-  // Monitor Consoles
-  if (needs.consoles.monitor.length > 0) {
-    needs.consoles.monitor.forEach(console => {
-      criticalItems.push(`Consola Monitor - ${console.model}: ${console.additionalQuantity} unidades adicionales (${console.requiredBy.join(', ')})`);
-    });
-  }
-  
-  // Wireless Systems
-  if (needs.wireless.length > 0) {
-    needs.wireless.forEach(wireless => {
-      const parts: string[] = [];
-      if (wireless.additionalChannels > 0) parts.push(`${wireless.additionalChannels} canales`);
-      if (wireless.additionalHH > 0) parts.push(`${wireless.additionalHH} manos`);
-      if (wireless.additionalBP > 0) parts.push(`${wireless.additionalBP} petacas`);
-      if (parts.length > 0) {
-        criticalItems.push(`Wireless - ${wireless.model}: ${parts.join(', ')} unidades (${wireless.requiredBy.join(', ')})`);
-      }
-    });
-  }
-  
-  // IEM Systems
-  if (needs.iem.length > 0) {
-    needs.iem.forEach(iem => {
-      const parts: string[] = [];
-      if (iem.additionalChannels > 0) parts.push(`${iem.additionalChannels} canales`);
-      if (iem.additionalBP > 0) parts.push(`${iem.additionalBP} petacas`);
-      if (parts.length > 0) {
-        criticalItems.push(`IEM - ${iem.model}: ${parts.join(', ')} (${iem.requiredBy.join(', ')})`);
-      }
-    });
-  }
-
-  if (criticalItems.length > 0) {
-    hasAnyNeeds = true;
-    checkPageBreak(15);
-    doc.text('EQUIPAMIENTO CRITICO:', 10, currentY);
-    currentY += 8;
-    
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    
-    criticalItems.forEach(item => {
-      checkPageBreak(6);
-      const wrappedText = doc.splitTextToSize(`• ${item}`, pageWidth - 25);
-      doc.text(wrappedText, 15, currentY);
-      currentY += wrappedText.length * 4 + 2;
-    });
-    currentY += 5;
-  }
-
-  // Infrastructure Section
-  const infraItems: string[] = [];
-  
-  if (needs.infrastructure.cat6.additionalQuantity > 0) {
-    infraItems.push(`Tiradas CAT6: ${needs.infrastructure.cat6.additionalQuantity} adicionales (${needs.infrastructure.cat6.requiredBy.join(', ')})`);
-  }
-  if (needs.infrastructure.hma.additionalQuantity > 0) {
-    infraItems.push(`Tiradas HMA: ${needs.infrastructure.hma.additionalQuantity} adicionales (${needs.infrastructure.hma.requiredBy.join(', ')})`);
-  }
-  if (needs.infrastructure.coax.additionalQuantity > 0) {
-    infraItems.push(`Tiradas Coax: ${needs.infrastructure.coax.additionalQuantity} adicionales (${needs.infrastructure.coax.requiredBy.join(', ')})`);
-  }
-  if (needs.infrastructure.opticalcon_duo.additionalQuantity > 0) {
-    infraItems.push(`Tiradas OpticalCON DUO: ${needs.infrastructure.opticalcon_duo.additionalQuantity} adicionales (${needs.infrastructure.opticalcon_duo.requiredBy.join(', ')})`);
-  }
-  if (needs.infrastructure.analog.additionalQuantity > 0) {
-    infraItems.push(`Tiradas Analogicas: ${needs.infrastructure.analog.additionalQuantity} adicionales (${needs.infrastructure.analog.requiredBy.join(', ')})`);
-  }
-
-  if (infraItems.length > 0) {
-    hasAnyNeeds = true;
-    checkPageBreak(15);
-    doc.setFontSize(12);
-    doc.setTextColor(255, 165, 0); // Orange for infrastructure
-    doc.text('INFRAESTRUCTURA:', 10, currentY);
-    currentY += 8;
-    
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    
-    infraItems.forEach(item => {
-      checkPageBreak(6);
-      const wrappedText = doc.splitTextToSize(`• ${item}`, pageWidth - 25);
-      doc.text(wrappedText, 15, currentY);
-      currentY += wrappedText.length * 4 + 2;
-    });
-    currentY += 5;
-  }
-
-  // Microphones Section
-  if (needs.microphones.length > 0) {
-    hasAnyNeeds = true;
-    checkPageBreak(15);
-    doc.setFontSize(12);
-    doc.setTextColor(0, 100, 200); // Blue for microphones
-    doc.text('MICROFONOS:', 10, currentY);
-    currentY += 8;
-    
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    
-    needs.microphones.forEach(mic => {
-      checkPageBreak(6);
-      const wrappedText = doc.splitTextToSize(`• ${mic.model}: ${mic.additionalQuantity} unidades adicionales (${mic.requiredBy.join(', ')})`, pageWidth - 25);
-      doc.text(wrappedText, 15, currentY);
-      currentY += wrappedText.length * 4 + 2;
-    });
-    currentY += 5;
-  }
-
-  // Monitors Section
-  if (needs.monitors.additionalQuantity > 0) {
-    hasAnyNeeds = true;
-    checkPageBreak(10);
-    doc.setFontSize(12);
-    doc.setTextColor(0, 150, 0); // Green for monitors
-    doc.text('MONITORES:', 10, currentY);
-    currentY += 8;
-    
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`• Monitores adicionales: ${needs.monitors.additionalQuantity} unidades (${needs.monitors.requiredBy.join(', ')})`, 15, currentY);
-    currentY += 10;
-  }
-
-  // Extras Section
-  const extrasItems: string[] = [];
-  
-  if (needs.extras.sideFills.additionalStages > 0) {
-    extrasItems.push(`Side Fills: ${needs.extras.sideFills.additionalStages} escenarios (${needs.extras.sideFills.requiredBy.join(', ')})`);
-  }
-  if (needs.extras.drumFills.additionalStages > 0) {
-    extrasItems.push(`Drum Fills: ${needs.extras.drumFills.additionalStages} escenarios (${needs.extras.drumFills.requiredBy.join(', ')})`);
-  }
-  if (needs.extras.djBooths.additionalStages > 0) {
-    extrasItems.push(`DJ Booths: ${needs.extras.djBooths.additionalStages} escenarios (${needs.extras.djBooths.requiredBy.join(', ')})`);
-  }
-
-  if (extrasItems.length > 0) {
-    hasAnyNeeds = true;
-    checkPageBreak(15);
-    doc.setFontSize(12);
-    doc.setTextColor(150, 0, 150); // Purple for extras
-    doc.text('EXTRAS:', 10, currentY);
-    currentY += 8;
-    
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    
-    extrasItems.forEach(item => {
-      checkPageBreak(6);
-      const wrappedText = doc.splitTextToSize(`• ${item}`, pageWidth - 25);
-      doc.text(wrappedText, 15, currentY);
-      currentY += wrappedText.length * 4 + 2;
-    });
-    currentY += 5;
-  }
-
-  // If no additional equipment is needed
-  if (!hasAnyNeeds) {
-    checkPageBreak(10);
-    doc.setFontSize(12);
-    doc.setTextColor(0, 150, 0); // Green
-    doc.text('Todos los requerimientos pueden satisfacerse con el inventario actual.', 10, currentY);
-    currentY += 15;
-  }
-
-  return currentY;
+const formatMismatches = (mismatches: GearMismatch[] = []): string => {
+  if (mismatches.length === 0) return 'Correcto';
+  const errors = mismatches.filter((mismatch) => mismatch.severity === 'error').length;
+  const warnings = mismatches.filter((mismatch) => mismatch.severity === 'warning').length;
+  const parts: string[] = [];
+  if (errors > 0) parts.push(`${errors} error${errors === 1 ? '' : 'es'}`);
+  if (warnings > 0) parts.push(`${warnings} aviso${warnings === 1 ? '' : 's'}`);
+  return parts.join(', ');
 };
+
+const formatMicrophones = (artist: ArtistTablePdfData['artists'][number]): string => {
+  if (artist.micKit === 'mixed') {
+    return `Kit mixto\nFestival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+  }
+  if (artist.micKit === 'festival') {
+    return `Kit del festival\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+  }
+  return 'Kit de la banda';
+};
+
+const TABLE_HEAD = [
+  'Artista',
+  'Carga',
+  'Show',
+  'Prueba',
+  'Line check',
+  'Consolas',
+  'RF / IEM',
+  'Microfonía',
+  'Monitores',
+  'Infraestructura',
+  'Extras',
+  'Notas',
+  'Rider',
+  'Material',
+];
+const TABLE_WEIGHTS = [24, 13, 18, 17, 17, 32, 32, 27, 12, 20, 12, 24, 13, 16];
+/** Artist, show and soundcheck never leave the table, even if they are uniform. */
+const PROTECTED_COLUMNS = [0, 2, 3];
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
-  console.log('exportArtistTablePDF called with data:', data);
-  
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const doc = new jsPDF('landscape');
-  const pageWidth = doc.internal.pageSize.width;
-  const pageHeight = doc.internal.pageSize.height;
-  const createdDate = new Date().toLocaleDateString('es-ES');
-  const leftMargin = 10;
-  const rightMargin = 10;
-  const headerBottomY = 40;
-  const footerReserve = 24;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  const stageText = data.stage && data.stage !== 'all'
-    ? ` - ${data.stageNames?.[parseInt(data.stage)] || `Escenario ${data.stage}`}`
-    : '';
-  const titleText = `${data.jobTitle} - Tabla de Artistas${stageText}`;
-  const dateText = new Date(data.date).toLocaleDateString('es-ES');
+  const stageName = data.stage && data.stage !== 'all'
+    ? data.stageNames?.[Number.parseInt(data.stage, 10)] || `Escenario ${data.stage}`
+    : 'Todos los escenarios';
+  const showDate = new Date(data.date);
+  const dateLabel = Number.isNaN(showDate.getTime())
+    ? data.date
+    : showDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  let headerLogoImage: HTMLImageElement | null = null;
-  let headerLogoFormat: 'PNG' | 'JPEG' = 'PNG';
-  if (data.logoUrl) {
-    console.log("Attempting to load festival logo:", data.logoUrl);
-    headerLogoImage = await loadImageWithTimeout(data.logoUrl, 'festival logo');
-    if (headerLogoImage) {
-      headerLogoFormat = data.logoUrl.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-    }
-  }
+  await loadFestivalIssuerMark();
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
 
-  if (!headerLogoImage) {
-    console.log("Trying fallback logo");
-    headerLogoImage = await loadImageWithTimeout(FALLBACK_BRAND_LOGO_PATH, 'fallback logo');
-    if (headerLogoImage) {
-      headerLogoFormat = 'PNG';
-    }
-  }
+  const chrome = (): FestivalGeometry =>
+    drawFestivalChrome(doc, {
+      kind: 'programme',
+      eventTitle: data.jobTitle,
+      contextLabel: `${stageName} · ${dateLabel}`,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      paginate: false,
+    });
 
-  const drawPageHeader = (): void => {
-    drawFestivalHeaderBand(doc);
+  const geo = chrome();
+  const { mm } = geo;
 
-    if (headerLogoImage && headerLogoImage.width > 0 && headerLogoImage.height > 0) {
-      const maxLogoWidth = 40;
-      const maxLogoHeight = 18;
-      const scale = Math.min(maxLogoWidth / headerLogoImage.width, maxLogoHeight / headerLogoImage.height);
-      const drawWidth = headerLogoImage.width * scale;
-      const drawHeight = headerLogoImage.height * scale;
-      doc.addImage(
-        headerLogoImage,
-        headerLogoFormat,
-        pageWidth - drawWidth - rightMargin,
-        6,
-        drawWidth,
-        drawHeight,
-      );
-    }
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'Programa del día  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: `${stageName} · ${dateLabel}`,
+    clientLogo,
+  });
 
-    drawFestivalHeaderText(doc, titleText, dateText);
+  // Ordered along the programme day, not by clock string: a 01:00 show is the
+  // last of the night, not the first of the morning.
+  const showTimes = data.artists
+    .map((artist) => artist.showTime?.start)
+    .filter((value): value is string => Boolean(value))
+    .map((start) => ({ start, offset: toWindowOffset(start) ?? Number.POSITIVE_INFINITY }))
+    .sort((a, b) => a.offset - b.offset)
+    .map((entry) => entry.start);
+  const pendingRiders = data.artists.filter((artist) => artist.riderMissing).length;
+
+  y = drawFestivalMetaGrid(doc, geo, [
+    { label: 'Artistas', value: String(data.artists.length) },
+    { label: 'Primer show', value: showTimes[0] ?? '—' },
+    { label: 'Último show', value: showTimes[showTimes.length - 1] ?? '—' },
+    { label: 'Riders pendientes', value: pendingRiders > 0 ? String(pendingRiders) : 'Ninguno' },
+  ], y);
+
+  const ensureSpace = (required: number, current: number): number => {
+    if (current + required <= geo.contentBottom) return current;
+    doc.addPage();
+    chrome();
+    return geo.contentTop;
   };
 
-  drawPageHeader();
+  // --- 01 · Day programme -------------------------------------------------
+  y = drawFestivalSectionHeading(doc, geo, 'Programa de la jornada', y, 1);
 
-  // === ARTIST TABLE ===
-  const rowColorMeta: Array<{
-    stage: number;
-    consolesProvider: 'festival' | 'band' | 'mixed';
-    rfIemProvider: 'festival' | 'band' | 'mixed';
-    micProvider: 'festival' | 'band' | 'mixed';
-  }> = [];
+  if (data.artists.length === 0) {
+    y = drawFestivalNilState(
+      doc,
+      geo,
+      y,
+      'No hay artistas programados en este escenario para esta fecha. Confirmado como jornada sin actividad, no pendiente de datos.',
+    );
+  } else {
+    const laneHeight = data.artists.length > 12 ? 4.4 : 5.4;
+    // Hour scale above the lanes and the key below, neither of which scales
+    // with the number of artists.
+    const timelineFurniture = 12 * mm;
 
-  const tableData = data.artists.map(artist => {
-    console.log(`Processing artist: ${artist.name}`, {
-      infrastructure: artist.infrastructure,
-      micKit: artist.micKit,
-      wiredMics: artist.wiredMics?.length || 0,
-      fohTech: artist.technical.fohTech,
-      monTech: artist.technical.monTech,
-      gearMismatches: artist.gearMismatches?.length || 0
-    });
+    let remaining = data.artists.map((artist) => ({
+      name: artist.name,
+      show: artist.showTime,
+      soundcheck: artist.soundcheck,
+    }));
+    const findings: TimelineFinding[] = [];
+    const skipped: string[] = [];
 
-    // Format microphones column with enhanced mixed provider support
-    let microphonesDisplay = '';
-    if (artist.micKit === 'mixed') {
-      microphonesDisplay = `Kit: Mixto\n${FESTIVAL_TEXT_TOKEN}Festival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
-    } else if (artist.micKit === 'festival') {
-      microphonesDisplay = `Kit: Festival\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
-    } else {
-      microphonesDisplay = `Kit: Banda\nBanda provee`;
+    // A day with many artists is drawn across as many pages as it needs rather
+    // than running the lanes down through the footer.
+    while (remaining.length > 0) {
+      const available = geo.contentBottom - y - timelineFurniture;
+      const lanesThatFit = Math.floor(available / (laneHeight * mm));
+
+      if (lanesThatFit < 1) {
+        doc.addPage();
+        chrome();
+        y = geo.contentTop;
+        continue;
+      }
+
+      const chunk = remaining.slice(0, lanesThatFit);
+      remaining = remaining.slice(lanesThatFit);
+
+      const timeline = drawFestivalTimeline(doc, geo, { entries: chunk, y, laneHeight });
+      y = timeline.y;
+      findings.push(...timeline.findings);
+      skipped.push(...timeline.skipped);
     }
 
-    const rfIemProvider = summarizeProvider([
-      artist.technical.wireless.providedBy,
-      artist.technical.iem.providedBy,
-    ]);
-    const consolesProvider = summarizeProvider([
-      artist.technical.fohConsole.providedBy,
-      artist.technical.monConsole.providedBy,
-    ]);
-    const micProvider = normalizeProviderToken(artist.micKit);
-    rowColorMeta.push({
-      stage: artist.stage,
-      consolesProvider,
-      rfIemProvider,
-      micProvider,
-    });
-
-    return [
-      artist.name,
-      artist.loadInTime || '-',
-      `${artist.showTime.start} - ${artist.showTime.end}`,
-      formatTimeRangeForPdf(artist.soundcheck),
-      formatTimeRangeForPdf(artist.lineCheck),
-      formatConsoleSectionForPdf(artist.technical),
-      `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
-      microphonesDisplay,
-      artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'Ninguno',
-      formatInfrastructureForPdf(artist.infrastructure),
-      [
-        artist.extras.sideFill ? 'SF' : '',
-        artist.extras.drumFill ? 'DF' : '',
-        artist.extras.djBooth ? 'DJ' : ''
-      ].filter(Boolean).join(', ') || 'Ninguno',
-      artist.notes || 'Sin notas',
-      artist.riderMissing ? 'Falta' : 'Completo',
-      formatGearMismatchesForPdf(artist.gearMismatches)
-    ];
-  });
-
-  console.log('Table data prepared:', tableData.length, 'rows');
-
-  const availableTableWidth = pageWidth - leftMargin - rightMargin;
-  const baseColumnWidths = [24, 14, 18, 16, 16, 32, 32, 28, 11, 18, 11, 22, 13, 18];
-  const totalBaseWidth = baseColumnWidths.reduce((sum, width) => sum + width, 0) || 1;
-  const normalizedColumnStyles = baseColumnWidths.reduce((acc, width, index) => {
-    acc[index] = { cellWidth: availableTableWidth * (width / totalBaseWidth) };
-    return acc;
-  }, {} as Record<number, { cellWidth: number }>);
-  const tokenizedCellText = new Map<string, string>();
-
-  autoTable(doc, {
-    head: [['Artista', 'Load', 'Show', 'SC', 'Line', 'Consolas', 'RF/IEM', 'Microfonos', 'Mons', 'Infra', 'Extras', 'Notas', 'Rider', 'Material']],
-    body: tableData,
-    startY: 40,
-    theme: 'grid',
-    styles: { fontSize: 7, cellPadding: 1.4, valign: 'top', overflow: 'linebreak' },
-    headStyles: { ...FESTIVAL_TABLE_HEAD_STYLES, fontSize: 7.5, fontStyle: 'bold', cellPadding: 1.6 },
-    columnStyles: normalizedColumnStyles,
-    didParseCell: (cellData) => {
-      if (cellData.section === 'body') {
-        const rowMeta = rowColorMeta[cellData.row.index];
-        if (rowMeta) {
-          const stageColor = getStageCellColor(rowMeta.stage);
-          const consoleColor = getProviderCellColor(rowMeta.consolesProvider);
-          const rfIemColor = getProviderCellColor(rowMeta.rfIemProvider);
-          const micColor = getProviderCellColor(rowMeta.micProvider);
-
-          if (cellData.column.index >= 0 && cellData.column.index <= 4) {
-            cellData.cell.styles.fillColor = stageColor;
-            cellData.cell.styles.textColor = [30, 30, 30];
-          }
-          if (cellData.column.index === 5) {
-            cellData.cell.styles.fillColor = consoleColor;
-            cellData.cell.styles.textColor = [35, 35, 35];
-          }
-          if (cellData.column.index === 6) {
-            cellData.cell.styles.fillColor = rfIemColor;
-            cellData.cell.styles.textColor = [35, 35, 35];
-          }
-          if (cellData.column.index === 7) {
-            cellData.cell.styles.fillColor = micColor;
-            cellData.cell.styles.textColor = [35, 35, 35];
-          }
-        }
-      }
-
-      const mixedDetailColumns = cellData.column.index === 6 || cellData.column.index === 7;
-      if (mixedDetailColumns) {
-        const cellText = Array.isArray(cellData.cell.text)
-          ? cellData.cell.text.join('\n')
-          : String(cellData.cell.text || '');
-        if (hasProviderTextToken(cellText)) {
-          tokenizedCellText.set(`${cellData.row.index}-${cellData.column.index}`, cellText);
-          const visibleText = stripProviderTextTokens(cellText);
-          cellData.cell.text = visibleText.split('\n');
-          const fillColor = cellData.cell.styles.fillColor;
-          if (Array.isArray(fillColor)) {
-            cellData.cell.styles.textColor = [fillColor[0], fillColor[1], fillColor[2]];
-          }
-        }
-      }
-
-      // Make "Missing" text red in the Rider Status column (column 12)
-      if (cellData.column.index === 12 && cellData.cell.text[0] === 'Falta') {
-        cellData.cell.styles.textColor = [255, 0, 0]; // Red color
-      }
-      
-      // Color code gear status column (column 13) - now looking for text instead of icons
-      if (cellData.column.index === 13) {
-        const cellText = cellData.cell.text[0];
-        if (cellText.includes('Error')) {
-          cellData.cell.styles.textColor = [255, 0, 0]; // Red for errors
-        } else if (cellText.includes('Warning') || cellText.includes('Aviso')) {
-          cellData.cell.styles.textColor = [255, 165, 0]; // Orange for warnings
-        } else if (cellText === 'OK') {
-          cellData.cell.styles.textColor = [0, 128, 0]; // Green for OK
-        }
-      }
-    },
-    didDrawCell: (cellData) => {
-      if (cellData.section !== 'body') return;
-      const key = `${cellData.row.index}-${cellData.column.index}`;
-      const tokenizedText = tokenizedCellText.get(key);
-      if (!tokenizedText) return;
-
-      const docInstance = (cellData as any).doc;
-      const cellPadding = typeof cellData.cell.styles.cellPadding === 'number'
-        ? cellData.cell.styles.cellPadding
-        : 2;
-      const textX = cellData.cell.x + cellPadding;
-      const maxTextWidth = Math.max(0, cellData.cell.width - (cellPadding * 2));
-      const wrappedWithProvider: Array<{ providerType: 'festival' | 'band' | 'default'; text: string }> = [];
-      for (const rawLine of tokenizedText.split('\n')) {
-        const providerType = getProviderTokenType(rawLine);
-        const visibleLine = stripProviderTextTokens(rawLine);
-        const wrappedLines: string[] = docInstance.splitTextToSize(visibleLine, maxTextWidth);
-
-        for (const wrappedLine of wrappedLines) {
-          wrappedWithProvider.push({ providerType, text: wrappedLine });
-        }
-      }
-
-      if (wrappedWithProvider.length === 0) return;
-      const usableHeight = Math.max(2, cellData.cell.height - (cellPadding * 2));
-      const lineStep = usableHeight / wrappedWithProvider.length;
-      let textY = cellData.cell.y + cellPadding + (lineStep * 0.8);
-      const cellBottomLimit = cellData.cell.y + cellData.cell.height - 1;
-
-      for (const line of wrappedWithProvider) {
-        if (textY > cellBottomLimit) break;
-
-        if (line.providerType === 'festival') {
-          docInstance.setTextColor(72, 105, 136);
-        } else {
-          docInstance.setTextColor(35, 35, 35);
-        }
-
-        docInstance.text(line.text, textX, textY);
-        textY += lineStep;
-      }
-    },
-    margin: { left: leftMargin, right: rightMargin, top: headerBottomY, bottom: footerReserve },
-    rowPageBreak: 'avoid',
-    didDrawPage: () => {
-      drawPageHeader();
-    },
-  });
-
-  // Add gear conflicts summary ONLY if includeGearConflicts is true
-  if (data.includeGearConflicts) {
-    const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
-    if (artistsWithConflicts.length > 0) {
-      let currentY = getLastAutoTableY(doc, 0) + 20;
-      
-      // Check if we need a new page for the summary
-      if (currentY > pageHeight - 60) {
-        doc.addPage();
-        drawPageHeader();
-        currentY = 40;
-      }
-      
-      // Add summary header
-      doc.setFontSize(14);
-      doc.setTextColor(0, 0, 0);
-      doc.text('Resumen de Conflictos de Material', 10, currentY);
-      currentY += 10;
-      
-      // Add conflicts details with page break handling
-      doc.setFontSize(10);
-      artistsWithConflicts.forEach(artist => {
-        const errors = artist.gearMismatches?.filter(m => m.severity === 'error') || [];
-        const warnings = artist.gearMismatches?.filter(m => m.severity === 'warning') || [];
-        
-        if (errors.length > 0 || warnings.length > 0) {
-          // Check if we need a new page
-          if (currentY > pageHeight - 40) {
-            doc.addPage();
-            drawPageHeader();
-            currentY = 40;
-          }
-          
-          doc.setTextColor(0, 0, 0);
-          doc.text(`${artist.name}:`, 10, currentY);
-          currentY += 5;
-          
-          [...errors, ...warnings].forEach(mismatch => {
-            // Check if we need a new page for each mismatch
-            if (currentY > pageHeight - 25) {
-              doc.addPage();
-              drawPageHeader();
-              currentY = 40;
-            }
-            
-            const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
-            doc.setTextColor(color[0], color[1], color[2]);
-            
-            // Wrap long messages to prevent truncation
-            const wrappedMessage = doc.splitTextToSize(`• ${mismatch.message}`, pageWidth - 25);
-            doc.text(wrappedMessage, 15, currentY);
-            currentY += wrappedMessage.length * 4;
-            
-            if (mismatch.details) {
-              if (currentY > pageHeight - 20) {
-                doc.addPage();
-                drawPageHeader();
-                currentY = 40;
-              }
-              
-              doc.setTextColor(100, 100, 100);
-              const wrappedDetails = doc.splitTextToSize(`${mismatch.details}`, pageWidth - 30);
-              doc.text(wrappedDetails, 20, currentY);
-              currentY += wrappedDetails.length * 4;
-            }
-            currentY += 3;
-          });
-          currentY += 3;
-        }
+    for (const finding of findings) {
+      y = ensureSpace(18 * mm, y);
+      y = drawFestivalFlag(doc, geo, y, {
+        label: finding.label,
+        text: `${finding.name}: ${finding.message}`,
       });
-      
-      // Add Equipment Needs section after conflicts summary
-      if (data.equipmentNeeds) {
-        currentY += 10;
-        currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY, drawPageHeader);
-      }
-    } else if (data.equipmentNeeds) {
-      // Add Equipment Needs section even if no conflicts
-      let currentY = getLastAutoTableY(doc, 0) + 20;
-      
-      // Check if we need a new page for the equipment needs
-      if (currentY > pageHeight - 60) {
-        doc.addPage();
-        drawPageHeader();
-        currentY = 40;
-      }
-      
-      currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY, drawPageHeader);
+    }
+
+    if (skipped.length > 0) {
+      y = ensureSpace(18 * mm, y);
+      y = drawFestivalFlag(doc, geo, y, {
+        label: 'Revisar',
+        text: `Sin horarios registrados: ${skipped.join(', ')}. No aparecen en el gráfico hasta que se introduzcan.`,
+      });
     }
   }
 
-  const sectorImg = await loadSectorProFooterLogo();
+  // --- 02 · Detail table --------------------------------------------------
+  const rows = data.artists.map((artist) => [
+    artist.name,
+    artist.loadInTime || '—',
+    `${artist.showTime.start || '—'} – ${artist.showTime.end || '—'}`,
+    formatTimeRange(artist.soundcheck),
+    formatTimeRange(artist.lineCheck),
+    formatConsoleSection(artist.technical),
+    stripProviderTokens(
+      `RF: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
+    ),
+    formatMicrophones(artist),
+    artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}` : 'Ninguno',
+    formatInfrastructureForPdf(artist.infrastructure),
+    [
+      artist.extras.sideFill ? 'SF' : '',
+      artist.extras.drumFill ? 'DF' : '',
+      artist.extras.djBooth ? 'DJ' : '',
+    ].filter(Boolean).join(', ') || 'Ninguno',
+    artist.notes || 'Sin notas',
+    artist.riderMissing ? 'Pendiente' : 'Completo',
+    formatMismatches(artist.gearMismatches),
+  ]);
+
+  const trimmed = dropConstantColumns(TABLE_HEAD, rows, { protect: PROTECTED_COLUMNS });
+  const weights = trimmed.keptIndexes.map((index) => TABLE_WEIGHTS[index]);
+
+  if (rows.length > 0) {
+    y = drawFestivalSectionHeading(doc, geo, 'Detalle por artista', y + 2 * mm, 2);
+
+    autoTable(doc, {
+      head: [trimmed.head],
+      body: trimmed.rows,
+      startY: y,
+      ...festivalTableTheme(geo, { fontSize: 6.8, numericColumns: [] }),
+      columnStyles: distributeColumnWidths(weights, geo.contentWidth),
+      margin: { left: geo.left, right: geo.pageWidth - geo.right, top: geo.contentTop, bottom: geo.pageHeight - geo.contentBottom },
+      rowPageBreak: 'avoid',
+      didDrawPage: () => {
+        chrome();
+      },
+    });
+
+    y = getLastAutoTableY(doc, y) + 2 * mm;
+
+    const constants = [
+      { label: 'Escenario', value: stageName },
+      { label: 'Fecha', value: dateLabel },
+      ...trimmed.constants,
+    ];
+    y = drawFestivalConstantsLine(doc, geo, constants, y);
+  }
+
+  // --- 03 · Conflicts and shortfalls --------------------------------------
+  if (data.includeGearConflicts) {
+    const withConflicts = data.artists.filter(
+      (artist) => (artist.gearMismatches?.length ?? 0) > 0,
+    );
+
+    if (withConflicts.length > 0) {
+      y = ensureSpace(24 * mm, y + 4 * mm);
+      y = drawFestivalSectionHeading(doc, geo, 'Conflictos de material', y, 3);
+
+      for (const artist of withConflicts) {
+        y = ensureSpace(12 * mm, y);
+        setFestivalText(doc, FESTIVAL_INK, 8, 'bold');
+        doc.text(artist.name, geo.left, y);
+        y += 4.4 * mm;
+
+        for (const mismatch of artist.gearMismatches ?? []) {
+          setFestivalText(doc, FESTIVAL_INK, 7.2);
+          const lines = doc.splitTextToSize(mismatch.message, geo.contentWidth - 8 * mm) as string[];
+          y = ensureSpace(lines.length * 3.3 * mm + 4 * mm, y);
+
+          setFestivalMonoText(doc, FESTIVAL_SOFT, 5.6, 'bold');
+          doc.text(mismatch.severity === 'error' ? 'ERROR' : 'AVISO', geo.left, y, {
+            charSpace: 0.2 * mm,
+          });
+          setFestivalText(doc, FESTIVAL_INK, 7.2);
+          doc.text(lines, geo.left + 14 * mm, y, { lineHeightFactor: 1.25 });
+          y += lines.length * 3.3 * mm;
+
+          if (mismatch.details) {
+            setFestivalText(doc, FESTIVAL_SOFT, 6.8);
+            const detailLines = doc.splitTextToSize(mismatch.details, geo.contentWidth - 22 * mm) as string[];
+            y = ensureSpace(detailLines.length * 3 * mm + 2 * mm, y);
+            doc.text(detailLines, geo.left + 14 * mm, y, { lineHeightFactor: 1.2 });
+            y += detailLines.length * 3 * mm;
+          }
+          y += 2 * mm;
+        }
+        y += 2 * mm;
+      }
+    }
+
+    if (data.equipmentNeeds) {
+      drawEquipmentNeedsSection(
+        doc,
+        geo,
+        data.equipmentNeeds,
+        y + 4 * mm,
+        withConflicts.length > 0 ? 4 : 3,
+        ensureSpace,
+      );
+    }
+  }
 
   const totalPages = doc.getNumberOfPages();
-  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-    doc.setPage(pageNumber);
-    drawPageHeader();
-
-    drawCenteredFooterLogo(doc, sectorImg, pageWidth, pageHeight, 5, 'Error adding Sector Pro logo to PDF:');
-    drawFooterMetaText(
-      doc,
-      pageWidth,
-      pageHeight,
-      `Generado: ${createdDate}`,
-      `Pagina ${pageNumber} de ${totalPages}`,
-    );
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFestivalChrome(doc, {
+      kind: 'programme',
+      eventTitle: data.jobTitle,
+      contextLabel: `${stageName} · ${dateLabel}`,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber: page,
+      totalPages,
+      paginate: data.paginate !== false,
+    });
   }
 
-  console.log('Artist table PDF generation completed');
   return pdfToBlob(doc);
 };
