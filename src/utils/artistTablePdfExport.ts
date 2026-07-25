@@ -11,8 +11,6 @@ import {
   formatWirelessSystemsForPdf,
 } from '@/utils/pdf/artistTableFormatters';
 import {
-  FESTIVAL_INK,
-  FESTIVAL_SOFT,
   distributeColumnWidths,
   drawEquipmentNeedsSection,
   drawFestivalChrome,
@@ -24,7 +22,10 @@ import {
   drawFestivalTimeline,
   drawFestivalTitleBlock,
   dropConstantColumns,
+  FESTIVAL_INK,
+  FESTIVAL_SOFT,
   festivalTableTheme,
+  loadFestivalIssuerMark,
   setFestivalMonoText,
   setFestivalText,
   toWindowOffset,
@@ -172,6 +173,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     ? data.date
     : showDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
 
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
     : null;

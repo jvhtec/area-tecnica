@@ -13,6 +13,7 @@ import {
   drawFestivalSectionHeading,
   drawFestivalTitleBlock,
   festivalTableTheme,
+  loadFestivalIssuerMark,
 } from '@/utils/pdf/festival-report';
 
 export interface WeatherPdfData {
@@ -110,6 +111,7 @@ export const generateWeatherPDF = async (
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
     : null;

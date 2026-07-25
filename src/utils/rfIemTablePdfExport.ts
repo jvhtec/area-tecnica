@@ -2,15 +2,16 @@ import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
-  FESTIVAL_ACCENT,
-  FESTIVAL_RULE,
   distributeColumnWidths,
   drawFestivalChrome,
   drawFestivalConstantsLine,
   drawFestivalMetaGrid,
   drawFestivalSectionHeading,
   drawFestivalTitleBlock,
+  FESTIVAL_ACCENT,
+  FESTIVAL_RULE,
   festivalTableTheme,
+  loadFestivalIssuerMark,
 } from '@/utils/pdf/festival-report';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 import { extractRfIemScheduleFields, formatRfIemScheduleCell } from '@/utils/rfIemScheduleFields';
@@ -421,6 +422,7 @@ export const exportRfIemTablePDF = async (
     throw new Error('No hay datos RF/IEM para los escenarios seleccionados.');
   }
 
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
     : null;

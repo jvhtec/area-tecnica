@@ -5,9 +5,6 @@ import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import { formatFrequencyBand } from '@/lib/frequencyBands';
 import { combineWavesDisplay } from '@/constants/wavesModels';
 import {
-  FESTIVAL_INK,
-  FESTIVAL_MATRIX_ZERO,
-  FESTIVAL_SOFT,
   distributeColumnWidths,
   drawFestivalChrome,
   drawFestivalConstantsLine,
@@ -15,7 +12,11 @@ import {
   drawFestivalNilState,
   drawFestivalSectionHeading,
   drawFestivalTitleBlock,
+  FESTIVAL_INK,
+  FESTIVAL_MATRIX_ZERO,
+  FESTIVAL_SOFT,
   festivalTableTheme,
+  loadFestivalIssuerMark,
   setFestivalText,
   type FestivalGeometry,
 } from '@/utils/pdf/festival-report';
@@ -107,6 +108,7 @@ export const generateStageGearPDF = async (
       console.log(`Using ${isStageSpecific ? 'stage-specific' : 'global'} setup data for stage ${stageNumber}:`, setupToUse);
 
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      await loadFestivalIssuerMark();
       const clientLogo = logoUrl
         ? await loadImageWithTimeout(logoUrl, 'logotipo del festival')
         : null;

@@ -1,4 +1,5 @@
-import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import { getFestivalIssuerMarkDataUrl } from '@/utils/pdf/festival-report';
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -60,14 +61,26 @@ const CHILD_LINE_HEIGHT = 15;
 const drawContentsChrome = (
   page: PDFPage,
   fonts: { display: PDFFont; mono: PDFFont },
+  issuerMark?: PDFImage | null,
 ): void => {
-  page.drawText('SECTOR-PRO', {
-    x: LEFT,
-    y: HEADER_RULE_Y + 6.4 * MM_TO_PT,
-    size: 8.5,
-    font: fonts.display,
-    color: INK,
-  });
+  if (issuerMark) {
+    const width = 68;
+    const height = (issuerMark.height / issuerMark.width) * width;
+    page.drawImage(issuerMark, {
+      x: LEFT,
+      y: HEADER_RULE_Y + 6.4 * MM_TO_PT - height * 0.78,
+      width,
+      height,
+    });
+  } else {
+    page.drawText('SECTOR-PRO', {
+      x: LEFT,
+      y: HEADER_RULE_Y + 6.4 * MM_TO_PT,
+      size: 8.5,
+      font: fonts.display,
+      color: INK,
+    });
+  }
   page.drawText('CONTENIDO', {
     x: RIGHT - fonts.mono.widthOfTextAtSize('CONTENIDO', 5.6),
     y: HEADER_RULE_Y + 6.4 * MM_TO_PT,
@@ -152,10 +165,20 @@ export const generateTableOfContents = async (
   const mono = await pdfDoc.embedFont(StandardFonts.Courier);
   const monoBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
+  let issuerMark: PDFImage | null = null;
+  const issuerMarkDataUrl = await getFestivalIssuerMarkDataUrl('ink');
+  if (issuerMarkDataUrl) {
+    try {
+      issuerMark = await pdfDoc.embedPng(issuerMarkDataUrl);
+    } catch (error) {
+      console.warn('No se pudo añadir la marca de Sector-Pro al índice:', error);
+    }
+  }
+
   const tocLinks: TocLinkRegion[] = [];
   let pageIndex = 0;
   let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  drawContentsChrome(page, { display, mono });
+  drawContentsChrome(page, { display, mono }, issuerMark);
 
   let y = CONTENT_TOP_Y;
   page.drawText('Contenido', { x: LEFT, y, size: 22, font: display, color: INK });
@@ -174,7 +197,7 @@ export const generateTableOfContents = async (
     if (y - lineHeight < CONTENT_BOTTOM_Y && pageIndex + 1 < tocPageCount) {
       pageIndex += 1;
       page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      drawContentsChrome(page, { display, mono });
+      drawContentsChrome(page, { display, mono }, issuerMark);
       y = CONTENT_TOP_Y;
     }
 
@@ -222,7 +245,7 @@ export const generateTableOfContents = async (
 
   // Pad out to the announced page count so the offsets above stay true.
   while (pdfDoc.getPageCount() < tocPageCount) {
-    drawContentsChrome(pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]), { display, mono });
+    drawContentsChrome(pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]), { display, mono }, issuerMark);
   }
 
   if (logoUrl) {

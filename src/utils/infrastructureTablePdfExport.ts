@@ -2,9 +2,6 @@ import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
-  FESTIVAL_INK,
-  FESTIVAL_MATRIX_ZERO,
-  FESTIVAL_SOFT,
   distributeColumnWidths,
   drawFestivalChrome,
   drawFestivalConstantsLine,
@@ -14,7 +11,11 @@ import {
   drawFestivalTitleBlock,
   drawFestivalTotalsRule,
   dropConstantColumns,
+  FESTIVAL_INK,
+  FESTIVAL_MATRIX_ZERO,
+  FESTIVAL_SOFT,
   festivalTableTheme,
+  loadFestivalIssuerMark,
   setFestivalMonoText,
   setFestivalText,
 } from '@/utils/pdf/festival-report';
@@ -151,6 +152,7 @@ export const exportInfrastructureTablePDF = async (
   const stageNumbers = [...artistsByStage.keys()].sort((a, b) => a - b);
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
     : null;

@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { getFestivalIssuerMarkDataUrl } from '@/utils/pdf/festival-report';
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -33,6 +34,18 @@ export const generateSectionDivider = async (spec: SectionDividerSpec): Promise<
   const mono = await pdfDoc.embedFont(StandardFonts.Courier);
 
   page.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: GROUND });
+
+  const issuerMark = await getFestivalIssuerMarkDataUrl('paper');
+  if (issuerMark) {
+    try {
+      const mark = await pdfDoc.embedPng(issuerMark);
+      const width = 72;
+      const height = (mark.height / mark.width) * width;
+      page.drawImage(mark, { x: MARGIN, y: PAGE_HEIGHT - MARGIN - height, width, height });
+    } catch (error) {
+      console.warn('No se pudo añadir la marca de Sector-Pro al separador:', error);
+    }
+  }
 
   page.drawText(String(spec.number).padStart(2, '0'), {
     x: MARGIN,

@@ -5,15 +5,16 @@ import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import { generateQRCode } from '@/utils/qrcode';
 import {
-  FESTIVAL_INK,
-  FESTIVAL_SOFT,
   distributeColumnWidths,
   drawFestivalChrome,
   drawFestivalMetaGrid,
   drawFestivalNilState,
   drawFestivalSectionHeading,
   drawFestivalTitleBlock,
+  FESTIVAL_INK,
+  FESTIVAL_SOFT,
   festivalTableTheme,
+  loadFestivalIssuerMark,
   setFestivalMonoText,
   setFestivalText,
 } from '@/utils/pdf/festival-report';
@@ -69,6 +70,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
     : null;

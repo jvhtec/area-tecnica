@@ -1,5 +1,6 @@
 import type jsPDF from 'jspdf';
 import type { PdfRgb } from '@/utils/pdf/exportHelpers';
+import { getFestivalIssuerMark } from './issuerMark';
 import {
   FESTIVAL_ACCENT,
   FESTIVAL_FAINT,
@@ -116,6 +117,34 @@ export const drawFestivalTypeMark = (
   }
 };
 
+/** Height of the issuer mark in the running head, in millimetres. */
+const ISSUER_MARK_HEIGHT = 4.4;
+
+/**
+ * Places the Sector-Pro wordmark at the left of the running head, sitting on
+ * the same baseline as the document-type label. Falls back to setting the name
+ * in type only when the artwork could not be loaded.
+ */
+const drawFestivalIssuerMark = (doc: jsPDF, geo: FestivalGeometry): void => {
+  const { mm } = geo;
+  const baseline = geo.headerRuleY - 6.4 * mm;
+  const mark = getFestivalIssuerMark();
+
+  if (mark) {
+    const height = ISSUER_MARK_HEIGHT * mm;
+    const width = height * (mark.width / mark.height);
+    try {
+      doc.addImage(mark, 'PNG', geo.left, baseline - height, width, height);
+      return;
+    } catch (error) {
+      console.warn('No se pudo añadir la marca de Sector-Pro a la cabecera:', error);
+    }
+  }
+
+  setFestivalText(doc, FESTIVAL_INK, 8.5, 'bold');
+  doc.text('SECTOR-PRO', geo.left, baseline, { charSpace: 0.35 * mm });
+};
+
 export interface FestivalChromeOptions {
   kind: FestivalDocKind;
   /** Overrides the default label for the document type. */
@@ -147,8 +176,7 @@ export const drawFestivalChrome = (
   const { mm } = geo;
   const label = (options.kindLabel ?? FESTIVAL_DOC_LABELS[options.kind]).toUpperCase();
 
-  setFestivalText(doc, FESTIVAL_INK, 8.5, 'bold');
-  doc.text('SECTOR-PRO', geo.left, geo.headerRuleY - 6.4 * mm, { charSpace: 0.35 * mm });
+  drawFestivalIssuerMark(doc, geo);
 
   // The mark sits to the right of its label, both resting on the same baseline.
   // The label is measured and placed from the left because jsPDF's right

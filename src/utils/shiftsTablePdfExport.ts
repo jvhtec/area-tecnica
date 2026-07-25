@@ -12,6 +12,7 @@ import {
   drawFestivalSectionHeading,
   drawFestivalTitleBlock,
   festivalTableTheme,
+  loadFestivalIssuerMark,
 } from '@/utils/pdf/festival-report';
 
 export interface ShiftsTablePdfData {
@@ -49,6 +50,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
     ? data.date
     : format(shiftDate, 'dd/MM/yyyy');
 
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
     : null;

@@ -3,13 +3,14 @@ import { formatFrequencyBand } from '@/lib/frequencyBands';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
-  FESTIVAL_ACCENT,
-  FESTIVAL_INK,
-  FESTIVAL_SOFT,
   drawFestivalChrome,
   drawFestivalMetaGrid,
   drawFestivalTitleBlock,
+  FESTIVAL_ACCENT,
+  FESTIVAL_INK,
+  FESTIVAL_SOFT,
   festivalTableTheme,
+  loadFestivalIssuerMark,
   setFestivalText,
   type FestivalGeometry,
 } from '@/utils/pdf/festival-report';
@@ -55,6 +56,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
   const pageHeight = doc.internal.pageSize.height;
   const createdDate = new Date().toLocaleDateString(language === "en" ? "en-GB" : "es-ES");
 
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'festival logo')
     : null;

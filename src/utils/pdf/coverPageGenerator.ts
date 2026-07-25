@@ -1,5 +1,6 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import { supabase } from '@/lib/supabase';
+import { getFestivalIssuerMarkDataUrl } from '@/utils/pdf/festival-report';
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -142,13 +143,30 @@ export const generateCoverPage = async (
 
   const dateRangeText = formatDateRange(jobData?.start_time, jobData?.end_time);
 
-  page.drawText('SECTOR-PRO', {
-    x: MARGIN,
-    y: PAGE_HEIGHT - MARGIN - 8,
-    size: 9,
-    font: display,
-    color: COVER_PAPER,
-  });
+  // The issuer mark, recoloured for the black ground. Falls back to the
+  // typographic wordmark when the artwork cannot be prepared.
+  const issuerMark = await getFestivalIssuerMarkDataUrl('paper');
+  let issuerDrawn = false;
+  if (issuerMark) {
+    try {
+      const mark = await pdfDoc.embedPng(issuerMark);
+      const width = 92;
+      const height = (mark.height / mark.width) * width;
+      page.drawImage(mark, { x: MARGIN, y: PAGE_HEIGHT - MARGIN - height, width, height });
+      issuerDrawn = true;
+    } catch (error) {
+      console.warn('No se pudo añadir la marca de Sector-Pro a la portada:', error);
+    }
+  }
+  if (!issuerDrawn) {
+    page.drawText('SECTOR-PRO', {
+      x: MARGIN,
+      y: PAGE_HEIGHT - MARGIN - 8,
+      size: 9,
+      font: display,
+      color: COVER_PAPER,
+    });
+  }
   page.drawText('DOCUMENTACIÓN TÉCNICA', {
     x: MARGIN,
     y: PAGE_HEIGHT - MARGIN - 24,

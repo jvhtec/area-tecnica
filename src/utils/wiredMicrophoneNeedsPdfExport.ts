@@ -2,9 +2,6 @@ import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
-  FESTIVAL_ACCENT,
-  FESTIVAL_FAINT,
-  FESTIVAL_MATRIX_ZERO,
   distributeColumnWidths,
   drawFestivalChrome,
   drawFestivalConstantsLine,
@@ -12,7 +9,11 @@ import {
   drawFestivalNilState,
   drawFestivalSectionHeading,
   drawFestivalTitleBlock,
+  FESTIVAL_ACCENT,
+  FESTIVAL_FAINT,
+  FESTIVAL_MATRIX_ZERO,
   festivalTableTheme,
+  loadFestivalIssuerMark,
 } from '@/utils/pdf/festival-report';
 
 export interface WiredMicrophoneMatrixData {
@@ -99,6 +100,7 @@ export const exportWiredMicrophoneMatrixPDF = async (
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
+  await loadFestivalIssuerMark();
   const clientLogo = data.logoUrl
     ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
     : null;
