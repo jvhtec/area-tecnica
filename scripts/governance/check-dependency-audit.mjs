@@ -82,6 +82,15 @@ function collectAuditSnapshot(report) {
   };
 }
 
+function isValidCalendarDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function findValidException(advisoryId, baseline, today) {
   const exceptions = Array.isArray(baseline.exceptions) ? baseline.exceptions : [];
   const exception = exceptions.find((entry) => String(entry?.advisoryId ?? "") === String(advisoryId));
@@ -91,7 +100,7 @@ function findValidException(advisoryId, baseline, today) {
   }
 
   const hasOwner = typeof exception.owner === "string" && exception.owner.trim().length > 0;
-  const hasValidReviewBy = typeof exception.reviewBy === "string" && /^\d{4}-\d{2}-\d{2}$/.test(exception.reviewBy);
+  const hasValidReviewBy = isValidCalendarDate(exception.reviewBy);
 
   if (!hasOwner || !hasValidReviewBy || exception.reviewBy < today) {
     return null;
@@ -163,7 +172,7 @@ function validateExceptions(snapshot, baseline) {
     if (typeof exception.owner !== "string" || !exception.owner.trim()) {
       errors.push(`advisory ${advisoryId} has no remediation owner`);
     }
-    if (typeof exception.reviewBy !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(exception.reviewBy)) {
+    if (!isValidCalendarDate(exception.reviewBy)) {
       errors.push(`advisory ${advisoryId} has an invalid reviewBy date`);
     } else if (exception.reviewBy < today) {
       errors.push(`advisory ${advisoryId} review expired on ${exception.reviewBy}`);

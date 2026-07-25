@@ -32,6 +32,8 @@ export const useJobDocumentActions = () => {
   });
 
   const handleDownload = (doc: JobDocument) => withLoadingDocument(doc.id, async () => {
+    let url: string | undefined;
+    let link: HTMLAnchorElement | undefined;
     try {
       // Fetch as a blob rather than assigning a signed (cross-origin) URL to an
       // anchor's `download` attribute: browsers ignore that attribute across
@@ -40,17 +42,18 @@ export const useJobDocumentActions = () => {
       const { data, error } = await dataLayerClient.storage.from(bucket).download(path);
       if (error || !data) throw error || new Error("No se pudo descargar el documento");
 
-      const url = window.URL.createObjectURL(data);
-      const link = document.createElement("a");
+      url = window.URL.createObjectURL(data);
+      link = document.createElement("a");
       link.href = url;
       link.download = doc.file_name;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`No se pudo descargar el documento: ${message}`);
+    } finally {
+      link?.remove();
+      if (url) window.URL.revokeObjectURL(url);
     }
   });
 
