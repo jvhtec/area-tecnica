@@ -31,7 +31,7 @@ import {
     type StaffAssignment,
     type TabId,
 } from '@/components/department/enhancedJobDetailsModel';
-import { EnhancedJobDocumentRow } from '@/components/department/EnhancedJobDocumentRow';
+import { JobDocumentRow } from '@/components/jobs/documents/JobDocumentRow';
 import { useJobDocumentActions } from '@/hooks/useJobDocumentActions';
 
 import { queryKeys, createQueryKey } from "@/lib/react-query";
@@ -519,7 +519,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                     return visibleDocs.length > 0 ? (
                                         <div className="space-y-2">
                                             {visibleDocs.map((doc) => (
-                                                <EnhancedJobDocumentRow
+                                                <JobDocumentRow
                                                     key={doc.id}
                                                     doc={doc}
                                                     isDark={isDark}

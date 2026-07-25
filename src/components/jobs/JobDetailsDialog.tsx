@@ -105,7 +105,11 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   const { data: jobExpenses = [] } = useJobExpenses(resolvedJobId);
   const hasExpenses = jobExpenses.length > 0;
 
-  const resolvedDocuments = jobDetails?.job_documents || job?.job_documents || [];
+  const canViewAllDocuments = isManager || isHouseTech;
+  const resolvedDocuments = useMemo(() => {
+    const docs = jobDetails?.job_documents || job?.job_documents || [];
+    return canViewAllDocuments ? docs : docs.filter((doc: any) => doc.visible_to_tech);
+  }, [jobDetails?.job_documents, job?.job_documents, canViewAllDocuments]);
   const documentsLoading = isJobLoading;
 
   const expenseTechnicianOptions = useMemo(() => {

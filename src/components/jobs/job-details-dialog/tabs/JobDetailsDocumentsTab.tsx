@@ -1,6 +1,4 @@
 import React, { useMemo } from "react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { AlertCircle, Download, Eye, FileText, Loader2, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -11,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { JobDocumentRow } from "@/components/jobs/documents/JobDocumentRow";
+import { useJobDocumentActions } from "@/hooks/useJobDocumentActions";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -116,47 +115,7 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
     }
   };
 
-  const handleDownloadDocument = async (doc: any) => {
-    try {
-      const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await dataLayerClient.storage.from(bucket).createSignedUrl(path, 3600);
-
-      if (error) throw error;
-
-      if (data?.signedUrl) {
-        const link = document.createElement("a");
-        link.href = data.signedUrl;
-        link.download = doc.file_name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success("Descargando documento");
-      } else {
-        throw new Error("No se pudo generar el enlace de descarga");
-      }
-    } catch (error) {
-      console.error("Error downloading document:", error);
-      toast.error(`Error al descargar el documento: ${(error as Error).message || "Error desconocido"}`);
-    }
-  };
-
-  const handleViewDocument = async (doc: any) => {
-    try {
-      const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await dataLayerClient.storage.from(bucket).createSignedUrl(path, 3600);
-
-      if (error) throw error;
-
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, "_blank", "noopener");
-      } else {
-        throw new Error("No se pudo generar el enlace de visualización");
-      }
-    } catch (error) {
-      console.error("Error viewing document:", error);
-      toast.error(`Error al visualizar el documento: ${(error as Error).message || "Error desconocido"}`);
-    }
-  };
+  const { documentLoading, handleDownload, handleViewDocument } = useJobDocumentActions();
 
   return (
     <TabsContent value="documents" className="space-y-4 min-w-0 overflow-x-hidden">
@@ -178,48 +137,15 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
           </div>
         ) : resolvedDocuments.length > 0 ? (
           <div className="space-y-2">
-            {resolvedDocuments.map((doc: any) => {
-              const isTemplate = doc.template_type === "soundvision";
-              const isReadOnly = Boolean(doc.read_only);
-              return (
-                <div
-                  key={doc.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-slate-50 dark:bg-[#0f1219] border border-slate-200 dark:border-[#1f232e] rounded min-w-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium flex items-center gap-2 break-words">
-                      {doc.file_name}
-                      {isTemplate && (
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                          Plantilla SoundVision
-                        </Badge>
-                      )}
-                    </p>
-                    <p className="text-sm text-muted-foreground break-words">
-                      {doc.uploaded_at
-                        ? `Subido el ${format(new Date(doc.uploaded_at), "PPP", { locale: es })}`
-                        : "Fecha de subida desconocida"}
-                      {isReadOnly && <span className="ml-2 italic">Solo lectura</span>}
-                    </p>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
-                    <Button onClick={() => handleViewDocument(doc)} size="sm" variant="outline" className="w-full sm:w-auto">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver
-                    </Button>
-                    <Button
-                      onClick={() => handleDownloadDocument(doc)}
-                      size="sm"
-                      variant="outline"
-                      className="w-full sm:w-auto"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Descargar
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+            {resolvedDocuments.map((doc: any) => (
+              <JobDocumentRow
+                key={doc.id}
+                doc={doc}
+                isLoading={documentLoading.has(doc.id)}
+                onView={() => handleViewDocument(doc)}
+                onDownload={() => handleDownload(doc)}
+              />
+            ))}
           </div>
         ) : (
           <div className="text-center py-8">
