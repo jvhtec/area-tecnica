@@ -724,7 +724,7 @@ const DocumentRow = ({
   uploadedAt?: string;
 }) => (
   <div className={`${isDark ? "bg-[#151820] border-[#2a2e3b]" : "bg-slate-50 border-slate-200"} border rounded-lg p-3`}>
-    <div className="flex items-start gap-3">
+    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start">
       <div className="min-w-0 flex-1">
         <div className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 mb-1`} title={fileName}>
           {fileName}
@@ -735,13 +735,13 @@ const DocumentRow = ({
         </div>
         {badges && <div className="flex gap-1 mt-1 flex-wrap">{badges}</div>}
       </div>
-      <div className="flex gap-3 shrink-0">
+      <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:shrink-0">
         <Button
           variant="outline"
           size="icon"
           onClick={onView}
           disabled={isLoading}
-          className="h-10 w-10 p-0"
+          className="min-h-11 w-full md:h-10 md:w-10 md:p-0"
           title={`Ver ${fileName}`}
           aria-label={`Ver ${fileName}`}
         >
@@ -752,7 +752,7 @@ const DocumentRow = ({
           size="icon"
           onClick={onDownload}
           disabled={isLoading}
-          className="h-10 w-10 p-0"
+          className="min-h-11 w-full md:h-10 md:w-10 md:p-0"
           title={`Descargar ${fileName}`}
           aria-label={`Descargar ${fileName}`}
         >
