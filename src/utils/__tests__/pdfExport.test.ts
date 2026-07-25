@@ -35,13 +35,21 @@ const makePdf = () => {
     addPage: vi.fn(() => {
       pdf.internal.pages.push({});
     }),
+    circle: vi.fn(),
+    getNumberOfPages: vi.fn(() => pdf.internal.pages.length - 1),
+    getTextWidth: vi.fn((text: string) => text.length * 1.8),
+    line: vi.fn(),
     output: vi.fn(() => new Blob(['pdf'], { type: 'application/pdf' })),
     rect: vi.fn(),
+    roundedRect: vi.fn(),
+    setDrawColor: vi.fn(),
     setFillColor: vi.fn(),
     setFont: vi.fn(),
     setFontSize: vi.fn(),
+    setLineWidth: vi.fn(),
     setPage: vi.fn(),
     setTextColor: vi.fn(),
+    splitTextToSize: vi.fn((text: string) => [text]),
     text: vi.fn(),
     lastAutoTable: {
       finalY: 80,
@@ -104,8 +112,8 @@ describe('exportToPDF', () => {
     expect(pdfMocks.autoTable).toHaveBeenCalledWith(
       pdf,
       expect.objectContaining({
-        head: [['Truss', 'Motores', 'Peso Total (kg)']],
-        body: [['Main PA', '2', '250.00']],
+        head: [['Punto / conjunto', 'Motores', 'Peso total']],
+        body: [['Main PA', '2', '250,0 kg']],
       })
     );
   });
@@ -141,11 +149,10 @@ describe('exportToPDF', () => {
       true
     );
 
-    expect(pdf.text).toHaveBeenCalledWith(
-      expect.stringContaining('formato schuko hembra'),
-      14,
-      expect.any(Number)
-    );
+    const renderedText = pdf.text.mock.calls
+      .flatMap(([text]) => Array.isArray(text) ? text : [text])
+      .join('\n');
+    expect(renderedText).toContain('formato Schuko hembra');
   });
 
   it('uses each table snapshot and withholds invalid single-phase aggregate totals', async () => {
@@ -194,46 +201,25 @@ describe('exportToPDF', () => {
       '2026-07-10',
     );
 
-    expect(pdf.text).toHaveBeenCalledWith(
-      'Potencia: 100.00 W; ajustada (10%): 110.00 W',
-      14,
-      expect.any(Number),
-    );
-    expect(pdf.text).toHaveBeenCalledWith(
-      'Potencia: 100.00 W; ajustada (20%): 120.00 W',
-      14,
-      expect.any(Number),
-    );
-    expect(pdf.text).toHaveBeenCalledWith(
-      expect.stringContaining('no agregables'),
-      14,
-      expect.any(Number),
-    );
-    expect(pdf.text).toHaveBeenCalledWith(
-      expect.stringContaining('1φ'),
-      14,
-      expect.any(Number),
-    );
-    expect(pdf.text).toHaveBeenCalledWith(
-      expect.stringContaining('ΣP/ΣQ'),
-      14,
-      expect.any(Number),
-    );
-    expect(pdf.text).toHaveBeenCalledWith(
-      'Aparente: 0.11 kVA; corriente de línea: 0.48 A',
-      14,
-      expect.any(Number),
-    );
-    expect(pdf.text).toHaveBeenCalledWith(
-      'PDU: Schuko 16A; límite 80% 12.8 A; OK',
-      14,
-      expect.any(Number),
-    );
+    const renderedText = pdf.text.mock.calls
+      .flatMap(([text]) => Array.isArray(text) ? text : [text])
+      .join('\n');
+    expect(renderedText).toContain('Potencia de cálculo (10 %): 110 W');
+    expect(renderedText).toContain('Potencia de cálculo (20 %): 120 W');
+    expect(renderedText).toContain('La corriente global no es agregable');
+    expect(renderedText).toContain('monofásico 230 V');
+    expect(renderedText).toContain('Factor de potencia: Vectorial por componente');
+    expect(renderedText).toContain('Aparente: 0,11 kVA');
+    expect(renderedText).toContain('Corriente: 0,48 A');
+    expect(renderedText).toContain('referencia 80 %: 12,8 A');
+    expect(renderedText).not.toContain('Corriente: 99');
     const unicodeFontCallIndex = pdf.setFont.mock.calls.findIndex(
       ([family]) => family === 'NotoSansPdf',
     );
     const unicodeTextCallIndex = pdf.text.mock.calls.findIndex(
-      ([text]) => typeof text === 'string' && text.includes('1φ'),
+      ([text]) =>
+        (typeof text === 'string' && text.includes('√3')) ||
+        (Array.isArray(text) && text.some((line) => line.includes('√3'))),
     );
     expect(unicodeFontCallIndex).toBeGreaterThanOrEqual(0);
     expect(unicodeTextCallIndex).toBeGreaterThanOrEqual(0);
@@ -243,7 +229,7 @@ describe('exportToPDF', () => {
     expect(pdfMocks.autoTable).toHaveBeenCalledWith(
       pdf,
       expect.objectContaining({
-        head: [['Cantidad', 'Componente', 'Vatios (por unidad)', 'PF', 'Vatios Totales']],
+        head: [['Cant.', 'Componente', 'W / unidad', 'FP', 'W totales']],
       }),
     );
   });
