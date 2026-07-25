@@ -4,19 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { JobCardDocumentActions } from "@/components/jobs/cards/JobCardDocumentActions";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { useJobDocumentActions } from "@/hooks/useJobDocumentActions";
+import { formatDocumentUploadDate } from "@/utils/jobDocuments";
 import { isManagementRole } from "@/utils/permissions";
-import { formatInJobTimezone, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
+import type { JobDocument } from "@/types/job";
 
-export interface JobDocument {
-  id: string;
-  file_name: string;
-  file_path: string;
-  uploaded_at: string;
-  visible_to_tech?: boolean;
-  read_only?: boolean;
-  template_type?: string | null;
-}
+export type { JobDocument } from "@/types/job";
 
 interface JobCardDocumentsProps {
   documents: JobDocument[];
@@ -32,57 +25,11 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
   showTitle = true,
 }) => {
   const canManageDocuments = isManagementRole(userRole);
+  const { handleDownload, handleViewDocument } = useJobDocumentActions();
 
   if (documents.length === 0) {
     return null;
   }
-
-  const handleViewDocument = async (doc: JobDocument) => {
-    try {
-      console.log("Attempting to view document:", doc);
-      const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await dataLayerClient.storage
-        .from(bucket)
-        .createSignedUrl(path, 60 * 60);
-
-      if (error || !data?.signedUrl) {
-        console.error("Error creating signed URL:", error || 'No signedUrl returned', { bucket, path });
-        throw error || new Error('Failed to generate signed URL');
-      }
-
-      console.log("Signed URL created:", data.signedUrl);
-      window.open(data.signedUrl, "_blank", "noopener");
-    } catch (err: any) {
-      console.error("Error in handleViewDocument:", err);
-      alert(`Error al visualizar el documento: ${err.message}`);
-    }
-  };
-  
-  const handleDownload = async (doc: JobDocument) => {
-    try {
-      console.log('Starting download for document:', doc.file_name);
-
-      const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await dataLayerClient.storage.from(bucket).download(path);
-      if (error) {
-        console.error('Error downloading document:', error, { bucket, path });
-        throw error;
-      }
-
-      const url = window.URL.createObjectURL(data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = doc.file_name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-    } catch (err: any) {
-      console.error('Error in handleDownload:', err);
-      alert(`Error al descargar el documento: ${err.message}`);
-    }
-  };
 
   const handleToggleVisibility = async (doc: JobDocument) => {
     if (doc.read_only) {
@@ -141,7 +88,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
                     </span>
                   )}
                   <span>
-                    Subido el {formatInJobTimezone(doc.uploaded_at, "MMM d, yyyy", MADRID_TIMEZONE)}
+                    Subido el {formatDocumentUploadDate(doc.uploaded_at)}
                   </span>
                   {isReadOnly && (
                     <span className="italic">Solo lectura</span>

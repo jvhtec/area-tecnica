@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "generatedAt": "2026-07-21T22:37:24.260Z",
-  "note": "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities.",
+  "generatedAt": "2026-07-25T09:52:28.688Z",
+  "note": "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities that lack their own valid exception entry.",
   "advisoryIds": [
     "1112659",
     "1113300",
@@ -19,7 +19,10 @@
     "1123940",
     "1123941",
     "1123942",
-    "1124066"
+    "1124066",
+    "1124282",
+    "1124287",
+    "1124334"
   ],
   "exceptions": [
     {
@@ -140,14 +143,35 @@
       "owner": "platform-security",
       "reviewBy": "2026-08-31",
       "rationale": "The vulnerable sharp 0.32.6 copy is confined to local/build tooling through @capacitor/assets 3.0.5; the direct runtime sharp dependency is already 0.35.2. @capacitor/assets is at its latest release and npm audit reports no compatible fix for its nested sharp, so remove this exception when that package adopts sharp >=0.35.0 or the asset-generation toolchain is replaced."
+    },
+    {
+      "advisoryId": "1124287",
+      "package": "tar",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
+      "rationale": "This remains only in local/build tooling through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x -> tar 6.2.1. The production @capacitor/cli path is already on a patched tar; @capacitor/assets is at its latest release with no compatible fix, so remove this exception when its nested CLI is updated."
+    },
+    {
+      "advisoryId": "1124282",
+      "package": "react-router / react-router-dom",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-15",
+      "rationale": "GHSA-qwww-vcr4-c8h2 (React Router RSC Mode CSRF Bypass) only affects apps that opt into React Router's RSC/framework server-rendering mode (unstable_RSC, server actions). This app is a client-side Vite SPA using react-router-dom as a plain client router -- no RSC APIs are imported anywhere in src/. react-router-dom is already at its latest release (7.18.1); the only 'fix' npm audit offers is downgrading to 7.11.0, which reintroduces multiple other high-severity advisories (e.g. GHSA-chx6-hx7r-mcp5, GHSA-337j-9hxr-rhxg) that are only patched at >=7.18.0, so no version currently clears the full advisory set. Re-review when React Router publishes a release that patches GHSA-qwww-vcr4-c8h2 without regressing the later fixes."
+    },
+    {
+      "advisoryId": "1124334",
+      "package": "brace-expansion",
+      "owner": "platform-security",
+      "reviewBy": "2026-09-30",
+      "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @trapezedev/project -> replace -> minimatch@3.0.5 -> brace-expansion@1.1.16, the same local/build-tooling chain as the other minimatch exceptions above; remove this exception when that chain resolves to a non-vulnerable brace-expansion range."
     }
   ],
   "vulnerabilityCounts": {
     "info": 0,
     "low": 1,
     "moderate": 3,
-    "high": 6,
+    "high": 12,
     "critical": 1
   },
-  "total": 11
+  "total": 17
 }

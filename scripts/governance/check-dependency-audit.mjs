@@ -78,14 +78,42 @@ function collectAuditSnapshot(report) {
       severities.map((severity) => [severity, Number(counts[severity] ?? 0)]),
     ),
     total: Number(counts.total ?? 0),
+    packages: vulnerabilities,
   };
+}
+
+function isValidCalendarDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function findValidException(advisoryId, baseline, today) {
+  const exceptions = Array.isArray(baseline.exceptions) ? baseline.exceptions : [];
+  const exception = exceptions.find((entry) => String(entry?.advisoryId ?? "") === String(advisoryId));
+
+  if (!exception) {
+    return null;
+  }
+
+  const hasOwner = typeof exception.owner === "string" && exception.owner.trim().length > 0;
+  const hasValidReviewBy = isValidCalendarDate(exception.reviewBy);
+
+  if (!hasOwner || !hasValidReviewBy || exception.reviewBy < today) {
+    return null;
+  }
+
+  return exception;
 }
 
 function buildBaseline(snapshot, existingBaseline = {}) {
   return {
     version: 2,
     generatedAt: new Date().toISOString(),
-    note: "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities.",
+    note: "Current npm audit advisories are grandfathered only with an owner and non-expired review date. CI fails on new advisory IDs, increased severity counts, expired exceptions, or production high/critical vulnerabilities that lack their own valid exception entry.",
     advisoryIds: snapshot.advisoryIds,
     exceptions: existingBaseline.exceptions ?? [],
     vulnerabilityCounts: snapshot.vulnerabilityCounts,
@@ -144,7 +172,7 @@ function validateExceptions(snapshot, baseline) {
     if (typeof exception.owner !== "string" || !exception.owner.trim()) {
       errors.push(`advisory ${advisoryId} has no remediation owner`);
     }
-    if (typeof exception.reviewBy !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(exception.reviewBy)) {
+    if (!isValidCalendarDate(exception.reviewBy)) {
       errors.push(`advisory ${advisoryId} has an invalid reviewBy date`);
     } else if (exception.reviewBy < today) {
       errors.push(`advisory ${advisoryId} review expired on ${exception.reviewBy}`);
@@ -160,11 +188,33 @@ function validateExceptions(snapshot, baseline) {
   return errors;
 }
 
-function productionExposureFailures(snapshot) {
-  return ["high", "critical"].flatMap((severity) => {
-    const count = Number(snapshot.vulnerabilityCounts[severity] ?? 0);
-    return count > 0 ? [`production dependency audit has ${count} ${severity} vulnerabilities`] : [];
-  });
+function productionExposureFailures(snapshot, baseline) {
+  const today = new Date().toISOString().slice(0, 10);
+  const failures = [];
+
+  for (const [name, entry] of Object.entries(snapshot.packages ?? {})) {
+    const severity = entry?.severity;
+    if (severity !== "high" && severity !== "critical") {
+      continue;
+    }
+
+    const advisoryIds = advisoryIdsFromVia(entry.via);
+    // Entries whose `via` only references another package name (no advisory objects of their
+    // own) inherit their severity entirely from that dependency; that dependency's own entry is
+    // evaluated separately, so skip here to avoid double-reporting the same advisory.
+    if (advisoryIds.length === 0) {
+      continue;
+    }
+
+    const unexempted = advisoryIds.filter((advisoryId) => !findValidException(advisoryId, baseline, today));
+    if (unexempted.length > 0) {
+      failures.push(
+        `production dependency "${name}" (${severity}) has unexempted advisories: ${unexempted.join(", ")}`,
+      );
+    }
+  }
+
+  return failures;
 }
 
 function writeSummary(snapshot, failures = { newAdvisoryIds: [], increasedSeverityCounts: [] }) {
@@ -215,7 +265,7 @@ const baseline = readBaseline();
 const failures = compareToBaseline(snapshot, baseline);
 const exceptionFailures = validateExceptions(snapshot, baseline);
 const productionSnapshot = collectAuditSnapshot(runAudit(["--omit=dev"]));
-const productionFailures = productionExposureFailures(productionSnapshot);
+const productionFailures = productionExposureFailures(productionSnapshot, baseline);
 writeSummary(snapshot, failures);
 
 if (exceptionFailures.length > 0 || productionFailures.length > 0) {

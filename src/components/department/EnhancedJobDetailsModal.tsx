@@ -18,7 +18,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { canManagePayouts, isManagementRole } from '@/utils/permissions';
+import { canManagePayouts, canUploadDocuments, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 import {
     buildEnhancedJobTabs,
@@ -31,7 +31,7 @@ import {
     type StaffAssignment,
     type TabId,
 } from '@/components/department/enhancedJobDetailsModel';
-import { EnhancedJobDocumentRow } from '@/components/department/EnhancedJobDocumentRow';
+import { JobDocumentRow } from '@/components/jobs/documents/JobDocumentRow';
 import { useJobDocumentActions } from '@/hooks/useJobDocumentActions';
 
 import { queryKeys, createQueryKey } from "@/lib/react-query";
@@ -266,7 +266,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const isDryhire = jobType === 'dryhire';
     const showTourRatesTab = !isDryhire && jobType === 'tourdate' && (isManager || jobRatesApproved) && !isHouseTech;
     const showExtrasTab = !isDryhire && (isManager || isHouseTech || (jobRatesApproved && jobExtras.length > 0));
-    const canViewAllDocs = isManager || isHouseTech;
+    const canViewAllDocs = canUploadDocuments(userRole) || isHouseTech;
 
     const tabs = buildEnhancedJobTabs(showTourRatesTab, showExtrasTab);
 
@@ -519,7 +519,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                     return visibleDocs.length > 0 ? (
                                         <div className="space-y-2">
                                             {visibleDocs.map((doc) => (
-                                                <EnhancedJobDocumentRow
+                                                <JobDocumentRow
                                                     key={doc.id}
                                                     doc={doc}
                                                     isDark={isDark}

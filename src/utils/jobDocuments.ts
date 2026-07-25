@@ -1,6 +1,24 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isValid } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
 
 const DEPT_PREFIXES = new Set(['sound','lights','video','production','logistics','administrative']);
+
+const MADRID_TIMEZONE = 'Europe/Madrid';
+const UNAVAILABLE_DATE = 'Fecha no disponible';
+
+export const formatDocumentUploadDate = (value: string): string => {
+  if (!value) return UNAVAILABLE_DATE;
+  const date = new Date(value);
+  if (!isValid(date)) return UNAVAILABLE_DATE;
+
+  try {
+    return formatInTimeZone(date, MADRID_TIMEZONE, "d 'de' MMMM 'de' yyyy", { locale: es });
+  } catch {
+    return UNAVAILABLE_DATE;
+  }
+};
 
 export const resolveJobDocLocation = (path: string) => {
   const normalized = (path || '').replace(/^\/+/, '');
