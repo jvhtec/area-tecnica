@@ -24,6 +24,7 @@ import { CARLOS_AGENT_NAME } from "@/features/staffing/carlos";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
 import { canAccessExpenses, canAssignPersonnel, canManagePayouts, canUploadDocuments, isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { getVisibleFinancialTechnicianIds } from "@/components/jobs/financialViewerScope";
+import type { JobDocument } from "@/types/job";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -108,7 +109,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   const canViewAllDocuments = canUploadDocuments(userRole) || isHouseTech;
   const resolvedDocuments = useMemo(() => {
     const docs = jobDetails?.job_documents || job?.job_documents || [];
-    return canViewAllDocuments ? docs : docs.filter((doc: any) => doc.visible_to_tech);
+    return canViewAllDocuments ? docs : docs.filter((doc: JobDocument) => doc.visible_to_tech);
   }, [jobDetails?.job_documents, job?.job_documents, canViewAllDocuments]);
   const documentsLoading = isJobLoading;
 
