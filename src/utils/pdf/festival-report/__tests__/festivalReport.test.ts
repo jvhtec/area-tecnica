@@ -10,6 +10,8 @@ import {
   dropConstantColumns,
 } from '@/utils/pdf/festival-report/tables';
 import { formatFestivalNumber } from '@/utils/pdf/festival-report/components';
+import { festivalGeometry } from '@/utils/pdf/festival-report/tokens';
+import { fitImageWithin } from '@/utils/pdf/soundvisionReportPdf';
 import { buildWiredMicrophoneMatrix } from '@/utils/wiredMicrophoneNeedsPdfExport';
 
 describe('timeline clock parsing', () => {
@@ -141,6 +143,54 @@ describe('formatFestivalNumber', () => {
 
   it('renders a missing value rather than NaN', () => {
     expect(formatFestivalNumber(Number.NaN)).toBe('—');
+  });
+});
+
+describe('landscape content box', () => {
+  // A stage plot is placed into this box. It has to clear the running head and
+  // the footer rule, or the header rule prints across the top of the drawing.
+  const geo = festivalGeometry({
+    internal: { pageSize: { getWidth: () => 297, getHeight: () => 210 } },
+  } as never);
+
+  it('is recognised as landscape and drops the rail', () => {
+    expect(geo.landscape).toBe(true);
+    expect(geo.contentWidth).toBeCloseTo(297 - 22 - 16);
+  });
+
+  it('starts below the header rule and ends above the footer rule', () => {
+    expect(geo.contentTop).toBeGreaterThan(geo.headerRuleY);
+    expect(geo.contentBottom).toBeLessThan(geo.footerRuleY);
+  });
+
+  it('keeps a wide plot inside the box', () => {
+    const fitted = fitImageWithin(
+      1400,
+      900,
+      geo.left,
+      geo.contentTop,
+      geo.contentWidth,
+      geo.contentBottom - geo.contentTop,
+    );
+
+    expect(fitted.x).toBeGreaterThanOrEqual(geo.left);
+    expect(fitted.y).toBeGreaterThanOrEqual(geo.contentTop);
+    expect(fitted.x + fitted.width).toBeLessThanOrEqual(geo.right + 0.01);
+    expect(fitted.y + fitted.height).toBeLessThanOrEqual(geo.contentBottom + 0.01);
+  });
+
+  it('keeps a tall plot inside the box too', () => {
+    const fitted = fitImageWithin(
+      900,
+      1400,
+      geo.left,
+      geo.contentTop,
+      geo.contentWidth,
+      geo.contentBottom - geo.contentTop,
+    );
+
+    expect(fitted.height).toBeLessThanOrEqual(geo.contentBottom - geo.contentTop + 0.01);
+    expect(fitted.y + fitted.height).toBeLessThanOrEqual(geo.contentBottom + 0.01);
   });
 });
 

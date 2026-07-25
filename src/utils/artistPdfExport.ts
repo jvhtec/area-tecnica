@@ -1,5 +1,6 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { formatFrequencyBand } from '@/lib/frequencyBands';
+import { fitImageWithin } from '@/utils/pdf/soundvisionReportPdf';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 import {
@@ -8,9 +9,12 @@ import {
   drawFestivalTitleBlock,
   FESTIVAL_ACCENT,
   FESTIVAL_INK,
+  FESTIVAL_RULE,
   FESTIVAL_SOFT,
+  festivalGeometry,
   festivalTableTheme,
   loadFestivalIssuerMark,
+  setFestivalMonoText,
   setFestivalText,
   type FestivalGeometry,
 } from '@/utils/pdf/festival-report';
@@ -697,40 +701,50 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     }
   }
 
+  // The stage plot gets its own landscape page, fitted inside the running head
+  // and the footer rather than under them, and captioned because the vertical
+  // rail is dropped on landscape sheets.
   if (!templateMode && data.stagePlotUrl) {
     const stagePlotImage = await loadImageWithTimeout(data.stagePlotUrl, "stage plot");
-    if (stagePlotImage) {
+    if (stagePlotImage && stagePlotImage.width > 0 && stagePlotImage.height > 0) {
       try {
         const stagePlotDataUrl = imageToJpegDataUrl(stagePlotImage);
         doc.addPage("a4", "landscape");
 
-        const stagePlotPageWidth = doc.internal.pageSize.getWidth();
-        const stagePlotPageHeight = doc.internal.pageSize.getHeight();
-        const margin = 8;
-        const footerReserve = 14;
-        const availableWidth = stagePlotPageWidth - margin * 2;
-        const availableHeight = stagePlotPageHeight - margin * 2 - footerReserve;
-        const imageRatio = stagePlotImage.width / stagePlotImage.height;
-        const pageRatio = availableWidth / availableHeight;
+        const plotGeo = festivalGeometry(doc);
+        const captionHeight = 6 * plotGeo.mm;
+        const boxTop = plotGeo.contentTop + captionHeight;
+        const boxHeight = plotGeo.contentBottom - boxTop;
+        const fitted = fitImageWithin(
+          stagePlotImage.width,
+          stagePlotImage.height,
+          plotGeo.left,
+          boxTop,
+          plotGeo.contentWidth,
+          boxHeight,
+        );
 
-        let renderWidth = availableWidth;
-        let renderHeight = availableHeight;
-        if (imageRatio > pageRatio) {
-          renderHeight = renderWidth / imageRatio;
-        } else {
-          renderWidth = renderHeight * imageRatio;
-        }
+        setFestivalMonoText(doc, FESTIVAL_SOFT, 5.6, "bold");
+        doc.text(
+          `${tx("PLANO DE ESCENARIO", "STAGE PLOT")}  ·  ${data.name.toUpperCase()}`,
+          plotGeo.left,
+          plotGeo.contentTop,
+          { charSpace: 0.2 * plotGeo.mm },
+        );
 
-        const x = (stagePlotPageWidth - renderWidth) / 2;
-        const y = Math.max(margin, (stagePlotPageHeight - footerReserve - renderHeight) / 2);
-
-        doc.addImage(stagePlotDataUrl, "JPEG", x, y, renderWidth, renderHeight);
+        doc.addImage(stagePlotDataUrl, "JPEG", fitted.x, fitted.y, fitted.width, fitted.height);
+        doc.setDrawColor(...FESTIVAL_RULE);
+        doc.setLineWidth(0.25 * plotGeo.mm);
+        doc.rect(fitted.x, fitted.y, fitted.width, fitted.height);
       } catch (stagePlotError) {
         console.error("Error adding stage plot page to PDF:", stagePlotError);
       }
+    } else {
+      console.warn(`No se pudo cargar el plano de escenario de ${data.name}; la ficha se emite sin él.`);
     }
   }
-  
+
+
   const totalPages = doc.getNumberOfPages();
   for (let page = 1; page <= totalPages; page += 1) {
     doc.setPage(page);
