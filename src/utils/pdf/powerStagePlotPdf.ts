@@ -65,6 +65,7 @@ const drawZoneEntries = (
   y: number,
   width: number,
   entryColorFor?: (entry: StagePlotEntry) => StagePlotRgb,
+  annotationColor: StagePlotRgb = [150, 100, 0],
 ) => {
   let entryY = y + ZONE_HEADER_HEIGHT;
   entries.forEach((entry) => {
@@ -82,7 +83,7 @@ const drawZoneEntries = (
     }
     if (entry.includesHoist) {
       doc.setFontSize(6);
-      doc.setTextColor(150, 100, 0);
+      doc.setTextColor(...annotationColor);
       doc.setFont("helvetica", "italic");
       doc.text(
         fitText(doc, "+ Motor: CEE32A 3P+N+G", width - 4),
@@ -105,6 +106,7 @@ const drawZoneBox = (
   width: number,
   height: number,
   entryColorFor?: (entry: StagePlotEntry) => StagePlotRgb,
+  annotationColor?: StagePlotRgb,
 ) => {
   doc.setDrawColor(120, 120, 120);
   if (entries.length === 0) {
@@ -116,7 +118,7 @@ const drawZoneBox = (
   doc.setFontSize(6);
   doc.setTextColor(140, 140, 140);
   doc.text(zone, x + 1.5, y + 3.5);
-  drawZoneEntries(doc, entries, x, y, width, entryColorFor);
+  drawZoneEntries(doc, entries, x, y, width, entryColorFor, annotationColor);
 };
 
 const formatEntryList = (entries: StagePlotEntry[]) =>
@@ -194,6 +196,15 @@ export const drawPowerStagePlot = (
     entryColorFor?: (entry: StagePlotEntry) => StagePlotRgb;
     /** Color legend drawn under the title when provided. */
     legend?: StagePlotLegendItem[];
+    /** Accent color for the section title. */
+    titleColor?: StagePlotRgb;
+    /** Content start used when the plot needs a fresh page. */
+    pageBreakY?: number;
+    /** Left and right content insets; defaults preserve the legacy layout. */
+    contentLeft?: number;
+    contentRight?: number;
+    /** Accent used for auxiliary power and hoist annotations. */
+    annotationColor?: StagePlotRgb;
   },
 ): number => {
   const {
@@ -204,6 +215,11 @@ export const drawPowerStagePlot = (
     title = "Distribución en Escenario",
     entryColorFor,
     legend,
+    titleColor = [125, 1, 1],
+    pageBreakY = 20,
+    contentLeft = 14,
+    contentRight = 14,
+    annotationColor = [150, 100, 0],
   } = options;
   let y = options.startY;
 
@@ -214,17 +230,17 @@ export const drawPowerStagePlot = (
   );
   if (y + totalHeight > pageHeight - footerSpace) {
     doc.addPage();
-    y = 20;
+    y = pageBreakY;
   }
 
   doc.setFontSize(14);
-  doc.setTextColor(125, 1, 1);
-  doc.text(title, 14, y);
+  doc.setTextColor(...titleColor);
+  doc.text(title, contentLeft, y);
   y += 8;
 
   // Color legend (one swatch + label per department)
   if (legend && legend.length > 0) {
-    let legendX = 14;
+    let legendX = contentLeft;
     doc.setFontSize(8);
     legend.forEach(({ label, color }) => {
       const [red, green, blue] = color;
@@ -238,18 +254,25 @@ export const drawPowerStagePlot = (
     y += LEGEND_HEIGHT;
   }
 
-  const totalWidth = STAGE_WIDTH + 2 * (WING_WIDTH + WING_GAP);
-  const wingLeftX = (pageWidth - totalWidth) / 2;
-  const stageX = wingLeftX + WING_WIDTH + WING_GAP;
-  const wingRightX = stageX + STAGE_WIDTH + WING_GAP;
-  const cellWidth = STAGE_WIDTH / 3;
+  const availableWidth = pageWidth - contentLeft - contentRight;
+  const baseTotalWidth = STAGE_WIDTH + 2 * (WING_WIDTH + WING_GAP);
+  const widthScale = Math.min(1, availableWidth / baseTotalWidth);
+  const stageWidth = STAGE_WIDTH * widthScale;
+  const wingWidth = WING_WIDTH * widthScale;
+  const wingGap = WING_GAP * widthScale;
+  const totalWidth = stageWidth + 2 * (wingWidth + wingGap);
+  const plotCenterX = contentLeft + availableWidth / 2;
+  const wingLeftX = plotCenterX - totalWidth / 2;
+  const stageX = wingLeftX + wingWidth + wingGap;
+  const wingRightX = stageX + stageWidth + wingGap;
+  const cellWidth = stageWidth / 3;
 
   doc.setLineWidth(0.4);
 
   // Backstage band behind the stage
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text("BACKSTAGE", pageWidth / 2, y, { align: "center" });
+  doc.text("TRAS ESCENA", plotCenterX, y, { align: "center" });
   y += 2;
   const backstageBandHeight = backstageHeight(plot);
   const backstageCellWidth = totalWidth / STAGE_PLOT_BACKSTAGE_ROW.length;
@@ -263,13 +286,14 @@ export const drawPowerStagePlot = (
       backstageCellWidth,
       backstageBandHeight,
       entryColorFor,
+      annotationColor,
     );
   });
   y += backstageBandHeight + 2;
 
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text("ESCENARIO", pageWidth / 2, y + 2, { align: "center" });
+  doc.text("ESCENARIO", plotCenterX, y + 2, { align: "center" });
   y += 4;
 
   // Stage grid with offstage wings (split up/center/down) aligned per row
@@ -283,9 +307,10 @@ export const drawPowerStagePlot = (
       plot.zones[STAGE_PLOT_WING_LEFT_COLUMN[rowIndex]],
       wingLeftX,
       rowY,
-      WING_WIDTH,
+      wingWidth,
       rowHeight,
       entryColorFor,
+      annotationColor,
     );
     drawZoneBox(
       doc,
@@ -293,9 +318,10 @@ export const drawPowerStagePlot = (
       plot.zones[STAGE_PLOT_WING_RIGHT_COLUMN[rowIndex]],
       wingRightX,
       rowY,
-      WING_WIDTH,
+      wingWidth,
       rowHeight,
       entryColorFor,
+      annotationColor,
     );
     row.forEach((zone, columnIndex) => {
       drawZoneBox(
@@ -307,6 +333,7 @@ export const drawPowerStagePlot = (
         cellWidth,
         rowHeight,
         entryColorFor,
+        annotationColor,
       );
     });
     rowY += rowHeight;
@@ -317,12 +344,12 @@ export const drawPowerStagePlot = (
   y += 3;
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text("PÚBLICO", pageWidth / 2, y + 4, { align: "center" });
+  doc.text("PÚBLICO", plotCenterX, y + 4, { align: "center" });
   y += AUDIENCE_LABEL_HEIGHT;
 
   const fohEntries = plot.zones[STAGE_PLOT_FOH];
-  const fohWidth = (STAGE_WIDTH * 2) / 3;
-  const fohX = (pageWidth - fohWidth) / 2;
+  const fohWidth = (stageWidth * 2) / 3;
+  const fohX = plotCenterX - fohWidth / 2;
   const fohHeight = fohBoxHeight(plot, fohSchukoRequired);
   doc.setDrawColor(120, 120, 120);
   try {
@@ -344,13 +371,21 @@ export const drawPowerStagePlot = (
   doc.setFontSize(6);
   doc.setTextColor(140, 140, 140);
   doc.text(STAGE_PLOT_FOH, fohX + 1.5, y + 3.5);
-  drawZoneEntries(doc, fohEntries, fohX, y, fohWidth, entryColorFor);
+  drawZoneEntries(
+    doc,
+    fohEntries,
+    fohX,
+    y,
+    fohWidth,
+    entryColorFor,
+    annotationColor,
+  );
   if (fohSchukoRequired) {
     doc.setFontSize(7);
-    doc.setTextColor(150, 100, 0);
+    doc.setTextColor(...annotationColor);
     doc.setFont("helvetica", "italic");
     doc.text(
-      fitText(doc, "Se requiere schuko 16A hembra", fohWidth - 4),
+      fitText(doc, "Se requiere Schuko hembra de 16 A", fohWidth - 4),
       fohX + fohWidth / 2,
       y + fohHeight - 2.5,
       { align: "center" },
@@ -361,23 +396,23 @@ export const drawPowerStagePlot = (
 
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text("PÚBLICO", pageWidth / 2, y + 4, { align: "center" });
+  doc.text("PÚBLICO", plotCenterX, y + 4, { align: "center" });
   y += AUDIENCE_LABEL_HEIGHT + 2;
 
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
   plot.custom.forEach((group) => {
     doc.text(
-      fitText(doc, `${group.position}: ${formatEntryList(group.entries)}`, pageWidth - 28),
-      14,
+      fitText(doc, `${group.position}: ${formatEntryList(group.entries)}`, availableWidth),
+      contentLeft,
       y + 4,
     );
     y += 6;
   });
   if (plot.unpositioned.length > 0) {
     doc.text(
-      fitText(doc, `Sin posición: ${formatEntryList(plot.unpositioned)}`, pageWidth - 28),
-      14,
+      fitText(doc, `Sin posición: ${formatEntryList(plot.unpositioned)}`, availableWidth),
+      contentLeft,
       y + 4,
     );
     y += 6;
