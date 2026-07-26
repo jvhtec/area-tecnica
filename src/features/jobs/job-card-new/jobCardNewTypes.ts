@@ -149,7 +149,8 @@ export type JobCardFolderDependencies = {
   isJobBeingDeleted: boolean;
   isManagementUser: boolean;
   job: JobCardJob;
-  onDeleteClick: (jobId: string) => void;
+  /** Optional: read-only surfaces render cards without a delete handler. */
+  onDeleteClick?: (jobId: string) => void;
   queryClient: QueryClient;
   removeDeletingJob: (jobId: string) => void;
   setFlexPickerMode: (mode: FlexPickerMode) => void;

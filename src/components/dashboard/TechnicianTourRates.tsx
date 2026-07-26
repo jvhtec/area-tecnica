@@ -330,7 +330,7 @@ export const TechnicianTourRates: React.FC<TechnicianTourRatesProps> = ({ theme,
                                 {quote.breakdown.error === 'category_missing' && 'Falta configurar tu categoría de técnico.'}
                                 {quote.breakdown.error === 'house_rate_missing' && 'Falta configurar tu tarifa de técnico residente.'}
                                 {quote.breakdown.error === 'tour_base_missing' && 'Falta la tarifa base de gira para tu categoría.'}
-                                {!['category_missing', 'house_rate_missing', 'tour_base_missing'].includes(quote.breakdown.error) && `Error: ${quote.breakdown.error}`}
+                                {!!quote.breakdown.error && !['category_missing', 'house_rate_missing', 'tour_base_missing'].includes(quote.breakdown.error) && `Error: ${quote.breakdown.error}`}
                               </span>
                             </div>
                           </div>

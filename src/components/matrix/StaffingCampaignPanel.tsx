@@ -463,6 +463,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         ? { next_run_at: new Date().toISOString() }
         : {}
 
+      if (!campaign?.id) return
+
       const { data, error } = await dataLayerClient.from('staffing_campaigns')
         .update({
           mode: formData.mode,
@@ -471,7 +473,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           updated_at: new Date().toISOString(),
           ...nextRunUpdate
         })
-        .eq('id', campaign?.id)
+        .eq('id', campaign.id)
         .select()
         .single()
 

@@ -17,7 +17,7 @@ type MutationControl = {
 };
 
 export interface StaffingCampaignViewProps {
-  jobMeta?: JobMeta;
+  jobMeta?: JobMeta | null;
   inferredJobProfile: JobProfileName;
   profileOverrideActive: boolean;
   roleCodes: string[];

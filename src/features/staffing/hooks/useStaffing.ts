@@ -85,7 +85,7 @@ export function useSendStaffingEmail() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'apikey': anonKey,
+          'apikey': anonKey ?? '',
         },
         body: JSON.stringify(payload)
       });

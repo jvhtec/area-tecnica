@@ -67,7 +67,7 @@ export interface PayoutData {
     rejected_total_eur?: number;
   }>;
   vehicle_disclaimer?: boolean;
-  vehicle_disclaimer_text?: string;
+  vehicle_disclaimer_text?: string | null;
   // Payout override fields (when manual override is set)
   has_override?: boolean; // True if override_amount_eur is set
   override_amount_eur?: number; // Manual override amount (if set)

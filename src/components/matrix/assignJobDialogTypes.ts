@@ -67,8 +67,8 @@ export const getAssignableJobDateKeys = (job: AssignableJob | null | undefined) 
   });
 
   const startKey = normalizeDateKey(job.start_time);
-  const endKey = normalizeDateKey(job.end_time) ?? startKey;
   if (!startKey) return sortDateKeys(keys);
+  const endKey = normalizeDateKey(job.end_time) ?? startKey;
   let cursorKey = startKey;
 
   while (cursorKey <= endKey) {

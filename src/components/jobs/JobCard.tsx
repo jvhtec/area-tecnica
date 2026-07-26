@@ -15,7 +15,7 @@ interface JobCardProps {
   onEditClick: (job: Job) => void;
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
-  userRole: string | null;
+  userRole?: string | null;
   department: string;
   selectedDate?: Date;
   festivalLogo?: string;

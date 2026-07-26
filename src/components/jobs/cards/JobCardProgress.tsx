@@ -6,7 +6,7 @@ import { RequiredRoleSummaryItem } from "@/hooks/useJobRequiredRoles";
 import { labelForCode } from "@/utils/roles";
 
 interface JobCardProgressProps {
-  soundTasks: any[] | null;
+  soundTasks?: any[] | null;
   roleSummary?: RequiredRoleSummaryItem[];
 }
 
@@ -57,7 +57,7 @@ export const JobCardProgress: React.FC<JobCardProgressProps> = ({
         </div>
       )}
 
-      {soundTasks?.length > 0 && (
+      {!!soundTasks?.length && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>

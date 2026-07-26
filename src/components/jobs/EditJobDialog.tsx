@@ -45,7 +45,7 @@ interface EditJobDialogProps {
 const EDITABLE_JOB_DEPARTMENTS = new Set<string>(TECHNICAL_DEPARTMENTS);
 
 function isEditableJobDepartment(department: string | null | undefined): department is Department {
-  return Boolean(department) && EDITABLE_JOB_DEPARTMENTS.has(department);
+  return department != null && EDITABLE_JOB_DEPARTMENTS.has(department);
 }
 
 function getDepartmentsFromJob(job: any): Department[] {

@@ -88,9 +88,11 @@ export const useOptimizedJobCard = <TJob extends OptimizedJobCardJob>(
   job: TJob,
   department: string,
   userRole: string | null,
-  _onEditClick: (job: TJob) => void,
-  _onDeleteClick: (jobId: string) => void,
-  _onJobClick: (jobId: string) => void,
+  // Kept for call-site compatibility; the hook does not invoke them. Optional because
+  // read-only surfaces render cards without handlers.
+  _onEditClick?: (job: TJob) => void,
+  _onDeleteClick?: (jobId: string) => void,
+  _onJobClick?: (jobId: string) => void,
   options?: UseOptimizedJobCardOptions
 ) => {
   const { theme } = useTheme();

@@ -40,9 +40,10 @@ declare global {
 import { queryKeys } from "@/lib/react-query";
 export interface JobCardNewProps {
   job: JobCardJob;
-  onEditClick: (job: JobCardJob) => void;
-  onDeleteClick: (jobId: string) => void;
-  onJobClick: (jobId: string) => void;
+  // Optional: read-only surfaces (dashboards, wallboards) render cards without handlers.
+  onEditClick?: (job: JobCardJob) => void;
+  onDeleteClick?: (jobId: string) => void;
+  onJobClick?: (jobId: string) => void;
   showAssignments?: boolean;
   department?: Department;
   userRole?: string | null;
@@ -190,7 +191,7 @@ function JobCardNewFull({
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('tour_documents')
         .select('id, file_name, file_path, uploaded_at')
-        .eq('tour_id', cardTourId)
+        .eq('tour_id', cardTourId!)
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
       return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string }>;

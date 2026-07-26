@@ -265,7 +265,7 @@ export function useJobCardFolderActions({
           result.details ||
           "The job has been removed and cleanup is running in background.",
       });
-      onDeleteClick(job.id);
+      onDeleteClick?.(job.id);
       await queryClient.invalidateQueries({
         queryKey: queryKeys.scope("jobs"),
       });

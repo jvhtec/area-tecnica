@@ -4,6 +4,7 @@ import type { Department } from "@/types/department";
 import type { Job } from "@/types/job";
 import type { FlatElementNode } from "@/utils/flex-folders";
 import type { TechnicalPowerSummaryAvailability } from "@/utils/technicalPowerTypes";
+import type { JobTourFlexFolders } from '@/utils/flexMainFolderId';
 
 export type JobCardLocationObject = {
   name?: string | null;
@@ -38,15 +39,7 @@ export interface JobCardJob extends Job {
   name?: string | null;
   presupuesto_element_id?: string | null;
   presupuestoElementId?: string | null;
-  tour?: {
-    id: string;
-    flex_main_folder_id?: string | null;
-    flex_sound_folder_id?: string | null;
-    flex_lights_folder_id?: string | null;
-    flex_video_folder_id?: string | null;
-    flex_production_folder_id?: string | null;
-    flex_personnel_folder_id?: string | null;
-  } | null;
+  tour?: JobTourFlexFolders | null;
   tour_id?: string | null;
 }
 
