@@ -95,7 +95,7 @@ export const createQueryKey = {
   jobs: {
     all: ['jobs'] as const,
     lists: () => [...createQueryKey.jobs.all, 'list'] as const,
-    list: (filters: Record<string, any>) => [...createQueryKey.jobs.lists(), filters] as const,
+    list: (filters: Record<string, unknown>) => [...createQueryKey.jobs.lists(), filters] as const,
     details: () => [...createQueryKey.jobs.all, 'detail'] as const,
     detail: (id: string) => [...createQueryKey.jobs.details(), id] as const,
     /** Job metadata for timesheet closure window checks (end_time, timezone). */

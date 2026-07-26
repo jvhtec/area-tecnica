@@ -83,7 +83,7 @@ export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) 
           }
 
           // The RPC returns a JSON object with all fields; coerce to the expected type
-          const q = (data || {}) as Record<string, any>
+          const q = (data || {}) as Record<string, unknown>
 
           return {
             job_id: q.job_id ?? jobId,

@@ -12,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useJobDistance } from "@/hooks/useJobDistance";
 import { getDateTypeMeta } from "@/constants/dateTypes";
 import { canEditJobs } from "@/utils/permissions";
+import type { JobDateTypeForCard } from "@/hooks/useOptimizedJobCard";
 import {
   getDepartmentPackageSize,
   getPackageBadgeLabel,
@@ -24,7 +25,8 @@ interface JobCardHeaderProps {
   onToggleCollapse: (e: React.MouseEvent) => void;
   appliedBorderColor: string;
   appliedBgColor: string;
-  dateTypes: Record<string, any>;
+  /** Keyed by `${jobId}-${yyyy-MM-dd}`; carries the job's date-type row. */
+  dateTypes: Record<string, JobDateTypeForCard>;
   department: Department;
   isProjectManagementPage?: boolean;
   userRole?: string | null;
@@ -48,7 +50,7 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
     ? getDepartmentPackageSize(job.tour_date, packageDepartment)
     : null;
 
-  const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
+  const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, JobDateTypeForCard>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
     const meta = getDateTypeMeta(dateTypes[key]?.type);
     if (!meta) return null;

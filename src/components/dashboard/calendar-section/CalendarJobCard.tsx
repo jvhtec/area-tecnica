@@ -17,11 +17,13 @@ import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { getDateTypeMeta } from "@/constants/dateTypes";
 
 import { DateTypeContextMenu } from "../DateTypeContextMenu";
+import type { JobDateTypeForCard } from "@/hooks/useOptimizedJobCard";
 
 export interface CalendarJobCardProps {
   job: any;
   date: Date;
-  dateTypes: Record<string, any>;
+  /** Keyed by `${jobId}-${yyyy-MM-dd}`; carries the job's date-type row. */
+  dateTypes: Record<string, JobDateTypeForCard>;
 }
 
 export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dateTypes }) => {

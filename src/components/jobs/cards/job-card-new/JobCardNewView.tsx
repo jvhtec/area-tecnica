@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
 import { FileText, Loader2, NotebookPen } from "lucide-react";
-import React from "react";
+import React, { useMemo } from "react";
 import { createPortal } from "react-dom";
 
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
@@ -52,6 +52,8 @@ import type {
   WhatsappRequestSummary,
 } from "@/features/jobs/job-card-new/jobCardNewTypes";
 import { queryKeys } from "@/lib/react-query";
+import type { JobDateTypeMap } from "@/hooks/useOptimizedDateTypes";
+import type { JobDateTypeForCard } from "@/hooks/useOptimizedJobCard";
 
 export interface JobCardNewViewProps {
   job: JobCardJob;
@@ -320,6 +322,16 @@ export function JobCardNewView({
     setCelebrateSeed((s) => (s + 1) % 1_000_000);
   }, [isAndreaWeddingJob, reducedMotion]);
 
+  // `JobCardHeader` looks date types up by `${jobId}-${yyyy-MM-dd}`. `job_date_types`
+  // is a flat array, so passing it through unchanged meant every lookup missed and
+  // the date-type icon never rendered.
+  const dateTypeMap = useMemo<JobDateTypeMap>(() => {
+    const entries = (job.job_date_types ?? [])
+      .filter((dt): dt is JobDateTypeForCard & { date: string } => Boolean(dt?.date))
+      .map((dt) => [`${job.id}-${dt.date}`, dt] as const);
+    return Object.fromEntries(entries);
+  }, [job.id, job.job_date_types]);
+
   return (
     <div>
       <Card
@@ -364,7 +376,7 @@ export function JobCardNewView({
           onToggleCollapse={toggleCollapse}
           appliedBorderColor={appliedBorderColor}
           appliedBgColor={appliedBgColor}
-          dateTypes={job.job_date_types || {}}
+          dateTypes={dateTypeMap}
           department={department}
           isProjectManagementPage={isProjectManagementPage}
           userRole={userRole}

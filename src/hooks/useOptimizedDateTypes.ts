@@ -3,6 +3,13 @@ import { supabase } from "@/lib/supabase";
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { JobDateTypeForCard } from "@/hooks/useOptimizedJobCard";
+
+/**
+ * Date-type rows keyed by `${job_id}-${date}` — the lookup shape every consumer
+ * (`JobCardHeader`, `CalendarJobCard`, `FestivalDateNavigation`) indexes with.
+ */
+export type JobDateTypeMap = Record<string, JobDateTypeForCard>;
 /**
  * Optimized hook for fetching date types with aggressive caching
  */
@@ -25,7 +32,7 @@ export const useOptimizedDateTypes = (jobIds: string[], dates: string[]) => {
         throw error;
       }
 
-      return data.reduce((acc: Record<string, any>, curr) => ({
+      return data.reduce((acc: JobDateTypeMap, curr) => ({
         ...acc,
         [`${curr.job_id}-${curr.date}`]: curr,
       }), {});

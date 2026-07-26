@@ -175,7 +175,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         return {};
       }
 
-      return data.reduce((acc: Record<string, any>, curr) => ({
+      return data.reduce((acc: Record<string, unknown>, curr) => ({
         ...acc,
         [`${curr.job_id}-${curr.date}`]: curr,
       }), {});

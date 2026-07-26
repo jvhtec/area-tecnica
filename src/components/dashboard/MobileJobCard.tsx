@@ -51,7 +51,7 @@ interface MobileJobCardProps {
   job: any;
   department?: Department;
   currentDate: Date;
-  dateTypes?: Record<string, any>;
+  dateTypes?: Record<string, unknown>;
   onDateTypeChange?: () => void;
   onEditClick?: (job: any) => void;
   onDeleteClick?: (jobId: string) => void;
