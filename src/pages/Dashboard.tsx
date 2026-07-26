@@ -21,6 +21,7 @@ import { canAccessDashboard, canViewPendingExpenses, isManagementRole } from "@/
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 const DashboardMobileHub = lazy(() =>
   import("@/components/dashboard/DashboardMobileHub").then((m) => ({ default: m.DashboardMobileHub }))
 );
@@ -84,7 +85,7 @@ const Dashboard = () => {
   // Modal state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<JobCardJob | null>(null);
 
   // New Dialog States
   const [messagesOpen, setMessagesOpen] = useState(false);

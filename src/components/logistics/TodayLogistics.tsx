@@ -9,6 +9,7 @@ import { useState } from "react";
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { LogisticsCalendarEvent } from "@/components/logistics/LogisticsEventDialog";
 interface TodayLogisticsProps {
   selectedDate: Date;
 }
@@ -16,7 +17,7 @@ interface TodayLogisticsProps {
 export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
   const { toast } = useToast();
   const [showEventDialog, setShowEventDialog] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
   const { data: events, isLoading } = useQuery({

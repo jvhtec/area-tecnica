@@ -53,27 +53,31 @@ const departments: Department[] = [
   "video"
 ];
 
+
+/** A logistics event as the calendar views hold it and hand it to the edit dialog. */
+export type LogisticsCalendarEvent = {
+  id: string;
+  event_type: "load" | "unload";
+  transport_type: LogisticsTransportType;
+  event_time: string;
+  event_date: string;
+  loading_bay: string | null;
+  job_id: string | null;
+  license_plate: string | null;
+  title?: string;
+  color?: string;
+  transport_provider?: TransportProvider | null;
+  notes?: string | null;
+  is_hoja_relevant?: boolean;
+  hoja_categories?: LogisticsHojaCategory[];
+  departments: { department: Department }[];
+};
+
 interface LogisticsEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedDate?: Date;
-  selectedEvent?: {
-    id: string;
-    event_type: "load" | "unload";
-    transport_type: LogisticsTransportType;
-    event_time: string;
-    event_date: string;
-    loading_bay: string | null;
-    job_id: string | null;
-    license_plate: string | null;
-    title?: string;
-    color?: string;
-    transport_provider?: TransportProvider | null;
-    notes?: string | null;
-    is_hoja_relevant?: boolean;
-    hoja_categories?: LogisticsHojaCategory[];
-    departments: { department: Department }[];
-  };
+  selectedEvent?: LogisticsCalendarEvent;
   // Optional initial values when creating a new event
   initialJobId?: string | null;
   initialDepartments?: Department[];

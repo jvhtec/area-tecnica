@@ -42,6 +42,7 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 const Sound = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,7 +54,7 @@ const Sound = () => {
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<JobCardJob | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
@@ -62,8 +63,8 @@ const Sound = () => {
   const [showIncidentReport, setShowIncidentReport] = useState(false);
   const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
-  const [selectedJobForDetails, setSelectedJobForDetails] = useState<any>(null);
-  const [selectedJobForAssignments, setSelectedJobForAssignments] = useState<any>(null);
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState<JobCardJob | null>(null);
+  const [selectedJobForAssignments, setSelectedJobForAssignments] = useState<JobCardJob | null>(null);
   const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
   const currentDepartment = "sound" as const;

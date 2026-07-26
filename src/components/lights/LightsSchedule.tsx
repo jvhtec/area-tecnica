@@ -1,10 +1,11 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 
 interface LightsScheduleProps {
   date: Date | undefined;
-  jobs: any[];
+  jobs: JobCardJob[];
   isLoading: boolean;
   onJobClick: (jobId: string) => void;
   onEditClick: (job: any) => void;

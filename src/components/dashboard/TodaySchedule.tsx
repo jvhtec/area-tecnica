@@ -1,9 +1,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
+import type { Department } from "@/types/department";
+
+/**
+ * `TodaySchedule` is fed either job rows directly or assignment rows that wrap the
+ * job under `jobs` — hence the `job.jobs || job` unwrapping below. Modelled as one
+ * shape with both sides optional rather than a union, so the unwrap stays readable.
+ */
+export type TodayScheduleEntry = Partial<JobCardJob> & {
+  job_id?: string | null;
+  department?: string | null;
+  jobs?: JobCardJob | null;
+};
+
 
 interface TodayScheduleProps {
-  jobs: any[];
+  jobs: TodayScheduleEntry[];
   onEditClick: (job: any) => void;
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
@@ -81,7 +95,9 @@ export const TodaySchedule = ({
     return (
       <div className="flex flex-col gap-3">
         {jobs.map(job => {
-          const jobData = job.jobs || job;
+          // An entry is either a job row or an assignment row wrapping one; once
+          // unwrapped it is a full job either way.
+          const jobData = (job.jobs ?? job) as JobCardJob;
           const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
 
           if (!jobId) return null;
@@ -99,7 +115,7 @@ export const TodaySchedule = ({
               onDeleteClick={onDeleteClick}
               onJobClick={onJobClick}
               userRole={userRole}
-              department={department || job.department || jobData.department || "sound"}
+              department={(department || job.department || jobData.department || "sound") as Department}
               hideTasks={hideTasks}
               showManageArtists={isFestivalJob}
               detailsOnlyMode={detailsOnlyMode}
@@ -122,7 +138,9 @@ export const TodaySchedule = ({
             if (import.meta.env.DEV) {
               console.log("Rendering job in TodaySchedule:", job);
             }
-            const jobData = job.jobs || job;
+            // An entry is either a job row or an assignment row wrapping one; once
+          // unwrapped it is a full job either way.
+          const jobData = (job.jobs ?? job) as JobCardJob;
             const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
 
             if (!jobId) {
@@ -157,7 +175,7 @@ export const TodaySchedule = ({
                 onDeleteClick={onDeleteClick}
                 onJobClick={onJobClick}
                 userRole={userRole}
-                department={department || job.department || jobData.department || "sound"}
+                department={(department || job.department || jobData.department || "sound") as Department}
                 hideTasks={hideTasks}
                 showManageArtists={isFestivalJob}
                 detailsOnlyMode={detailsOnlyMode}

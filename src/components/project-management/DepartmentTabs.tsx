@@ -6,11 +6,12 @@ import { Loader2 } from "lucide-react";
 import { isToday, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 
 interface DepartmentTabsProps {
   selectedDepartment: Department;
   onDepartmentChange: (value: string) => void;
-  jobs: any[];
+  jobs: JobCardJob[];
   jobsLoading: boolean;
   onDeleteDocument?: (jobId: string, document: any) => void;
   userRole?: string | null;
