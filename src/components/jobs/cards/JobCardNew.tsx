@@ -189,9 +189,10 @@ function JobCardNewFull({
     queryKey: queryKeys.scope('jobcard-tour-documents', job.id, cardTourId),
     enabled: !!cardTourId && job.job_type !== 'dryhire',
     queryFn: async () => {
+      if (!cardTourId) return [];
       const { data, error } = await dataLayerClient.from('tour_documents')
         .select('id, file_name, file_path, uploaded_at')
-        .eq('tour_id', cardTourId!)
+        .eq('tour_id', cardTourId)
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
       return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string }>;

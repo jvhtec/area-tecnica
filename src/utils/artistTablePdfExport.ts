@@ -6,6 +6,7 @@ import {
   BAND_TEXT_TOKEN,
   FESTIVAL_TEXT_TOKEN,
   MIXED_TEXT_TOKEN,
+  type WirelessSystemPdf,
   formatInfrastructureForPdf,
   formatWiredMicsForPdf,
   formatWirelessSystemsForPdf,
@@ -54,8 +55,8 @@ export interface ArtistTablePdfData {
       monitorsFromFoh?: boolean;
       fohWavesOutboard?: string;
       monWavesOutboard?: string;
-      wireless: { systems: any[]; providedBy?: string | null };
-      iem: { systems: any[]; providedBy?: string | null };
+      wireless: { systems: WirelessSystemPdf[]; providedBy?: string | null };
+      iem: { systems: WirelessSystemPdf[]; providedBy?: string | null };
       monitors: { enabled: boolean; quantity: number };
     };
     extras: { sideFill: boolean; drumFill: boolean; djBooth: boolean };

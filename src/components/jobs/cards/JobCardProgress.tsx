@@ -5,8 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { RequiredRoleSummaryItem } from "@/hooks/useJobRequiredRoles";
 import { labelForCode } from "@/utils/roles";
 
+interface JobCardSoundTask {
+  id: string;
+  progress?: number | null;
+  status?: string | null;
+  task_type: string;
+  assigned_to?: {
+    first_name?: string | null;
+    last_name?: string | null;
+  } | null;
+}
+
 interface JobCardProgressProps {
-  soundTasks?: any[] | null;
+  soundTasks?: JobCardSoundTask[] | null;
   roleSummary?: RequiredRoleSummaryItem[];
 }
 
@@ -22,7 +33,7 @@ export const JobCardProgress: React.FC<JobCardProgressProps> = ({
 
   const getCompletedTasks = () => {
     if (!soundTasks?.length) return 0;
-    return soundTasks.filter((task: any) => task.status === "completed").length;
+    return soundTasks.filter((task) => task.status === "completed").length;
   };
 
   const hasRequirements = roleSummary.length > 0;
@@ -67,7 +78,7 @@ export const JobCardProgress: React.FC<JobCardProgressProps> = ({
           </div>
           <Progress value={calculateTotalProgress()} className="h-1" />
           <div className="space-y-1">
-            {soundTasks.map((task: any) => (
+            {soundTasks.map((task) => (
               <div key={task.id} className="flex items-center justify-between text-xs">
                 <span>{task.task_type}</span>
                 <div className="flex items-center gap-2">
