@@ -370,6 +370,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 type="number"
                 min="0"
                 value={personnel?.video_directors || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;
@@ -394,6 +395,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 type="number"
                 min="0"
                 value={personnel?.camera_ops || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;
@@ -418,6 +420,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 type="number"
                 min="0"
                 value={personnel?.playback_techs || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;
@@ -442,6 +445,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 type="number"
                 min="0"
                 value={personnel?.video_techs || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;

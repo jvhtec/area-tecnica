@@ -1,3 +1,5 @@
+import { hashKey } from "@tanstack/react-query";
+
 export type SubscriptionPriority = "high" | "medium" | "low";
 
 export type RealtimeSubscriptionFilter = {
@@ -90,6 +92,9 @@ export type SubscriptionQueryKey = string | readonly unknown[];
 export const normalizeQueryKey = (queryKey: SubscriptionQueryKey): unknown[] =>
   Array.isArray(queryKey) ? [...queryKey] : [queryKey];
 
+export const hashSubscriptionQueryKey = (queryKey: SubscriptionQueryKey): string =>
+  hashKey(normalizeQueryKey(queryKey));
+
 export const buildSubscriptionKey = (
   table: string,
   queryKey: SubscriptionQueryKey,
@@ -101,7 +106,7 @@ export const buildSubscriptionKey = (
     filter: filter?.filter ?? "",
   };
 
-  return `${table}::${JSON.stringify(normalizeQueryKey(queryKey))}::${normalizedFilter.event}::${normalizedFilter.schema}::${normalizedFilter.filter}`;
+  return `${table}::${hashSubscriptionQueryKey(queryKey)}::${normalizedFilter.event}::${normalizedFilter.schema}::${normalizedFilter.filter}`;
 };
 
 export const createInitialSubscriptionSnapshot = (now = Date.now()): SubscriptionSnapshot => ({

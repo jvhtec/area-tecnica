@@ -367,6 +367,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 type="number"
                 min="0"
                 value={personnel?.lighting_designers || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;
@@ -391,6 +392,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 type="number"
                 min="0"
                 value={personnel?.lighting_techs || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;
@@ -415,6 +417,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 type="number"
                 min="0"
                 value={personnel?.spot_ops || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;
@@ -439,6 +442,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 type="number"
                 min="0"
                 value={personnel?.riggers || 0}
+                disabled={!personnel?.id}
                 onChange={async (e) => {
                   // Without an existing personnel row there is nothing to update.
                   if (!personnel?.id) return;

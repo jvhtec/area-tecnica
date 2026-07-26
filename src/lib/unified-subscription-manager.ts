@@ -9,6 +9,7 @@ import {
   createSubscriptionDebugEntries,
   forceRefreshManagedSubscriptions,
   groupSubscriptionsByTable,
+  hashSubscriptionQueryKey,
   normalizeQueryKey,
   type ManagedSubscription,
   type PendingManagedSubscription,
@@ -302,7 +303,7 @@ export class UnifiedSubscriptionManager {
 
   private scheduleInvalidation(queryKey: SubscriptionQueryKey, priority: 'high' | 'medium' | 'low') {
     const normalizedQueryKey = this.normalizeQueryKey(queryKey);
-    const key = JSON.stringify(normalizedQueryKey);
+    const key = hashSubscriptionQueryKey(normalizedQueryKey);
 
     const existing = this.invalidationTimers.get(key);
     if (existing) {
@@ -323,7 +324,7 @@ export class UnifiedSubscriptionManager {
 
   private invalidateStaleQueries(maxAgeMs: number) {
     const now = Date.now();
-    const queryKeysToInvalidate = new Set<string>();
+    const queryKeysToInvalidate = new Map<string, unknown[]>();
 
     this.subscriptions.forEach((subscription, subscriptionKey) => {
       const lastActivity = this.tableLastActivity.get(subscriptionKey) ?? 0;
@@ -331,20 +332,15 @@ export class UnifiedSubscriptionManager {
       if (now - lastActivity <= maxAgeMs) return;
 
       const normalized = this.normalizeQueryKey(subscription.options.queryKey);
-      queryKeysToInvalidate.add(JSON.stringify(normalized));
+      queryKeysToInvalidate.set(hashSubscriptionQueryKey(normalized), normalized);
     });
 
     if (!queryKeysToInvalidate.size) {
       return;
     }
 
-    queryKeysToInvalidate.forEach((serialized) => {
-      try {
-        const parsed = JSON.parse(serialized) as string[];
-        this.queryClient.invalidateQueries({ queryKey: parsed });
-      } catch (error) {
-        console.warn('[UnifiedSubscriptionManager] Failed to invalidate stale queryKey', error);
-      }
+    queryKeysToInvalidate.forEach((queryKey) => {
+      this.queryClient.invalidateQueries({ queryKey });
     });
 
     this.updateSnapshot({ lastRefreshTime: Date.now() });

@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
-import type { SubscriptionQueryKey } from "@/lib/unified-subscription-support";
+import {
+  buildSubscriptionKey,
+  normalizeQueryKey,
+  type SubscriptionQueryKey,
+} from "@/lib/unified-subscription-support";
 
 type SubscriptionOptions = {
   table: string;
@@ -27,7 +31,14 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
 
   const subscriptions = Array.isArray(options) ? options : [options];
   const serializedSubscriptions = useMemo(
-    () => JSON.stringify(subscriptions),
+    () =>
+      JSON.stringify(
+        subscriptions
+          .map(({ table, schema, event, filter, queryKey }) =>
+            buildSubscriptionKey(table, queryKey, { schema, event, filter }),
+          )
+          .sort(),
+      ),
     [subscriptions],
   );
   const stableSubscriptions = useMemo(() => subscriptions, [serializedSubscriptions]);
@@ -37,7 +48,7 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
 
     stableSubscriptions.forEach((subscription) => {
       const { table, schema = "public", event = "*", filter, queryKey } = subscription;
-      const normalizedQueryKey = Array.isArray(queryKey) ? queryKey : [queryKey];
+      const normalizedQueryKey = normalizeQueryKey(queryKey);
 
       subscriptionManager.subscribeToTable(
         table,
