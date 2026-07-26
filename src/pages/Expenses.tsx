@@ -291,7 +291,8 @@ const ExpensesPage: React.FC = () => {
       const { error } = await dataLayerClient.rpc('approve_job_expense', {
         p_expense_id: expenseId,
         p_approved: approved,
-        p_rejection_reason: approved ? null : reason ?? null,
+        // DEFAULT NULL, so omitting is equivalent to sending null.
+        p_rejection_reason: approved ? undefined : reason ?? undefined,
       });
       if (error) throw error;
     },

@@ -74,16 +74,18 @@ const FestivalGearManagement = () => {
       console.log("=== FETCHING AND SYNCING STAGE DATA ===");
       
       // Get current max_stages from gear setup if not provided
-      let actualMaxStages = currentMaxStages;
-      if (!actualMaxStages) {
+      let resolvedMaxStages = currentMaxStages;
+      if (!resolvedMaxStages) {
         const { data: setupData } = await supabase
           .from("festival_gear_setups")
           .select("max_stages")
           .eq("job_id", jobId)
           .maybeSingle();
         
-        actualMaxStages = setupData?.max_stages || 1;
+        resolvedMaxStages = setupData?.max_stages || 1;
       }
+      // Narrowed to a plain number for the loop and `setMaxStages` below.
+      const actualMaxStages: number = resolvedMaxStages ?? 1;
       
       console.log(`Current max_stages: ${actualMaxStages}`);
       

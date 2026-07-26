@@ -87,7 +87,7 @@ const getErrorMessage = (error: unknown): string =>
 export const useOptimizedJobCard = <TJob extends OptimizedJobCardJob>(
   job: TJob,
   department: string,
-  userRole: string | null,
+  userRole: string | null | undefined,
   // Kept for call-site compatibility; the hook does not invoke them. Optional because
   // read-only surfaces render cards without handlers.
   _onEditClick?: (job: TJob) => void,

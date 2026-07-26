@@ -43,7 +43,8 @@ type TechnicianArtistReadOnlyModalProps = {
 type ReadOnlyArtist = {
   id: string;
   name: string;
-  stage: number;
+  /** Nullable to match the `festival_artists.stage` column. */
+  stage: number | null;
   date: string;
   show_start: string;
   show_end: string;
@@ -320,7 +321,7 @@ export function TechnicianArtistReadOnlyModal({
       id: string;
       file_name: string;
       file_path: string;
-      uploaded_at: string;
+      uploaded_at: string | null;
       artist_id: string | null;
     };
 

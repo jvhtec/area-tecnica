@@ -18,7 +18,7 @@ import {
 
 interface TechnicianIncidentReportDialogProps {
   job: Job;
-  techName?: string;
+  techName?: string | null;
   className?: string;
   labeled?: boolean;
   theme?: Theme;

@@ -39,18 +39,19 @@ export interface TourDatePowerOverride {
   updated_at: string;
 }
 
+// Mirrors the nullable `tour_date_weight_overrides` columns.
 export interface TourDateWeightOverride {
   id: string;
   tour_date_id: string;
-  default_table_id?: string;
+  default_table_id?: string | null;
   item_name: string;
   weight_kg: number;
   quantity: number;
-  department?: string;
-  category?: string;
+  department?: string | null;
+  category?: string | null;
   override_data?: unknown;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export const useTourDateOverrides = (tourDateId: string, type: TourDateOverrideTable) => {

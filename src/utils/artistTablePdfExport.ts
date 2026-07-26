@@ -48,13 +48,14 @@ export interface ArtistTablePdfData {
     technical: {
       fohTech: boolean;
       monTech: boolean;
-      fohConsole: { model: string; providedBy: string };
-      monConsole: { model: string; providedBy: string };
+      // `model` / `providedBy` come from nullable `festival_artists` columns.
+      fohConsole: { model: string | null; providedBy?: string | null };
+      monConsole: { model: string | null; providedBy?: string | null };
       monitorsFromFoh?: boolean;
       fohWavesOutboard?: string;
       monWavesOutboard?: string;
-      wireless: { systems: any[]; providedBy: string };
-      iem: { systems: any[]; providedBy: string };
+      wireless: { systems: any[]; providedBy?: string | null };
+      iem: { systems: any[]; providedBy?: string | null };
       monitors: { enabled: boolean; quantity: number };
     };
     extras: { sideFill: boolean; drumFill: boolean; djBooth: boolean };
@@ -77,7 +78,7 @@ export interface ArtistTablePdfData {
     riderMissing: boolean;
     gearMismatches?: GearMismatch[];
   }>;
-  logoUrl?: string;
+  logoUrl?: string | null;
   includeGearConflicts?: boolean;
   equipmentNeeds?: EquipmentNeeds;
   /** False when the document is bound into a set that stamps its own folios. */
@@ -97,11 +98,12 @@ const stripProviderTokens = (value: string): string =>
     .split(MIXED_TEXT_TOKEN).join('');
 
 const formatConsole = (
-  console: { model: string; providedBy: string },
+  console: { model: string | null; providedBy?: string | null },
   techRequired: boolean,
   position: string,
 ): string => {
-  const provider = PROVIDER_LABELS[console.providedBy] ?? console.providedBy;
+  const providedBy = console.providedBy ?? 'festival';
+  const provider = PROVIDER_LABELS[providedBy] ?? providedBy;
   const tech = techRequired ? ' + técnico' : '';
   return `${position}: ${console.model || '—'} (${provider})${tech}`;
 };
@@ -294,7 +296,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     formatTimeRange(artist.lineCheck),
     formatConsoleSection(artist.technical),
     stripProviderTokens(
-      `RF: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
+      `RF: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy ?? undefined)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy ?? undefined, true)}`,
     ),
     formatMicrophones(artist),
     artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}` : 'Ninguno',

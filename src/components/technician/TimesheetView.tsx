@@ -60,7 +60,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
 
   // Get my earnings total
   const isTech = isTechnicianRole(userRole);
-  const { data: payoutRows = [], isLoading: payoutLoading } = useJobPayoutTotals(job?.id, isTech ? userId : undefined);
+  const { data: payoutRows = [], isLoading: payoutLoading } = useJobPayoutTotals(job?.id, isTech ? (userId ?? undefined) : undefined);
   const { data: approvalRow } = useJobRatesApproval(job?.id);
   const isRatesApproved = approvalRow?.rates_approved ?? false;
   const isClosureLocked = isJobPastClosureWindow(job?.end_time, job?.timezone ?? 'Europe/Madrid');

@@ -78,10 +78,11 @@ export const PowerTableControls = <Table extends PowerTable>({
   table,
   tableId = table.id ?? table.name,
 }: PowerTableControlsProps<Table>) => {
-  const hasCustomPdu = table.customPduType !== undefined && table.customPduType !== null;
-  const pduSelectValue = hasCustomPdu
-    ? pduTypes.includes(table.customPduType)
-      ? table.customPduType
+  // Hoisted so the narrowing survives into the nested conditional below.
+  const customPduType = table.customPduType;
+  const pduSelectValue = customPduType != null
+    ? pduTypes.includes(customPduType)
+      ? customPduType
       : customPduSelectValue
     : "default";
 
@@ -133,7 +134,7 @@ export const PowerTableControls = <Table extends PowerTable>({
               <SelectItem value={customPduSelectValue}>{labels.customPduOption}</SelectItem>
             </SelectContent>
           </Select>
-          {hasCustomPdu && !pduTypes.includes(table.customPduType || "") && (
+          {customPduType != null && !pduTypes.includes(customPduType) && (
             <Input
               placeholder={labels.customPduPlaceholder}
               value={table.customPduType || ""}

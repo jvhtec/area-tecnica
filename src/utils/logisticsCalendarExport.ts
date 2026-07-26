@@ -57,7 +57,7 @@ const getTransportTypeLabel = (type: string): string => {
   return TRANSPORT_TYPE_LABELS[type] || type;
 };
 
-const getTransportProviderLabel = (provider?: string): string => {
+const getTransportProviderLabel = (provider?: string | null): string => {
   if (!provider) return "-";
   return TRANSPORT_PROVIDER_LABELS[provider] || provider;
 };

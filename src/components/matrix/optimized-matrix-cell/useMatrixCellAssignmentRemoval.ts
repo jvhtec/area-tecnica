@@ -139,6 +139,9 @@ export const useMatrixCellAssignmentRemoval = ({
           : 'Asignación eliminada';
         toast.success(message);
       } else {
+        // `currentDate` is only null before the dialog has been opened for a cell.
+        if (!multiDateRemoval.currentDate) return;
+
         const { error } = await dataLayerClient.from('timesheets')
           .delete()
           .eq('job_id', assignmentJobId)

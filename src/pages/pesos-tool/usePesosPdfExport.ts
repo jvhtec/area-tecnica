@@ -30,7 +30,7 @@ export const usePesosPdfExport = ({ activeTables, selectedJob, selectedJobId, se
       const motorCount = getRiggingPointNumbers(table.riggingPoints).length;
       if (motorCount > 0) return String(motorCount);
       if (table.dualMotors) return '2';
-      return table.totalWeight > 0 ? '1' : 'N/A';
+      return (table.totalWeight ?? 0) > 0 ? '1' : 'N/A';
     };
 
     const summaryRows: SummaryRow[] = activeTables.map((table) => {

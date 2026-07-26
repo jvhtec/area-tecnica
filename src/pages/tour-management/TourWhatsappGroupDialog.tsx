@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { WhatsappGroupSummary, WhatsappRequestSummary } from '@/features/jobs/job-card-new/jobCardNewTypes';
 
 type Props = {
   handleCreateWaGroup: () => void | Promise<void>;
@@ -15,8 +16,9 @@ type Props = {
   setWaSelectedDateId: (id: string | null) => void;
   sortedTourDates: any[];
   waDepartment: "sound" | "lights" | "video";
-  waGroup: unknown;
-  waRequest: unknown;
+  // Row summaries from `useTourWhatsappGroup`; only their presence is rendered.
+  waGroup: WhatsappGroupSummary | null | undefined;
+  waRequest: WhatsappRequestSummary | null | undefined;
   waSelectedDateId: string | null;
 };
 

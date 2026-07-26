@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatMadridDateKey } from '@/utils/timezoneUtils';
 import { isWithinSeasonalAvailability } from '@/utils/seasonalHouseTech';
+import { isPresent } from '@/utils/typeGuards';
 
 type TimesheetWithRelations = {
   technician_id: string;
@@ -32,8 +33,8 @@ type AvailabilitySummaryRow = {
   user_id: string;
   source: string | null;
   profile: {
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
     nickname: string | null;
     department: string;
     role: string;
@@ -209,7 +210,8 @@ export default function MorningSummary() {
         const unavailableIds = new Set((unavailableMerged || []).map((u: any) => u.user_id));
         const warehouse = (allTechs || [])
           .filter(t => !assignedIds.has(t.id) && !unavailableIds.has(t.id))
-          .map(t => t.nickname || t.first_name);
+          .map(t => t.nickname || t.first_name)
+          .filter(isPresent);
 
         const bySource: Record<string, string[]> = {};
         for (const u of (unavailableMerged || [])) {
