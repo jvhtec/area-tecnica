@@ -79,7 +79,9 @@ interface MockQueryBuilder<T> extends Promise<MockSupabaseResult<T>> {
   single: ReturnType<typeof vi.fn>;
   maybeSingle: ReturnType<typeof vi.fn>;
   csv: ReturnType<typeof vi.fn>;
-  __setResult: (nextResult: MockSupabaseResult<T>) => MockQueryBuilder<T>;
+  // Accepts an unconstrained payload so `MockQueryBuilder<T>` stays covariant in `T` under
+  // `strictFunctionTypes` — helpers can queue builders of mixed shapes as `MockQueryBuilder<unknown>`.
+  __setResult: (nextResult: MockSupabaseResult<unknown>) => MockQueryBuilder<T>;
 }
 
 export function createMockQueryBuilder<T = unknown>(
@@ -107,8 +109,8 @@ export function createMockQueryBuilder<T = unknown>(
     Promise.resolve(result).catch(onRejected);
   builder.finally = (onFinally?: (() => void) | undefined) =>
     Promise.resolve(result).finally(onFinally);
-  builder.__setResult = (nextResult: MockSupabaseResult<T>) => {
-    result = nextResult;
+  builder.__setResult = (nextResult: MockSupabaseResult<unknown>) => {
+    result = nextResult as MockSupabaseResult<T>;
     return builder;
   };
 

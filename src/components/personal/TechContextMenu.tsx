@@ -11,6 +11,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Calendar, Plane, Stethoscope, CalendarOff, Warehouse } from 'lucide-react';
+import type { TechUnavailabilityStatus } from "@/types/availability";
 
 interface TechContextMenuProps {
   children: React.ReactNode;
@@ -21,7 +22,7 @@ interface TechContextMenuProps {
     department: string | null;
   };
   date: Date;
-  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => void;
+  onAvailabilityChange: (techId: string, status: TechUnavailabilityStatus, date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -32,7 +33,7 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
   onAvailabilityChange,
   onAvailabilityRemove,
 }) => {
-  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable') => {
+  const handleUnavailable = (reason: TechUnavailabilityStatus) => {
     onAvailabilityChange(technician.id, reason, date);
   };
 

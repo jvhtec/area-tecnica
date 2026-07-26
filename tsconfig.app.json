@@ -19,6 +19,10 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
     "useUnknownInCatchVariables": true,
     "noFallthroughCasesInSwitch": false,
 

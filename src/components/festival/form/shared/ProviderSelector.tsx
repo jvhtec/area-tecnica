@@ -3,7 +3,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ProviderSelectorProps } from "@/types/festival-form";
 
-export const ProviderSelector = ({
+export const ProviderSelector = <T extends string = string>({
   value,
   onChange,
   label,
@@ -11,15 +11,23 @@ export const ProviderSelector = ({
   showMixed = false,
   disabled = false,
   language = "es",
-}: ProviderSelectorProps) => {
+}: ProviderSelectorProps<T>) => {
   const tx = (es: string, en: string) => (language === "en" ? en : es);
+
+  // RadioGroup emits `string`; the only values it can emit are the RadioGroupItem
+  // values rendered below, which are always members of `T` at every call site.
+  const handleValueChange = (next: string) => {
+    if (next === "festival" || next === "band" || (showMixed && next === "mixed")) {
+      onChange(next as T);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <h4 className="font-medium text-sm">{label}</h4>
       <RadioGroup
         value={value}
-        onValueChange={onChange}
+        onValueChange={handleValueChange}
         className="flex space-x-4"
         disabled={disabled}
       >

@@ -9,6 +9,9 @@ import { queryKeys } from "@/lib/react-query";
 import { supabase } from "@/lib/supabase";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+/** Which override table a mutation targets. */
+export type TourDateOverrideTable = 'power' | 'weight';
+
 export type TourDatePowerOverrideData = {
   rows?: PowerTableRow[];
   safetyMargin?: number;
@@ -169,7 +172,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
 
   // Delete override
   const deleteOverrideMutation = useMutation({
-    mutationFn: async ({ id, table }: { id: string; table: 'power' | 'weight' }) => {
+    mutationFn: async ({ id, table }: { id: string; table: TourDateOverrideTable }) => {
       const tableName = table === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
       const { data, error } = await supabase
         .from(tableName)

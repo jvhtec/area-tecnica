@@ -11,9 +11,15 @@ export interface SectionProps {
   language?: 'es' | 'en';
 }
 
-export interface ProviderSelectorProps {
-  value: string;
-  onChange: (value: string) => void;
+export type ProviderValue = 'festival' | 'band' | 'mixed';
+
+/**
+ * `T` lets call sites keep a narrow provider union (e.g. `ProviderValue`) instead of
+ * widening to `string`; it defaults to `string` for call sites reading raw DB columns.
+ */
+export interface ProviderSelectorProps<T extends string = string> {
+  value: T;
+  onChange: (value: T) => void;
   label: string;
   id: string;
   showMixed?: boolean;

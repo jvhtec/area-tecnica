@@ -18,7 +18,8 @@ import type {
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
-  private headerSection: HeaderSection;
+  // Assigned in renderPDF() once job info and logo are resolved, before any section renders.
+  private headerSection!: HeaderSection;
   private contentSections: ContentSections;
   private logoData?: string;
   private hasCoverPage = true;

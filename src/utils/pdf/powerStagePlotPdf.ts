@@ -19,7 +19,12 @@ type PdfDoc = {
   setLineDashPattern?: (pattern: number[], phase: number) => void;
   setFont: (font: string | undefined, style?: string) => void;
   rect: (x: number, y: number, w: number, h: number, style?: string) => void;
-  text: (text: string, x: number, y: number, options?: { align?: string }) => void;
+  text: (
+    text: string,
+    x: number,
+    y: number,
+    options?: { align?: "left" | "center" | "right" | "justify" },
+  ) => void;
   getTextWidth: (text: string) => number;
 };
 

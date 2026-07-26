@@ -29,6 +29,7 @@ import { Theme } from "@/components/technician/types";
 import { PersonalCalendarPrintDialog } from "./PersonalCalendarPrintDialog";
 import { generatePersonalCalendarPDF, generatePersonalCalendarXLS } from "@/utils/personalCalendarPdfExport";
 import { useMadridHolidays } from "@/hooks/useMadridHolidays";
+import type { TechUnavailabilityStatus } from "@/types/availability";
 
 interface MobilePersonalCalendarProps {
   date: Date;
@@ -58,7 +59,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const [selectedTech, setSelectedTech] = useState<any | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any | undefined>(undefined);
   const [selectedAvailability, setSelectedAvailability] = useState<
-    'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable' | null
+    TechUnavailabilityStatus | null
   >(null);
 
   useEffect(() => {
@@ -119,7 +120,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     onDateSelect(today);
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', targetDate: Date) => {
+  const handleAvailabilityChange = (techId: string, status: TechUnavailabilityStatus, targetDate: Date) => {
     updateAvailability(techId, status, targetDate);
   };
 

@@ -22,6 +22,7 @@ import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { PersonalCalendarPrintDialog } from "./PersonalCalendarPrintDialog";
 import { generatePersonalCalendarPDF, generatePersonalCalendarXLS } from "@/utils/personalCalendarPdfExport";
 import { useMadridHolidays } from "@/hooks/useMadridHolidays";
+import type { TechUnavailabilityStatus } from "@/types/availability";
 
 interface PersonalCalendarProps {
   date: Date;
@@ -126,7 +127,7 @@ export const PersonalCalendar = memo<PersonalCalendarProps>(({
     return filtered;
   };
 
-  const handleAvailabilityChange = useCallback((techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
+  const handleAvailabilityChange = useCallback((techId: string, status: TechUnavailabilityStatus, date: Date) => {
     updateAvailability(techId, status, date);
   }, [updateAvailability]);
 

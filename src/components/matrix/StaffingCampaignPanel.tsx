@@ -41,12 +41,12 @@ interface Campaign {
   mode: 'assisted' | 'auto'
   status: 'active' | 'paused' | 'stopped' | 'completed' | 'failed'
   policy: StoredCampaignPolicy
-  offer_message?: string
-  created_at: string
-  updated_at: string
-  last_run_at?: string
-  next_run_at?: string
-  version: number
+  offer_message?: string | null
+  created_at: string | null
+  updated_at: string | null
+  last_run_at?: string | null
+  next_run_at?: string | null
+  version: number | null
 }
 
 interface CampaignRole {
