@@ -165,18 +165,19 @@ export class ContentSections {
     );
   }
 
-  hasTravelData(travelArrangements: any[] | undefined): boolean {
+  hasTravelData(travelArrangements: TravelArrangement[] | undefined): boolean {
     return !!travelArrangements && travelArrangements.length > 0;
   }
 
-  hasAccommodationData(accommodations: any[] | undefined): boolean {
+  hasAccommodationData(accommodations: Accommodation[] | undefined): boolean {
     if (!accommodations || accommodations.length === 0) return false;
 
     return accommodations.some(acc => {
       if (!acc) return false;
 
+      // `hotel_address` belongs to the tour-ops accommodation shape, not this one — the
+      // previous `any[]` hid that, so the check was always undefined. `address` is the field.
       const hasHotelInfo = DataValidators.hasData(acc.hotel_name) ||
-        DataValidators.hasData(acc.hotel_address) ||
         DataValidators.hasData(acc.address);
       const hasDates = DataValidators.hasData(acc.check_in) || DataValidators.hasData(acc.check_out);
       const hasRooms = Array.isArray(acc.rooms) && (
@@ -187,7 +188,7 @@ export class ContentSections {
     });
   }
 
-  hasRoomingData(accommodations: any[] | undefined): boolean {
+  hasRoomingData(accommodations: Accommodation[] | undefined): boolean {
     return !!accommodations && accommodations.some(acc =>
       acc.rooms && acc.rooms.length > 0
     );

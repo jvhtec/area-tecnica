@@ -53,7 +53,7 @@ export interface TourDateWeightOverride {
   updated_at: string;
 }
 
-export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight') => {
+export const useTourDateOverrides = (tourDateId: string, type: TourDateOverrideTable) => {
   const queryClient = useQueryClient();
   const refreshDefaultDocuments = useTourDateDefaultDocumentRefresh(tourDateId);
 
@@ -62,7 +62,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
   const resolveTargetTourDateId = (affectedTourDateId?: string | null) =>
     affectedTourDateId || tourDateId || null;
 
-  const invalidateOverrideQueries = (table: 'power' | 'weight', affectedTourDateId?: string | null) => {
+  const invalidateOverrideQueries = (table: TourDateOverrideTable, affectedTourDateId?: string | null) => {
     const targetTourDateId = resolveTargetTourDateId(affectedTourDateId);
     if (!targetTourDateId) return;
     const scope = table === 'power' ? "tour-date-power-overrides" : "tour-date-weight-overrides";

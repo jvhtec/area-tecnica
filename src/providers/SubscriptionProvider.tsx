@@ -16,7 +16,7 @@ import {
 } from "@/lib/unified-subscription-manager";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { isAdminRole } from "@/utils/permissions";
-import type { SubscriptionQueryKey } from "@/lib/unified-subscription-support";
+import { normalizeQueryKey, type SubscriptionQueryKey } from "@/lib/unified-subscription-support";
 
 interface SubscriptionContextType {
   connectionStatus: "connected" | "disconnected" | "connecting";
@@ -25,7 +25,7 @@ interface SubscriptionContextType {
   subscriptionsByTable: Record<string, string[]>;
   debugSubscriptions: SubscriptionDebugEntry[];
   refreshSubscriptions: () => void;
-  invalidateQueries: (queryKey?: string | string[]) => void;
+  invalidateQueries: (queryKey?: SubscriptionQueryKey) => void;
   lastRefreshTime: number;
   forceRefresh: (tables?: string[]) => void;
   forceSubscribe: (
@@ -147,10 +147,9 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   }, [isAdmin, manager]);
 
   const invalidateQueries = useCallback(
-    (queryKey?: string | string[]) => {
+    (queryKey?: SubscriptionQueryKey) => {
       if (queryKey) {
-        const key = Array.isArray(queryKey) ? queryKey : [queryKey];
-        queryClient.invalidateQueries({ queryKey: key });
+        queryClient.invalidateQueries({ queryKey: normalizeQueryKey(queryKey) });
       } else {
         queryClient.invalidateQueries();
       }

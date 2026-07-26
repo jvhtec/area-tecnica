@@ -12,16 +12,17 @@ import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { AUXILIARY_MACHINERY_OPTIONS } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
-import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
+import { DocumentationJobPicker, type DocumentationJobOption } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 
 interface ModernEventSectionProps {
   eventData: EventData;
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
   selectedJobId: string;
   setSelectedJobId: React.Dispatch<React.SetStateAction<string>>;
-  jobs: any[] | undefined;
+  // Forwarded verbatim to `DocumentationJobPicker`, so it carries that component's option type.
+  jobs: DocumentationJobOption[] | undefined;
   isLoadingJobs: boolean;
-  jobDetails: any;
+  jobDetails: { start_time: string; end_time: string; location?: string | null } | null;
   onAutoPopulate: () => void;
   hideJobSelection?: boolean;
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
