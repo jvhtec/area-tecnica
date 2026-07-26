@@ -267,7 +267,7 @@ export const exportToPDF = async (
           type === 'power' && table.rows.some((row) => row.pf?.trim());
         const tableRows = table.rows.map((row) => {
           const baseCells = [
-            row.quantity,
+            row.quantity ?? '',
             row.componentName || '',
             type === 'weight' ? row.weight || '' : row.watts || '',
             type === 'weight'
@@ -282,7 +282,7 @@ export const exportToPDF = async (
           }
 
           const namedCells = [
-            row.quantity,
+            row.quantity ?? '',
             row.lineName || '',
             row.componentName || '',
             row.watts || '',
@@ -316,7 +316,7 @@ export const exportToPDF = async (
           headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] },
           bodyStyles: { textColor: [51, 51, 51] },
           alternateRowStyles: { fillColor: [250, 250, 255] },
-          didDrawPage: (data) => { yPosition = data.cursor.y + 10; }
+          didDrawPage: (data) => { if (data.cursor) yPosition = data.cursor.y + 10; }
         });
 
         yPosition = (doc as any).lastAutoTable.finalY + 10;
@@ -523,7 +523,7 @@ export const exportToPDF = async (
             headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] },
             bodyStyles: { textColor: [51, 51, 51] },
             alternateRowStyles: { fillColor: [250, 250, 255] },
-            didDrawPage: (data) => { yPosition = data.cursor.y + 10; }
+            didDrawPage: (data) => { if (data.cursor) yPosition = data.cursor.y + 10; }
           });
         }
       }

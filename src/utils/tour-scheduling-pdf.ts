@@ -14,6 +14,7 @@ import {
   SECTOR_PRO_RED,
 } from '@/utils/pdf/exportHelpers';
 import { buildReadableFilename } from '@/utils/fileName';
+import { setFontStyle } from '@/utils/pdf/shared/pdfExportShared';
 
 const CORPORATE_RED = SECTOR_PRO_RED;
 
@@ -142,7 +143,7 @@ export const generateTourDaySheet = async (
 
   // Date and Location Section
   pdf.setFontSize(14);
-  pdf.setFont(undefined, 'bold');
+  setFontStyle(pdf, 'bold');
   pdf.text('Información del Evento', 10, currentY);
   currentY += 10;
 
@@ -180,7 +181,7 @@ export const generateTourDaySheet = async (
     if (hojaDeRuta && hojaDeRuta.program_schedule_json) {
       // Schedule Section
       pdf.setFontSize(14);
-      pdf.setFont(undefined, 'bold');
+      setFontStyle(pdf, 'bold');
       pdf.text('Programa del Día', 10, currentY);
       currentY += 10;
 
@@ -191,7 +192,7 @@ export const generateTourDaySheet = async (
         if (day.rows && day.rows.length > 0) {
           if (day.label) {
             pdf.setFontSize(12);
-            pdf.setFont(undefined, 'bold');
+            setFontStyle(pdf, 'bold');
             pdf.setTextColor(...CORPORATE_RED);
             pdf.text(day.label, 10, currentY);
             pdf.setTextColor(0, 0, 0);
@@ -254,7 +255,7 @@ export const generateTourDaySheet = async (
           }
 
           pdf.setFontSize(14);
-          pdf.setFont(undefined, 'bold');
+          setFontStyle(pdf, 'bold');
           pdf.text('Pronóstico del Tiempo', 10, currentY);
           currentY += 10;
 
@@ -321,7 +322,7 @@ export const generateTourDaySheet = async (
         }
 
         pdf.setFontSize(14);
-        pdf.setFont(undefined, 'bold');
+        setFontStyle(pdf, 'bold');
         pdf.text('Personal Asignado', 10, currentY);
         currentY += 10;
 
@@ -442,12 +443,12 @@ export const generateTourBook = async (
   let currentY = 45;
   pdf.setTextColor(0, 0, 0);
   pdf.setFontSize(16);
-  pdf.setFont(undefined, 'bold');
+  setFontStyle(pdf, 'bold');
   pdf.text('Contenido', 10, currentY);
   currentY += 15;
 
   pdf.setFontSize(11);
-  pdf.setFont(undefined, 'normal');
+  setFontStyle(pdf, 'normal');
 
   const tocItems = [
     'Resumen del Tour',
@@ -591,7 +592,7 @@ export const generateTourBook = async (
 
       if (hojaDeRuta && hojaDeRuta.program_schedule_json) {
         pdf.setFontSize(12);
-        pdf.setFont(undefined, 'bold');
+        setFontStyle(pdf, 'bold');
         pdf.text('Programa', 10, currentY);
         currentY += 8;
 

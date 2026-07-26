@@ -15,6 +15,7 @@ import {
   SECTOR_PRO_RED,
 } from '@/utils/pdf/exportHelpers';
 import { buildReadableFilename } from '@/utils/fileName';
+import { setFontStyle } from '@/utils/pdf/shared/pdfExportShared';
 
 const CORPORATE_RED = SECTOR_PRO_RED;
 
@@ -150,7 +151,7 @@ const addTourContactsSection = (
   if (!tourContacts || tourContacts.length === 0) return startY;
 
   pdf.setFontSize(14);
-  pdf.setFont(undefined, 'bold');
+  setFontStyle(pdf, 'bold');
   pdf.setTextColor(...CORPORATE_RED);
   pdf.text('Contactos del Tour', 10, startY);
   pdf.setTextColor(0, 0, 0);
@@ -163,7 +164,7 @@ const addTourContactsSection = (
 
     return [
       `${contact.name}${contact.isPrimary ? ' ⭐' : ''}`,
-      contact.role,
+      contact.role ?? '',
       details.join('\n') || '-',
     ];
   });
@@ -221,7 +222,7 @@ export const generateTravelDaySheet = async (
 
   // Travel Information Section
   pdf.setFontSize(14);
-  pdf.setFont(undefined, 'bold');
+  setFontStyle(pdf, 'bold');
   pdf.text('Información del Viaje', 10, currentY);
   currentY += 10;
 
@@ -260,7 +261,7 @@ export const generateTravelDaySheet = async (
   // Route Details
   if (direction === 'to') {
     pdf.setFontSize(12);
-    pdf.setFont(undefined, 'bold');
+    setFontStyle(pdf, 'bold');
     pdf.setTextColor(...CORPORATE_RED);
     pdf.text('Detalles del Destino', 10, currentY);
     pdf.setTextColor(0, 0, 0);
@@ -325,7 +326,7 @@ export const generateTravelDaySheet = async (
         }
 
         pdf.setFontSize(14);
-        pdf.setFont(undefined, 'bold');
+        setFontStyle(pdf, 'bold');
         pdf.setTextColor(...CORPORATE_RED);
         pdf.text('Roster de Crew', 10, currentY);
         pdf.setTextColor(0, 0, 0);
@@ -384,14 +385,14 @@ export const generateTravelDaySheet = async (
     }
 
     pdf.setFontSize(12);
-    pdf.setFont(undefined, 'bold');
+    setFontStyle(pdf, 'bold');
     pdf.setTextColor(...CORPORATE_RED);
     pdf.text('Notas', 10, currentY);
     pdf.setTextColor(0, 0, 0);
     currentY += 8;
 
     pdf.setFontSize(10);
-    pdf.setFont(undefined, 'normal');
+    setFontStyle(pdf, 'normal');
     const splitNotes = pdf.splitTextToSize(travelSegment.notes, 190);
     pdf.text(splitNotes, 10, currentY);
   }
@@ -435,7 +436,7 @@ export const generateEnhancedEventDaySheet = async (
 
   // Event Information
   pdf.setFontSize(14);
-  pdf.setFont(undefined, 'bold');
+  setFontStyle(pdf, 'bold');
   pdf.text('Información del Evento', 10, currentY);
   currentY += 10;
 
@@ -475,7 +476,7 @@ export const generateEnhancedEventDaySheet = async (
 
     if (hojaDeRuta && hojaDeRuta.program_schedule_json) {
       pdf.setFontSize(14);
-      pdf.setFont(undefined, 'bold');
+      setFontStyle(pdf, 'bold');
       pdf.setTextColor(...CORPORATE_RED);
       pdf.text('Programa del Evento', 10, currentY);
       pdf.setTextColor(0, 0, 0);
@@ -487,7 +488,7 @@ export const generateEnhancedEventDaySheet = async (
         if (day.rows && day.rows.length > 0) {
           if (day.label) {
             pdf.setFontSize(12);
-            pdf.setFont(undefined, 'bold');
+            setFontStyle(pdf, 'bold');
             pdf.text(day.label, 10, currentY);
             currentY += 8;
           }
@@ -537,14 +538,14 @@ export const generateEnhancedEventDaySheet = async (
       }
 
       pdf.setFontSize(14);
-      pdf.setFont(undefined, 'bold');
+      setFontStyle(pdf, 'bold');
       pdf.setTextColor(...CORPORATE_RED);
       pdf.text('Alojamiento', 10, currentY);
       pdf.setTextColor(0, 0, 0);
       currentY += 10;
 
       pdf.setFontSize(10);
-      pdf.setFont(undefined, 'normal');
+      setFontStyle(pdf, 'normal');
       const hotelInfo = typeof hojaDeRuta.hotel_info === 'string' ? hojaDeRuta.hotel_info : String(hojaDeRuta.hotel_info);
       const hotelText = pdf.splitTextToSize(hotelInfo, 190);
       pdf.text(hotelText, 10, currentY);
@@ -560,14 +561,14 @@ export const generateEnhancedEventDaySheet = async (
       }
 
       pdf.setFontSize(14);
-      pdf.setFont(undefined, 'bold');
+      setFontStyle(pdf, 'bold');
       pdf.setTextColor(...CORPORATE_RED);
       pdf.text('Restaurantes Recomendados', 10, currentY);
       pdf.setTextColor(0, 0, 0);
       currentY += 10;
 
       pdf.setFontSize(10);
-      pdf.setFont(undefined, 'normal');
+      setFontStyle(pdf, 'normal');
       const restaurantsInfo =
         typeof hojaDeRuta.restaurants_info === 'string' ? hojaDeRuta.restaurants_info : String(hojaDeRuta.restaurants_info);
       const restaurantText = pdf.splitTextToSize(restaurantsInfo, 190);
@@ -591,7 +592,7 @@ export const generateEnhancedEventDaySheet = async (
         }
 
         pdf.setFontSize(14);
-        pdf.setFont(undefined, 'bold');
+        setFontStyle(pdf, 'bold');
         pdf.setTextColor(...CORPORATE_RED);
         pdf.text('Pronóstico del Tiempo', 10, currentY);
         pdf.setTextColor(0, 0, 0);
@@ -671,7 +672,7 @@ export const generateEnhancedEventDaySheet = async (
         }
 
         pdf.setFontSize(14);
-        pdf.setFont(undefined, 'bold');
+        setFontStyle(pdf, 'bold');
         pdf.setTextColor(...CORPORATE_RED);
         pdf.text('Crew Asignado al Evento', 10, currentY);
         pdf.setTextColor(0, 0, 0);

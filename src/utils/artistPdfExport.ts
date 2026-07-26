@@ -22,6 +22,7 @@ import {
 import { drawArtistScheduleSection } from '@/utils/pdf/artistScheduleSection';
 import { buildFestivalOptionChecklistRows } from '@/utils/pdf/artistTemplateChecklist';
 import type { ArtistPdfData, ArtistPdfOptions } from '@/utils/pdf/artistPdfTypes';
+import { isTruthy } from '@/utils/typeGuards';
 
 export type {
   ArtistInfrastructure,
@@ -557,7 +558,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         data.infrastructure.coax.enabled && ['Coax', data.infrastructure.coax.quantity],
         data.infrastructure.opticalconDuo.enabled && ['OpticalCon Duo', data.infrastructure.opticalconDuo.quantity],
         data.infrastructure.analog > 0 && [tx('Líneas Analógicas', 'Analog Lines'), data.infrastructure.analog],
-      ].filter(Boolean);
+      ].filter(isTruthy);
 
   if (templateMode || infrastructureRows.length > 0) {
     autoTable(doc, {
@@ -588,7 +589,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         data.extras.drumFill && ['Drum Fill', yesNo(true)],
         data.extras.djBooth && ['DJ Booth', yesNo(true)],
         data.extras.wired && [tx('Cableado Adicional', 'Additional Wired'), data.extras.wired]
-      ].filter(Boolean);
+      ].filter(isTruthy);
 
   if (templateMode || extraRows.length > 0) {
     autoTable(doc, {
@@ -625,7 +626,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     } else {
       doc.setFontSize(9);
       doc.setTextColor(...FESTIVAL_INK);
-      const splitNotes = doc.splitTextToSize(data.notes, geo.contentWidth);
+      const splitNotes = doc.splitTextToSize(data.notes ?? '', geo.contentWidth);
       doc.text(splitNotes, geo.left, yPosition);
       yPosition += splitNotes.length * 5 + 10;
     }

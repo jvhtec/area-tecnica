@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { categoryLabels } from '@/types/equipment';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { setFontStyle } from '@/utils/pdf/shared/pdfExportShared';
 
 interface DailyUsage {
   used: number;
@@ -147,9 +148,9 @@ export const exportWeeklySummaryPDF = async (
 
         // Equipment title
         ensureSpace(16);
-        doc.setFont(undefined, 'bold');
+        setFontStyle(doc, 'bold');
         doc.text(`${row.name} · ${categoryLabels[row.category as keyof typeof categoryLabels]}`, LEFT, y);
-        doc.setFont(undefined, 'normal');
+        setFontStyle(doc, 'normal');
         y += 4;
 
         // Build table rows

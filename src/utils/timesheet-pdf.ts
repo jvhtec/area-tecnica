@@ -313,7 +313,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
 
 // Helper function to load all signatures
 const loadSignatures = async (timesheets: Timesheet[]) => {
-  const signaturePromises: Promise<{ timesheetId: string; image: HTMLImageElement }>[] = [];
+  const signaturePromises: Promise<{ timesheetId: string; image: HTMLImageElement } | null>[] = [];
   
   for (const timesheet of timesheets) {
     if (timesheet.signature_data) {

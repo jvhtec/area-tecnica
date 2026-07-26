@@ -30,7 +30,8 @@ export interface JobDetails {
   id: string;
   title: string;
   start_time: string;
-  end_time?: string;
+  /** Nullable: mirrors the `jobs.end_time` column. */
+  end_time?: string | null;
   tour_id?: string | null;
   job_type?: string | null;
   invoicing_company?: string | null;

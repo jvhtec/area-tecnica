@@ -39,8 +39,8 @@ export const generateStageGearPDF = async (
       console.log(`Starting PDF generation for stage ${stageNumber} (${stageName})`);
       
       // Fetch stage name from database if not provided
-      let actualStageName = stageName;
-      if (!actualStageName) {
+      let resolvedStageName = stageName;
+      if (!resolvedStageName) {
         const { data: stageData, error: stageError } = await supabase
           .from("festival_stages")
           .select("name")
@@ -52,8 +52,10 @@ export const generateStageGearPDF = async (
           console.error("Error fetching stage name:", stageError);
         }
         
-        actualStageName = stageData?.name || `Escenario ${stageNumber}`;
+        resolvedStageName = stageData?.name || `Escenario ${stageNumber}`;
       }
+      // Narrowed to a plain string so the closures below don't see `string | undefined`.
+      const actualStageName: string = resolvedStageName ?? `Escenario ${stageNumber}`;
 
       // Fetch job data
       const { data: jobData, error: jobError } = await supabase

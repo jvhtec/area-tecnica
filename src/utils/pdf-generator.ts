@@ -162,9 +162,9 @@ export const generatePDF = async (
     yPosition += 10;
 
     const contactsTableData = eventData.contacts.map((contact) => [
-      contact.name,
-      contact.role,
-      contact.phone,
+      contact.name ?? "",
+      contact.role ?? "",
+      contact.phone ?? "",
     ]);
     autoTable(doc, {
       startY: yPosition,
@@ -221,10 +221,10 @@ export const generatePDF = async (
     yPosition += 10;
 
     const staffTableData = eventData.staff.map((person) => [
-      person.name,
-      person.surname1,
-      person.surname2,
-      person.position,
+      person.name ?? "",
+      person.surname1 ?? "",
+      person.surname2 ?? "",
+      person.position ?? "",
     ]);
     autoTable(doc, {
       startY: yPosition,
@@ -249,7 +249,7 @@ export const generatePDF = async (
     doc.text("Arreglos de Viaje", 20, yPosition);
     yPosition += 10;
     const travelTableData = travelArrangements.map((arr) => [
-      arr.transportation_type,
+      arr.transportation_type ?? "",
       `${arr.pickup_address || ""} ${formatPickupDateTime(arr.pickup_time)}`.trim(),
       formatPickupDateTime(arr.departure_time),
       formatPickupDateTime(arr.arrival_time),

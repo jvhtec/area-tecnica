@@ -17,7 +17,7 @@ type PdfDoc = {
   setFillColor: (r: number, g: number, b: number) => void;
   setLineWidth: (width: number) => void;
   setLineDashPattern?: (pattern: number[], phase: number) => void;
-  setFont: (font: string | undefined, style?: string) => void;
+  setFont: (font: string, style?: string) => void;
   rect: (x: number, y: number, w: number, h: number, style?: string) => void;
   text: (
     text: string,

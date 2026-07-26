@@ -458,36 +458,34 @@ export class UnifiedSubscriptionManager {
     const subscriptionKey = this.getSubscriptionKey(table, queryKey, filter);
     
     // Check if we already have this subscription (deduplication)
-    if (this.subscriptions.has(subscriptionKey)) {
-      const existingSubscription = this.subscriptions.get(subscriptionKey);
-      if (existingSubscription) {
-        if (options.invalidateOnPayload !== false) {
-          existingSubscription.invalidateOnPayload = true;
-        }
-        if (options.ownerRoute) {
-          this.registerRouteSubscription(options.ownerRoute, subscriptionKey);
-        }
-        const handlerId = options.onPayload
-          ? this.addPayloadHandler(existingSubscription, options.onPayload, options.ownerRoute)
-          : null;
+    const existingSubscription = this.subscriptions.get(subscriptionKey);
+    if (existingSubscription) {
+      if (options.invalidateOnPayload !== false) {
+        existingSubscription.invalidateOnPayload = true;
+      }
+      if (options.ownerRoute) {
+        this.registerRouteSubscription(options.ownerRoute, subscriptionKey);
+      }
+      const handlerId = options.onPayload
+        ? this.addPayloadHandler(existingSubscription, options.onPayload, options.ownerRoute)
+        : null;
 
-        if (handlerId) {
-          return {
-            ...existingSubscription,
-            unsubscribe: () => {
-              const currentSubscription = this.subscriptions.get(subscriptionKey);
-              if (currentSubscription) {
-                this.removePayloadHandler(currentSubscription, handlerId);
-              }
-            },
-          };
-        }
+      if (handlerId) {
+        return {
+          ...existingSubscription,
+          unsubscribe: () => {
+            const currentSubscription = this.subscriptions.get(subscriptionKey);
+            if (currentSubscription) {
+              this.removePayloadHandler(currentSubscription, handlerId);
+            }
+          },
+        };
       }
 
       if (priority === 'high') {
         console.log(`Already subscribed to ${table} with query key ${subscriptionKey}`);
       }
-      return this.subscriptions.get(subscriptionKey);
+      return existingSubscription;
     }
     
     if (priority === 'high') {
