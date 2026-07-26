@@ -30,7 +30,7 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
   isPrintSectionExcluded,
   onPrintSectionExcludedChange,
 }) => {
-  const getTransportIcon = (type: string) => {
+  const getTransportIcon = (type: string | undefined) => {
     switch (type) {
       case 'plane': return Plane;
       case 'train': return Train;

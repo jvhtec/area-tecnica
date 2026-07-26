@@ -13,10 +13,17 @@ import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { HojaDeRutaPrintPreviewTarget } from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
 import type { HojaDeRutaPdfPreview } from "@/components/hoja-de-ruta/HojaDeRutaPdfPreviewDialog";
 
-type HojaDeRutaExportMetadata = Omit<
-  Pick<HojaDeRutaMetadata, "id" | "document_version" | "status" | "created_at" | "updated_at" | "last_modified">,
-  "status"
-> & { status?: string | null };
+/**
+ * The subset of `hoja_de_ruta` metadata the export flow reads. Nullable because it comes
+ * straight off a DB row rather than the in-memory `HojaDeRutaMetadata`; every field is
+ * defaulted at use site.
+ */
+type HojaDeRutaExportMetadata = {
+  [K in keyof Pick<
+    HojaDeRutaMetadata,
+    "id" | "document_version" | "created_at" | "updated_at" | "last_modified"
+  >]?: NonNullable<HojaDeRutaMetadata[K]> | null;
+} & { status?: string | null };
 
 type Options = {
   accommodations: any[];
@@ -85,7 +92,7 @@ export const useHojaDeRutaExports = ({
     ...eventData,
     metadata: hojaDeRuta
       ? {
-          id: hojaDeRuta.id,
+          id: hojaDeRuta.id ?? undefined,
           document_version: hojaDeRuta.document_version || 1,
           status: normalizeHojaStatus(hojaDeRuta.status),
           created_at: hojaDeRuta.created_at || new Date().toISOString(),

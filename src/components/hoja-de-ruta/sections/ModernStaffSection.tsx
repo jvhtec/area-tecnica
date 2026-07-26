@@ -113,7 +113,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                         Nombre
                       </Label>
                       <ProfileAutocomplete
-                        value={staff.name}
+                        value={staff.name ?? ""}
                         onChange={(value) => onStaffChange(index, 'name', value)}
                         onSelect={(profile) => handleProfileSelect(index, profile)}
                         placeholder="Buscar por nombre..."

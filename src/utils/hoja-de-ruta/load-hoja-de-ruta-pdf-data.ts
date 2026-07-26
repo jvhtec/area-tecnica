@@ -140,6 +140,8 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
       eventDates: mainData.event_dates || '',
       venue: mappedVenue,
       contacts: mappedContacts,
+      // The Hoja de Transportes PDF only renders venue/contacts/transport.
+      staff: [],
       logistics: {
         transport: mappedTransport,
       },

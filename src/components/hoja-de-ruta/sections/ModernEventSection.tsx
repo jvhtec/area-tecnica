@@ -19,7 +19,7 @@ interface ModernEventSectionProps {
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
   selectedJobId: string;
   setSelectedJobId: React.Dispatch<React.SetStateAction<string>>;
-  jobs: any[];
+  jobs: any[] | undefined;
   isLoadingJobs: boolean;
   jobDetails: any;
   onAutoPopulate: () => void;
@@ -244,7 +244,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   Nombre del Venue *
                 </Label>
                 <PlaceAutocomplete
-                  value={eventData.venue.name}
+                  value={eventData.venue.name ?? ""}
                   onSelect={handleVenueSelect}
                   placeholder="Ej. Palacio de Congresos"
                   className="border-2 focus:border-purple-300"

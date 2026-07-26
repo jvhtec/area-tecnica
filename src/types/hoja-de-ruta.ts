@@ -56,7 +56,8 @@ export interface Transport {
 }
 
 export interface RoomAssignment {
-  room_type?: string;
+  /** Always set: `addRoom` seeds 'single' and the loader maps a NOT NULL column. */
+  room_type: string;
   room_number?: string;
   staff_member1_id?: string;
   staff_member2_id?: string;
@@ -65,7 +66,8 @@ export interface RoomAssignment {
 }
 
 export interface Accommodation {
-  id?: string;
+  /** Always set: `addAccommodation` generates a UUID and the loader maps the row id. */
+  id: string;
   hotel_name?: string;
   address?: string;
   check_in?: string;
@@ -104,7 +106,11 @@ export interface EventData {
   actualCost?: number;
   currency?: string;
   eventStatus?: string;
-  venue?: {
+  /**
+   * `venue`, `contacts`, `staff` and `logistics` are always present: they are seeded by
+   * `useHojaDeRutaState`'s initial state and by every loader/mapper that builds an `EventData`.
+   */
+  venue: {
     name?: string;
     address?: string;
     latitude?: number;
@@ -123,7 +129,7 @@ export interface EventData {
     phone?: string;
     email?: string;
   };
-  contacts?: Array<{
+  contacts: Array<{
     name?: string;
     role?: string;
     phone?: string;
@@ -131,7 +137,7 @@ export interface EventData {
     // Optional link to a technician profile when the contact originates from job staffing
     technician_id?: string;
   }>;
-  staff?: Array<{
+  staff: Array<{
     id?: string;
     name?: string;
     surname1?: string;
@@ -144,8 +150,8 @@ export interface EventData {
     // Optional link to a technician profile when the staff row originates from job staffing
     technician_id?: string;
   }>;
-  logistics?: {
-    transport?: Transport[];
+  logistics: {
+    transport: Transport[];
     loadingDetails?: string;
     unloadingDetails?: string;
     equipmentLogistics?: string;

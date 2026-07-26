@@ -79,12 +79,12 @@ export class ContentSections {
   }
 
   async addAccommodationSection(
-    accommodations: any[], 
-    eventData: EventData, 
+    accommodations: Accommodation[] | undefined,
+    eventData: EventData,
     yPosition: number,
     suppressRoomTable: boolean = false
   ): Promise<number> {
-    return await this.accommodationSection.addAccommodationSection(accommodations, eventData, yPosition, suppressRoomTable);
+    return await this.accommodationSection.addAccommodationSection(accommodations ?? [], eventData, yPosition, suppressRoomTable);
   }
 
   addStaffSection(eventData: EventData, yPosition: number): number {
@@ -150,7 +150,7 @@ export class ContentSections {
   }
 
   hasWeatherData(eventData: EventData): boolean {
-    return eventData.weather && eventData.weather.length > 0;
+    return !!eventData.weather && eventData.weather.length > 0;
   }
 
   hasContactsData(eventData: EventData): boolean {
@@ -165,11 +165,11 @@ export class ContentSections {
     );
   }
 
-  hasTravelData(travelArrangements: any[]): boolean {
-    return travelArrangements && travelArrangements.length > 0;
+  hasTravelData(travelArrangements: any[] | undefined): boolean {
+    return !!travelArrangements && travelArrangements.length > 0;
   }
 
-  hasAccommodationData(accommodations: any[]): boolean {
+  hasAccommodationData(accommodations: any[] | undefined): boolean {
     if (!accommodations || accommodations.length === 0) return false;
 
     return accommodations.some(acc => {
@@ -187,8 +187,8 @@ export class ContentSections {
     });
   }
 
-  hasRoomingData(accommodations: any[]): boolean {
-    return accommodations && accommodations.some(acc => 
+  hasRoomingData(accommodations: any[] | undefined): boolean {
+    return !!accommodations && accommodations.some(acc =>
       acc.rooms && acc.rooms.length > 0
     );
   }
@@ -219,7 +219,7 @@ export class ContentSections {
   }
 
   hasPowerData(eventData: EventData): boolean {
-    return eventData.powerRequirements && eventData.powerRequirements.trim().length > 0;
+    return !!eventData.powerRequirements && eventData.powerRequirements.trim().length > 0;
   }
 
   hasAuxNeedsData(eventData: EventData): boolean {
