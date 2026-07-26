@@ -88,7 +88,7 @@ describe("useIncidentReports", () => {
     mockSupabase.storage.from.mockReturnValue({
       remove: removeMock,
       download: vi.fn().mockResolvedValue({ data: new Blob(["test"]), error: null }),
-    } as any);
+    });
 
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "job_documents") {
@@ -150,7 +150,7 @@ describe("useIncidentReports", () => {
     mockSupabase.storage.from.mockReturnValue({
       download: vi.fn().mockResolvedValue({ data: new Blob(["pdf"]), error: null }),
       remove: vi.fn().mockResolvedValue({ data: null, error: null }),
-    } as any);
+    });
 
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "job_documents") {
@@ -196,7 +196,7 @@ describe("useIncidentReports", () => {
     mockSupabase.storage.from.mockReturnValue({
       download: vi.fn().mockResolvedValue({ data: null, error: new Error("download failed") }),
       remove: vi.fn().mockResolvedValue({ data: null, error: null }),
-    } as any);
+    });
 
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "job_documents") {

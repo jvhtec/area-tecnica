@@ -271,7 +271,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     onClick={async () => {
                       if (!resolvedJobId || isClosureLocked) return;
                       await dataLayerClient.from("jobs")
-                        .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                        .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null })
                         .eq("id", resolvedJobId);
                       queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-details", resolvedJobId) });
                       queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rates-approval", resolvedJobId) });
@@ -304,7 +304,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                             rates_approved: true,
                             rates_approved_at: new Date().toISOString(),
                             rates_approved_by: u?.user?.id || null,
-                          } as any)
+                          })
                           .eq("id", resolvedJobId);
 
                         if (approvalError) throw approvalError;

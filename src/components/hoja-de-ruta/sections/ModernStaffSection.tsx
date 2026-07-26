@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Plus, Trash2, User, IdCard, Briefcase } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
-import { ProfileAutocomplete } from "../components/ProfileAutocomplete";
+import { ProfileAutocomplete, type Profile } from "../components/ProfileAutocomplete";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
@@ -30,7 +30,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
   isPrintSectionExcluded,
   onPrintSectionExcludedChange,
 }) => {
-  const handleProfileSelect = async (index: number, profile: any) => {
+  const handleProfileSelect = async (index: number, profile: Partial<Profile>) => {
     console.debug('[ModernStaffSection] Profile selected', { index, profile });
     // Auto-fill: use first_name for 'Nombre' and put full last_name in 'Apellidos'
     const firstName = (profile.first_name || '').toString().trim();
@@ -43,7 +43,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
     }
 
     // Ensure DNI auto-fills when available
-    let dni = (profile.dni || (profile.DNI as string) || '').toString().trim();
+    let dni = (profile.dni || '').toString().trim();
     if (!dni && profile.id) {
       // Fallback: fetch full profile to ensure DNI is loaded
       try {

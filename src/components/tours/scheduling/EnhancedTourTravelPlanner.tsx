@@ -41,15 +41,27 @@ interface EnhancedTourTravelPlannerProps {
   onSave: () => void;
 }
 
-interface TravelSegment {
+/** Venue coordinates copied onto a segment when the plan is generated. */
+type TravelLocation = {
+  name?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+/**
+ * Persisted into the `tours.travel_plan` jsonb column, so this must stay a `type`
+ * alias rather than an `interface`: only type aliases get the implicit index
+ * signature that makes them assignable to the generated `Json` type.
+ */
+type TravelSegment = {
   id: string;
   type: "home_to_venue" | "venue_to_venue" | "venue_to_home" | "home_return";
   fromType: "home" | "venue";
   toType: "home" | "venue";
   fromDateId?: string;
   toDateId?: string;
-  fromLocation?: any;
-  toLocation?: any;
+  fromLocation?: TravelLocation;
+  toLocation?: TravelLocation;
   transportType: "bus" | "plane" | "train" | "van" | "personal";
   departureTime: string;
   arrivalTime: string;
@@ -304,7 +316,7 @@ export const EnhancedTourTravelPlanner: React.FC<
     setIsSaving(true);
     try {
       const { error } = await dataLayerClient.from("tours")
-        .update({ travel_plan: travelPlan } as any)
+        .update({ travel_plan: travelPlan })
         .eq("id", tourId);
 
       if (error) throw error;

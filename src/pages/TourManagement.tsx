@@ -637,7 +637,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                           onClick={async (e) => {
                             e.stopPropagation();
                             await dataLayerClient.from('tours')
-                              .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                              .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null })
                               .eq('id', tour.id);
                             refetchApproval();
                           }}
@@ -653,7 +653,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                             e.stopPropagation();
                             const { data: u } = await dataLayerClient.auth.getUser();
                             await dataLayerClient.from('tours')
-                              .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
+                              .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null })
                               .eq('id', tour.id);
                             refetchApproval();
                           }}

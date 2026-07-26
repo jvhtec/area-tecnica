@@ -192,7 +192,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                     rates_approved: true,
                     rates_approved_at: new Date().toISOString(),
                     rates_approved_by: u?.user?.id || null,
-                } as any)
+                })
                 .eq('id', resolvedJobId);
             if (error) throw error;
             toast.success('Tarifas aprobadas');
@@ -210,7 +210,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         setIsApproving(true);
         try {
             const { error } = await dataLayerClient.from('jobs')
-                .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null })
                 .eq('id', resolvedJobId);
             if (error) throw error;
             toast.success('Aprobación revocada');

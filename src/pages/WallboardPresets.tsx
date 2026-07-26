@@ -70,7 +70,7 @@ function getPublicDisplayUrl(value?: string, slug?: string): string {
   const trimmed = (value || '').trim();
   if (trimmed) return trimmed;
   const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
-  const token = (import.meta as any).env?.VITE_WALLBOARD_TOKEN as string | undefined || DEFAULT_WALLBOARD_TOKEN;
+  const token = import.meta.env?.VITE_WALLBOARD_TOKEN as string | undefined || DEFAULT_WALLBOARD_TOKEN;
   const cleanSlug = (slug?.trim() || 'default').toLowerCase();
   return `${origin || ''}/wallboard/public/${encodeURIComponent(token)}/${encodeURIComponent(cleanSlug)}`;
 }

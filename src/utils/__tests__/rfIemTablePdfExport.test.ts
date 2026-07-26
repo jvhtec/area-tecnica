@@ -68,7 +68,7 @@ describe('rfIemTablePdfExport helpers', () => {
       iem_systems: [{ model: 'Shure PSM1000 Series', quantity_bp: 4 }],
       wireless_provided_by: 'band',
       iem_provided_by: 'festival',
-    } as any);
+    });
 
     expect(normalized.wirelessSystems[0]?.provided_by).toBe('band');
     expect(normalized.iemSystems[0]?.provided_by).toBe('festival');
@@ -83,7 +83,7 @@ describe('rfIemTablePdfExport helpers', () => {
       stage: 1,
       wireless_systems: [],
       iem_systems: [],
-    } as any);
+    });
 
     expect(hasRfIemContent(normalized)).toBe(false);
   });

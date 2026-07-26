@@ -237,7 +237,7 @@ export const MatrixDialogs = ({
                 return;
               }
               sendStaffingEmail(
-                ({ job_id: jobId, profile_id: profileId, phase: "offer", role, message, channel: via, department: staffingDepartment, single_day: false } as any),
+                ({ job_id: jobId, profile_id: profileId, phase: "offer", role, message, channel: via, department: staffingDepartment, single_day: false }),
                 {
                   onSuccess: (data: any) => {
                     const ch = data?.channel || via;

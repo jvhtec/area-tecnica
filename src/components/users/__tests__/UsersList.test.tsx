@@ -73,7 +73,7 @@ describe("UsersList", () => {
       ),
       error: null,
       count: 12,
-    } as any);
+    });
 
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "profiles") {
@@ -116,7 +116,7 @@ describe("UsersList", () => {
       ],
       error: null,
       count: 2,
-    } as any);
+    });
 
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "profiles") {
@@ -145,7 +145,7 @@ describe("UsersList", () => {
       data: [],
       error: null,
       count: 0,
-    } as any);
+    });
 
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "profiles") {
@@ -166,7 +166,7 @@ describe("UsersList", () => {
       data: null,
       error: new Error("boom"),
       count: 0,
-    } as any);
+    });
 
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "profiles") {
@@ -186,7 +186,7 @@ describe("UsersList", () => {
       data: [createUserProfile({ id: "user-1", first_name: "Recovered" })],
       error: null,
       count: 1,
-    } as any);
+    });
 
     await user.click(screen.getByRole("button", { name: /retry/i }));
 

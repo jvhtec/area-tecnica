@@ -149,8 +149,8 @@ export function SubRentalManager() {
       }
 
       // Bulk insert with shared batch id so items are grouped together
-      const batchId = (typeof crypto !== 'undefined' && (crypto as any).randomUUID)
-        ? (crypto as any).randomUUID()
+      const batchId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+        ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const payload = validItems.map((it) => ({
         equipment_id: it.equipment_id,
