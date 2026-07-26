@@ -362,7 +362,7 @@ serve(async (req) => {
 
       const result = {
         jobs: filteredJobs.map((j: any) => {
-          const depts = Array.from(
+          const depts: Dept[] = Array.from(
             new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
           );
 
@@ -519,7 +519,7 @@ serve(async (req) => {
         jobs: filteredJobs.map((j: any) => ({
           id: j.id,
           title: j.title,
-          departments: Array.from(new Set((j.job_departments ?? []).map((d: any) => d.department))).map((dept: Dept) => ({
+          departments: Array.from(new Set<Dept>((j.job_departments ?? []).map((d: any) => d.department))).map((dept) => ({
             dept,
             have: 0,
             need: 0,
@@ -594,7 +594,7 @@ serve(async (req) => {
         overdueJobs.forEach((j: any) => {
           const m = byJobTech.get(j.id) ?? new Map<string, string[]>();
           // Count technicians with no submitted/approved timesheets
-          const techIds = Array.from(new Set((j.job_assignments ?? []).map((a: any) => a.technician_id)));
+          const techIds = Array.from(new Set<string>((j.job_assignments ?? []).map((a: any) => a.technician_id)));
           const missingCount = techIds.filter((tid) => {
             const statuses = m.get(tid) ?? [];
             return !statuses.some((s) => s === "submitted" || s === "approved");

@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { requireAdminOrManagement } from "../_shared/auth.ts"
 import { businessRoleLookupFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
+import { getErrorStatus } from "../_shared/http.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -685,8 +686,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in manage-flex-crew-assignments:', error);
-    const status = typeof error?.status === 'number' ? error.status : 500;
-    const message = status >= 500 ? 'Internal server error' : error.message;
+    const status = getErrorStatus(error, 500);
+    const message = status >= 500
+      ? 'Internal server error'
+      : (error instanceof Error ? error.message : String(error));
     return new Response(
       JSON.stringify({ error: message }),
       { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

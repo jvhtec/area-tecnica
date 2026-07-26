@@ -774,7 +774,9 @@ async function tickCampaign(
         continue;
       }
 
-      if (!campaignRoleCodes.has(roleCode)) continue;
+      // `roleCode` is undefined when the request id has no resolved role; the Set lookup
+      // already returned false for it, so this only makes the narrowing explicit.
+      if (!roleCode || !campaignRoleCodes.has(roleCode)) continue;
 
       const contactedProfiles = contactedProfilesByRole.get(roleCode) || new Set<string>();
       contactedProfiles.add(profileId);
@@ -1253,7 +1255,9 @@ serve(async (req) => {
   try {
     const body = (await parseJsonBody(req)) || {};
 
-    let result = { status: 404, body: { error: 'Unknown action' } };
+    // Annotated: each action handler returns a differently-shaped body, and the
+    // initializer alone would pin `result` to the 'Unknown action' shape.
+    let result: { status: number; body: unknown } = { status: 404, body: { error: 'Unknown action' } };
 
     switch (action) {
       case 'start':

@@ -15,18 +15,26 @@ interface AuditAuthUser {
   email?: string | null;
 }
 
+/**
+ * Minimal client surface so tests can pass a fake. Uses `PromiseLike` because the real
+ * `SupabaseClient` returns query builders (thenables), not plain Promises.
+ */
 interface AuditInsertClient {
   auth: {
     getUser: (
       accessToken: string,
-    ) => Promise<{ data: { user: AuditAuthUser | null }; error: unknown }>;
+    ) => PromiseLike<{ data: { user: AuditAuthUser | null }; error: unknown }>;
   };
   from: (table: string) => {
-    insert: (payload: Record<string, unknown>) => Promise<{ error: unknown }>;
+    insert: (payload: Record<string, unknown>) => PromiseLike<{ error: unknown }>;
   };
 }
 
 const ALLOWED_SEVERITIES: SecurityAuditSeverity[] = ["low", "medium", "high", "critical"];
+
+/** Narrows an unvalidated payload value to a known severity. */
+const isSecurityAuditSeverity = (value: unknown): value is SecurityAuditSeverity =>
+  ALLOWED_SEVERITIES.includes(value as SecurityAuditSeverity);
 const ACTION_MAX_LENGTH = 120;
 const RESOURCE_MAX_LENGTH = 255;
 const REDACTED_FIELDS = new Set([
@@ -230,7 +238,7 @@ export function validateSecurityAuditEvent(
     };
   }
 
-  if (!ALLOWED_SEVERITIES.includes(severity as SecurityAuditSeverity) || userId === "__invalid__") {
+  if (!isSecurityAuditSeverity(severity) || userId === "__invalid__") {
     return {
       event: null,
       errorResponse: jsonResponse({ error: "Invalid audit payload" }, { status: 400 }),

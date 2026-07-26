@@ -23,7 +23,10 @@ const base64UrlEncode = (input: Uint8Array | string): string => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 };
 
-const getApnsPrivateKey = (): Uint8Array | null => {
+// `Uint8Array<ArrayBuffer>`, not the default `Uint8Array<ArrayBufferLike>`: `BufferSource`
+// (what crypto.subtle.importKey takes) excludes SharedArrayBuffer-backed views.
+// `new Uint8Array(length)` below always allocates a plain ArrayBuffer.
+const getApnsPrivateKey = (): Uint8Array<ArrayBuffer> | null => {
   if (!APNS_AUTH_KEY) {
     return null;
   }

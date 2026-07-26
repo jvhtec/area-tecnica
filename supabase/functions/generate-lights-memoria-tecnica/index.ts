@@ -222,6 +222,6 @@ serve(createHttpHandler(async (req) => {
     return jsonResponse(await uploadGeneratedMemoriaPdf(supabase, projectName, fileName, pdfBytes, {
       bucketCandidates: ["lights-memoria-tecnica"],
     }));
-}), {
+}, {
   onError: (error) => console.error("generate-lights-memoria-tecnica failed", error),
-});
+}));

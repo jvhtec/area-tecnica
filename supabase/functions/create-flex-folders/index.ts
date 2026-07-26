@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
+import { getErrorStatus } from "../_shared/http.ts";
 import {
   ESTRUCTURA_DEPARTMENT,
   ESTRUCTURA_PULL_SHEETS,
@@ -635,8 +636,10 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Error in create-flex-folders:", error)
-    const status = typeof error?.status === 'number' ? error.status : 400
-    const message = status >= 500 ? 'Internal server error' : error.message
+    const status = getErrorStatus(error, 400);
+    const message = status >= 500
+      ? 'Internal server error'
+      : (error instanceof Error ? error.message : String(error));
     return new Response(
       JSON.stringify({ error: message }),
       { 

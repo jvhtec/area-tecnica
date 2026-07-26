@@ -8,6 +8,7 @@ import {
 } from "./messageUtils.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { isServiceRoleRequest, requireAdminOrManagement } from "../_shared/auth.ts";
+import { joinedSingle } from "../_shared/joins.ts";
 import {
   corsHeaders,
   createHttpHandler,
@@ -202,11 +203,6 @@ function jobLocation(job: any): { latitude: number | null; longitude: number | n
     latitude: toFiniteNumber(location?.latitude),
     longitude: toFiniteNumber(location?.longitude),
   };
-}
-
-function joinedSingle<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
 }
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
