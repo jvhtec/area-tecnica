@@ -66,6 +66,7 @@ npm run test:e2e          # Playwright smoke tests (Chromium)
 
 # Linting
 npm run lint:functions    # ESLint on Supabase edge functions (Deno globals)
+npm run typecheck:functions  # deno check over every edge function + _shared module (needs Deno)
 ```
 
 ### Governance & CI Gates
@@ -506,6 +507,11 @@ All checks across all three workflows are enumerated in `docs/release/production
 **Edge Function Patterns**:
 - Runtime: Deno (import from `https://esm.sh/` or `jsr:` for deps)
 - Linting: `npm run lint:functions` (separate ESLint config with Deno globals)
+- Type checking: `npm run typecheck:functions` — `deno check` over every entrypoint and
+  `_shared/` module. Edge Functions are **not** in `tsconfig.app.json`, so `npm run typecheck`
+  does not cover them. Needs Deno on PATH (or `DENO_BIN`); it skips locally when Deno is
+  absent but hard-fails in CI (`functions_typecheck` job).
+- Deno type-checks with `strict` on by default, which is stricter than the app project
 - Deployment: Via Supabase CLI (`npx supabase functions deploy <name>`)
 - Secrets: Managed via `npx supabase secrets set KEY=VALUE`
 - Each function is a directory with `index.ts` entry point
@@ -1026,6 +1032,12 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Don't import lovable-tagger** in vite.config.ts (causes build failures)
 - **Edge functions use Deno runtime** — don't use Node.js APIs or npm imports in `supabase/functions/`; use `https://esm.sh/` or `jsr:` for deps
 - **Lint edge functions separately** — `npm run lint:functions` uses different ESLint config with Deno globals
+- **Type-check edge functions separately too** — `npm run typecheck:functions`; `npm run typecheck` only covers `src/`
+- **Never type a Supabase client as `ReturnType<typeof createClient>`** — that instantiates the generic with its defaults and makes every `.from()` row resolve to `never`, so the module silently stops being type-checked. Import the exported `SupabaseClient` type instead.
+- **`.returns<T>()` takes the array form** even when the query ends in `.maybeSingle()`/`.single()` — `.returns<Row[]>()`, not `.returns<Row>()`, or the row resolves to `never`.
+- **Embedded PostgREST joins may arrive as arrays** — `select('..., other(...)')` can return an object or an array depending on how the relationship resolves, and reading a column off the array silently gives `undefined`. Normalize with `joinedSingle`/`joinedMany` from `supabase/functions/_shared/joins.ts`.
+- **`const { data: x = [] } = await client...` does not protect against null** — destructuring defaults only apply to `undefined`, and Supabase returns `data: null` on error. Use `?? []`.
+- **Options for `createHttpHandler` go inside its call** — `serve(createHttpHandler(handler, { onError }))`. Writing `serve(createHttpHandler(handler), { onError })` passes them to std's `serve`, whose `onError` must return a `Response`.
 - **Never commit .env files** — all dotenv files are gitignored; secrets go in Cloudflare Pages dashboard or Supabase secrets
 - **Staging uses a separate Supabase project** — don't point staging at production; use `.env.staging.local` and `npm run dev:staging`
 - **Staffing campaign state machine** — don't bypass status transitions in the staffing orchestrator flow
