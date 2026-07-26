@@ -58,15 +58,16 @@ function uniqueParts(parts: Array<string | null>): string[] {
  * Convert unknown runtime errors (including Supabase/PostgREST objects)
  * into deterministic, user-readable strings.
  */
-export function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown, fallback = 'Unexpected error'): string {
   if (error instanceof Error) {
     const msg = toText(error.message);
-    return msg ?? error.name ?? 'Unexpected error';
+    const specificName = error.name === 'Error' ? null : toText(error.name);
+    return msg ?? specificName ?? fallback;
   }
 
   if (Array.isArray(error)) {
-    const nested = uniqueParts(error.map((item) => getErrorMessage(item)));
-    return nested.length > 0 ? nested.join('; ') : 'Unexpected error';
+    const nested = uniqueParts(error.map((item) => getErrorMessage(item, fallback)));
+    return nested.length > 0 ? nested.join('; ') : fallback;
   }
 
   if (isRecord(error)) {
@@ -89,7 +90,8 @@ export function getErrorMessage(error: unknown): string {
 
   const direct = toText(error);
   if (direct) return direct;
-  return stringifySafe(error);
+  const serialized = stringifySafe(error);
+  return serialized === 'Unexpected error' ? fallback : serialized;
 }
 
 
@@ -114,4 +116,23 @@ export function getErrorStack(error: unknown): string | undefined {
     if (stack) return stack;
   }
   return undefined;
+}
+
+/**
+ * Reads an HTTP-ish status off an unknown error — Supabase/PostgREST errors and
+ * fetch wrappers both carry one, and retry policies branch on it.
+ */
+export function getErrorStatus(error: unknown): number | undefined {
+  if (!isRecord(error)) return undefined;
+  const status = error.status ?? error.statusCode;
+  const numericStatus =
+    typeof status === 'number'
+      ? status
+      : typeof status === 'string' && status.trim().length > 0
+        ? Number(status)
+        : Number.NaN;
+
+  return Number.isInteger(numericStatus) && numericStatus >= 400 && numericStatus <= 599
+    ? numericStatus
+    : undefined;
 }
