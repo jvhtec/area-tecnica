@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   assignmentRoleColumnForDepartment,
   canManageCampaign,
@@ -25,7 +25,7 @@ const corsHeaders = {
 };
 
 // Resolve user from Authorization header
-async function resolveUser(supabase: ReturnType<typeof createClient>, req: Request) {
+async function resolveUser(supabase: SupabaseClient, req: Request) {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return null;
@@ -106,7 +106,7 @@ function parseJsonBody(req: Request): Promise<any> {
 async function canManageCampaignOrThrow(
   user: any,
   department: string,
-  supabase: ReturnType<typeof createClient>
+  supabase: SupabaseClient
 ) {
   const ok = await canManageCampaign(user, department, supabase);
   if (!ok) {
@@ -116,7 +116,7 @@ async function canManageCampaignOrThrow(
 }
 
 async function syncCampaignRolesWithCurrentRequirements(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   campaign: { id: string; job_id: string; department: string },
   requiredRoles?: any[] | null,
   campaignRoles?: any[] | null,
@@ -173,7 +173,7 @@ async function syncCampaignRolesWithCurrentRequirements(
 
 // START action: Create new campaign
 async function startCampaign(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   user: any,
   body: any
 ) {
@@ -322,7 +322,7 @@ async function startCampaign(
 
 // PAUSE action: Pause active campaign
 async function pauseCampaign(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   user: any,
   body: any
 ) {
@@ -368,7 +368,7 @@ async function pauseCampaign(
 
 // RESUME action: Resume paused, stopped, or completed campaign
 async function resumeCampaign(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   user: any,
   body: any
 ) {
@@ -437,7 +437,7 @@ async function resumeCampaign(
 
 // STOP action: Terminate campaign
 async function stopCampaign(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   user: any,
   body: any
 ) {
@@ -479,7 +479,7 @@ async function stopCampaign(
 
 // NUDGE action: Trigger immediate tick
 async function nudgeCampaign(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   user: any,
   body: any
 ) {
@@ -543,7 +543,7 @@ async function nudgeCampaign(
 
 // TICK action: Execute one campaign cycle
 async function tickCampaign(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   campaign_id: string
 ) {
   const lockId = crypto.randomUUID();
@@ -1150,7 +1150,7 @@ async function tickCampaign(
 
 // ESCALATE action: Advance to next escalation step
 async function escalateCampaign(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   user: any,
   body: any
 ) {

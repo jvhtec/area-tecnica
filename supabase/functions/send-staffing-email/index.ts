@@ -588,6 +588,19 @@ serve(createHttpHandler(async (req) => {
       
       const job = jobResult.data;
       const tech = techResult.data;
+
+      // Both queries use maybeSingle(): a missing row yields `data: null` with no error,
+      // so the error checks above are not enough to guarantee either is present.
+      if (!job || !tech) {
+        console.error('❌ JOB/PROFILE NOT FOUND:', { job: Boolean(job), tech: Boolean(tech) });
+        return new Response(JSON.stringify({
+          error: "Job or profile not found",
+          details: { job_found: Boolean(job), profile_found: Boolean(tech) }
+        }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
       const roleDepartmentRows = Array.isArray(roleDepartmentResult.data)
         ? roleDepartmentResult.data as Array<{ department?: string | null }>
         : [];
@@ -1134,7 +1147,7 @@ serve(createHttpHandler(async (req) => {
       // In that case we reuse its id so the confirm link points at a real row.
       const isBatch = normalizedDates.length > 1;
       let batchId: string | null = null;
-      let rid = crypto.randomUUID();
+      let rid: string = crypto.randomUUID();
       let firstDate: string | null = null;
       let existingFirstRowId: string | null = null;
 
@@ -1441,7 +1454,7 @@ serve(createHttpHandler(async (req) => {
       const endDate = fmtDate(job.end_time);
       const callTime = fmtTime(job.start_time);
       const targetDateLabel = normalizedTargetDate ? fmtDate(`${normalizedTargetDate}T00:00:00Z`) : null;
-      const loc = job.locations?.formatted_address ?? 'Por confirmar';
+      const loc = joinedSingle(job.locations)?.formatted_address ?? 'Por confirmar';
 
       const safeMessage = (message ?? '').replace(/</g, '&lt;').replace(/\n/g, '<br/>');
 

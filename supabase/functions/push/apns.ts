@@ -67,7 +67,9 @@ const getApnsJwt = async (): Promise<string | null> => {
 
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
-    keyBytes.buffer,
+    // Pass the view, not `.buffer`: a Uint8Array may be a window into a larger
+    // ArrayBuffer, and `.buffer` would hand the whole thing to importKey.
+    keyBytes,
     { name: "ECDSA", namedCurve: "P-256" },
     false,
     ["sign"],

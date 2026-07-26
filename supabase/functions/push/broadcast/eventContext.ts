@@ -1,7 +1,7 @@
-import type { createClient } from "../deps.ts";
+import type { SupabaseClient } from "../deps.ts";
 import type { BroadcastBody, DepartmentRoleSummary, PushNotificationRoute } from "../types.ts";
 
-export type BroadcastClient = ReturnType<typeof createClient>;
+export type BroadcastClient = SupabaseClient;
 
 export type BroadcastMetaExtras = {
   view?: string;
@@ -45,7 +45,9 @@ export type BroadcastEventContext = {
   body: BroadcastBody;
   type: string;
   jobId?: string;
-  jobTitle: string;
+  // Null when neither the body nor the job lookup supplied one; message builders
+  // already fall back to 'Trabajo'.
+  jobTitle: string | null;
   jobDepartment: string | null;
   jobType: string | null;
   tourId?: string;

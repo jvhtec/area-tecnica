@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
 import {
@@ -42,7 +42,7 @@ interface TypedFlexElementResponse {
   elementId: string;
 }
 
-type AppSupabaseClient = ReturnType<typeof createClient>;
+type AppSupabaseClient = SupabaseClient;
 
 interface TourFlexRecord {
   id: string;
@@ -104,7 +104,7 @@ const flexDate = (value: string): string => {
 const tourDateDocumentNumber = (value: string): string =>
   new Date(value).toISOString().slice(2, 10).replaceAll('-', '');
 
-async function resolveActorName(supabase: ReturnType<typeof createClient>, actorId: string | null): Promise<string | null> {
+async function resolveActorName(supabase: SupabaseClient, actorId: string | null): Promise<string | null> {
   if (!actorId) return null;
   try {
     const { data } = await supabase

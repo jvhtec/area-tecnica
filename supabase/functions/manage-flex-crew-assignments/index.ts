@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { requireAdminOrManagement } from "../_shared/auth.ts"
 import { businessRoleLookupFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
 
@@ -108,7 +108,7 @@ async function discoverLineItemId(
  * Set business role for a line item in a crew call when the Flex dictionary ID is known.
  */
 async function setBusinessRole(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   department: string,
   jobId: string,
   technicianId: string,

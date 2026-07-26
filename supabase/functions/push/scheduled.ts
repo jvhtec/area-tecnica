@@ -1,4 +1,4 @@
-import { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
 import { sendNativePushNotification } from "./apns.ts";
@@ -67,7 +67,7 @@ function getPushSendMetadata(result: PushSendResult): Pick<PushDeliveryResult, '
 }
 
 const loadNativeTokens = async (
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   userIds: string[],
 ): Promise<NativePushTokenRow[]> => {
   if (userIds.length === 0) {
@@ -123,7 +123,7 @@ type MorningSummaryData = {
 };
 
 async function getMorningSummaryDataForDepartment(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   department: string,
   targetDate: string, // YYYY-MM-DD
 ): Promise<MorningSummaryData> {
@@ -131,7 +131,7 @@ async function getMorningSummaryDataForDepartment(
   // Source of truth: timesheets (NOT job_assignments), which matches the Personal agenda.
   // Important: do NOT filter by job.start_time here — multi-day jobs may have a start_time on a
   // different day, but the technician is still working today if they have an active timesheet row.
-  const { data: assignments = [] } = await client
+  const { data: assignmentsRows } = await client
     .from('timesheets')
     .select(`
       technician_id,
@@ -144,9 +144,11 @@ async function getMorningSummaryDataForDepartment(
     .eq('profile.role', 'house_tech')
     .eq('profile.warehouse_duty_exempt', false)
     .returns<MorningSummaryAssignment[]>();
+  // Supabase returns `data: null` on error, which a destructuring default never catches.
+  const assignments: MorningSummaryAssignment[] = assignmentsRows ?? [];
 
   // 2) Get today's unavailability for this department (primary source)
-  const { data: unavailable = [] } = await client
+  const { data: unavailableRows } = await client
     .from('availability_schedules')
     .select(`
       user_id,
@@ -159,16 +161,18 @@ async function getMorningSummaryDataForDepartment(
     .eq('profile.role', 'house_tech')
     .eq('profile.warehouse_duty_exempt', false)
     .returns<MorningSummaryUnavailable[]>();
+  const unavailable: MorningSummaryUnavailable[] = unavailableRows ?? [];
   const unavailableHouseOnly: MorningSummaryUnavailable[] = [...unavailable];
 
   // 3) Get all house techs in department (population)
-  const { data: allTechs = [] } = await client
+  const { data: allTechsRows } = await client
     .from('profiles')
     .select('id, first_name, last_name, nickname')
     .eq('department', department)
     .eq('role', 'house_tech')
     .eq('warehouse_duty_exempt', false)
     .returns<MorningSummaryTech[]>();
+  const allTechs: MorningSummaryTech[] = allTechsRows ?? [];
 
   // 4) Legacy fallback: include legacy table marks (technician_availability)
   // Some environments still record travel/sick/day_off/vacation here.
@@ -471,7 +475,7 @@ function formatMultiDepartmentSummary(
 }
 
 async function checkAndGetScheduleConfig(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   eventType: string,
   force: boolean = false,
 ): Promise<{ shouldSend: boolean; config: ScheduleConfigRow | null }> {
@@ -480,7 +484,7 @@ async function checkAndGetScheduleConfig(
     .from('push_notification_schedules')
     .select('*')
     .eq('event_type', eventType)
-    .returns<ScheduleConfigRow>()
+    .returns<ScheduleConfigRow[]>()
     .maybeSingle();
 
   if (error || !config) {
@@ -584,7 +588,7 @@ async function checkAndGetScheduleConfig(
 }
 
 export async function handleCheckScheduled(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   body: CheckScheduledBody,
 ) {
   const type = body.type;

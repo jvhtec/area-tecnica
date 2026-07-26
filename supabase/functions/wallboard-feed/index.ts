@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 function readPositiveIntEnv(name: string, fallback: number) {
   const raw = Deno.env.get(name);
@@ -169,7 +169,7 @@ function endOfDay(d: Date) {
 
 // Filter out jobs whose parent tour is cancelled ("not happening")
 async function filterCancelledTourJobs<T extends { tour_id?: string | null }>(
-  sb: ReturnType<typeof createClient>,
+  sb: SupabaseClient,
   jobs: T[]
 ): Promise<T[]> {
   const tourIds = Array.from(new Set(jobs.map((j) => j.tour_id).filter(Boolean))) as string[];

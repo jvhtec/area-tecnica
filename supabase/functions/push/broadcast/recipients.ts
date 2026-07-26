@@ -1,4 +1,4 @@
-import type { createClient } from "../deps.ts";
+import type { SupabaseClient } from "../deps.ts";
 import {
   getAdminUserIdsForStaffingNotifications,
   getManagementAndAdminByDepartmentUserIds,
@@ -6,7 +6,7 @@ import {
   lookupTechnicianDepartment,
 } from "../data.ts";
 
-type BroadcastClient = ReturnType<typeof createClient>;
+type BroadcastClient = SupabaseClient;
 type ScopedManagementOptions = {
   includeCrossDepartmentAdmins?: boolean;
 };
