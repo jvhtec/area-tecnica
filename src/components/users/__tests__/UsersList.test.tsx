@@ -13,7 +13,7 @@ const { useTabVisibilityMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useTabVisibility", () => ({
-  useTabVisibility: (...args: any[]) => useTabVisibilityMock(...args),
+  useTabVisibility: (...args: unknown[]) => useTabVisibilityMock(...args),
 }));
 
 vi.mock("@/lib/supabase", () => ({

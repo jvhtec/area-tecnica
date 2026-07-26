@@ -18,6 +18,7 @@ import {
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface StaffingCandidateListProps {
   campaignId: string
   roleCode: string
@@ -398,10 +399,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_roleless_consultations', jobId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_candidate_role_activity', jobId, roleCode) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive'
       })
     }

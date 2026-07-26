@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export interface TourAssignment {
   id: string;
   tour_id: string;
@@ -71,8 +72,8 @@ export const useTourAssignments = (tourId: string) => {
       // Also invalidate job assignments since they're automatically synced
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to create assignment: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Failed to create assignment: ${getErrorMessage(error)}`);
     }
   });
 
@@ -91,8 +92,8 @@ export const useTourAssignments = (tourId: string) => {
       // Also invalidate job assignments since they're automatically synced
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to remove assignment: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Failed to remove assignment: ${getErrorMessage(error)}`);
     }
   });
 
@@ -112,8 +113,8 @@ export const useTourAssignments = (tourId: string) => {
       toast.success('Assignment updated successfully');
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-assignments', tourId) });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to update assignment: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Failed to update assignment: ${getErrorMessage(error)}`);
     }
   });
 

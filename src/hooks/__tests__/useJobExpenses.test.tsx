@@ -12,7 +12,7 @@ const { useOptimizedAuthMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({

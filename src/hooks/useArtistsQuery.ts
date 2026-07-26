@@ -13,6 +13,7 @@ import {
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface UseArtistsQueryOptions {
   /** When true, fetches artists across every festival date instead of just `selectedDate` (used by the "search all dates" mode). */
@@ -165,11 +166,11 @@ export const useArtistsQuery = (
           : "Artist deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error deleting artist:", error);
       toast({
         title: "Error",
-        description: "Could not delete artist: " + error.message,
+        description: "Could not delete artist: " + getErrorMessage(error),
         variant: "destructive",
       });
     }

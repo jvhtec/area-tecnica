@@ -12,7 +12,7 @@ const { useVacationRequestsMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useVacationRequests", () => ({
-  useVacationRequests: (...args: any[]) => useVacationRequestsMock(...args),
+  useVacationRequests: (...args: unknown[]) => useVacationRequestsMock(...args),
 }));
 
 import { VacationManagement } from "../VacationManagement";

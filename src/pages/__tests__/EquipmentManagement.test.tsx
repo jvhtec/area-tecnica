@@ -15,7 +15,7 @@ const { useOptimizedAuthMock, toastMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/hooks/use-toast", () => ({

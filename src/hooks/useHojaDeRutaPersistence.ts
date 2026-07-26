@@ -116,7 +116,7 @@ const normalizeTravelTransportationType = (value: string | null | undefined): st
 
 interface SaveCallbacks {
   onSuccess?: () => void;
-  onError?: (error: any) => void;
+  onError?: (error: unknown) => void;
   onSettled?: () => void;
 }
 

@@ -161,7 +161,7 @@ export const OptimizedMatrixCellDialogs = ({
                         { job_id: jid, profile_id: technicianId, phase: pendingCancel.phase },
                         {
                           onSuccess: () => resolve(),
-                          onError: (e) => reject(e),
+                          onError: (e: unknown) => reject(e),
                         }
                       );
                     })

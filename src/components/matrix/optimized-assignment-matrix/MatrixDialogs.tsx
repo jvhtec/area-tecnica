@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { queryKeys } from "@/lib/react-query";
 import type { OptimizedAssignmentMatrixViewProps } from "@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type MatrixDialogsProps = Pick<
   OptimizedAssignmentMatrixViewProps,
@@ -212,10 +213,10 @@ export const MatrixDialogs = ({
                     });
                     closeDialogs();
                   },
-                  onError: (error: any) => {
+                  onError: (error: unknown) => {
                     toast({
                       title: "No se pudo enviar la oferta",
-                      description: error.message,
+                      description: getErrorMessage(error),
                       variant: "destructive",
                     });
                   },
@@ -243,10 +244,10 @@ export const MatrixDialogs = ({
                     toast({ title: "Oferta enviada", description: `Oferta de ${role} enviada por ${ch}.` });
                     closeDialogs();
                   },
-                  onError: (error: any) => {
+                  onError: (error: unknown) => {
                     toast({
                       title: "No se pudo enviar la oferta",
-                      description: error.message,
+                      description: getErrorMessage(error),
                       variant: "destructive",
                     });
                   },
@@ -344,7 +345,7 @@ export const MatrixDialogs = ({
                         });
                         closeDialogs();
                       },
-                      onError: (error: any) => handleEmailError(error, payload),
+                      onError: (error: unknown) => handleEmailError(error, payload),
                     });
                     return;
                   }
@@ -385,7 +386,7 @@ export const MatrixDialogs = ({
                       });
                       closeDialogs();
                     },
-                    onError: (error: any) => handleEmailError(error, payload),
+                    onError: (error: unknown) => handleEmailError(error, payload),
                   });
                 }}
                 disabled={availabilitySending}
@@ -510,11 +511,11 @@ export const MatrixDialogs = ({
                       description: "Solicitud de staffing enviada (conflictos ignorados)",
                     });
                   },
-                  onError: (error: any) => {
+                  onError: (error: unknown) => {
                     setAvailabilitySending(false);
                     toast({
                       title: "Error al enviar",
-                      description: error.message || "No se pudo enviar la solicitud de staffing",
+                      description: getErrorMessage(error) || "No se pudo enviar la solicitud de staffing",
                       variant: "destructive",
                     });
                   },

@@ -13,7 +13,7 @@ import {
 import { renderWithProviders } from "@/test/renderWithProviders";
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 import { RequireAuth } from "../RequireAuth";

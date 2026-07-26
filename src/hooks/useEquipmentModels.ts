@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export interface EquipmentModel {
   id: string;
   name: string;
@@ -58,10 +59,10 @@ export const useEquipmentModels = () => {
         description: "Equipment model created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -87,10 +88,10 @@ export const useEquipmentModels = () => {
         description: "Equipment model updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -113,10 +114,10 @@ export const useEquipmentModels = () => {
         description: "Equipment model deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }

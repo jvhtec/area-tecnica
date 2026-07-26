@@ -1026,6 +1026,8 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Don't import lovable-tagger** in vite.config.ts (causes build failures)
 - **Edge functions use Deno runtime** — don't use Node.js APIs or npm imports in `supabase/functions/`; use `https://esm.sh/` or `jsr:` for deps
 - **Lint edge functions separately** — `npm run lint:functions` uses different ESLint config with Deno globals
+- **Errors are `unknown`, not `any`** — never annotate `catch (e: any)`; that annotation also silently overrides `useUnknownInCatchVariables`. Write `catch (error)` and read it through `getErrorMessage` / `getErrorName` / `getErrorStack` from `@/utils/errorMessage`, which unwrap Supabase/PostgREST error objects (message/details/hint/code) rather than assuming `.message` exists.
+- **`no-explicit-any` is ratcheted** — `governance:lint-warnings` holds a per-file, per-rule ceiling in `scripts/governance/lint-warning-baseline.json`. Reductions are always allowed; new warnings fail governance. After removing warnings run `node scripts/governance/check-lint-warning-baseline.mjs --write-baseline` so the gains are locked in.
 - **Never commit .env files** — all dotenv files are gitignored; secrets go in Cloudflare Pages dashboard or Supabase secrets
 - **Staging uses a separate Supabase project** — don't point staging at production; use `.env.staging.local` and `npm run dev:staging`
 - **Staffing campaign state machine** — don't bypass status transitions in the staffing orchestrator flow

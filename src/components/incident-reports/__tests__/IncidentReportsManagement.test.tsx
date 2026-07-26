@@ -14,7 +14,7 @@ const { useIncidentReportsMock, badgeMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useIncidentReports", () => ({
-  useIncidentReports: (...args: any[]) => useIncidentReportsMock(...args),
+  useIncidentReports: (...args: unknown[]) => useIncidentReportsMock(...args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({

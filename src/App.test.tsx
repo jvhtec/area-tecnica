@@ -25,7 +25,7 @@ const {
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
   OptimizedAuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/lib/multitab-coordinator", () => ({

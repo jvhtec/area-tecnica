@@ -68,8 +68,8 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-presets', tourId) });
       toast({ title: 'Éxito', description: 'Preset eliminado' });
     },
-    onError: (e: any) => {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    onError: (e: unknown) => {
+      toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' });
     }
   });
 

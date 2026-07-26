@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export const useVacationRequests = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -33,10 +34,10 @@ export const useVacationRequests = () => {
         description: "Your vacation request has been submitted for approval.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error submitting request",
-        description: error.message || "An unexpected error occurred.",
+        description: getErrorMessage(error) || "An unexpected error occurred.",
         variant: "destructive",
       });
     },
@@ -51,10 +52,10 @@ export const useVacationRequests = () => {
         description: `${data.length} vacation request(s) have been approved.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Approval failed",
-        description: error.message || "Failed to approve selected requests.",
+        description: getErrorMessage(error) || "Failed to approve selected requests.",
         variant: "destructive",
       });
     },
@@ -70,10 +71,10 @@ export const useVacationRequests = () => {
         description: `${data.length} vacation request(s) have been rejected.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Rejection failed",
-        description: error.message || "Failed to reject selected requests.",
+        description: getErrorMessage(error) || "Failed to reject selected requests.",
         variant: "destructive",
       });
     },

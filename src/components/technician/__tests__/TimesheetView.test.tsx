@@ -27,23 +27,23 @@ const {
 }));
 
 vi.mock("@/hooks/useTimesheets", () => ({
-  useTimesheets: (...args: any[]) => useTimesheetsMock(...args),
+  useTimesheets: (...args: unknown[]) => useTimesheetsMock(...args),
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/hooks/useJobPayoutTotals", () => ({
-  useJobPayoutTotals: (...args: any[]) => useJobPayoutTotalsMock(...args),
+  useJobPayoutTotals: (...args: unknown[]) => useJobPayoutTotalsMock(...args),
 }));
 
 vi.mock("@/hooks/useJobRatesApproval", () => ({
-  useJobRatesApproval: (...args: any[]) => useJobRatesApprovalMock(...args),
+  useJobRatesApproval: (...args: unknown[]) => useJobRatesApprovalMock(...args),
 }));
 
 vi.mock("@/utils/jobClosureUtils", () => ({
-  isJobPastClosureWindow: (...args: any[]) => isJobPastClosureWindowMock(...args),
+  isJobPastClosureWindow: (...args: unknown[]) => isJobPastClosureWindowMock(...args),
 }));
 
 vi.mock("react-signature-canvas", () => {

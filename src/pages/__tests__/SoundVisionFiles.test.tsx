@@ -13,11 +13,11 @@ const { useOptimizedAuthMock, useThemeMock, navigateMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("next-themes", () => ({
-  useTheme: (...args: any[]) => useThemeMock(...args),
+  useTheme: (...args: unknown[]) => useThemeMock(...args),
 }));
 
 vi.mock("react-router-dom", async () => {

@@ -1,41 +1,25 @@
 {
-  "generatedAt": "2026-07-10T21:21:43.204Z",
+  "generatedAt": "2026-07-26T13:35:50.075Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1901,
+  "total": 1473,
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 1640,
+    "@typescript-eslint/no-explicit-any": 1237,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
     "no-case-declarations": 1,
     "no-control-regex": 8,
     "no-empty": 15,
-    "no-useless-escape": 65,
+    "no-useless-escape": 64,
     "prefer-const": 1,
-    "react-hooks/exhaustive-deps": 96,
-    "react-refresh/only-export-components": 62
+    "react-hooks/exhaustive-deps": 80,
+    "react-refresh/only-export-components": 54
   },
   "files": {
-    "src/App.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/__tests__/RequireAuth.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/auth/ForgotPasswordForm.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/auth/ResetPasswordForm.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/auth/SignUpForm.tsx": {
-      "@typescript-eslint/ban-ts-comment": 1,
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/components/CompanyLogoUploader.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
+      "@typescript-eslint/ban-ts-comment": 1
     },
     "src/components/dashboard/calendar-section/CalendarGrid.tsx": {
       "@typescript-eslint/no-explicit-any": 3
@@ -44,27 +28,22 @@
       "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/dashboard/CalendarSection.tsx": {
-      "@typescript-eslint/no-explicit-any": 3,
-      "react-hooks/exhaustive-deps": 1
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/dashboard/DashboardContent.tsx": {
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/dashboard/DashboardMobileHub.tsx": {
-      "@typescript-eslint/no-explicit-any": 4,
-      "react-hooks/exhaustive-deps": 1
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/dashboard/DateTypeContextMenu.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/dashboard/DepartmentSchedule.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/dashboard/DepartmentTabContent.tsx": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/dashboard/JobDocuments.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/dashboard/LightsSchedule.tsx": {
       "@typescript-eslint/no-explicit-any": 2
@@ -73,7 +52,7 @@
       "@typescript-eslint/no-explicit-any": 7
     },
     "src/components/dashboard/MobileJobCard.tsx": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 5
     },
     "src/components/dashboard/RealTimeJobsList.tsx": {
       "@typescript-eslint/no-explicit-any": 2
@@ -85,13 +64,13 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/dashboard/TourChips.tsx": {
-      "@typescript-eslint/no-explicit-any": 8
+      "@typescript-eslint/no-explicit-any": 7
     },
     "src/components/department/DepartmentMobileHub.tsx": {
       "@typescript-eslint/no-explicit-any": 7
     },
     "src/components/department/EnhancedJobDetailsModal.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/department/MobileAssignmentsDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 5
@@ -105,17 +84,11 @@
     "src/components/disponibilidad/PresetManagement.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/disponibilidad/StockCreationManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 2,
-      "react-hooks/exhaustive-deps": 2
-    },
     "src/components/disponibilidad/WeeklySummary.tsx": {
-      "react-hooks/exhaustive-deps": 2,
       "@typescript-eslint/no-explicit-any": 5
     },
     "src/components/equipment/EquipmentCreationManager.tsx": {
-      "react-hooks/exhaustive-deps": 1,
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/equipment/InventoryManagementDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -125,9 +98,6 @@
     },
     "src/components/equipment/SubRentalManager.tsx": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/components/expenses/__tests__/ExpenseForm.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/expenses/ExpenseList.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -139,14 +109,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/festival/ArtistFileDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 8,
-      "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/festival/ArtistForm.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/festival/ArtistFormLinksDialog.tsx": {
-      "react-hooks/exhaustive-deps": 1
+      "@typescript-eslint/no-explicit-any": 5
     },
     "src/components/festival/ArtistFormSubmissionDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -157,16 +120,7 @@
     "src/components/festival/ArtistManagementForm.tsx": {
       "@typescript-eslint/no-explicit-any": 12
     },
-    "src/components/festival/ArtistRequirementsForm.tsx": {
-      "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/festival/ArtistTable.tsx": {
-      "@typescript-eslint/no-explicit-any": 5
-    },
     "src/components/festival/ArtistTablePrintDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
-    "src/components/festival/FestivalLogoManager.tsx": {
       "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/festival/form/sections/WirelessSetupSection.tsx": {
@@ -185,23 +139,8 @@
     "src/components/festival/mobile/MobileArtistList.tsx": {
       "@typescript-eslint/no-explicit-any": 4
     },
-    "src/components/festival/pdf/PrintOptionsDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 10
-    },
-    "src/components/festival/scheduling/CopyShiftsDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/festival/scheduling/CreateShiftDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/festival/scheduling/EditShiftDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/festival/scheduling/FestivalScheduling.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/festival/scheduling/ManageAssignmentsDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/festival/ViewFileDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -230,9 +169,6 @@
     "src/components/hoja-de-ruta/sections/ModernWeatherSection.tsx": {
       "react-hooks/exhaustive-deps": 1
     },
-    "src/components/incident-reports/__tests__/IncidentReportsManagement.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/jobs/__tests__/JobDetailsDialog.timesheet-pdf.test.ts": {
       "@typescript-eslint/no-explicit-any": 9
     },
@@ -246,28 +182,16 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/jobs/cards/job-card-actions/ArchiveToFlexAction.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/jobs/cards/job-card-actions/BackfillDocTecnicaAction.tsx": {
-      "@typescript-eslint/no-explicit-any": 5
-    },
-    "src/components/jobs/cards/job-card-new/JobCardNewDetailsOnly.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/jobs/cards/job-card-new/JobCardNewView.tsx": {
-      "@typescript-eslint/no-explicit-any": 23
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/jobs/cards/JobCardAssignments.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/components/jobs/cards/JobCardDocuments.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
     "src/components/jobs/cards/JobCardHeader.tsx": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/components/jobs/cards/JobCardNew.tsx": {
-      "@typescript-eslint/no-explicit-any": 10
     },
     "src/components/jobs/cards/JobCardProgress.tsx": {
       "@typescript-eslint/no-explicit-any": 3
@@ -277,11 +201,10 @@
       "react-hooks/exhaustive-deps": 2
     },
     "src/components/jobs/CrewCallLinker.tsx": {
-      "react-hooks/exhaustive-deps": 1,
-      "@typescript-eslint/no-explicit-any": 1
+      "react-hooks/exhaustive-deps": 1
     },
     "src/components/jobs/EditJobDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 5
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/jobs/FlexSyncLogDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 3,
@@ -294,13 +217,13 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/jobs/job-details-dialog/tabs/JobDetailsDocumentsTab.tsx": {
-      "@typescript-eslint/no-explicit-any": 5
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/jobs/job-details-dialog/tabs/JobDetailsInfoTab.tsx": {
       "@typescript-eslint/no-explicit-any": 27
     },
     "src/components/jobs/job-details-dialog/tabs/JobDetailsLocationTab.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/jobs/job-details-dialog/tabs/JobDetailsPersonnelTab.tsx": {
       "@typescript-eslint/no-explicit-any": 5
@@ -310,12 +233,6 @@
     },
     "src/components/jobs/job-details-dialog/tabs/JobDetailsWeatherTab.tsx": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/jobs/JobAssignmentDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 9
-    },
-    "src/components/jobs/JobAssignments.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/jobs/JobDetailsDialog.tsx": {
       "react-refresh/only-export-components": 1,
@@ -328,7 +245,7 @@
       "react-hooks/exhaustive-deps": 2
     },
     "src/components/layout/AboutCard.tsx": {
-      "@typescript-eslint/no-explicit-any": 5,
+      "@typescript-eslint/no-explicit-any": 1,
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/layout/Layout.tsx": {
@@ -343,9 +260,6 @@
     "src/components/lights/LightsSchedule.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/components/lights/LightsTaskDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
     "src/components/logistics/LogisticsCalendar.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
@@ -353,7 +267,7 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/logistics/LogisticsEventDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 7,
+      "@typescript-eslint/no-explicit-any": 5,
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/logistics/MobileLogisticsCalendar.tsx": {
@@ -363,7 +277,7 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/logistics/TransportRequestDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 6
     },
     "src/components/maps/GoogleMap.tsx": {
       "@typescript-eslint/no-explicit-any": 4
@@ -381,14 +295,10 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/matrix/AssignJobDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 6,
       "react-refresh/only-export-components": 1
     },
-    "src/components/matrix/AssignmentMatrix.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/matrix/AssignmentStatusDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/matrix/DateHeader.tsx": {
       "@typescript-eslint/no-explicit-any": 9
@@ -400,7 +310,7 @@
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/matrix/optimized-assignment-matrix/MatrixDialogs.tsx": {
-      "@typescript-eslint/no-explicit-any": 15
+      "@typescript-eslint/no-explicit-any": 10
     },
     "src/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView.tsx": {
       "@typescript-eslint/no-explicit-any": 25,
@@ -410,7 +320,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/matrix/optimized-matrix-cell/OptimizedMatrixCellDialogs.tsx": {
-      "@typescript-eslint/no-explicit-any": 5
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/matrix/optimized-matrix-cell/OptimizedMatrixCellTooltip.tsx": {
       "@typescript-eslint/no-explicit-any": 2
@@ -430,21 +340,12 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/matrix/StaffingAutoModePanel.tsx": {
-      "@typescript-eslint/no-explicit-any": 10
-    },
-    "src/components/matrix/StaffingCampaignPanel.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 5
     },
     "src/components/matrix/StaffingCandidateList.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/matrix/StaffingOrchestratorPanel.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/matrix/TechnicianRow.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
-    },
-    "src/components/messages/DirectMessageDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/messages/DirectMessagesList.tsx": {
@@ -454,19 +355,13 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/messages/MessageReplyDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/milestones/JobMilestonesDialog.tsx": {
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/milestones/ManageMilestonesDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
-    "src/components/PerformanceMonitor.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/personal/__tests__/VacationManagement.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/personal/hooks/usePersonalCalendarData.ts": {
       "@typescript-eslint/no-explicit-any": 1
@@ -482,7 +377,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/personal/VacationRequestHistory.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/personal/VacationRequestsTabs.tsx": {
       "@typescript-eslint/no-explicit-any": 3
@@ -500,13 +395,13 @@
       "react-hooks/exhaustive-deps": 2
     },
     "src/components/settings/__tests__/SkillRoleMappingManager.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/settings/DryHireFolderManager.tsx": {
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/settings/PushNotificationMatrix.tsx": {
-      "@typescript-eslint/no-explicit-any": 6,
+      "@typescript-eslint/no-explicit-any": 3,
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/settings/SkillRoleMappingManager.tsx": {
@@ -515,43 +410,33 @@
     "src/components/shortcuts/ShortcutableButton.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/sound/ReportGenerator.tsx": {
+    "src/components/sound/SoundTaskDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/sound/SoundTaskDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 7
-    },
     "src/components/soundvision/SoundVisionInteractiveMap.tsx": {
-      "@typescript-eslint/no-explicit-any": 14,
-      "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/soundvision/SoundVisionMap.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/soundvision/VenueMetadataForm.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tasks/TaskList.tsx": {
-      "@typescript-eslint/no-explicit-any": 16
+      "@typescript-eslint/no-explicit-any": 12
     },
     "src/components/tasks/TaskManagerDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/technician/__tests__/AvailabilityView.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/technician/__tests__/DashboardScreen.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/technician/__tests__/TimesheetView.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 12,
-      "@typescript-eslint/no-require-imports": 1
+      "@typescript-eslint/no-require-imports": 1,
+      "@typescript-eslint/no-explicit-any": 7
     },
     "src/components/technician/AboutModal.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/technician/AssignmentCard.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/technician/AssignmentsGrid.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -566,9 +451,6 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/technician/MessagesModal.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/technician/ProfileView.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/technician/TechnicianArtistReadOnlyModal.tsx": {
@@ -592,49 +474,45 @@
     "src/components/timesheet/TimesheetSignature.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/timesheet/TimesheetView.tsx": {
-      "@typescript-eslint/no-explicit-any": 1,
-      "react-hooks/exhaustive-deps": 2
-    },
     "src/components/tours/__tests__/TourManagementWrapper.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/BulkTourFolderActions.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/RequestTourAvailabilityDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 8,
+      "@typescript-eslint/no-explicit-any": 7,
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/tours/scheduling/EnhancedTourTravelPlanner.tsx": {
-      "@typescript-eslint/no-explicit-any": 8,
+      "@typescript-eslint/no-explicit-any": 6,
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/tours/scheduling/TourAccommodationsManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 14,
+      "@typescript-eslint/no-explicit-any": 10,
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/tours/scheduling/TourContactsManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/scheduling/TourItineraryBuilder.tsx": {
       "react-hooks/exhaustive-deps": 1
     },
     "src/components/tours/scheduling/TourMapViewMapbox.tsx": {
-      "@typescript-eslint/no-explicit-any": 7,
+      "@typescript-eslint/no-explicit-any": 6,
       "react-hooks/exhaustive-deps": 2
     },
     "src/components/tours/scheduling/TourSettingsPanel.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/tours/scheduling/TourTimelineView.tsx": {
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/tours/TourAssignmentDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/TourCard.tsx": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/tours/TourDateForm.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -643,37 +521,21 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/TourDateManagementDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 8
-    },
-    "src/components/tours/TourDefaultsManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/tours/TourDocumentsList.tsx": {
       "@typescript-eslint/no-explicit-any": 3
     },
-    "src/components/tours/TourLogoManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
     "src/components/tours/TourManagementDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/TourPowerWeightDefaultsDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/tours/TourPresetManagerDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/components/tours/TourRatesManagerDialog.tsx": {
-      "react-hooks/exhaustive-deps": 1,
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/tours/TourRequirementsDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
+      "react-hooks/exhaustive-deps": 1
     },
     "src/components/tours/TourSchedulingDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/tours/useTourCreation.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/ui/alert.tsx": {
@@ -716,40 +578,19 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/users/__tests__/EditUserDialog.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/users/__tests__/UsersList.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 5
     },
     "src/components/users/EditUserDialog.tsx": {
       "react-hooks/exhaustive-deps": 1
     },
-    "src/components/users/import/ImportUsersDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/video/VideoCalendar.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/video/VideoTaskDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
-    "src/components/WakeLockVideo.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/contexts/DepartmentContext.tsx": {
       "react-refresh/only-export-components": 2
-    },
-    "src/features/festival-management/hooks/useFestivalAdminActions.ts": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
-    "src/features/festival-management/hooks/useFestivalMapPreview.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/features/festival-management/hooks/useFestivalPrintActions.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/features/festival-management/hooks/useFestivalWhatsappActions.ts": {
-      "@typescript-eslint/no-explicit-any": 3
     },
     "src/features/festival-management/useFestivalManagementVm.ts": {
       "react-hooks/exhaustive-deps": 3
@@ -784,12 +625,6 @@
     "src/features/technical-tools/power/__tests__/powerPersistence.test.ts": {
       "@typescript-eslint/no-explicit-any": 3
     },
-    "src/features/technical-tools/power/consumos/useConsumosComponents.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/features/technical-tools/power/consumos/useConsumosTool.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/features/technical-tools/power/PowerTableControls.tsx": {
       "react-refresh/only-export-components": 2
     },
@@ -802,12 +637,6 @@
     "src/features/technical-tools/table-presets/useQuickPresets.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/features/tour-ops/tourOpsPdf.ts": {
-      "@typescript-eslint/no-explicit-any": 5
-    },
-    "src/features/tour-ops/tourSchedulingService.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/features/wallboard/components/panels/CalendarPanel.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
@@ -819,30 +648,18 @@
       "no-useless-escape": 2,
       "react-hooks/exhaustive-deps": 1
     },
-    "src/features/wallboard/WallboardDisplay.tsx": {
-      "no-useless-escape": 1
-    },
     "src/hooks/__tests__/useIncidentReports.test.tsx": {
       "@typescript-eslint/no-explicit-any": 5
-    },
-    "src/hooks/__tests__/useJobExpenses.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/__tests__/useOptimizedMatrixData.test.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/hooks/festival/useFestivalShifts.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/hooks/hoja-de-ruta/useHojaDeRutaData.ts": {
-      "@typescript-eslint/no-explicit-any": 5
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/hooks/hoja-de-ruta/useHojaDeRutaInitialization.ts": {
-      "@typescript-eslint/no-explicit-any": 9,
+      "@typescript-eslint/no-explicit-any": 8,
       "react-hooks/exhaustive-deps": 2
-    },
-    "src/hooks/tours/useTourCreation.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/tours/useTourCreationMutation.ts": {
       "@typescript-eslint/no-explicit-any": 2
@@ -853,24 +670,11 @@
     "src/hooks/useActivityPushFallback.ts": {
       "@typescript-eslint/no-explicit-any": 4
     },
-    "src/hooks/useArtistsQuery.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/hooks/useAuth.tsx": {
-      "@typescript-eslint/no-explicit-any": 5,
-      "react-refresh/only-export-components": 1
-    },
     "src/hooks/useConnectionStatus.ts": {
       "react-hooks/exhaustive-deps": 1
     },
     "src/hooks/useDragScroll.ts": {
       "react-hooks/exhaustive-deps": 4
-    },
-    "src/hooks/useEquipmentModels.ts": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/hooks/useFestival.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useGlobalTasks.ts": {
       "@typescript-eslint/no-explicit-any": 1
@@ -879,13 +683,13 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/hooks/useHojaDeRutaPersistence.ts": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useJobActions.ts": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useJobCard.ts": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 5
     },
     "src/hooks/useJobDistance.ts": {
       "react-hooks/exhaustive-deps": 4
@@ -894,7 +698,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useJobManagement.ts": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useJobRatesApproval.ts": {
       "@typescript-eslint/no-explicit-any": 1
@@ -915,7 +719,7 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/hooks/useOptimisticJobManagement.ts": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/hooks/useOptimisticMutation.ts": {
       "@typescript-eslint/no-explicit-any": 4
@@ -945,21 +749,12 @@
     "src/hooks/usePushNotificationSchedule.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/hooks/useRateExtrasCatalog.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/hooks/useRealtimeSubscription.ts": {
       "react-hooks/exhaustive-deps": 2
-    },
-    "src/hooks/users/useUserManagement.ts": {
-      "@typescript-eslint/no-explicit-any": 2
     },
     "src/hooks/useServiceWorkerUpdate.ts": {
       "@typescript-eslint/no-explicit-any": 2,
       "react-hooks/exhaustive-deps": 1
-    },
-    "src/hooks/useSoundVisionAccessRequest.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useSoundVisionFiles.ts": {
       "@typescript-eslint/no-explicit-any": 3
@@ -975,39 +770,15 @@
       "@typescript-eslint/no-explicit-any": 6,
       "react-hooks/exhaustive-deps": 1
     },
-    "src/hooks/useTourAssignments.ts": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/hooks/useTourBaseRates.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/hooks/useTourCreation.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/hooks/useTourDateOverrides.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/hooks/useTourDefaultSets.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/hooks/useTourDocuments.ts": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
     "src/hooks/useTourJobRateQuotesForManager.ts": {
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/hooks/useTourRatesApproval.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/hooks/useTourWeightDefaults.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/hooks/useUserPreferences.ts": {
       "@typescript-eslint/no-explicit-any": 2,
       "react-hooks/exhaustive-deps": 1
-    },
-    "src/hooks/useVacationRequests.ts": {
-      "@typescript-eslint/no-explicit-any": 3
     },
     "src/hooks/useWeatherData.ts": {
       "react-hooks/exhaustive-deps": 2
@@ -1019,9 +790,6 @@
       "no-control-regex": 1,
       "no-useless-escape": 2,
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/lib/errorTracking.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/lib/flex/urlBuilder.test.ts": {
       "@typescript-eslint/no-explicit-any": 3
@@ -1066,34 +834,31 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/__tests__/Disponibilidad.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/pages/__tests__/EquipmentManagement.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/pages/__tests__/JobAssignmentMatrix.test.tsx": {
       "@typescript-eslint/no-explicit-any": 7
     },
-    "src/pages/__tests__/ProjectManagement.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
     "src/pages/__tests__/Settings.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/pages/__tests__/SoundVisionFiles.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/__tests__/TechnicianSuperApp.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/pages/__tests__/TechnicianUnavailability.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/__tests__/TourManagement.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 12
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/pages/__tests__/Tours.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/ActivityCenter.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -1102,7 +867,7 @@
       "react-hooks/exhaustive-deps": 1
     },
     "src/pages/Dashboard.tsx": {
-      "@typescript-eslint/no-explicit-any": 5
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/pages/Disponibilidad.tsx": {
       "@typescript-eslint/no-explicit-any": 4,
@@ -1115,11 +880,10 @@
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/pages/FestivalGearManagement.tsx": {
-      "react-hooks/exhaustive-deps": 2,
-      "@typescript-eslint/no-explicit-any": 3
+      "react-hooks/exhaustive-deps": 2
     },
     "src/pages/Festivals.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/pages/job-assignment-matrix/MatrixPageControls.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -1129,7 +893,7 @@
       "react-hooks/exhaustive-deps": 1
     },
     "src/pages/Lights.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/pages/MorningSummary.tsx": {
       "react-hooks/exhaustive-deps": 1,
@@ -1141,12 +905,8 @@
     "src/pages/pesos-tool/TableCard.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/pages/PesosTool.tsx": {
-      "react-hooks/exhaustive-deps": 3,
-      "@typescript-eslint/no-explicit-any": 9
-    },
     "src/pages/Profile.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/pages/ProjectManagement.tsx": {
       "@typescript-eslint/no-explicit-any": 4
@@ -1162,7 +922,7 @@
       "react-hooks/exhaustive-deps": 1
     },
     "src/pages/Sound.tsx": {
-      "@typescript-eslint/no-explicit-any": 5
+      "@typescript-eslint/no-explicit-any": 4
     },
     "src/pages/StagePlot.tsx": {
       "react-hooks/exhaustive-deps": 1
@@ -1171,13 +931,13 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/TechnicianUnavailability.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/pages/TourManagement.tsx": {
-      "@typescript-eslint/no-explicit-any": 13
+      "@typescript-eslint/no-explicit-any": 5
     },
     "src/pages/Video.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/pages/VideoPesosTool.tsx": {
       "@typescript-eslint/no-explicit-any": 2
@@ -1186,7 +946,6 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/WallboardPublic.tsx": {
-      "@typescript-eslint/no-explicit-any": 1,
       "react-hooks/exhaustive-deps": 1
     },
     "src/providers/AppBadgeProvider.tsx": {
@@ -1195,23 +954,17 @@
     "src/providers/SubscriptionProvider.tsx": {
       "react-refresh/only-export-components": 1
     },
-    "src/routes/__tests__/AuthenticatedShell.test.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/routes/app-route-manifest.tsx": {
-      "react-refresh/only-export-components": 13
+      "react-refresh/only-export-components": 6
     },
     "src/services/flexWorkOrders.ts": {
       "@typescript-eslint/no-explicit-any": 11
-    },
-    "src/services/optimisticJobDeletionService.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/services/tourPayoutOverrides.ts": {
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/services/tours/createFoldersForDate.ts": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/stores/useShortcutStore.ts": {
       "@typescript-eslint/no-explicit-any": 2
@@ -1255,7 +1008,7 @@
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/utils/artistTablePdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 5
+      "@typescript-eslint/no-explicit-any": 2
     },
     "src/utils/consoleCapture.ts": {
       "@typescript-eslint/no-this-alias": 1
@@ -1297,7 +1050,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/utils/gearSetupPdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 10
+      "@typescript-eslint/no-explicit-any": 5
     },
     "src/utils/hoja-de-ruta/pdf-upload.ts": {
       "no-control-regex": 1
@@ -1333,29 +1086,17 @@
     "src/utils/pdf/technicalPowerSummaryPack.ts": {
       "@typescript-eslint/no-explicit-any": 7
     },
-    "src/utils/pdf/weatherPdfGenerator.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/utils/pdfExport.ts": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/utils/rates-pdf-export.ts": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/utils/rfIemTablePdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/utils/shiftsTablePdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/utils/timesheet-pdf.ts": {
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/utils/tourFolders.ts": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/utils/wiredMicrophoneNeedsPdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 5
     },
     "supabase/functions/_shared/placeCache.ts": {
       "@typescript-eslint/no-explicit-any": 1

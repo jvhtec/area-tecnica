@@ -40,7 +40,7 @@ export function useSaveRateExtra() {
       queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.extrasCatalog });
       toast.success('Extras catalog updated');
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       console.error('Failed to update extras catalog', err);
       toast.error('Failed to update extras amount');
     }

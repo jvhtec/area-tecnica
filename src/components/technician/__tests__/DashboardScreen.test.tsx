@@ -14,7 +14,7 @@ const { useMyToursMock, techJobCardMock, tourCardMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useMyTours", () => ({
-  useMyTours: (...args: any[]) => useMyToursMock(...args),
+  useMyTours: (...args: unknown[]) => useMyToursMock(...args),
 }));
 
 vi.mock("@/components/technician/TechJobCard", () => ({
