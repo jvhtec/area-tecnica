@@ -43,9 +43,14 @@ export const NotificationBadge = ({
         .select("id", { count: "exact", head: true })
         .eq("status", "unread")
 
+      // Mirrors useMessagesQuery: anyone without a scoped department — including a
+      // management profile whose department is null — falls back to their own sent
+      // messages. Leaving both filters off would count every department's unread
+      // messages (the messages SELECT policy shows management all rows), lighting the
+      // badge for messages the list will never show.
       if (isDepartmentManagementRole(userRole) && userDepartment) {
         deptQuery = deptQuery.eq("department", userDepartment)
-      } else if (userRole === "technician") {
+      } else {
         deptQuery = deptQuery.eq("sender_id", userId)
       }
 
