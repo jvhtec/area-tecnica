@@ -231,7 +231,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
           });
         } catch { /* best-effort push notification; ignore delivery failures */ }
       } catch (err) {
-        failedMessages.push(`${file.name}: ${getErrorMessage(err) || String(err)}`);
+        failedMessages.push(`${file.name}: ${getErrorMessage(err, String(err))}`);
       }
     }
 

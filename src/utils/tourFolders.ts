@@ -41,7 +41,7 @@ export async function createTourRootFolders(tourId: string): Promise<TourFolderC
     };
   } catch (error) {
     console.error("Exception creating tour root folders:", error);
-    return { success: false, error: getErrorMessage(error) || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }
 
@@ -67,7 +67,7 @@ export async function createTourDateFolders(tourId: string): Promise<TourFolderC
     return { success: true, data };
   } catch (error) {
     console.error("Exception creating tour date folders:", error);
-    return { success: false, error: getErrorMessage(error) || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }
 
@@ -269,7 +269,7 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
     return { success: true, data: folderUpdates };
   } catch (error) {
     console.error("Exception creating tour root folders manually:", error);
-    return { success: false, error: getErrorMessage(error) || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }
 
@@ -294,6 +294,6 @@ export async function createAllTourFolders(tourId: string): Promise<TourFolderCr
     return { success: true, data };
   } catch (error) {
     console.error("Exception creating all tour folders:", error);
-    return { success: false, error: getErrorMessage(error) || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }

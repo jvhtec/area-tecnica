@@ -170,7 +170,7 @@ export const OptimizedMatrixCellDialogs = ({
                 setPendingCancel(null);
                 toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`);
               } catch (e) {
-                toast.error(getErrorMessage(e) || 'No se pudo cancelar');
+                toast.error(getErrorMessage(e, 'No se pudo cancelar'));
               }
             }} disabled={isCancelling}>
               {isCancelling ? 'Cancelando…' : 'Cancelar'}

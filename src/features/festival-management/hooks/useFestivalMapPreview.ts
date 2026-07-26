@@ -25,7 +25,7 @@ export const useFestivalMapPreview = (venueData: FestivalVenueData) => {
           setMapPreviewUrl(url);
         }
       } catch (error) {
-        console.warn("Failed to load static map preview:", getErrorMessage(error) || error);
+        console.warn("Failed to load static map preview:", getErrorMessage(error, String(error)));
         if (isMounted) {
           setMapPreviewUrl(null);
         }

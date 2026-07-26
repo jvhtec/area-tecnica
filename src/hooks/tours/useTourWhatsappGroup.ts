@@ -129,7 +129,7 @@ export const useTourWhatsappGroup = ({ isManagementUser, tourDates }: Options) =
       }
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } catch (e) {
-      toast({ title: 'Error', description: getErrorMessage(e) || String(e), variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(e, String(e)), variant: 'destructive' });
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } finally {
       setIsCreatingWaGroup(false);

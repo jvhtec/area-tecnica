@@ -61,8 +61,8 @@ export const BackfillDocTecnicaAction: React.FC<BackfillDocTecnicaActionProps> =
       });
     } catch (err) {
       console.error("[BackfillDocTecnicaAction] Backfill error", err);
-      setMsg(getErrorMessage(err) || "Backfill failed");
-      toast({ title: "Backfill failed", description: getErrorMessage(err) || "Backfill failed", variant: "destructive" });
+      setMsg(getErrorMessage(err, "Backfill failed"));
+      toast({ title: "Backfill failed", description: getErrorMessage(err, "Backfill failed"), variant: "destructive" });
     } finally {
       setBackfilling(false);
     }

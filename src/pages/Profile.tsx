@@ -142,7 +142,7 @@ export const Profile = () => {
       console.error('Error updating profile:', error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "No se pudo actualizar el perfil",
+        description: getErrorMessage(error, "No se pudo actualizar el perfil"),
         variant: "destructive",
       });
     } finally {
@@ -170,7 +170,7 @@ export const Profile = () => {
       console.error('Error saving folder structure:', error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "No se pudo guardar la estructura de carpetas",
+        description: getErrorMessage(error, "No se pudo guardar la estructura de carpetas"),
         variant: "destructive",
       });
     } finally {
@@ -187,7 +187,7 @@ export const Profile = () => {
       toast({ title: 'Enlace actualizado', description: 'Se generó un nuevo token para tu calendario.' });
     } catch (err) {
       console.error('rotate token error', err);
-      toast({ title: 'Error', description: getErrorMessage(err) || 'No se pudo rotar el token.', variant: 'destructive' });
+      toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo rotar el token.'), variant: 'destructive' });
     }
   };
 
@@ -249,7 +249,7 @@ export const Profile = () => {
       console.error('Error updating password:', error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "No se pudo actualizar la contraseña",
+        description: getErrorMessage(error, "No se pudo actualizar la contraseña"),
         variant: "destructive",
       });
     } finally {

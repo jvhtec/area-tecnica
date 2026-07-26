@@ -89,7 +89,7 @@ export const BulkTourFolderActions = ({
       console.error("Verification error:", error);
       toast({
         title: "No se pudo comprobar",
-        description: getErrorMessage(error) || "No se pudo comprobar el estado de las carpetas",
+        description: getErrorMessage(error, "No se pudo comprobar el estado de las carpetas"),
         variant: "destructive"
       });
     } finally {
@@ -142,7 +142,7 @@ export const BulkTourFolderActions = ({
       console.error("Bulk creation error:", error);
       toast({
         title: "No se pudieron crear las carpetas",
-        description: getErrorMessage(error) || "No se pudieron crear las carpetas raíz",
+        description: getErrorMessage(error, "No se pudieron crear las carpetas raíz"),
         variant: "destructive"
       });
     } finally {

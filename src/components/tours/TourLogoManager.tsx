@@ -185,7 +185,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       });
     } catch (error) {
       console.error('Error uploading logo:', error);
-      const errorMessage = getErrorMessage(error) || "Could not upload logo";
+      const errorMessage = getErrorMessage(error, "Could not upload logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",
@@ -262,7 +262,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       }
     } catch (error) {
       console.error('Error deleting logo:', error);
-      const errorMessage = getErrorMessage(error) || "Could not delete logo";
+      const errorMessage = getErrorMessage(error, "Could not delete logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",

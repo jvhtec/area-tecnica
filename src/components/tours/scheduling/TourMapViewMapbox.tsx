@@ -106,7 +106,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       } catch (err) {
         if (!isMounted) return;
         console.error('Error initializing map:', err);
-        setError(getErrorMessage(err) || 'No se pudo cargar el mapa. Revisa tu conexión.');
+        setError(getErrorMessage(err, 'No se pudo cargar el mapa. Revisa tu conexión.'));
         setIsLoading(false);
       }
     };

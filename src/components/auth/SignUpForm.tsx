@@ -95,7 +95,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
           if (!data?.success) throw new Error('Failed to send onboarding email');
           toast({ title: 'Onboarding enviado', description: `Se envió el email a ${formData.email}.` });
         } catch (e) {
-          toast({ title: 'No se pudo enviar el onboarding', description: getErrorMessage(e) || 'Error desconocido', variant: 'destructive' });
+          toast({ title: 'No se pudo enviar el onboarding', description: getErrorMessage(e, 'Error desconocido'), variant: 'destructive' });
         }
       }
       return;
@@ -324,7 +324,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
                     }));
                     toast({ title: 'Obtenido de Flex', description: 'Los campos se han autocompletado.' });
                   } catch (e) {
-                    toast({ title: 'Fallo al obtener de Flex', description: getErrorMessage(e) || 'Error desconocido', variant: 'destructive' });
+                    toast({ title: 'Fallo al obtener de Flex', description: getErrorMessage(e, 'Error desconocido'), variant: 'destructive' });
                   } finally {
                     setIsFetchingFlex(false);
                   }

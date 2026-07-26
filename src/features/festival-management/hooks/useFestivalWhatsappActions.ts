@@ -101,7 +101,7 @@ export const useFestivalWhatsappActions = ({
       console.error("Error creating WhatsApp group:", error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "Error al crear grupo de WhatsApp",
+        description: getErrorMessage(error, "Error al crear grupo de WhatsApp"),
         variant: "destructive",
       });
       await refreshWhatsappState();
@@ -165,7 +165,7 @@ export const useFestivalWhatsappActions = ({
       toast({ title: "Enviado", description: "Mensaje enviado a Almacén sonido." });
       setIsAlmacenDialogOpen(false);
     } catch (error) {
-      toast({ title: "Error", description: getErrorMessage(error) || String(error), variant: "destructive" });
+      toast({ title: "Error", description: getErrorMessage(error, String(error)), variant: "destructive" });
     } finally {
       setIsSendingWa(false);
     }

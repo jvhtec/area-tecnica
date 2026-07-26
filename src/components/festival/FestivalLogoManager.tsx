@@ -197,7 +197,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       });
     } catch (error) {
       console.error('Error uploading logo:', error);
-      const errorMessage = getErrorMessage(error) || "No se pudo subir el logo";
+      const errorMessage = getErrorMessage(error, "No se pudo subir el logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",
@@ -273,7 +273,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       }
     } catch (error) {
       console.error('Error deleting logo:', error);
-      const errorMessage = getErrorMessage(error) || "No se pudo eliminar el logo";
+      const errorMessage = getErrorMessage(error, "No se pudo eliminar el logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",

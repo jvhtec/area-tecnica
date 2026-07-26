@@ -91,7 +91,7 @@ export const useTourCreation = (
       console.error("Error creating tour:", error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "Failed to create tour",
+        description: getErrorMessage(error, "Failed to create tour"),
         variant: "destructive",
       });
     } finally {

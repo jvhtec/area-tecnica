@@ -148,7 +148,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
 
       toast({ title: 'Datos obtenidos', description: 'Los datos del equipo se han rellenado desde Flex.' });
     } catch (e) {
-      toast({ title: 'Error al obtener datos', description: getErrorMessage(e) || 'Error desconocido', variant: 'destructive' });
+      toast({ title: 'Error al obtener datos', description: getErrorMessage(e, 'Error desconocido'), variant: 'destructive' });
     } finally {
       if (isAdvanced) {
         setIsFetchingAdvFlex(false);

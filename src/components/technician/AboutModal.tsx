@@ -74,7 +74,7 @@ export const AboutModal = ({ theme, isDark, onClose }: AboutModalProps) => {
         }));
         setChangelog(filterRecentEntries(mapped));
       } catch (e) {
-        console.warn('Failed to load changelog', getErrorMessage(e) || e);
+        console.warn('Failed to load changelog', getErrorMessage(e, String(e)));
       }
     };
     void load();

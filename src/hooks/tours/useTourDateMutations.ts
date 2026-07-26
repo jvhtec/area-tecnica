@@ -623,7 +623,7 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
       console.error("Error deleting date:", error);
       toast({
         title: "Error al eliminar la fecha",
-        description: getErrorMessage(error) || "Se produjo un error inesperado al eliminar la fecha de gira.",
+        description: getErrorMessage(error, "Se produjo un error inesperado al eliminar la fecha de gira."),
         variant: "destructive",
       });
     } finally {

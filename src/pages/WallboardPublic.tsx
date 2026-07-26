@@ -67,7 +67,7 @@ export default function WallboardPublic() {
           status: (err as { status?: unknown })?.status,
           stack: getErrorStack(err),
         });
-        setError(`Failed to initialize wallboard session: ${getErrorMessage(err) || 'Unknown error'}. Please refresh your shared link.`);
+        setError(`Failed to initialize wallboard session: ${getErrorMessage(err, 'Unknown error')}. Please refresh your shared link.`);
         setIsValid(false);
         setIsValidating(false);
         setAuthComplete(true);

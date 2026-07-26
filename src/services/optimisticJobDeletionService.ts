@@ -22,7 +22,7 @@ export const deleteJobOptimistically = async (jobId: string): Promise<DeletionRe
     console.error("Optimistic deletion service: Error deleting job:", error);
     return {
       success: false,
-      error: getErrorMessage(error) || "Unknown deletion error"
+      error: getErrorMessage(error, "Unknown deletion error")
     };
   }
 };

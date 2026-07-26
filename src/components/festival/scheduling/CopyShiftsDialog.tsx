@@ -132,7 +132,7 @@ export const CopyShiftsDialog = ({
 
     } catch (error) {
       console.error("Error copying shifts:", error);
-      toast.error(`Error al copiar turnos: ${getErrorMessage(error) || 'Error desconocido'}`);
+      toast.error(`Error al copiar turnos: ${getErrorMessage(error, 'Error desconocido')}`);
     } finally {
       setIsLoading(false);
     }

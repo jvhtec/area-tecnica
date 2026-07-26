@@ -215,7 +215,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
       }
       toast({
         title: "Error al subir",
-        description: getErrorMessage(error) || "No se pudo completar la subida. Se ha revertido la tanda.",
+        description: getErrorMessage(error, "No se pudo completar la subida. Se ha revertido la tanda."),
         variant: "destructive",
       });
     } finally {

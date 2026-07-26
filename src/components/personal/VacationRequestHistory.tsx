@@ -62,7 +62,7 @@ export const VacationRequestHistory: React.FC<VacationRequestHistoryProps> = ({ 
       if (error) throw error;
       toast({ title: 'Correo reenviado', description: 'El correo con la decisión y PDF se ha reenviado.' });
     } catch (e) {
-      toast({ title: 'Error al reenviar', description: getErrorMessage(e) || 'No se pudo reenviar el correo de decisión.', variant: 'destructive' });
+      toast({ title: 'Error al reenviar', description: getErrorMessage(e, 'No se pudo reenviar el correo de decisión.'), variant: 'destructive' });
     } finally {
       setSendingIds(prev => prev.filter(id => id !== request.id));
     }

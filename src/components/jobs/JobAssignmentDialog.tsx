@@ -195,7 +195,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       }
     } catch (e) {
       console.error('Flex sync exception:', e);
-      toast({ title: 'Flex sync failed', description: getErrorMessage(e) || 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Flex sync failed', description: getErrorMessage(e, 'Unknown error'), variant: 'destructive' });
     } finally {
       setIsSyncing(false);
     }
@@ -353,7 +353,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 console.error("Error updating role:", error);
                                 toast({
                                   title: "Error",
-                                  description: getErrorMessage(error) || "No se pudo actualizar el rol",
+                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
                                   variant: "destructive",
                                 });
                               }
@@ -406,7 +406,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 console.error("Error updating role:", error);
                                 toast({
                                   title: "Error",
-                                  description: getErrorMessage(error) || "No se pudo actualizar el rol",
+                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
                                   variant: "destructive",
                                 });
                               }
@@ -459,7 +459,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 console.error("Error updating role:", error);
                                 toast({
                                   title: "Error",
-                                  description: getErrorMessage(error) || "No se pudo actualizar el rol",
+                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
                                   variant: "destructive",
                                 });
                               }

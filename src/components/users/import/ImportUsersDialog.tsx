@@ -66,7 +66,7 @@ export const ImportUsersDialog = ({ open, onOpenChange }: ImportUsersDialogProps
       onOpenChange(false);
     } catch (err) {
       console.error("Import error:", err);
-      setError(getErrorMessage(err) || "Failed to import users");
+      setError(getErrorMessage(err, "Failed to import users"));
       toast({
         title: "Import failed",
         description: "There was an error importing users",

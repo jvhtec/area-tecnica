@@ -161,7 +161,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       console.error("useJobActions: Error creating flex folders:", error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "Failed to create Flex folders",
+        description: getErrorMessage(error, "Failed to create Flex folders"),
         variant: "destructive"
       });
     } finally {
@@ -280,7 +280,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       }
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "Failed to create local folder structure",
+        description: getErrorMessage(error, "Failed to create local folder structure"),
         variant: "destructive"
       });
     } finally {

@@ -116,7 +116,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       }
     } catch (e) {
       console.error('Flex sync exception:', e);
-      toast.error(`Flex sync failed: ${getErrorMessage(e) || 'Unknown error'}`);
+      toast.error(`Flex sync failed: ${getErrorMessage(e, 'Unknown error')}`);
     } finally {
       setIsSyncing(false);
     }

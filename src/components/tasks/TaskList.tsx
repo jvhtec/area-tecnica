@@ -150,7 +150,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       setNewAssignee(undefined);
       await refetch();
     } catch (e) {
-      toast({ title: 'Create failed', description: getErrorMessage(e) || String(e), variant: 'destructive' });
+      toast({ title: 'Create failed', description: getErrorMessage(e, String(e)), variant: 'destructive' });
     }
   };
 
@@ -194,7 +194,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       });
       await refetch();
     } catch (e) {
-      toast({ title: 'Bulk delete failed', description: getErrorMessage(e) || String(e), variant: 'destructive' });
+      toast({ title: 'Bulk delete failed', description: getErrorMessage(e, String(e)), variant: 'destructive' });
     }
   };
 
@@ -215,7 +215,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         await uploadAttachment(taskId, file);
         uploadedCount += 1;
       } catch (e) {
-        failedMessages.push(`${file.name}: ${getErrorMessage(e) || String(e)}`);
+        failedMessages.push(`${file.name}: ${getErrorMessage(e, String(e))}`);
       }
     }
 
@@ -255,7 +255,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       toast({ title: 'Attachment deleted' });
       await refetch();
     } catch (e) {
-      toast({ title: 'Delete failed', description: getErrorMessage(e) || String(e), variant: 'destructive' });
+      toast({ title: 'Delete failed', description: getErrorMessage(e, String(e)), variant: 'destructive' });
     }
   };
 

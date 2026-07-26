@@ -104,7 +104,7 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
       console.error("Error exporting PDF:", error);
       toast({
         title: "Error",
-        description: "No se pudo exportar el PDF: " + (getErrorMessage(error) || "Error desconocido"),
+        description: "No se pudo exportar el PDF: " + getErrorMessage(error, "Error desconocido"),
         variant: "destructive"
       });
     }

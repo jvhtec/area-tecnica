@@ -69,7 +69,7 @@ export const useFestivalAdminActions = ({
       console.error("Error creating local folders:", error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "Error al crear carpetas locales",
+        description: getErrorMessage(error, "Error al crear carpetas locales"),
         variant: "destructive",
       });
     } finally {
@@ -100,10 +100,10 @@ export const useFestivalAdminActions = ({
       }
     } catch (error) {
       console.error("Archive error", error);
-      setArchiveError(getErrorMessage(error) || "Failed to archive");
+      setArchiveError(getErrorMessage(error, "Failed to archive"));
       toast({
         title: "Error al archivar",
-        description: getErrorMessage(error) || "Error al archivar",
+        description: getErrorMessage(error, "Error al archivar"),
         variant: "destructive",
       });
     } finally {
@@ -137,10 +137,10 @@ export const useFestivalAdminActions = ({
       });
     } catch (error) {
       console.error("Backfill error", error);
-      setBackfillMessage(getErrorMessage(error) || "Backfill failed");
+      setBackfillMessage(getErrorMessage(error, "Backfill failed"));
       toast({
         title: "Error al rellenar",
-        description: getErrorMessage(error) || "Error al rellenar",
+        description: getErrorMessage(error, "Error al rellenar"),
         variant: "destructive",
       });
     } finally {
@@ -163,7 +163,7 @@ export const useFestivalAdminActions = ({
       console.error("Error deleting job:", error);
       toast({
         title: "Error",
-        description: getErrorMessage(error) || "Error al eliminar trabajo",
+        description: getErrorMessage(error, "Error al eliminar trabajo"),
         variant: "destructive",
       });
     } finally {
