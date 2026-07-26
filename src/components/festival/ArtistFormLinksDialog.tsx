@@ -13,7 +13,10 @@ import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { buildReadableFilename } from "@/utils/fileName";
-import { isPresent } from '@/utils/typeGuards';
+
+/** `festival_artists.stage` is nullable; group those artists explicitly rather than hiding them. */
+const formatStageLabel = (stage: number | null) =>
+  stage === null ? "Sin escenario" : `Stage ${stage}`;
 
 interface ArtistLinkData {
   artistId: string;
@@ -212,7 +215,7 @@ export const ArtistFormLinksDialog = ({
         : "Enlace aún no generado";
 
     const groupedByStage = filteredArtistLinks.reduce((acc, artist) => {
-      const stage = `Stage ${artist.stage}`;
+      const stage = formatStageLabel(artist.stage);
       if (!acc[stage]) acc[stage] = [];
       acc[stage].push(artist);
       return acc;
@@ -240,7 +243,7 @@ export const ArtistFormLinksDialog = ({
     });
   };
 
-  const copyStageLinks = (stage: number) => {
+  const copyStageLinks = (stage: number | null) => {
     const buildLink = (artist: ArtistLinkData) =>
       artist.token
         ? `${window.location.origin}/festival/artist-form/${artist.token}?lang=${artist.form_language === "en" ? "en" : "es"}`
@@ -251,7 +254,7 @@ export const ArtistFormLinksDialog = ({
       dateFilter === ALL_DATES_VALUE
         ? "Todas las fechas"
         : formatDateLabel(dateFilter);
-    let text = `Stage ${stage} - ${scopeLabel}\n\n`;
+    let text = `${formatStageLabel(stage)} - ${scopeLabel}\n\n`;
 
     stageArtists.forEach(artist => {
       const link = buildLink(artist);
@@ -261,7 +264,7 @@ export const ArtistFormLinksDialog = ({
     navigator.clipboard.writeText(text);
     toast({
       title: "Copiado",
-      description: `Enlaces del Stage ${stage} copiados al portapapeles`,
+      description: `Enlaces de ${formatStageLabel(stage)} copiados al portapapeles`,
     });
   };
 
@@ -361,7 +364,14 @@ export const ArtistFormLinksDialog = ({
     );
   }
 
-  const stages = [...new Set(filteredArtistLinks.map(a => a.stage))].filter(isPresent).sort();
+  // Artists whose `stage` is null still need a section — dropping them here would hide
+  // them from the dialog entirely while `filteredArtistLinks.length > 0` reports results.
+  // Null sorts last, under an explicit "Sin escenario" heading.
+  const stages = [...new Set(filteredArtistLinks.map(a => a.stage))].sort((a, b) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
   const titleDate = dateFilter === ALL_DATES_VALUE ? "Todas las fechas" : formatDateLabel(dateFilter);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -412,19 +422,22 @@ export const ArtistFormLinksDialog = ({
           </div>
 
           {stages.map(stage => (
-            <div key={stage} className="space-y-2">
+            <div key={stage ?? "sin-escenario"} className="space-y-2">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Stage {stage}</h3>
+                <h3 className="text-lg font-semibold">{formatStageLabel(stage)}</h3>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadBlankTemplatePdf(stage)}
-                    disabled={isGeneratingBlankPdf}
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Plantilla Stage
-                  </Button>
+                  {/* A blank template is stage-scoped, so it has no meaning without a stage. */}
+                  {stage !== null && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadBlankTemplatePdf(stage)}
+                      disabled={isGeneratingBlankPdf}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Plantilla Stage
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => copyStageLinks(stage)}>
                     <Copy className="h-4 w-4 mr-2" />
                     Copiar Enlaces del Stage

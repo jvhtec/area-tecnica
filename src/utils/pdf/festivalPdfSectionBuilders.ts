@@ -363,7 +363,8 @@ export const attachShiftAssignmentsAndProfiles = (
 
     return {
       id: String(shift.id),
-      job_id: String(shift.job_id),
+      // Propagate null rather than stringifying it into the literal "null".
+      job_id: shift.job_id === null ? null : String(shift.job_id),
       name: toStringValue(shift.name, 'Turno'),
       date: toStringValue(shift.date),
       start_time: toStringValue(shift.start_time),

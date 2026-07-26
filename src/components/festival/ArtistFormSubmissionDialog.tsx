@@ -1,7 +1,8 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
+// Submission timestamps render in Europe/Madrid, not the viewer's local zone.
+import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { Download, Loader2 } from "lucide-react";
 import { Loading } from "@/components/ui/loading";
 import { useEffect, useState } from "react";
@@ -83,7 +84,7 @@ export const ArtistFormSubmissionDialog = ({
 
       // Add submission date
       doc.setFontSize(12);
-      doc.text(`Enviado el: ${submission.submitted_at ? format(new Date(submission.submitted_at), 'PPpp') : 'Fecha desconocida'}`, 20, 35);
+      doc.text(`Enviado el: ${submission.submitted_at ? formatInJobTimezone(submission.submitted_at, 'PPpp') : 'Fecha desconocida'}`, 20, 35);
 
       // Add form data
       doc.setFontSize(14);
@@ -159,7 +160,7 @@ export const ArtistFormSubmissionDialog = ({
           <ScrollArea className="flex-1">
             <div className="space-y-4 p-4">
               <div className="text-sm text-muted-foreground">
-                Enviado el: {submission.submitted_at ? format(new Date(submission.submitted_at), 'PPpp') : 'Fecha desconocida'}
+                Enviado el: {submission.submitted_at ? formatInJobTimezone(submission.submitted_at, 'PPpp') : 'Fecha desconocida'}
               </div>
 
               <div className="space-y-4">

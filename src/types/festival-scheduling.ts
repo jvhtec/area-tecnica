@@ -1,7 +1,8 @@
 
 export interface FestivalShift {
   id: string;
-  job_id: string;
+  /** Nullable to match the `festival_shifts.job_id` column. */
+  job_id: string | null;
   date: string;
   start_time: string;
   end_time: string;

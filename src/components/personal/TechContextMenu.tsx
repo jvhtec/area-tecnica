@@ -48,6 +48,9 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-56">
+        {/* Read-only callers omit the handlers; rendering the items anyway would show
+            actions that silently do nothing when clicked. */}
+        {onAvailabilityChange && (
         <ContextMenuSub>
           <ContextMenuSubTrigger>
             <Calendar className="mr-2 h-4 w-4" />
@@ -76,11 +79,14 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
-        <ContextMenuSeparator />
+        )}
+        {onAvailabilityChange && onAvailabilityRemove && <ContextMenuSeparator />}
+        {onAvailabilityRemove && (
         <ContextMenuItem onClick={handleRemoveAvailability}>
           <Calendar className="mr-2 h-4 w-4" />
           Remove Override
         </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

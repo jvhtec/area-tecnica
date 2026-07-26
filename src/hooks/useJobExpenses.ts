@@ -295,8 +295,12 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
   const isManager = isManagementRole(userRole);
 
   return useQuery({
-    queryKey: queryKeys.scope('job-approved-expenses', jobId),
-    enabled: !!jobId,
+    // The result is scoped by user and role (technicians only see their own rows), so both
+    // must be part of the cache identity — otherwise a technician-scoped result can be served
+    // to a manager, or vice versa, after a login or role change. Gate on auth readiness too,
+    // so an unauthenticated `[]` is not cached for the whole staleTime window.
+    queryKey: queryKeys.scope('job-approved-expenses', jobId, user?.id, { isManager }),
+    enabled: !!jobId && !!user?.id,
     queryFn: async () => {
       if (!jobId) {
         return [];
