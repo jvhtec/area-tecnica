@@ -257,7 +257,7 @@ export const useHojaDeRutaInitialization = (
           ? `Se han cargado los datos básicos del trabajo con ${description}.`
           : "Se han cargado los datos básicos del trabajo seleccionado.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("❌ INITIALIZATION: Error auto-populating basic job data:", error);
       toast({
         title: "Error",

@@ -44,6 +44,7 @@ import {
   sortArtistsChronologically,
 } from "@/utils/pdf/festivalPdfSectionBuilders";
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type Options = { jobId?: string; jobTitle: string; options: PrintOptions };
 
@@ -198,10 +199,10 @@ export const usePrintOptionDownloads = ({
       ]);
 
       toast.success("Reporte de Riders Faltantes descargado exitosamente");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating Missing Rider Report:", error);
       toast.error(
-        `Error al generar Reporte de Riders Faltantes: ${error.message}`
+        `Error al generar Reporte de Riders Faltantes: ${getErrorMessage(error)}`
       );
     }
   };
@@ -263,10 +264,10 @@ export const usePrintOptionDownloads = ({
       }
 
       toast.success(`Reporte enviado a ${recipients.length} destinatario(s).`);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error sending Missing Rider Report email:", error);
       toast.error(
-        `Error al enviar reporte de riders faltantes: ${error.message}`
+        `Error al enviar reporte de riders faltantes: ${getErrorMessage(error)}`
       );
     } finally {
       setIsSendingMissingRiderEmail(false);
@@ -319,9 +320,9 @@ export const usePrintOptionDownloads = ({
       }
 
       toast.success("Equipamiento descargado exitosamente");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating Gear Setup:", error);
-      toast.error(`Error al generar Equipamiento: ${error.message}`);
+      toast.error(`Error al generar Equipamiento: ${getErrorMessage(error)}`);
     }
   };
 
@@ -444,9 +445,9 @@ export const usePrintOptionDownloads = ({
       ]);
 
       toast.success("Horarios de Turnos descargados exitosamente");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating Shift Schedules:", error);
-      toast.error(`Error al generar Horarios de Turnos: ${error.message}`);
+      toast.error(`Error al generar Horarios de Turnos: ${getErrorMessage(error)}`);
     }
   };
 
@@ -539,9 +540,9 @@ export const usePrintOptionDownloads = ({
       ]);
 
       toast.success("Tablas de Artistas descargadas exitosamente");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating Artist Tables:", error);
-      toast.error(`Error al generar Tablas de Artistas: ${error.message}`);
+      toast.error(`Error al generar Tablas de Artistas: ${getErrorMessage(error)}`);
     }
   };
 
@@ -594,9 +595,9 @@ export const usePrintOptionDownloads = ({
       ]);
 
       toast.success("Tabla de RF/IEM descargada exitosamente");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating RF/IEM Table:", error);
-      toast.error(`Error al generar Tabla de RF/IEM: ${error.message}`);
+      toast.error(`Error al generar Tabla de RF/IEM: ${getErrorMessage(error)}`);
     }
   };
 
@@ -655,10 +656,10 @@ export const usePrintOptionDownloads = ({
       ]);
 
       toast.success("Tabla de Infraestructura descargada exitosamente");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating Infrastructure Table:", error);
       toast.error(
-        `Error al generar Tabla de Infraestructura: ${error.message}`
+        `Error al generar Tabla de Infraestructura: ${getErrorMessage(error)}`
       );
     }
   };
@@ -715,10 +716,10 @@ export const usePrintOptionDownloads = ({
       toast.success(
         "Necesidades de Micrófonos Cableados descargadas exitosamente"
       );
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating Wired Microphone Needs:", error);
       toast.error(
-        `Error al generar Necesidades de Micrófonos Cableados: ${error.message}`
+        `Error al generar Necesidades de Micrófonos Cableados: ${getErrorMessage(error)}`
       );
     }
   };

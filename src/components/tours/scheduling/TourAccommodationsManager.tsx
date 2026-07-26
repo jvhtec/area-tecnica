@@ -120,7 +120,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
       if (error) throw error;
 
       setAccommodations(data as any || []);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading accommodations:', error);
       toast({
         title: "Error",
@@ -146,7 +146,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
       if (error) throw error;
 
       setStaff(data || []);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading staff:', error);
     }
   };
@@ -244,7 +244,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
       handleCloseDialog();
       loadAccommodations();
       onSave();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving accommodation:', error);
       toast({
         title: "Error",
@@ -284,7 +284,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
 
       loadAccommodations();
       onSave();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting accommodation:', error);
       toast({
         title: "Error",

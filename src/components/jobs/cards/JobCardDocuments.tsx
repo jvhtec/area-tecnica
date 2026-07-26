@@ -8,6 +8,7 @@ import { useJobDocumentActions } from "@/hooks/useJobDocumentActions";
 import { formatDocumentUploadDate } from "@/utils/jobDocuments";
 import { isManagementRole } from "@/utils/permissions";
 import type { JobDocument } from "@/types/job";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 export type { JobDocument } from "@/types/job";
 
@@ -53,9 +54,9 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
           }
         });
       } catch { /* best-effort push notification; ignore delivery failures */ }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error toggling document visibility:', err);
-      alert(`Error al actualizar la visibilidad: ${err.message}`);
+      alert(`Error al actualizar la visibilidad: ${getErrorMessage(err)}`);
     }
   };
 

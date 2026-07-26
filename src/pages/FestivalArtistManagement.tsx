@@ -31,6 +31,7 @@ import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineCo
 import { FestivalOfflineBanner } from "@/components/festival/FestivalOfflineBanner";
 import { ArtistPageActions } from "@/components/festival/ArtistPageActions";
 import { FestivalPushFeedButton } from "@/components/festival/FestivalPushFeedButton";
+import { getErrorStack } from '@/utils/errorMessage';
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
@@ -516,7 +517,7 @@ const FestivalArtistManagement = () => {
       setIsPrintDialogOpen(false);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      console.error('Error stack:', error.stack);
+      console.error('Error stack:', getErrorStack(error));
       toast({
         title: "Error",
         description: "No se pudo generar el PDF",

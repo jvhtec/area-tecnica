@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { getErrorMessage } from '@/utils/errorMessage';
 export interface BackfillDocTecnicaActionProps {
   job: any;
 }
@@ -58,10 +59,10 @@ export const BackfillDocTecnicaAction: React.FC<BackfillDocTecnicaActionProps> =
         title: "Backfill complete",
         description: `Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}`,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error("[BackfillDocTecnicaAction] Backfill error", err);
-      setMsg(err?.message || "Backfill failed");
-      toast({ title: "Backfill failed", description: err?.message || "Backfill failed", variant: "destructive" });
+      setMsg(getErrorMessage(err) || "Backfill failed");
+      toast({ title: "Backfill failed", description: getErrorMessage(err) || "Backfill failed", variant: "destructive" });
     } finally {
       setBackfilling(false);
     }

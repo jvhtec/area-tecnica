@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Map, MapPin, Home, Loader2, AlertCircle, Hotel } from "lucide-react";
 import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface TourMapViewMapboxProps {
   tourData: any;
@@ -102,10 +103,10 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         mapInstance.once('remove', () => {
           window.removeEventListener('resize', handleResize);
         });
-      } catch (err: any) {
+      } catch (err) {
         if (!isMounted) return;
         console.error('Error initializing map:', err);
-        setError(err.message || 'No se pudo cargar el mapa. Revisa tu conexión.');
+        setError(getErrorMessage(err) || 'No se pudo cargar el mapa. Revisa tu conexión.');
         setIsLoading(false);
       }
     };

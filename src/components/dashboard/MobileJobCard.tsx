@@ -195,7 +195,7 @@ export function MobileJobCard({
       if (onDateTypeChange) {
         onDateTypeChange();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating date type:', error);
       toast({
         title: "Error",
@@ -249,7 +249,7 @@ export function MobileJobCard({
       } else {
         toast({ title: "Información", description: "La carpeta de Flex no está disponible para este trabajo" });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Flex navigation error', err);
     }
   };

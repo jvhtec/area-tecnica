@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { Theme } from './types';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 // Get the version from Vite's env variables
 const defaultVersion = import.meta.env.VITE_APP_VERSION || 'dev';
@@ -72,8 +73,8 @@ export const AboutModal = ({ theme, isDark, onClose }: AboutModalProps) => {
           lastUpdated: row.last_updated
         }));
         setChangelog(filterRecentEntries(mapped));
-      } catch (e: any) {
-        console.warn('Failed to load changelog', e?.message || e);
+      } catch (e) {
+        console.warn('Failed to load changelog', getErrorMessage(e) || e);
       }
     };
     void load();

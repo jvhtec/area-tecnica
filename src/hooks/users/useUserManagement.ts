@@ -6,6 +6,7 @@ import { Profile } from "@/components/users/types";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export const useUserManagement = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -32,11 +33,11 @@ export const useUserManagement = () => {
       });
       
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('profiles') });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Delete error:", error);
       toast({
         title: "Error",
-        description: "Failed to delete user: " + error.message,
+        description: "Failed to delete user: " + getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -64,11 +65,11 @@ export const useUserManagement = () => {
         console.log("Current user was updated, refreshing session...");
         window.location.reload();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Update error:", error);
       toast({
         title: "Error",
-        description: "Failed to update user: " + error.message,
+        description: "Failed to update user: " + getErrorMessage(error),
         variant: "destructive",
       });
     }

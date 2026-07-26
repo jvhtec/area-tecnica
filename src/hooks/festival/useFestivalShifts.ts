@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface UseFestivalShiftsParams {
   jobId: string;
   selectedDate: string;
@@ -119,11 +120,11 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
       console.log("Final processed shifts with assignments:", shiftsWithAssignments);
       return shiftsWithAssignments;
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error in fetchShifts:", error);
       toast({
         title: "Error",
-        description: "Could not load shifts: " + error.message,
+        description: "Could not load shifts: " + getErrorMessage(error),
         variant: "destructive",
       });
       return [];

@@ -81,7 +81,7 @@ export const EditShiftDialog = ({
         title: "Éxito",
         description: "Turno actualizado exitosamente",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating shift:", error);
       toast({
         title: "Error",

@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface ResetPasswordFormProps {
   onSuccess: () => void;
 }
@@ -132,9 +133,9 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
       await resetPassword(formData.password);
       console.log('[ResetPassword] Password updated successfully');
       onSuccess();
-    } catch (err: any) {
+    } catch (err) {
       console.error('[ResetPassword] Error:', err);
-      setError(err.message || "Failed to reset password");
+      setError(getErrorMessage(err) || "Failed to reset password");
     }
   };
 

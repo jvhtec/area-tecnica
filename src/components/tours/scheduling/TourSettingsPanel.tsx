@@ -138,7 +138,7 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
       });
 
       onSave();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving settings:", error);
       toast({
         title: "Error",

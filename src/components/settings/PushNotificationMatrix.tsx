@@ -13,6 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useRef } from 'react';
 import { useDragScroll } from '@/hooks/useDragScroll';
 import { isManagementRole } from '@/utils/permissions';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type RecipientType = 'management_user' | 'department' | 'broadcast' | 'natural' | 'assigned_technicians';
 
@@ -268,10 +269,10 @@ export function PushNotificationMatrix() {
         if (error) throw error;
         toast({ title: 'Removed', description: 'Routing removed.' });
       }
-    } catch (e: any) {
+    } catch (e) {
       // revert optimistic change
       setRoutePresentOptimistic(ev, type, target, !next);
-      toast({ title: 'Save failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Save failed', description: getErrorMessage(e) || 'Unknown error', variant: 'destructive' });
     } finally {
       revert();
     }
@@ -307,9 +308,9 @@ export function PushNotificationMatrix() {
           .eq('event_code', ev);
         toast({ title: 'Disabled', description: 'Natural recipients excluded for this event.' });
       }
-    } catch (e: any) {
+    } catch (e) {
       setNaturalOptimistic(ev, !next);
-      toast({ title: 'Save failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Save failed', description: getErrorMessage(e) || 'Unknown error', variant: 'destructive' });
     } finally {
       revert();
     }
@@ -356,8 +357,8 @@ export function PushNotificationMatrix() {
         byEvent[r.event_code].push(r);
       }
       setRoutesByEvent(byEvent);
-    } catch (e: any) {
-      toast({ title: 'Load failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Load failed', description: getErrorMessage(e) || 'Unknown error', variant: 'destructive' });
       // fallback minimal state
       if (events.length === 0) setEvents(FALLBACK_EVENTS);
     } finally {

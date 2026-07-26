@@ -42,6 +42,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
 type LogisticsEventPayload = Database["public"]["Tables"]["logistics_events"]["Insert"];
 
@@ -258,10 +259,10 @@ export const LogisticsEventDialog = ({
       // Small timeout to allow the alert dialog to fully unmount before closing the parent dialog
       // This prevents "Failed to execute 'removeChild' on 'Node'" errors
       setTimeout(() => onOpenChange(false), 100);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -487,10 +488,10 @@ export const LogisticsEventDialog = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }

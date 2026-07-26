@@ -159,7 +159,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         title: "Éxito",
         description: "Calendario de gira exportado exitosamente",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error exporting tour schedule:", error);
       toast({
         title: "Error",

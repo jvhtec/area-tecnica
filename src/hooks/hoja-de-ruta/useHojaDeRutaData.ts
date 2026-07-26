@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { EventData, TravelArrangement, Accommodation, Restaurant } from '@/types/hoja-de-ruta';
 import type { Json } from '@/integrations/supabase/types';
 import { normalizeHojaDeRutaPrintSections } from '@/utils/hoja-de-ruta/pdf/section-options';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 /**
  * Normalizes a datetime value to a valid UTC ISO string for database storage.
@@ -53,8 +54,8 @@ export const useHojaDeRutaData = () => {
       
       if (error) throw error;
       return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
       return null;
     } finally {
       setIsLoading(false);
@@ -76,8 +77,8 @@ export const useHojaDeRutaData = () => {
       
       if (error) throw error;
       return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
       return null;
     } finally {
       setIsLoading(false);
@@ -159,8 +160,8 @@ export const useHojaDeRutaData = () => {
       await saveRestaurants(savedHoja.id, eventData.restaurants || []);
 
       return savedHoja;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
       throw err;
     } finally {
       setIsLoading(false);

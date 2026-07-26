@@ -5,6 +5,7 @@ import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface TourLogoManagerProps {
   tourId: string;
@@ -57,17 +58,17 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
               setLogoUrl(publicUrlData.publicUrl);
             }
           }
-        } catch (e: any) {
+        } catch (e) {
           console.error('Error getting logo public URL:', e);
-          setErrorDetails(`Failed to get logo URL: ${e.message}`);
+          setErrorDetails(`Failed to get logo URL: ${getErrorMessage(e)}`);
         }
       } else {
         console.log("No logo found for tour", tourId);
         setLogoUrl(null);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Unexpected error in fetchExistingLogo:', error);
-      setErrorDetails(`Unexpected error: ${error.message}`);
+      setErrorDetails(`Unexpected error: ${getErrorMessage(error)}`);
     }
   }, [tourId]);
 
@@ -182,9 +183,9 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
         title: "Success",
         description: "Tour logo has been updated",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading logo:', error);
-      const errorMessage = error.message || "Could not upload logo";
+      const errorMessage = getErrorMessage(error) || "Could not upload logo";
       setErrorDetails(errorMessage);
       toast({
         title: "Error",
@@ -259,9 +260,9 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       } else {
         console.log("No logo found to delete");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting logo:', error);
-      const errorMessage = error.message || "Could not delete logo";
+      const errorMessage = getErrorMessage(error) || "Could not delete logo";
       setErrorDetails(errorMessage);
       toast({
         title: "Error",

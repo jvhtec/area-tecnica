@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { getErrorMessage } from '@/utils/errorMessage';
 export interface ArchiveToFlexActionProps {
   job: any;
 }
@@ -50,12 +51,12 @@ export const ArchiveToFlexAction: React.FC<ArchiveToFlexActionProps> = ({ job })
         title: dryRun ? "Dry run complete" : "Archive complete",
         description: `${data?.uploaded ?? 0} uploaded, ${data?.failed ?? 0} failed`,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error("[ArchiveToFlexAction] ArchiveToFlex error", err);
-      setError(err?.message || "Failed to archive");
+      setError(getErrorMessage(err) || "Failed to archive");
       toast({
         title: "Archive failed",
-        description: err?.message || "Failed to archive",
+        description: getErrorMessage(err) || "Failed to archive",
         variant: "destructive",
       });
     } finally {

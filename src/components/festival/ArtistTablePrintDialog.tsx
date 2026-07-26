@@ -21,6 +21,7 @@ import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMa
 import { Checkbox } from "@/components/ui/checkbox";
 import { buildReadableFilename } from "@/utils/fileName";
 import { combineWavesDisplay } from "@/constants/wavesModels";
+import { getErrorStack } from '@/utils/errorMessage';
 
 interface Artist {
   id: string;
@@ -374,7 +375,7 @@ export const ArtistTablePrintDialog = ({
       setDialogOpen(false);
     } catch (error) {
       console.error('Error generating artist schedule PDF:', error);
-      console.error('Error stack:', error.stack);
+      console.error('Error stack:', getErrorStack(error));
       toast.error('Error al generar PDF');
     } finally {
       setIsGenerating(false);

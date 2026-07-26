@@ -107,7 +107,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         description: `Date type set to ${getDateTypeMeta(type)?.label || type}`,
       });
       onTypeChange();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error setting date type:', error);
       toast({
         title: "Error",

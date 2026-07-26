@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { loadStaticMapPreviewUrl } from "@/features/festival-management/commands";
 import type { FestivalVenueData } from "@/features/festival-management/types";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 export const useFestivalMapPreview = (venueData: FestivalVenueData) => {
   const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
@@ -23,8 +24,8 @@ export const useFestivalMapPreview = (venueData: FestivalVenueData) => {
         if (isMounted) {
           setMapPreviewUrl(url);
         }
-      } catch (error: any) {
-        console.warn("Failed to load static map preview:", error?.message || error);
+      } catch (error) {
+        console.warn("Failed to load static map preview:", getErrorMessage(error) || error);
         if (isMounted) {
           setMapPreviewUrl(null);
         }

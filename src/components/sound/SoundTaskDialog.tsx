@@ -36,6 +36,7 @@ import {
 
 import { queryKeys } from "@/lib/react-query";
 import type { Database } from "@/integrations/supabase/types";
+import { getErrorMessage } from '@/utils/errorMessage';
 import {
   DOCUMENT_UPLOAD_ACCEPT,
   getDocumentUploadValidationError,
@@ -205,11 +206,11 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details', jobId) });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating folders:', error);
       toast({
         title: "Error creating folders",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive"
       });
     }
@@ -286,7 +287,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       });
 
       refetchTasks();
-    } catch (error: any) {
+    } catch (error) {
       try {
         if (insertedIds.length > 0) {
           await dataLayerClient.from('task_documents').delete().in('id', insertedIds);
@@ -299,7 +300,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       }
       toast({
         title: "Error al subir",
-        description: error.message || "No se pudo completar la subida. Se ha revertido la tanda.",
+        description: getErrorMessage(error) || "No se pudo completar la subida. Se ha revertido la tanda.",
         variant: "destructive",
       });
     } finally {
@@ -332,10 +333,10 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         title: "File deleted",
         description: "The document has been removed successfully.",
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Delete failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -358,10 +359,10 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         description: `${field} updated to ${safeCount}`,
       });
       setPersonnel((prev) => ({ ...prev, [field]: safeCount }));
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Update failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -400,10 +401,10 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         title: "Task updated",
         description: "Task status has been updated successfully.",
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Update failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -423,10 +424,10 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Download failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }

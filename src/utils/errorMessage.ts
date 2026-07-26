@@ -92,3 +92,26 @@ export function getErrorMessage(error: unknown): string {
   return stringifySafe(error);
 }
 
+
+/**
+ * Reads the `name` of an unknown thrown value — used to branch on well-known
+ * `Error`/`DOMException` names such as 'AbortError' or 'NotSupportedError'.
+ */
+export function getErrorName(error: unknown): string | undefined {
+  if (error instanceof Error) return error.name;
+  if (isRecord(error)) {
+    const name = toText(error.name);
+    if (name) return name;
+  }
+  return undefined;
+}
+
+/** Reads the stack of an unknown thrown value, for diagnostic logging only. */
+export function getErrorStack(error: unknown): string | undefined {
+  if (error instanceof Error) return error.stack;
+  if (isRecord(error)) {
+    const stack = toText(error.stack);
+    if (stack) return stack;
+  }
+  return undefined;
+}

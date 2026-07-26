@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export type Festival = {
   id: string;
   name: string;
@@ -55,7 +56,7 @@ export function useFestival(festivalId: string) {
       }
 
       return data as Festival;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching festival:", error);
       
       // Increment retry count for UI feedback
@@ -69,7 +70,7 @@ export function useFestival(festivalId: string) {
         }
       }
       
-      throw new Error(`Failed to fetch festival: ${error.message}`);
+      throw new Error(`Failed to fetch festival: ${getErrorMessage(error)}`);
     }
   };
 

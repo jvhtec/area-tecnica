@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import { useJobDistance } from "@/hooks/useJobDistance";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface JobDetailsLocationTabProps {
   open: boolean;
@@ -50,8 +51,8 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
 
         const url = await getStaticMapUrlForLocation({ lat, lng, address, width: 600, height: 300, zoom: 15 });
         setMapPreviewUrl(url);
-      } catch (e: any) {
-        console.warn("Failed to load static map preview:", e?.message || e);
+      } catch (e) {
+        console.warn("Failed to load static map preview:", getErrorMessage(e) || e);
         setMapPreviewUrl(null);
       } finally {
         setIsMapLoading(false);

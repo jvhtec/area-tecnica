@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Loader2, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface ImportUsersDialogProps {
   open: boolean;
@@ -63,9 +64,9 @@ export const ImportUsersDialog = ({ open, onOpenChange }: ImportUsersDialogProps
       });
 
       onOpenChange(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Import error:", err);
-      setError(err.message || "Failed to import users");
+      setError(getErrorMessage(err) || "Failed to import users");
       toast({
         title: "Import failed",
         description: "There was an error importing users",

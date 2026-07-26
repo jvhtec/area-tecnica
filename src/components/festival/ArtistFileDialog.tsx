@@ -156,7 +156,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       });
 
       fetchFiles();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error uploading file:", error);
       const uploadErrorMessage = error instanceof Error ? error.message : "";
       try {
@@ -214,7 +214,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       });
 
       fetchFiles();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting file:", error);
       toast({
         title: "Error",
@@ -244,7 +244,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       a.download = file.file_name;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error downloading file:", error);
       toast({
         title: "Error",

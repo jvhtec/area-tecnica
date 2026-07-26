@@ -16,6 +16,7 @@ import { StockAdvancedEditDialog } from './stock-creation-manager/StockAdvancedE
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 // UUID regex for extracting Flex resource IDs
 const UUID_REGEX = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
 
@@ -146,8 +147,8 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
       }
 
       toast({ title: 'Datos obtenidos', description: 'Los datos del equipo se han rellenado desde Flex.' });
-    } catch (e: any) {
-      toast({ title: 'Error al obtener datos', description: e?.message || 'Error desconocido', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Error al obtener datos', description: getErrorMessage(e) || 'Error desconocido', variant: 'destructive' });
     } finally {
       if (isAdvanced) {
         setIsFetchingAdvFlex(false);

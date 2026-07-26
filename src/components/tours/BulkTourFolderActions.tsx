@@ -8,6 +8,7 @@ import { FolderPlus, Loader2, RefreshCw, ChevronDown, ChevronUp } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 import { createTourRootFolders } from "@/utils/tourFolders";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface BulkTourFolderActionsProps {
   tours: any[];
   onRefresh: () => void;
@@ -84,11 +85,11 @@ export const BulkTourFolderActions = ({
         });
       }
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Verification error:", error);
       toast({
         title: "No se pudo comprobar",
-        description: error.message || "No se pudo comprobar el estado de las carpetas",
+        description: getErrorMessage(error) || "No se pudo comprobar el estado de las carpetas",
         variant: "destructive"
       });
     } finally {
@@ -115,9 +116,9 @@ export const BulkTourFolderActions = ({
             errorCount++;
             errors.push(`${tour.name}: ${result.error}`);
           }
-        } catch (error: any) {
+        } catch (error) {
           errorCount++;
-          errors.push(`${tour.name}: ${error.message}`);
+          errors.push(`${tour.name}: ${getErrorMessage(error)}`);
         }
       }
 
@@ -137,11 +138,11 @@ export const BulkTourFolderActions = ({
           variant: "destructive"
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Bulk creation error:", error);
       toast({
         title: "No se pudieron crear las carpetas",
-        description: error.message || "No se pudieron crear las carpetas raíz",
+        description: getErrorMessage(error) || "No se pudieron crear las carpetas raíz",
         variant: "destructive"
       });
     } finally {

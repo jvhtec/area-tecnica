@@ -11,6 +11,7 @@ import { trackError } from "@/lib/errorTracking";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export const useOptimisticJobManagement = (
   selectedDepartment: Department,
   startDate: Date,
@@ -137,7 +138,7 @@ export const useOptimisticJobManagement = (
         title: "Document deleted",
         description: "The document has been successfully deleted."
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("useOptimisticJobManagement: Error deleting document:", error);
       void trackError(error, {
         system: 'assignments',
@@ -147,7 +148,7 @@ export const useOptimisticJobManagement = (
       });
       toast({
         title: "Error",
-        description: "Failed to delete document: " + error.message,
+        description: "Failed to delete document: " + getErrorMessage(error),
         variant: "destructive"
       });
     }
@@ -180,7 +181,7 @@ export const useOptimisticJobManagement = (
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
         throw new Error(result.error || "Unknown deletion error");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("useOptimisticJobManagement: Error in optimistic job deletion:", error);
       void trackError(error, {
         system: 'assignments',
@@ -189,7 +190,7 @@ export const useOptimisticJobManagement = (
       });
       toast({
         title: "Error deleting job",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive"
       });
       

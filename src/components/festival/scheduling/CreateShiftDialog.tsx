@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ShiftTimeCalculator } from "./ShiftTimeCalculator";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface CreateShiftDialogProps {
   open: boolean;
@@ -96,11 +97,11 @@ export const CreateShiftDialog = ({
         title: "Éxito",
         description: "Turno creado exitosamente",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating shift:", error);
       toast({
         title: "Error",
-        description: `No se pudo crear el turno: ${error.message}`,
+        description: `No se pudo crear el turno: ${getErrorMessage(error)}`,
         variant: "destructive",
       });
     } finally {

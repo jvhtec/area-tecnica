@@ -319,7 +319,7 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
       });
 
       onSave();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving contacts:", error);
       toast({
         title: "Error",

@@ -12,6 +12,7 @@ import { canUseCustomFolderStructure, isManagementRole } from "@/utils/permissio
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage, getErrorName } from '@/utils/errorMessage';
 export const useJobActions = (job: any, userRole: string | null, onDeleteClick?: (jobId: string) => void) => {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -72,11 +73,11 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("useJobActions: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive"
       });
     } finally {
@@ -156,11 +157,11 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("folder-existence") })
       ]);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("useJobActions: Error creating flex folders:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create Flex folders",
+        description: getErrorMessage(error) || "Failed to create Flex folders",
         variant: "destructive"
       });
     } finally {
@@ -271,15 +272,15 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         description: `${usedCustomStructure ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("useJobActions: Error creating local folders:", error);
-      if (error.name === 'AbortError') {
+      if (getErrorName(error) === 'AbortError') {
         // User cancelled, don't show error
         return;
       }
       toast({
         title: "Error",
-        description: error.message || "Failed to create local folder structure",
+        description: getErrorMessage(error) || "Failed to create local folder structure",
         variant: "destructive"
       });
     } finally {

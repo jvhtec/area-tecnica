@@ -35,6 +35,7 @@ import {
 
 import { queryKeys } from "@/lib/react-query";
 import type { Database } from "@/integrations/supabase/types";
+import { getErrorMessage } from '@/utils/errorMessage';
 import {
   DOCUMENT_UPLOAD_ACCEPT,
   getDocumentUploadValidationError,
@@ -204,7 +205,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       });
 
       refetchTasks();
-    } catch (error: any) {
+    } catch (error) {
       try {
         if (insertedIds.length > 0) {
           await dataLayerClient.from('task_documents').delete().in('id', insertedIds);
@@ -217,7 +218,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       }
       toast({
         title: "Error al subir",
-        description: error.message || "No se pudo completar la subida. Se ha revertido la tanda.",
+        description: getErrorMessage(error) || "No se pudo completar la subida. Se ha revertido la tanda.",
         variant: "destructive",
       });
     } finally {
@@ -241,10 +242,10 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Download failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -285,10 +286,10 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       });
   
       refetchTasks();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Delete failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -313,10 +314,10 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
         title: "Task updated",
         description: "Task status has been updated successfully.",
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Update failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }

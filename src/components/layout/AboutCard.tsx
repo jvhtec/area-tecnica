@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Info, Edit3, Save, X, Clock, Plus, Trash2, Bell } from "lucide-react"
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { getErrorMessage } from '@/utils/errorMessage';
 import { useToast } from "@/hooks/use-toast"
 import { getChangelogVersionAutofill } from "@/lib/changelog-version"
 import { isAdminRole, isManagementRole } from "@/utils/permissions"
@@ -126,8 +127,8 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
           lastUpdated: row.last_updated
         }))
         setChangelog(filterRecentEntries(mapped))
-      } catch (e: any) {
-        console.warn('Failed to load changelog', e?.message || e)
+      } catch (e) {
+        console.warn('Failed to load changelog', getErrorMessage(e) || e)
       }
     }
     if (isOpen) void load()
@@ -205,8 +206,8 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
       setEditDate("")
       setSendBroadcast(false)
       toast({ title: sendBroadcast ? 'Changelog updated & broadcast sent' : 'Changelog updated' })
-    } catch (e: any) {
-      toast({ title: 'Failed to save', description: e?.message || String(e), variant: 'destructive' })
+    } catch (e) {
+      toast({ title: 'Failed to save', description: getErrorMessage(e) || String(e), variant: 'destructive' })
     }
   }
 
@@ -232,8 +233,8 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
         setEditDate('')
       }
       toast({ title: 'Entrada eliminada' })
-    } catch (e: any) {
-      toast({ title: 'No se pudo eliminar', description: e?.message || String(e), variant: 'destructive' })
+    } catch (e) {
+      toast({ title: 'No se pudo eliminar', description: getErrorMessage(e) || String(e), variant: 'destructive' })
     }
   }
 
@@ -266,8 +267,8 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
         setEditDate(newEntry.date)
         toast({ title: 'Entry created' })
       }
-    } catch (e: any) {
-      toast({ title: 'Failed to add entry', description: e?.message || String(e), variant: 'destructive' })
+    } catch (e) {
+      toast({ title: 'Failed to add entry', description: getErrorMessage(e) || String(e), variant: 'destructive' })
     }
   }
 
