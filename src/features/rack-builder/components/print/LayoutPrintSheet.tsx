@@ -20,8 +20,10 @@ interface LayoutPrintSheetProps {
   scale?: number
   useAutoFitScale?: boolean
   simplifiedView?: boolean
-  drawingFrameRef?: RefObject<HTMLDivElement | null>
-  drawingContentRef?: RefObject<HTMLDivElement | null>
+  // `RefObject<T>` (not `RefObject<T | null>`): React 18's `ref` prop only accepts the
+  // former, and its `current` is already `T | null`.
+  drawingFrameRef?: RefObject<HTMLDivElement>
+  drawingContentRef?: RefObject<HTMLDivElement>
   sheetClassName?: string
 }
 
@@ -43,8 +45,8 @@ export default function LayoutPrintSheet({
   drawingContentRef,
   sheetClassName,
 }: LayoutPrintSheetProps) {
-  const internalFrameRef = useRef<HTMLDivElement | null>(null)
-  const internalContentRef = useRef<HTMLDivElement | null>(null)
+  const internalFrameRef = useRef<HTMLDivElement>(null)
+  const internalContentRef = useRef<HTMLDivElement>(null)
   const [autoScale, setAutoScale] = useState(1)
 
   const frameRef = drawingFrameRef ?? internalFrameRef

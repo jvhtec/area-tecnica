@@ -3,22 +3,12 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Speaker, Sliders, Camera, User, Radio, MoreVertical, Calendar as CalendarIcon, FileText, ChevronRight } from 'lucide-react';
 import { Theme } from './types';
+import type { MyTour } from '@/hooks/useMyTours';
 import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 
 interface TourCardProps {
-    tour: {
-        id: string;
-        name: string;
-        description?: string;
-        color: string;
-        start_date?: string;
-        end_date?: string;
-        assignment_role: string;
-        assignment_department: string;
-        assignment_notes?: string;
-        total_dates: number;
-        upcoming_dates: number;
-    };
+    /** Shared with `useMyTours` rather than re-declared, so the shapes cannot drift. */
+    tour: MyTour;
     theme: Theme;
     isDark: boolean;
     onNavigate: (tourId: string) => void;

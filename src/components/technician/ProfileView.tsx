@@ -20,24 +20,25 @@ interface ProfileUser {
     email?: string;
 }
 
+// Mirrors the nullable `profiles` columns this view reads.
 interface UserProfile {
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-    dni?: string;
-    residencia?: string;
-    bg_color?: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    phone?: string | null;
+    dni?: string | null;
+    residencia?: string | null;
+    bg_color?: string | null;
     profile_picture_url?: string | null;
-    role?: string;
-    department?: string;
-    calendar_ics_token?: string;
+    role?: string | null;
+    department?: string | null;
+    calendar_ics_token?: string | null;
 }
 
 interface ProfileViewProps {
     theme: Theme;
     isDark: boolean;
     user: ProfileUser | null;
-    userProfile: UserProfile | null;
+    userProfile: UserProfile | null | undefined;
     toggleTheme: () => void;
 }
 
@@ -130,14 +131,15 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         'admin': 'Administrador',
         'management': 'Gestión',
     };
-    const roleLabel = roleLabels[userProfile?.role] || userProfile?.role || 'Técnico';
+    const roleLabel = (userProfile?.role ? roleLabels[userProfile.role] : undefined) || userProfile?.role || 'Técnico';
 
     const deptLabels: Record<string, string> = {
         'sound': 'Sonido',
         'lights': 'Luces',
         'video': 'Vídeo',
     };
-    const deptLabel = deptLabels[userProfile?.department?.toLowerCase()] || userProfile?.department || '';
+    const departmentKey = userProfile?.department?.toLowerCase();
+    const deptLabel = (departmentKey ? deptLabels[departmentKey] : undefined) || userProfile?.department || '';
 
     const handleSignOut = async () => {
         await dataLayerClient.auth.signOut();

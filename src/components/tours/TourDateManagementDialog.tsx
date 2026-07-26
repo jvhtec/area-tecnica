@@ -122,7 +122,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (error) throw error;
 
       return data.reduce((acc: Record<string, boolean>, folder) => {
-        acc[folder.tour_date_id] = true;
+        if (folder.tour_date_id) acc[folder.tour_date_id] = true;
         return acc;
       }, {});
     },

@@ -705,7 +705,7 @@ export const TimesheetView = (props: TimesheetViewProps) => {
                               {(breakdown.plus_10_12_amount_eur ?? 0) > 0 && (
                                 <div>
                                   <p className="text-muted-foreground">Plus 10-12h</p>
-                                  <p className="font-medium">€{(breakdown.plus_10_12_amount_eur).toFixed(2)}</p>
+                                  <p className="font-medium">€{(breakdown.plus_10_12_amount_eur ?? 0).toFixed(2)}</p>
                                 </div>
                               )}
                               <div>

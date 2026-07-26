@@ -35,8 +35,8 @@ export default function LayoutPrintPage() {
   const [generatedAt] = useState(() => new Date())
   const exportRootRef = useRef<HTMLDivElement | null>(null)
 
-  const drawingFrameRef = useRef<HTMLDivElement | null>(null)
-  const drawingContentRef = useRef<HTMLDivElement | null>(null)
+  const drawingFrameRef = useRef<HTMLDivElement>(null)
+  const drawingContentRef = useRef<HTMLDivElement>(null)
 
   const scaleLabel = useMemo(() => `Fit (shared) ${scale.toFixed(2)}x`, [scale])
   const rackTotals = useMemo(() => {

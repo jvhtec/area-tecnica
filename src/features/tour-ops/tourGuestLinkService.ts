@@ -27,7 +27,8 @@ export async function createTourGuestLink(input: {
     p_tour_id: input.tourId,
     p_label: input.label,
     p_allowed_sections: input.allowedSections,
-    p_expires_at: input.expiresAt || null,
+    // DEFAULT NULL, so omitting is equivalent to sending null.
+    p_expires_at: input.expiresAt || undefined,
     p_access_level: input.accessLevel || "view",
   });
   if (error) throw error;
