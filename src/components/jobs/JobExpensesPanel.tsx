@@ -273,7 +273,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         const { error } = await dataLayerClient.rpc('approve_job_expense', {
           p_expense_id: expenseId,
           p_approved: true,
-          p_rejection_reason: null,
+          p_rejection_reason: undefined,
         });
         if (error) throw error;
         toast.success('Gasto aprobado');
@@ -292,7 +292,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         const { error } = await dataLayerClient.rpc('approve_job_expense', {
           p_expense_id: expenseId,
           p_approved: false,
-          p_rejection_reason: reason ?? null,
+          p_rejection_reason: reason ?? undefined,
         });
         if (error) throw error;
         toast.success('Gasto rechazado');
@@ -358,13 +358,15 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
           p_job_id: jobId,
           p_technician_id: permissionForm.technicianId,
           p_category_slug: permissionForm.categorySlug,
-          p_valid_from: permissionForm.validFrom || null,
-          p_valid_to: permissionForm.validTo || null,
+          // These RPC args are all DEFAULT NULL, so omitting them is equivalent to
+          // sending null — and the generated types model them as optional, not nullable.
+          p_valid_from: permissionForm.validFrom || undefined,
+          p_valid_to: permissionForm.validTo || undefined,
           p_daily_cap_eur:
-            permissionForm.dailyCap.trim() !== '' ? Number(permissionForm.dailyCap) : null,
+            permissionForm.dailyCap.trim() !== '' ? Number(permissionForm.dailyCap) : undefined,
           p_total_cap_eur:
-            permissionForm.totalCap.trim() !== '' ? Number(permissionForm.totalCap) : null,
-          p_notes: permissionForm.notes || null,
+            permissionForm.totalCap.trim() !== '' ? Number(permissionForm.totalCap) : undefined,
+          p_notes: permissionForm.notes || undefined,
         });
         if (error) throw error;
         toast.success('Permiso guardado');

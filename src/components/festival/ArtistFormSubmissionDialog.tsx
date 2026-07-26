@@ -17,12 +17,13 @@ interface ArtistFormSubmissionDialogProps {
   artistId: string;
 }
 
+// Mirrors the nullable `festival_artist_form_submissions` columns.
 interface FormSubmission {
   id: string;
-  submitted_at: string;
+  submitted_at: string | null;
   form_data: any;
-  status: string;
-  notes?: string;
+  status: string | null;
+  notes?: string | null;
 }
 
 export const ArtistFormSubmissionDialog = ({
@@ -82,7 +83,7 @@ export const ArtistFormSubmissionDialog = ({
 
       // Add submission date
       doc.setFontSize(12);
-      doc.text(`Enviado el: ${format(new Date(submission.submitted_at), 'PPpp')}`, 20, 35);
+      doc.text(`Enviado el: ${submission.submitted_at ? format(new Date(submission.submitted_at), 'PPpp') : 'Fecha desconocida'}`, 20, 35);
 
       // Add form data
       doc.setFontSize(14);
@@ -158,7 +159,7 @@ export const ArtistFormSubmissionDialog = ({
           <ScrollArea className="flex-1">
             <div className="space-y-4 p-4">
               <div className="text-sm text-muted-foreground">
-                Enviado el: {format(new Date(submission.submitted_at), 'PPpp')}
+                Enviado el: {submission.submitted_at ? format(new Date(submission.submitted_at), 'PPpp') : 'Fecha desconocida'}
               </div>
 
               <div className="space-y-4">

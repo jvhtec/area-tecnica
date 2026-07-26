@@ -22,9 +22,10 @@ export interface AvailabilitySchedule {
   department: string;
   date: string;
   status: AvailabilityStatus;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
+  // Nullable to match the `availability_schedules` columns.
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface GlobalAvailabilityPreset {

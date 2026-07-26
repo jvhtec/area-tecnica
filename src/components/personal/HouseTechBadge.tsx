@@ -147,6 +147,8 @@ export const HouseTechBadge = memo<HouseTechBadgeProps>(({
     }
   };
 
+  const role = getRole();
+
   return (
     <>
       <Badge
@@ -178,9 +180,9 @@ export const HouseTechBadge = memo<HouseTechBadgeProps>(({
         ) : (
           <>
             <span className="flex-shrink-0 text-xs">{getInitials()}</span>
-            {assignment && getRole() && !isUnavailable && (
+            {assignment && role && !isUnavailable && (
               <span className="truncate text-[10px] opacity-75 max-w-[24px]">
-                {getRole().slice(0, 3)}
+                {role.slice(0, 3)}
               </span>
             )}
             {getAvailabilityIcon() && (

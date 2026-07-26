@@ -94,6 +94,9 @@ export const EditShiftDialog = ({
     }
   };
 
+  // Hoisted so the value is narrowed once instead of re-read inside `parseInt`.
+  const watchedStage = form.watch("stage");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
@@ -118,7 +121,7 @@ export const EditShiftDialog = ({
           <ShiftTimeCalculator 
             jobId={shift.job_id} 
             date={shift.date} 
-            stage={form.watch("stage") ? parseInt(form.watch("stage")) : undefined}
+            stage={watchedStage ? parseInt(watchedStage) : undefined}
             onApplyTimes={handleApplyCalculatedTimes}
           />
 

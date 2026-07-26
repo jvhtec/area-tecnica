@@ -68,7 +68,12 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
   };
 
   const getDepartmentRole = () => {
-    const dept = technician.department?.charAt(0).toUpperCase() + technician.department?.slice(1) || 'Unknown';
+    const department = technician.department;
+    // Without the local, `a?.charAt(0) + a?.slice(1)` yields "undefinedundefined"
+    // before `|| 'Unknown'` ever gets a chance to apply.
+    const dept = department
+      ? department.charAt(0).toUpperCase() + department.slice(1)
+      : 'Unknown';
     return `${dept} House Tech`;
   };
 

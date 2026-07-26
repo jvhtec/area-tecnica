@@ -368,9 +368,11 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.lighting_designers || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ lighting_designers: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({
@@ -390,9 +392,11 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.lighting_techs || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ lighting_techs: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({
@@ -412,9 +416,11 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.spot_ops || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ spot_ops: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({
@@ -434,9 +440,11 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.riggers || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ riggers: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({

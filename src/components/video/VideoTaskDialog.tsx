@@ -371,9 +371,11 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 min="0"
                 value={personnel?.video_directors || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('video_job_personnel')
                     .update({ video_directors: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({
@@ -393,9 +395,11 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 min="0"
                 value={personnel?.camera_ops || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('video_job_personnel')
                     .update({ camera_ops: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({
@@ -415,9 +419,11 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 min="0"
                 value={personnel?.playback_techs || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('video_job_personnel')
                     .update({ playback_techs: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({
@@ -437,9 +443,11 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                 min="0"
                 value={personnel?.video_techs || 0}
                 onChange={async (e) => {
+                  // Without an existing personnel row there is nothing to update.
+                  if (!personnel?.id) return;
                   const { error } = await dataLayerClient.from('video_job_personnel')
                     .update({ video_techs: parseInt(e.target.value) })
-                    .eq('id', personnel?.id);
+                    .eq('id', personnel.id);
                   
                   if (error) {
                     toast({

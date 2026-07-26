@@ -13,11 +13,13 @@ import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { buildReadableFilename } from "@/utils/fileName";
+import { isPresent } from '@/utils/typeGuards';
 
 interface ArtistLinkData {
   artistId: string;
   name: string;
-  stage: number;
+  /** Nullable to match the `festival_artists.stage` column. */
+  stage: number | null;
   date?: string | null;
   form_language?: "es" | "en";
   token?: string;
@@ -75,9 +77,16 @@ export const ArtistFormLinksDialog = ({
       if (formsError) throw formsError;
 
       const now = new Date();
+      // Mirrors the selected `festival_artist_forms` columns, which are all nullable.
       const formByArtistId = new Map<
         string,
-        { token?: string; expires_at?: string; status?: string; updated_at?: string | null; created_at?: string | null }
+        {
+          token?: string | null;
+          expires_at?: string | null;
+          status?: string | null;
+          updated_at?: string | null;
+          created_at?: string | null;
+        }
       >();
 
       (formsData || []).forEach((form) => {
@@ -352,7 +361,7 @@ export const ArtistFormLinksDialog = ({
     );
   }
 
-  const stages = [...new Set(filteredArtistLinks.map(a => a.stage))].sort();
+  const stages = [...new Set(filteredArtistLinks.map(a => a.stage))].filter(isPresent).sort();
   const titleDate = dateFilter === ALL_DATES_VALUE ? "Todas las fechas" : formatDateLabel(dateFilter);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
