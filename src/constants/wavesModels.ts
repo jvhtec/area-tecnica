@@ -1,6 +1,8 @@
 export type WavesModel = 'server_one' | 'extreme' | 'titan' | 'livebox' | 'fourier' | 'axis_one' | 'axis_scope';
 
-export interface WavesModelSelection {
+// `type`, not `interface`, so it stays assignable to the generated `Json` when
+// persisted into the artists' waves-model jsonb columns.
+export type WavesModelSelection = {
   model: WavesModel;
   quantity: number;
 }

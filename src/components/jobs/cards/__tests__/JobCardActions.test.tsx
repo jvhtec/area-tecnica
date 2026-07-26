@@ -59,7 +59,7 @@ const {
   },
 }));
 
-const createSupabaseBuilder = (response: { data: any; error: any }) => {
+const createSupabaseBuilder = (response: { data: any; error: unknown }) => {
   const filters: Array<{ type: 'eq' | 'in'; column: string; value: any }> = [];
   const applyFilters = () => {
     if (!Array.isArray(response.data)) {
@@ -89,7 +89,7 @@ const createSupabaseBuilder = (response: { data: any; error: any }) => {
   builder.single = vi.fn(() => builder);
   builder.maybeSingle = vi.fn(() => builder);
   builder.order = vi.fn(() => builder);
-  builder.then = (resolve: (value: any) => void, reject?: (error: any) => void) =>
+  builder.then = (resolve: (value: any) => void, reject?: (error: unknown) => void) =>
     Promise.resolve({ data: applyFilters(), error: response.error }).then(resolve, reject);
   return builder;
 };

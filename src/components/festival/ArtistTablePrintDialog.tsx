@@ -22,6 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { buildReadableFilename } from "@/utils/fileName";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { getErrorStack } from '@/utils/errorMessage';
+import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
+import type { WavesModelSelection } from '@/constants/wavesModels';
 
 interface Artist {
   id: string;
@@ -42,15 +44,15 @@ interface Artist {
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
+  foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string;
   foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_waves_models?: any[];
+  mon_waves_models?: WavesModelSelection[];
   mon_outboard?: string;
   mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  wireless_systems: any[];
+  wireless_systems: WirelessSystem[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
-  iem_systems: any[];
+  iem_systems: IEMSystem[];
   iem_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_enabled: boolean;
   monitors_quantity: number;

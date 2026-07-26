@@ -3,6 +3,8 @@ import { MobileArtistCard, type MobileArtistRiderFile, type MobileConfigCategory
 import { MobileArtistConfigEditor, ReadOnlyArtistCategoryContent } from "./MobileArtistConfigEditor";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
+import type { WavesModelSelection } from '@/constants/wavesModels';
 
 const CATEGORY_TITLES: Record<MobileConfigCategory, string> = {
   consoles: "Consolas",
@@ -29,13 +31,13 @@ interface Artist {
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
+  foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string;
-  mon_waves_models?: any[];
+  mon_waves_models?: WavesModelSelection[];
   mon_outboard?: string;
-  wireless_systems: any[];
+  wireless_systems: WirelessSystem[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
-  iem_systems: any[];
+  iem_systems: IEMSystem[];
   iem_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_enabled: boolean;
   monitors_quantity: number;

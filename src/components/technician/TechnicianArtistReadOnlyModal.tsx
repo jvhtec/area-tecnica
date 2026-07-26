@@ -24,6 +24,8 @@ import {
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { canEditJobs } from "@/utils/permissions";
 import type { Tables } from "@/integrations/supabase/types";
+import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
+import type { WavesModelSelection } from '@/constants/wavesModels';
 
 type TechnicianArtistReadOnlyModalProps = {
   theme: Theme;
@@ -60,13 +62,13 @@ type ReadOnlyArtist = {
   mon_console_provided_by?: "festival" | "band" | "mixed" | null;
   mon_position?: string | null;
   monitors_from_foh?: boolean | null;
-  foh_waves_models?: any[] | null;
+  foh_waves_models?: WavesModelSelection[] | null;
   foh_outboard?: string | null;
-  mon_waves_models?: any[] | null;
+  mon_waves_models?: WavesModelSelection[] | null;
   mon_outboard?: string | null;
-  wireless_systems: any[];
+  wireless_systems: WirelessSystem[];
   wireless_provided_by?: "festival" | "band" | "mixed" | null;
-  iem_systems: any[];
+  iem_systems: IEMSystem[];
   iem_provided_by?: "festival" | "band" | "mixed" | null;
   monitors_enabled: boolean;
   monitors_quantity: number;

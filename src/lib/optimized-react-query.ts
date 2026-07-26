@@ -1,13 +1,15 @@
 
 import { QueryClient, DefaultOptions, QueryKey } from "@tanstack/react-query";
+import { getErrorStatus } from '@/utils/errorMessage';
 
 // Optimized React Query configuration for real-time data with multi-tab support
 const createOptimizedQueryOptions = (isLeader: boolean = true): DefaultOptions => ({
   queries: {
     staleTime: 2 * 60 * 1000, // 2 minutes - reduced from 5 minutes for real-time data
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: unknown) => {
       // Don't retry auth errors or 404s
-      if (error?.status === 401 || error?.status === 404) {
+      const status = getErrorStatus(error);
+      if (status === 401 || status === 404) {
         return false;
       }
       return failureCount < 2; // Reduced from 3 retries

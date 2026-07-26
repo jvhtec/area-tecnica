@@ -49,7 +49,7 @@ export function useWallboardPreset({
 
     const loadPreset = async () => {
       let data: any = null;
-      let error: any = null;
+      let error: unknown = null;
 
       console.log('🎨 [Wallboard] Loading preset configuration...', {
         effectiveSlug,

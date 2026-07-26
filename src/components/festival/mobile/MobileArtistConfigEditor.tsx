@@ -17,6 +17,8 @@ import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtist
 import type { Database, Json } from "@/integrations/supabase/types";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
+import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
+import type { WavesModelSelection } from '@/constants/wavesModels';
 
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
 type ProviderType = Database["public"]["Enums"]["provider_type"];
@@ -39,15 +41,15 @@ interface Artist {
   mon_console_provided_by?: ProviderType | null;
   mon_position?: string | null;
   monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
+  foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string;
   foh_waves_provided_by?: ProviderType | null;
-  mon_waves_models?: any[];
+  mon_waves_models?: WavesModelSelection[];
   mon_outboard?: string;
   mon_waves_provided_by?: ProviderType | null;
-  wireless_systems: any[];
+  wireless_systems: WirelessSystem[];
   wireless_provided_by?: ProviderType | null;
-  iem_systems: any[];
+  iem_systems: IEMSystem[];
   iem_provided_by?: ProviderType | null;
   monitors_enabled: boolean;
   monitors_quantity: number;

@@ -94,7 +94,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   setAvailabilityMultiDates: (value: Date[]) => void;
   availabilitySending: boolean;
   setAvailabilitySending: (value: boolean) => void;
-  handleEmailError: (error: any, payload: any) => void;
+  handleEmailError: (error: unknown, payload: any) => void;
   conflictDialog: any;
   setConflictDialog: (value: any) => void;
   // Roadmap P3-06 keeps this prop reserved for Stream Deck-aware matrix view integration.

@@ -9,7 +9,7 @@ vi.mock("../api", () => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
-  type SupabaseResult<T> = Promise<{ data: T; error: any }>;
+  type SupabaseResult<T> = Promise<{ data: T; error: unknown }>;
 
   type QueryAction = "select" | "insert";
 
@@ -91,7 +91,7 @@ vi.mock("@/integrations/supabase/client", () => {
 
     then<TResult1 = any, TResult2 = never>(
       onfulfilled?:
-        | ((value: { data: any; error: any }) => TResult1 | PromiseLike<TResult1>)
+        | ((value: { data: any; error: unknown }) => TResult1 | PromiseLike<TResult1>)
         | null,
       onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
     ) {

@@ -1,3 +1,4 @@
+import { getErrorMessage, getErrorStatus } from '@/utils/errorMessage';
 /**
  * Network utility functions for handling connection issues and retries
  */
@@ -62,15 +63,17 @@ export async function retryWithBackoff<T>(
 /**
  * Check if an error should not be retried
  */
-function isNonRetryableError(error: any): boolean {
+function isNonRetryableError(error: unknown): boolean {
   // Don't retry authentication errors
-  if (error?.message?.includes('JWTIssuedAtFuture')) return true;
-  if (error?.message?.includes('expired')) return true;
-  if (error?.message?.includes('invalid')) return true;
-  
+  const message = getErrorMessage(error);
+  if (message.includes('JWTIssuedAtFuture')) return true;
+  if (message.includes('expired')) return true;
+  if (message.includes('invalid')) return true;
+
   // Don't retry 4xx errors (except 408, 429)
-  if (error?.status >= 400 && error?.status < 500) {
-    return error.status !== 408 && error.status !== 429;
+  const status = getErrorStatus(error);
+  if (status !== undefined && status >= 400 && status < 500) {
+    return status !== 408 && status !== 429;
   }
   
   return false;

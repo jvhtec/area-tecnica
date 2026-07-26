@@ -18,6 +18,8 @@ import {
   type ConsolePosition,
 } from "@/constants/consoleDrive";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
+import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
+import type { WavesModelSelection } from '@/constants/wavesModels';
 
 interface Artist {
   id: string;
@@ -41,13 +43,13 @@ interface Artist {
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_position?: string | null;
   monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
+  foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string;
-  mon_waves_models?: any[];
+  mon_waves_models?: WavesModelSelection[];
   mon_outboard?: string;
-  wireless_systems: any[];
+  wireless_systems: WirelessSystem[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
-  iem_systems: any[];
+  iem_systems: IEMSystem[];
   iem_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_enabled: boolean;
   monitors_quantity: number;

@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/utils/errorMessage';
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications, type PermissionStatus, type Token } from '@capacitor/push-notifications'
 
@@ -91,12 +92,12 @@ const waitForRegistrationToken = async (): Promise<string> => {
           void cleanup().then(() => resolve(token.value))
         })
 
-        errorHandle = await PushNotifications.addListener('registrationError', (error: any) => {
+        errorHandle = await PushNotifications.addListener('registrationError', (error: unknown) => {
           if (resolved) {
             return
           }
           resolved = true
-          const message = error?.error || error?.message || 'Unable to register for native push notifications.'
+          const message = getErrorMessage(error, 'Unable to register for native push notifications.')
           void cleanup().then(() => reject(new Error(message)))
         })
 

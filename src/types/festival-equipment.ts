@@ -36,8 +36,9 @@ export const IEM_SYSTEMS = [
 export type WirelessSystemModel = typeof WIRELESS_SYSTEMS[number];
 export type IEMSystemModel = typeof IEM_SYSTEMS[number];
 
-// Base interface for wireless system
-export interface WirelessSystem {
+// Persisted into jsonb columns, so this must stay a `type` alias: only aliases get
+// the implicit index signature that makes them assignable to the generated `Json`.
+export type WirelessSystem = {
   model: WirelessSystemModel | string;
   quantity_hh?: number;
   quantity_bp?: number;
@@ -46,8 +47,8 @@ export interface WirelessSystem {
   provided_by?: 'festival' | 'band' | 'mixed';
 }
 
-// Base interface for IEM system
-export interface IEMSystem {
+// See WirelessSystem: `type`, not `interface`, so it stays assignable to `Json`.
+export type IEMSystem = {
   model: IEMSystemModel | string;
   quantity?: number;  // Keep for backward compatibility
   quantity_hh?: number;  // Channels
