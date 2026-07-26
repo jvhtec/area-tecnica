@@ -8,10 +8,15 @@
     "",
     "nodeModulesDir=none keeps Deno from trying to resolve `npm:` specifiers out of the",
     "repo's Node `node_modules/` (which is for the Vite app, not the functions).",
-    "The Edge Runtime resolves them from the registry the same way."
+    "The Edge Runtime resolves them from the registry the same way.",
+    "",
+    "The committed deno.lock pins every remote dependency. Without it, floating",
+    "specifiers like `npm:@supabase/supabase-js@2` would resolve to whichever 2.x was",
+    "newest at that moment, so an unrelated PR could start failing with no repo change.",
+    "The check runs with --frozen so the lock is enforced, not silently updated."
   ],
   "nodeModulesDir": "none",
-  "lock": false,
+  "lock": "./deno.lock",
   "compilerOptions": {
     "types": ["./_shared/edge-runtime.d.ts"]
   }

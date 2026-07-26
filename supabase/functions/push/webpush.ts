@@ -1,4 +1,4 @@
-import { createClient, webpush, type SupabaseClient } from "./deps.ts";
+import { webpush, type SupabaseClient } from "./deps.ts";
 import { CONTACT_EMAIL, PUSH_CONFIG, VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY } from "./config.ts";
 import type { PushPayload, PushSendResult, PushSubscriptionRow } from "./types.ts";
 

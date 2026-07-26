@@ -459,7 +459,8 @@ Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`
 | Job | Timeout | What it does |
 |-----|---------|-------------|
 | `lint` | 20 min | ESLint on app code |
-| `typecheck` | 20 min | TypeScript no-emit check |
+| `typecheck` | 20 min | TypeScript no-emit check (app only — `src/`) |
+| `functions_typecheck` | 15 min | `deno check` over every Edge Function + `_shared/` module |
 | `governance` | 20 min | Source-boundary, file-size budget, Edge Function, workflow pinning, migration ordering, and dependency gates |
 | `test_critical` | 25 min | Critical test files (auth, assignments, timesheets) |
 | `test_run` | 25 min | Full Vitest suite |
@@ -509,8 +510,10 @@ All checks across all three workflows are enumerated in `docs/release/production
 - Linting: `npm run lint:functions` (separate ESLint config with Deno globals)
 - Type checking: `npm run typecheck:functions` — `deno check` over every entrypoint and
   `_shared/` module. Edge Functions are **not** in `tsconfig.app.json`, so `npm run typecheck`
-  does not cover them. Needs Deno on PATH (or `DENO_BIN`); it skips locally when Deno is
-  absent but hard-fails in CI (`functions_typecheck` job).
+  does not cover them. Needs Deno on PATH (or `DENO_BIN`) and **fails if Deno is
+  missing** — pass `--allow-missing-deno` to skip deliberately. Runs `--frozen` against
+  the committed `supabase/functions/deno.lock`, so remote dependency versions are
+  reproducible; regenerate the lock by running the check without `--frozen`.
 - Deno type-checks with `strict` on by default, which is stricter than the app project
 - Deployment: Via Supabase CLI (`npx supabase functions deploy <name>`)
 - Secrets: Managed via `npx supabase secrets set KEY=VALUE`

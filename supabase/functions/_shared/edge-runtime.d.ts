@@ -2,7 +2,7 @@
  * Ambient declarations for globals the Supabase Edge Runtime injects but that are
  * not part of Deno's own type libraries.
  *
- * Loaded via `compilerOptions.types` in `supabase/functions/deno.json` so every
+ * Loaded via `compilerOptions.types` in `supabase/functions/deno.check.json` so every
  * function sees them without a per-file `/// <reference>`.
  */
 

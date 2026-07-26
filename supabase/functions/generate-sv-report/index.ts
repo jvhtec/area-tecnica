@@ -36,11 +36,14 @@ serve(async (req) => {
       },
     )
   } catch (error) {
+    // Log the detail server-side; return a generic message so error internals are not
+    // exposed to the caller (CodeQL: information exposure through a stack trace).
+    console.error('generate-sv-report failed:', error)
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
-      { 
+      JSON.stringify({ error: 'Failed to generate SoundVision report' }),
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 500,
       },
     )
   }

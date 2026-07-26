@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { joinedMany } from "../_shared/joins.ts";
 
 function readPositiveIntEnv(name: string, fallback: number) {
   const raw = Deno.env.get(name);
@@ -282,11 +283,11 @@ serve(async (req) => {
       const result = {
         jobs: filteredJobs.map((j: any) => {
           const depts: Dept[] = Array.from(
-            new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
+            new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(Boolean))
           );
 
           const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
-          (j.job_assignments ?? []).forEach((a: any) => {
+          joinedMany(j.job_assignments).forEach((a: any) => {
             if (a.sound_role) crewAssigned.sound++;
             if (a.lights_role) crewAssigned.lights++;
             if (a.video_role) crewAssigned.video++;
@@ -363,11 +364,11 @@ serve(async (req) => {
       const result = {
         jobs: filteredJobs.map((j: any) => {
           const depts: Dept[] = Array.from(
-            new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
+            new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(Boolean))
           );
 
           const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
-          (j.job_assignments ?? []).forEach((a: any) => {
+          joinedMany(j.job_assignments).forEach((a: any) => {
             if (a.sound_role) crewAssigned.sound++;
             if (a.lights_role) crewAssigned.lights++;
             if (a.video_role) crewAssigned.video++;
@@ -477,7 +478,7 @@ serve(async (req) => {
           jobType: j.job_type,
           start_time: j.start_time,
           end_time: j.end_time,
-          crew: (j.job_assignments ?? []).map((a: any) => {
+          crew: joinedMany(j.job_assignments).map((a: any) => {
             const dept: Dept | null = a.sound_role ? "sound" : a.lights_role ? "lights" : a.video_role ? "video" : null;
             const role = a.sound_role || a.lights_role || a.video_role || "assigned";
             const name = [a.profiles?.first_name, a.profiles?.last_name].filter(Boolean).join(" ") || "";
@@ -519,7 +520,7 @@ serve(async (req) => {
         jobs: filteredJobs.map((j: any) => ({
           id: j.id,
           title: j.title,
-          departments: Array.from(new Set<Dept>((j.job_departments ?? []).map((d: any) => d.department))).map((dept) => ({
+          departments: Array.from(new Set<Dept>(joinedMany(j.job_departments).map((d: any) => d.department))).map((dept) => ({
             dept,
             have: 0,
             need: 0,
@@ -560,9 +561,9 @@ serve(async (req) => {
       const items: { severity: "red" | "yellow"; text: string }[] = [];
 
       filteredJobs.forEach((j: any) => {
-        const depts: Dept[] = Array.from(new Set((j.job_departments ?? []).map((d: any) => d.department)));
+        const depts: Dept[] = Array.from(new Set(joinedMany(j.job_departments).map((d: any) => d.department)));
         const counts = { sound: 0, lights: 0, video: 0 } as Record<Dept, number>;
-        (j.job_assignments ?? []).forEach((a: any) => {
+        joinedMany(j.job_assignments).forEach((a: any) => {
           if (a.sound_role) counts.sound++;
           if (a.lights_role) counts.lights++;
           if (a.video_role) counts.video++;
@@ -594,7 +595,7 @@ serve(async (req) => {
         overdueJobs.forEach((j: any) => {
           const m = byJobTech.get(j.id) ?? new Map<string, string[]>();
           // Count technicians with no submitted/approved timesheets
-          const techIds = Array.from(new Set<string>((j.job_assignments ?? []).map((a: any) => a.technician_id)));
+          const techIds = Array.from(new Set<string>(joinedMany(j.job_assignments).map((a: any) => a.technician_id)));
           const missingCount = techIds.filter((tid) => {
             const statuses = m.get(tid) ?? [];
             return !statuses.some((s) => s === "submitted" || s === "approved");

@@ -45,8 +45,9 @@ export type BroadcastEventContext = {
   body: BroadcastBody;
   type: string;
   jobId?: string;
-  // Null when neither the body nor the job lookup supplied one; message builders
-  // already fall back to 'Trabajo'.
+  // Null when neither the body nor the job lookup supplied one. Each message builder
+  // decides what to do with that: the job and assignment builders fall back to
+  // 'Trabajo', while the festival and logistics builders omit the job label instead.
   jobTitle: string | null;
   jobDepartment: string | null;
   jobType: string | null;

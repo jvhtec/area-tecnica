@@ -10,9 +10,10 @@
  * Checks every function entrypoint plus every `_shared/` module (the latter so shared
  * code is covered even when no function currently imports it).
  *
- * Requires Deno on PATH, or DENO_BIN pointing at the binary. Skips with a clear
- * message when Deno is absent so local `npm run governance` does not hard-fail on
- * machines without it — CI installs Deno and therefore always enforces it.
+ * Requires Deno on PATH, or DENO_BIN pointing at the binary. Missing Deno is a
+ * FAILURE by default, so a `&&`-chained validation run or a release checklist can
+ * never report success without the functions having actually been checked. Pass
+ * `--allow-missing-deno` to opt out explicitly on a machine without Deno.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
@@ -27,14 +28,16 @@ const denoBin = process.env.DENO_BIN || "deno";
 const denoAvailable = spawnSync(denoBin, ["--version"], { encoding: "utf8" }).status === 0;
 
 if (!denoAvailable) {
-  const required = process.env.CI === "true" || process.argv.includes("--require-deno");
   const message =
     `Deno not found (tried '${denoBin}'). Install it from https://deno.land or set DENO_BIN.`;
-  if (required) {
+  // Fail closed: skipping silently would let `npm run governance` and the release
+  // checklist pass without any Edge Function having been type-checked.
+  if (!process.argv.includes("--allow-missing-deno")) {
     console.error(`FAIL: ${message}`);
+    console.error("Pass --allow-missing-deno to skip this check deliberately.");
     process.exit(1);
   }
-  console.warn(`SKIP: edge function type check — ${message}`);
+  console.warn(`SKIP (--allow-missing-deno): edge function type check — ${message}`);
   process.exit(0);
 }
 
@@ -67,7 +70,7 @@ console.log(`Type-checking ${entrypoints.length} edge function modules with Deno
 
 const result = spawnSync(
   denoBin,
-  ["check", "--config", configPath, ...entrypoints.map((path) => relative(repoRoot, path))],
+  ["check", "--frozen", "--config", configPath, ...entrypoints.map((path) => relative(repoRoot, path))],
   { cwd: repoRoot, stdio: "inherit" },
 );
 

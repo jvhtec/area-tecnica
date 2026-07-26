@@ -131,7 +131,7 @@ async function getMorningSummaryDataForDepartment(
   // Source of truth: timesheets (NOT job_assignments), which matches the Personal agenda.
   // Important: do NOT filter by job.start_time here — multi-day jobs may have a start_time on a
   // different day, but the technician is still working today if they have an active timesheet row.
-  const { data: assignmentsRows } = await client
+  const { data: assignmentsRows, error: assignmentsError } = await client
     .from('timesheets')
     .select(`
       technician_id,
@@ -144,11 +144,13 @@ async function getMorningSummaryDataForDepartment(
     .eq('profile.role', 'house_tech')
     .eq('profile.warehouse_duty_exempt', false)
     .returns<MorningSummaryAssignment[]>();
-  // Supabase returns `data: null` on error, which a destructuring default never catches.
+  // Fail loudly: `data` is null on error, so a bare `?? []` would send a "successful"
+  // morning summary that silently omits everyone.
+  if (assignmentsError) throw assignmentsError;
   const assignments: MorningSummaryAssignment[] = assignmentsRows ?? [];
 
   // 2) Get today's unavailability for this department (primary source)
-  const { data: unavailableRows } = await client
+  const { data: unavailableRows, error: unavailableError } = await client
     .from('availability_schedules')
     .select(`
       user_id,
@@ -161,17 +163,19 @@ async function getMorningSummaryDataForDepartment(
     .eq('profile.role', 'house_tech')
     .eq('profile.warehouse_duty_exempt', false)
     .returns<MorningSummaryUnavailable[]>();
+  if (unavailableError) throw unavailableError;
   const unavailable: MorningSummaryUnavailable[] = unavailableRows ?? [];
   const unavailableHouseOnly: MorningSummaryUnavailable[] = [...unavailable];
 
   // 3) Get all house techs in department (population)
-  const { data: allTechsRows } = await client
+  const { data: allTechsRows, error: allTechsError } = await client
     .from('profiles')
     .select('id, first_name, last_name, nickname')
     .eq('department', department)
     .eq('role', 'house_tech')
     .eq('warehouse_duty_exempt', false)
     .returns<MorningSummaryTech[]>();
+  if (allTechsError) throw allTechsError;
   const allTechs: MorningSummaryTech[] = allTechsRows ?? [];
 
   // 4) Legacy fallback: include legacy table marks (technician_availability)
