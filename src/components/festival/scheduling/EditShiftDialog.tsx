@@ -118,12 +118,15 @@ export const EditShiftDialog = ({
             )}
           </div>
 
-          <ShiftTimeCalculator 
-            jobId={shift.job_id} 
-            date={shift.date} 
-            stage={watchedStage ? parseInt(watchedStage) : undefined}
-            onApplyTimes={handleApplyCalculatedTimes}
-          />
+          {/* The calculator derives times from the job's schedule, so it needs a job. */}
+          {shift.job_id && (
+            <ShiftTimeCalculator
+              jobId={shift.job_id}
+              date={shift.date}
+              stage={watchedStage ? parseInt(watchedStage) : undefined}
+              onApplyTimes={handleApplyCalculatedTimes}
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

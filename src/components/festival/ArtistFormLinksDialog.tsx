@@ -16,7 +16,7 @@ import { buildReadableFilename } from "@/utils/fileName";
 
 /** `festival_artists.stage` is nullable; group those artists explicitly rather than hiding them. */
 const formatStageLabel = (stage: number | null) =>
-  stage === null ? "Sin escenario" : `Stage ${stage}`;
+  stage === null ? "Sin escenario" : `Escenario ${stage}`;
 
 interface ArtistLinkData {
   artistId: string;
@@ -435,12 +435,12 @@ export const ArtistFormLinksDialog = ({
                       disabled={isGeneratingBlankPdf}
                     >
                       <Printer className="h-4 w-4 mr-2" />
-                      Plantilla Stage
+                      Plantilla de Escenario
                     </Button>
                   )}
                   <Button variant="outline" size="sm" onClick={() => copyStageLinks(stage)}>
                     <Copy className="h-4 w-4 mr-2" />
-                    Copiar Enlaces del Stage
+                    Copiar Enlaces del Escenario
                   </Button>
                 </div>
               </div>

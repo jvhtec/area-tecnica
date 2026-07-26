@@ -69,6 +69,11 @@ export const ManageAssignmentsDialog = ({
   const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError } = useQuery({
     queryKey: queryKeys.scope("job-technicians", shift.job_id, shift.department),
     queryFn: async () => {
+      // `festival_shifts.job_id` is nullable. A shift with no job has no crew to draw from,
+      // and `.eq("job_id", null)` is not an IS NULL filter in PostgREST — it would send
+      // `job_id=eq.null` and match nothing useful.
+      if (!shift.job_id) return [];
+
       const departmentFilter = shift.department || "sound";
       
       // First, get assigned technicians for this job and department
