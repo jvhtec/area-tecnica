@@ -77,7 +77,7 @@ interface LogisticsEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedDate?: Date;
-  selectedEvent?: LogisticsCalendarEvent;
+  selectedEvent?: LogisticsCalendarEvent | null;
   // Optional initial values when creating a new event
   initialJobId?: string | null;
   initialDepartments?: Department[];

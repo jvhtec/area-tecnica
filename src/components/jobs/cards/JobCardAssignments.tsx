@@ -103,13 +103,16 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
     let roleCode: string | null = null;
     switch (department) {
       case 'sound':
-        roleCode = assignment.sound_role; break;
+        roleCode = assignment.sound_role ?? null;
+        break;
       case 'lights':
-        roleCode = assignment.lights_role; break;
+        roleCode = assignment.lights_role ?? null;
+        break;
       case 'video':
-        roleCode = assignment.video_role; break;
+        roleCode = assignment.video_role ?? null;
+        break;
       default:
-        roleCode = assignment.sound_role || assignment.lights_role || assignment.video_role;
+        roleCode = assignment.sound_role ?? assignment.lights_role ?? assignment.video_role ?? null;
     }
     if (!roleCode) continue;
 

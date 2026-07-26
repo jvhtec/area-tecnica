@@ -44,6 +44,7 @@ export type JobProfileRef = {
   nickname?: string | null;
   last_name?: string | null;
   department?: string | null;
+  profile_picture_url?: string | null;
   [key: string]: unknown;
 };
 

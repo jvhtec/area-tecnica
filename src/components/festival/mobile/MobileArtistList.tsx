@@ -3,8 +3,7 @@ import { MobileArtistCard, type MobileArtistRiderFile, type MobileConfigCategory
 import { MobileArtistConfigEditor, ReadOnlyArtistCategoryContent } from "./MobileArtistConfigEditor";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
-import type { WavesModelSelection } from '@/constants/wavesModels';
+import type { Artist } from "@/components/festival/artistTableTypes";
 
 const CATEGORY_TITLES: Record<MobileConfigCategory, string> = {
   consoles: "Consolas",
@@ -15,64 +14,6 @@ const CATEGORY_TITLES: Record<MobileConfigCategory, string> = {
   notes: "Notas",
   rider: "Riders",
 };
-
-interface Artist {
-  id: string;
-  name: string;
-  stage: number;
-  date: string;
-  show_start: string;
-  show_end: string;
-  soundcheck: boolean;
-  soundcheck_start?: string;
-  soundcheck_end?: string;
-  foh_console: string;
-  foh_console_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_console: string;
-  mon_console_provided_by?: 'festival' | 'band' | 'mixed';
-  monitors_from_foh?: boolean;
-  foh_waves_models?: WavesModelSelection[];
-  foh_outboard?: string;
-  mon_waves_models?: WavesModelSelection[];
-  mon_outboard?: string;
-  wireless_systems: WirelessSystem[];
-  wireless_provided_by?: 'festival' | 'band' | 'mixed';
-  iem_systems: IEMSystem[];
-  iem_provided_by?: 'festival' | 'band' | 'mixed';
-  monitors_enabled: boolean;
-  monitors_quantity: number;
-  extras_sf: boolean;
-  extras_df: boolean;
-  extras_djbooth: boolean;
-  extras_wired?: string;
-  notes?: string;
-  rider_missing?: boolean;
-  rider_copied_from_date?: string | null;
-  rider_outdated?: boolean;
-  rider_outdated_dismissed?: boolean;
-  foh_tech?: boolean;
-  mon_tech?: boolean;
-  isaftermidnight?: boolean;
-  mic_kit?: 'festival' | 'band' | 'mixed';
-  wired_mics?: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }>;
-  job_id?: string;
-  infra_cat6?: boolean;
-  infra_cat6_quantity?: number;
-  infra_hma?: boolean;
-  infra_hma_quantity?: number;
-  infra_coax?: boolean;
-  infra_coax_quantity?: number;
-  infra_opticalcon_duo?: boolean;
-  infra_opticalcon_duo_quantity?: number;
-  infra_analog?: number;
-  other_infrastructure?: string;
-  infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
-  artist_submitted?: boolean;
-  stage_plot_file_path?: string | null;
-  stage_plot_file_name?: string | null;
-  stage_plot_file_type?: string | null;
-  stage_plot_uploaded_at?: string | null;
-}
 
 interface MobileArtistListProps {
   artists: Artist[];

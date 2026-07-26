@@ -110,7 +110,7 @@ export class WallboardApi {
   private async request<T>(path: string): Promise<T> {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      const headers = this.token ? { "x-wallboard-jwt": this.token } : {};
+      const headers: Record<string, string> = this.token ? { "x-wallboard-jwt": this.token } : {};
       const { data, error } = await supabase.functions.invoke('wallboard-feed', {
         body: { path },
         headers,

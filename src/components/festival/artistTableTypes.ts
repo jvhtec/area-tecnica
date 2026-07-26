@@ -1,5 +1,12 @@
 import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
 import type { WavesModelSelection } from '@/constants/wavesModels';
+
+/**
+ * Canonical shape of a `festival_artists` row across the festival UI — the table view
+ * and the mobile views (`MobileArtistList` / `MobileArtistCard` / `MobileArtistConfigEditor`)
+ * all share it. Do not re-declare a local `Artist` interface in those components: divergent
+ * copies are structurally incompatible under `strictFunctionTypes`.
+ */
 export interface Artist {
   id: string;
   name: string;
@@ -37,6 +44,7 @@ export interface Artist {
   extras_sf: boolean;
   extras_df: boolean;
   extras_djbooth: boolean;
+  extras_wired?: string;
   notes?: string;
   rider_missing?: boolean;
   rider_copied_from_date?: string | null;
