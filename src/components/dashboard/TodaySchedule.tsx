@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
-import { isFestivalLikeJobType } from "@/utils/jobType";
+import { isFestivalLikeJobType, isKnownJobType } from "@/utils/jobType";
 import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
-import type { Department } from "@/types/department";
+import { ALL_DEPARTMENTS, type Department } from "@/types/department";
 
 /**
  * `TodaySchedule` is fed either job rows directly or assignment rows that wrap the
@@ -15,10 +15,23 @@ export type TodayScheduleEntry = Partial<JobCardJob> & {
   jobs?: JobCardJob | null;
 };
 
+const isJobCardJob = (job: Partial<JobCardJob>): job is JobCardJob =>
+  typeof job.id === "string" &&
+  typeof job.title === "string" &&
+  typeof job.start_time === "string" &&
+  typeof job.end_time === "string" &&
+  typeof job.created_at === "string" &&
+  isKnownJobType(job.job_type);
+
+const isDepartment = (value: unknown): value is Department =>
+  typeof value === "string" && (ALL_DEPARTMENTS as readonly string[]).includes(value);
+
+const resolveDepartment = (...candidates: unknown[]): Department =>
+  candidates.find(isDepartment) ?? "sound";
 
 interface TodayScheduleProps {
   jobs: TodayScheduleEntry[];
-  onEditClick: (job: any) => void;
+  onEditClick: (job: JobCardJob) => void;
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
   userRole: string | null;
@@ -91,38 +104,40 @@ export const TodaySchedule = ({
     );
   }
 
+  const jobCards = jobs.map((entry) => {
+    if (import.meta.env.DEV) {
+      console.log("Rendering job in TodaySchedule:", entry);
+    }
+
+    const job = entry.jobs ?? entry;
+    if (!isJobCardJob(job)) {
+      if (import.meta.env.DEV) {
+        console.warn("TodaySchedule entry is missing required job fields:", entry);
+      }
+      return null;
+    }
+
+    return (
+      <JobCardNew
+        key={job.id}
+        job={job}
+        onEditClick={onEditClick}
+        onDeleteClick={onDeleteClick}
+        onJobClick={onJobClick}
+        userRole={userRole}
+        department={resolveDepartment(department, entry.department, job.department)}
+        hideTasks={hideTasks}
+        showManageArtists={isFestivalLikeJobType(job.job_type)}
+        detailsOnlyMode={detailsOnlyMode}
+        selectedDate={selectedDate}
+      />
+    );
+  });
+
   if (viewMode === "sidebar") {
     return (
       <div className="flex flex-col gap-3">
-        {jobs.map(job => {
-          // An entry is either a job row or an assignment row wrapping one; once
-          // unwrapped it is a full job either way.
-          const jobData = (job.jobs ?? job) as JobCardJob;
-          const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
-
-          if (!jobId) return null;
-
-          let isFestivalJob = false;
-          if (typeof jobData === 'object' && 'job_type' in jobData) {
-            isFestivalJob = isFestivalLikeJobType(jobData.job_type);
-          }
-
-          return (
-            <JobCardNew
-              key={jobId}
-              job={jobData}
-              onEditClick={onEditClick}
-              onDeleteClick={onDeleteClick}
-              onJobClick={onJobClick}
-              userRole={userRole}
-              department={(department || job.department || jobData.department || "sound") as Department}
-              hideTasks={hideTasks}
-              showManageArtists={isFestivalJob}
-              detailsOnlyMode={detailsOnlyMode}
-              selectedDate={selectedDate}
-            />
-          );
-        })}
+        {jobCards}
       </div>
     );
   }
@@ -134,55 +149,7 @@ export const TodaySchedule = ({
       </CardHeader>
       <CardContent className="p-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {jobs.map(job => {
-            if (import.meta.env.DEV) {
-              console.log("Rendering job in TodaySchedule:", job);
-            }
-            // An entry is either a job row or an assignment row wrapping one; once
-          // unwrapped it is a full job either way.
-          const jobData = (job.jobs ?? job) as JobCardJob;
-            const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
-
-            if (!jobId) {
-              if (import.meta.env.DEV) {
-                console.warn("Job is missing ID:", job);
-              }
-              return null;
-            }
-
-            // Check if this is a festival job
-            let isFestivalJob = false;
-
-            if (typeof jobData === 'object') {
-              if ('job_type' in jobData) {
-                isFestivalJob = isFestivalLikeJobType(jobData.job_type);
-              }
-            }
-
-            if (import.meta.env.DEV) {
-              console.log("Is festival job check for:", {
-                jobId,
-                isFestivalJob,
-                jobType: jobData?.job_type
-              });
-            }
-
-            return (
-              <JobCardNew
-                key={jobId}
-                job={jobData}
-                onEditClick={onEditClick}
-                onDeleteClick={onDeleteClick}
-                onJobClick={onJobClick}
-                userRole={userRole}
-                department={(department || job.department || jobData.department || "sound") as Department}
-                hideTasks={hideTasks}
-                showManageArtists={isFestivalJob}
-                detailsOnlyMode={detailsOnlyMode}
-                selectedDate={selectedDate}
-              />
-            );
-          })}
+          {jobCards}
         </div>
       </CardContent>
     </Card>
