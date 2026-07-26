@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { supabase } from '@/lib/supabase';
-import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
+import { getScheduledWorkDateKeys, type TourDateLike } from '@/utils/assignmentWorkDates';
 import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
 import type { JobDocument } from '@/types/job';
@@ -74,7 +74,7 @@ export type OptimizedJobCardJob = {
   start_time?: string | null;
   end_time?: string | null;
   job_type?: string | null;
-  tour_date?: unknown;
+  tour_date?: TourDateLike | TourDateLike[] | null;
   job_assignments?: JobAssignmentForCard[] | null;
   job_documents?: JobDocumentRow[] | null;
   job_date_types?: JobDateTypeForCard[] | null;

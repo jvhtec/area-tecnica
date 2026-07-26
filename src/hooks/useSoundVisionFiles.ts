@@ -5,6 +5,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { isPresent } from '@/utils/typeGuards';
 export interface SoundVisionFile {
   id: string;
   venue_id: string;
@@ -88,8 +89,8 @@ export const useSoundVisionFiles = (
       const currentUserId = user?.id ?? null;
 
       // Get uploader info separately since uploaded_by references auth.users
-      const uploaderIds = [...new Set(filesData.map(f => f.uploaded_by))];
-      let profilesData: { id: string; first_name: string; last_name: string }[] = [];
+      const uploaderIds = [...new Set(filesData.map(f => f.uploaded_by))].filter(isPresent);
+      let profilesData: { id: string; first_name: string | null; last_name: string | null }[] = [];
 
       if (uploaderIds.length > 0) {
         const { data } = await supabase
@@ -148,7 +149,8 @@ export const useSoundVisionFiles = (
       // Combine data
       const filesWithUploaders = filesData.map(file => ({
         ...file,
-        uploader: profilesMap.get(file.uploaded_by) || { first_name: '', last_name: '' },
+        uploader: (file.uploaded_by ? profilesMap.get(file.uploaded_by) : undefined)
+          ?? { first_name: '', last_name: '' },
         hasReviewed: userReviewsMap.has(file.id),
         hasDownloaded: userDownloadsMap.has(file.id),
         lastDownloadedAt: userDownloadsMap.get(file.id) ?? null,
@@ -181,9 +183,10 @@ export const useSoundVisionFiles = (
         );
       }
 
-      if (filters?.fileType) {
+      const fileTypeFilter = filters?.fileType;
+      if (fileTypeFilter) {
         filteredData = filteredData.filter(
-          (file) => file.file_type === filters.fileType.replace('.', '')
+          (file) => file.file_type === fileTypeFilter.replace('.', '')
         );
       }
 

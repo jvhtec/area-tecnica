@@ -139,7 +139,11 @@ interface FetchMatrixTimesheetArgs {
   endDate?: Date;
 }
 
-type SupabaseQueryResult<TData> = PromiseLike<{ data: TData; error: { message?: string; code?: string } | null }>;
+// `data` is null on a PostgREST failure, which is exactly when `error` is set.
+type SupabaseQueryResult<TData> = PromiseLike<{
+  data: TData | null;
+  error: { message?: string; code?: string } | null;
+}>;
 
 interface TimesheetAssignmentRow {
   job_id: string;

@@ -9,6 +9,7 @@ export function useTourRatesApproval(tourId?: string) {
     queryKey: queryKeys.scope('tour-rates-approval', tourId),
     enabled: !!tourId,
     queryFn: async () => {
+      if (!tourId) return null;
       const { data, error } = await supabase
         .from('tours')
         .select('id, rates_approved, rates_approved_at, rates_approved_by')

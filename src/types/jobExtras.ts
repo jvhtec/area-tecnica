@@ -9,8 +9,9 @@ export interface JobExtra {
   extra_type: JobExtraType;
   quantity: number;
   status?: 'pending' | 'approved' | 'rejected';
-  amount_override_eur?: number;
-  updated_by?: string;
+  // Nullable to match the `job_extras` columns.
+  amount_override_eur?: number | null;
+  updated_by?: string | null;
   updated_at: string;
 }
 
@@ -49,7 +50,7 @@ export interface JobPayoutTotals {
   extras_breakdown: JobExtrasBreakdown;
   expenses_breakdown: JobExpenseBreakdownItem[];
   vehicle_disclaimer: boolean;
-  vehicle_disclaimer_text?: string;
+  vehicle_disclaimer_text?: string | null;
   payout_approved?: boolean;
   prep_days_total_eur?: number;
 

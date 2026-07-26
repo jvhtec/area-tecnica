@@ -128,7 +128,9 @@ export function useLogRateActivity() {
     mutationFn: async ({ profileId, profileName }: { profileId: string; profileName: string }) => {
       const { error } = await supabase.rpc('log_activity', {
         _code: 'settings.house_rate.updated',
-        _job_id: null,
+        // `log_activity._job_id` is a nullable uuid (settings changes are not job-scoped);
+        // the generated types do not model argument nullability.
+        _job_id: null as unknown as string,
         _entity_type: 'profile',
         _entity_id: profileId,
         _payload: { profile_name: profileName },

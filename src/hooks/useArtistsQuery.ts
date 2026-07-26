@@ -31,6 +31,8 @@ export const useArtistsQuery = (
   const { searchAllDates = false } = options;
 
   const fetchArtistsOnline = async () => {
+    // The query is only `enabled` with a jobId; guard so the id is narrowed here too.
+    if (!jobId) return [];
     let query = supabase
       .from("festival_artists")
       .select(`
