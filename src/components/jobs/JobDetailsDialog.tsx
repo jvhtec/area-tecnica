@@ -28,6 +28,7 @@ import type { JobDocument } from "@/types/job";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { normalizeProfile, type JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
 
 interface JobDetailsDialogProps {
@@ -115,10 +116,11 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   const expenseTechnicianOptions = useMemo(() => {
     const map = new Map<string, string>();
-    (jobDetails?.job_assignments ?? []).forEach((assignment: any) => {
+    (jobDetails?.job_assignments ?? []).forEach((assignment: JobAssignmentForCard) => {
       const techId = assignment.technician_id;
       if (!techId || map.has(techId)) return;
-      const name = [assignment.profiles?.first_name, assignment.profiles?.last_name].filter(Boolean).join(" ").trim();
+      const techProfile = normalizeProfile(assignment.profiles);
+      const name = [techProfile?.first_name, techProfile?.last_name].filter(Boolean).join(" ").trim();
       map.set(techId, name || techId);
     });
     (jobDetails?.timesheets ?? []).forEach((row: any) => {
@@ -132,9 +134,9 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   const visibleFinancialTechnicianIds = useMemo(() => {
     const assignmentTechnicians = (jobDetails?.job_assignments ?? [])
-      .map((assignment: any) => ({
+      .map((assignment: JobAssignmentForCard) => ({
         id: assignment.technician_id as string,
-        department: assignment.profiles?.department as string | null | undefined,
+        department: normalizeProfile(assignment.profiles)?.department,
       }))
       .filter((assignment: { id?: string }) => Boolean(assignment.id));
 

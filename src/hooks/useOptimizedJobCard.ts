@@ -83,7 +83,12 @@ export type OptimizedJobCardJob = {
   [key: string]: unknown;
 };
 
-const normalizeProfile = (profile: JobProfileRef | JobProfileRef[] | null | undefined): JobProfileRef | null =>
+/**
+ * PostgREST returns an embedded `profiles` relation as an object or an array depending
+ * on how it resolves the relationship; reading a column straight off the array silently
+ * yields `undefined`. Normalize before use.
+ */
+export const normalizeProfile = (profile: JobProfileRef | JobProfileRef[] | null | undefined): JobProfileRef | null =>
   Array.isArray(profile) ? (profile[0] ?? null) : (profile ?? null);
 
 const getErrorMessage = (error: unknown): string =>

@@ -11,6 +11,7 @@ import { PreventiveResourceSelector } from "@/components/jobs/job-details-dialog
 import { labelForCode } from "@/utils/roles";
 import { isPreventiveResourceForJob } from "@/utils/preventiveResource";
 import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
+import { normalizeProfile, type JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
 
@@ -34,8 +35,8 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({
     if (!normalizedDepartment) {
       return assignments;
     }
-    return assignments.filter((assignment: any) => {
-      const profileDept = assignment.profiles?.department?.toLowerCase?.();
+    return assignments.filter((assignment: JobAssignmentForCard) => {
+      const profileDept = normalizeProfile(assignment.profiles)?.department?.toLowerCase?.();
       if (profileDept === normalizedDepartment) {
         return true;
       }
@@ -70,8 +71,8 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({
 
   const scheduledWorkDateKeys = useMemo(() => getScheduledWorkDateKeys(jobDetails), [jobDetails]);
 
-  const assignmentsWithDates = useMemo<Array<{ assignment: any; workDateKeys: string[] }>>(() => (
-    filteredAssignments.map((assignment: any) => ({
+  const assignmentsWithDates = useMemo<Array<{ assignment: JobAssignmentForCard; workDateKeys: string[] }>>(() => (
+    filteredAssignments.map((assignment: JobAssignmentForCard) => ({
       assignment,
       workDateKeys: resolveAssignmentWorkDateKeys(assignment, {
         timesheetDateKeys: technicianDatesMap.get(assignment.technician_id),
@@ -113,32 +114,34 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({
           </div>
         ) : assignmentsWithDates.length > 0 ? (
           <div className="space-y-3">
-            {assignmentsWithDates.map(({ assignment, workDateKeys }) => (
+            {assignmentsWithDates.map(({ assignment, workDateKeys }) => {
+              const profile = normalizeProfile(assignment.profiles);
+              return (
               <div
                 key={assignment.technician_id}
                 className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 p-3 bg-muted rounded min-w-0"
               >
                 <div className="min-w-0 flex-1 flex items-center gap-3 md:min-w-[200px]">
                   <Avatar className="h-10 w-10 shrink-0">
-                    {assignment.profiles?.profile_picture_url && (
+                    {profile?.profile_picture_url && (
                       <AvatarImage
-                        src={assignment.profiles.profile_picture_url}
-                        alt={`${assignment.profiles.first_name} ${assignment.profiles.last_name}`}
+                        src={String(profile.profile_picture_url)}
+                        alt={`${profile.first_name} ${profile.last_name}`}
                       />
                     )}
                     <AvatarFallback className="text-sm">
-                      {assignment.profiles
-                        ? `${assignment.profiles.first_name?.[0] || ""}${assignment.profiles.last_name?.[0] || ""}`.toUpperCase()
+                      {profile
+                        ? `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`.toUpperCase()
                         : "EX"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium break-words">
-                      {assignment.profiles
-                        ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
-                        : assignment.external_technician_name || "Desconocido"}
+                      {profile
+                        ? `${profile.first_name} ${profile.last_name}`
+                        : String(assignment.external_technician_name ?? "") || "Desconocido"}
                     </p>
-                    <p className="text-sm text-muted-foreground">{assignment.profiles?.department || "Externo"}</p>
+                    <p className="text-sm text-muted-foreground">{profile?.department || "Externo"}</p>
                     {workDateKeys.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {workDateKeys.map((dateKey) => (
@@ -178,7 +181,8 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8">

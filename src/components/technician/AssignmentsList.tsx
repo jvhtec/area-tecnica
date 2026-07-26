@@ -2,9 +2,10 @@ import { Button } from "@/components/ui/button";
 import { useAssignmentsListSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 import { AssignmentCard } from './AssignmentCard';
 import { RefreshCw } from 'lucide-react';
+import type { JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
 
 interface AssignmentsListProps {
-  assignments: any[];
+  assignments: JobAssignmentForCard[];
   loading: boolean;
   onRefresh: () => void;
   techName?: string;
@@ -37,7 +38,7 @@ export const AssignmentsList = ({ assignments = [], loading = false, onRefresh, 
   return (
     <div className="space-y-4">
       {assignments.map((assignment) => (
-        <AssignmentCard key={assignment.id || `${assignment.job_id}-${assignment.technician_id}`} assignment={assignment} techName={techName} />
+        <AssignmentCard key={String(assignment.id ?? `${assignment.job_id}-${assignment.technician_id}`)} assignment={assignment} techName={techName} />
       ))}
     </div>
   );

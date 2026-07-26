@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { normalizeProfile, type JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
 interface ManageAssignmentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -98,14 +99,11 @@ export const ManageAssignmentsDialog = ({
 
       // Filter by department and map to get just the profiles
       const filteredTechnicians = data
-        .filter((assignment: any) => 
-          assignment.profiles && 
-          assignment.profiles.department === departmentFilter
-        )
-        .map((assignment: any) => assignment.profiles);
+        .map((assignment: JobAssignmentForCard) => normalizeProfile(assignment.profiles))
+        .filter((profile) => profile?.department === departmentFilter);
 
       console.log(`Found ${filteredTechnicians.length} technicians assigned to job ${shift.job_id} for department ${departmentFilter}`);
-      return filteredTechnicians as Technician[];
+      return filteredTechnicians as unknown as Technician[];
     },
   });
 
