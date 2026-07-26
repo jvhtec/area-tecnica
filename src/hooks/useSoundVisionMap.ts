@@ -7,6 +7,7 @@ import { useVenues } from "@/hooks/useVenues";
 import { isManagementRole } from "@/utils/permissions";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { VenueGroup } from "@/components/soundvision/soundVisionMapModel";
+import { isPresent } from '@/utils/typeGuards';
 
 type Options = {
   activeVenueId: string | null;
@@ -65,7 +66,7 @@ export const useSoundVisionMap = ({ activeVenueId, city, country, drawerHeight, 
     const { data: venues } = useVenues();
     const cities = [...new Set(venues?.map((v) => v.city).filter(Boolean))].sort();
     const countries = [...new Set(venues?.map((v) => v.country).filter(Boolean))].sort();
-    const stateRegions = [...new Set(venues?.map((v) => v.state_region).filter(Boolean))].sort();
+    const stateRegions = [...new Set(venues?.map((v) => v.state_region))].filter(isPresent).sort();
 
     const hasActiveFilters = city || country || stateRegion || fileType || searchTerm;
     const isManagement = isManagementRole(profileRole);

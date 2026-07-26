@@ -4,7 +4,8 @@ import { Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface LaSessionImportButtonProps {
-  inputRef: RefObject<HTMLInputElement | null>;
+  // `RefObject<T>` (not `RefObject<T | null>`): React 18's `ref` prop only accepts the former.
+  inputRef: RefObject<HTMLInputElement>;
   isImporting: boolean;
   onImport: (file: File) => void;
 }

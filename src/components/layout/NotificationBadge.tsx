@@ -43,7 +43,7 @@ export const NotificationBadge = ({
         .select("id", { count: "exact", head: true })
         .eq("status", "unread")
 
-      if (isDepartmentManagementRole(userRole)) {
+      if (isDepartmentManagementRole(userRole) && userDepartment) {
         deptQuery = deptQuery.eq("department", userDepartment)
       } else if (userRole === "technician") {
         deptQuery = deptQuery.eq("sender_id", userId)

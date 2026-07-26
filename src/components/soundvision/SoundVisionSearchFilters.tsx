@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useVenues } from '@/hooks/useVenues';
+import { isPresent } from '@/utils/typeGuards';
 
 interface SoundVisionSearchFiltersProps {
   searchTerm: string;
@@ -42,7 +43,7 @@ export const SoundVisionSearchFilters = ({
   // Extract unique values for dropdowns
   const cities = [...new Set(venues?.map((v) => v.city).filter(Boolean))].sort();
   const countries = [...new Set(venues?.map((v) => v.country).filter(Boolean))].sort();
-  const stateRegions = [...new Set(venues?.map((v) => v.state_region).filter(Boolean))].sort();
+  const stateRegions = [...new Set(venues?.map((v) => v.state_region))].filter(isPresent).sort();
 
   const hasActiveFilters = city || country || stateRegion || fileType || searchTerm;
 

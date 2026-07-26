@@ -38,10 +38,13 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
         `)
         .order('created_at', { ascending: false });
 
-      if (isDepartmentManagementRole(userRole)) {
+      if (isDepartmentManagementRole(userRole) && userDepartment) {
         query.eq('department', userDepartment);
       } else {
-        query.eq('sender_id', await dataLayerClient.auth.getUser().then(res => res.data.user?.id));
+        const { data: authData } = await dataLayerClient.auth.getUser();
+        // No signed-in user means no messages to scope to.
+        if (!authData.user?.id) return [];
+        query.eq('sender_id', authData.user.id);
       }
 
       const { data, error } = await query;
