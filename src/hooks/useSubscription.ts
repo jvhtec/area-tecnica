@@ -3,6 +3,7 @@
 import { useTableSubscription, type TableSubscriptionStatus } from './useTableSubscription';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { useEffect, useMemo } from 'react';
+import type { SubscriptionQueryKey } from "@/lib/unified-subscription-support";
 
 // Export the useTableSubscription hook
 export { useTableSubscription };
@@ -11,7 +12,7 @@ export { useTableSubscription };
  * Hook for subscribing to related tables that should all invalidate the same query
  */
 export function useRelatedTablesSubscription(
-  queryKey: string | string[],
+  queryKey: SubscriptionQueryKey,
   tables: string[],
   schema: string = 'public',
   priority: 'high' | 'medium' | 'low' = 'medium'
@@ -64,7 +65,7 @@ export function useRelatedTablesSubscription(
 export function useMultiTableSubscription(
   tables: Array<{ 
     table: string, 
-    queryKey: string | string[],
+    queryKey: SubscriptionQueryKey,
     priority?: 'high' | 'medium' | 'low'
   }>
 ) {

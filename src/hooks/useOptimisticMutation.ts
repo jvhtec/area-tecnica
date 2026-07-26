@@ -20,9 +20,10 @@ export function useOptimisticMutation<
   options: {
     queryKey: string | string[];
     optimisticUpdate?: (variables: TVariables, oldData: any) => any;
-    onSuccess?: (data: TData, variables: TVariables, context: MutationContext) => void;
-    onError?: (error: TError, variables: TVariables, context: MutationContext) => void;
-    onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: MutationContext) => void;
+    // React Query passes `undefined` for the context when `onMutate` never ran (or threw).
+    onSuccess?: (data: TData, variables: TVariables, context: MutationContext | undefined) => void;
+    onError?: (error: TError, variables: TVariables, context: MutationContext | undefined) => void;
+    onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: MutationContext | undefined) => void;
   }
 ) {
   const queryClient = useQueryClient();
@@ -50,8 +51,10 @@ export function useOptimisticMutation<
     },
     
     onError: (error, variables, context) => {
-      // Rollback to previous data on error
-      queryClient.setQueryData(normalizedQueryKey, context.previousData);
+      // Rollback to previous data on error (no context means the snapshot never happened)
+      if (context) {
+        queryClient.setQueryData(normalizedQueryKey, context.previousData);
+      }
       
       // Call the provided onError callback if any
       if (options.onError) {

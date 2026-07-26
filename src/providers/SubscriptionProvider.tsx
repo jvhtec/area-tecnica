@@ -16,6 +16,7 @@ import {
 } from "@/lib/unified-subscription-manager";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { isAdminRole } from "@/utils/permissions";
+import type { SubscriptionQueryKey } from "@/lib/unified-subscription-support";
 
 interface SubscriptionContextType {
   connectionStatus: "connected" | "disconnected" | "connecting";
@@ -28,7 +29,7 @@ interface SubscriptionContextType {
   lastRefreshTime: number;
   forceRefresh: (tables?: string[]) => void;
   forceSubscribe: (
-    tables: Array<{ table: string; queryKey: string | string[]; priority?: "high" | "medium" | "low" }>,
+    tables: Array<{ table: string; queryKey: SubscriptionQueryKey; priority?: "high" | "medium" | "low" }>,
   ) => void;
 }
 
@@ -63,7 +64,7 @@ const noopManager = {
   getSnapshot: () => noopSnapshot,
   reestablishSubscriptions: () => false,
   forceRefreshSubscriptions: () => {},
-  subscribeToTable: (table = "noop", queryKey: string | string[] = []) => ({
+  subscribeToTable: (table = "noop", queryKey: SubscriptionQueryKey = []) => ({
     key: "noop",
     unsubscribe: () => {},
     options: { table, queryKey, priority: "low" as const },
@@ -180,7 +181,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   );
 
   const forceSubscribe = useCallback(
-    (tables: Array<{ table: string; queryKey: string | string[]; priority?: "high" | "medium" | "low" }>) => {
+    (tables: Array<{ table: string; queryKey: SubscriptionQueryKey; priority?: "high" | "medium" | "low" }>) => {
       if (!tables || tables.length === 0) return;
       const names = tables.map((t) => t.table).join(", ");
       console.log(`Ensuring subscriptions for tables: ${names}`);

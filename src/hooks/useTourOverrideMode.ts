@@ -86,7 +86,9 @@ export const useTourOverrideMode = (
   const isOverrideMode = Boolean(tourId && tourDateId);
 
   useEffect(() => {
-    if (!isOverrideMode || !department) return;
+    // Narrow the optional args directly: `isOverrideMode` is a boolean, so it
+    // cannot prove `tourId`/`tourDateId` are defined further down.
+    if (!isOverrideMode || !tourId || !tourDateId || !department) return;
 
     const loadOverrideData = async () => {
       setIsLoading(true);

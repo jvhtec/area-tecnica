@@ -19,7 +19,7 @@ export type RealtimePayloadHandler = (payload: RealtimeChangePayload) => void | 
 
 export type SubscriptionOptions = {
   table: string;
-  queryKey: string | string[];
+  queryKey: SubscriptionQueryKey;
   filter?: RealtimeSubscriptionFilter;
   priority: SubscriptionPriority;
 };
@@ -57,7 +57,7 @@ export type SubscriptionDebugEntry = {
   key: string;
   ownerRoutes: string[];
   table: string;
-  queryKey: string[];
+  queryKey: unknown[];
   filter?: RealtimeSubscriptionFilter;
   priority: SubscriptionPriority;
   createdAt: number;
@@ -80,12 +80,19 @@ export type SubscriptionSnapshot = {
   lastHealthCheck: number;
 };
 
-export const normalizeQueryKey = (queryKey: string | string[]): string[] =>
-  Array.isArray(queryKey) ? queryKey : [queryKey];
+/**
+ * A React Query key as accepted by the subscription layer: either a bare scope string
+ * or a key array. Mirrors `QueryKey` (`readonly unknown[]`) so keys built by
+ * `queryKeys.scope(...)` — which may embed nullable ids — are accepted without casts.
+ */
+export type SubscriptionQueryKey = string | readonly unknown[];
+
+export const normalizeQueryKey = (queryKey: SubscriptionQueryKey): unknown[] =>
+  Array.isArray(queryKey) ? [...queryKey] : [queryKey];
 
 export const buildSubscriptionKey = (
   table: string,
-  queryKey: string | string[],
+  queryKey: SubscriptionQueryKey,
   filter?: RealtimeSubscriptionFilter,
 ): string => {
   const normalizedFilter = {
@@ -143,7 +150,7 @@ type ForceRefreshSubscriptionsOptions = {
   tableLastActivity: Map<string, number>;
   snapshotSubscription: (subscription: ManagedSubscription) => PendingManagedSubscription;
   replaySubscription: (subscription: PendingManagedSubscription) => void;
-  invalidateQuery: (queryKey: string[]) => void;
+  invalidateQuery: (queryKey: unknown[]) => void;
 };
 
 export const forceRefreshManagedSubscriptions = (

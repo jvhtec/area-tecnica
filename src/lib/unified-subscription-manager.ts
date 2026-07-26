@@ -18,6 +18,7 @@ import {
   type SubscribeToTableOptions,
   type SubscriptionDebugEntry,
   type SubscriptionPriority,
+  type SubscriptionQueryKey,
   type SubscriptionSnapshot,
 } from "@/lib/unified-subscription-support";
 
@@ -26,6 +27,7 @@ export type {
   RealtimePayloadHandler,
   RealtimeSubscriptionFilter,
   SubscriptionDebugEntry,
+  SubscriptionQueryKey,
   SubscriptionSnapshot,
 } from "@/lib/unified-subscription-support";
 
@@ -104,11 +106,11 @@ export class UnifiedSubscriptionManager {
     });
   }
 
-  private normalizeQueryKey(queryKey: string | string[]) {
+  private normalizeQueryKey(queryKey: SubscriptionQueryKey) {
     return normalizeQueryKey(queryKey);
   }
 
-  private getSubscriptionKey(table: string, queryKey: string | string[], filter?: RealtimeSubscriptionFilter) {
+  private getSubscriptionKey(table: string, queryKey: SubscriptionQueryKey, filter?: RealtimeSubscriptionFilter) {
     return buildSubscriptionKey(table, queryKey, filter);
   }
 
@@ -298,7 +300,7 @@ export class UnifiedSubscriptionManager {
     }
   }
 
-  private scheduleInvalidation(queryKey: string | string[], priority: 'high' | 'medium' | 'low') {
+  private scheduleInvalidation(queryKey: SubscriptionQueryKey, priority: 'high' | 'medium' | 'low') {
     const normalizedQueryKey = this.normalizeQueryKey(queryKey);
     const key = JSON.stringify(normalizedQueryKey);
 
@@ -450,7 +452,7 @@ export class UnifiedSubscriptionManager {
    */
   public subscribeToTable(
     table: string, 
-    queryKey: string | string[], 
+    queryKey: SubscriptionQueryKey, 
     filter?: RealtimeSubscriptionFilter,
     priority: SubscriptionPriority = 'medium',
     options: SubscribeToTableOptions = {},
@@ -685,7 +687,7 @@ export class UnifiedSubscriptionManager {
   public subscribeToTables(
     tableConfigs: Array<{
       table: string, 
-      queryKey: string | string[],
+      queryKey: SubscriptionQueryKey,
       filter?: RealtimeSubscriptionFilter,
       priority?: SubscriptionPriority
     }>
@@ -765,7 +767,7 @@ export class UnifiedSubscriptionManager {
   /**
    * Get subscription status for a specific table
    */
-  public getSubscriptionStatus(table: string, queryKey: string | string[]): { isConnected: boolean, lastActivity: number } {
+  public getSubscriptionStatus(table: string, queryKey: SubscriptionQueryKey): { isConnected: boolean, lastActivity: number } {
     const subscriptionKey = this.getSubscriptionKey(table, queryKey);
     
     const isConnected = this.subscriptions.has(subscriptionKey) && this.connectionStatus === 'connected';

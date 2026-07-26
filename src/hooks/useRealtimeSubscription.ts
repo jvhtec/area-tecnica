@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
+import type { SubscriptionQueryKey } from "@/lib/unified-subscription-support";
 
 type SubscriptionOptions = {
   table: string;
   schema?: string;
   event?: "INSERT" | "UPDATE" | "DELETE" | "*";
   filter?: string;
-  queryKey: string | string[];
+  queryKey: SubscriptionQueryKey;
 };
 
 /**
