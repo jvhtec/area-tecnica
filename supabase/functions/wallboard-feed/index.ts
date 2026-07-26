@@ -25,6 +25,16 @@ type AuthResult = {
 
 type Dept = "sound" | "lights" | "video";
 
+const DEPARTMENTS: readonly Dept[] = ["sound", "lights", "video"];
+
+/** The joined rows are `any`; annotations alone let null/unknown departments through. */
+const isDept = (value: unknown): value is Dept =>
+  typeof value === "string" && (DEPARTMENTS as readonly string[]).includes(value);
+
+/** Guards against null/non-string technician ids creating false missing-timesheet alerts. */
+const isTechnicianId = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
 type CacheEntry = {
   expiresAt: number;
   body: string;
@@ -283,7 +293,7 @@ serve(async (req) => {
       const result = {
         jobs: filteredJobs.map((j: any) => {
           const depts: Dept[] = Array.from(
-            new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(Boolean))
+            new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(isDept))
           );
 
           const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
@@ -364,7 +374,7 @@ serve(async (req) => {
       const result = {
         jobs: filteredJobs.map((j: any) => {
           const depts: Dept[] = Array.from(
-            new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(Boolean))
+            new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(isDept))
           );
 
           const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
@@ -520,7 +530,7 @@ serve(async (req) => {
         jobs: filteredJobs.map((j: any) => ({
           id: j.id,
           title: j.title,
-          departments: Array.from(new Set<Dept>(joinedMany(j.job_departments).map((d: any) => d.department))).map((dept) => ({
+          departments: Array.from(new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(isDept))).map((dept) => ({
             dept,
             have: 0,
             need: 0,
@@ -561,7 +571,7 @@ serve(async (req) => {
       const items: { severity: "red" | "yellow"; text: string }[] = [];
 
       filteredJobs.forEach((j: any) => {
-        const depts: Dept[] = Array.from(new Set(joinedMany(j.job_departments).map((d: any) => d.department)));
+        const depts: Dept[] = Array.from(new Set(joinedMany(j.job_departments).map((d: any) => d.department).filter(isDept)));
         const counts = { sound: 0, lights: 0, video: 0 } as Record<Dept, number>;
         joinedMany(j.job_assignments).forEach((a: any) => {
           if (a.sound_role) counts.sound++;
@@ -595,7 +605,7 @@ serve(async (req) => {
         overdueJobs.forEach((j: any) => {
           const m = byJobTech.get(j.id) ?? new Map<string, string[]>();
           // Count technicians with no submitted/approved timesheets
-          const techIds = Array.from(new Set<string>(joinedMany(j.job_assignments).map((a: any) => a.technician_id)));
+          const techIds = Array.from(new Set(joinedMany(j.job_assignments).map((a: any) => a.technician_id).filter(isTechnicianId)));
           const missingCount = techIds.filter((tid) => {
             const statuses = m.get(tid) ?? [];
             return !statuses.some((s) => s === "submitted" || s === "approved");

@@ -12,8 +12,23 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let payload: Record<string, unknown>
   try {
-    const { eventName, date, venue, details } = await req.json()
+    payload = await req.json()
+  } catch (error) {
+    // A malformed body is the caller's fault; keep it out of the 500 path below.
+    console.error('generate-sv-report received invalid JSON:', error)
+    return new Response(
+      JSON.stringify({ error: 'Invalid JSON body' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      },
+    )
+  }
+
+  try {
+    const { eventName, date, venue, details } = payload
 
     // Here you would implement the actual report generation logic
     // For now, we'll just return a success message

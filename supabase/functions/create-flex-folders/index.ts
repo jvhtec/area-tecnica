@@ -343,7 +343,7 @@ serve(async (req) => {
     const { tourId, createRootFolders, createDateFolders } = await req.json()
     
     if (!tourId) {
-      throw new Error('Tour ID is required')
+      throw new HttpError(400, 'Tour ID is required')
     }
 
     // Initialize Supabase client
@@ -638,11 +638,13 @@ serve(async (req) => {
     console.error("Error in create-flex-folders:", error)
     // Default to 500: nothing else in this function throws with a status, so a 400
     // fallback reported env/database failures as client errors and echoed their raw
-    // messages back. Only explicit HttpErrors now expose a message.
+    // messages back. Only explicit HttpErrors with exposeDetails surface their text.
     const status = getErrorStatus(error, 500);
-    const message = status >= 500
-      ? 'Internal server error'
-      : (error instanceof Error ? error.message : String(error));
+    // Only errors we constructed deliberately may surface their text. A Supabase or
+    // env failure that happens to carry a 4xx status still gets the generic message.
+    const message = error instanceof HttpError && error.exposeDetails
+      ? error.message
+      : 'Internal server error';
     return new Response(
       JSON.stringify({ error: message }),
       { 
