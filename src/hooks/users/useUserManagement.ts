@@ -37,7 +37,7 @@ export const useUserManagement = () => {
       console.error("Delete error:", error);
       toast({
         title: "Error",
-        description: "Failed to delete user: " + getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el usuario"),
         variant: "destructive",
       });
     }
@@ -69,7 +69,7 @@ export const useUserManagement = () => {
       console.error("Update error:", error);
       toast({
         title: "Error",
-        description: "Failed to update user: " + getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo actualizar el usuario"),
         variant: "destructive",
       });
     }

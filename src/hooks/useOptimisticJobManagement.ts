@@ -148,7 +148,7 @@ export const useOptimisticJobManagement = (
       });
       toast({
         title: "Error",
-        description: "Failed to delete document: " + getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el documento"),
         variant: "destructive"
       });
     }
@@ -190,7 +190,7 @@ export const useOptimisticJobManagement = (
       });
       toast({
         title: "Error deleting job",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive"
       });
       

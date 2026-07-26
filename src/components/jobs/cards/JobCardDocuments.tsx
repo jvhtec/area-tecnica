@@ -56,7 +56,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       } catch { /* best-effort push notification; ignore delivery failures */ }
     } catch (err) {
       console.error('Error toggling document visibility:', err);
-      alert(`Error al actualizar la visibilidad: ${getErrorMessage(err)}`);
+      alert(`Error al actualizar la visibilidad: ${getErrorMessage(err, 'Error desconocido')}`);
     }
   };
 

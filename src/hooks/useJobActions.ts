@@ -76,8 +76,8 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
     } catch (error) {
       console.error("useJobActions: Error in optimistic job deletion:", error);
       toast({
-        title: "Error deleting job",
-        description: getErrorMessage(error),
+        title: "Error al eliminar el trabajo",
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive"
       });
     } finally {
@@ -161,7 +161,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       console.error("useJobActions: Error creating flex folders:", error);
       toast({
         title: "Error",
-        description: getErrorMessage(error, "Failed to create Flex folders"),
+        description: getErrorMessage(error, "No se pudieron crear las carpetas de Flex"),
         variant: "destructive"
       });
     } finally {
@@ -280,7 +280,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       }
       toast({
         title: "Error",
-        description: getErrorMessage(error, "Failed to create local folder structure"),
+        description: getErrorMessage(error, "No se pudo crear la estructura de carpetas local"),
         variant: "destructive"
       });
     } finally {

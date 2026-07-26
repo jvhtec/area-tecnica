@@ -122,7 +122,11 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
       onOpenChange(false);
     } catch (err) {
       console.error('[RequestTourAvailability] Failed to send', err);
-      toast({ title: 'Failed to send', description: getErrorMessage(err, String(err)), variant: 'destructive' });
+      toast({
+        title: 'Error al enviar',
+        description: getErrorMessage(err, 'No se pudo enviar la solicitud de disponibilidad'),
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

@@ -35,7 +35,7 @@ export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
       setSuccess(true);
     } catch (err) {
       console.error('[ForgotPassword] Error:', err);
-      setError(getErrorMessage(err, "Failed to send password reset email. Please try again."));
+      setError(getErrorMessage(err, "No se pudo enviar el correo de recuperación. Inténtalo de nuevo."));
     }
   };
 

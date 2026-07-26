@@ -147,7 +147,7 @@ const Video = () => {
     } catch (error) {
       toast({
         title: "Error al eliminar el trabajo",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive",
       });
     }

@@ -145,7 +145,7 @@ export const useFestivalWhatsappActions = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: `Error al reintentar: ${getErrorMessage(error)}`,
+        description: `Error al reintentar: ${getErrorMessage(error, 'No se pudo reintentar la creación del grupo')}`,
         variant: "destructive",
       });
       await refreshWhatsappState();
@@ -165,7 +165,11 @@ export const useFestivalWhatsappActions = ({
       toast({ title: "Enviado", description: "Mensaje enviado a Almacén sonido." });
       setIsAlmacenDialogOpen(false);
     } catch (error) {
-      toast({ title: "Error", description: getErrorMessage(error, String(error)), variant: "destructive" });
+      toast({
+        title: "Error",
+        description: getErrorMessage(error, "No se pudo enviar el mensaje a Almacén"),
+        variant: "destructive",
+      });
     } finally {
       setIsSendingWa(false);
     }

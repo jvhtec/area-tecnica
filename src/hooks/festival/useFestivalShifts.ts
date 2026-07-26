@@ -124,7 +124,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
       console.error("Error in fetchShifts:", error);
       toast({
         title: "Error",
-        description: "Could not load shifts: " + getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudieron cargar los turnos"),
         variant: "destructive",
       });
       return [];

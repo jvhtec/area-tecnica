@@ -118,7 +118,11 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       toast({ title: 'Saved', description: `Linked ${dept} crew call` });
     } catch (e) {
       console.error('Save crew call error:', e);
-      toast({ title: 'Save failed', description: getErrorMessage(e, 'Unknown error'), variant: 'destructive' });
+      toast({
+        title: 'Error al guardar',
+        description: getErrorMessage(e, 'No se pudo guardar la convocatoria'),
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

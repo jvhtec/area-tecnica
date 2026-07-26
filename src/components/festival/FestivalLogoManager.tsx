@@ -62,7 +62,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
           }
         } catch (e) {
           console.error('Error getting logo public URL:', e);
-          setErrorDetails(`Failed to get logo URL: ${getErrorMessage(e)}`);
+          setErrorDetails(`No se pudo obtener la URL del logo: ${getErrorMessage(e, 'Error desconocido')}`);
         }
       } else {
         console.log("No logo found for festival job", jobId);
@@ -70,7 +70,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       }
     } catch (error) {
       console.error('Unexpected error in fetchExistingLogo:', error);
-      setErrorDetails(`Unexpected error: ${getErrorMessage(error)}`);
+      setErrorDetails(`Error inesperado: ${getErrorMessage(error, 'Error desconocido')}`);
     }
   }, [jobId]);
 

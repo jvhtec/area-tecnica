@@ -284,7 +284,7 @@ const Sound = () => {
       console.error("Error in optimistic job deletion:", error);
       toast({
         title: "Error al eliminar el trabajo",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "Error desconocido al eliminar el trabajo"),
         variant: "destructive"
       });
     }

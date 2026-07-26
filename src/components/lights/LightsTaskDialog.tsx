@@ -241,8 +241,8 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
       URL.revokeObjectURL(url);
     } catch (error) {
       toast({
-        title: "Download failed",
-        description: getErrorMessage(error),
+        title: "Error al descargar",
+        description: getErrorMessage(error, "No se pudo descargar el documento"),
         variant: "destructive",
       });
     }
@@ -285,8 +285,8 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
       refetchTasks();
     } catch (error) {
       toast({
-        title: "Delete failed",
-        description: getErrorMessage(error),
+        title: "Error al eliminar",
+        description: getErrorMessage(error, "No se pudo eliminar el documento"),
         variant: "destructive",
       });
     }
@@ -313,8 +313,8 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
       });
     } catch (error) {
       toast({
-        title: "Update failed",
-        description: getErrorMessage(error),
+        title: "Error al actualizar",
+        description: getErrorMessage(error, "No se pudo actualizar el estado de la tarea"),
         variant: "destructive",
       });
     }

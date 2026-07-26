@@ -118,7 +118,7 @@ export const BulkTourFolderActions = ({
           }
         } catch (error) {
           errorCount++;
-          errors.push(`${tour.name}: ${getErrorMessage(error)}`);
+          errors.push(`${tour.name}: ${getErrorMessage(error, 'Error desconocido')}`);
         }
       }
 

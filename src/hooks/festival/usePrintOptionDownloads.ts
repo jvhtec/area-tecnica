@@ -202,7 +202,7 @@ export const usePrintOptionDownloads = ({
     } catch (error) {
       console.error("Error generating Missing Rider Report:", error);
       toast.error(
-        `Error al generar Reporte de Riders Faltantes: ${getErrorMessage(error)}`
+        `Error al generar Reporte de Riders Faltantes: ${getErrorMessage(error, 'Error desconocido')}`
       );
     }
   };
@@ -267,7 +267,7 @@ export const usePrintOptionDownloads = ({
     } catch (error) {
       console.error("Error sending Missing Rider Report email:", error);
       toast.error(
-        `Error al enviar reporte de riders faltantes: ${getErrorMessage(error)}`
+        `Error al enviar reporte de riders faltantes: ${getErrorMessage(error, 'Error desconocido')}`
       );
     } finally {
       setIsSendingMissingRiderEmail(false);
@@ -322,7 +322,7 @@ export const usePrintOptionDownloads = ({
       toast.success("Equipamiento descargado exitosamente");
     } catch (error) {
       console.error("Error generating Gear Setup:", error);
-      toast.error(`Error al generar Equipamiento: ${getErrorMessage(error)}`);
+      toast.error(`Error al generar Equipamiento: ${getErrorMessage(error, 'Error desconocido')}`);
     }
   };
 
@@ -447,7 +447,7 @@ export const usePrintOptionDownloads = ({
       toast.success("Horarios de Turnos descargados exitosamente");
     } catch (error) {
       console.error("Error generating Shift Schedules:", error);
-      toast.error(`Error al generar Horarios de Turnos: ${getErrorMessage(error)}`);
+      toast.error(`Error al generar Horarios de Turnos: ${getErrorMessage(error, 'Error desconocido')}`);
     }
   };
 
@@ -542,7 +542,7 @@ export const usePrintOptionDownloads = ({
       toast.success("Tablas de Artistas descargadas exitosamente");
     } catch (error) {
       console.error("Error generating Artist Tables:", error);
-      toast.error(`Error al generar Tablas de Artistas: ${getErrorMessage(error)}`);
+      toast.error(`Error al generar Tablas de Artistas: ${getErrorMessage(error, 'Error desconocido')}`);
     }
   };
 
@@ -597,7 +597,7 @@ export const usePrintOptionDownloads = ({
       toast.success("Tabla de RF/IEM descargada exitosamente");
     } catch (error) {
       console.error("Error generating RF/IEM Table:", error);
-      toast.error(`Error al generar Tabla de RF/IEM: ${getErrorMessage(error)}`);
+      toast.error(`Error al generar Tabla de RF/IEM: ${getErrorMessage(error, 'Error desconocido')}`);
     }
   };
 
@@ -659,7 +659,7 @@ export const usePrintOptionDownloads = ({
     } catch (error) {
       console.error("Error generating Infrastructure Table:", error);
       toast.error(
-        `Error al generar Tabla de Infraestructura: ${getErrorMessage(error)}`
+        `Error al generar Tabla de Infraestructura: ${getErrorMessage(error, 'Error desconocido')}`
       );
     }
   };
@@ -719,7 +719,7 @@ export const usePrintOptionDownloads = ({
     } catch (error) {
       console.error("Error generating Wired Microphone Needs:", error);
       toast.error(
-        `Error al generar Necesidades de Micrófonos Cableados: ${getErrorMessage(error)}`
+        `Error al generar Necesidades de Micrófonos Cableados: ${getErrorMessage(error, 'Error desconocido')}`
       );
     }
   };

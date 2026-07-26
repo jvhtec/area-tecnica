@@ -181,7 +181,7 @@ export const FestivalScheduling = ({
       console.error("Error deleting shift:", error);
       toast({
         title: "Error",
-        description: `No se pudo eliminar el turno: ${getErrorMessage(error)}`,
+        description: `No se pudo eliminar el turno: ${getErrorMessage(error, 'Error desconocido')}`,
         variant: "destructive",
       });
     } finally {

@@ -142,7 +142,11 @@ export function TransportRequestDialog({
       onSubmitted?.();
       onOpenChange(false);
     } catch (error) {
-      toast({ title: 'Error', description: getErrorMessage(error, 'Failed to save request'), variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: getErrorMessage(error, 'No se pudo guardar la solicitud'),
+        variant: 'destructive',
+      });
     }
   };
 

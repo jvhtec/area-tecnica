@@ -194,7 +194,7 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
       console.error("Error adding date:", error);
       toast({
         title: "Error al añadir la fecha",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo crear la fecha de gira"),
         variant: "destructive",
       });
     }
@@ -405,7 +405,7 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
       console.error("Error editing date:", error);
       toast({
         title: "Error al editar la fecha",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo actualizar la fecha de gira"),
         variant: "destructive",
       });
     }

@@ -60,7 +60,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
           }
         } catch (e) {
           console.error('Error getting logo public URL:', e);
-          setErrorDetails(`Failed to get logo URL: ${getErrorMessage(e)}`);
+          setErrorDetails(`No se pudo obtener la URL del logo: ${getErrorMessage(e, 'Error desconocido')}`);
         }
       } else {
         console.log("No logo found for tour", tourId);
@@ -68,7 +68,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       }
     } catch (error) {
       console.error('Unexpected error in fetchExistingLogo:', error);
-      setErrorDetails(`Unexpected error: ${getErrorMessage(error)}`);
+      setErrorDetails(`Error inesperado: ${getErrorMessage(error, 'Error desconocido')}`);
     }
   }, [tourId]);
 
@@ -185,7 +185,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       });
     } catch (error) {
       console.error('Error uploading logo:', error);
-      const errorMessage = getErrorMessage(error, "Could not upload logo");
+      const errorMessage = getErrorMessage(error, "No se pudo subir el logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",
@@ -262,7 +262,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       }
     } catch (error) {
       console.error('Error deleting logo:', error);
-      const errorMessage = getErrorMessage(error, "Could not delete logo");
+      const errorMessage = getErrorMessage(error, "No se pudo eliminar el logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",

@@ -100,7 +100,7 @@ export const useFestivalAdminActions = ({
       }
     } catch (error) {
       console.error("Archive error", error);
-      setArchiveError(getErrorMessage(error, "Failed to archive"));
+      setArchiveError(getErrorMessage(error, "No se pudo archivar el trabajo"));
       toast({
         title: "Error al archivar",
         description: getErrorMessage(error, "Error al archivar"),
@@ -137,7 +137,7 @@ export const useFestivalAdminActions = ({
       });
     } catch (error) {
       console.error("Backfill error", error);
-      setBackfillMessage(getErrorMessage(error, "Backfill failed"));
+      setBackfillMessage(getErrorMessage(error, "No se pudo regenerar la documentación técnica"));
       toast({
         title: "Error al rellenar",
         description: getErrorMessage(error, "Error al rellenar"),

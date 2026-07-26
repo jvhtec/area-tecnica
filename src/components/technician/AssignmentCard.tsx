@@ -137,7 +137,11 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
       const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
       window.open(url, '_blank');
     } catch (err) {
-      toast({ title: 'Error', description: `No se pudo abrir el documento: ${getErrorMessage(err)}`, variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: `No se pudo abrir el documento: ${getErrorMessage(err, 'Error desconocido')}`,
+        variant: 'destructive',
+      });
     } finally {
       setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
     }
@@ -155,7 +159,11 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      toast({ title: 'Error', description: `No se pudo descargar el documento: ${getErrorMessage(err)}`, variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: `No se pudo descargar el documento: ${getErrorMessage(err, 'Error desconocido')}`,
+        variant: 'destructive',
+      });
     } finally {
       setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
     }

@@ -35,8 +35,13 @@ function stringifySafe(value: unknown): string {
     // Fall through to String(value)
   }
 
-  const text = String(value);
-  if (text && text !== '[object Object]') return text;
+  try {
+    const text = String(value);
+    if (text && text !== '[object Object]') return text;
+  } catch {
+    // Some thrown values have no prototype or define a throwing toString().
+  }
+
   return 'Unexpected error';
 }
 

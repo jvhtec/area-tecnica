@@ -128,7 +128,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
         }))
         setChangelog(filterRecentEntries(mapped))
       } catch (e) {
-        console.warn('Failed to load changelog', getErrorMessage(e, String(e)))
+        console.warn('Failed to load changelog', getErrorMessage(e, 'Error desconocido al cargar el registro de cambios'))
       }
     }
     if (isOpen) void load()
@@ -207,7 +207,11 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
       setSendBroadcast(false)
       toast({ title: sendBroadcast ? 'Changelog updated & broadcast sent' : 'Changelog updated' })
     } catch (e) {
-      toast({ title: 'Failed to save', description: getErrorMessage(e, String(e)), variant: 'destructive' })
+      toast({
+        title: 'Error al guardar',
+        description: getErrorMessage(e, 'No se pudo guardar la entrada'),
+        variant: 'destructive',
+      })
     }
   }
 
@@ -234,7 +238,11 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
       }
       toast({ title: 'Entrada eliminada' })
     } catch (e) {
-      toast({ title: 'No se pudo eliminar', description: getErrorMessage(e, String(e)), variant: 'destructive' })
+      toast({
+        title: 'No se pudo eliminar',
+        description: getErrorMessage(e, 'No se pudo eliminar la entrada'),
+        variant: 'destructive',
+      })
     }
   }
 
@@ -268,7 +276,11 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
         toast({ title: 'Entry created' })
       }
     } catch (e) {
-      toast({ title: 'Failed to add entry', description: getErrorMessage(e, String(e)), variant: 'destructive' })
+      toast({
+        title: 'Error al añadir la entrada',
+        description: getErrorMessage(e, 'No se pudo añadir la entrada'),
+        variant: 'destructive',
+      })
     }
   }
 

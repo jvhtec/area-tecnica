@@ -105,7 +105,11 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
       onOpenChange(false)
     } catch (e) {
       console.error('Tour requirements apply error:', e)
-      toast({ title: 'Error', description: getErrorMessage(e, 'Failed to apply requirements'), variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: getErrorMessage(e, 'No se pudieron aplicar los requisitos'),
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }

@@ -129,7 +129,11 @@ export const useTourWhatsappGroup = ({ isManagementUser, tourDates }: Options) =
       }
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } catch (e) {
-      toast({ title: 'Error', description: getErrorMessage(e, String(e)), variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: getErrorMessage(e, 'No se pudo crear el grupo de WhatsApp'),
+        variant: 'destructive',
+      });
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } finally {
       setIsCreatingWaGroup(false);
@@ -205,7 +209,7 @@ export const useTourWhatsappGroup = ({ isManagementUser, tourDates }: Options) =
     } catch (err) {
       toast({
         title: 'Error',
-        description: `Error al reintentar: ${getErrorMessage(err)}`,
+        description: `Error al reintentar: ${getErrorMessage(err, 'No se pudo reintentar la creación del grupo')}`,
         variant: 'destructive'
       });
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);

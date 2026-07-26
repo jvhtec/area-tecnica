@@ -187,7 +187,7 @@ const Festivals = () => {
       toast.success('Documentación generada exitosamente');
     } catch (error) {
       console.error('Error generating documentation:', error);
-      toast.error(`Error al generar documentación: ${getErrorMessage(error)}`);
+      toast.error(`Error al generar documentación: ${getErrorMessage(error, 'No se pudo generar la documentación')}`);
     } finally {
       setIsPrinting(prev => ({ ...prev, [selectedJobForPrint.id]: false }));
     }

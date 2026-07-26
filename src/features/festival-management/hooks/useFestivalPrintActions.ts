@@ -57,7 +57,7 @@ export const useFestivalPrintActions = ({
         console.error("Error generating documentation:", error);
         toast({
           title: "Error",
-          description: `Error al generar documentación: ${getErrorMessage(error)}`,
+          description: `Error al generar documentación: ${getErrorMessage(error, 'Error desconocido')}`,
           variant: "destructive",
         });
       } finally {

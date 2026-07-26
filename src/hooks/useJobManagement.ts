@@ -131,7 +131,7 @@ export const useJobManagement = (
       console.error("useJobManagement: Error deleting document:", error);
       toast({
         title: "Error",
-        description: "Failed to delete document: " + getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el documento"),
         variant: "destructive"
       });
     }
@@ -155,7 +155,7 @@ export const useJobManagement = (
       console.error("useJobManagement: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive"
       });
       throw error;

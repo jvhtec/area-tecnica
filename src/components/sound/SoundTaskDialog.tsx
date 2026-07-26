@@ -209,8 +209,8 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
     } catch (error) {
       console.error('Error creating folders:', error);
       toast({
-        title: "Error creating folders",
-        description: getErrorMessage(error),
+        title: "Error al crear carpetas",
+        description: getErrorMessage(error, "No se pudieron crear las carpetas de la tarea"),
         variant: "destructive"
       });
     }
@@ -335,8 +335,8 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       });
     } catch (error) {
       toast({
-        title: "Delete failed",
-        description: getErrorMessage(error),
+        title: "Error al eliminar",
+        description: getErrorMessage(error, "No se pudo eliminar el documento"),
         variant: "destructive",
       });
     }
@@ -361,8 +361,8 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       setPersonnel((prev) => ({ ...prev, [field]: safeCount }));
     } catch (error) {
       toast({
-        title: "Update failed",
-        description: getErrorMessage(error),
+        title: "Error al actualizar",
+        description: getErrorMessage(error, "No se pudo actualizar el personal de la tarea"),
         variant: "destructive",
       });
     }
@@ -403,8 +403,8 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       });
     } catch (error) {
       toast({
-        title: "Update failed",
-        description: getErrorMessage(error),
+        title: "Error al actualizar",
+        description: getErrorMessage(error, "No se pudo actualizar el estado de la tarea"),
         variant: "destructive",
       });
     }
@@ -426,8 +426,8 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       URL.revokeObjectURL(url);
     } catch (error) {
       toast({
-        title: "Download failed",
-        description: getErrorMessage(error),
+        title: "Error al descargar",
+        description: getErrorMessage(error, "No se pudo descargar el documento"),
         variant: "destructive",
       });
     }

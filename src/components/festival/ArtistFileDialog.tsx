@@ -14,6 +14,7 @@ import {
 } from "@/utils/documentUploadValidation";
 import { optimizeImageForUpload } from "@/utils/imageOptimization";
 import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
+import { getErrorMessage } from "@/utils/errorMessage";
 
 interface ArtistFileDialogProps {
   open: boolean;
@@ -158,7 +159,10 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       fetchFiles();
     } catch (error) {
       console.error("Error uploading file:", error);
-      const uploadErrorMessage = error instanceof Error ? error.message : "";
+      const uploadErrorMessage = getErrorMessage(
+        error,
+        "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
+      );
       try {
         if (insertedIds.length > 0) {
           await dataLayerClient.from('festival_artist_files').delete().in('id', insertedIds);
@@ -171,7 +175,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       }
       toast({
         title: "Error",
-        description: uploadErrorMessage || "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
+        description: uploadErrorMessage,
         variant: "destructive",
       });
     } finally {
@@ -218,7 +222,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       console.error("Error deleting file:", error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar el archivo",
+        description: getErrorMessage(error, "No se pudo eliminar el archivo"),
         variant: "destructive",
       });
     } finally {
@@ -248,7 +252,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       console.error("Error downloading file:", error);
       toast({
         title: "Error",
-        description: "No se pudo descargar el archivo",
+        description: getErrorMessage(error, "No se pudo descargar el archivo"),
         variant: "destructive",
       });
     }

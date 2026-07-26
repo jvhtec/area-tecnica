@@ -272,7 +272,11 @@ export function PushNotificationMatrix() {
     } catch (e) {
       // revert optimistic change
       setRoutePresentOptimistic(ev, type, target, !next);
-      toast({ title: 'Save failed', description: getErrorMessage(e, 'Unknown error'), variant: 'destructive' });
+      toast({
+        title: 'Error al guardar',
+        description: getErrorMessage(e, 'No se pudo guardar la ruta de notificación'),
+        variant: 'destructive',
+      });
     } finally {
       revert();
     }
@@ -310,7 +314,11 @@ export function PushNotificationMatrix() {
       }
     } catch (e) {
       setNaturalOptimistic(ev, !next);
-      toast({ title: 'Save failed', description: getErrorMessage(e, 'Unknown error'), variant: 'destructive' });
+      toast({
+        title: 'Error al guardar',
+        description: getErrorMessage(e, 'No se pudo guardar la ruta de notificación'),
+        variant: 'destructive',
+      });
     } finally {
       revert();
     }
@@ -358,7 +366,11 @@ export function PushNotificationMatrix() {
       }
       setRoutesByEvent(byEvent);
     } catch (e) {
-      toast({ title: 'Load failed', description: getErrorMessage(e, 'Unknown error'), variant: 'destructive' });
+      toast({
+        title: 'Error al cargar',
+        description: getErrorMessage(e, 'No se pudo cargar la matriz de notificaciones'),
+        variant: 'destructive',
+      });
       // fallback minimal state
       if (events.length === 0) setEvents(FALLBACK_EVENTS);
     } finally {

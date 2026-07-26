@@ -111,7 +111,11 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
       setIsCreating(false);
       toast({ title: 'Éxito', description: 'Preset guardado' });
     } catch (e) {
-      toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: getErrorMessage(e, 'No se pudo guardar el preset'),
+        variant: 'destructive',
+      });
     }
   };
 

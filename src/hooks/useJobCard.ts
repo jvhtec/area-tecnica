@@ -231,7 +231,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
           });
         } catch { /* best-effort push notification; ignore delivery failures */ }
       } catch (err) {
-        failedMessages.push(`${file.name}: ${getErrorMessage(err, String(err))}`);
+        failedMessages.push(`${file.name}: ${getErrorMessage(err, "No se pudo subir el documento")}`);
       }
     }
 
@@ -314,8 +314,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     } catch (err) {
       console.error("Error in handleDeleteDocument:", err);
       toast({
-        title: "Error deleting document",
-        description: getErrorMessage(err),
+        title: "Error al eliminar el documento",
+        description: getErrorMessage(err, "Error desconocido al eliminar el documento"),
         variant: "destructive"
       });
     }

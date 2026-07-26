@@ -156,7 +156,7 @@ export const TourManagementDialog = ({
       console.error("Error updating tour dates:", error);
       toast({
         title: "Error",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudieron actualizar las fechas de la gira"),
         variant: "destructive",
       });
     } finally {
@@ -203,7 +203,7 @@ export const TourManagementDialog = ({
       console.error(`Error ${actionWord}ing tour:`, error);
       toast({
         title: "Error",
-        description: `Error al ${newStatus === 'cancelled' ? 'cancelar' : 'reactivar'} la gira: ${getErrorMessage(error)}`,
+        description: `Error al ${newStatus === 'cancelled' ? 'cancelar' : 'reactivar'} la gira: ${getErrorMessage(error, 'No se pudo actualizar el estado de la gira')}`,
         variant: "destructive",
       });
     } finally {

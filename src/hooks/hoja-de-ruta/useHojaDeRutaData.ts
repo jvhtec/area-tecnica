@@ -55,7 +55,7 @@ export const useHojaDeRutaData = () => {
       if (error) throw error;
       return data;
     } catch (err) {
-      setError(getErrorMessage(err));
+      setError(getErrorMessage(err, "No se pudo cargar la hoja de ruta"));
       return null;
     } finally {
       setIsLoading(false);
@@ -78,7 +78,7 @@ export const useHojaDeRutaData = () => {
       if (error) throw error;
       return data;
     } catch (err) {
-      setError(getErrorMessage(err));
+      setError(getErrorMessage(err, "No se pudo cargar la hoja de ruta del trabajo"));
       return null;
     } finally {
       setIsLoading(false);
@@ -161,7 +161,7 @@ export const useHojaDeRutaData = () => {
 
       return savedHoja;
     } catch (err) {
-      setError(getErrorMessage(err));
+      setError(getErrorMessage(err, "No se pudo guardar la hoja de ruta"));
       throw err;
     } finally {
       setIsLoading(false);

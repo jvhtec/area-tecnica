@@ -434,7 +434,7 @@ const FestivalGearManagement = () => {
       console.error('Error generating gear setup PDF:', error);
       toast({
         title: "Error",
-        description: `Error al generar documentación: ${getErrorMessage(error)}`,
+        description: `Error al generar documentación: ${getErrorMessage(error, 'No se pudo generar el PDF de equipamiento')}`,
         variant: "destructive"
       });
     } finally {
@@ -473,7 +473,7 @@ const FestivalGearManagement = () => {
       console.error('Error generating documentation:', error);
       toast({
         title: "Error",
-        description: `Error al generar documentación: ${getErrorMessage(error)}`,
+        description: `Error al generar documentación: ${getErrorMessage(error, 'No se pudo generar el PDF de documentación')}`,
         variant: "destructive"
       });
     } finally {

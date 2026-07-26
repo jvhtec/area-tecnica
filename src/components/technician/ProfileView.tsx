@@ -106,7 +106,10 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                 if (error) throw error;
                 setAppVersion(data?.version || 'N/A');
             } catch (e) {
-                console.warn('Failed to load app version', getErrorMessage(e, String(e)));
+                console.warn(
+                    'Failed to load app version',
+                    getErrorMessage(e, 'Error desconocido al cargar la versión de la aplicación'),
+                );
                 setAppVersion('N/A');
             }
         };

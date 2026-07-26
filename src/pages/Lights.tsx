@@ -150,7 +150,7 @@ const Lights = () => {
         console.error("Lights page: Error in optimistic job deletion:", error);
         toast({
           title: "Error al eliminar el trabajo",
-          description: getErrorMessage(error),
+          description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
           variant: "destructive"
         });
       }

@@ -194,7 +194,7 @@ const Dashboard = () => {
       console.error("Dashboard: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive"
       });
     }

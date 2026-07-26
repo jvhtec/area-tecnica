@@ -52,7 +52,10 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
         const url = await getStaticMapUrlForLocation({ lat, lng, address, width: 600, height: 300, zoom: 15 });
         setMapPreviewUrl(url);
       } catch (e) {
-        console.warn("Failed to load static map preview:", getErrorMessage(e, String(e)));
+        console.warn(
+          "Failed to load static map preview:",
+          getErrorMessage(e, "Error desconocido al cargar la vista previa del mapa"),
+        );
         setMapPreviewUrl(null);
       } finally {
         setIsMapLoading(false);

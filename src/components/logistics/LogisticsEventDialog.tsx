@@ -262,7 +262,7 @@ export const LogisticsEventDialog = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo eliminar el evento de logística"),
         variant: "destructive",
       });
     }
@@ -491,7 +491,7 @@ export const LogisticsEventDialog = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo guardar el evento de logística"),
         variant: "destructive",
       });
     }

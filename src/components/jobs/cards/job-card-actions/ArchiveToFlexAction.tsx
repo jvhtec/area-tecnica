@@ -53,10 +53,10 @@ export const ArchiveToFlexAction: React.FC<ArchiveToFlexActionProps> = ({ job })
       });
     } catch (err) {
       console.error("[ArchiveToFlexAction] ArchiveToFlex error", err);
-      setError(getErrorMessage(err, "Failed to archive"));
+      setError(getErrorMessage(err, "No se pudo archivar el trabajo"));
       toast({
-        title: "Archive failed",
-        description: getErrorMessage(err, "Failed to archive"),
+        title: "Error al archivar",
+        description: getErrorMessage(err, "No se pudo archivar el trabajo"),
         variant: "destructive",
       });
     } finally {

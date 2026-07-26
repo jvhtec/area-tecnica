@@ -135,7 +135,7 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
       onSuccess();
     } catch (err) {
       console.error('[ResetPassword] Error:', err);
-      setError(getErrorMessage(err, "Failed to reset password"));
+      setError(getErrorMessage(err, "No se pudo actualizar la contraseña"));
     }
   };
 

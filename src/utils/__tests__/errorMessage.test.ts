@@ -46,6 +46,21 @@ describe('getErrorMessage', () => {
     const message = getErrorMessage({ foo: 'bar' });
     expect(message).not.toBe('[object Object]');
   });
+
+  it('uses the caller fallback when an unknown value cannot be stringified', () => {
+    expect(getErrorMessage(Object.create(null), 'Operation failed')).toBe('Operation failed');
+    expect(
+      getErrorMessage(
+        {
+          toJSON: (): undefined => undefined,
+          toString: () => {
+            throw new Error('string conversion failed');
+          },
+        },
+        'Operation failed',
+      ),
+    ).toBe('Operation failed');
+  });
 });
 
 describe('getErrorStatus', () => {

@@ -195,7 +195,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       }
     } catch (e) {
       console.error('Flex sync exception:', e);
-      toast({ title: 'Flex sync failed', description: getErrorMessage(e, 'Unknown error'), variant: 'destructive' });
+      toast({
+        title: 'Error al sincronizar con Flex',
+        description: getErrorMessage(e, 'Error desconocido'),
+        variant: 'destructive',
+      });
     } finally {
       setIsSyncing(false);
     }

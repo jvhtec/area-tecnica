@@ -188,7 +188,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       console.error("Error creating tour date folders:", error);
       toast({
         title: "Error al crear las carpetas de fechas",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudieron crear las carpetas de fechas"),
         variant: "destructive"
       });
     }
@@ -379,14 +379,14 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         return;
       }
 
+      const errorDetail = getErrorMessage(error, "");
       let errorMessage = "No se pudieron crear las carpetas";
-      const caughtMessage = getErrorMessage(error);
-      if (caughtMessage.includes("Name is not allowed")) {
+      if (errorDetail.includes("Name is not allowed")) {
         errorMessage = "Se detectó un nombre de carpeta no válido. Inténtalo de nuevo o contacta con soporte.";
-      } else if (caughtMessage.includes("getDirectoryHandle")) {
+      } else if (errorDetail.includes("getDirectoryHandle")) {
         errorMessage = "No se pudo crear la estructura. Comprueba los caracteres especiales de los nombres.";
-      } else if (caughtMessage) {
-        errorMessage = caughtMessage;
+      } else if (errorDetail) {
+        errorMessage = errorDetail;
       }
 
       toast({
@@ -439,7 +439,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       console.error(`Error ${actionWord}ing tour:`, error);
       toast({
         title: "Error",
-        description: `No se pudo actualizar la gira: ${getErrorMessage(error)}`,
+        description: `No se pudo actualizar la gira: ${getErrorMessage(error, 'Error desconocido')}`,
         variant: "destructive",
       });
     }

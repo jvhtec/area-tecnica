@@ -461,7 +461,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       console.error("Error updating job:", error);
       toast({
         title: "Error updating job",
-        description: getErrorMessage(error),
+        description: getErrorMessage(error, "No se pudo actualizar el trabajo"),
         variant: "destructive",
       });
     } finally {

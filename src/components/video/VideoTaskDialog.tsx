@@ -244,8 +244,8 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       URL.revokeObjectURL(url);
     } catch (error) {
       toast({
-        title: "Download failed",
-        description: getErrorMessage(error),
+        title: "Error al descargar",
+        description: getErrorMessage(error, "No se pudo descargar el documento"),
         variant: "destructive",
       });
     }
@@ -288,8 +288,8 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       refetchTasks();
     } catch (error) {
       toast({
-        title: "Delete failed",
-        description: getErrorMessage(error),
+        title: "Error al eliminar",
+        description: getErrorMessage(error, "No se pudo eliminar el documento"),
         variant: "destructive",
       });
     }
@@ -316,8 +316,8 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
       });
     } catch (error) {
       toast({
-        title: "Update failed",
-        description: getErrorMessage(error),
+        title: "Error al actualizar",
+        description: getErrorMessage(error, "No se pudo actualizar el estado de la tarea"),
         variant: "destructive",
       });
     }
