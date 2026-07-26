@@ -1,6 +1,5 @@
 import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
 import type { WavesModelSelection } from '@/constants/wavesModels';
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface Artist {
   id: string;
   name: string;
