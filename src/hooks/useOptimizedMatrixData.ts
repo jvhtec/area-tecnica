@@ -6,6 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
 const MADRID_TIMEZONE = 'Europe/Madrid';
 
 function toMadridDateKey(date: Date | undefined): string {
@@ -47,7 +48,7 @@ export interface MatrixTimesheetAssignment {
 }
 
 interface OptimizedMatrixDataProps {
-  technicians: Array<{ id: string; first_name: string; nickname?: string | null; last_name: string; email: string; department: string; role: string; profile_picture_url?: string | null; }>;
+  technicians: Array<SeasonalHouseTechProfile & { first_name: string; nickname?: string | null; last_name: string; email: string; department: string; role: string; profile_picture_url?: string | null; }>;
   dates: Date[];
   jobs: MatrixJob[];
 }
@@ -301,6 +302,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
       // Build per-day unavailable marks in the visible range
       const perDay: Map<string, AvailabilityDay> = new Map();
+      buildSeasonalUnavailability(technicians, dateStart, dateEnd).forEach((row) => {
+        perDay.set(`${row.user_id}-${row.date}`, row);
+      });
       const startDay = new Date(dateRange.start);
       startDay.setHours(0,0,0,0);
       const endDay = new Date(dateRange.end);

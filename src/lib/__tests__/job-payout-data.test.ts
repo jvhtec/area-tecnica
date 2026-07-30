@@ -116,6 +116,7 @@ describe('prepareJobPayoutData', () => {
                         last_name: 'Lopez',
                         email: 'ana@example.com',
                         autonomo: false,
+                        role: 'house_tech',
                       },
                     ]
                   : [
@@ -141,13 +142,7 @@ describe('prepareJobPayoutData', () => {
 
         throw new Error(`Unexpected table lookup: ${table}`);
       }),
-      rpc: vi.fn(async (fn: string, args: { _profile_id: string }) => {
-        if (fn !== 'is_house_tech') {
-          throw new Error(`Unexpected RPC: ${fn}`);
-        }
-
-        return { data: args._profile_id === 'tech-1', error: null };
-      }),
+      rpc: vi.fn(),
     };
 
     const result = await prepareJobPayoutData({
@@ -183,7 +178,6 @@ describe('prepareJobPayoutData', () => {
   });
 
   it('does not short-circuit on partial provided profiles when more technician ids are required', async () => {
-    const rpcCalls: string[] = [];
     const supabase = {
       from: vi.fn((table: string) => {
         if (table === 'jobs') {
@@ -268,6 +262,7 @@ describe('prepareJobPayoutData', () => {
                         last_name: 'One',
                         email: 'one@example.com',
                         autonomo: false,
+                        role: 'house_tech',
                       },
                       {
                         id: 'tech-2',
@@ -275,6 +270,7 @@ describe('prepareJobPayoutData', () => {
                         last_name: 'Two',
                         email: 'two@example.com',
                         autonomo: true,
+                        role: 'technician',
                       },
                     ]
                   : [],
@@ -293,14 +289,7 @@ describe('prepareJobPayoutData', () => {
 
         throw new Error(`Unexpected table lookup: ${table}`);
       }),
-      rpc: vi.fn(async (fn: string, args: { _profile_id: string }) => {
-        if (fn !== 'is_house_tech') {
-          throw new Error(`Unexpected RPC: ${fn}`);
-        }
-
-        rpcCalls.push(args._profile_id);
-        return { data: args._profile_id === 'tech-1', error: null };
-      }),
+      rpc: vi.fn(),
     };
 
     const result = await prepareJobPayoutData({
@@ -332,7 +321,7 @@ describe('prepareJobPayoutData', () => {
         is_house_tech: false,
       }),
     ]);
-    expect(rpcCalls.sort()).toEqual(['tech-1', 'tech-2']);
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
   it('falls back to provided profiles when the profile lookup fails', async () => {

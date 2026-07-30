@@ -492,16 +492,22 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     enabled: techIds.length > 0,
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('profiles')
-        .select('id, first_name, last_name, email, autonomo, department')
+        .select('id, first_name, last_name, email, autonomo, department, role, seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date')
         .in('id', techIds);
       if (error) throw error;
-      return (data || []) as TechnicianProfileWithEmail[];
+      return (data || []).map((profile) => ({
+        ...profile,
+        is_house_tech: profile.role === 'house_tech',
+      })) as TechnicianProfileWithEmail[];
     },
     staleTime: 60_000,
   });
   const profilesWithEmail = profiles as TechnicianProfileWithEmail[];
   const autonomoMap = React.useMemo(
-    () => new Map(profilesWithEmail.map((p) => [p.id, p.autonomo ?? null])),
+    () => new Map(profilesWithEmail.map((p) => [
+      p.id,
+      p.is_house_tech ? null : (p.autonomo ?? null),
+    ])),
     [profilesWithEmail]
   );
   const profileMap = React.useMemo(() => new Map(profilesWithEmail.map((p) => [p.id, p])), [profilesWithEmail]);
@@ -639,7 +645,9 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       const override = payoutOverrides.find(o => o.technician_id === payout.technician_id);
 
       let deduction = 0;
-      const isNonAutonomo = autonomoMap.get(payout.technician_id) === false;
+      const isNonAutonomo =
+        profileMap.get(payout.technician_id)?.is_house_tech !== true
+        && autonomoMap.get(payout.technician_id) === false;
       if (isNonAutonomo && !override && !isTourDate) {
         const days = techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
         deduction = days * NON_AUTONOMO_DEDUCTION_EUR;
@@ -648,7 +656,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       const effectiveTotal = (override?.override_amount_eur ?? payout.total_eur) - (override ? 0 : deduction);
       return sum + effectiveTotal;
     }, 0);
-  }, [payoutTotalsWithPrep, payoutOverrides, autonomoMap, isTourDate, techDaysMap]);
+  }, [payoutTotalsWithPrep, payoutOverrides, profileMap, autonomoMap, isTourDate, techDaysMap]);
 
   return {
     jobMeta,

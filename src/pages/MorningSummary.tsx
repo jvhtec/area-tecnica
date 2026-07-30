@@ -50,6 +50,7 @@ type MorningSummaryData = {
   travel: string[];
   sick: string[];
   dayOff: string[];
+  seasonal: string[];
   totalTechs: number;
   availableTechs: number;
 };
@@ -123,7 +124,7 @@ export default function MorningSummary() {
 
         // Get all house techs (population)
       const { data: allTechs } = await dataLayerClient.from('profiles')
-        .select('id, first_name, last_name, nickname')
+        .select('id, first_name, last_name, nickname, role, seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date')
         .eq('department', dept)
         .eq('role', 'house_tech')
         .eq('warehouse_duty_exempt', false);
@@ -171,6 +172,33 @@ export default function MorningSummary() {
           // Legacy table may not exist in some environments
         }
 
+        const alreadyUnavailable = new Set(unavailableMerged.map((row) => row.user_id));
+        for (const tech of allTechs || []) {
+          if (
+            tech.seasonal_house_tech === true
+            && (
+              !tech.seasonal_house_tech_start_date
+              || !tech.seasonal_house_tech_end_date
+              || date < tech.seasonal_house_tech_start_date
+              || date > tech.seasonal_house_tech_end_date
+            )
+            && !alreadyUnavailable.has(tech.id)
+          ) {
+            unavailableMerged.push({
+              user_id: tech.id,
+              source: 'seasonal',
+              profile: {
+                first_name: tech.first_name || '',
+                last_name: tech.last_name || '',
+                nickname: tech.nickname,
+                department: dept,
+                role: 'house_tech',
+              },
+            });
+            alreadyUnavailable.add(tech.id);
+          }
+        }
+
         // Process data
         const jobGroups: Record<string, string[]> = {};
         for (const timesheet of timesheetData || []) {
@@ -203,6 +231,7 @@ export default function MorningSummary() {
           travel: bySource.travel || [],
           sick: bySource.sick || [],
           dayOff: bySource.day_off || [],
+          seasonal: bySource.seasonal || [],
           totalTechs: (allTechs || []).length,
           availableTechs: warehouse.length,
         });
@@ -357,6 +386,18 @@ export default function MorningSummary() {
                     </div>
                     <div className="pl-7">
                       <p>{summary.dayOff.join(', ')}</p>
+                    </div>
+                  </div>
+                )}
+
+                {summary.seasonal.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 font-semibold text-lg">
+                      <Calendar className="h-5 w-5" />
+                      <span>Fuera de temporada</span>
+                    </div>
+                    <div className="pl-7">
+                      <p>{summary.seasonal.join(', ')}</p>
                     </div>
                   </div>
                 )}

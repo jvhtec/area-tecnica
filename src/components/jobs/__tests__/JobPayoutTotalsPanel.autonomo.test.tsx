@@ -132,4 +132,26 @@ describe("JobPayoutTotalsPanel autonomo badge", () => {
 
     expect(screen.getByText(NO_AUTONOMO_LABEL)).toBeInTheDocument();
   });
+
+  it("never renders or deducts the non-autonomo state for a house tech", () => {
+    const current = useJobPayoutDataMock();
+    const houseProfile = {
+      ...current.profilesWithEmail[0],
+      role: "house_tech",
+      is_house_tech: true,
+      autonomo: false,
+    };
+    useJobPayoutDataMock.mockReturnValue({
+      ...current,
+      profilesWithEmail: [houseProfile],
+      profileMap: new Map([["tech-1", houseProfile]]),
+      autonomoMap: new Map([["tech-1", null]]),
+      calculatedGrandTotal: 100,
+    });
+
+    renderWithProviders(<JobPayoutTotalsPanel jobId="job-1" />);
+
+    expect(screen.queryByText(NO_AUTONOMO_LABEL)).not.toBeInTheDocument();
+    expect(screen.queryByText(/-30/)).not.toBeInTheDocument();
+  });
 });

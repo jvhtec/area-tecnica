@@ -23,6 +23,7 @@ export interface TechnicianProfile {
   role?: string | null;
   autonomo?: boolean | null;
   is_house_tech?: boolean | null;
+  seasonal_house_tech?: boolean | null;
 }
 
 export interface JobDetails {
@@ -88,6 +89,8 @@ export interface TimesheetLine {
   total_eur?: number;
   is_evento?: boolean;
   is_prep_day?: boolean;
+  is_seasonal_house_tech?: boolean;
+  seasonal_overtime_only?: boolean;
   prep_day_hourly_rate_eur?: number;
 }
 
@@ -106,7 +109,7 @@ export const getTechNameFactory = (profiles: TechnicianProfile[]) => {
       return { name: 'Unknown', profile: undefined, autonomo: true, is_house_tech: false };
     }
     const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Unknown';
-    const is_house_tech = profile.is_house_tech === true;
+    const is_house_tech = profile.is_house_tech === true || profile.role === 'house_tech';
     // autonomo field reflects profile setting - deduction logic handles house techs separately
     const autonomo = profile.autonomo !== false;
     return { name, profile, autonomo, is_house_tech };

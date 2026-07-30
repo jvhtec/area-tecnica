@@ -8,6 +8,7 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { buildTourSchedulePdfBlob } from '@/lib/tourPdfExport';
 import { uploadTourPdfWithRecord } from '@/utils/tourDocumentsUpload';
 import { isDepartmentManagementRole, isTechnicianRole } from '@/utils/permissions';
+import { isWithinSeasonalAvailability, type SeasonalHouseTechProfile } from '@/utils/seasonalHouseTech';
 
 type TourDateLite = {
   id: string;
@@ -28,7 +29,9 @@ type Props = {
 
 export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenChange, tourId, tourDates }) => {
   const { toast } = useToast();
-  const [techOptions, setTechOptions] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [technicianProfiles, setTechnicianProfiles] = React.useState<Array<
+    SeasonalHouseTechProfile & { name: string }
+  >>([]);
   const [selectedTechId, setSelectedTechId] = React.useState<string>('');
   const [channel, setChannel] = React.useState<'email' | 'whatsapp'>('email');
   const [loading, setLoading] = React.useState(false);
@@ -43,12 +46,19 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
         if (error) throw error;
         const filtered = (data || [])
           .filter((t: any) => isTechnicianRole(t.role) || (isDepartmentManagementRole(t.role) && t.assignable_as_tech))
-          .map((t: any) => ({ id: t.id, name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email || t.id }))
+          .map((t: any) => ({
+            id: t.id,
+            role: t.role,
+            seasonal_house_tech: t.seasonal_house_tech,
+            seasonal_house_tech_start_date: t.seasonal_house_tech_start_date,
+            seasonal_house_tech_end_date: t.seasonal_house_tech_end_date,
+            name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email || t.id,
+          }))
           .sort((a: any, b: any) => a.name.localeCompare(b.name));
-        setTechOptions(filtered);
+        setTechnicianProfiles(filtered);
       } catch (e) {
         console.error('[RequestTourAvailability] Failed to fetch technicians', e);
-        setTechOptions([]);
+        setTechnicianProfiles([]);
       }
     })();
     // Load tour dates if not provided
@@ -67,6 +77,19 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
       }
     })();
   }, [open]);
+
+  const techOptions = React.useMemo(
+    () => technicianProfiles.filter((profile) =>
+      dates.every((tourDate) => isWithinSeasonalAvailability(profile, tourDate.date))
+    ),
+    [dates, technicianProfiles],
+  );
+
+  React.useEffect(() => {
+    if (selectedTechId && !techOptions.some((option) => option.id === selectedTechId)) {
+      setSelectedTechId('');
+    }
+  }, [selectedTechId, techOptions]);
 
   const handleSend = async () => {
     if (!selectedTechId) {

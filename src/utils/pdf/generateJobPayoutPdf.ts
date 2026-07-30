@@ -197,8 +197,8 @@ export async function generateJobPayoutPDF(
   });
 
   const anyDeductionApplied = payouts.some(p => {
-      const { autonomo } = getTechName(p.technician_id);
-      return !autonomo;
+      const { autonomo, is_house_tech } = getTechName(p.technician_id);
+      return !autonomo && !is_house_tech;
   });
 
   const anyOverride = payouts.some(p => p.has_override);
@@ -323,7 +323,7 @@ export async function generateJobPayoutPDF(
           ? `${format(new Date(ln.date), 'P', { locale: es })}${ln.is_prep_day ? '\nDía preparación' : ''}`
           : (ln.is_prep_day ? 'Día preparación' : '—'),
         `${ln.hours_rounded ?? 0}h`,
-        ln.is_prep_day
+        ln.is_prep_day && !ln.seasonal_overtime_only
           ? `${formatCurrency(ln.base_day_eur ?? 0)}\n${formatCurrency(ln.prep_day_hourly_rate_eur ?? 15)}/h`
           : formatCurrency(ln.base_day_eur ?? 0),
         ln.plus_10_12_amount_eur ? `${ln.plus_10_12_hours ?? 0}h = ${formatCurrency(ln.plus_10_12_amount_eur)}` : '—',

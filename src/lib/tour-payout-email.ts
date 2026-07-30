@@ -37,6 +37,7 @@ export interface TourJobEmailContextResult {
   lpoMap?: Map<string, string | null>;
   timesheetDateMap: Map<string, Set<string>>;
   prepTimesheetMap: Map<string, TimesheetLine[]>;
+  hourlyTimesheetMap: Map<string, TimesheetLine[]>;
   expenseMap: Map<string, number>;
   attachments: TourJobEmailAttachment[];
   missingEmails: string[];
@@ -47,6 +48,15 @@ export interface TourJobEmailInput {
   supabase: SupabaseClient;
   quotes: TourJobRateQuote[];
   profiles: (TechnicianProfile & { email?: string | null })[];
+}
+
+interface TourEmailTimesheetRow {
+  technician_id?: string | null;
+  job_id?: string | null;
+  date?: string | null;
+  approved_by_manager?: boolean | null;
+  amount_breakdown?: unknown;
+  amount_breakdown_visible?: unknown;
 }
 
 // Backward-compatible no-op for stale dev/HMR imports. Multi-day rehearsal math
@@ -96,7 +106,10 @@ async function fetchLpoMap(
   return new Map((data || []).map((row: any) => [row.technician_id, row.lpo_number || null]));
 }
 
-export async function fetchTourJobEmailTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
+export async function fetchTourJobEmailTimesheets(
+  client: SupabaseClient,
+  jobId: string,
+): Promise<TourEmailTimesheetRow[]> {
   const { data, error } = await client
     .from('timesheets')
     .select('technician_id, job_id, date, approved_by_manager, amount_breakdown')
@@ -106,27 +119,58 @@ export async function fetchTourJobEmailTimesheets(client: SupabaseClient, jobId:
   return data || [];
 }
 
-export function buildPrepTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
+export async function fetchTourJobHourlyRateModes(
+  client: SupabaseClient,
+  jobId: string,
+): Promise<Array<{ job_id: string; technician_id: string; date: string }>> {
+  const { data, error } = await client.rpc('get_hourly_rate_mode_dates_for_timesheets', {
+    _job_ids: [jobId],
+  });
+  if (error) throw error;
+  return (data || []) as Array<{ job_id: string; technician_id: string; date: string }>;
+}
+
+function buildTimesheetLine(row: TourEmailTimesheetRow): TimesheetLine {
+  const breakdown = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, unknown>;
+  return {
+    date: row.date ?? null,
+    hours_rounded: Number(breakdown.hours_rounded ?? breakdown.worked_hours_rounded ?? 0) || 0,
+    base_day_eur: breakdown.base_day_eur != null ? Number(breakdown.base_day_eur) : undefined,
+    plus_10_12_hours:
+      breakdown.plus_10_12_hours != null ? Number(breakdown.plus_10_12_hours) : undefined,
+    plus_10_12_amount_eur:
+      breakdown.plus_10_12_amount_eur != null ? Number(breakdown.plus_10_12_amount_eur) : undefined,
+    overtime_hours: breakdown.overtime_hours != null ? Number(breakdown.overtime_hours) : undefined,
+    overtime_hour_eur:
+      breakdown.overtime_hour_eur != null ? Number(breakdown.overtime_hour_eur) : undefined,
+    overtime_amount_eur:
+      breakdown.overtime_amount_eur != null ? Number(breakdown.overtime_amount_eur) : undefined,
+    total_eur: breakdown.total_eur != null ? Number(breakdown.total_eur) : undefined,
+    is_prep_day: breakdown.is_prep_day === true,
+    is_seasonal_house_tech: breakdown.is_seasonal_house_tech === true,
+    seasonal_overtime_only: breakdown.seasonal_overtime_only === true,
+    prep_day_hourly_rate_eur:
+      breakdown.prep_day_hourly_rate_eur != null ? Number(breakdown.prep_day_hourly_rate_eur) : undefined,
+  };
+}
+
+export function buildPrepTimesheetMap(rows: TourEmailTimesheetRow[]): Map<string, TimesheetLine[]> {
   const map = new Map<string, TimesheetLine[]>();
 
   rows.forEach((row) => {
+    if (!row.technician_id) return;
     if (row.approved_by_manager !== true) return;
-    const breakdown = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, any>;
+    const breakdown = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, unknown>;
     if (breakdown.is_prep_day !== true) return;
 
     const line: TimesheetLine = {
-      date: row.date ?? null,
-      hours_rounded: Number(breakdown.hours_rounded ?? breakdown.worked_hours_rounded ?? 0) || 0,
-      base_day_eur: breakdown.base_day_eur != null ? Number(breakdown.base_day_eur) : undefined,
+      ...buildTimesheetLine(row),
       plus_10_12_hours: 0,
       plus_10_12_amount_eur: 0,
       overtime_hours: 0,
       overtime_hour_eur: 0,
       overtime_amount_eur: 0,
-      total_eur: breakdown.total_eur != null ? Number(breakdown.total_eur) : undefined,
       is_prep_day: true,
-      prep_day_hourly_rate_eur:
-        breakdown.prep_day_hourly_rate_eur != null ? Number(breakdown.prep_day_hourly_rate_eur) : undefined,
     };
 
     const existing = map.get(row.technician_id) || [];
@@ -137,32 +181,83 @@ export function buildPrepTimesheetMap(rows: any[]): Map<string, TimesheetLine[]>
   return map;
 }
 
-export function buildPrepTimesheetDateMap(
-  prepTimesheetMap: Map<string, TimesheetLine[]>
-): Map<string, Set<string>> {
-  const map = new Map<string, Set<string>>();
+export function buildHourlyTimesheetMap(
+  rows: TourEmailTimesheetRow[],
+  hourlyRateModes: Array<{ technician_id: string; date: string }>,
+  seasonalTechnicianIds: Set<string> = new Set(),
+): Map<string, TimesheetLine[]> {
+  const hourlyKeys = new Set(
+    hourlyRateModes.map((row) => `${row.technician_id}:${row.date}`),
+  );
+  const map = new Map<string, TimesheetLine[]>();
 
-  prepTimesheetMap.forEach((lines, technicianId) => {
-    const dates = lines
-      .map((line) => line.date)
-      .filter((date): date is string => Boolean(date));
+  rows.forEach((row) => {
+    if (!row.technician_id || !row.date) return;
+    if (!hourlyKeys.has(`${row.technician_id}:${row.date}`)
+      && !seasonalTechnicianIds.has(row.technician_id)) return;
 
-    if (dates.length > 0) {
-      map.set(technicianId, new Set(dates));
-    }
+    const line = buildTimesheetLine(row);
+    const existing = map.get(row.technician_id) || [];
+    existing.push(line);
+    map.set(row.technician_id, existing);
+  });
+
+  map.forEach((lines) => {
+    lines.sort((left, right) => String(left.date ?? '').localeCompare(String(right.date ?? '')));
   });
 
   return map;
+}
+
+export function buildTourTimesheetDateMap(
+  prepTimesheetMap: Map<string, TimesheetLine[]>,
+  hourlyTimesheetMap: Map<string, TimesheetLine[]>,
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+
+  [prepTimesheetMap, hourlyTimesheetMap].forEach((sourceMap) => {
+    sourceMap.forEach((lines, technicianId) => {
+      const dates = lines
+        .map((line) => line.date)
+        .filter((date): date is string => Boolean(date));
+      if (dates.length === 0) return;
+
+      const existing = map.get(technicianId) || new Set<string>();
+      dates.forEach((date) => existing.add(date));
+      map.set(technicianId, existing);
+    });
+  });
+
+  return map;
+}
+
+export function buildPrepTimesheetDateMap(
+  prepTimesheetMap: Map<string, TimesheetLine[]>
+): Map<string, Set<string>> {
+  return buildTourTimesheetDateMap(prepTimesheetMap, new Map());
 }
 
 export async function prepareTourJobEmailContext(
   input: TourJobEmailInput
 ): Promise<TourJobEmailContextResult> {
   const { jobId, supabase, quotes, profiles } = input;
-  const job = await fetchJobDetails(supabase, jobId);
-  const lpoMap = await fetchLpoMap(supabase, jobId);
-  const timesheetRows = await fetchTourJobEmailTimesheets(supabase, jobId);
+  const [job, lpoMap, timesheetRows, hourlyRateModes] = await Promise.all([
+    fetchJobDetails(supabase, jobId),
+    fetchLpoMap(supabase, jobId),
+    fetchTourJobEmailTimesheets(supabase, jobId),
+    fetchTourJobHourlyRateModes(supabase, jobId),
+  ]);
   const prepTimesheetMap = buildPrepTimesheetMap(timesheetRows);
+  const seasonalTechnicianIds = new Set(
+    profiles
+      .filter((profile) => profile.role === 'house_tech' && profile.seasonal_house_tech === true)
+      .map((profile) => profile.id),
+  );
+  const hourlyTimesheetMap = buildHourlyTimesheetMap(
+    timesheetRows,
+    hourlyRateModes,
+    seasonalTechnicianIds,
+  );
 
   // Fetch expenses for tour date jobs
   const expenseMap = new Map<string, number>();
@@ -180,7 +275,7 @@ export async function prepareTourJobEmailContext(
     console.warn('[tour-payout-email] Failed to fetch expenses:', e);
   }
 
-  const timesheetDateMap = buildPrepTimesheetDateMap(prepTimesheetMap);
+  const timesheetDateMap = buildTourTimesheetDateMap(prepTimesheetMap, hourlyTimesheetMap);
 
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
   const attachments: TourJobEmailAttachment[] = [];
@@ -209,6 +304,7 @@ export async function prepareTourJobEmailContext(
           download: false,
           timesheetMap: timesheetDateMap,
           prepTimesheetMap,
+          hourlyTimesheetMap,
         }
       )) as Blob | void;
     } catch (error) {
@@ -255,6 +351,7 @@ export async function prepareTourJobEmailContext(
     lpoMap,
     timesheetDateMap,
     prepTimesheetMap,
+    hourlyTimesheetMap,
     expenseMap,
     attachments,
     missingEmails,

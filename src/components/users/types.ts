@@ -20,5 +20,8 @@ export type Profile = {
   soundvision_access_enabled?: boolean | null;
   soundvision_tool_access_enabled?: boolean | null;
   autonomo?: boolean | null;
+  seasonal_house_tech?: boolean | null;
+  seasonal_house_tech_start_date?: string | null;
+  seasonal_house_tech_end_date?: string | null;
   bg_color?: string | null;
 };
