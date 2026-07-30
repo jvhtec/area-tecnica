@@ -41,9 +41,15 @@ ALTER TABLE public.profiles
       AND seasonal_house_tech_end_date IS NOT NULL
       AND seasonal_house_tech_start_date <= seasonal_house_tech_end_date
     )
-  ),
+  ) NOT VALID,
   ADD CONSTRAINT profiles_house_tech_autonomo_ignored_check
-  CHECK (role <> 'house_tech' OR autonomo IS DISTINCT FROM false);
+  CHECK (role <> 'house_tech' OR autonomo IS DISTINCT FROM false) NOT VALID;
+
+ALTER TABLE public.profiles
+  VALIDATE CONSTRAINT profiles_seasonal_house_tech_range_check;
+
+ALTER TABLE public.profiles
+  VALIDATE CONSTRAINT profiles_house_tech_autonomo_ignored_check;
 
 CREATE OR REPLACE FUNCTION public.normalize_house_tech_finance_profile()
 RETURNS trigger
@@ -76,10 +82,24 @@ AS $$
 DECLARE
   v_actor uuid := auth.uid();
   v_actor_role text;
+  v_target_id uuid := NEW.id;
+  v_old_seasonal_house_tech boolean := false;
+  v_old_start_date date;
+  v_old_end_date date;
 BEGIN
-  IF OLD.seasonal_house_tech IS NOT DISTINCT FROM NEW.seasonal_house_tech
-     AND OLD.seasonal_house_tech_start_date IS NOT DISTINCT FROM NEW.seasonal_house_tech_start_date
-     AND OLD.seasonal_house_tech_end_date IS NOT DISTINCT FROM NEW.seasonal_house_tech_end_date THEN
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.seasonal_house_tech IS NOT DISTINCT FROM NEW.seasonal_house_tech
+       AND OLD.seasonal_house_tech_start_date IS NOT DISTINCT FROM NEW.seasonal_house_tech_start_date
+       AND OLD.seasonal_house_tech_end_date IS NOT DISTINCT FROM NEW.seasonal_house_tech_end_date THEN
+      RETURN NEW;
+    END IF;
+
+    v_old_seasonal_house_tech := OLD.seasonal_house_tech;
+    v_old_start_date := OLD.seasonal_house_tech_start_date;
+    v_old_end_date := OLD.seasonal_house_tech_end_date;
+  ELSIF NEW.seasonal_house_tech = false
+        AND NEW.seasonal_house_tech_start_date IS NULL
+        AND NEW.seasonal_house_tech_end_date IS NULL THEN
     RETURN NEW;
   END IF;
 
@@ -96,8 +116,8 @@ BEGIN
   FROM public.profiles p
   WHERE p.id = v_actor;
 
-  IF v_actor = OLD.id THEN
-    RAISE EXCEPTION 'Seasonal house tech settings cannot be changed on your own account'
+  IF v_actor = v_target_id THEN
+    RAISE EXCEPTION 'Seasonal house tech settings cannot be set or changed on your own account'
       USING ERRCODE = '42501';
   END IF;
 
@@ -115,7 +135,7 @@ BEGIN
   ) VALUES (
     v_actor,
     'profile_privilege_change',
-    'profile:' || OLD.id::text,
+    'profile:' || v_target_id::text,
     'high',
     jsonb_build_object(
       'changed_fields', jsonb_build_array(
@@ -124,11 +144,11 @@ BEGIN
         'seasonal_house_tech_end_date'
       ),
       'actor_role', v_actor_role,
-      'old_seasonal_house_tech', OLD.seasonal_house_tech,
+      'old_seasonal_house_tech', v_old_seasonal_house_tech,
       'new_seasonal_house_tech', NEW.seasonal_house_tech,
-      'old_start_date', OLD.seasonal_house_tech_start_date,
+      'old_start_date', v_old_start_date,
       'new_start_date', NEW.seasonal_house_tech_start_date,
-      'old_end_date', OLD.seasonal_house_tech_end_date,
+      'old_end_date', v_old_end_date,
       'new_end_date', NEW.seasonal_house_tech_end_date
     )
   );
@@ -146,6 +166,12 @@ DROP TRIGGER IF EXISTS enforce_seasonal_house_tech_change ON public.profiles;
 CREATE TRIGGER enforce_seasonal_house_tech_change
 BEFORE UPDATE OF seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date
 ON public.profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_seasonal_house_tech_change();
+
+DROP TRIGGER IF EXISTS enforce_seasonal_house_tech_insert ON public.profiles;
+CREATE TRIGGER enforce_seasonal_house_tech_insert
+BEFORE INSERT ON public.profiles
 FOR EACH ROW
 EXECUTE FUNCTION public.enforce_seasonal_house_tech_change();
 
@@ -857,9 +883,8 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.trg_apply_prep_day_rate() FROM PUBLIC;
 
--- Profile finance-mode changes must also refresh already-created timesheets.
--- Without this, enabling seasonal mode could leave historical base/plus amounts
--- stored on active timesheets until somebody edited each timesheet manually.
+-- Profile finance-mode changes must refresh open timesheets that can still affect
+-- payroll. Manager-approved payouts are treated as immutable historical records.
 CREATE OR REPLACE FUNCTION public.recompute_timesheets_after_profile_finance_change()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -874,6 +899,7 @@ BEGIN
     FROM public.timesheets t
     WHERE t.technician_id = NEW.id
       AND t.is_active = true
+      AND t.approved_by_manager IS DISTINCT FROM true
       AND t.start_time IS NOT NULL
       AND t.end_time IS NOT NULL
   LOOP

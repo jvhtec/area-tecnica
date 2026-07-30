@@ -8,6 +8,7 @@ import { Loading } from '@/components/ui/loading';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatMadridDateKey } from '@/utils/timezoneUtils';
+import { isWithinSeasonalAvailability } from '@/utils/seasonalHouseTech';
 
 type TimesheetWithRelations = {
   technician_id: string;
@@ -175,13 +176,7 @@ export default function MorningSummary() {
         const alreadyUnavailable = new Set(unavailableMerged.map((row) => row.user_id));
         for (const tech of allTechs || []) {
           if (
-            tech.seasonal_house_tech === true
-            && (
-              !tech.seasonal_house_tech_start_date
-              || !tech.seasonal_house_tech_end_date
-              || date < tech.seasonal_house_tech_start_date
-              || date > tech.seasonal_house_tech_end_date
-            )
+            !isWithinSeasonalAvailability(tech, date)
             && !alreadyUnavailable.has(tech.id)
           ) {
             unavailableMerged.push({

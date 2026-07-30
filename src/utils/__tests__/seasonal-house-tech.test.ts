@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildSeasonalUnavailability,
+  isSeasonalDateRangeValid,
   isWithinSeasonalAvailability,
 } from '@/utils/seasonalHouseTech';
 
@@ -47,5 +48,20 @@ describe('seasonal house tech availability', () => {
       ...seasonalProfile,
       seasonal_house_tech: false,
     }, '2026-01-01')).toBe(true);
+  });
+
+  it('treats a seasonal profile without a configured range as unavailable', () => {
+    expect(isWithinSeasonalAvailability({
+      ...seasonalProfile,
+      seasonal_house_tech_start_date: null,
+      seasonal_house_tech_end_date: null,
+    }, '2026-07-01')).toBe(false);
+  });
+
+  it('validates complete Madrid date ranges without accepting normalized invalid dates', () => {
+    expect(isSeasonalDateRangeValid('2026-06-01', '2026-08-31')).toBe(true);
+    expect(isSeasonalDateRangeValid('2026-08-31', '2026-06-01')).toBe(false);
+    expect(isSeasonalDateRangeValid('2026-02-31', '2026-08-31')).toBe(false);
+    expect(isSeasonalDateRangeValid('', '2026-08-31')).toBe(false);
   });
 });

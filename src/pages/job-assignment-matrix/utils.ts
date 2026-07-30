@@ -295,15 +295,20 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
   const startDateKey = toMadridDateKey(start);
   const endDateKey = toMadridDateKey(end);
 
-  const { data: seasonalProfiles, error: seasonalProfilesError } = await dataLayerClient
-    .from("profiles")
-    .select("id, role, seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date")
-    .in("id", technicianIds)
-    .eq("seasonal_house_tech", true);
-  if (seasonalProfilesError) throw seasonalProfilesError;
+  const seasonalProfiles = (
+    await Promise.all(techBatches.map(async (batch) => {
+      const { data, error } = await dataLayerClient
+        .from("profiles")
+        .select("id, role, seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date")
+        .in("id", batch)
+        .eq("seasonal_house_tech", true);
+      if (error) throw error;
+      return (data ?? []) as SeasonalHouseTechProfile[];
+    }))
+  ).flat();
 
   buildSeasonalUnavailability(
-    (seasonalProfiles ?? []) as SeasonalHouseTechProfile[],
+    seasonalProfiles,
     startDateKey,
     endDateKey,
   ).forEach((row) => {

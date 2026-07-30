@@ -18,6 +18,7 @@ import { formatUserName } from "@/utils/userName";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
 import { isAdminRole, isManagementRole } from "@/utils/permissions";
+import { isSeasonalDateRangeValid } from "@/utils/seasonalHouseTech";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -102,7 +103,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     const nextIsSoundHouseTech = nextDepartment === 'sound' && nextRole === 'house_tech';
     const nextIsSeasonalHouseTech = nextRole === 'house_tech' && isSeasonalHouseTech;
 
-    if (nextIsSeasonalHouseTech && (!seasonalStartDate || !seasonalEndDate || seasonalStartDate > seasonalEndDate)) {
+    if (nextIsSeasonalHouseTech && !isSeasonalDateRangeValid(seasonalStartDate, seasonalEndDate)) {
       toast({
         title: "Rango de temporada no válido",
         description: "Indica una fecha de inicio y fin, con la fecha de inicio anterior o igual a la de fin.",

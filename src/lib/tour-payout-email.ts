@@ -193,6 +193,7 @@ export function buildHourlyTimesheetMap(
 
   rows.forEach((row) => {
     if (!row.technician_id || !row.date) return;
+    if (row.approved_by_manager !== true) return;
     if (!hourlyKeys.has(`${row.technician_id}:${row.date}`)
       && !seasonalTechnicianIds.has(row.technician_id)) return;
 

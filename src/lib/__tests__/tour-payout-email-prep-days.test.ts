@@ -65,6 +65,7 @@ describe("tour payout prep-day timesheet documentation", () => {
       {
         technician_id: "explicit-hourly",
         date: "2026-06-01",
+        approved_by_manager: true,
         amount_breakdown: {
           hours_rounded: 14,
           base_day_eur: 0,
@@ -77,6 +78,7 @@ describe("tour payout prep-day timesheet documentation", () => {
       {
         technician_id: "seasonal-house",
         date: "2026-06-02",
+        approved_by_manager: true,
         amount_breakdown: {
           hours_rounded: 12,
           base_day_eur: 0,
@@ -91,7 +93,14 @@ describe("tour payout prep-day timesheet documentation", () => {
       {
         technician_id: "standard-tech",
         date: "2026-06-02",
+        approved_by_manager: true,
         amount_breakdown: { hours_rounded: 10, total_eur: 180 },
+      },
+      {
+        technician_id: "seasonal-house",
+        date: "2026-06-03",
+        approved_by_manager: false,
+        amount_breakdown: { hours_rounded: 16, total_eur: 80 },
       },
     ];
 

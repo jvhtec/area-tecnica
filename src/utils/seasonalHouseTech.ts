@@ -1,3 +1,8 @@
+import { addDays, isAfter, isValid } from 'date-fns';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+
+const MADRID_TIMEZONE = 'Europe/Madrid';
+
 export interface SeasonalHouseTechProfile {
   id: string;
   role?: string | null;
@@ -27,10 +32,28 @@ export const isWithinSeasonalAvailability = (
   return Boolean(startDate && endDate && dateKey >= startDate && dateKey <= endDate);
 };
 
+const parseMadridDateKey = (dateKey: string): Date =>
+  fromZonedTime(`${dateKey}T12:00:00`, MADRID_TIMEZONE);
+
+const isValidMadridDateKey = (dateKey: string, date: Date): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+  && isValid(date)
+  && formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy-MM-dd') === dateKey;
+
+export const isSeasonalDateRangeValid = (startDateKey: string, endDateKey: string): boolean => {
+  if (!startDateKey || !endDateKey) return false;
+
+  const startDate = parseMadridDateKey(startDateKey);
+  const endDate = parseMadridDateKey(endDateKey);
+  return isValidMadridDateKey(startDateKey, startDate)
+    && isValidMadridDateKey(endDateKey, endDate)
+    && !isAfter(startDate, endDate);
+};
+
 const nextDateKey = (dateKey: string): string => {
-  const date = new Date(`${dateKey}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
+  const madridNoonUtc = parseMadridDateKey(dateKey);
+  if (!isValid(madridNoonUtc)) return dateKey;
+  return formatInTimeZone(addDays(madridNoonUtc, 1), MADRID_TIMEZONE, 'yyyy-MM-dd');
 };
 
 export const buildSeasonalUnavailability = (

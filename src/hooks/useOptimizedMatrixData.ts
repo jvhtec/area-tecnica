@@ -284,12 +284,32 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   });
 
   // Availability (unavailability) merged from per-day schedules and legacy table
+  const seasonalAvailabilityKey = useMemo(
+    () => technicians
+      .filter((technician) => technician.seasonal_house_tech === true)
+      .map((technician) => [
+        technician.id,
+        technician.role ?? '',
+        technician.seasonal_house_tech_start_date ?? '',
+        technician.seasonal_house_tech_end_date ?? '',
+      ].join(':'))
+      .sort()
+      .join('|'),
+    [technicians],
+  );
+
   const {
     data: availabilityData = [],
     isLoading: availabilityInitialLoading,
     isFetching: availabilityFetching,
   } = useQuery({
-    queryKey: queryKeys.scope('optimized-matrix-availability', technicianIds, toMadridDateKey(dateRange.start), toMadridDateKey(dateRange.end)),
+    queryKey: queryKeys.scope(
+      'optimized-matrix-availability',
+      technicianIds,
+      seasonalAvailabilityKey,
+      toMadridDateKey(dateRange.start),
+      toMadridDateKey(dateRange.end),
+    ),
     queryFn: async () => {
       if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string; notes?: string }>;
 

@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(25);
+SELECT plan(28);
 
 SELECT has_column('public', 'profiles', 'seasonal_house_tech', 'profiles stores the seasonal house-tech flag');
 SELECT has_column('public', 'profiles', 'seasonal_house_tech_start_date', 'profiles stores the season start');
@@ -35,6 +35,16 @@ SELECT ok(
       AND NOT tgisinternal
   ),
   'seasonal profile changes have a dedicated privilege guard'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'public.profiles'::regclass
+      AND tgname = 'enforce_seasonal_house_tech_insert'
+      AND NOT tgisinternal
+  ),
+  'seasonal settings on newly inserted profiles use the same privilege guard'
 );
 
 SELECT ok(
@@ -90,6 +100,13 @@ INSERT INTO auth.users (
     'role-change-house@test.local', 'test', now(), now(), now(),
     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
     'authenticated', 'authenticated'
+  ),
+  (
+    'dc100000-0000-0000-0000-000000000005'::uuid,
+    '00000000-0000-0000-0000-000000000000'::uuid,
+    'seasonal-self-insert@test.local', 'test', now(), now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+    'authenticated', 'authenticated'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -129,6 +146,26 @@ ON CONFLICT (id) DO UPDATE SET
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
 SET ROLE authenticated;
+
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000005', false);
+
+SELECT throws_ok(
+  $$
+    INSERT INTO public.profiles (
+      id, email, first_name, last_name, role, department, autonomo,
+      seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date
+    ) VALUES (
+      'dc100000-0000-0000-0000-000000000005'::uuid,
+      'seasonal-self-insert@test.local', 'Seasonal', 'Self Insert',
+      'house_tech', 'sound', true, true, '2026-06-01', '2026-08-31'
+    )
+  $$,
+  '42501',
+  'Seasonal house tech settings cannot be set or changed on your own account',
+  'a caller cannot bypass the admin guard by inserting a seasonal own-profile row'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
 
 SELECT throws_ok(
   $$
@@ -182,7 +219,9 @@ SELECT is(
 );
 
 INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
-VALUES ('job.created', 'Job created', 'management', 'info', false)
+VALUES
+  ('job.created', 'Job created', 'management', 'info', false),
+  ('timesheet.approved', 'Timesheet approved', 'job_participants', 'info', false)
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public.jobs (id, title, start_time, end_time, job_type, status)
@@ -230,6 +269,12 @@ INSERT INTO public.timesheets (
     'dc200000-0000-0000-0000-000000000001'::uuid,
     'dc100000-0000-0000-0000-000000000003'::uuid,
     '2026-07-12', '08:00', '22:00', 0, 'responsable', true
+  ),
+  (
+    'dc300000-0000-0000-0000-000000000004'::uuid,
+    'dc200000-0000-0000-0000-000000000001'::uuid,
+    'dc100000-0000-0000-0000-000000000003'::uuid,
+    '2026-07-13', '08:00', '22:00', 0, 'responsable', true
   )
 ON CONFLICT (id) DO UPDATE SET
   start_time = excluded.start_time,
@@ -248,6 +293,12 @@ ON CONFLICT (job_id, date) DO UPDATE SET type = excluded.type;
 UPDATE public.timesheets
 SET updated_at = now()
 WHERE id = 'dc300000-0000-0000-0000-000000000003'::uuid;
+
+UPDATE public.timesheets
+SET approved_by_manager = true,
+    amount_eur = 777,
+    amount_breakdown = '{"locked_for_review_test":true}'::jsonb
+WHERE id = 'dc300000-0000-0000-0000-000000000004'::uuid;
 
 SELECT is(
   (public.compute_timesheet_amount_2025('dc300000-0000-0000-0000-000000000001'::uuid, true)->>'amount_eur')::numeric,
@@ -331,6 +382,16 @@ SELECT is(
   ),
   50::numeric,
   'enabling seasonal mode automatically removes stored base and plus amounts'
+);
+
+SELECT is(
+  (
+    SELECT amount_eur
+    FROM public.timesheets
+    WHERE id = 'dc300000-0000-0000-0000-000000000004'::uuid
+  ),
+  777::numeric,
+  'profile changes do not rewrite a manager-approved historical payout'
 );
 
 SELECT is(
