@@ -85,7 +85,9 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     return displayedPayouts.reduce((sum, payout) => {
       const override = data.getTechOverride(payout.technician_id);
       let deduction = 0;
-      const isNonAutonomo = data.autonomoMap.get(payout.technician_id) === false;
+      const isNonAutonomo =
+        data.profileMap.get(payout.technician_id)?.is_house_tech !== true
+        && data.autonomoMap.get(payout.technician_id) === false;
       if (isNonAutonomo && !override && !data.isTourDate) {
         const days = data.techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
         deduction = days * NON_AUTONOMO_DEDUCTION_EUR;

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from '
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from '@/utils/seasonalHouseTech';
 
 interface TechnicianAvailability {
   id: number;
@@ -124,6 +125,16 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
           return;
         }
 
+        const { data: seasonalProfiles, error: seasonalProfilesError } = await dataLayerClient.from('profiles')
+          .select('id, role, seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date')
+          .eq('role', 'house_tech')
+          .eq('seasonal_house_tech', true);
+
+        if (seasonalProfilesError) {
+          console.error('TechnicianAvailability: Error fetching seasonal profiles:', seasonalProfilesError);
+          return;
+        }
+
         console.log('TechnicianAvailability: Fetched availability data:', availabilityDataRaw);
         console.log('TechnicianAvailability: Fetched schedules data:', schedulesData);
 
@@ -150,6 +161,15 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
               availabilityMap[key] = 'unavailable';
             }
           }
+        });
+
+        buildSeasonalUnavailability(
+          (seasonalProfiles ?? []) as SeasonalHouseTechProfile[],
+          startOfMonthFormatted,
+          endOfMonthFormatted,
+        ).forEach((item) => {
+          const key = `${item.user_id}-${item.date}`;
+          if (!availabilityMap[key]) availabilityMap[key] = 'unavailable';
         });
 
         // Update global store instead of local state - no parent rerender
@@ -221,11 +241,24 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       )
       .subscribe();
 
+    const seasonalProfilesChannel = dataLayerClient.channel('seasonal-house-tech-profile-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+        },
+        () => debouncedRefetch(),
+      )
+      .subscribe();
+
     return () => {
       clearTimeout(refetchTimeout);
       dataLayerClient.removeChannel(availabilityChannel);
       dataLayerClient.removeChannel(schedulesChannel);
       dataLayerClient.removeChannel(vacationRequestsChannel);
+      dataLayerClient.removeChannel(seasonalProfilesChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthKey]); // Only refetch when month boundary changes

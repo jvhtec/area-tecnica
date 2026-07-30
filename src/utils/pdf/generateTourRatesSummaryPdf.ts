@@ -227,8 +227,13 @@ export async function generateTourRatesSummaryPDF(
         const plus = Number(quote.breakdown?.single_plus_10_12_total_eur ?? 0);
         const otH = Number(quote.breakdown?.single_overtime_hours_total ?? 0);
         const otAmt = Number(quote.breakdown?.single_overtime_amount_total_eur ?? 0);
+        const isHourly = Number(quote.breakdown?.hourly_days ?? 0) > 0 || quote.category === 'hourly';
         const parts: string[] = [];
-        if (hrs > 0) parts.push(`Horas: ${hrs}h`);
+        if (isHourly) {
+          parts.push(`Por horas: ${hrs}h`);
+        } else if (hrs > 0) {
+          parts.push(`Horas: ${hrs}h`);
+        }
         if (plus > 0) parts.push(`+10–12: ${formatCurrency(plus)}`);
         if (otH > 0) parts.push(`HE: ${otH}h = ${formatCurrency(otAmt)}`);
         if (parts.length) {

@@ -117,9 +117,9 @@ export function TechnicianPayoutCard({
   const techId = payout.technician_id;
   const techName = getTechName(techId);
   const profile = profileMap.get(techId);
-  const autonomoStatus = autonomoMap.get(techId);
+  const autonomoStatus = profile?.is_house_tech ? null : autonomoMap.get(techId);
   const autonomoBadgeLabel = getAutonomoBadgeLabel(autonomoStatus);
-  const isNonAutonomo = autonomoStatus === false;
+  const isNonAutonomo = profile?.is_house_tech !== true && autonomoStatus === false;
 
   /* Deduction calc (standard jobs only) */
   let deduction = 0;

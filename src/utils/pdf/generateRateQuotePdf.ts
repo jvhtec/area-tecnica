@@ -48,6 +48,7 @@ export async function generateRateQuotePDF(
     download?: boolean;
     timesheetMap?: Map<string, Set<string>>;
     prepTimesheetMap?: Map<string, TimesheetLine[]>;
+    hourlyTimesheetMap?: Map<string, TimesheetLine[]>;
   }
 ): Promise<Blob | void> {
   const { jsPDF, autoTable } = await loadPdfLibs();
@@ -88,6 +89,7 @@ export async function generateRateQuotePDF(
 
   const getTechName = getTechNameFactory(profiles);
   const getPrepLines = (technicianId: string) => options?.prepTimesheetMap?.get(technicianId) || [];
+  const getHourlyLines = (technicianId: string) => options?.hourlyTimesheetMap?.get(technicianId) || [];
   const getPrepTotal = (technicianId: string) => (
     getPrepLines(technicianId).reduce((sum, line) => sum + Number(line.total_eur ?? 0), 0)
   );
@@ -111,6 +113,9 @@ export async function generateRateQuotePDF(
     // Manual overrides are applied server-side (see v_tour_job_rate_quotes_2025).
     const effectiveTotal = resolveEffectiveTotal(quote, computed);
     const prepLines = getPrepLines(quote.technician_id);
+    const hourlyLines = getHourlyLines(quote.technician_id);
+    const hourlyDates = new Set(hourlyLines.map((line) => line.date).filter(Boolean));
+    const separatelyDisplayedPrepLines = prepLines.filter((line) => !hourlyDates.has(line.date));
     const prepTotal = getPrepTotal(quote.technician_id);
     const effectiveTotalWithPrep = effectiveTotal + prepTotal;
 
@@ -134,7 +139,7 @@ export async function generateRateQuotePDF(
     // Show autonomo discount from server breakdown if applicable
     let nameCellContent = withLpo(nameWithStatus, lpo);
     const autonomoDiscount = quote.autonomo_discount_eur;
-    if (autonomoDiscount && autonomoDiscount > 0) {
+    if (!is_house_tech && autonomoDiscount && autonomoDiscount > 0) {
       nameCellContent += `\n(Deducción IRPF ya aplicada: -${formatCurrency(autonomoDiscount)})`;
     }
 
@@ -159,14 +164,30 @@ export async function generateRateQuotePDF(
       }
     }
 
-    if (prepLines.length > 0) {
-      const prepSummary = prepLines
+    if (separatelyDisplayedPrepLines.length > 0) {
+      const prepSummary = separatelyDisplayedPrepLines
         .map((line) => {
           const dateLabel = line.date ? format(new Date(line.date), 'P', { locale: es }) : '—';
           return `${dateLabel}: ${line.hours_rounded ?? 0}h = ${formatCurrency(line.total_eur ?? 0)}`;
         })
         .join(' · ');
       nameCellContent += `\nDía(s) preparación: ${prepSummary}`;
+    }
+
+    if (hourlyLines.length > 0) {
+      const hourlySummary = hourlyLines
+        .map((line) => {
+          const dateLabel = line.date ? format(new Date(line.date), 'P', { locale: es }) : '—';
+          const overtimeHours = Number(line.overtime_hours ?? 0);
+          const overtimeRate = Number(line.overtime_hour_eur ?? 0);
+          const overtimeAmount = Number(line.overtime_amount_eur ?? 0);
+          const overtimeText = overtimeHours > 0
+            ? ` · HE ${overtimeHours}h × ${formatCurrency(overtimeRate)} = ${formatCurrency(overtimeAmount)}`
+            : '';
+          return `${dateLabel}: ${line.hours_rounded ?? 0}h · base ${formatCurrency(line.base_day_eur ?? 0)}${overtimeText} · total ${formatCurrency(line.total_eur ?? 0)}`;
+        })
+        .join('\n');
+      nameCellContent += `\nDesglose por horas:\n${hourlySummary}`;
     }
 
     return [
@@ -231,7 +252,10 @@ export async function generateRateQuotePDF(
 
   // Check if any quotes have autonomo discount applied by server
   const anyDeductionApplied = quotesWithComputed.some(({ quote }) => {
-      return quote.autonomo_discount_eur && quote.autonomo_discount_eur > 0;
+      const techInfo = getTechName(quote.technician_id);
+      return !techInfo.is_house_tech
+        && quote.autonomo_discount_eur
+        && quote.autonomo_discount_eur > 0;
   });
 
   // Check if any quotes have manual override

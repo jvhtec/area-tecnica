@@ -6109,6 +6109,9 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
           selected_job_statuses: string[] | null
           selected_job_types: string[] | null
+          seasonal_house_tech: boolean
+          seasonal_house_tech_end_date: string | null
+          seasonal_house_tech_start_date: string | null
           soundvision_access_enabled: boolean | null
           soundvision_tool_access_enabled: boolean
           time_span: string | null
@@ -6147,6 +6150,9 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
+          seasonal_house_tech?: boolean
+          seasonal_house_tech_end_date?: string | null
+          seasonal_house_tech_start_date?: string | null
           soundvision_access_enabled?: boolean | null
           soundvision_tool_access_enabled?: boolean
           time_span?: string | null
@@ -6185,6 +6191,9 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
+          seasonal_house_tech?: boolean
+          seasonal_house_tech_end_date?: string | null
+          seasonal_house_tech_start_date?: string | null
           soundvision_access_enabled?: boolean | null
           soundvision_tool_access_enabled?: boolean
           time_span?: string | null
@@ -11398,6 +11407,9 @@ export type Database = {
           phone: string
           profile_picture_url: string
           role: string
+          seasonal_house_tech: boolean
+          seasonal_house_tech_end_date: string
+          seasonal_house_tech_start_date: string
           skills: Json
         }[]
       }

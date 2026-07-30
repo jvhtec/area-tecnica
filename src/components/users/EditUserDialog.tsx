@@ -17,7 +17,8 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { formatUserName } from "@/utils/userName";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
-import { isManagementRole } from "@/utils/permissions";
+import { isAdminRole, isManagementRole } from "@/utils/permissions";
+import { isSeasonalDateRangeValid } from "@/utils/seasonalHouseTech";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -32,9 +33,13 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [soundvisionAccessEnabled, setSoundvisionAccessEnabled] = useState<boolean>(!!user?.soundvision_access_enabled);
   const [soundvisionToolAccessEnabled, setSoundvisionToolAccessEnabled] = useState<boolean>(!!user?.soundvision_tool_access_enabled);
   const [isAutonomo, setIsAutonomo] = useState<boolean>(user?.autonomo !== false);
+  const [isSeasonalHouseTech, setIsSeasonalHouseTech] = useState<boolean>(!!user?.seasonal_house_tech);
+  const [seasonalStartDate, setSeasonalStartDate] = useState<string>(user?.seasonal_house_tech_start_date || "");
+  const [seasonalEndDate, setSeasonalEndDate] = useState<string>(user?.seasonal_house_tech_end_date || "");
   const [selectedRole, setSelectedRole] = useState<string>(user?.role || "technician");
   const { userRole } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
+  const isAdminUser = isAdminRole(userRole);
   const [flexUrl, setFlexUrl] = useState<string>("");
   const [flexResourceId, setFlexResourceId] = useState<string>(user?.flex_resource_id || "");
   const [isSendingOnboarding, setIsSendingOnboarding] = useState(false);
@@ -54,6 +59,9 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     setFlexResourceId(user?.flex_resource_id || "");
     setFlexUrl("");
     setIsAutonomo(user?.autonomo !== false);
+    setIsSeasonalHouseTech(!!user?.seasonal_house_tech);
+    setSeasonalStartDate(user?.seasonal_house_tech_start_date || "");
+    setSeasonalEndDate(user?.seasonal_house_tech_end_date || "");
     setResidencia(user?.residencia || "");
     setHomeLatitude(user?.home_latitude ?? null);
     setHomeLongitude(user?.home_longitude ?? null);
@@ -93,6 +101,16 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     const nextDepartment = formData.get('department') as Department;
     const nextRole = formData.get('role') as string;
     const nextIsSoundHouseTech = nextDepartment === 'sound' && nextRole === 'house_tech';
+    const nextIsSeasonalHouseTech = nextRole === 'house_tech' && isSeasonalHouseTech;
+
+    if (nextIsSeasonalHouseTech && !isSeasonalDateRangeValid(seasonalStartDate, seasonalEndDate)) {
+      toast({
+        title: "Rango de temporada no válido",
+        description: "Indica una fecha de inicio y fin, con la fecha de inicio anterior o igual a la de fin.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const updatedData: Partial<Profile> = {
       id: user.id,
@@ -115,7 +133,12 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
         nextDepartment === 'sound'
           ? nextIsSoundHouseTech || soundvisionToolAccessEnabled
           : false,
-      autonomo: isAutonomo,
+      // House tech payroll never uses autónomo status. Normalizing the stored
+      // value also prevents stale technician state leaking into older readers.
+      autonomo: nextRole === 'house_tech' ? true : isAutonomo,
+      seasonal_house_tech: nextIsSeasonalHouseTech,
+      seasonal_house_tech_start_date: nextIsSeasonalHouseTech ? seasonalStartDate : null,
+      seasonal_house_tech_end_date: nextIsSeasonalHouseTech ? seasonalEndDate : null,
     };
 
     console.log("Submitting user update with data:", updatedData);
@@ -338,18 +361,63 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
               </Select>
             </div>
             {selectedRole === 'house_tech' && (
-              <div className="space-y-2">
-                <Label htmlFor="warehouseDutyExempt">Exento de almacén</Label>
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    id="warehouseDutyExempt"
-                    checked={warehouseDutyExempt}
-                    onCheckedChange={(value) => setWarehouseDutyExempt(!!value)}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    Excluir a este house tech de las guardias de almacén en la agenda Personal y en los resúmenes de almacén.
-                  </span>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="warehouseDutyExempt">Exento de almacén</Label>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="warehouseDutyExempt"
+                      checked={warehouseDutyExempt}
+                      onCheckedChange={(value) => setWarehouseDutyExempt(!!value)}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Excluir a este house tech de las guardias de almacén en la agenda Personal y en los resúmenes de almacén.
+                    </span>
+                  </div>
                 </div>
+                {isAdminUser && (
+                  <div className="space-y-2">
+                    <Label htmlFor="seasonalHouseTech">House tech de temporada</Label>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="seasonalHouseTech"
+                        checked={isSeasonalHouseTech}
+                        onCheckedChange={(value) => setIsSeasonalHouseTech(!!value)}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        Sin tarifa base ni plus. Solo cobra las horas que superen las 12 h, usando su tarifa de horas extra.
+                      </span>
+                    </div>
+                    {isSeasonalHouseTech && (
+                      <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="seasonalStartDate">Disponible desde</Label>
+                          <Input
+                            id="seasonalStartDate"
+                            type="date"
+                            value={seasonalStartDate}
+                            onChange={(event) => setSeasonalStartDate(event.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="seasonalEndDate">Disponible hasta</Label>
+                          <Input
+                            id="seasonalEndDate"
+                            type="date"
+                            value={seasonalEndDate}
+                            min={seasonalStartDate || undefined}
+                            onChange={(event) => setSeasonalEndDate(event.target.value)}
+                            required
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground sm:col-span-2">
+                          El rango es inclusivo y se usa en la matriz y en los selectores de personal disponible.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {selectedRole === 'technician' && (

@@ -6,6 +6,7 @@ import {
   getDateKeyRange,
   normalizeDateKey,
 } from "@/utils/assignmentWorkDates";
+import { isWithinSeasonalAvailability } from "@/utils/seasonalHouseTech";
 
 export interface TechnicianJobConflict {
   id: string;
@@ -77,6 +78,9 @@ type TechnicianProfile = {
   dni?: string | null;
   bg_color?: string | null;
   profile_picture_url?: string | null;
+  seasonal_house_tech?: boolean | null;
+  seasonal_house_tech_start_date?: string | null;
+  seasonal_house_tech_end_date?: string | null;
   skills?: unknown;
 };
 
@@ -177,6 +181,10 @@ export async function getAvailableTechnicians(
 
     // Filter out technicians who have conflicts
     const availableTechnicians = eligibleTechnicians.filter((technician) => {
+      if (jobDateKeys.some((dateKey) => !isWithinSeasonalAvailability(technician, dateKey))) {
+        return false;
+      }
+
       // Check if already assigned to current job
       const assignedJobs = technicianJobs.get(technician.id);
       if (assignedJobs?.has(jobId)) {

@@ -68,10 +68,10 @@ export function usePayoutActions({
     tourContext: Awaited<ReturnType<typeof prepareTourJobEmailContext>>
   ) => {
     const map = new Map<string, TimesheetLine[]>(
-      Array.from(tourContext.timesheetDateMap.entries()).map(([techId, dates]) => [
+      Array.from(tourContext.hourlyTimesheetMap.entries()).map(([techId, lines]) => [
         techId,
-        Array.from(dates).sort().map((date) => ({ date, hours_rounded: 0 })),
-      ])
+        [...lines],
+      ]),
     );
 
     tourContext.prepTimesheetMap.forEach((prepLines, techId) => {
@@ -81,6 +81,16 @@ export function usePayoutActions({
         ...prepLines,
         ...existing.filter((line) => !prepDates.has(line.date)),
       ]);
+    });
+
+    tourContext.timesheetDateMap.forEach((dates, techId) => {
+      const existing = map.get(techId) || [];
+      const existingDates = new Set(existing.map((line) => line.date).filter(Boolean));
+      const missingDateLines = Array.from(dates)
+        .filter((date) => !existingDates.has(date))
+        .sort()
+        .map((date) => ({ date, hours_rounded: 0 }));
+      map.set(techId, [...existing, ...missingDateLines]);
     });
 
     return map;
@@ -177,6 +187,7 @@ export function usePayoutActions({
           {
             timesheetMap: tourContext.timesheetDateMap,
             prepTimesheetMap: tourContext.prepTimesheetMap,
+            hourlyTimesheetMap: tourContext.hourlyTimesheetMap,
           }
         );
         toast.success('PDF de tarifas generado');

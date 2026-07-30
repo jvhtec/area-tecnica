@@ -223,6 +223,46 @@ describe("EditUserDialog", () => {
     expect(screen.queryByRole("checkbox", { name: /nm\/sv designer access/i })).not.toBeInTheDocument();
   });
 
+  it("lets only an admin enable a seasonal house tech with an inclusive date range", async () => {
+    useOptimizedAuthMock.mockReturnValue({ userRole: "admin" });
+    const user = userEvent.setup();
+    const { onSave } = renderDialog(
+      createUserProfile({
+        id: "seasonal-house-1",
+        role: "house_tech",
+        department: "lights",
+        autonomo: false,
+      }),
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: /house tech de temporada/i }));
+    await user.type(screen.getByLabelText(/disponible desde/i), "2026-06-01");
+    await user.type(screen.getByLabelText(/disponible hasta/i), "2026-08-31");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+        id: "seasonal-house-1",
+        role: "house_tech",
+        autonomo: true,
+        seasonal_house_tech: true,
+        seasonal_house_tech_start_date: "2026-06-01",
+        seasonal_house_tech_end_date: "2026-08-31",
+      }));
+    });
+  });
+
+  it("does not expose seasonal payroll controls to management users", () => {
+    useOptimizedAuthMock.mockReturnValue({ userRole: "management" });
+    renderDialog(createUserProfile({
+      id: "managed-house-1",
+      role: "house_tech",
+      department: "sound",
+    }));
+
+    expect(screen.queryByRole("checkbox", { name: /house tech de temporada/i })).not.toBeInTheDocument();
+  });
+
   it("sends onboarding emails and surfaces both success and failure toasts", async () => {
     const user = userEvent.setup();
     renderDialog(

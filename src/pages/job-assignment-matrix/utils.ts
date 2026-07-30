@@ -1,6 +1,7 @@
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
 const MADRID_TIMEZONE = "Europe/Madrid";
 
 function toMadridDateKey(date: Date): string {
@@ -293,6 +294,26 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
   const perDay = new Map<string, { user_id: string; date: string; status: string; notes?: string }>();
   const startDateKey = toMadridDateKey(start);
   const endDateKey = toMadridDateKey(end);
+
+  const seasonalProfiles = (
+    await Promise.all(techBatches.map(async (batch) => {
+      const { data, error } = await dataLayerClient
+        .from("profiles")
+        .select("id, role, seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date")
+        .in("id", batch)
+        .eq("seasonal_house_tech", true);
+      if (error) throw error;
+      return (data ?? []) as SeasonalHouseTechProfile[];
+    }))
+  ).flat();
+
+  buildSeasonalUnavailability(
+    seasonalProfiles,
+    startDateKey,
+    endDateKey,
+  ).forEach((row) => {
+    perDay.set(`${row.user_id}-${row.date}`, row);
+  });
 
   for (const batch of techBatches) {
     const { data: schedRows, error: schedErr } = await dataLayerClient.from("availability_schedules")

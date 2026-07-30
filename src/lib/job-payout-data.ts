@@ -8,7 +8,11 @@ export interface TechnicianProfileWithEmail {
   email?: string | null;
   autonomo?: boolean | null;
   is_house_tech?: boolean | null;
+  role?: string | null;
   department?: string | null;
+  seasonal_house_tech?: boolean | null;
+  seasonal_house_tech_start_date?: string | null;
+  seasonal_house_tech_end_date?: string | null;
 }
 
 export interface JobPayoutDocumentJobDetails {
@@ -196,7 +200,7 @@ async function fetchProfiles(
 
   const { data, error } = await client
     .from('profiles')
-    .select('id, first_name, last_name, email, autonomo')
+    .select('id, first_name, last_name, email, autonomo, role, seasonal_house_tech, seasonal_house_tech_start_date, seasonal_house_tech_end_date')
     .in('id', techIds);
 
   if (error) {
@@ -215,14 +219,8 @@ async function fetchProfiles(
       const mergedProfile: TechnicianProfileWithEmail = {
         ...profileMap.get(profile.id),
         ...profile,
+        is_house_tech: profile.role === 'house_tech',
       };
-
-      try {
-        const { data: isHouseTech } = await client.rpc('is_house_tech', { _profile_id: profile.id });
-        mergedProfile.is_house_tech = isHouseTech ?? false;
-      } catch {
-        mergedProfile.is_house_tech = mergedProfile.is_house_tech ?? false;
-      }
 
       return mergedProfile;
     })

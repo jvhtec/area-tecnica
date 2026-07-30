@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  buildHourlyTimesheetMap,
   buildPrepTimesheetDateMap,
   buildPrepTimesheetMap,
   fetchTourJobEmailTimesheets,
@@ -57,6 +58,72 @@ describe("tour payout prep-day timesheet documentation", () => {
       ["is_active", true],
     ]);
     expect(rows).toHaveLength(1);
+  });
+
+  it("documents every hourly tour row, including profile-driven seasonal rows", () => {
+    const rows = [
+      {
+        technician_id: "explicit-hourly",
+        date: "2026-06-01",
+        approved_by_manager: true,
+        amount_breakdown: {
+          hours_rounded: 14,
+          base_day_eur: 0,
+          overtime_hours: 2,
+          overtime_hour_eur: 20,
+          overtime_amount_eur: 40,
+          total_eur: 40,
+        },
+      },
+      {
+        technician_id: "seasonal-house",
+        date: "2026-06-02",
+        approved_by_manager: true,
+        amount_breakdown: {
+          hours_rounded: 12,
+          base_day_eur: 0,
+          overtime_hours: 0,
+          overtime_hour_eur: 15,
+          overtime_amount_eur: 0,
+          total_eur: 0,
+          is_seasonal_house_tech: true,
+          seasonal_overtime_only: true,
+        },
+      },
+      {
+        technician_id: "standard-tech",
+        date: "2026-06-02",
+        approved_by_manager: true,
+        amount_breakdown: { hours_rounded: 10, total_eur: 180 },
+      },
+      {
+        technician_id: "seasonal-house",
+        date: "2026-06-03",
+        approved_by_manager: false,
+        amount_breakdown: { hours_rounded: 16, total_eur: 80 },
+      },
+    ];
+
+    const map = buildHourlyTimesheetMap(
+      rows,
+      [{ technician_id: "explicit-hourly", date: "2026-06-01" }],
+      new Set(["seasonal-house"]),
+    );
+
+    expect(map.get("explicit-hourly")).toEqual([
+      expect.objectContaining({ date: "2026-06-01", hours_rounded: 14, overtime_hours: 2, total_eur: 40 }),
+    ]);
+    expect(map.get("seasonal-house")).toEqual([
+      expect.objectContaining({
+        date: "2026-06-02",
+        hours_rounded: 12,
+        base_day_eur: 0,
+        total_eur: 0,
+        is_seasonal_house_tech: true,
+        seasonal_overtime_only: true,
+      }),
+    ]);
+    expect(map.has("standard-tech")).toBe(false);
   });
 
   it("keeps only approved prep-day rows in the prep timesheet map", () => {
