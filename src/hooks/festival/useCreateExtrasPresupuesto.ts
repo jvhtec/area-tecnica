@@ -13,8 +13,16 @@ const jobCreationQueues = new Map<string, Promise<void>>();
 const RETRY_DELAYS = [500, 1000, 2000];
 const FLEX_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 
-export function formatArtistDateTimeForFlex(date: string, time: string): string {
-  const match = time.match(FLEX_TIME_PATTERN);
+/**
+ * Formats a festival wall-clock value for Flex's ISO-like date contract.
+ * Flex expects the local schedule fields with a trailing `Z`; this value must
+ * not be converted to a UTC instant or the displayed schedule will shift.
+ */
+export function formatArtistDateTimeForFlex(
+  date: string,
+  time: string | null | undefined,
+): string {
+  const match = typeof time === "string" ? time.match(FLEX_TIME_PATTERN) : null;
   if (!match) {
     throw new Error(`Hora de artista invalida para Flex: ${time || "(vacia)"}`);
   }
@@ -24,6 +32,33 @@ export function formatArtistDateTimeForFlex(date: string, time: string): string 
   return `${date}T${hours}:${minutes}:${seconds}.000Z`;
 }
 
+/**
+ * Builds the Flex schedule for an artist, falling back to the complete
+ * festival operating day when show times have not been scheduled yet.
+ */
+export function buildArtistFlexDateRange(
+  artistDate: string,
+  showStart: string | null | undefined,
+  showEnd: string | null | undefined,
+  isAfterMidnight = false,
+  dayStartTime = "07:00",
+): { plannedStartDate: string; plannedEndDate: string } {
+  const parsedDate = parseISO(artistDate);
+  const effectiveShowStart = showStart?.trim() || dayStartTime;
+  const effectiveShowEnd = showEnd?.trim() || dayStartTime;
+  const endDateBase =
+    isAfterMidnight || !showEnd?.trim() ? addDays(parsedDate, 1) : parsedDate;
+
+  return {
+    plannedStartDate: formatArtistDateTimeForFlex(artistDate, effectiveShowStart),
+    plannedEndDate: formatArtistDateTimeForFlex(
+      format(endDateBase, "yyyy-MM-dd"),
+      effectiveShowEnd,
+    ),
+  };
+}
+
+/** Returns the stable document number for an artist extras folder. */
 export function formatArtistExtrasFolderDocumentNumber(date: Date): string {
   return `${format(date, "ddMMyy")}ESQT`;
 }
@@ -41,7 +76,11 @@ async function insertWithRetry(insertFn: () => Promise<{ error: unknown }>): Pro
   throw lastError;
 }
 
-export function useCreateExtrasPresupuesto(jobId: string | undefined) {
+/** Creates artist extras folders and presupuestos in Flex for one festival. */
+export function useCreateExtrasPresupuesto(
+  jobId: string | undefined,
+  dayStartTime = "07:00",
+) {
   const [creatingExtrasForArtistIds, setCreatingExtrasForArtistIds] = useState<Set<string>>(new Set());
 
   const addCreating = (id: string) =>
@@ -54,8 +93,8 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
     artistId: string,
     artistName: string,
     artistDate: string,   // YYYY-MM-DD
-    showStart: string,    // HH:MM
-    showEnd: string,      // HH:MM
+    showStart: string | null | undefined, // HH:MM when scheduled
+    showEnd: string | null | undefined,   // HH:MM when scheduled
     isAfterMidnight = false
   ) => {
     if (!jobId) {
@@ -88,10 +127,13 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
 
       // 2. Build Flex date strings from the artist's local show day/time
       const parsedDate = parseISO(artistDate);
-      const endDateBase = isAfterMidnight ? addDays(parsedDate, 1) : parsedDate;
-
-      const plannedStartDate = formatArtistDateTimeForFlex(artistDate, showStart);
-      const plannedEndDate = formatArtistDateTimeForFlex(format(endDateBase, "yyyy-MM-dd"), showEnd);
+      const { plannedStartDate, plannedEndDate } = buildArtistFlexDateRange(
+        artistDate,
+        showStart,
+        showEnd,
+        isAfterMidnight,
+        dayStartTime,
+      );
 
       // 3. Compute document number: DDMMAA.xSQT
       //    Count runs inside the queue so the ordinal is always fresh.
