@@ -12,7 +12,7 @@ vi.mock("@/components/dashboard/DateTypeContextMenu", () => ({
 describe("FestivalDateNavigation", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 4, 1, 12));
+    vi.setSystemTime(new Date("2026-05-01T10:00:00.000Z"));
   });
 
   afterEach(() => {
@@ -23,9 +23,9 @@ describe("FestivalDateNavigation", () => {
     render(
       <FestivalDateNavigation
         jobDates={[
-          new Date(2026, 5, 4),
-          new Date(2026, 5, 5),
-          new Date(2026, 5, 6),
+          new Date("2026-06-03T22:00:00.000Z"),
+          new Date("2026-06-04T22:00:00.000Z"),
+          new Date("2026-06-05T22:00:00.000Z"),
         ]}
         selectedDate="2026-06-04"
         onDateChange={vi.fn()}
@@ -47,9 +47,9 @@ describe("FestivalDateNavigation", () => {
     render(
       <FestivalDateNavigation
         jobDates={[
-          new Date(2026, 7, 4),
-          new Date(2026, 7, 5),
-          new Date(2026, 7, 6),
+          new Date("2026-08-03T22:00:00.000Z"),
+          new Date("2026-08-04T22:00:00.000Z"),
+          new Date("2026-08-05T22:00:00.000Z"),
         ]}
         selectedDate="2026-08-05"
         onDateChange={vi.fn()}
@@ -71,15 +71,15 @@ describe("FestivalDateNavigation", () => {
     );
   });
 
-  it("hides past dates by default and reveals them on request", () => {
-    vi.setSystemTime(new Date(2026, 7, 3, 12));
+  it("uses the Madrid day boundary when hiding and revealing past dates", () => {
+    vi.setSystemTime(new Date("2026-08-02T22:30:00.000Z"));
 
     render(
       <FestivalDateNavigation
         jobDates={[
-          new Date(2026, 7, 1),
-          new Date(2026, 7, 3),
-          new Date(2026, 7, 4),
+          new Date("2026-08-01T22:00:00.000Z"),
+          new Date("2026-08-02T22:00:00.000Z"),
+          new Date("2026-08-03T22:00:00.000Z"),
         ]}
         selectedDate="2026-08-04"
         onDateChange={vi.fn()}
@@ -90,7 +90,8 @@ describe("FestivalDateNavigation", () => {
       />,
     );
 
-    expect(screen.queryByRole("tab", { name: "Sat, Aug 1" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Sun, Aug 2" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Mon, Aug 3" })).toBeInTheDocument();
 
     const showPastDates = screen.getByRole("switch", {
       name: "Mostrar fechas pasadas",
@@ -100,6 +101,6 @@ describe("FestivalDateNavigation", () => {
     fireEvent.click(showPastDates);
 
     expect(showPastDates).toBeChecked();
-    expect(screen.getByRole("tab", { name: "Sat, Aug 1" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Sun, Aug 2" })).toBeInTheDocument();
   });
 });

@@ -3,7 +3,7 @@ import {
   buildArtistFlexDateRange,
   formatArtistDateTimeForFlex,
   formatArtistExtrasFolderDocumentNumber,
-} from "../useCreateExtrasPresupuesto";
+} from "@/hooks/festival/useCreateExtrasPresupuesto";
 
 vi.mock("sonner", () => ({
   toast: {

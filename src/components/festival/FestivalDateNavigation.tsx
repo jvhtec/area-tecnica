@@ -4,18 +4,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DateTypeContextMenu } from "@/components/dashboard/DateTypeContextMenu";
 import { ChevronLeft, ChevronRight, Calendar, CalendarCheck2, Filter } from "lucide-react";
-import {
-  addWeeks,
-  endOfWeek,
-  format,
-  isBefore,
-  isSameWeek,
-  parseISO,
-  startOfDay,
-  startOfWeek,
-  subWeeks,
-} from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   Popover,
   PopoverContent,
@@ -26,6 +17,31 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getDateTypeMeta, getEffectiveFestivalDateType, isKeyFestivalDateType } from "@/constants/dateTypes";
+import {
+  addMadridCalendarDays,
+  formatMadridDateKey,
+  fromMadridDateKey,
+  MADRID_TIMEZONE,
+} from "@/utils/timezoneUtils";
+
+const FESTIVAL_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const getFestivalWeekStartKey = (dateKey: string): string => {
+  const safeDateKey = FESTIVAL_DATE_KEY_PATTERN.test(dateKey)
+    ? dateKey
+    : formatMadridDateKey(new Date());
+  const madridNoon = fromMadridDateKey(safeDateKey, "12:00:00");
+  const isoWeekday = Number(formatInTimeZone(madridNoon, MADRID_TIMEZONE, "i"));
+
+  return addMadridCalendarDays(safeDateKey, -(isoWeekday - 1));
+};
+
+const formatFestivalDateKey = (dateKey: string, formatPattern: string): string =>
+  formatInTimeZone(
+    fromMadridDateKey(dateKey, "12:00:00"),
+    MADRID_TIMEZONE,
+    formatPattern,
+  );
 
 interface FestivalDateNavigationProps {
   jobDates: Date[];
@@ -56,71 +72,88 @@ export const FestivalDateNavigation = ({
   maxStages = 3
 }: FestivalDateNavigationProps) => {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    const selected = new Date(selectedDate);
-    return startOfWeek(selected, { weekStartsOn: 1 }); // Start week on Monday
+    return getFestivalWeekStartKey(selectedDate);
   });
   const [showOnlyShowDates, setShowOnlyShowDates] = useState(true);
   const [showPastDates, setShowPastDates] = useState(false);
   const [viewMode, setViewMode] = useState<'week' | 'all'>('all');
+  const todayDateKey = formatMadridDateKey(new Date());
   const selectedDateLabel = useMemo(() => {
-    if (!selectedDate) return "";
-    const parsedSelectedDate = parseISO(selectedDate);
-    if (Number.isNaN(parsedSelectedDate.getTime())) return selectedDate;
-    return format(parsedSelectedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
+    if (!FESTIVAL_DATE_KEY_PATTERN.test(selectedDate)) return selectedDate;
+    return formatInTimeZone(
+      fromMadridDateKey(selectedDate, "12:00:00"),
+      MADRID_TIMEZONE,
+      "EEEE, d 'de' MMMM 'de' yyyy",
+      { locale: es },
+    );
   }, [selectedDate]);
 
   const hasPastDates = useMemo(() => {
-    const today = startOfDay(new Date());
-    return jobDates.some((date) => isBefore(startOfDay(date), today));
-  }, [jobDates]);
+    return jobDates.some((date) => formatMadridDateKey(date) < todayDateKey);
+  }, [jobDates, todayDateKey]);
 
   // Filter dates based on preferences. Keep a selected historical date visible
   // so the navigation never loses the day the user is inspecting.
   const filteredDates = useMemo(() => {
-    const today = startOfDay(new Date());
-
     return jobDates.filter(date => {
-      const formattedDate = format(date, 'yyyy-MM-dd');
+      const formattedDate = formatMadridDateKey(date);
       if (formattedDate === selectedDate) return true;
-      if (!showPastDates && isBefore(startOfDay(date), today)) return false;
+      if (!showPastDates && formattedDate < todayDateKey) return false;
       if (!showOnlyShowDates) return true;
 
       const key = `${jobId}-${formattedDate}`;
       const dateType = getEffectiveFestivalDateType(dateTypes[key]);
       return isKeyFestivalDateType(dateType);
     });
-  }, [jobDates, selectedDate, showPastDates, showOnlyShowDates, dateTypes, jobId]);
+  }, [
+    jobDates,
+    selectedDate,
+    showPastDates,
+    showOnlyShowDates,
+    dateTypes,
+    jobId,
+    todayDateKey,
+  ]);
 
   // Get dates for current week
   const weekDates = useMemo(() => {
     if (viewMode === 'all') return filteredDates;
-    
-    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-    return filteredDates.filter(date => 
-      date >= currentWeekStart && date <= weekEnd
-    );
+
+    const weekEnd = addMadridCalendarDays(currentWeekStart, 6);
+    return filteredDates.filter(date => {
+      const dateKey = formatMadridDateKey(date);
+      return dateKey >= currentWeekStart && dateKey <= weekEnd;
+    });
   }, [currentWeekStart, filteredDates, viewMode]);
 
   const canGoToPrevWeek = useMemo(() => {
-    const prevWeek = subWeeks(currentWeekStart, 1);
-    return filteredDates.some(date => isSameWeek(date, prevWeek, { weekStartsOn: 1 }));
+    const prevWeekStart = addMadridCalendarDays(currentWeekStart, -7);
+    const prevWeekEnd = addMadridCalendarDays(prevWeekStart, 6);
+    return filteredDates.some(date => {
+      const dateKey = formatMadridDateKey(date);
+      return dateKey >= prevWeekStart && dateKey <= prevWeekEnd;
+    });
   }, [currentWeekStart, filteredDates]);
 
   const canGoToNextWeek = useMemo(() => {
-    const nextWeek = addWeeks(currentWeekStart, 1);
-    return filteredDates.some(date => isSameWeek(date, nextWeek, { weekStartsOn: 1 }));
+    const nextWeekStart = addMadridCalendarDays(currentWeekStart, 7);
+    const nextWeekEnd = addMadridCalendarDays(nextWeekStart, 6);
+    return filteredDates.some(date => {
+      const dateKey = formatMadridDateKey(date);
+      return dateKey >= nextWeekStart && dateKey <= nextWeekEnd;
+    });
   }, [currentWeekStart, filteredDates]);
 
   const handlePrevWeek = () => {
-    setCurrentWeekStart(prev => subWeeks(prev, 1));
+    setCurrentWeekStart(prev => addMadridCalendarDays(prev, -7));
   };
 
   const handleNextWeek = () => {
-    setCurrentWeekStart(prev => addWeeks(prev, 1));
+    setCurrentWeekStart(prev => addMadridCalendarDays(prev, 7));
   };
 
   const getDateTypeColor = (date: Date) => {
-    const formattedDate = format(date, 'yyyy-MM-dd');
+    const formattedDate = formatMadridDateKey(date);
     const key = `${jobId}-${formattedDate}`;
     const meta = getDateTypeMeta(getEffectiveFestivalDateType(dateTypes[key]));
     if (!meta) return "border-gray-300";
@@ -128,7 +161,7 @@ export const FestivalDateNavigation = ({
   };
 
   const getDateTypeBadge = (date: Date) => {
-    const formattedDate = format(date, 'yyyy-MM-dd');
+    const formattedDate = formatMadridDateKey(date);
     const key = `${jobId}-${formattedDate}`;
     const meta = getDateTypeMeta(getEffectiveFestivalDateType(dateTypes[key]));
     if (!meta) return null;
@@ -147,21 +180,23 @@ export const FestivalDateNavigation = ({
     if (!date) return;
     
     const formattedDate = format(date, 'yyyy-MM-dd');
-    const isValidDate = jobDates.some(jobDate => format(jobDate, 'yyyy-MM-dd') === formattedDate);
+    const isValidDate = jobDates.some(
+      jobDate => formatMadridDateKey(jobDate) === formattedDate,
+    );
     
     if (isValidDate) {
       onDateChange(formattedDate);
-      setCurrentWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+      setCurrentWeekStart(getFestivalWeekStartKey(formattedDate));
     }
   };
 
   const formatTabDate = (date: Date) => {
-    return format(date, 'EEE, MMM d');
+    return formatInTimeZone(date, MADRID_TIMEZONE, 'EEE, MMM d');
   };
 
   const getWeekRange = () => {
-    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-    return `${format(currentWeekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`;
+    const weekEnd = addMadridCalendarDays(currentWeekStart, 6);
+    return `${formatFestivalDateKey(currentWeekStart, 'MMM d')} - ${formatFestivalDateKey(weekEnd, 'MMM d')}`;
   };
 
   // Show simplified view for long festivals (7+ days)
@@ -297,11 +332,11 @@ export const FestivalDateNavigation = ({
             <PopoverContent className="w-auto p-0" align="end">
               <CalendarComponent
                 mode="single"
-                selected={new Date(selectedDate)}
+                selected={parseISO(selectedDate)}
                 onSelect={handleDateJump}
                 disabled={(date) =>
                   !jobDates.some(jobDate =>
-                    format(jobDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                    formatMadridDateKey(jobDate) === format(date, 'yyyy-MM-dd')
                   )
                 }
                 initialFocus
@@ -317,11 +352,11 @@ export const FestivalDateNavigation = ({
             <PopoverContent className="w-auto p-0" align="end">
               <CalendarComponent
                 mode="single"
-                selected={new Date(selectedDate)}
+                selected={parseISO(selectedDate)}
                 onSelect={handleDateJump}
                 disabled={(date) => 
                   !jobDates.some(jobDate => 
-                    format(jobDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                    formatMadridDateKey(jobDate) === format(date, 'yyyy-MM-dd')
                   )
                 }
                 initialFocus
@@ -349,7 +384,7 @@ export const FestivalDateNavigation = ({
         <div className="overflow-x-auto -mx-2 px-2 touch-pan-x">
           <TabsList className="mb-4 inline-flex h-auto p-1 w-auto min-w-full">
             {weekDates.map((date) => {
-              const formattedDateValue = format(date, 'yyyy-MM-dd');
+              const formattedDateValue = formatMadridDateKey(date);
               const dateTypeColor = getDateTypeColor(date);
               const isSelectedDate = formattedDateValue === selectedDate;
               
@@ -357,7 +392,7 @@ export const FestivalDateNavigation = ({
                 <DateTypeContextMenu 
                   key={formattedDateValue}
                   jobId={jobId}
-                  date={date}
+                  date={parseISO(formattedDateValue)}
                   onTypeChange={onTypeChange}
                 >
                   <TooltipProvider>
@@ -393,8 +428,8 @@ export const FestivalDateNavigation = ({
         
         {weekDates.map((date) => (
           <TabsContent
-            key={format(date, 'yyyy-MM-dd')}
-            value={format(date, 'yyyy-MM-dd')}
+            key={formatMadridDateKey(date)}
+            value={formatMadridDateKey(date)}
             className="mt-0"
           >
             {/* Content will be rendered by parent component */}
