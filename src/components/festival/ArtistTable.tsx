@@ -50,6 +50,7 @@ export const ArtistTable = ({
   searchTerm,
   stageFilter,
   riderFilter,
+  dayStartTime,
   jobId,
   selectedDate,
   crossDateSearch = false,
@@ -59,7 +60,10 @@ export const ArtistTable = ({
 }: ArtistTableProps) => {
   const [sortBy, setSortBy] = useState<ArtistSortField>('chronological');
   const confirm = useConfirm();
-  const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
+  const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(
+    jobId,
+    dayStartTime,
+  );
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linksDialogOpen, setLinksDialogOpen] = useState(false);

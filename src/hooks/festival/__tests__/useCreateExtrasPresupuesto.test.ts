@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildArtistFlexDateRange,
   formatArtistDateTimeForFlex,
   formatArtistExtrasFolderDocumentNumber,
 } from "../useCreateExtrasPresupuesto";
@@ -36,6 +37,32 @@ describe("formatArtistDateTimeForFlex", () => {
     expect(() => formatArtistDateTimeForFlex("2026-07-18", "24:00")).toThrow(
       "Hora de artista invalida"
     );
+  });
+
+  it("reports a domain error instead of crashing when a time is null", () => {
+    expect(() => formatArtistDateTimeForFlex("2026-07-18", null)).toThrow(
+      "Hora de artista invalida para Flex: (vacia)"
+    );
+  });
+});
+
+describe("buildArtistFlexDateRange", () => {
+  it("uses the festival operating day when the artist has no show times", () => {
+    expect(
+      buildArtistFlexDateRange("2026-08-05", null, null, false, "07:00")
+    ).toEqual({
+      plannedStartDate: "2026-08-05T07:00:00.000Z",
+      plannedEndDate: "2026-08-06T07:00:00.000Z",
+    });
+  });
+
+  it("preserves the artist show range when both times are available", () => {
+    expect(
+      buildArtistFlexDateRange("2026-08-05", "20:00", "21:30", false, "07:00")
+    ).toEqual({
+      plannedStartDate: "2026-08-05T20:00:00.000Z",
+      plannedEndDate: "2026-08-05T21:30:00.000Z",
+    });
   });
 });
 

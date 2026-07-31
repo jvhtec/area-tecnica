@@ -3,8 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DateTypeContextMenu } from "@/components/dashboard/DateTypeContextMenu";
-import { ChevronLeft, ChevronRight, Calendar, Filter } from "lucide-react";
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, isSameWeek } from "date-fns";
+import { ChevronLeft, ChevronRight, Calendar, CalendarCheck2, Filter } from "lucide-react";
+import {
+  addWeeks,
+  endOfWeek,
+  format,
+  isBefore,
+  isSameWeek,
+  parseISO,
+  startOfDay,
+  startOfWeek,
+  subWeeks,
+} from "date-fns";
+import { es } from "date-fns/locale";
 import {
   Popover,
   PopoverContent,
@@ -49,19 +60,36 @@ export const FestivalDateNavigation = ({
     return startOfWeek(selected, { weekStartsOn: 1 }); // Start week on Monday
   });
   const [showOnlyShowDates, setShowOnlyShowDates] = useState(true);
+  const [showPastDates, setShowPastDates] = useState(false);
   const [viewMode, setViewMode] = useState<'week' | 'all'>('all');
+  const selectedDateLabel = useMemo(() => {
+    if (!selectedDate) return "";
+    const parsedSelectedDate = parseISO(selectedDate);
+    if (Number.isNaN(parsedSelectedDate.getTime())) return selectedDate;
+    return format(parsedSelectedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
+  }, [selectedDate]);
 
-  // Filter dates based on preferences
+  const hasPastDates = useMemo(() => {
+    const today = startOfDay(new Date());
+    return jobDates.some((date) => isBefore(startOfDay(date), today));
+  }, [jobDates]);
+
+  // Filter dates based on preferences. Keep a selected historical date visible
+  // so the navigation never loses the day the user is inspecting.
   const filteredDates = useMemo(() => {
-    if (!showOnlyShowDates) return jobDates;
-    
+    const today = startOfDay(new Date());
+
     return jobDates.filter(date => {
       const formattedDate = format(date, 'yyyy-MM-dd');
+      if (formattedDate === selectedDate) return true;
+      if (!showPastDates && isBefore(startOfDay(date), today)) return false;
+      if (!showOnlyShowDates) return true;
+
       const key = `${jobId}-${formattedDate}`;
       const dateType = getEffectiveFestivalDateType(dateTypes[key]);
       return isKeyFestivalDateType(dateType);
     });
-  }, [jobDates, showOnlyShowDates, dateTypes, jobId]);
+  }, [jobDates, selectedDate, showPastDates, showOnlyShowDates, dateTypes, jobId]);
 
   // Get dates for current week
   const weekDates = useMemo(() => {
@@ -106,7 +134,10 @@ export const FestivalDateNavigation = ({
     if (!meta) return null;
     
     return (
-      <span className={`absolute -top-1 -right-1 w-4 h-4 ${meta.festivalBadgeColorClassName} text-white text-xs rounded-full flex items-center justify-center font-bold`}>
+      <span
+        aria-hidden="true"
+        className={`absolute -top-1 -right-1 w-4 h-4 ${meta.festivalBadgeColorClassName} text-white text-xs rounded-full flex items-center justify-center font-bold`}
+      >
         {meta.shortLabel}
       </span>
     );
@@ -191,6 +222,19 @@ export const FestivalDateNavigation = ({
                 <Label htmlFor="show-filter" className="text-sm whitespace-nowrap">Solo fechas clave</Label>
               </div>
             </>
+          )}
+
+          {hasPastDates && (
+            <div className="flex items-center gap-2">
+              <Switch
+                id="show-past-dates"
+                checked={showPastDates}
+                onCheckedChange={setShowPastDates}
+              />
+              <Label htmlFor="show-past-dates" className="text-sm whitespace-nowrap">
+                Mostrar fechas pasadas
+              </Label>
+            </div>
           )}
 
           {/* Stage Filter */}
@@ -287,6 +331,19 @@ export const FestivalDateNavigation = ({
         </div>
       </div>
 
+      {selectedDate && (
+        <div
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm"
+          aria-live="polite"
+        >
+          <CalendarCheck2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="font-medium">Fecha seleccionada:</span>
+          <time dateTime={selectedDate} className="font-semibold capitalize">
+            {selectedDateLabel}
+          </time>
+        </div>
+      )}
+
       {/* Date Tabs */}
       <Tabs value={selectedDate} onValueChange={onDateChange} className="w-full">
         <div className="overflow-x-auto -mx-2 px-2 touch-pan-x">
@@ -294,6 +351,7 @@ export const FestivalDateNavigation = ({
             {weekDates.map((date) => {
               const formattedDateValue = format(date, 'yyyy-MM-dd');
               const dateTypeColor = getDateTypeColor(date);
+              const isSelectedDate = formattedDateValue === selectedDate;
               
               return (
                 <DateTypeContextMenu 
@@ -307,7 +365,12 @@ export const FestivalDateNavigation = ({
                       <TooltipTrigger asChild>
                         <TabsTrigger
                           value={formattedDateValue}
-                          className={`relative border-b-2 ${dateTypeColor} min-w-[100px] h-12 touch-manipulation`}
+                          aria-current={isSelectedDate ? "date" : undefined}
+                          className={`relative border-b-2 ${dateTypeColor} min-w-[100px] h-12 touch-manipulation ${
+                            isSelectedDate
+                              ? "z-10 ring-2 ring-primary ring-offset-2 !bg-primary !text-primary-foreground font-semibold"
+                              : ""
+                          }`}
                         >
                           {formatTabDate(date)}
                           {getDateTypeBadge(date)}
