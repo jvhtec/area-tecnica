@@ -34,9 +34,10 @@ import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
-import { isJobOnDate } from "@/utils/timezoneUtils";
+import { isJobOnDate, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import { isManagementRole } from "@/utils/permissions";
 import { addDays, endOfMonth, startOfMonth, subDays } from "date-fns";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -66,8 +67,15 @@ const Sound = () => {
 
   const currentDepartment = "sound" as const;
   const monthAnchor = date ?? new Date();
-  const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
-  const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
+  const madridMonthAnchor = toZonedTime(monthAnchor, MADRID_TIMEZONE);
+  const jobsRangeStart = fromZonedTime(
+    subDays(startOfMonth(madridMonthAnchor), 7),
+    MADRID_TIMEZONE,
+  );
+  const jobsRangeEnd = fromZonedTime(
+    addDays(endOfMonth(madridMonthAnchor), 14),
+    MADRID_TIMEZONE,
+  );
   const { data: jobs, isLoading: jobsLoading } = useOptimizedJobs(
     currentDepartment,
     jobsRangeStart,

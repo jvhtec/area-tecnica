@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
 import { screen } from "@testing-library/react";
-import { addDays, endOfMonth, startOfMonth, subDays } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import Sound from "@/pages/Sound";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import Sound from "../Sound";
+import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
 const { mockUseOptimizedJobs } = vi.hoisted(() => ({
   mockUseOptimizedJobs: vi.fn(),
@@ -87,7 +88,7 @@ vi.mock("@/services/optimisticJobDeletionService", () => ({
 describe("Sound calendar data range", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    vi.setSystemTime(new Date("2026-08-31T22:30:00.000Z"));
     mockUseOptimizedJobs.mockReset();
   });
 
@@ -112,11 +113,10 @@ describe("Sound calendar data range", () => {
 
     renderWithProviders(<Sound />, { route: "/sound" });
 
-    const monthAnchor = new Date("2026-09-15T12:00:00.000Z");
     expect(mockUseOptimizedJobs).toHaveBeenCalledWith(
       "sound",
-      subDays(startOfMonth(monthAnchor), 7),
-      addDays(endOfMonth(monthAnchor), 14),
+      fromZonedTime("2026-08-25T00:00:00.000", MADRID_TIMEZONE),
+      fromZonedTime("2026-10-14T23:59:59.999", MADRID_TIMEZONE),
     );
     expect(screen.getByTestId("sound-calendar")).toHaveTextContent("KBS Music Bank");
   });
