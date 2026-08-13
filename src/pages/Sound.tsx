@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useMemo } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import { useJobs } from "@/hooks/useJobs";
+import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,7 @@ import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmen
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { isManagementRole } from "@/utils/permissions";
+import { addDays, endOfMonth, startOfMonth, subDays } from "date-fns";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -63,8 +64,15 @@ const Sound = () => {
   const [selectedJobForAssignments, setSelectedJobForAssignments] = useState<any>(null);
   const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
-  const currentDepartment = "sound";
-  const { data: jobs, isLoading: jobsLoading } = useJobs();
+  const currentDepartment = "sound" as const;
+  const monthAnchor = date ?? new Date();
+  const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
+  const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
+  const { data: jobs, isLoading: jobsLoading } = useOptimizedJobs(
+    currentDepartment,
+    jobsRangeStart,
+    jobsRangeEnd,
+  );
   const { toast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
