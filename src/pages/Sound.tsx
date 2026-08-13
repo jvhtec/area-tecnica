@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useMemo } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import { useJobs } from "@/hooks/useJobs";
+import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -34,8 +34,10 @@ import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
-import { isJobOnDate } from "@/utils/timezoneUtils";
+import { isJobOnDate, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import { isManagementRole } from "@/utils/permissions";
+import { addDays, endOfMonth, startOfMonth, subDays } from "date-fns";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -63,8 +65,22 @@ const Sound = () => {
   const [selectedJobForAssignments, setSelectedJobForAssignments] = useState<any>(null);
   const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
-  const currentDepartment = "sound";
-  const { data: jobs, isLoading: jobsLoading } = useJobs();
+  const currentDepartment = "sound" as const;
+  const monthAnchor = date ?? new Date();
+  const madridMonthAnchor = toZonedTime(monthAnchor, MADRID_TIMEZONE);
+  const jobsRangeStart = fromZonedTime(
+    subDays(startOfMonth(madridMonthAnchor), 7),
+    MADRID_TIMEZONE,
+  );
+  const jobsRangeEnd = fromZonedTime(
+    addDays(endOfMonth(madridMonthAnchor), 14),
+    MADRID_TIMEZONE,
+  );
+  const { data: jobs, isLoading: jobsLoading } = useOptimizedJobs(
+    currentDepartment,
+    jobsRangeStart,
+    jobsRangeEnd,
+  );
   const { toast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
