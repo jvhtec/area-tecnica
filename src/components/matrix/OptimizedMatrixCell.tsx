@@ -134,17 +134,13 @@ export const OptimizedMatrixCell = memo(({
     }
 
     if (hasAssignment) {
-      if (allowDirectAssign) {
-        onClick('assign'); // Edit existing assignment
-      } else {
-      }
+      // Without direct assign the cell is read-only; the staffing icon buttons
+      // stay available either way.
+      if (allowDirectAssign) onClick('assign'); // Edit existing assignment
     } else if (isUnavailable) {
       onClick('unavailable'); // Edit unavailability
-    } else {
-      if (allowDirectAssign) {
-        onClick('select-job'); // Create new assignment
-      } else {
-      }
+    } else if (allowDirectAssign) {
+      onClick('select-job'); // Create new assignment
     }
   }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, technician, date, assignment, allowDirectAssign, allowMarkUnavailable]);
 
@@ -217,17 +213,32 @@ export const OptimizedMatrixCell = memo(({
   const hasVisibleStaffingAction =
     showAvailabilityEmail || showAvailabilityWhatsapp || showOfferEmail || showOfferWhatsapp;
 
-  // Skip noisy debug logs in production
+  // Corner budget, so nothing stacks on top of anything else:
+  //   top-left     status indicators (fridge / declined), side by side
+  //   top-right    remove-assignment (assigned cells) or staffing actions (desktop)
+  //   bottom-left  staffing status badges — lifted one row on mobile, where the
+  //                actions share the bottom edge
+  //   bottom-right assignment status badge (assigned) or staffing actions (mobile)
+  // The remove button and the staffing actions never coexist: the actions are
+  // only offered on cells without an assignment.
+  const statusBadgesPosClass = mobile ? 'absolute bottom-9 left-1' : 'absolute bottom-1 left-1';
+  const actionButtonsPosClass = mobile ? 'absolute bottom-1 right-1' : 'absolute top-1 right-1';
+  // Four 32px buttons plus gaps overflow a 140px mobile cell; 28px fits and
+  // coarse-hit-target still grows the tap area beyond the painted box.
+  const actionBtnSize = mobile ? 'h-7 w-7 coarse-hit-target' : 'h-5 w-5';
 
-  const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
-  const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
-  const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
+  // A plain click only does something in one of the edit modes; without one the
+  // cell is read-only and should not advertise itself as clickable.
+  const plainClickIsActionable =
+    allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div
           className={cn(
-            'border-r border-b cursor-pointer transition-colors duration-150',
+            'border-r border-b transition-colors duration-150',
+            plainClickIsActionable ? 'cursor-pointer' : 'cursor-default',
             'flex flex-col justify-between p-1 text-xs relative',
             getCellBackground(),
             getBorderColor()
@@ -242,6 +253,7 @@ export const OptimizedMatrixCell = memo(({
               ? assignment.job.color
               : undefined
           }}
+          data-matrix-cell="true"
           onClick={handleCellClick}
           onContextMenu={handleRightClick}
           onMouseEnter={handleMouseEnter}
@@ -250,15 +262,24 @@ export const OptimizedMatrixCell = memo(({
           {isSelected && (
             <div className="absolute top-0 right-0 z-20" title="Celda seleccionada para shortcuts">
               <div className="bg-blue-600 text-white px-1.5 py-0.5 text-[10px] font-bold rounded-bl">
-                ✓ SELECTED
+                ✓ SEL.
               </div>
             </div>
           )}
 
-          {/* Fridge indicator */}
-          {isFridge && (
-            <div className="absolute top-1 left-1 z-10" title="En la nevera: no asignable">
-              <Refrigerator className="h-3.5 w-3.5 text-sky-600" />
+          {/* Status indicators — one row so they never stack on each other */}
+          {(isFridge || isDeclinedAssignment) && (
+            <div className="absolute top-1 left-1 z-10 flex items-center gap-0.5">
+              {isFridge && (
+                <span title="En la nevera: no asignable">
+                  <Refrigerator className="h-3.5 w-3.5 text-sky-600" />
+                </span>
+              )}
+              {isDeclinedAssignment && (
+                <span title="Rechazado: no se puede reasignar a este trabajo">
+                  <Ban className="h-3.5 w-3.5 text-rose-600" />
+                </span>
+              )}
             </div>
           )}
           {/* Staffing Status Badges */}
@@ -355,16 +376,9 @@ export const OptimizedMatrixCell = memo(({
             </div>
           )}
 
-          {/* Declined lock indicator for the job to prevent re-assigning to the same job */}
-          {isDeclinedAssignment && (
-            <div className="absolute top-1 left-1 z-10" title="Rechazado: no se puede reasignar a este trabajo">
-              <Ban className="h-3.5 w-3.5 text-rose-600" />
-            </div>
-          )}
-
           {/* Staffing Action Buttons */}
           {hasVisibleStaffingAction && (
-            <div className={`${actionButtonsPosClass} flex gap-1 z-10`}>
+            <div className={`${actionButtonsPosClass} flex ${mobile ? 'gap-0.5' : 'gap-1'} z-10`}>
               {canAskAvailability && (
                 <>
                   {showAvailabilityEmail && (

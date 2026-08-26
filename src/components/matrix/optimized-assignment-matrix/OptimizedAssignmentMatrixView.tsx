@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowUpDown, UserPlus } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
 
 import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
@@ -171,6 +171,14 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
 }: OptimizedAssignmentMatrixViewProps) => {
   void _isGlobalCellSelected;
 
+  // DateHeader is memoized and runs queries keyed off these props; rebuilding
+  // them inline per render defeated the memo and re-fired those queries.
+  const technicianIds = React.useMemo(() => technicians.map((t) => t.id), [technicians]);
+  const handleDateHeaderJobClick = React.useCallback(
+    (jobId: string) => setSortJobId((prev) => (prev === jobId ? null : jobId)),
+    [setSortJobId],
+  );
+
   return (
     <div className="matrix-layout relative">
       {isFetching && !isInitialLoading && (
@@ -214,11 +222,36 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 </Button>
               ))}
           </div>
-          {getSortLabel() && (
-            <div className="flex items-center justify-center px-2 py-1 flex-1">
-              <span className="text-xs font-medium text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">
-                {getSortLabel()}
-              </span>
+          {(mobile || getSortLabel()) && (
+            <div className="flex items-center justify-center gap-1 px-1 py-1 flex-1 min-h-0">
+              {/* Mobile date paging. It used to be an overlay inside the header's
+                  scroll container, which both scrolled away with the content and
+                  covered the first and last visible columns. */}
+              {mobile && (
+                <>
+                  <button
+                    aria-label="Fechas anteriores"
+                    className={`shrink-0 rounded-full bg-background border shadow-sm h-6 w-6 flex items-center justify-center coarse-hit-target ${canNavLeft ? "opacity-100" : "opacity-40"}`}
+                    onClick={() => handleMobileNav("left")}
+                    disabled={!canNavLeft}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                  <button
+                    aria-label="Fechas siguientes"
+                    className={`shrink-0 rounded-full bg-background border shadow-sm h-6 w-6 flex items-center justify-center coarse-hit-target ${canNavRight ? "opacity-100" : "opacity-40"}`}
+                    onClick={() => handleMobileNav("right")}
+                    disabled={!canNavRight}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </>
+              )}
+              {getSortLabel() && (
+                <span className="truncate text-xs font-medium text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">
+                  {getSortLabel()}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -235,34 +268,6 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         }}
         onScroll={handleDateHeadersScroll}
       >
-        {mobile && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-1">
-            <button
-              aria-label="Fechas anteriores"
-              className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavLeft ? "opacity-100" : "opacity-40"}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMobileNav("left");
-              }}
-              disabled={!canNavLeft}
-            >
-              <span className="sr-only">Anterior</span>
-              {"<"}
-            </button>
-            <button
-              aria-label="Fechas siguientes"
-              className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavRight ? "opacity-100" : "opacity-40"}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMobileNav("right");
-              }}
-              disabled={!canNavRight}
-            >
-              <span className="sr-only">Siguiente</span>
-              {">"}
-            </button>
-          </div>
-        )}
         <div style={{ width: matrixWidth, height: "100%", display: "flex", position: "relative" }}>
           {/* Leading spacer for virtualized columns */}
           <div style={{ width: visibleCols.start * CELL_WIDTH }} />
@@ -272,10 +277,9 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               date={date}
               width={CELL_WIDTH}
               jobs={getJobsForDate(date)}
-              technicianIds={technicians.map((t) => t.id)}
-              onJobClick={(jobId) => {
-                setSortJobId((prev) => (prev === jobId ? null : jobId));
-              }}
+              technicianIds={technicianIds}
+              compact={mobile}
+              onJobClick={handleDateHeaderJobClick}
             />
           ))}
           {/* Trailing spacer to fill remaining width */}

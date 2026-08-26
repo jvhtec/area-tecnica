@@ -23,6 +23,8 @@ interface DateHeaderProps {
     _assigned_count?: number;
   }>;
   technicianIds?: string[];
+  /** Mobile layout: drops the month/year lines and puts the badges on one row. */
+  compact?: boolean;
   onJobClick?: (jobId: string) => void;
 }
 
@@ -118,7 +120,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
   });
 }
 
-const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: DateHeaderProps) => {
+const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false, onJobClick }: DateHeaderProps) => {
   const isTodayHeader = isMadridToday(date);
   const isWeekendHeader = isMadridWeekend(date);
   const hasJobs = jobs.length > 0;
@@ -219,21 +221,38 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
             height: '100%'
           }}
         >
-          <div className="font-semibold text-xs">
-            {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
-          </div>
-          <div className={cn('text-base font-bold leading-tight', {
-            'text-orange-700 dark:text-orange-300': isTodayHeader
-          })}>
-            {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
-          </div>
-          <div className="text-xs text-muted-foreground leading-tight">
-            {formatInTimeZone(date, MADRID_TIMEZONE, 'MMM', { locale: es })}
-          </div>
-          {formatInTimeZone(date, MADRID_TIMEZONE, 'd') === '1' && (
-            <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
-              {formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy')}
+          {compact ? (
+            // 50px of header height cannot fit weekday + day + month + a badge
+            // column, so mobile shows "Sáb 14" on one line.
+            <div className="flex items-baseline gap-1 leading-none">
+              <span className="text-[11px] font-semibold capitalize">
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
+              </span>
+              <span className={cn('text-sm font-bold', {
+                'text-orange-700 dark:text-orange-300': isTodayHeader
+              })}>
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+              </span>
             </div>
+          ) : (
+            <>
+              <div className="font-semibold text-xs">
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
+              </div>
+              <div className={cn('text-base font-bold leading-tight', {
+                'text-orange-700 dark:text-orange-300': isTodayHeader
+              })}>
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+              </div>
+              <div className="text-xs text-muted-foreground leading-tight">
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'MMM', { locale: es })}
+              </div>
+              {formatInTimeZone(date, MADRID_TIMEZONE, 'd') === '1' && (
+                <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
+                  {formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy')}
+                </div>
+              )}
+            </>
           )}
 
           {/* Job indicators */}
@@ -254,14 +273,19 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
 
           {/* Job count badge */}
           {hasJobs && (
-            <div className="absolute top-0.5 right-0.5 flex flex-col items-end gap-0.5">
+            <div
+              className={cn(
+                'absolute top-0.5 right-0.5 flex gap-0.5',
+                compact ? 'flex-row items-center' : 'flex-col items-end',
+              )}
+            >
               <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 leading-none" title="Trabajos en esta fecha">
                 {jobs.length}
               </Badge>
               <Badge variant="default" className="text-[10px] px-1 py-0 h-4 leading-none" title="Técnicos confirmados en esta fecha">
                 {confirmedForDate ?? 0}
               </Badge>
-              {openSlots && openSlots.required > 0 && (
+              {!compact && openSlots && openSlots.required > 0 && (
                 <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 leading-none" title="Vacantes en todos los trabajos">
                   {openSlots.open} libres
                 </Badge>

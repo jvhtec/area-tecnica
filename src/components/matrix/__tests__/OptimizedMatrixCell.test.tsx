@@ -105,7 +105,9 @@ const render = (ui: JSX.Element) => rtlRender(
 );
 
 const getCellElement = () => {
-  const cell = document.querySelector('.cursor-pointer');
+  // Not `.cursor-pointer`: read-only cells (no edit mode enabled) render
+  // cursor-default, so the cell is addressed by its stable data attribute.
+  const cell = document.querySelector('[data-matrix-cell]');
   expect(cell).toBeInTheDocument();
   return cell as HTMLElement;
 };
@@ -466,7 +468,7 @@ describe('OptimizedMatrixCell', () => {
       />
     );
 
-    expect(screen.getByText('✓ SELECTED')).toBeInTheDocument();
+    expect(screen.getByText('✓ SEL.')).toBeInTheDocument();
     const cell = container.querySelector('.border-blue-600');
     expect(cell).toBeInTheDocument();
   });

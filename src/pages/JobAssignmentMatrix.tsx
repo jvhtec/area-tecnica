@@ -611,7 +611,8 @@ export default function JobAssignmentMatrix() {
     if (selectedDepartment !== defaultDepartment) c++;
     if (debouncedSearch) c++;
     if (selectedSkills.length) c += selectedSkills.length;
-    if (hideFridge) c++;
+    // Hiding the fridge is the default, so only the opened fridge is a filter.
+    if (!hideFridge) c++;
     if (allowDirectAssign) c++;
     if (hideStaffingEmailButtons) c++;
     if (hideStaffingWhatsappButtons) c++;
@@ -705,7 +706,7 @@ export default function JobAssignmentMatrix() {
             cellWidth={isMobile ? 140 : undefined}
             cellHeight={isMobile ? 80 : undefined}
             technicianWidth={isMobile ? 110 : undefined}
-            headerHeight={isMobile ? 50 : undefined}
+            headerHeight={isMobile ? 64 : undefined}
             onNearEdgeScroll={(direction) => {
               if (direction === 'before' && canExpandBefore) {
                 expandBefore();

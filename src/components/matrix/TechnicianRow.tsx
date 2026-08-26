@@ -455,11 +455,11 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
             title={compact ? displayName : undefined}
           >
             {compact ? (
-              <div className="h-full flex flex-col items-center justify-center">
+              <div className="h-full flex flex-col items-center justify-center w-full min-w-0">
                 <div className="relative">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-7 w-7">
                     <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
-                    <AvatarFallback className="text-xs">
+                    <AvatarFallback className="text-[10px]">
                       {getInitials()}
                     </AvatarFallback>
                   </Avatar>
@@ -472,7 +472,12 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                     </div>
                   )}
                 </div>
-                <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
+                {/* Initials alone are unidentifiable on touch, where there is no
+                    hover to reveal the title. */}
+                <div className="mt-0.5 w-full truncate text-center text-[10px] font-medium leading-tight">
+                  {displayName}
+                </div>
+                <div className="text-[9px] leading-none text-muted-foreground">{deptAbbrev}</div>
               </div>
             ) : (
               <div className="flex items-center gap-3 h-full">
