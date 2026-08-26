@@ -24,6 +24,19 @@ import { queryKeys } from "@/lib/react-query";
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Error desconocido";
 
+/**
+ * Picks a list entry from a seed. Math.random() here made render impure: the
+ * medal tooltip drew a different line on every re-render of the matrix.
+ */
+const pickStableIndex = (seed: string, length: number) => {
+  if (length <= 0) return 0;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % length;
+};
+
 interface TechnicianRowProps {
   technician: {
     id: string;
@@ -365,7 +378,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     };
 
     const list = comments[rank];
-    return list[Math.floor(Math.random() * list.length)];
+    return list[pickStableIndex(`${technician.id}:${rank}`, list.length)];
   };
 
   const getLastYearSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
@@ -410,7 +423,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     };
 
     const list = comments[rank];
-    return list[Math.floor(Math.random() * list.length)];
+    return list[pickStableIndex(`${technician.id}:last:${rank}`, list.length)];
   };
 
   const getMedalIcon = (rank?: 'gold' | 'silver' | 'bronze', size: 'sm' | 'md' = 'sm') => {

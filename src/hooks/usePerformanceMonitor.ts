@@ -44,8 +44,9 @@ export const usePerformanceMonitor = (componentName: string) => {
 
   const incrementCellRender = useCallback(() => {
     cellRenderCountRef.current += 1;
+    // Counting only: writing this to state re-rendered the whole matrix, which
+    // rendered more cells, which fed the counter that triggered it.
     if (cellRenderCountRef.current % 5000 === 0) { // Reduced logging frequency
-      setMetrics(prev => ({ ...prev, cellRenderCount: cellRenderCountRef.current }));
       console.log(`${componentName} cells rendered: ${cellRenderCountRef.current}`);
     }
   }, [componentName]);

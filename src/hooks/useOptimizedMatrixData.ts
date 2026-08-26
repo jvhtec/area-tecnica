@@ -8,6 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { queryKeys } from "@/lib/react-query";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
 const MADRID_TIMEZONE = 'Europe/Madrid';
+const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
 
 function toMadridDateKey(date: Date | undefined): string {
   return date ? formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy-MM-dd') : '';
@@ -297,8 +298,6 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     queryFn: async (): Promise<MatrixTimesheetAssignment[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
 
-      console.log('Fetching timesheet assignments for', jobIds.length, 'jobs and', technicianIds.length, 'technicians');
-
       try {
         return await fetchMatrixTimesheetAssignments({
           jobIds,
@@ -567,7 +566,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     });
     
     return (date: Date): MatrixJob[] => {
-      return jobsByDate.get(toMadridDateKey(date)) || [];
+      // Shared empty array, not a fresh []: DateHeader is memoized on this prop.
+      return jobsByDate.get(toMadridDateKey(date)) || EMPTY_JOBS_FOR_DATE;
     };
   }, [jobs, dates]);
 
@@ -591,21 +591,22 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Invalidate specific queries for real-time updates
   const invalidateAssignmentQueries = useCallback(async () => {
-    console.log('Invalidating assignment queries...');
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') }) // Also invalidate jobs to refresh the matrix
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') }), // Also invalidate jobs to refresh the matrix
+      // Date-header counts. These used to stay fresh only via a 2s staleTime,
+      // which meant every column scrolled back into view refetched them.
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-date-confirmed-count') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-open-slots') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-job-engagement-counts') }),
     ]);
-    console.log('Assignment queries invalidated');
   }, [queryClient]);
 
   // Realtime subscription for job_assignments table
   useEffect(() => {
-    console.log('🔔 Setting up job_assignments realtime subscription for matrix');
-
     const channel = supabase
       .channel('matrix-job-assignments')
       .on(
@@ -615,26 +616,20 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'job_assignments'
         },
-        (payload) => {
-          console.log('🔔 job_assignments change detected in matrix:', payload.eventType, payload);
+        () => {
           // Immediately invalidate and refetch
           invalidateAssignmentQueries();
         }
       )
-      .subscribe((status) => {
-        console.log('🔔 job_assignments subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔔 Cleaning up job_assignments realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [invalidateAssignmentQueries]);
 
   // Realtime subscription for per-day timesheets updates
   useEffect(() => {
-    console.log('🔔 Setting up timesheets realtime subscription for matrix');
-
     const channel = supabase
       .channel('matrix-timesheets')
       .on(
@@ -648,12 +643,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
         }
       )
-      .subscribe((status) => {
-        console.log('🔔 timesheets subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔔 Cleaning up timesheets realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [queryClient]);

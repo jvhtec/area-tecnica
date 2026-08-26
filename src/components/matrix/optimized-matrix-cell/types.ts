@@ -58,10 +58,13 @@ export interface OptimizedMatrixCellProps {
   width: number;
   height: number;
   isSelected: boolean;
-  onSelect: (selected: boolean) => void;
-  onClick: (action: MatrixCellAction, selectedJobId?: string) => void;
-  onPrefetch?: () => void;
-  onOptimisticUpdate?: (status: string) => void;
+  // The cell passes its own identity back rather than being handed a closure
+  // bound to it: one stable handler shared by every cell is what lets the memo
+  // around OptimizedMatrixCell actually hold.
+  onSelect: (technicianId: string, date: Date, selected: boolean) => void;
+  onClick: (technicianId: string, date: Date, action: MatrixCellAction, selectedJobId?: string) => void;
+  onPrefetch?: (technicianId: string) => void;
+  onOptimisticUpdate?: (technicianId: string, jobId: string, status: string) => void;
   onRender?: () => void;
   jobId?: string;
   allowDirectAssign?: boolean;
@@ -75,6 +78,12 @@ export interface OptimizedMatrixCellProps {
   staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
+  // Owned by the matrix, not the cell: one mutation observer for the grid
+  // instead of two per rendered cell.
+  sendStaffingEmail: (payload: unknown) => void;
+  isSendingStaffingEmail?: boolean;
+  cancelStaffing: (payload: unknown) => void;
+  isCancellingStaffing?: boolean;
 }
 
 export type AssignmentLifecycleResult = {

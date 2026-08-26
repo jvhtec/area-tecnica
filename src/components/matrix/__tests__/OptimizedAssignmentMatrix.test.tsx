@@ -69,7 +69,13 @@ vi.mock('@/hooks/use-toast', () => ({
 vi.mock('@/features/staffing/hooks/useStaffing', () => ({
   useSendStaffingEmail: () => ({
     mutate: vi.fn(),
+    isPending: false,
   }),
+  useCancelStaffingRequest: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  ConflictError: class ConflictError extends Error {},
 }));
 
 vi.mock('@/hooks/usePerformanceMonitor', () => ({

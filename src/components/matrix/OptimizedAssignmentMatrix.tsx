@@ -3,7 +3,7 @@ import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { formatMadridDateKey } from '@/utils/timezoneUtils';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
-import { useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
+import { useCancelStaffingRequest, useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
@@ -84,7 +84,10 @@ export const OptimizedAssignmentMatrix = ({
   // Staffing functionality
   useStaffingRealtime();
   const { toast } = useToast();
-  const { mutate: sendStaffingEmail } = useSendStaffingEmail();
+  // Owned here rather than in every cell: the grid renders hundreds of cells,
+  // and each useMutation call registers its own observer.
+  const { mutate: sendStaffingEmail, isPending: isSendingStaffingEmail } = useSendStaffingEmail();
+  const { mutate: cancelStaffing, isPending: isCancellingStaffing } = useCancelStaffingRequest();
 
   // Cell dimensions (overridable for mobile)
   const CELL_WIDTH = cellWidth ?? 160;
@@ -509,16 +512,24 @@ export const OptimizedAssignmentMatrix = ({
     }
   };
 
+  // Read at seed time only, so a selection change does not re-seed an open dialog.
+  const selectedCellsRef = React.useRef(selectedCells);
+  selectedCellsRef.current = selectedCells;
+  const availabilityDialogOpen = !!availabilityDialog?.open;
+  const availabilityDialogProfileId = availabilityDialog?.profileId;
+  const availabilityDialogDateIso = availabilityDialog?.dateIso;
+  const availabilityDialogSingleDay = availabilityDialog?.singleDay;
+
   useEffect(() => {
-    if (availabilityDialog?.open) {
-      setAvailabilityCoverage(availabilityDialog.singleDay ? 'single' : 'full');
+    if (availabilityDialogOpen) {
+      setAvailabilityCoverage(availabilityDialogSingleDay ? 'single' : 'full');
       try {
         // Extract dates from selectedCells for this technician
-        const technicianId = availabilityDialog.profileId;
+        const technicianId = availabilityDialogProfileId;
         const selectedDatesForTech: Date[] = [];
 
         // Parse selectedCells to find all dates for this technician
-        for (const cellKey of selectedCells) {
+        for (const cellKey of selectedCellsRef.current) {
           // cellKey format: "${technicianId}-yyyy-MM-dd"
           if (cellKey.startsWith(`${technicianId}-`)) {
             const dateStr = cellKey.substring(technicianId.length + 1); // Remove "techId-" prefix
@@ -539,13 +550,15 @@ export const OptimizedAssignmentMatrix = ({
           setAvailabilityCoverage('multi');
         } else {
           // Single date or no selection - use the clicked date
-          const clickedDate = availabilityDialog.dateIso ? new Date(`${availabilityDialog.dateIso}T00:00:00`) : null;
+          const clickedDate = availabilityDialogDateIso ? new Date(`${availabilityDialogDateIso}T00:00:00`) : null;
           setAvailabilitySingleDate(clickedDate);
           setAvailabilityMultiDates(clickedDate ? [clickedDate] : []);
         }
       } catch { /* ignore */ }
     }
-  }, [availabilityDialog?.open, selectedCells]);
+    // Seeds once per opening. Depending on selectedCells re-ran this while the
+    // dialog was open, discarding the coverage and dates the user had picked.
+  }, [availabilityDialogOpen, availabilityDialogProfileId, availabilityDialogDateIso, availabilityDialogSingleDay]);
 
   if (isInitialLoading) {
     return (
@@ -574,6 +587,7 @@ export const OptimizedAssignmentMatrix = ({
     declinedJobsByTech, cellAction, currentTechnician, closeDialogs,
     handleJobSelected, handleStaffingActionSelected, forcedStaffingAction, forcedStaffingChannel,
     jobs, offerChannel, toast, sendStaffingEmail, checkTimeConflictEnhanced,
+    isSendingStaffingEmail, cancelStaffing, isCancellingStaffing,
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,

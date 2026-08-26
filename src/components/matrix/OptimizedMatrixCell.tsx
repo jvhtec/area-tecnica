@@ -6,7 +6,6 @@ import { Calendar, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, Messag
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { formatMadridDateKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
-import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
@@ -14,8 +13,10 @@ import { pickTextColor, rgbaFromHex } from '@/utils/color';
 import { OptimizedMatrixCellDialogs } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellDialogs';
 import { OptimizedMatrixCellTooltip } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellTooltip';
 import { assignmentStatusLabel, EMPTY_PROFILE_NAMES_MAP, normalizeStatus } from '@/components/matrix/optimized-matrix-cell/helpers';
-import type { OptimizedMatrixCellProps } from '@/components/matrix/optimized-matrix-cell/types';
+import type { MatrixCellAction, OptimizedMatrixCellProps } from '@/components/matrix/optimized-matrix-cell/types';
 import { useMatrixCellAssignmentRemoval } from '@/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval';
+
+const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
 
 export const OptimizedMatrixCell = memo(({
   technician,
@@ -25,15 +26,15 @@ export const OptimizedMatrixCell = memo(({
   width,
   height,
   isSelected,
-  onSelect,
-  onClick,
-  onPrefetch,
-  onOptimisticUpdate,
+  onSelect: onSelectProp,
+  onClick: onClickProp,
+  onPrefetch: onPrefetchProp,
+  onOptimisticUpdate: onOptimisticUpdateProp,
   onRender,
   jobId,
   allowDirectAssign = false,
   allowMarkUnavailable = false,
-  declinedJobIdsSet = new Set<string>(),
+  declinedJobIdsSet = EMPTY_DECLINED_JOB_IDS,
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
   profileNamesMap = EMPTY_PROFILE_NAMES_MAP,
@@ -42,7 +43,30 @@ export const OptimizedMatrixCell = memo(({
   staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
+  sendStaffingEmail,
+  isSendingStaffingEmail = false,
+  cancelStaffing,
+  isCancellingStaffing = false,
 }: OptimizedMatrixCellProps) => {
+  // The parent's handlers are shared by every cell; bind this cell's identity
+  // here so the rest of the component keeps its simple call signatures.
+  const technicianId = technician.id;
+  const onSelect = useCallback(
+    (selected: boolean) => onSelectProp(technicianId, date, selected),
+    [onSelectProp, technicianId, date],
+  );
+  const onClick = useCallback(
+    (action: MatrixCellAction, selectedJobId?: string) => onClickProp(technicianId, date, action, selectedJobId),
+    [onClickProp, technicianId, date],
+  );
+  const onPrefetch = useCallback(() => onPrefetchProp?.(technicianId), [onPrefetchProp, technicianId]);
+  const onOptimisticUpdate = useCallback(
+    (status: string) => {
+      if (assignment?.job_id) onOptimisticUpdateProp?.(technicianId, assignment.job_id, status);
+    },
+    [onOptimisticUpdateProp, technicianId, assignment?.job_id],
+  );
+
   // Track cell renders for performance monitoring
   React.useEffect(() => {
     onRender?.();
@@ -63,8 +87,6 @@ export const OptimizedMatrixCell = memo(({
   // Staffing status: use provided batched data exclusively for performance
   const staffingStatusByJob = staffingStatusProvided;
   const staffingStatusByDate = staffingStatusByDateProvided;
-  const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
-  const { mutate: cancelStaffing, isPending: isCancelling } = useCancelStaffingRequest();
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null, allJobIds?: string[] }>(null);
@@ -387,7 +409,7 @@ export const OptimizedMatrixCell = memo(({
                       size={mobile ? 'default' : 'sm'}
                       className={`${actionBtnSize} p-0 hover:bg-blue-100`}
                       onClick={(e) => handleStaffingEmail(e, 'availability')}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title="Solicitar disponibilidad"
                     >
                       <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
@@ -402,7 +424,7 @@ export const OptimizedMatrixCell = memo(({
                         e.stopPropagation();
                         onClick('availability-wa');
                       }}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title="Solicitar disponibilidad por WhatsApp"
                     >
                       <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
@@ -418,7 +440,7 @@ export const OptimizedMatrixCell = memo(({
                       size={mobile ? 'default' : 'sm'}
                       className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
                       onClick={(e) => handleStaffingEmail(e, 'offer')}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title={canSendOffer ? 'Enviar oferta' : 'Enviar oferta (progreso manual)'}
                     >
                       <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
@@ -433,7 +455,7 @@ export const OptimizedMatrixCell = memo(({
                         e.stopPropagation();
                         onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
                       }}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title={canSendOffer ? 'Enviar oferta por WhatsApp' : 'Enviar oferta por WhatsApp (progreso manual)'}
                     >
                       <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
@@ -549,7 +571,7 @@ export const OptimizedMatrixCell = memo(({
             pendingCancel={pendingCancel}
             setPendingCancel={setPendingCancel}
             cancelStaffing={cancelStaffing}
-            isCancelling={isCancelling}
+            isCancelling={isCancellingStaffing}
             multiDateRemoval={multiDateRemoval}
             setMultiDateRemoval={setMultiDateRemoval}
             handleRemoveAssignment={handleRemoveAssignment}

@@ -100,6 +100,12 @@ const mockAssignment: MatrixAssignment = {
   },
 };
 
+// Owned by the matrix and passed down, so every cell render needs them.
+const requiredCellProps = {
+  sendStaffingEmail: vi.fn(),
+  cancelStaffing: vi.fn(),
+};
+
 const render = (ui: JSX.Element) => rtlRender(
   <TooltipProvider delayDuration={0}>{ui}</TooltipProvider>
 );
@@ -147,6 +153,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -168,6 +175,7 @@ describe('OptimizedMatrixCell', () => {
   it('renders assignment details when assignment is present', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={mockAssignment}
@@ -186,6 +194,7 @@ describe('OptimizedMatrixCell', () => {
   it('does not render a redundant confirmed status badge', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={mockAssignment}
@@ -205,6 +214,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={declinedAssignment}
@@ -228,6 +238,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         availability={availability}
@@ -248,6 +259,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -262,10 +274,10 @@ describe('OptimizedMatrixCell', () => {
     const cell = getCellElement();
     await user.click(cell);
 
-    expect(onClickMock).toHaveBeenCalledWith('toggle-unavailable');
+    expect(onClickMock).toHaveBeenCalledWith('tech-1', mockDate, 'toggle-unavailable', undefined);
 
     fireEvent.contextMenu(cell);
-    expect(onClickMock).toHaveBeenCalledWith('unavailable');
+    expect(onClickMock).toHaveBeenCalledWith('tech-1', mockDate, 'unavailable', undefined);
   });
 
   it('handles ctrl+click for cell selection', () => {
@@ -273,6 +285,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -286,7 +299,7 @@ describe('OptimizedMatrixCell', () => {
     const cell = getCellElement();
     fireEvent.click(cell, { ctrlKey: true });
 
-    expect(onSelectMock).toHaveBeenCalledWith(true);
+    expect(onSelectMock).toHaveBeenCalledWith('tech-1', mockDate, true);
   });
 
   it('displays staffing availability status badge', () => {
@@ -297,6 +310,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -319,6 +333,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -336,6 +351,7 @@ describe('OptimizedMatrixCell', () => {
   it('shows availability request buttons when can ask availability', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -358,6 +374,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -376,6 +393,7 @@ describe('OptimizedMatrixCell', () => {
   it('can hide email staffing action buttons without hiding WhatsApp buttons', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -394,6 +412,7 @@ describe('OptimizedMatrixCell', () => {
   it('can hide WhatsApp staffing action buttons without hiding email buttons', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -417,6 +436,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={mockAssignment}
@@ -441,6 +461,7 @@ describe('OptimizedMatrixCell', () => {
   it('displays fridge indicator when technician is in fridge', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -458,6 +479,7 @@ describe('OptimizedMatrixCell', () => {
   it('highlights cell when selected', () => {
     const { container } = render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -479,6 +501,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -501,6 +524,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -524,6 +548,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={singleDayAssignment}
@@ -541,6 +566,7 @@ describe('OptimizedMatrixCell', () => {
   it('shows delete button for assignments', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={mockAssignment}
@@ -558,6 +584,7 @@ describe('OptimizedMatrixCell', () => {
   it('handles assignment with color background for confirmed status', () => {
     const { container } = render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={mockAssignment}
@@ -576,6 +603,7 @@ describe('OptimizedMatrixCell', () => {
   it('renders with mobile-specific styling when mobile prop is true', () => {
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={140}
@@ -597,6 +625,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         jobId="job-1"
@@ -625,6 +654,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={assignmentWithMeta}
@@ -650,6 +680,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         assignment={{ ...mockAssignment, status: 'Pending' }}
@@ -686,6 +717,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}
@@ -729,6 +761,7 @@ describe('OptimizedMatrixCell', () => {
 
     render(
       <OptimizedMatrixCell
+        {...requiredCellProps}
         technician={mockTechnician}
         date={mockDate}
         width={160}

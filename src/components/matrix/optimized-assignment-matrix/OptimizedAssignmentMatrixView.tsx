@@ -10,6 +10,10 @@ import { TechnicianRow } from "../TechnicianRow";
 import { OptimizedMatrixCell } from "../OptimizedMatrixCell";
 import { DateHeader } from "../DateHeader";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
+import type { MatrixCellAction } from "@/components/matrix/optimized-matrix-cell/types";
+
+// Shared so cells for technicians with no declined jobs keep a stable prop.
+const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
 
 export interface OptimizedAssignmentMatrixViewProps {
   isFetching: boolean;
@@ -55,9 +59,9 @@ export interface OptimizedAssignmentMatrixViewProps {
   staffingMaps: any;
   profileNamesMap: Map<string, string>;
   handleCellSelect: (technicianId: string, date: Date, selected: boolean) => void;
-  handleCellClick: (technicianId: string, date: Date, action: any, selectedJobId?: string) => void;
+  handleCellClick: (technicianId: string, date: Date, action: MatrixCellAction, selectedJobId?: string) => void;
   handleCellPrefetch: (technicianId: string) => void;
-  handleOptimisticUpdate: (technicianId: string, jobId: string, status: any) => void;
+  handleOptimisticUpdate: (technicianId: string, jobId: string, status: string) => void;
   incrementCellRender: () => void;
   declinedJobsByTech: Map<string, Set<string>>;
   cellAction: any;
@@ -71,6 +75,9 @@ export interface OptimizedAssignmentMatrixViewProps {
   offerChannel: "email" | "whatsapp";
   toast: any;
   sendStaffingEmail: any;
+  isSendingStaffingEmail: boolean;
+  cancelStaffing: any;
+  isCancellingStaffing: boolean;
   checkTimeConflictEnhanced: any;
   availabilityDialog: any;
   setAvailabilityDialog: (value: any) => void;
@@ -151,6 +158,9 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   offerChannel,
   toast,
   sendStaffingEmail,
+  isSendingStaffingEmail,
+  cancelStaffing,
+  isCancellingStaffing,
   checkTimeConflictEnhanced,
   availabilityDialog,
   setAvailabilityDialog,
@@ -370,17 +380,13 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             width={CELL_WIDTH}
                             height={CELL_HEIGHT}
                             isSelected={isSelected}
-                            onSelect={(selected) => handleCellSelect(technician.id, date, selected)}
-                            onClick={(action, selectedJobId) =>
-                              handleCellClick(technician.id, date, action, selectedJobId)
-                            }
-                            onPrefetch={() => handleCellPrefetch(technician.id)}
-                            onOptimisticUpdate={(status) =>
-                              assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)
-                            }
-                            onRender={() => incrementCellRender()}
+                            onSelect={handleCellSelect}
+                            onClick={handleCellClick}
+                            onPrefetch={handleCellPrefetch}
+                            onOptimisticUpdate={handleOptimisticUpdate}
+                            onRender={incrementCellRender}
                             jobId={jobId}
-                            declinedJobIdsSet={declinedJobsByTech.get(technician.id) || new Set<string>()}
+                            declinedJobIdsSet={declinedJobsByTech.get(technician.id) ?? EMPTY_DECLINED_JOB_IDS}
                             allowDirectAssign={allowDirectAssign}
                             allowMarkUnavailable={allowMarkUnavailable}
                             staffingStatusProvided={providedByJob}
@@ -391,6 +397,10 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             staffingDepartment={staffingDepartment}
                             hideStaffingEmailButtons={hideStaffingEmailButtons}
                             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
+                            sendStaffingEmail={sendStaffingEmail}
+                            isSendingStaffingEmail={isSendingStaffingEmail}
+                            cancelStaffing={cancelStaffing}
+                            isCancellingStaffing={isCancellingStaffing}
                           />
                         </div>
                       );

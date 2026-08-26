@@ -393,12 +393,6 @@
     "src/components/matrix/DateHeader.tsx": {
       "@typescript-eslint/no-explicit-any": 9
     },
-    "src/components/matrix/MatrixCell.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/components/matrix/MatrixPerformanceWrapper.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
-    },
     "src/components/matrix/OfferDetailsDialog.tsx": {
       "react-hooks/exhaustive-deps": 1
     },

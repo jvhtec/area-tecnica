@@ -114,8 +114,10 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
 
       return { invitations, offers, confirmations } as const;
     },
-    staleTime: 2_000,
-    gcTime: 60_000,
+    // Kept fresh by invalidateAssignmentQueries (which now covers these count
+    // scopes) rather than by a 2s staleTime that refetched on every scroll.
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
     enabled: !!jobId,
   });
 }
@@ -196,7 +198,8 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
       const open = Math.max(required - assigned, 0);
       return { required, assigned, open };
     },
-    staleTime: 10_000,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
     enabled: hasJobs,
   });
 
@@ -402,8 +405,8 @@ function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technici
       (data || []).forEach((r: any) => { if (r.technician_id) unique.add(r.technician_id); });
       return unique.size;
     },
-    staleTime: 2_000,
-    gcTime: 60_000,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
     enabled: jobIds.length > 0,
   });
 }
