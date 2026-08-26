@@ -5,6 +5,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { hasTechnicianSelfServiceAccess, isManagementRole } from '@/utils/permissions';
+import {
+  buildSeasonalAvailabilityKey,
+  fetchMatrixTimesheetAssignments,
+  matrixAssignmentsQueryKey,
+  matrixAvailabilityQueryKey,
+} from '@/hooks/useOptimizedMatrixData';
 import { MatrixPageControls } from '@/pages/job-assignment-matrix/MatrixPageControls';
 import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingReminderDialogs';
 import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
@@ -14,7 +20,6 @@ import {
   DEPARTMENT_LABELS,
   FALLBACK_DEPARTMENT,
   OUTSTANDING_STORAGE_KEY,
-  fetchAssignmentsForWindow,
   fetchAvailabilityForWindow,
   fetchJobsForWindow,
   formatLabel,
@@ -280,6 +285,10 @@ export default function JobAssignmentMatrix() {
 
   const filteredTechnicianIds = useMemo(() => filteredTechnicians.map((tech: { id: string }) => tech.id), [filteredTechnicians]);
   const filteredTechnicianIdsKey = useMemo(() => filteredTechnicianIds.join(','), [filteredTechnicianIds]);
+  const seasonalAvailabilityKey = useMemo(
+    () => buildSeasonalAvailabilityKey(filteredTechnicians),
+    [filteredTechnicians],
+  );
 
   // Optimized jobs query with smart date filtering
   const {
@@ -324,7 +333,7 @@ export default function JobAssignmentMatrix() {
     prefetchStatusRef.current.set(windowKey, 'pending');
 
     const runPrefetch = async () => {
-      const jobCacheKey = ['optimized-matrix-jobs', startFormatted, endFormatted, selectedDepartment] as const;
+      const jobCacheKey = queryKeys.scope('optimized-matrix-jobs', startFormatted, endFormatted, selectedDepartment);
       const jobsData = await qc.prefetchQuery({
         queryKey: jobCacheKey,
         queryFn: () => fetchJobsForWindow(start, end, selectedDepartment),
@@ -340,9 +349,19 @@ export default function JobAssignmentMatrix() {
       const jobIds = jobsForWindow.map((job) => job.id).filter(Boolean);
 
       if (!cancelled && jobIds.length && technicianIds.length) {
+        const jobsById = new Map<string, MatrixJob>();
+        jobsForWindow.forEach((job) => { if (job?.id) jobsById.set(job.id, job); });
         await qc.prefetchQuery({
-          queryKey: queryKeys.scope('optimized-matrix-assignments', jobIds, technicianIds, startFormatted),
-          queryFn: () => fetchAssignmentsForWindow(jobIds, technicianIds, jobsForWindow),
+          // Same builder + same fetcher as useOptimizedMatrixData, so the matrix
+          // reads this entry back instead of refetching on expand.
+          queryKey: matrixAssignmentsQueryKey(jobIds, technicianIds, start, end),
+          queryFn: () => fetchMatrixTimesheetAssignments({
+            jobIds,
+            technicianIds,
+            jobsById,
+            startDate: start,
+            endDate: end,
+          }),
           staleTime: 30 * 1000,
           gcTime: 2 * 60 * 1000,
         });
@@ -350,15 +369,11 @@ export default function JobAssignmentMatrix() {
 
       if (!cancelled && technicianIds.length) {
         await qc.prefetchQuery({
-          queryKey: queryKeys.scope('optimized-matrix-availability', technicianIds, startFormatted, endFormatted),
+          queryKey: matrixAvailabilityQueryKey(technicianIds, seasonalAvailabilityKey, start, end),
           queryFn: () => fetchAvailabilityForWindow(technicianIds, start, end),
           staleTime: 60 * 1000,
           gcTime: 10 * 60 * 1000,
         });
-      }
-
-      if (!cancelled && canExpandAfter) {
-        expandAfter();
       }
     };
 
@@ -384,11 +399,11 @@ export default function JobAssignmentMatrix() {
   }, [
     qc,
     canExpandAfter,
-    expandAfter,
     filteredTechnicianIds,
     filteredTechnicianIdsKey,
     getProjectedRangeInfo,
     isInitialMatrixLoad,
+    seasonalAvailabilityKey,
     selectedDepartment,
   ]);
 
