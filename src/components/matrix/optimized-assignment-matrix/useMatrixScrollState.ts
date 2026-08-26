@@ -146,7 +146,11 @@ export const useMatrixScrollState = ({
     const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
 
     if (previousScrollLeft !== null && !movedHorizontally) {
+      // Vertical-only scroll: still record the position, otherwise the restore
+      // effect below rewinds the matrix to a stale row on the next dates change.
       syncScrollPositions(scrollLeft, scrollTop, "main");
+      lastKnownScrollRef.current.left = scrollLeft;
+      lastKnownScrollRef.current.top = scrollTop;
       scheduleVisibleWindowUpdate();
       return;
     }
@@ -252,6 +256,15 @@ export const useMatrixScrollState = ({
     return true;
   }, [cellWidth, dates, matrixWidth]);
 
+  // Crossing the mobile breakpoint changes cellWidth, which invalidates the
+  // column the initial scroll landed on — allow it to run again.
+  const autoScrolledCellWidthRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (autoScrolledCellWidthRef.current !== null && autoScrolledCellWidthRef.current !== cellWidth) {
+      autoScrolledRef.current = false;
+    }
+  }, [cellWidth]);
+
   useEffect(() => {
     if (autoScrolledRef.current) return;
     if (isInitialLoading || dates.length === 0) return;
@@ -266,6 +279,7 @@ export const useMatrixScrollState = ({
       const success = scrollToToday();
       if (success) {
         autoScrolledRef.current = true;
+        autoScrolledCellWidthRef.current = cellWidth;
         return;
       }
 
@@ -282,7 +296,7 @@ export const useMatrixScrollState = ({
         clearTimeout(timeoutId);
       }
     };
-  }, [dates.length, isInitialLoading, scrollToToday]);
+  }, [cellWidth, dates.length, isInitialLoading, scrollToToday]);
 
   useEffect(() => {
     updateVisibleWindow();
