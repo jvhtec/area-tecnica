@@ -1,6 +1,7 @@
 import React from "react";
-import { format } from "date-fns";
 import { ArrowUpDown, UserPlus } from "lucide-react";
+
+import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -336,11 +337,11 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                       const dateIndex = visibleCols.start + jdx;
                       const assignment = getAssignmentForCell(technician.id, date);
                       const availability = getAvailabilityForCell(technician.id, date);
-                      const cellKey = `${technician.id}-${format(date, "yyyy-MM-dd")}`;
+                      const cellKey = `${technician.id}-${formatMadridDateKey(date)}`;
                       const isSelected = selectedCells.has(cellKey);
                       const jobId = assignment?.job_id;
                       const byJobKey = jobId ? `${jobId}-${technician.id}` : "";
-                      const byDateKey = `${technician.id}-${format(date, "yyyy-MM-dd")}`;
+                      const byDateKey = cellKey;
                       const providedByJob =
                         jobId && staffingMaps?.byJob.get(byJobKey) ? (staffingMaps?.byJob.get(byJobKey) as any) : null;
                       const providedByDate = staffingMaps?.byDate.get(byDateKey)

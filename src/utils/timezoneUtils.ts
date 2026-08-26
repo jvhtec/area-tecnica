@@ -96,6 +96,16 @@ export const formatMadridDateKey = (date: Date | string): string => {
 export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): Date =>
   fromZonedTime(`${dateKey}T${time}`, MADRID_TIMEZONE);
 
+/** Madrid-local equivalents of date-fns `isToday` / `isWeekend`. */
+export const isMadridToday = (date: Date | string): boolean =>
+  formatMadridDateKey(date) === formatMadridDateKey(new Date());
+
+export const isMadridWeekend = (date: Date | string): boolean => {
+  // Read the weekday off the Madrid calendar day rather than the browser's.
+  const day = new Date(`${formatMadridDateKey(date)}T12:00:00Z`).getUTCDay();
+  return day === 0 || day === 6;
+};
+
 export const addMadridCalendarDays = (dateKey: string, amount: number): string => {
   const madridNoon = fromMadridDateKey(dateKey, "12:00:00");
   return formatMadridDateKey(addDays(madridNoon, amount));

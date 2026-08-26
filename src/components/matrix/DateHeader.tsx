@@ -1,7 +1,8 @@
 
 import React from 'react';
-import { format, isToday, isWeekend } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
+import { MADRID_TIMEZONE, formatMadridDateKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar, Clock, Users } from 'lucide-react';
@@ -118,8 +119,8 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
 }
 
 const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: DateHeaderProps) => {
-  const isTodayHeader = isToday(date);
-  const isWeekendHeader = isWeekend(date);
+  const isTodayHeader = isMadridToday(date);
+  const isWeekendHeader = isMadridWeekend(date);
   const hasJobs = jobs.length > 0;
 
   const getJobIndicatorColors = () => {
@@ -219,19 +220,19 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
           }}
         >
           <div className="font-semibold text-xs">
-            {format(date, 'EEE', { locale: es })}
+            {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
           </div>
           <div className={cn('text-base font-bold leading-tight', {
             'text-orange-700 dark:text-orange-300': isTodayHeader
           })}>
-            {format(date, 'd')}
+            {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
           </div>
           <div className="text-xs text-muted-foreground leading-tight">
-            {format(date, 'MMM', { locale: es })}
+            {formatInTimeZone(date, MADRID_TIMEZONE, 'MMM', { locale: es })}
           </div>
-          {format(date, 'd') === '1' && (
+          {formatInTimeZone(date, MADRID_TIMEZONE, 'd') === '1' && (
             <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
-              {format(date, 'yyyy')}
+              {formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy')}
             </div>
           )}
 
@@ -276,7 +277,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <span className="font-medium">
-                {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy', { locale: es })}
               </span>
             </div>
 
@@ -316,7 +317,7 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
           <div className="font-medium text-sm">{job.title}</div>
           <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
             <Clock className="h-3 w-3" />
-            {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+            {formatInTimeZone(job.start_time, MADRID_TIMEZONE, 'HH:mm')} - {formatInTimeZone(job.end_time, MADRID_TIMEZONE, 'HH:mm')}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -346,7 +347,8 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
 // Total confirmed/scheduled technicians for a specific date across the provided jobs
 // Timesheets are the source of truth for actual scheduled assignments
 function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technicianIds?: string[]) {
-  const dateStr = format(date, 'yyyy-MM-dd');
+  // timesheets.date is a Madrid calendar day, so key off the same calendar.
+  const dateStr = formatMadridDateKey(date);
   const jobIds = (jobs || []).map(j => j.id);
   return useQuery({
     queryKey: queryKeys.scope('matrix-date-confirmed-count', dateStr, jobIds.join(','), (technicianIds || []).join(',')),

@@ -3,8 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Calendar, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle } from 'lucide-react';
-import { format, isToday, isWeekend } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { formatMadridDateKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
@@ -47,8 +48,8 @@ export const OptimizedMatrixCell = memo(({
     onRender?.();
   }, [onRender]);
 
-  const isTodayCell = isToday(date);
-  const isWeekendCell = isWeekend(date);
+  const isTodayCell = isMadridToday(date);
+  const isWeekendCell = isMadridWeekend(date);
   const hasAssignment = !!assignment;
   const assignmentStatus = hasAssignment ? normalizeStatus(assignment.status) : null;
   const isConfirmedAssignment = assignmentStatus === 'confirmed';
@@ -79,21 +80,6 @@ export const OptimizedMatrixCell = memo(({
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = isConfirmedAssignment ? null : (hasAssignment ? staffingStatusByJob : staffingStatusByDate);
 
-  // Debug logging for staffing status changes
-  React.useEffect(() => {
-    if (staffingStatus?.availability_status || staffingStatus?.offer_status) {
-      console.log('🔵 CELL STATUS:', {
-        tech: technician.id,
-        date: format(date, 'yyyy-MM-dd'),
-        hasAssignment,
-        availabilityStatus: staffingStatus?.availability_status,
-        offerStatus: staffingStatus?.offer_status,
-        byDateJobId: staffingStatusByDate?.availability_job_id,
-        pendingJobIds: staffingStatusByDate?.pending_availability_job_ids
-      });
-    }
-  }, [staffingStatus?.availability_status, staffingStatus?.offer_status, technician.id, date, hasAssignment, staffingStatusByDate]);
-
   // Handle staffing email actions
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
     e.stopPropagation();
@@ -109,7 +95,6 @@ export const OptimizedMatrixCell = memo(({
       // Determine target job id: assignment > prop (do not auto-pick by status)
       const targetJobId = jobId || assignment?.job_id;
       if (!targetJobId) {
-        console.log('📋 No resolvable job for offer; opening job selection (email-intent)');
         onClick('offer-details-email');
         return;
       }
