@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
-import { formatMadridDateKey } from '@/utils/timezoneUtils';
+import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
 import { useCancelStaffingRequest, useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
@@ -533,12 +533,10 @@ export const OptimizedAssignmentMatrix = ({
           // cellKey format: "${technicianId}-yyyy-MM-dd"
           if (cellKey.startsWith(`${technicianId}-`)) {
             const dateStr = cellKey.substring(technicianId.length + 1); // Remove "techId-" prefix
-            try {
-              const parsedDate = new Date(`${dateStr}T00:00:00`);
-              if (!isNaN(parsedDate.getTime())) {
-                selectedDatesForTech.push(parsedDate);
-              }
-            } catch { /* ignore invalid dates */ }
+            const parsedDate = madridDateKeyToCalendarDate(dateStr);
+            if (parsedDate) {
+              selectedDatesForTech.push(parsedDate);
+            }
           }
         }
 
@@ -550,7 +548,7 @@ export const OptimizedAssignmentMatrix = ({
           setAvailabilityCoverage('multi');
         } else {
           // Single date or no selection - use the clicked date
-          const clickedDate = availabilityDialogDateIso ? new Date(`${availabilityDialogDateIso}T00:00:00`) : null;
+          const clickedDate = availabilityDialogDateIso ? madridDateKeyToCalendarDate(availabilityDialogDateIso) : null;
           setAvailabilitySingleDate(clickedDate);
           setAvailabilityMultiDates(clickedDate ? [clickedDate] : []);
         }

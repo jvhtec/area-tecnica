@@ -96,6 +96,20 @@ export const formatMadridDateKey = (date: Date | string): string => {
 export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): Date =>
   fromZonedTime(`${dateKey}T${time}`, MADRID_TIMEZONE);
 
+/**
+ * Turns a Madrid calendar-day key into the local-midnight Date that calendar
+ * widgets (react-day-picker) render and that `format(date, "yyyy-MM-dd")`
+ * round-trips back to the same key. This is a calendar day, not an instant —
+ * use `fromMadridDateKey` when you need the actual UTC moment.
+ */
+export const madridDateKeyToCalendarDate = (dateKey: string): Date | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 /** Madrid-local equivalents of date-fns `isToday` / `isWeekend`. */
 export const isMadridToday = (date: Date | string): boolean =>
   formatMadridDateKey(date) === formatMadridDateKey(new Date());

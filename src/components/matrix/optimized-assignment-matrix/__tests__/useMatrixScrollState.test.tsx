@@ -106,4 +106,42 @@ describe("useMatrixScrollState", () => {
       });
     }).not.toThrow();
   });
+
+  it("keeps the vertical position when the date range grows", () => {
+    const { result, rerender } = renderHook((args: typeof defaultArgs) => useMatrixScrollState(args), {
+      initialProps: defaultArgs,
+    });
+    const main = createScrollableDiv();
+    const headers = createScrollableDiv();
+    const technicianColumn = createScrollableDiv();
+
+    result.current.mainScrollRef.current = main;
+    result.current.dateHeadersRef.current = headers;
+    result.current.technicianScrollRef.current = technicianColumn;
+
+    // Establish a horizontal baseline, then scroll down only — the case that
+    // used to return before recording the position.
+    act(() => {
+      main.scrollLeft = 0;
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      // Releases the in-progress sync guard, which otherwise drops the next event.
+      flushAnimationFrames();
+    });
+    act(() => {
+      main.scrollTop = 240;
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      flushAnimationFrames();
+    });
+
+    // Expanding forwards appends dates and keeps the same first date.
+    act(() => {
+      rerender({
+        ...defaultArgs,
+        dates: [...defaultArgs.dates, new Date("2026-04-12T00:00:00.000Z")],
+      });
+    });
+
+    expect(main.scrollTop).toBe(240);
+    expect(technicianColumn.scrollTop).toBe(240);
+  });
 });

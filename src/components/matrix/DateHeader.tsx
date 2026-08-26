@@ -228,7 +228,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
             // 50px of header height cannot fit weekday + day + month + a badge
             // column, so mobile shows "Sáb 14" on one line.
             <div className="flex items-baseline gap-1 leading-none">
-              <span className="text-[11px] font-semibold capitalize">
+              <span className="text-xs font-semibold capitalize">
                 {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
               </span>
               <span className={cn('text-sm font-bold', {
