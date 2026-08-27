@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 
 import {
@@ -79,8 +80,9 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
       endKey,
       totalWeeks: state.weeksBefore + state.weeksAfter,
       totalDays: buildDateKeys(startKey, endKey).length,
-      startFormatted: formatInTimeZone(start, MADRID_TIMEZONE, 'MMM d, yyyy'),
-      endFormatted: formatInTimeZone(end, MADRID_TIMEZONE, 'MMM d, yyyy'),
+      // Display only — the UI is Spanish. Cache keys use startKey/endKey.
+      startFormatted: formatInTimeZone(start, MADRID_TIMEZONE, "d 'de' MMMM 'de' yyyy", { locale: es }),
+      endFormatted: formatInTimeZone(end, MADRID_TIMEZONE, "d 'de' MMMM 'de' yyyy", { locale: es }),
       isAtMaxBefore: state.weeksBefore >= state.maxWeeksBefore,
       isAtMaxAfter: state.weeksAfter >= state.maxWeeksAfter,
     };

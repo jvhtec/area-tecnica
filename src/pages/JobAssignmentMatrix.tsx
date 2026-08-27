@@ -296,7 +296,7 @@ export default function JobAssignmentMatrix() {
     isInitialLoading: isInitialLoadingJobs,
     isFetching: isFetchingJobs,
   } = useQuery<any[]>({
-    queryKey: queryKeys.scope('optimized-matrix-jobs', rangeInfo.startFormatted, rangeInfo.endFormatted, selectedDepartment),
+    queryKey: queryKeys.scope('optimized-matrix-jobs', rangeInfo.startKey, rangeInfo.endKey, selectedDepartment),
     queryFn: async () => {
       return fetchJobsForWindow(rangeInfo.start, rangeInfo.end, selectedDepartment);
     },
@@ -319,14 +319,14 @@ export default function JobAssignmentMatrix() {
     if (!projection) return;
 
     const { rangeInfo: projectedRange } = projection;
-    const { start, end, startFormatted, endFormatted } = projectedRange;
+    const { start, end, startKey, endKey } = projectedRange;
     if (!start || !end) return;
 
     const technicianIds = filteredTechnicianIds;
     const technicianKey = filteredTechnicianIdsKey;
     // seasonalAvailabilityKey is part of matrixAvailabilityQueryKey, so a
     // seasonal change needs a distinct window or the 'done' guard skips it.
-    const windowKey = [startFormatted, endFormatted, selectedDepartment, technicianKey, seasonalAvailabilityKey].join('|');
+    const windowKey = [startKey, endKey, selectedDepartment, technicianKey, seasonalAvailabilityKey].join('|');
 
     const currentStatus = prefetchStatusRef.current.get(windowKey);
     if (currentStatus === 'pending' || currentStatus === 'done') return;
@@ -335,7 +335,7 @@ export default function JobAssignmentMatrix() {
     prefetchStatusRef.current.set(windowKey, 'pending');
 
     const runPrefetch = async () => {
-      const jobCacheKey = queryKeys.scope('optimized-matrix-jobs', startFormatted, endFormatted, selectedDepartment);
+      const jobCacheKey = queryKeys.scope('optimized-matrix-jobs', startKey, endKey, selectedDepartment);
       const jobsData = await qc.prefetchQuery({
         queryKey: jobCacheKey,
         queryFn: () => fetchJobsForWindow(start, end, selectedDepartment),

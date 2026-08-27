@@ -220,17 +220,17 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
             </button>
             {isManagementUser &&
               (mobile ? (
-                // A plain button, not <Button size="sm">: that variant carries its
-                // own px-3/h-9 intrinsics, which overflowed this 109px corner even
-                // with h-6 w-6 p-0 applied.
-                <button
-                  type="button"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-background"
+                // icon-xs, not sm: the sm variant's px-3/h-9 intrinsics
+                // overflowed this 109px corner even with h-6 w-6 p-0 applied.
+                <Button
+                  variant="outline"
+                  size="icon-xs"
+                  className="shrink-0"
                   onClick={() => setCreateUserOpen(true)}
                   aria-label="Añadir usuario"
                 >
-                  <UserPlus className="h-3 w-3" />
-                </button>
+                  <UserPlus />
+                </Button>
               ) : (
                 <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
                   <UserPlus className="h-3.5 w-3.5 mr-1" /> Añadir
@@ -244,22 +244,26 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                   covered the first and last visible columns. */}
               {mobile && (
                 <>
-                  <button
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
                     aria-label="Fechas anteriores"
-                    className={`shrink-0 rounded-full bg-background border shadow-sm h-7 w-7 flex items-center justify-center ${canNavLeft ? "opacity-100" : "opacity-40"}`}
+                    className={`shrink-0 rounded-full shadow-sm ${canNavLeft ? "opacity-100" : "opacity-40"}`}
                     onClick={() => handleMobileNav("left")}
                     disabled={!canNavLeft}
                   >
-                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                  <button
+                    <ChevronLeft aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
                     aria-label="Fechas siguientes"
-                    className={`shrink-0 rounded-full bg-background border shadow-sm h-7 w-7 flex items-center justify-center ${canNavRight ? "opacity-100" : "opacity-40"}`}
+                    className={`shrink-0 rounded-full shadow-sm ${canNavRight ? "opacity-100" : "opacity-40"}`}
                     onClick={() => handleMobileNav("right")}
                     disabled={!canNavRight}
                   >
-                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
+                    <ChevronRight aria-hidden="true" />
+                  </Button>
                 </>
               )}
               {getSortLabel() && (

@@ -24,6 +24,12 @@ const buttonVariants = cva(
         sm: "coarse-hit-target coarse-hit-target-36 h-9 rounded-md px-3",
         lg: "h-11 rounded-md px-8",
         icon: "coarse-hit-target coarse-hit-target-40 h-10 w-10",
+        // Compact icon sizes for dense fixed-width chrome (e.g. the assignment
+        // matrix corner, which is 109px wide on a phone). Deliberately without
+        // coarse-hit-target: at this pitch its 44px pseudo-element overlaps the
+        // neighbouring control, so a near-miss fires the wrong action.
+        "icon-sm": "h-7 w-7 [&_svg]:size-3.5",
+        "icon-xs": "h-6 w-6 [&_svg]:size-3",
       },
     },
     defaultVariants: {

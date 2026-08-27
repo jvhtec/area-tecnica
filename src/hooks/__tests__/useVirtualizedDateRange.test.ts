@@ -103,8 +103,11 @@ describe('useVirtualizedDateRange', () => {
 
     expect(formatMadridDateKey(result.current.rangeInfo.start)).toBe('2026-05-13');
     expect(formatMadridDateKey(result.current.rangeInfo.end)).toBe('2026-05-27');
-    expect(result.current.rangeInfo.startFormatted).toBe('May 13, 2026');
-    expect(result.current.rangeInfo.endFormatted).toBe('May 27, 2026');
+    // Display labels are Spanish; cache keys use startKey/endKey.
+    expect(result.current.rangeInfo.startFormatted).toBe('13 de mayo de 2026');
+    expect(result.current.rangeInfo.endFormatted).toBe('27 de mayo de 2026');
+    expect(result.current.rangeInfo.startKey).toBe('2026-05-13');
+    expect(result.current.rangeInfo.endKey).toBe('2026-05-27');
   });
 
   it('jumps to the first Madrid day of the requested month', () => {
