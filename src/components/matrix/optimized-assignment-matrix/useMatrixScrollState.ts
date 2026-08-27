@@ -43,6 +43,8 @@ export const useMatrixScrollState = ({
   const updateScheduledRef = useRef(false);
   const autoScrolledRef = useRef(false);
   const prevDatesRef = useRef<Date[] | null>(null);
+  // The cellWidth lastKnownScrollRef.current.left was measured against.
+  const previousCellWidthRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
 
   const [visibleRows, setVisibleRows] = useState({ start: 0, end: Math.min(techniciansLength - 1, 20) });
@@ -312,24 +314,37 @@ export const useMatrixScrollState = ({
     const headers = dateHeadersRef.current;
     const technicianScroller = technicianScrollRef.current;
     if (!main || dates.length === 0) {
+      // Record the width even with nothing to restore: leaving it unset makes
+      // the next run convert the stored offset from the width it is moving to
+      // rather than the one it was measured at, which is a no-op conversion.
+      previousCellWidthRef.current = cellWidth;
       prevDatesRef.current = dates.slice();
       return;
     }
 
     const lastLeft = lastKnownScrollRef.current.left ?? main.scrollLeft;
     const lastTop = lastKnownScrollRef.current.top ?? main.scrollTop;
-    let targetLeft = lastLeft;
+
+    // Restore in columns, not pixels. This effect also runs when cellWidth
+    // changes (crossing the mobile breakpoint, rotating), and the stored offset
+    // was measured against the previous width — reapplying it as-is kept the
+    // scroll position and moved the date under it. At 120px, column 3 is 360px;
+    // re-laid out at 40px the same 360px is column 9.
+    const measuredCellWidth = previousCellWidthRef.current ?? cellWidth;
+    let targetColumn = measuredCellWidth > 0 ? lastLeft / measuredCellWidth : 0;
 
     if (prev && prev.length > 0) {
       const prevFirstIso = prev[0].toISOString();
       const nextIndex = dates.findIndex((date) => date.toISOString() === prevFirstIso);
 
+      // Days prepended: the day that was first is now at nextIndex, so the same
+      // day sits that many columns further along.
       if (nextIndex > 0) {
-        targetLeft = lastLeft + nextIndex * cellWidth;
-      } else if (nextIndex === -1) {
-        targetLeft = lastLeft;
+        targetColumn += nextIndex;
       }
     }
+
+    const targetLeft = cellWidth > 0 ? targetColumn * cellWidth : lastLeft;
 
     const applyScroll = (element: HTMLDivElement | null, value: number) => {
       if (!element) return;
@@ -350,6 +365,9 @@ export const useMatrixScrollState = ({
     lastKnownScrollRef.current.left = targetLeft;
     lastKnownScrollRef.current.top = lastTop;
     previousMainScrollLeftRef.current = targetLeft;
+    // The offset above is now expressed in the current width, so that is what
+    // the next run must convert from.
+    previousCellWidthRef.current = cellWidth;
     prevDatesRef.current = dates.slice();
   }, [cellWidth, dates]);
 

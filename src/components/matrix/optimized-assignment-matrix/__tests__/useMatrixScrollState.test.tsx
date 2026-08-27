@@ -179,4 +179,67 @@ describe("useMatrixScrollState", () => {
 
     expect(main.scrollTop).toBe(360);
   });
+
+  it("keeps the same column when the cell width changes", () => {
+    // Crossing the mobile breakpoint (or rotating) re-lays out the grid at a
+    // new cellWidth. The restore effect runs on that change too, and used to
+    // reapply the pixel offset measured at the *old* width — the same pixels,
+    // a different date. Here: column 3 at 120px is 360px, which at 40px would
+    // land on column 9 instead.
+    const { result, rerender } = renderHook((args: typeof defaultArgs) => useMatrixScrollState(args), {
+      initialProps: defaultArgs,
+    });
+    const main = createScrollableDiv();
+    const headers = createScrollableDiv();
+
+    result.current.mainScrollRef.current = main;
+    result.current.dateHeadersRef.current = headers;
+
+    act(() => {
+      main.scrollLeft = 360; // column 3 at cellWidth 120
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      flushAnimationFrames();
+    });
+
+    act(() => {
+      rerender({ ...defaultArgs, cellWidth: 40 });
+    });
+
+    // Column 3 at cellWidth 40.
+    expect(main.scrollLeft).toBe(120);
+    expect(headers.scrollLeft).toBe(120);
+  });
+
+  it("still shifts by the prepended columns when the range grows backwards", () => {
+    const { result, rerender } = renderHook((args: typeof defaultArgs) => useMatrixScrollState(args), {
+      initialProps: defaultArgs,
+    });
+    const main = createScrollableDiv();
+    const headers = createScrollableDiv();
+
+    result.current.mainScrollRef.current = main;
+    result.current.dateHeadersRef.current = headers;
+
+    act(() => {
+      main.scrollLeft = 240; // column 2 at cellWidth 120
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      flushAnimationFrames();
+    });
+
+    // Two earlier days prepended: the old first date moves to index 2, so the
+    // same day is now column 4.
+    act(() => {
+      rerender({
+        ...defaultArgs,
+        dates: [
+          new Date("2026-04-08T00:00:00.000Z"),
+          new Date("2026-04-09T00:00:00.000Z"),
+          ...defaultArgs.dates,
+        ],
+      });
+    });
+
+    expect(main.scrollLeft).toBe(480);
+    expect(headers.scrollLeft).toBe(480);
+  });
 });
