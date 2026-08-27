@@ -8,6 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { queryKeys } from "@/lib/react-query";
 import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
+import { addMadridCalendarDays } from "@/utils/timezoneUtils";
 const MADRID_TIMEZONE = 'Europe/Madrid';
 const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
 
@@ -346,11 +347,6 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       buildSeasonalUnavailability(technicians, dateStart, dateEnd).forEach((row) => {
         perDay.set(`${row.user_id}-${row.date}`, row);
       });
-      const startDay = new Date(dateRange.start);
-      startDay.setHours(0,0,0,0);
-      const endDay = new Date(dateRange.end);
-      endDay.setHours(0,0,0,0);
-
       const runBatches = async <T,>(
         batches: string[][],
         worker: (batch: string[]) => Promise<T[]>,
@@ -455,14 +451,24 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         );
 
         vacs.forEach((r) => {
-          const s = new Date(r.start_date);
-          const e = new Date(r.end_date);
-          const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
-          const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
-          for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
-            const dateKey = toMadridDateKey(d);
+          // vacation_requests dates and dateStart/dateEnd are all Madrid day
+          // keys, so clamp and iterate in key space. Round-tripping them through
+          // local midnights shifted the marked days outside Europe/Madrid.
+          const vacationStart = String(r.start_date ?? '');
+          const vacationEnd = String(r.end_date ?? '');
+          if (!vacationStart || !vacationEnd) return;
+
+          const clampStart = vacationStart > dateStart ? vacationStart : dateStart;
+          const clampEnd = vacationEnd < dateEnd ? vacationEnd : dateEnd;
+          if (clampStart > clampEnd) return;
+
+          let dateKey = clampStart;
+          while (dateKey <= clampEnd) {
             const key = `${r.technician_id}-${dateKey}`;
             if (!perDay.has(key)) perDay.set(key, { user_id: r.technician_id, date: dateKey, status: 'unavailable' });
+            const nextDateKey = addMadridCalendarDays(dateKey, 1);
+            if (nextDateKey === dateKey) break;
+            dateKey = nextDateKey;
           }
         });
       } catch (e: unknown) {

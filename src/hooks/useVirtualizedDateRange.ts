@@ -1,8 +1,25 @@
 import { useState, useMemo, useCallback } from 'react';
-import { addDays, addWeeks, format, isSameDay, startOfDay, differenceInCalendarDays } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
+import {
+  MADRID_TIMEZONE,
+  addMadridCalendarDays,
+  formatMadridDateKey,
+  fromMadridDateKey,
+} from '@/utils/timezoneUtils';
+
+/**
+ * The range is defined in Madrid calendar days, not browser-local ones.
+ *
+ * State is held as `yyyy-MM-dd` Madrid keys and only converted to Date at the
+ * edges, where each Date is the *instant* of that Madrid midnight. Consumers
+ * therefore get the same day from `formatMadridDateKey(date)` in every
+ * timezone. Deriving the range from local midnights instead used to make the
+ * column a browser east or west of Madrid displayed disagree with the day its
+ * data was keyed and submitted under.
+ */
 interface DateRangeState {
-  centerDate: Date;
+  centerDateKey: string;
   weeksBefore: number;
   weeksAfter: number;
   maxWeeksBefore: number;
@@ -17,6 +34,21 @@ interface UseVirtualizedDateRangeOptions {
   expandByWeeks?: number;
 }
 
+const madridTodayKey = () => formatMadridDateKey(new Date());
+
+/** Inclusive run of Madrid day keys. Steps calendar days, so DST is handled. */
+const buildDateKeys = (startKey: string, endKey: string): string[] => {
+  const keys: string[] = [];
+  let key = startKey;
+  while (key <= endKey) {
+    keys.push(key);
+    const next = addMadridCalendarDays(key, 1);
+    if (next === key) break;
+    key = next;
+  }
+  return keys;
+};
+
 export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions = {}) => {
   const {
     initialWeeksBefore = 1,
@@ -26,28 +58,29 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
     expandByWeeks = 4    // Expand by 4 weeks at a time
   } = options;
 
-  const [dateState, setDateState] = useState<DateRangeState>({
-    centerDate: startOfDay(new Date()),
+  const [dateState, setDateState] = useState<DateRangeState>(() => ({
+    centerDateKey: madridTodayKey(),
     weeksBefore: initialWeeksBefore,
     weeksAfter: initialWeeksAfter,
     maxWeeksBefore,
     maxWeeksAfter
-  });
+  }));
 
   const buildRangeInfo = useCallback((state: DateRangeState) => {
-    const start = addWeeks(state.centerDate, -state.weeksBefore);
-    const end = addWeeks(state.centerDate, state.weeksAfter);
-
-    const totalWeeks = state.weeksBefore + state.weeksAfter;
-    const totalDays = Math.max(differenceInCalendarDays(end, start) + 1, 0);
+    const startKey = addMadridCalendarDays(state.centerDateKey, -state.weeksBefore * 7);
+    const endKey = addMadridCalendarDays(state.centerDateKey, state.weeksAfter * 7);
+    const start = fromMadridDateKey(startKey);
+    const end = fromMadridDateKey(endKey);
 
     return {
       start,
       end,
-      totalWeeks,
-      totalDays,
-      startFormatted: format(start, 'MMM d, yyyy'),
-      endFormatted: format(end, 'MMM d, yyyy'),
+      startKey,
+      endKey,
+      totalWeeks: state.weeksBefore + state.weeksAfter,
+      totalDays: buildDateKeys(startKey, endKey).length,
+      startFormatted: formatInTimeZone(start, MADRID_TIMEZONE, 'MMM d, yyyy'),
+      endFormatted: formatInTimeZone(end, MADRID_TIMEZONE, 'MMM d, yyyy'),
       isAtMaxBefore: state.weeksBefore >= state.maxWeeksBefore,
       isAtMaxAfter: state.weeksAfter >= state.maxWeeksAfter,
     };
@@ -55,24 +88,15 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
 
   // Generate the current date range
   const dateRange = useMemo(() => {
-    const startDate = addWeeks(dateState.centerDate, -dateState.weeksBefore);
-    const endDate = addWeeks(dateState.centerDate, dateState.weeksAfter);
-    
-    const dates = [];
-    let currentDate = startDate;
-    
-    while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
-      currentDate = addDays(currentDate, 1);
-    }
-    
-    return dates;
+    const startKey = addMadridCalendarDays(dateState.centerDateKey, -dateState.weeksBefore * 7);
+    const endKey = addMadridCalendarDays(dateState.centerDateKey, dateState.weeksAfter * 7);
+    return buildDateKeys(startKey, endKey).map((key) => fromMadridDateKey(key));
   }, [dateState]);
 
   // Get today's index in the current range
   const todayIndex = useMemo(() => {
-    const today = new Date();
-    return dateRange.findIndex(date => isSameDay(date, today));
+    const todayKey = madridTodayKey();
+    return dateRange.findIndex((date) => formatMadridDateKey(date) === todayKey);
   }, [dateRange]);
 
   // Check if we can expand in either direction
@@ -82,24 +106,24 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
   // Expand the range backwards (earlier dates)
   const expandBefore = useCallback(() => {
     if (!canExpandBefore) return false;
-    
+
     setDateState(prev => ({
       ...prev,
       weeksBefore: Math.min(prev.weeksBefore + expandByWeeks, prev.maxWeeksBefore)
     }));
-    
+
     return true;
   }, [canExpandBefore, expandByWeeks]);
 
   // Expand the range forwards (later dates)
   const expandAfter = useCallback(() => {
     if (!canExpandAfter) return false;
-    
+
     setDateState(prev => ({
       ...prev,
       weeksAfter: Math.min(prev.weeksAfter + expandByWeeks, prev.maxWeeksAfter)
     }));
-    
+
     return true;
   }, [canExpandAfter, expandByWeeks]);
 
@@ -107,14 +131,14 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
   const setCenterDate = useCallback((date: Date) => {
     setDateState(prev => ({
       ...prev,
-      centerDate: startOfDay(date)
+      centerDateKey: formatMadridDateKey(date)
     }));
   }, []);
 
   // Reset to initial state
   const resetRange = useCallback(() => {
     setDateState({
-      centerDate: startOfDay(new Date()),
+      centerDateKey: madridTodayKey(),
       weeksBefore: initialWeeksBefore,
       weeksAfter: initialWeeksAfter,
       maxWeeksBefore,
@@ -124,9 +148,10 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
 
   // Jump to a specific month/year
   const jumpToMonth = useCallback((year: number, month: number) => {
-    const targetDate = new Date(year, month - 1, 1); // month is 0-indexed
-    setCenterDate(targetDate);
-  }, [setCenterDate]);
+    // month is 1-indexed; the range centres on the first of that Madrid month.
+    const centerDateKey = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`;
+    setDateState(prev => ({ ...prev, centerDateKey }));
+  }, []);
 
   // Get range metadata
   const rangeInfo = useMemo(() => buildRangeInfo(dateState), [buildRangeInfo, dateState]);
