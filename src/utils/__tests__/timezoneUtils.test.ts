@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { es } from "date-fns/locale";
 
 import {
   addMadridCalendarDays,
@@ -8,6 +9,9 @@ import {
   getMadridMonthGrid,
   isMadridToday,
   isMadridWeekend,
+  formatMadridDayKey,
+  getDayBoundsInTimezone,
+  isJobOnDate,
   madridDateKeyToCalendarDate,
 } from "@/utils/timezoneUtils";
 
@@ -128,5 +132,49 @@ describe("madridDateKeyToCalendarDate", () => {
   it("accepts a real leap day", () => {
     expect(madridDateKeyToCalendarDate("2024-02-29")).not.toBeNull();
     expect(madridDateKeyToCalendarDate("2026-02-29")).toBeNull();
+  });
+});
+
+describe("getDayBoundsInTimezone", () => {
+  // The argument is a calendar day off a grid (a local midnight meaning
+  // "22 July"), not an instant. Converting that instant into the job timezone
+  // first moved it onto the neighbouring day whenever the browser and the job
+  // disagreed, and a job vanished from its own calendar cell.
+  it("bounds the calendar day the caller asked for", () => {
+    const { start, end } = getDayBoundsInTimezone(new Date(2026, 6, 22), "Europe/Madrid");
+
+    // July: Madrid is UTC+2, so the day runs 22:00Z the previous day to 21:59:59.999Z.
+    expect(start.toISOString()).toBe("2026-07-21T22:00:00.000Z");
+    expect(end.toISOString()).toBe("2026-07-22T21:59:59.999Z");
+  });
+
+  it("keeps a job inside the day it falls on", () => {
+    expect(isJobOnDate("2026-07-22T08:00:00Z", "2026-07-22T18:00:00Z", new Date(2026, 6, 22))).toBe(true);
+    expect(isJobOnDate("2026-07-22T08:00:00Z", "2026-07-22T18:00:00Z", new Date(2026, 6, 21))).toBe(false);
+    expect(isJobOnDate("2026-07-22T08:00:00Z", "2026-07-22T18:00:00Z", new Date(2026, 6, 23))).toBe(false);
+  });
+
+  it("spans the 23- and 25-hour days either side of a DST change", () => {
+    // 2026-03-29 is 23 hours in Madrid, 2026-10-25 is 25.
+    const spring = getDayBoundsInTimezone(new Date(2026, 2, 29), "Europe/Madrid");
+    expect(spring.end.getTime() - spring.start.getTime()).toBe(23 * 60 * 60 * 1000 - 1);
+
+    const autumn = getDayBoundsInTimezone(new Date(2026, 9, 25), "Europe/Madrid");
+    expect(autumn.end.getTime() - autumn.start.getTime()).toBe(25 * 60 * 60 * 1000 - 1);
+  });
+});
+
+describe("formatMadridDayKey", () => {
+  // formatInTimeZone(parseISO(key), ...) looks equivalent and is not: parseISO
+  // gives a local midnight, which east of Madrid is still the previous Madrid
+  // day, so a payout row for 2026-04-08 read "mar 7 abr" under TZ=Asia/Tokyo.
+  it("names the day the key names", () => {
+    expect(formatMadridDayKey("2026-04-08", "yyyy-MM-dd")).toBe("2026-04-08");
+    expect(formatMadridDayKey("2026-01-01", "yyyy-MM-dd")).toBe("2026-01-01");
+    expect(formatMadridDayKey("2026-12-31", "yyyy-MM-dd")).toBe("2026-12-31");
+  });
+
+  it("formats with the requested pattern", () => {
+    expect(formatMadridDayKey("2026-04-08", "EEE d MMM", { locale: es })).toBe("mié 8 abr");
   });
 });

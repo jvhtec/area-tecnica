@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { parseISO } from "date-fns";
 import {
   buildArtistFlexDateRange,
   formatArtistDateTimeForFlex,
@@ -67,9 +68,23 @@ describe("buildArtistFlexDateRange", () => {
 });
 
 describe("formatArtistExtrasFolderDocumentNumber", () => {
+  // The hook documents artistDate as YYYY-MM-DD and reaches this function via
+  // parseISO(artistDate), i.e. a local-midnight calendar value. Building the
+  // argument as a UTC-noon instant instead — as this test used to — asserted a
+  // contract the function never sees, and only agreed with it below UTC+13:
+  // at UTC+14 that instant is already the next local day, so the number read
+  // "080526ESQT". Drive it the way the hook does.
+  const fromArtistDate = (artistDate: string) =>
+    formatArtistExtrasFolderDocumentNumber(parseISO(artistDate));
+
   it("uses the extras sound quote document number for the shared extras folder", () => {
-    expect(formatArtistExtrasFolderDocumentNumber(new Date("2026-05-07T12:00:00.000Z"))).toBe(
-      "070526ESQT"
-    );
+    expect(fromArtistDate("2026-05-07")).toBe("070526ESQT");
+  });
+
+  it("names the artist's own day in any browser timezone", () => {
+    // Regression guard: the day in the number must come from the key, not from
+    // wherever the browser happens to be.
+    expect(fromArtistDate("2026-01-01")).toBe("010126ESQT");
+    expect(fromArtistDate("2026-12-31")).toBe("311226ESQT");
   });
 });

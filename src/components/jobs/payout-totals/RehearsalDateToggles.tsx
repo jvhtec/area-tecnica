@@ -1,7 +1,6 @@
 import React from 'react';
-import { parseISO } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
+import { formatMadridDayKey } from '@/utils/timezoneUtils';
 import { Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -55,7 +54,8 @@ export function RehearsalDateToggles({
       <div className="flex flex-wrap gap-2">
         {jobTimesheetDates.map(dateStr => {
           const isActive = rehearsalDateSet.has(dateStr);
-          const label = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'd MMM', { locale: es });
+          // dateStr is a Madrid day key, not an instant — see formatMadridDayKey.
+          const label = formatMadridDayKey(dateStr, 'd MMM', { locale: es });
           return (
             <button
               key={dateStr}

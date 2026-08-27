@@ -1,5 +1,5 @@
 
-import { addDays, format, parseISO, startOfDay, endOfDay } from "date-fns";
+import { addDays, format, parseISO, startOfDay } from "date-fns";
 import { toZonedTime, fromZonedTime, formatInTimeZone } from "date-fns-tz";
 
 export const MADRID_TIMEZONE = "Europe/Madrid";
@@ -34,15 +34,27 @@ export const formatInJobTimezone = (
 /**
  * Get start and end of day in a specific timezone
  */
+/**
+ * UTC bounds of the calendar day `date` stands for, anchored in `timezone`.
+ *
+ * `date` is a calendar value, not an instant: every caller passes a day off a
+ * calendar grid (a local midnight meaning "22 July"), so the day is read from
+ * its local fields. Converting the instant into the job timezone first — as
+ * this used to — moved it onto the neighbouring day whenever the browser and
+ * the job disagreed about which day that midnight falls in. Under
+ * `TZ=Asia/Tokyo`, asking for 22 July returned the bounds of 21 July, and a
+ * job on the 22nd vanished from its own calendar cell.
+ */
 export const getDayBoundsInTimezone = (date: Date, timezone: string = MADRID_TIMEZONE) => {
-  const zonedDate = toJobTimezone(date, timezone);
-  const startOfDayLocal = startOfDay(zonedDate);
-  const endOfDayLocal = endOfDay(zonedDate);
-  
-  return {
-    start: fromJobTimezone(startOfDayLocal, timezone),
-    end: fromJobTimezone(endOfDayLocal, timezone)
-  };
+  const dayKey = format(startOfDay(date), "yyyy-MM-dd");
+  const nextDayKey = format(startOfDay(addDays(date, 1)), "yyyy-MM-dd");
+
+  const start = fromZonedTime(`${dayKey}T00:00:00`, timezone);
+  // One millisecond before the next day begins, so the bound holds on the
+  // 23- and 25-hour days either side of a DST transition.
+  const end = new Date(fromZonedTime(`${nextDayKey}T00:00:00`, timezone).getTime() - 1);
+
+  return { start, end };
 };
 
 /**
@@ -115,6 +127,22 @@ export const formatMadridDateKey = (date: Date | string): string => {
 
 export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): Date =>
   fromZonedTime(`${dateKey}T${time}`, MADRID_TIMEZONE);
+
+/**
+ * Renders a Madrid day key for display.
+ *
+ * Anchors the key to the instant of Madrid midnight before formatting it back
+ * in Madrid, so the label names the day the key names in every browser
+ * timezone. The tempting shorthand — `formatInTimeZone(parseISO(key), …)` —
+ * looks equivalent and is not: `parseISO` yields a *local* midnight, which east
+ * of Madrid still belongs to the previous Madrid day, so labels came out a day
+ * early (a payout row for 2026-04-08 read "mar 7 abr" under TZ=Asia/Tokyo).
+ */
+export const formatMadridDayKey = (
+  dateKey: string,
+  pattern: string,
+  options?: Parameters<typeof formatInTimeZone>[3],
+): string => formatInTimeZone(fromMadridDateKey(dateKey), MADRID_TIMEZONE, pattern, options);
 
 /**
  * Turns a Madrid calendar-day key into the local-midnight Date that calendar
