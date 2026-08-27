@@ -233,7 +233,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               ))}
           </div>
           {(mobile || getSortLabel()) && (
-            <div className="flex items-center justify-center gap-1 px-1 py-1 flex-1 min-h-0">
+            <div className="flex items-center justify-center gap-2 px-1 py-1 flex-1 min-h-0">
               {/* Mobile date paging. It used to be an overlay inside the header's
                   scroll container, which both scrolled away with the content and
                   covered the first and last visible columns. */}
@@ -241,7 +241,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 <>
                   <button
                     aria-label="Fechas anteriores"
-                    className={`shrink-0 rounded-full bg-background border shadow-sm h-6 w-6 flex items-center justify-center coarse-hit-target ${canNavLeft ? "opacity-100" : "opacity-40"}`}
+                    className={`shrink-0 rounded-full bg-background border shadow-sm h-7 w-7 flex items-center justify-center ${canNavLeft ? "opacity-100" : "opacity-40"}`}
                     onClick={() => handleMobileNav("left")}
                     disabled={!canNavLeft}
                   >
@@ -249,7 +249,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                   </button>
                   <button
                     aria-label="Fechas siguientes"
-                    className={`shrink-0 rounded-full bg-background border shadow-sm h-6 w-6 flex items-center justify-center coarse-hit-target ${canNavRight ? "opacity-100" : "opacity-40"}`}
+                    className={`shrink-0 rounded-full bg-background border shadow-sm h-7 w-7 flex items-center justify-center ${canNavRight ? "opacity-100" : "opacity-40"}`}
                     onClick={() => handleMobileNav("right")}
                     disabled={!canNavRight}
                   >

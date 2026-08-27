@@ -5,7 +5,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { Calendar, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { formatMadridDateKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
+import { isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
@@ -245,9 +245,12 @@ export const OptimizedMatrixCell = memo(({
   // only offered on cells without an assignment.
   const statusBadgesPosClass = mobile ? 'absolute bottom-9 left-1' : 'absolute bottom-1 left-1';
   const actionButtonsPosClass = mobile ? 'absolute bottom-1 right-1' : 'absolute top-1 right-1';
-  // Four 32px buttons plus gaps overflow a 140px mobile cell; 28px fits and
-  // coarse-hit-target still grows the tap area beyond the painted box.
-  const actionBtnSize = mobile ? 'h-7 w-7 coarse-hit-target' : 'h-5 w-5';
+  // Four 32px buttons plus gaps overflow a 140px mobile cell, so these are 28px.
+  // Deliberately NOT coarse-hit-target: its 44px ::after on a 30px centre pitch
+  // overlaps the neighbour by 14px, so a near-miss would fire the wrong staffing
+  // action. Four 44px targets cannot fit 132px of usable width — the Email and
+  // WhatsApp toggles are how a user drops to two comfortable controls.
+  const actionBtnSize = mobile ? 'h-7 w-7' : 'h-5 w-5';
 
   // A plain click only does something in one of the edit modes; without one the
   // cell is read-only and should not advertise itself as clickable.

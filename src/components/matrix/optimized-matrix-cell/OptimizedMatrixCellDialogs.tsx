@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { formatMadridDateKey } from '@/utils/timezoneUtils';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type React from 'react';
@@ -98,7 +98,7 @@ export const OptimizedMatrixCellDialogs = ({
                   phase: 'availability',
                   channel: retryChannel,
                   department: staffingDepartment,
-                  target_date: format(date, 'yyyy-MM-dd'),
+                  target_date: formatMadridDateKey(date),
                   single_day: true,
                 } as any),
                 {

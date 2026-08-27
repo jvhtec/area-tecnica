@@ -67,14 +67,6 @@ export const StaffingJobSelectionDialog = ({
 
   const handleContinue = () => {
     if (selectedJobId) {
-      console.log('🚀 StaffingJobSelectionDialog: handleContinue called', {
-        job_id: selectedJobId,
-        action: effectiveAction,
-        technician: technicianName,
-        date: format(date, 'yyyy-MM-dd'),
-        singleDay
-      });
-
       // Call the callback to let parent handle it.
       // Do NOT call onClose() here to avoid racing with parent state transitions (e.g., opening OfferDetails).
       onStaffingActionSelected(selectedJobId, effectiveAction, { singleDay });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
+import { invalidateMatrixHeaderCounts, useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
@@ -135,6 +135,8 @@ export const OptimizedAssignmentMatrix = ({
   useEffect(() => {
     const handler = () => {
       qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') });
+      // The date-header invitation/offer badges are counted off staffing_requests.
+      void invalidateMatrixHeaderCounts(qc);
     };
     window.addEventListener('staffing-updated', handler);
     return () => window.removeEventListener('staffing-updated', handler);

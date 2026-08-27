@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
 import { isWithinInterval, isSameDay } from 'date-fns';
@@ -42,6 +42,24 @@ export const matrixAssignmentsQueryKey = (
   start: Date | undefined,
   end: Date | undefined,
 ) => queryKeys.scope('optimized-matrix-assignments', jobIds, technicianIds, toMadridDateKey(start), toMadridDateKey(end));
+
+/**
+ * Date-header count scopes. They read job_assignments, staffing_requests and
+ * timesheets, so every source of those changes has to invalidate them — they
+ * are no longer kept fresh by a 2s staleTime.
+ */
+export const MATRIX_HEADER_COUNT_SCOPES = [
+  'matrix-date-confirmed-count',
+  'matrix-open-slots',
+  'matrix-job-engagement-counts',
+] as const;
+
+export const invalidateMatrixHeaderCounts = (queryClient: QueryClient) =>
+  Promise.all(
+    MATRIX_HEADER_COUNT_SCOPES.map((scope) =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope(scope) }),
+    ),
+  );
 
 export const matrixAvailabilityQueryKey = (
   technicianIds: string[],
@@ -597,11 +615,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') }), // Also invalidate jobs to refresh the matrix
-      // Date-header counts. These used to stay fresh only via a 2s staleTime,
-      // which meant every column scrolled back into view refetched them.
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-date-confirmed-count') }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-open-slots') }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-job-engagement-counts') }),
+      invalidateMatrixHeaderCounts(queryClient),
     ]);
   }, [queryClient]);
 
@@ -641,6 +655,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         },
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
+          // Confirmed and open-slot badges are counted off timesheets too.
+          void invalidateMatrixHeaderCounts(queryClient);
         }
       )
       .subscribe();

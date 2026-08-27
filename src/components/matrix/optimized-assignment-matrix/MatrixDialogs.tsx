@@ -1,5 +1,7 @@
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
+
+import { formatMadridDateKey } from "@/utils/timezoneUtils";
 import { Calendar as CalendarIcon } from "lucide-react";
 
 import { AssignmentStatusDialog } from "@/components/matrix/AssignmentStatusDialog";
@@ -152,7 +154,7 @@ export const MatrixDialogs = ({
         defaultSingleDay={cellAction.singleDay}
         jobStartTimeIso={jobs.find((j) => j.id === cellAction.selectedJobId)?.start_time}
         jobEndTimeIso={jobs.find((j) => j.id === cellAction.selectedJobId)?.end_time}
-        defaultDateIso={format(cellAction.date, "yyyy-MM-dd")}
+        defaultDateIso={formatMadridDateKey(cellAction.date)}
         onSubmit={({ role, message, singleDay, dates }) => {
           if (!cellAction.selectedJobId) return;
           void (async () => {
@@ -162,7 +164,7 @@ export const MatrixDialogs = ({
               const via = offerChannel;
               if (singleDay) {
                 const selectedDates =
-                  Array.isArray(dates) && dates.length ? dates : [format(cellAction.date, "yyyy-MM-dd")];
+                  Array.isArray(dates) && dates.length ? dates : [formatMadridDateKey(cellAction.date)];
                 for (const d of selectedDates) {
                   const conflictResult = await checkTimeConflictEnhanced(profileId, jobId, {
                     targetDateIso: d,
