@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { MultiDateRemovalState } from '@/components/matrix/optimized-matrix-cell/types';
+import type {
+  CancelStaffingMutate,
+  MultiDateRemovalState,
+  SendStaffingEmailMutate,
+} from '@/components/matrix/optimized-matrix-cell/types';
 
 type PendingRetry = { jobId: string } | null;
 type PendingCancel = { phase: 'availability' | 'offer'; jobId: string | null; allJobIds?: string[] } | null;
@@ -23,10 +27,10 @@ type OptimizedMatrixCellDialogsProps = {
   setRetryChannel: (value: 'email' | 'whatsapp') => void;
   availabilityRetrying: boolean;
   setAvailabilityRetrying: (value: boolean) => void;
-  sendStaffingEmail: any;
+  sendStaffingEmail: SendStaffingEmailMutate;
   pendingCancel: PendingCancel;
   setPendingCancel: (value: PendingCancel) => void;
-  cancelStaffing: any;
+  cancelStaffing: CancelStaffingMutate;
   isCancelling: boolean;
   multiDateRemoval: MultiDateRemovalState;
   setMultiDateRemoval: React.Dispatch<React.SetStateAction<MultiDateRemovalState>>;
@@ -92,7 +96,7 @@ export const OptimizedMatrixCellDialogs = ({
               if (!pendingRetry) return;
               setAvailabilityRetrying(true);
               sendStaffingEmail(
-                ({
+                {
                   job_id: pendingRetry.jobId,
                   profile_id: technicianId,
                   phase: 'availability',
@@ -100,7 +104,7 @@ export const OptimizedMatrixCellDialogs = ({
                   department: staffingDepartment,
                   target_date: formatMadridDateKey(date),
                   single_day: true,
-                } as any),
+                },
                 {
                   onSuccess: () => {
                     setAvailabilityRetrying(false);
@@ -156,7 +160,7 @@ export const OptimizedMatrixCellDialogs = ({
                         { job_id: jid, profile_id: technicianId, phase: pendingCancel.phase },
                         {
                           onSuccess: () => resolve(),
-                          onError: (e: any) => reject(e),
+                          onError: (e) => reject(e),
                         }
                       );
                     })

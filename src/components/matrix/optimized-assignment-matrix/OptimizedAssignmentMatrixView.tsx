@@ -10,7 +10,11 @@ import { TechnicianRow } from "../TechnicianRow";
 import { OptimizedMatrixCell } from "../OptimizedMatrixCell";
 import { DateHeader } from "../DateHeader";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
-import type { MatrixCellAction } from "@/components/matrix/optimized-matrix-cell/types";
+import type {
+  CancelStaffingMutate,
+  MatrixCellAction,
+  SendStaffingEmailMutate,
+} from "@/components/matrix/optimized-matrix-cell/types";
 
 // Shared so cells for technicians with no declined jobs keep a stable prop.
 const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
@@ -74,9 +78,9 @@ export interface OptimizedAssignmentMatrixViewProps {
   jobs: any[];
   offerChannel: "email" | "whatsapp";
   toast: any;
-  sendStaffingEmail: any;
+  sendStaffingEmail: SendStaffingEmailMutate;
   isSendingStaffingEmail: boolean;
-  cancelStaffing: any;
+  cancelStaffing: CancelStaffingMutate;
   isCancellingStaffing: boolean;
   checkTimeConflictEnhanced: any;
   availabilityDialog: any;
@@ -209,7 +213,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
             box, and anything that outgrows it spills across the borders into the
             first date column instead of being clipped. */}
         <div className="flex flex-col h-full overflow-hidden bg-card border-r border-b">
-          <div className={`flex items-center justify-between border-b ${mobile ? "gap-0.5 px-0.5 py-0.5" : "px-2 py-1"}`}>
+          <div className={`flex border-b ${mobile ? "items-stretch gap-0.5 px-0.5 py-0.5" : "items-center justify-between px-2 py-1"}`}>
             <button
               className={`flex items-center gap-1 font-semibold hover:text-primary transition-colors cursor-pointer group ${mobile ? "min-w-0 flex-1 overflow-hidden" : ""}`}
               onClick={cycleTechSort}
@@ -222,15 +226,19 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               (mobile ? (
                 // icon-xs, not sm: the sm variant's px-3/h-9 intrinsics
                 // overflowed this 109px corner even with h-6 w-6 p-0 applied.
-                <Button
-                  variant="outline"
-                  size="icon-xs"
-                  className="shrink-0"
-                  onClick={() => setCreateUserOpen(true)}
-                  aria-label="Añadir usuario"
-                >
-                  <UserPlus />
-                </Button>
+                // hit-target-fill grows the tap area to this cell rather than
+                // to 44px, which at this pitch would overlap the sort control.
+                <span className="relative flex shrink-0 items-center">
+                  <Button
+                    variant="outline"
+                    size="icon-xs"
+                    className="hit-target-fill shrink-0"
+                    onClick={() => setCreateUserOpen(true)}
+                    aria-label="Añadir usuario"
+                  >
+                    <UserPlus />
+                  </Button>
+                </span>
               ) : (
                 <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
                   <UserPlus className="h-3.5 w-3.5 mr-1" /> Añadir
@@ -244,26 +252,34 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                   covered the first and last visible columns. */}
               {mobile && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label="Fechas anteriores"
-                    className={`shrink-0 rounded-full shadow-sm ${canNavLeft ? "opacity-100" : "opacity-40"}`}
-                    onClick={() => handleMobileNav("left")}
-                    disabled={!canNavLeft}
-                  >
-                    <ChevronLeft aria-hidden="true" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label="Fechas siguientes"
-                    className={`shrink-0 rounded-full shadow-sm ${canNavRight ? "opacity-100" : "opacity-40"}`}
-                    onClick={() => handleMobileNav("right")}
-                    disabled={!canNavRight}
-                  >
-                    <ChevronRight aria-hidden="true" />
-                  </Button>
+                  {/* Each arrow sits in its own stretched flex cell so its tap
+                      area fills that cell. The cells tile the row, so the two
+                      targets meet without overlapping — the 44px pseudo-element
+                      the default sizes carry would overlap at this pitch. */}
+                  <span className="relative flex flex-1 items-center justify-center self-stretch">
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Fechas anteriores"
+                      className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavLeft ? "opacity-100" : "opacity-40"}`}
+                      onClick={() => handleMobileNav("left")}
+                      disabled={!canNavLeft}
+                    >
+                      <ChevronLeft aria-hidden="true" />
+                    </Button>
+                  </span>
+                  <span className="relative flex flex-1 items-center justify-center self-stretch">
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Fechas siguientes"
+                      className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavRight ? "opacity-100" : "opacity-40"}`}
+                      onClick={() => handleMobileNav("right")}
+                      disabled={!canNavRight}
+                    >
+                      <ChevronRight aria-hidden="true" />
+                    </Button>
+                  </span>
                 </>
               )}
               {getSortLabel() && (

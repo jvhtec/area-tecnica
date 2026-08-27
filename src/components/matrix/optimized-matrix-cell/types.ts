@@ -1,3 +1,20 @@
+import type { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+
+/**
+ * The matrix owns these mutations and threads `mutate` down to the cells, which
+ * call it with an options object (`{ onSuccess, onError }`) to clear their own
+ * retry spinner and to settle the promise the cancel dialog awaits.
+ *
+ * They are derived from the hooks rather than restated so the payload shapes
+ * stay checked at the call sites. Previously these props were declared unary
+ * (`(payload: unknown) => void`) and re-declared as `any` one level down, which
+ * hid both the second argument and the payload: a handler typed to satisfy that
+ * contract could legally drop the callbacks, leaving the retry button stuck on
+ * "Reenviando…" and the cancel dialog's `Promise.all` pending forever.
+ */
+export type SendStaffingEmailMutate = ReturnType<typeof useSendStaffingEmail>['mutate'];
+export type CancelStaffingMutate = ReturnType<typeof useCancelStaffingRequest>['mutate'];
+
 export type MatrixCellAction =
   | 'select-job'
   | 'select-job-for-staffing'
@@ -80,9 +97,9 @@ export interface OptimizedMatrixCellProps {
   hideStaffingWhatsappButtons?: boolean;
   // Owned by the matrix, not the cell: one mutation observer for the grid
   // instead of two per rendered cell.
-  sendStaffingEmail: (payload: unknown) => void;
+  sendStaffingEmail: SendStaffingEmailMutate;
   isSendingStaffingEmail?: boolean;
-  cancelStaffing: (payload: unknown) => void;
+  cancelStaffing: CancelStaffingMutate;
   isCancellingStaffing?: boolean;
 }
 

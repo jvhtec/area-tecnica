@@ -200,7 +200,9 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
     },
     staleTime: 60_000,
     gcTime: 5 * 60_000,
-    enabled: hasJobs,
+    // The "libres" badge this feeds is desktop-only, so a compact header would
+    // pay for two table reads per date column and render nothing with them.
+    enabled: hasJobs && !compact,
   });
 
   return (
