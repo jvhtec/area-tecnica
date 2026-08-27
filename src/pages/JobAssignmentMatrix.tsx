@@ -324,7 +324,9 @@ export default function JobAssignmentMatrix() {
 
     const technicianIds = filteredTechnicianIds;
     const technicianKey = filteredTechnicianIdsKey;
-    const windowKey = [startFormatted, endFormatted, selectedDepartment, technicianKey].join('|');
+    // seasonalAvailabilityKey is part of matrixAvailabilityQueryKey, so a
+    // seasonal change needs a distinct window or the 'done' guard skips it.
+    const windowKey = [startFormatted, endFormatted, selectedDepartment, technicianKey, seasonalAvailabilityKey].join('|');
 
     const currentStatus = prefetchStatusRef.current.get(windowKey);
     if (currentStatus === 'pending' || currentStatus === 'done') return;
@@ -614,6 +616,7 @@ export default function JobAssignmentMatrix() {
     // Hiding the fridge is the default, so only the opened fridge is a filter.
     if (!hideFridge) c++;
     if (allowDirectAssign) c++;
+    if (allowMarkUnavailable) c++;
     if (hideStaffingEmailButtons) c++;
     if (hideStaffingWhatsappButtons) c++;
     return c;
@@ -624,6 +627,7 @@ export default function JobAssignmentMatrix() {
     selectedSkills,
     hideFridge,
     allowDirectAssign,
+    allowMarkUnavailable,
     hideStaffingEmailButtons,
     hideStaffingWhatsappButtons,
   ]);

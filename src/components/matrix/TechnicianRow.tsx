@@ -311,7 +311,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     return initials ? initials.toUpperCase() : 'T';
   };
 
-  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Technician';
+  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico';
 
   const getDepartmentColor = (department: string) => {
     switch (department?.toLowerCase()) {

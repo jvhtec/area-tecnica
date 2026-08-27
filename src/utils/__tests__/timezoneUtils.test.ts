@@ -8,6 +8,7 @@ import {
   getMadridMonthGrid,
   isMadridToday,
   isMadridWeekend,
+  madridDateKeyToCalendarDate,
 } from "@/utils/timezoneUtils";
 
 describe("timezoneUtils Madrid calendar helpers", () => {
@@ -77,5 +78,30 @@ describe("isMadridToday / isMadridWeekend", () => {
     expect(isMadridWeekend(new Date("2026-05-29T12:00:00Z"))).toBe(false);
     expect(isMadridWeekend(new Date("2026-05-31T12:00:00Z"))).toBe(true);
     expect(isMadridWeekend(new Date("2026-06-01T12:00:00Z"))).toBe(false);
+  });
+});
+
+describe("madridDateKeyToCalendarDate", () => {
+  it("returns the local calendar day a picker should render", () => {
+    const d = madridDateKeyToCalendarDate("2026-06-01");
+    expect(d).not.toBeNull();
+    expect(d!.getFullYear()).toBe(2026);
+    expect(d!.getMonth()).toBe(5);
+    expect(d!.getDate()).toBe(1);
+  });
+
+  it("rejects malformed and impossible calendar days", () => {
+    expect(madridDateKeyToCalendarDate("")).toBeNull();
+    expect(madridDateKeyToCalendarDate("2026-6-1")).toBeNull();
+    expect(madridDateKeyToCalendarDate("not-a-date")).toBeNull();
+    // Date would silently roll these over (Feb 30 -> Mar 2, month 13 -> Jan).
+    expect(madridDateKeyToCalendarDate("2026-02-30")).toBeNull();
+    expect(madridDateKeyToCalendarDate("2026-13-05")).toBeNull();
+    expect(madridDateKeyToCalendarDate("2026-04-31")).toBeNull();
+  });
+
+  it("accepts a real leap day", () => {
+    expect(madridDateKeyToCalendarDate("2024-02-29")).not.toBeNull();
+    expect(madridDateKeyToCalendarDate("2026-02-29")).toBeNull();
   });
 });

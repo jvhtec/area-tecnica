@@ -4,7 +4,7 @@ import {
   buildSeasonalAvailabilityKey,
   matrixAssignmentsQueryKey,
   matrixAvailabilityQueryKey,
-} from '../useOptimizedMatrixData';
+} from '@/hooks/useOptimizedMatrixData';
 
 const createDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 

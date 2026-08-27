@@ -105,9 +105,21 @@ export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): D
 export const madridDateKeyToCalendarDate = (dateKey: string): Date | null => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
   if (!match) return null;
-  const [, year, month, day] = match;
-  const parsed = new Date(Number(year), Number(month) - 1, Number(day));
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  if (Number.isNaN(parsed.getTime())) return null;
+  // Date rolls impossible components over instead of failing ("2026-02-30"
+  // becomes March 2), so reject anything it had to normalise.
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+  return parsed;
 };
 
 /** Madrid-local equivalents of date-fns `isToday` / `isWeekend`. */

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 // import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar } from 'lucide-react';
+import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { MADRID_TIMEZONE, formatMadridDateKey } from '@/utils/timezoneUtils';
 import { dataLayerClient } from '@/services/dataLayerClient';
@@ -114,7 +115,7 @@ export const MarkUnavailableDialog = ({
           <DialogTitle>Marcar como No Disponible</DialogTitle>
           <DialogDescription>
             Marcar a {technician?.first_name} {technician?.last_name} como no disponible el{' '}
-            {formatInTimeZone(selectedDate, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy')}
+            {formatInTimeZone(selectedDate, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy', { locale: es })}
           </DialogDescription>
         </DialogHeader>
 
@@ -133,7 +134,7 @@ export const MarkUnavailableDialog = ({
               <span className="font-medium">Fecha</span>
             </div>
             <div className="text-sm">
-              {formatInTimeZone(selectedDate, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy')}
+              {formatInTimeZone(selectedDate, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy', { locale: es })}
             </div>
             {selectedCells.length > 1 && (
               <div className="text-xs text-muted-foreground mt-1">
