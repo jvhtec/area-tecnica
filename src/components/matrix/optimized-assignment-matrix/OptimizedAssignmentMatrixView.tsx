@@ -222,7 +222,13 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               variant="ghost"
               size="inline"
               className={`group flex cursor-pointer items-center gap-1 font-semibold hover:bg-transparent hover:text-primary ${
-                mobile ? "min-w-0 flex-1 justify-start overflow-hidden [&_svg]:size-3" : "[&_svg]:size-3.5"
+                mobile
+                  ? // min-h-6 is a floor, not a change: items-stretch on the row
+                    // already gives this 24px. But it gets that by matching the
+                    // height of the button beside it, so shrinking that one
+                    // would silently drop this under the 24px WCAG minimum.
+                    "min-h-6 min-w-0 flex-1 justify-start overflow-hidden [&_svg]:size-3"
+                  : "[&_svg]:size-3.5"
               }`}
               onClick={cycleTechSort}
               title="Cambia el orden de técnicos"
