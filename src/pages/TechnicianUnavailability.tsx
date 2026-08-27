@@ -76,7 +76,8 @@ export default function TechnicianUnavailability() {
       const startKey = payload.startDate;
       const endKey = payload.endDate;
       if (!madridDateKeyToCalendarDate(startKey) || !madridDateKeyToCalendarDate(endKey) || endKey < startKey) {
-        throw new Error('Invalid date range');
+        // Surfaced to the user by the mutation's onError toast, so it is Spanish.
+        throw new Error('El rango de fechas no es válido');
       }
 
       let dateKey = startKey;

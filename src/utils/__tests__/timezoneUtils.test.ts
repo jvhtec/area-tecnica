@@ -79,6 +79,31 @@ describe("isMadridToday / isMadridWeekend", () => {
     expect(isMadridWeekend(new Date("2026-05-31T12:00:00Z"))).toBe(true);
     expect(isMadridWeekend(new Date("2026-06-01T12:00:00Z"))).toBe(false);
   });
+
+  // These read a day key rather than an instant. Reparsing a bare "yyyy-MM-dd"
+  // as a local midnight put it on the previous Madrid day everywhere east of
+  // Madrid, so under TZ=Asia/Tokyo the weekday came back off by one and a
+  // Saturday column was not shaded as a weekend.
+  it("keeps a day key on its own day, whatever the browser timezone", () => {
+    expect(formatMadridDateKey("2026-03-12")).toBe("2026-03-12");
+    // 2026-03-14 is a Saturday and 2026-03-13 a Friday, on the Madrid calendar.
+    expect(isMadridWeekend("2026-03-14")).toBe(true);
+    expect(isMadridWeekend("2026-03-13")).toBe(false);
+  });
+
+  it("still converts a timestamp string to the Madrid day it falls on", () => {
+    // 23:30 UTC on the 12th is already the 13th in Madrid (CET, UTC+1).
+    expect(formatMadridDateKey("2026-03-12T23:30:00Z")).toBe("2026-03-13");
+    expect(formatMadridDateKey("2026-03-12T09:00:00Z")).toBe("2026-03-12");
+  });
+
+  it("treats a day key as today on the Madrid calendar", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-31T23:30:00Z"));
+
+    expect(isMadridToday("2026-06-01")).toBe(true);
+    expect(isMadridToday("2026-05-31")).toBe(false);
+  });
 });
 
 describe("madridDateKeyToCalendarDate", () => {

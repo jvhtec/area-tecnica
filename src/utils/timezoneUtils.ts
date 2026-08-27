@@ -88,9 +88,29 @@ export const utcToLocalInput = (utcDate: Date | string, timezone: string = MADRI
   return format(zonedDate, "yyyy-MM-dd'T'HH:mm");
 };
 
+/** Matches a bare calendar day, as distinct from a full ISO timestamp. */
+const MADRID_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Madrid calendar day for an instant — or the identity, for a value that is
+ * already a Madrid day key.
+ *
+ * The distinction matters because the two kinds of string need opposite
+ * treatment. A timestamp ("2026-03-12T23:30:00Z") is an instant and has to be
+ * converted, which is what the previous unconditional `parseISO` did. A bare
+ * "2026-03-12" is already a Madrid day, but `parseISO` reads it as a *local*
+ * midnight, and east of Madrid that instant still falls on the previous Madrid
+ * day — so the key came back shifted by one (in Asia/Tokyo, "2026-03-12"
+ * returned "2026-03-11", and `isMadridWeekend` denied that Saturday was a
+ * weekend). Passing day keys straight through fixes every caller that hands
+ * this function a key rather than only the two that were noticed.
+ */
 export const formatMadridDateKey = (date: Date | string): string => {
-  const utcDate = typeof date === "string" ? parseISO(date) : date;
-  return formatInTimeZone(utcDate, MADRID_TIMEZONE, "yyyy-MM-dd");
+  if (typeof date === "string") {
+    if (MADRID_DATE_KEY_PATTERN.test(date)) return date;
+    return formatInTimeZone(parseISO(date), MADRID_TIMEZONE, "yyyy-MM-dd");
+  }
+  return formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
 };
 
 export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): Date =>

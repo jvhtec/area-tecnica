@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Theme } from './types';
+import { addMadridCalendarDays, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -55,23 +56,27 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     const createMutation = useMutation({
         mutationFn: async (payload: { startDate: string; endDate: string }) => {
             if (!user?.id) return;
+            // The picked values are already calendar days and
+            // technician_availability stores Madrid calendar days, so this walks
+            // the keys directly. The formatter this replaces was meant to stop
+            // the day shifting, but caused one: it parsed the key into a *local*
+            // midnight and then read that instant in Madrid, which is still the
+            // previous Madrid day anywhere east of Madrid (in Asia/Tokyo,
+            // picking 2026-03-12 stored 2026-03-11).
             const rows: Array<{ technician_id: string; date: string; status: string }> = [];
-            const s = new Date(payload.startDate + 'T00:00');
-            const e = new Date(payload.endDate + 'T00:00');
-            if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) throw new Error('Invalid date range');
+            const startKey = payload.startDate;
+            const endKey = payload.endDate;
+            if (!madridDateKeyToCalendarDate(startKey) || !madridDateKeyToCalendarDate(endKey) || endKey < startKey) {
+                // Surfaced to the user by the onError toast below, so it is Spanish.
+                throw new Error('El rango de fechas no es válido');
+            }
 
-            // Use Spain timezone to avoid date shifting bugs
-            // E.g., selecting 2025-01-15 should store as 2025-01-15, not shift to 2025-01-14
-            const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
-                timeZone: 'Europe/Madrid',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            });
-
-            for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-                const dateStr = spanishDateFormatter.format(d);
-                rows.push({ technician_id: user.id, date: dateStr, status: 'day_off' });
+            let dateKey = startKey;
+            while (dateKey <= endKey) {
+                rows.push({ technician_id: user.id, date: dateKey, status: 'day_off' });
+                const nextDateKey = addMadridCalendarDays(dateKey, 1);
+                if (nextDateKey === dateKey) break;
+                dateKey = nextDateKey;
             }
             const { error } = await dataLayerClient.from('technician_availability')
                 .upsert(rows, { onConflict: 'technician_id,date' });
