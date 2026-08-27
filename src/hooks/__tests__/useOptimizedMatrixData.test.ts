@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAssignmentDateMap,
+  buildJobsByDate,
   buildSeasonalAvailabilityKey,
   matrixAssignmentsQueryKey,
   matrixAvailabilityQueryKey,
@@ -126,5 +127,62 @@ describe('buildSeasonalAvailabilityKey', () => {
     expect(
       buildSeasonalAvailabilityKey([{ ...seasonal, seasonal_house_tech_end_date: '2026-10-31' }]),
     ).not.toBe(key);
+  });
+});
+
+describe('buildJobsByDate', () => {
+  const job = {
+    id: 'job-a',
+    title: 'Single Madrid Day',
+    // 08:00-20:00 Madrid on 2026-04-10 (CEST, UTC+2)
+    start_time: '2026-04-10T06:00:00.000Z',
+    end_time: '2026-04-10T18:00:00.000Z',
+    status: 'Confirmado',
+    job_type: 'single',
+  } as Parameters<typeof buildJobsByDate>[0][number];
+
+  // Madrid midnight instants, as the range now produces.
+  const madridMidnight = (key: string) => new Date(`${key}T00:00:00+02:00`);
+
+  it('puts a job on the Madrid day it runs on', () => {
+    const map = buildJobsByDate([job], [
+      madridMidnight('2026-04-09'),
+      madridMidnight('2026-04-10'),
+      madridMidnight('2026-04-11'),
+    ]);
+
+    expect(map.get('2026-04-10')?.map((j) => j.id)).toEqual(['job-a']);
+    expect(map.get('2026-04-09')).toEqual([]);
+    expect(map.get('2026-04-11')).toEqual([]);
+  });
+
+  it('spans every Madrid day of a multi-day job', () => {
+    const multiDay = {
+      ...job,
+      id: 'job-multi',
+      start_time: '2026-04-10T06:00:00.000Z',
+      end_time: '2026-04-12T18:00:00.000Z',
+    };
+    const map = buildJobsByDate([multiDay], [
+      madridMidnight('2026-04-10'),
+      madridMidnight('2026-04-11'),
+      madridMidnight('2026-04-12'),
+      madridMidnight('2026-04-13'),
+    ]);
+
+    expect(map.get('2026-04-10')).toHaveLength(1);
+    expect(map.get('2026-04-11')).toHaveLength(1);
+    expect(map.get('2026-04-12')).toHaveLength(1);
+    expect(map.get('2026-04-13')).toEqual([]);
+  });
+
+  it('honours an explicit job_date_types entry', () => {
+    const typed = {
+      ...job,
+      id: 'job-typed',
+      job_date_types: [{ date: '2026-04-15', type: 'travel' }],
+    };
+    const map = buildJobsByDate([typed], [madridMidnight('2026-04-15')]);
+    expect(map.get('2026-04-15')?.map((j) => j.id)).toEqual(['job-typed']);
   });
 });

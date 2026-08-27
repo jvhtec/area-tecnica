@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
-import { isWithinInterval, isSameDay } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
 
@@ -105,6 +104,31 @@ export const buildAssignmentDateMap = (
   });
 
   return map;
+};
+
+/**
+ * Groups jobs by the Madrid day each column represents.
+ *
+ * Both sides are compared as Madrid day keys. The previous isSameDay /
+ * isWithinInterval check read the browser's calendar day, so once the range
+ * carried Madrid-midnight instants a job disappeared from its own column for
+ * anyone west of Madrid.
+ */
+export const buildJobsByDate = (jobs: MatrixJob[], dates: Date[]) => {
+  const jobsByDate = new Map<string, MatrixJob[]>();
+
+  dates.forEach((date) => {
+    const dateKey = toMadridDateKey(date);
+    jobsByDate.set(dateKey, jobs.filter((job) => {
+      const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
+      if (hasTypedDate) return true;
+      const jobStartKey = toMadridDateKey(new Date(job.start_time));
+      const jobEndKey = toMadridDateKey(new Date(job.end_time));
+      return dateKey >= jobStartKey && dateKey <= jobEndKey;
+    }));
+  });
+
+  return jobsByDate;
 };
 
 interface FetchMatrixTimesheetArgs {
@@ -552,26 +576,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [availabilityData]);
 
-  // Fixed getJobsForDate function with proper typing
   const getJobsForDate = useMemo(() => {
-    const jobsByDate = new Map<string, MatrixJob[]>();
-    
-    dates.forEach(date => {
-      const dateKey = toMadridDateKey(date);
-      const dateJobs = jobs.filter((job: MatrixJob) => {
-        const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
-        if (hasTypedDate) return true;
-        const jobStart = new Date(job.start_time);
-        const jobEnd = new Date(job.end_time);
-        
-        return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
-               isSameDay(date, jobStart) || 
-               isSameDay(date, jobEnd);
-      });
-      
-      jobsByDate.set(dateKey, dateJobs);
-    });
-    
+    const jobsByDate = buildJobsByDate(jobs, dates);
     return (date: Date): MatrixJob[] => {
       // Shared empty array, not a fresh []: DateHeader is memoized on this prop.
       return jobsByDate.get(toMadridDateKey(date)) || EMPTY_JOBS_FOR_DATE;

@@ -8,6 +8,7 @@ import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignmen
 import { codeForLabel, isRoleCode, roleOptionsForDiscipline } from '@/utils/roles';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -38,6 +39,9 @@ export type {
   ExistingAssignment
 } from "@/components/matrix/assignJobDialogTypes";
 
+/** Madrid-midnight instant from the matrix -> the local calendar day it stands for. */
+const toCalendarDate = (date: Date): Date => madridDateKeyToCalendarDate(formatMadridDateKey(date)) ?? date;
+
 export const AssignJobDialog = ({
   open,
   onClose,
@@ -51,7 +55,7 @@ export const AssignJobDialog = ({
   const [selectedRole, setSelectedRole] = useState<string>('');
   // Coverage mode: full job span, single day, multiple days
   const [coverageMode, setCoverageMode] = useState<CoverageMode>(existingAssignment?.single_day ? 'single' : 'full');
-  const [singleDate, setSingleDate] = useState<Date | null>(date);
+  const [singleDate, setSingleDate] = useState<Date | null>(() => toCalendarDate(date));
   const [multiDates, setMultiDates] = useState<Date[]>(date ? [date] : []);
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -90,8 +94,15 @@ export const AssignJobDialog = ({
   // When adding a new day to an already-assigned job from an *empty* cell, existingAssignment is undefined,
   // but timesheets for (job_id, technician_id) already exist. We treat that as "modifying the same job".
   const isModifyingSameJobByContext = isReassignment && existingAssignment?.job_id === selectedJobId;
+  // The matrix supplies Madrid-midnight instants while the picker and this
+  // local yyyy-MM-dd formatting work in calendar days, so the range value is
+  // converted at the boundary. Formatting the instant directly submitted the
+  // previous day west of Madrid.
   // IMPORTANT: use local yyyy-MM-dd, not toISOString (which is UTC)
-  const assignmentDate = React.useMemo(() => format((singleDate ?? date), 'yyyy-MM-dd'), [date, singleDate]);
+  const assignmentDate = React.useMemo(
+    () => format(singleDate ?? toCalendarDate(date), 'yyyy-MM-dd'),
+    [date, singleDate],
+  );
 
   // Fetch existing timesheets for this job+technician.
   // This is needed even when existingAssignment is undefined (adding a new day to an existing job).
@@ -735,7 +746,7 @@ export const AssignJobDialog = ({
       onClose={onClose}
       isReassignment={isReassignment}
       technician={technician}
-      date={date}
+      date={toCalendarDate(date)}
       existingAssignment={existingAssignment}
       preSelectedJobId={preSelectedJobId}
       selectedJobId={selectedJobId}

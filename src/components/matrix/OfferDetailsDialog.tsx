@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatMadridDateKey } from '@/utils/timezoneUtils';
 
 interface OfferDetailsDialogProps {
   open: boolean;
@@ -70,18 +71,19 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
     }
   }, [open, defaultSingleDay, jobDescription]);
 
-  const jobSpan = useMemo(() => {
-    const s = jobStartTimeIso ? new Date(jobStartTimeIso) : null;
-    const e = jobEndTimeIso ? new Date(jobEndTimeIso) : s;
-    if (s) s.setHours(0, 0, 0, 0);
-    if (e) e.setHours(0, 0, 0, 0);
-    return { start: s, end: e };
-  }, [jobStartTimeIso, jobEndTimeIso]);
+  // Job timestamps are real instants, so their day is the Madrid one. Picker
+  // values are local calendar days that round-trip through local format(), so
+  // they are compared as such. Normalising the job bounds to local midnights
+  // instead widened the allowed span by a day east of Madrid.
+  const jobSpan = useMemo(() => ({
+    startKey: jobStartTimeIso ? formatMadridDateKey(jobStartTimeIso) : null,
+    endKey: jobEndTimeIso ? formatMadridDateKey(jobEndTimeIso) : (jobStartTimeIso ? formatMadridDateKey(jobStartTimeIso) : null),
+  }), [jobStartTimeIso, jobEndTimeIso]);
 
   const isAllowedDate = (d: Date) => {
-    if (!jobSpan.start || !jobSpan.end) return true;
-    const t = new Date(d); t.setHours(0, 0, 0, 0);
-    return t >= jobSpan.start && t <= jobSpan.end;
+    if (!jobSpan.startKey || !jobSpan.endKey) return true;
+    const dayKey = format(d, 'yyyy-MM-dd');
+    return dayKey >= jobSpan.startKey && dayKey <= jobSpan.endKey;
   };
 
   return (
