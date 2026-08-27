@@ -12,6 +12,14 @@ import { Label } from '@/components/ui/label';
 import { CalendarDays, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
+import {
+  MADRID_TIMEZONE,
+  addMadridCalendarDays,
+  fromMadridDateKey,
+  madridDateKeyToCalendarDate,
+} from '@/utils/timezoneUtils';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -58,21 +66,25 @@ export default function TechnicianUnavailability() {
   const createMutation = useMutation({
     mutationFn: async (payload: { startDate: string; endDate: string; status: 'vacation'|'travel'|'sick'|'day_off' }) => {
       if (!user?.id) return;
-      // Build per-day rows inclusive
+      // Build per-day rows inclusive.
+      //
+      // The picked values are already calendar days, and technician_availability
+      // stores Madrid calendar days, so this walks the keys directly. Parsing
+      // them to a local midnight and then formatting that instant in Madrid
+      // wrote the previous day for anyone east of Madrid.
       const rows: Array<{ technician_id: string; date: string; status: string }> = [];
-      const s = new Date(payload.startDate + 'T00:00');
-      const e = new Date(payload.endDate + 'T00:00');
-      if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) throw new Error('Invalid date range');
+      const startKey = payload.startDate;
+      const endKey = payload.endDate;
+      if (!madridDateKeyToCalendarDate(startKey) || !madridDateKeyToCalendarDate(endKey) || endKey < startKey) {
+        throw new Error('Invalid date range');
+      }
 
-      const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Europe/Madrid',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
-
-      for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-        rows.push({ technician_id: user.id, date: spanishDateFormatter.format(d), status: payload.status });
+      let dateKey = startKey;
+      while (dateKey <= endKey) {
+        rows.push({ technician_id: user.id, date: dateKey, status: payload.status });
+        const nextDateKey = addMadridCalendarDays(dateKey, 1);
+        if (nextDateKey === dateKey) break;
+        dateKey = nextDateKey;
       }
       const { error } = await dataLayerClient.from('technician_availability')
         .upsert(rows, { onConflict: 'technician_id,date' });
@@ -240,7 +252,15 @@ export default function TechnicianUnavailability() {
             <div className="text-muted-foreground">Todavía no tienes bloqueos de disponibilidad. Añade uno para evitar asignaciones durante esas fechas.</div>
           )}
           {blocks.map((b: any) => {
-            const formattedDate = new Date(b.date).toLocaleDateString('es-ES', { dateStyle: 'long' });
+            // b.date is a Madrid calendar day. new Date('yyyy-MM-dd') parses as
+            // UTC midnight, which toLocaleDateString then rendered as the
+            // previous day for anyone west of UTC.
+            const formattedDate = formatInTimeZone(
+              fromMadridDateKey(b.date),
+              MADRID_TIMEZONE,
+              "d 'de' MMMM 'de' yyyy",
+              { locale: es },
+            );
             const badgeClass = statusStyles[b.status as keyof typeof statusStyles] || 'border-transparent bg-muted text-foreground';
             const statusLabel = statusLabels[b.status as keyof typeof statusLabels] || b.status;
             return (
