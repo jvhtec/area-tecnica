@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
 import { isWithinInterval, isSameDay } from 'date-fns';
@@ -6,6 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
 const MADRID_TIMEZONE = 'Europe/Madrid';
 const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
@@ -42,24 +43,6 @@ export const matrixAssignmentsQueryKey = (
   start: Date | undefined,
   end: Date | undefined,
 ) => queryKeys.scope('optimized-matrix-assignments', jobIds, technicianIds, toMadridDateKey(start), toMadridDateKey(end));
-
-/**
- * Date-header count scopes. They read job_assignments, staffing_requests and
- * timesheets, so every source of those changes has to invalidate them — they
- * are no longer kept fresh by a 2s staleTime.
- */
-export const MATRIX_HEADER_COUNT_SCOPES = [
-  'matrix-date-confirmed-count',
-  'matrix-open-slots',
-  'matrix-job-engagement-counts',
-] as const;
-
-export const invalidateMatrixHeaderCounts = (queryClient: QueryClient) =>
-  Promise.all(
-    MATRIX_HEADER_COUNT_SCOPES.map((scope) =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope(scope) }),
-    ),
-  );
 
 export const matrixAvailabilityQueryKey = (
   technicianIds: string[],

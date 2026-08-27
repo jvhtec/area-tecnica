@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { invalidateMatrixHeaderCounts, useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
+import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
+import { invalidateMatrixHeaderCounts } from '@/lib/matrix-header-counts';
 import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';

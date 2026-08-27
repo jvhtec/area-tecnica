@@ -6,6 +6,7 @@ import { UnifiedSubscriptionManager, type RealtimeChangePayload } from '@/lib/un
 
 
 import { queryKeys } from "@/lib/react-query";
+import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 export function useStaffingRealtime() {
   const qc = useQueryClient()
   const location = useLocation()
@@ -79,6 +80,7 @@ export function useStaffingRealtime() {
               qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-by-date') })
               qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
               qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
+              void invalidateMatrixHeaderCounts(qc)
             }
           } catch (e) {
             console.warn('Activity staffing event handling error', e)
@@ -136,10 +138,13 @@ export function useStaffingRealtime() {
       }
 
       // Always invalidate broader matrix queries for safety
-      console.log('🔄 Invalidating matrix queries')
       qc.invalidateQueries({ queryKey: queryKeys.scope('assignment-matrix') })
       qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
       qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
+      // The window 'staffing-updated' event only covers this browser's own
+      // mutations; remote changes arrive here, so the date-header counts have
+      // to be invalidated on this path too.
+      void invalidateMatrixHeaderCounts(qc)
     }
 
     return () => {

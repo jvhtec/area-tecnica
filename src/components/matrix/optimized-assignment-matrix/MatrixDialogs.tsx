@@ -295,13 +295,18 @@ export const MatrixDialogs = ({
               </RadioGroup>
               {(() => {
                 const job = jobs.find((j) => j.id === availabilityDialog.jobId);
+                // Job timestamps are real instants, so they convert to Madrid days.
                 const toMadridDay = (value: Date | string) =>
                   formatInTimeZone(value, "Europe/Madrid", "yyyy-MM-dd");
                 const startDay = job?.start_time ? toMadridDay(job.start_time) : undefined;
                 const endDay = job?.end_time ? toMadridDay(job.end_time) : startDay;
                 const isAllowed = (d: Date) => {
                   if (!startDay || !endDay) return true;
-                  const day = toMadridDay(d);
+                  // Picker values are NOT instants: they are local-midnight calendar
+                  // values standing for a Madrid day (see madridDateKeyToCalendarDate),
+                  // and they are submitted with the same local format below. Running
+                  // them through formatInTimeZone shifted them a day east of Madrid.
+                  const day = format(d, "yyyy-MM-dd");
                   return day >= startDay && day <= endDay;
                 };
                 return (

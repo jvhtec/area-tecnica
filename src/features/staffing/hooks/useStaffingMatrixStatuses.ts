@@ -301,13 +301,10 @@ export function useStaffingMatrixStatuses(
             if (!r.single_day) {
               const job = jobLookup.get(r.job_id)
               if (!job) return false
-              const cellDate = new Date(d)
-              cellDate.setHours(0, 0, 0, 0)
-              const start = new Date(job.start)
-              start.setHours(0, 0, 0, 0)
-              const end = new Date(job.end)
-              end.setHours(0, 0, 0, 0)
-              return cellDate >= start && cellDate <= end
+              // dStr is a Madrid day, so the job bounds have to be Madrid days too.
+              // Comparing local midnights here put the badge on the neighbouring
+              // column in browsers east or west of Madrid.
+              return dStr >= formatMadridDateKey(job.start) && dStr <= formatMadridDateKey(job.end)
             }
 
             return false

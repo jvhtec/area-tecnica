@@ -240,4 +240,60 @@ describe('useStaffingMatrixStatuses', () => {
       availability_actor_label: CARLOS_AGENT_NAME,
     })
   })
+  it('matches full-span requests on the Madrid day the column represents', async () => {
+    // The matrix supplies local-midnight calendar values; in a browser east of
+    // Madrid the column keyed Madrid 2026-04-10 is backed by a Date whose local
+    // day is the 11th. The overlap check must use the Madrid day either way.
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'staffing_requests') {
+        return createQueryBuilder({
+          data: [
+            {
+              id: 'req-span',
+              job_id: 'job-span',
+              profile_id: 'tech-1',
+              phase: 'availability',
+              status: 'pending',
+              updated_at: '2026-04-10T08:00:00.000Z',
+              single_day: false,
+              target_date: null,
+              created_at: '2026-04-10T07:55:00.000Z',
+              requested_by: 'manager-1',
+            },
+          ],
+          error: null,
+        })
+      }
+      return createQueryBuilder({ data: [], error: null })
+    })
+
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses(
+        ['tech-1'],
+        [
+          {
+            id: 'job-span',
+            title: 'Single Madrid Day',
+            // 08:00-20:00 Madrid on 2026-04-10 (CEST, UTC+2)
+            start_time: '2026-04-10T06:00:00.000Z',
+            end_time: '2026-04-10T18:00:00.000Z',
+          },
+        ],
+        [
+          new Date('2026-04-09T23:00:00.000Z'), // Madrid 2026-04-10 01:00
+          new Date('2026-04-10T23:00:00.000Z'), // Madrid 2026-04-11 01:00
+        ],
+      ),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(result.current.data?.byDate.get('tech-1-2026-04-10')).toMatchObject({
+      availability_status: 'requested',
+    })
+    // The following Madrid day is outside the job span and must stay empty.
+    expect(result.current.data?.byDate.get('tech-1-2026-04-11')).toBeUndefined()
+  })
 })
