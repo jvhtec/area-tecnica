@@ -516,8 +516,13 @@ export const OptimizedAssignmentMatrix = ({
   };
 
   // Read at seed time only, so a selection change does not re-seed an open dialog.
+  // Synced in an effect rather than during render: a render React discards would
+  // otherwise leave the ref holding a selection that was never committed. This
+  // effect is declared before the seeding effect so the ref is current when it runs.
   const selectedCellsRef = React.useRef(selectedCells);
-  selectedCellsRef.current = selectedCells;
+  useEffect(() => {
+    selectedCellsRef.current = selectedCells;
+  }, [selectedCells]);
   const availabilityDialogOpen = !!availabilityDialog?.open;
   const availabilityDialogProfileId = availabilityDialog?.profileId;
   const availabilityDialogDateIso = availabilityDialog?.dateIso;

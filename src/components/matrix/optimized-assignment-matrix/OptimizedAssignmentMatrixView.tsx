@@ -205,27 +205,32 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           height: HEADER_HEIGHT,
         }}
       >
-        <div className="flex flex-col h-full bg-card border-r border-b">
-          <div className="flex items-center justify-between px-2 py-1 border-b">
+        {/* overflow-hidden is a backstop: the corner is a fixed TECHNICIAN_WIDTH
+            box, and anything that outgrows it spills across the borders into the
+            first date column instead of being clipped. */}
+        <div className="flex flex-col h-full overflow-hidden bg-card border-r border-b">
+          <div className={`flex items-center justify-between border-b ${mobile ? "gap-0.5 px-0.5 py-0.5" : "px-2 py-1"}`}>
             <button
-              className="flex items-center gap-1 font-semibold hover:text-primary transition-colors cursor-pointer group"
+              className={`flex items-center gap-1 font-semibold hover:text-primary transition-colors cursor-pointer group ${mobile ? "min-w-0 flex-1 overflow-hidden" : ""}`}
               onClick={cycleTechSort}
               title="Cambia el orden de técnicos"
             >
-              {mobile ? <span className="text-sm">Técnicos</span> : <span>Técnicos</span>}
-              <ArrowUpDown className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100" />
+              <span className={mobile ? "min-w-0 flex-1 truncate text-left text-xs" : ""}>Técnicos</span>
+              <ArrowUpDown className={`shrink-0 opacity-50 group-hover:opacity-100 ${mobile ? "h-3 w-3" : "h-3.5 w-3.5"}`} />
             </button>
             {isManagementUser &&
               (mobile ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 w-7 p-0"
+                // A plain button, not <Button size="sm">: that variant carries its
+                // own px-3/h-9 intrinsics, which overflowed this 109px corner even
+                // with h-6 w-6 p-0 applied.
+                <button
+                  type="button"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-background"
                   onClick={() => setCreateUserOpen(true)}
                   aria-label="Añadir usuario"
                 >
-                  <UserPlus className="h-3.5 w-3.5" />
-                </Button>
+                  <UserPlus className="h-3 w-3" />
+                </button>
               ) : (
                 <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
                   <UserPlus className="h-3.5 w-3.5 mr-1" /> Añadir
@@ -233,7 +238,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               ))}
           </div>
           {(mobile || getSortLabel()) && (
-            <div className="flex items-center justify-center gap-2 px-1 py-1 flex-1 min-h-0">
+            <div className={`flex items-center justify-center flex-1 min-h-0 px-1 ${mobile ? "gap-1 py-0.5" : "gap-2 py-1"}`}>
               {/* Mobile date paging. It used to be an overlay inside the header's
                   scroll container, which both scrolled away with the content and
                   covered the first and last visible columns. */}

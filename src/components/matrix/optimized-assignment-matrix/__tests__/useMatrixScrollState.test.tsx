@@ -144,4 +144,39 @@ describe("useMatrixScrollState", () => {
     expect(main.scrollTop).toBe(240);
     expect(technicianColumn.scrollTop).toBe(240);
   });
+  it("keeps the newest vertical position when events outrun the sync frame", () => {
+    const { result, rerender } = renderHook((args: typeof defaultArgs) => useMatrixScrollState(args), {
+      initialProps: defaultArgs,
+    });
+    const main = createScrollableDiv();
+    const technicianColumn = createScrollableDiv();
+
+    result.current.mainScrollRef.current = main;
+    result.current.technicianScrollRef.current = technicianColumn;
+
+    act(() => {
+      main.scrollLeft = 0;
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      flushAnimationFrames();
+    });
+
+    // Two vertical events with no frame in between: the second is dropped for
+    // syncing (a frame is already pending) but is still the newest position.
+    act(() => {
+      main.scrollTop = 120;
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      main.scrollTop = 360;
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      flushAnimationFrames();
+    });
+
+    act(() => {
+      rerender({
+        ...defaultArgs,
+        dates: [...defaultArgs.dates, new Date("2026-04-12T00:00:00.000Z")],
+      });
+    });
+
+    expect(main.scrollTop).toBe(360);
+  });
 });

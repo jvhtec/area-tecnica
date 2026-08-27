@@ -137,20 +137,25 @@ export const useMatrixScrollState = ({
   });
 
   const handleMainScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (syncInProgressRef.current) return;
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
+
+    // Recorded before the in-progress guard: events that arrive while a sync
+    // frame is pending are dropped for syncing purposes, but their position is
+    // still the newest one the restore effect must not rewind past.
+    lastKnownScrollRef.current.left = scrollLeft;
+    lastKnownScrollRef.current.top = scrollTop;
+
+    if (syncInProgressRef.current) return;
 
     const previousScrollLeft = previousMainScrollLeftRef.current;
     const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
     const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
 
     if (previousScrollLeft !== null && !movedHorizontally) {
-      // Vertical-only scroll: still record the position, otherwise the restore
-      // effect below rewinds the matrix to a stale row on the next dates change.
+      // Vertical-only scroll. The position was recorded above, otherwise the
+      // restore effect rewinds to a stale row on the next dates change.
       syncScrollPositions(scrollLeft, scrollTop, "main");
-      lastKnownScrollRef.current.left = scrollLeft;
-      lastKnownScrollRef.current.top = scrollTop;
       scheduleVisibleWindowUpdate();
       return;
     }
@@ -177,8 +182,6 @@ export const useMatrixScrollState = ({
     }
 
     syncScrollPositions(scrollLeft, scrollTop, "main");
-    lastKnownScrollRef.current.left = scrollLeft;
-    lastKnownScrollRef.current.top = scrollTop;
     scheduleVisibleWindowUpdate();
   }, [
     canExpandAfter,

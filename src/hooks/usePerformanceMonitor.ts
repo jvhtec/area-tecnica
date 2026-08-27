@@ -3,15 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 interface PerformanceMetrics {
   renderTime: number;
   queryTime: number;
-  cellRenderCount: number;
   memoryUsage?: number;
 }
 
 export const usePerformanceMonitor = (componentName: string) => {
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     renderTime: 0,
-    queryTime: 0,
-    cellRenderCount: 0
+    queryTime: 0
   });
   
   const renderStartRef = useRef<number>(0);
@@ -66,8 +64,13 @@ export const usePerformanceMonitor = (componentName: string) => {
     return () => clearInterval(interval);
   }, [measureMemoryUsage]);
 
+  // Exposed as a getter rather than a metrics field: mirroring the counter into
+  // state would re-render every consumer from the cell-render hot path.
+  const getCellRenderCount = useCallback(() => cellRenderCountRef.current, []);
+
   return {
     metrics,
+    getCellRenderCount,
     startRenderTimer,
     endRenderTimer,
     startQueryTimer,
