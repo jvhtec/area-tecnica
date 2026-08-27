@@ -30,6 +30,11 @@ const buttonVariants = cva(
         // neighbouring control, so a near-miss fires the wrong action.
         "icon-sm": "h-7 w-7 [&_svg]:size-3.5",
         "icon-xs": "h-6 w-6 [&_svg]:size-3",
+        // Text control that contributes no box of its own: the row it sits in
+        // sets the height, and the tap area comes from that cell (see
+        // hit-target-fill) rather than from a 44px pseudo-element, which at
+        // this pitch would overlap the neighbouring control.
+        inline: "h-auto p-0",
       },
     },
     defaultVariants: {

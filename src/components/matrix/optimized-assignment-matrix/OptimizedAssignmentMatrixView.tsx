@@ -214,14 +214,22 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
             first date column instead of being clipped. */}
         <div className="flex flex-col h-full overflow-hidden bg-card border-r border-b">
           <div className={`flex border-b ${mobile ? "items-stretch gap-0.5 px-0.5 py-0.5" : "items-center justify-between px-2 py-1"}`}>
-            <button
-              className={`flex items-center gap-1 font-semibold hover:text-primary transition-colors cursor-pointer group ${mobile ? "min-w-0 flex-1 overflow-hidden" : ""}`}
+            {/* size="inline" so the primitive adds no box of its own: this row
+                is 28px tall on a phone, and the default size's h-10 plus its
+                44px hit pseudo-element would both overflow the corner and
+                overlap the control beside it. */}
+            <Button
+              variant="ghost"
+              size="inline"
+              className={`group flex cursor-pointer items-center gap-1 font-semibold hover:bg-transparent hover:text-primary ${
+                mobile ? "min-w-0 flex-1 justify-start overflow-hidden [&_svg]:size-3" : "[&_svg]:size-3.5"
+              }`}
               onClick={cycleTechSort}
               title="Cambia el orden de técnicos"
             >
               <span className={mobile ? "min-w-0 flex-1 truncate text-left text-xs" : ""}>Técnicos</span>
-              <ArrowUpDown className={`shrink-0 opacity-50 group-hover:opacity-100 ${mobile ? "h-3 w-3" : "h-3.5 w-3.5"}`} />
-            </button>
+              <ArrowUpDown className="shrink-0 opacity-50 group-hover:opacity-100" />
+            </Button>
             {isManagementUser &&
               (mobile ? (
                 // icon-xs, not sm: the sm variant's px-3/h-9 intrinsics
