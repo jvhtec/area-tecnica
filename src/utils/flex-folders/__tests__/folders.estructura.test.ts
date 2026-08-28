@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   inserted: [] as Record<string, unknown>[],
 }));
 
-vi.mock("../api", () => ({ createFlexFolder: mocks.createFlexFolder }));
+vi.mock("@/utils/flex-folders/api", () => ({ createFlexFolder: mocks.createFlexFolder }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -32,8 +32,8 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { ensureEstructuraFolders } from "../folder-creation/createEstructuraFolders";
-import { RESPONSIBLE_PERSON_IDS } from "../constants";
+import { RESPONSIBLE_PERSON_IDS } from "@/utils/flex-folders/constants";
+import { ensureEstructuraFolders } from "@/utils/flex-folders/folder-creation/createEstructuraFolders";
 
 describe("ensureEstructuraFolders", () => {
   beforeEach(() => {

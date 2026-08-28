@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(7);
+SELECT plan(8);
 
 SELECT has_column(
   'public',
@@ -43,6 +43,21 @@ SELECT ok(
       AND indexdef ILIKE '%folder_type = ''pull_sheet''%'
   ),
   'a job can track at most one Estructura Pull Sheet per source department'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'flex_folders'
+      AND indexname = 'ux_flex_folders_estructura_pull_sheet_source_per_tour_date'
+      AND indexdef ILIKE '%UNIQUE INDEX%'
+      AND indexdef ILIKE '%(tour_date_id, source_department)%'
+      AND indexdef ILIKE '%department = ''estructura''%'
+      AND indexdef ILIKE '%folder_type = ''pull_sheet''%'
+  ),
+  'a tour date can track at most one pre-job Estructura Pull Sheet per source department'
 );
 
 SELECT throws_ok(

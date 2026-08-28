@@ -30,6 +30,13 @@ create unique index if not exists ux_flex_folders_estructura_pull_sheet_source_p
     and folder_type = 'pull_sheet'
     and source_department is not null;
 
+create unique index if not exists ux_flex_folders_estructura_pull_sheet_source_per_tour_date
+  on public.flex_folders (tour_date_id, source_department)
+  where tour_date_id is not null
+    and department = 'estructura'
+    and folder_type = 'pull_sheet'
+    and source_department is not null;
+
 alter table public.tours
   add column if not exists flex_estructura_folder_id uuid;
 

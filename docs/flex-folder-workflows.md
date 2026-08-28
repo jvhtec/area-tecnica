@@ -18,7 +18,7 @@ For every standard job with normal Flex folders, the tracked hierarchy is:
 
 Both children are `folder_type = 'pull_sheet'` and `department = 'estructura'`. Their source is persisted explicitly as `source_department = 'sound'` or `'lights'`; names are display text, never the primary discriminator. The Sound sheet uses the Sound responsible person and the Lights sheet uses the Lights responsible person. The parent uses the existing main/general responsible.
 
-Creation and reconciliation do not depend on `job_departments` or folder-picker options. The selectable technical department union remains unchanged, so Estructura does not appear in job creation, job editing, or the Flex folder picker. A partial unique index permits at most one tracked Estructura Pull Sheet per `(job_id, source_department)`, while legacy rows with a null discriminator continue to work.
+Creation and reconciliation do not depend on `job_departments` or folder-picker options. The selectable technical department union remains unchanged, so Estructura does not appear in job creation, job editing, or the Flex folder picker. Partial unique indexes permit at most one tracked Estructura Pull Sheet per source for either a linked job or a tour date whose job has not been linked yet, while legacy rows with a null discriminator continue to work.
 
 ## Job Flex Folder Creation
 

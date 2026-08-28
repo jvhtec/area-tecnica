@@ -22,7 +22,7 @@ Added the operational Estructura hierarchy to standard jobs, tours, and tour dat
 ## Decisions made
 
 - Estructura is an operational Flex department, not a user-selectable staffing department. Folder creation therefore runs independently of selected job departments.
-- The two Estructura Pull Sheets are distinguished by `source_department` (`sound` or `lights`) and protected by a partial unique index per job/source.
+- The two Estructura Pull Sheets are distinguished by `source_department` (`sound` or `lights`) and protected by partial unique indexes per job/source and tour-date/source; the latter closes the pre-job concurrent-creation window.
 - Manual motor pushes are additive and independent per source so one failed destination does not erase a successful push to the other.
 - Automatic certificates read outbound manifests only from the tracked Estructura Pull Sheets. The manual certificate fallback remains available.
 - XMLP motor rows route only to Estructura Sound. Bumpers, rigging hardware, and ordinary Sound rows continue to use the selected Sound destination.
