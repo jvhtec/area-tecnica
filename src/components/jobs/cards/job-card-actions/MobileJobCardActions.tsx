@@ -346,7 +346,6 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
               {isProjectManagementPage && isManagementUser && job.job_type !== "dryhire" && (
                 <PrepareMotorsAction
                   jobId={job.id}
-                  onCreateFlexFolders={canCreateFlexFolders ? onCreateFlexFolders : undefined}
                 />
               )}
               {isProjectManagementPage && isManagementUser && <MotorCertificateAction job={job} />}

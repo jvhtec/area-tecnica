@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEventHandler } from "react";
+import { useMemo, useState } from "react";
 import { Boxes, Loader2, Minus, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -10,6 +10,7 @@ import {
 } from "@/domain/estructura";
 import {
   pushEstructuraMotorQuantities,
+  reconcileEstructuraFoldersForJob,
   resolveEstructuraPullSheetTargets,
   type EstructuraMotorPushResult,
 } from "@/services/estructuraMotorPreparation";
@@ -36,14 +37,15 @@ const sourceLabel = (source: EstructuraSourceDepartment) =>
 
 export function PrepareMotorsAction({
   jobId,
-  onCreateFlexFolders,
 }: {
   jobId: string;
-  onCreateFlexFolders?: MouseEventHandler<HTMLButtonElement>;
 }) {
   const [open, setOpen] = useState(false);
   const [quantities, setQuantities] = useState<QuantityState>(emptyQuantities);
   const [isPushing, setIsPushing] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
   const [pushResult, setPushResult] = useState<EstructuraMotorPushResult | null>(null);
   const targetsQuery = useQuery({
     queryKey: ["estructura-pull-sheet-targets", jobId],
@@ -100,13 +102,29 @@ export function PrepareMotorsAction({
     }
   };
 
+  const handleReconcile = async () => {
+    if (isReconciling) return;
+    setIsReconciling(true);
+    setReconcileMessage(null);
+    setReconcileError(null);
+    try {
+      await reconcileEstructuraFoldersForJob(jobId);
+      await targetsQuery.refetch();
+      setReconcileMessage("La carpeta Estructura y sus Pull Sheets de Sonido y Luces ya están disponibles.");
+    } catch (error) {
+      setReconcileError(error instanceof Error ? error.message : "No se pudieron crear las carpetas Estructura.");
+    } finally {
+      setIsReconciling(false);
+    }
+  };
+
   return (
     <>
       <Button
         type="button"
         variant="outline"
         size="sm"
-        className="gap-2"
+        className="min-h-11 gap-2"
         title="Añadir motores a los Pull Sheets de Estructura"
         onClick={(event) => {
           event.stopPropagation();
@@ -119,7 +137,7 @@ export function PrepareMotorsAction({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="flex max-h-[92vh] max-w-5xl flex-col"
+          className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1rem)] w-[calc(100vw-1rem)] max-w-5xl flex-col gap-3 overflow-hidden p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,calc(env(safe-area-inset-left)+0.5rem))] pr-[max(1rem,calc(env(safe-area-inset-right)+0.5rem))] sm:max-h-[92vh] sm:w-full sm:gap-4 sm:p-6 sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pl-[max(1.5rem,calc(env(safe-area-inset-left)+0.5rem))] sm:pr-[max(1.5rem,calc(env(safe-area-inset-right)+0.5rem))] [&>button]:flex [&>button]:h-11 [&>button]:w-11 [&>button]:items-center [&>button]:justify-center"
           onClick={(event) => event.stopPropagation()}
         >
           <DialogHeader>
@@ -142,12 +160,28 @@ export function PrepareMotorsAction({
               <p>
                 Faltan los Pull Sheets de Estructura de {targetsQuery.data.missing.map(sourceLabel).join(" y ")}.
               </p>
-              {onCreateFlexFolders ? (
-                <Button type="button" variant="link" className="h-auto p-0" onClick={onCreateFlexFolders}>
-                  Crear o reconciliar carpetas Flex
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="link"
+                className="min-h-11 justify-start p-0 text-left"
+                onClick={() => void handleReconcile()}
+                disabled={isReconciling}
+              >
+                {isReconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Crear Estructura y Pull Sheets
+              </Button>
             </div>
+          ) : null}
+
+          {reconcileMessage ? (
+            <p role="status" aria-live="polite" className="rounded-md border border-emerald-500/40 p-3 text-sm text-emerald-700">
+              {reconcileMessage}
+            </p>
+          ) : null}
+          {reconcileError ? (
+            <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              {reconcileError}
+            </p>
           ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
@@ -171,7 +205,7 @@ export function PrepareMotorsAction({
                               type="button"
                               variant="outline"
                               size="icon"
-                              className="h-9 w-9"
+                              className="h-11 w-11 shrink-0"
                               aria-label={`Restar ${model.name} de ${sourceLabel(source)}`}
                               onClick={() => updateQuantity(source, model.id, quantity - 1)}
                               disabled={quantity === 0 || isPushing}
@@ -185,7 +219,7 @@ export function PrepareMotorsAction({
                               min={0}
                               step={1}
                               value={quantity}
-                              className="h-9 w-16 px-2 text-center"
+                              className="h-11 w-16 px-2 text-center text-base"
                               aria-label={`Cantidad de ${model.name} para ${sourceLabel(source)}`}
                               onChange={(event) => updateQuantity(source, model.id, Number(event.target.value))}
                               disabled={isPushing}
@@ -194,7 +228,7 @@ export function PrepareMotorsAction({
                               type="button"
                               variant="outline"
                               size="icon"
-                              className="h-9 w-9"
+                              className="h-11 w-11 shrink-0"
                               aria-label={`Sumar ${model.name} a ${sourceLabel(source)}`}
                               onClick={() => updateQuantity(source, model.id, quantity + 1)}
                               disabled={isPushing}
@@ -233,18 +267,19 @@ export function PrepareMotorsAction({
             </div>
           ) : null}
 
-          <DialogFooter className="items-center sm:justify-between">
+          <DialogFooter className="shrink-0 items-stretch border-t pt-3 sm:items-center sm:justify-between">
             <span className="text-sm text-muted-foreground">
               Sonido: {totals.bySource.sound} · Luces: {totals.bySource.lights} · Total: {totals.total}
             </span>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPushing}>
+            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+              <Button type="button" variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => setOpen(false)} disabled={isPushing || isReconciling}>
                 Cerrar
               </Button>
               <Button
                 type="button"
+                className="min-h-11 w-full sm:w-auto"
                 onClick={() => void handlePush()}
-                disabled={totals.total === 0 || isPushing || targetsQuery.isLoading || targetsQuery.isError}
+                disabled={totals.total === 0 || isPushing || isReconciling || targetsQuery.isLoading || targetsQuery.isError}
               >
                 {isPushing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Añadir {totals.total} {totals.total === 1 ? "motor" : "motores"}

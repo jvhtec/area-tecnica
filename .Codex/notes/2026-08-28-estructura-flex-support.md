@@ -2,7 +2,7 @@
 
 ## Task summary
 
-Added the operational Estructura hierarchy to standard jobs, tours, and tour dates; introduced source-discriminated Sound/Lights Pull Sheets; and routed manual/XMLP motor preparation plus automatic certificate manifests through those tracked documents.
+Added the operational Estructura hierarchy to standard jobs, tours, and tour dates; introduced source-discriminated Sound/Lights Pull Sheets; routed manual/XMLP motor preparation plus automatic certificate manifests through those tracked documents; and added in-dialog repair for legacy jobs that predate the hierarchy.
 
 ## Files changed
 
@@ -26,6 +26,8 @@ Added the operational Estructura hierarchy to standard jobs, tours, and tour dat
 - Manual motor pushes are additive and independent per source so one failed destination does not erase a successful push to the other.
 - Automatic certificates read outbound manifests only from the tracked Estructura Pull Sheets. The manual certificate fallback remains available.
 - XMLP motor rows route only to Estructura Sound. Bumpers, rigging hardware, and ordinary Sound rows continue to use the selected Sound destination.
+- Legacy-folder recovery lives inside the Motores dialog and reuses the additive folder-creation path with an empty child selection so it creates/reuses the hierarchy without duplicating optional work elements.
+- The Motores dialog uses dynamic-viewport/safe-area sizing, an internally scrolling model list, stacked narrow-screen actions, and at least 44 px targets for quantity, recovery, close, submit, and icon-close controls.
 
 ## Patterns discovered
 
@@ -38,6 +40,7 @@ Added the operational Estructura hierarchy to standard jobs, tours, and tour dat
 - Regenerating `src/integrations/supabase/types.ts` from a clean local reset also captured pre-existing local/committed generated-type drift, so its diff is larger than the two new fields alone.
 - XMLP import selections live only in component memory. They cannot safely prefill a later job-card dialog without adding a persistence contract.
 - Existing tours may have `flex_folders_created = true` without Estructura. Reconciliation must still check and create the missing Estructura root.
+- For a legacy tour date, reconcile the tour-level Estructura root before invoking date-level folder creation; otherwise the date branch has no valid parent.
 
 ## Follow-up items
 

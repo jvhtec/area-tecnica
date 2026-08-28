@@ -432,7 +432,6 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
         {job.job_type !== "dryhire" && (
           <PrepareMotorsAction
             jobId={job.id}
-            onCreateFlexFolders={canCreateFlexFolders ? onCreateFlexFolders : undefined}
           />
         )}
         <MotorCertificateAction job={job} />

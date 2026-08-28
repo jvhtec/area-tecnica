@@ -3,12 +3,16 @@ import {
   ESTRUCTURA_SOURCE_DEPARTMENTS,
   type EstructuraSourceDepartment,
 } from "@/domain/estructura";
+import { formatInTimeZone } from "date-fns-tz";
 import { supabase } from "@/integrations/supabase/client";
 import {
   pushEquipmentToFlexDocumentStrict,
   type EquipmentItem,
   type StrictGroupedPushResult,
 } from "@/services/flexPullsheets";
+import { createAllFoldersForJob } from "@/utils/flex-folders";
+import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
+import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
 export type EstructuraPullSheetTarget = {
   id: string;
@@ -95,6 +99,77 @@ export async function resolveEstructuraPullSheetTargets(
   }
 
   return { targets, missing };
+}
+
+export async function reconcileEstructuraFoldersForJob(
+  jobId: string,
+): Promise<EstructuraTargetResolution> {
+  const { data: job, error: jobError } = await supabase
+    .from("jobs")
+    .select(`
+      id,
+      title,
+      start_time,
+      end_time,
+      job_type,
+      tour_id,
+      tour_date_id,
+      timezone,
+      location:locations(name, formatted_address)
+    `)
+    .eq("id", jobId)
+    .single();
+
+  if (jobError || !job) {
+    throw new Error(`No se pudo cargar el trabajo para crear Estructura: ${jobError?.message ?? "trabajo no encontrado"}.`);
+  }
+  if (job.job_type === "dryhire") {
+    throw new Error("La preparación de motores de Estructura no está disponible para dry-hire.");
+  }
+
+  if (job.job_type === "tourdate") {
+    if (!job.tour_id) {
+      throw new Error("La fecha de gira no tiene una gira asociada para crear la raíz Estructura.");
+    }
+    const { error: tourRootError } = await supabase.functions.invoke("create-flex-folders", {
+      body: {
+        tourId: job.tour_id,
+        createRootFolders: true,
+        createDateFolders: false,
+      },
+    });
+    if (tourRootError) {
+      throw new Error(`No se pudo reconciliar la raíz Estructura de la gira: ${tourRootError.message}`);
+    }
+  }
+
+  const startDate = new Date(job.start_time);
+  const endDate = new Date(job.end_time);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    throw new Error("El trabajo no tiene fechas válidas para crear las carpetas Estructura.");
+  }
+
+  await createAllFoldersForJob(
+    job as FlexFolderJob,
+    `${startDate.toISOString().split(".")[0]}.000Z`,
+    `${endDate.toISOString().split(".")[0]}.000Z`,
+    formatInTimeZone(startDate, MADRID_TIMEZONE, "yyMMdd"),
+    {},
+  );
+
+  const { error: updateError } = await supabase
+    .from("jobs")
+    .update({ flex_folders_created: true })
+    .eq("id", jobId);
+  if (updateError) {
+    throw new Error(`Se creó Estructura en Flex, pero no se pudo actualizar el trabajo: ${updateError.message}`);
+  }
+
+  const resolution = await resolveEstructuraPullSheetTargets(jobId);
+  if (resolution.missing.length > 0) {
+    throw new Error(`Siguen faltando los Pull Sheets de Estructura de ${resolution.missing.join(" y ")}.`);
+  }
+  return resolution;
 }
 
 const requestedQuantity = (items: readonly EquipmentItem[]) =>

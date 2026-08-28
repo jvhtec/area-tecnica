@@ -17,14 +17,16 @@ Both rows retain `department = 'estructura'` and `folder_type = 'pull_sheet'`. T
 
 `Preparar motores` is available in desktop and mobile Project Management job-card actions to management users for non-dry-hire jobs.
 
-1. Reconcile the job's Flex folders if the Estructura targets are missing.
-2. Open `Motores` / `Preparar motores`.
+1. Open `Motores` / `Preparar motores`.
+2. If the job predates Estructura tracking, choose `Crear Estructura y Pull Sheets` inside the dialog.
 3. Enter inventory-model quantities independently for Sonido and Luces using the numeric inputs or step buttons.
 4. Review the per-side and combined totals.
 5. Read the additive warning and choose `Añadir N motores`.
 6. Review the independent result for each destination. One side may succeed while the other reports an error.
 
 The dialog uses the same approved motor-model definition as automatic certificate eligibility. It requests inventory-model quantities only; warehouse staff assign serialized units later in Flex.
+
+The dialog is mobile-ready: it uses the dynamic viewport and safe-area inset, confines scrolling to the model list, stacks footer actions on narrow screens, and keeps quantity/recovery controls at a minimum 44 px touch target.
 
 ## Additive semantics
 
@@ -34,7 +36,7 @@ Flex writes are additive. The operation does not read, reduce, delete, move, or 
 
 No XMLP data is required. Existing Pesos/XMLP motor requirements, when the import is linked to a job, are routed directly to Estructura Sonido by the XMLP package workflow; rigging hardware remains in Sound. XMLP parse results are ephemeral and are not persisted as defaults for a later job-card dialog, avoiding stale hidden quantities.
 
-Legacy jobs without tracked Estructura sheets can use the normal folder reconciliation action. Automatic motor-certificate discovery reports unavailable until the two Estructura sheets and outbound manifests exist; the existing manual serialized-unit certificate selector remains available for exceptions.
+Legacy jobs without tracked Estructura sheets repair themselves from the motor dialog. The recovery action loads the job and reuses its tracked Flex hierarchy; for a tour date it first reconciles the tour-level Estructura root, then creates/reuses the date's Estructura folder and both source Pull Sheets. It refreshes the destinations in place without opening the generic folder picker. Automatic motor-certificate discovery reports unavailable until the two Estructura sheets and outbound manifests exist; the existing manual serialized-unit certificate selector remains available for exceptions.
 
 ## Deliberately deferred inventory
 

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  reconcileFolders: vi.fn(),
   resolveTargets: vi.fn(),
   pushQuantities: vi.fn(),
 }));
@@ -11,6 +12,7 @@ vi.mock("@/services/estructuraMotorPreparation", async () => {
   const actual = await vi.importActual("@/services/estructuraMotorPreparation");
   return {
     ...actual,
+    reconcileEstructuraFoldersForJob: mocks.reconcileFolders,
     resolveEstructuraPullSheetTargets: mocks.resolveTargets,
     pushEstructuraMotorQuantities: mocks.pushQuantities,
   };
@@ -18,11 +20,11 @@ vi.mock("@/services/estructuraMotorPreparation", async () => {
 
 import { PrepareMotorsAction } from "../PrepareMotorsAction";
 
-const renderAction = (onCreateFlexFolders?: () => void) => {
+const renderAction = () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PrepareMotorsAction jobId="job-1" onCreateFlexFolders={onCreateFlexFolders} />
+      <PrepareMotorsAction jobId="job-1" />
     </QueryClientProvider>,
   );
 };
@@ -41,6 +43,7 @@ describe("PrepareMotorsAction", () => {
       sound: { status: "success", requestedQuantity: 1, message: "Flex añadió 1 motor." },
       lights: { status: "skipped", requestedQuantity: 0, message: "Sin motores." },
     });
+    mocks.reconcileFolders.mockResolvedValue({ targets: {}, missing: [] });
   });
 
   it("renders approved models for both destinations and shows the additive warning", async () => {
@@ -71,17 +74,40 @@ describe("PrepareMotorsAction", () => {
   });
 
   it("shows a clear missing-target recovery action", async () => {
-    const createFolders = vi.fn();
-    mocks.resolveTargets.mockResolvedValue({
-      targets: { sound: { id: "sound-row", elementId: "sound-ps", sourceDepartment: "sound" } },
-      missing: ["lights"],
-    });
-    renderAction(createFolders);
+    mocks.resolveTargets
+      .mockResolvedValueOnce({
+        targets: { sound: { id: "sound-row", elementId: "sound-ps", sourceDepartment: "sound" } },
+        missing: ["lights"],
+      })
+      .mockResolvedValue({
+        targets: {
+          sound: { id: "sound-row", elementId: "sound-ps", sourceDepartment: "sound" },
+          lights: { id: "lights-row", elementId: "lights-ps", sourceDepartment: "lights" },
+        },
+        missing: [],
+      });
+    renderAction();
     fireEvent.click(screen.getByRole("button", { name: "Motores" }));
 
     expect(await screen.findByText(/Faltan los Pull Sheets de Estructura de Luces/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Crear o reconciliar carpetas Flex" }));
-    expect(createFolders).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Crear Estructura y Pull Sheets" }));
+    await waitFor(() => expect(mocks.reconcileFolders).toHaveBeenCalledWith("job-1"));
+    expect(await screen.findByRole("status")).toHaveTextContent(/ya están disponibles/);
+  });
+
+  it("uses mobile-safe viewport sizing and touch targets", async () => {
+    renderAction();
+    fireEvent.click(screen.getByRole("button", { name: "Motores" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveClass("w-[calc(100vw-1rem)]");
+    expect(dialog.className).toContain("safe-area-inset-bottom");
+    expect(dialog.className).toContain("safe-area-inset-left");
+    expect(dialog.className).toContain("[&>button]:h-11");
+    expect(screen.getByRole("button", {
+      name: "Sumar Motor eléctrico de elevación 250 kg - 20 m a Sonido",
+    })).toHaveClass("h-11", "w-11");
+    expect(screen.getByRole("button", { name: "Cerrar" })).toHaveClass("min-h-11", "w-full");
   });
 
   it("shows Sound and Lights outcomes independently after a partial push", async () => {
