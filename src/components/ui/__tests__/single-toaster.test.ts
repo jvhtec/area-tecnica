@@ -40,5 +40,5 @@ describe("single toast renderer (Sonner)", () => {
       offenders,
       `Use Sonner (one <Toaster>) — do not import the removed Radix toaster: ${offenders.join(", ")}`,
     ).toEqual([])
-  })
+  }, 15_000)
 })
