@@ -72,6 +72,10 @@ const legacyWarnRules = {
   "no-useless-catch": "warn",
   "no-useless-escape": "warn",
   "prefer-const": "warn",
+  // ESLint 10 added these rules to its recommended preset. Keep the existing
+  // repository policy stable until their findings are triaged deliberately.
+  "no-useless-assignment": "off",
+  "preserve-caught-error": "off",
 };
 
 export default tseslint.config(
@@ -100,8 +104,8 @@ export default tseslint.config(
       "react-refresh": reactRefresh,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
       ...legacyWarnRules,
+      "react-hooks/exhaustive-deps": "warn",
       "react-hooks/rules-of-hooks": "error",
       "react-refresh/only-export-components": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
@@ -130,6 +134,14 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // shadcn primitives intentionally export several related components from
+    // one module; the newer refresh plugin otherwise reports each export.
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
   {

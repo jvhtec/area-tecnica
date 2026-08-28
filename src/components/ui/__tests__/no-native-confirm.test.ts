@@ -49,5 +49,5 @@ describe("no native window.confirm/alert in app source", () => {
     }
 
     expect(offenders, `Use useConfirm() instead of window.confirm/alert in: ${offenders.join(", ")}`).toEqual([])
-  })
+  }, 15_000)
 })

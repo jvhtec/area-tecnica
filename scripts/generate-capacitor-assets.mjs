@@ -49,7 +49,7 @@ async function generateAssets() {
   console.log('✓ Created assets/splash.png (2732x2732)');
 
   console.log('\nAssets generated successfully!');
-  console.log('Run: npx @capacitor/assets generate');
+  console.log('Native platform asset catalogs are committed separately; refresh them deliberately before a mobile release.');
 }
 
 generateAssets().catch(console.error);

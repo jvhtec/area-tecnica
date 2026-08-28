@@ -18,38 +18,13 @@
 - **Date**: 2026-01-11
 - **Also upgraded**: jspdf-autotable@5.0.7 (for compatibility with jspdf 4.x)
 
-## Known Vulnerabilities (Cannot Fix)
-
-### Quill HTML export - Cross-site Scripting (LOW)
-- **Status**: ⚠️ ACCEPTED RISK
-- **CVE**: GHSA-v3m3-f69x-jf25
-- **Severity**: Low
-- **Affected**: quill@2.0.3
-- **Mitigation**:
-  - ReactQuill and its nested quill@1.3.7 copy have been removed.
-  - Corporate email sanitizes editor HTML with DOMPurify before sending.
-  - Do not render Quill HTML output outside a DOMPurify-sanitized flow.
-- **Why not fixed**: No patched Quill 2.x release is available. `npm audit fix` suggests downgrading to quill@2.0.2, which should be treated as a planned dependency change with editor regression testing.
-
-### ExcelJS/uuid - Buffer Bounds Check (MODERATE)
-- **Status**: ⚠️ ACCEPTED RISK
-- **CVE**: GHSA-w5hq-g745-h8pq
-- **Severity**: Moderate
-- **Affected**: exceljs@4.4.0 -> uuid@8.3.2
-- **Mitigation**:
-  - ExcelJS is used for generated spreadsheet exports.
-  - The application does not pass caller-controlled buffers to uuid v3/v5/v6 through ExcelJS.
-- **Why not fixed**: `npm audit fix` requires downgrading ExcelJS to 3.4.0, which would undo the SheetJS replacement and requires a dedicated export regression pass. Revisit when ExcelJS publishes a compatible uuid update.
-
-### Capacitor assets toolchain - tar/minimatch/uuid (HIGH)
-- **Status**: ⚠️ ACCEPTED RISK (BUILD TOOLING)
-- **CVE**: GHSA-34x7-hfp2-rc4v, GHSA-8qq5-rm4j-mr97, GHSA-83g3-92jg-28cx, GHSA-qffp-2rhf-9h96, GHSA-9ppj-qmqm-q256, GHSA-r6q2-hw4h-h46w, GHSA-vmf3-w455-68vh, GHSA-3ppc-4f35-3m26, GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74, GHSA-w5hq-g745-h8pq
-- **Severity**: High
-- **Affected**: @capacitor/assets@3.0.5 -> @capacitor/cli/tar and @trapezedev/project/replace/minimatch/xcode/uuid
-- **Mitigation**:
-  - Build-time only; these packages are not part of the production browser bundle.
-  - Capacitor asset generation runs on controlled repository assets, not on untrusted archives or glob patterns.
-- **Why not fixed**: `npm audit` reports no compatible fix for @capacitor/assets. Revisit when @capacitor/assets or @trapezedev/project publishes a patched dependency chain.
+### Dependency audit backlog cleared
+- **Status**: ✅ FIXED
+- **Date**: 2026-08-28
+- Removed the unused `@capacitor/assets` generator and its vulnerable `tar`, `minimatch`, `sharp`, and legacy Capacitor dependency chain.
+- Pinned Quill to the non-advisory `2.0.2` release and retained DOMPurify sanitization around editor output.
+- Overrode transitive `uuid` consumers to `^11.1.1`, covering ExcelJS and Capacitor CLI without downgrading ExcelJS.
+- Removed the GitHub dependency-review allowlist and reset the governance audit baseline to zero vulnerabilities and zero exceptions.
 
 ## Security Best Practices
 
@@ -61,7 +36,7 @@
 
 ### 2. Dependency Security
 - **Regular Audits**: Run `npm audit` before each release and weekly in development
-- **Automated Updates**: Consider Dependabot or Renovate for automated dependency PRs
+- **Automated Updates**: Dependabot opens dependency PRs and the governance audit gate rejects new advisories
 - **Review Updates**: Always review changelogs for security-related updates
 - **Lock Critical Versions**: Document and lock versions with known security issues until patches available
 
@@ -130,18 +105,13 @@
 - [ ] Audit all Supabase RLS policies for proper access control
 
 ### Medium Priority (Next Month)
-- [ ] Implement automated security scanning in CI/CD (npm audit, Snyk, or OWASP)
-- [ ] Set up Dependabot or Renovate for automated dependency PRs
-- [ ] Track a patched Quill 2.x release or schedule a tested downgrade from quill@2.0.3 to quill@2.0.2
 - [ ] Document security testing procedures in test suite
 
 ### Long-term (Next Quarter)
-- [ ] Plan vitest upgrade to 4.x in dedicated testing sprint (fixes esbuild vulnerability)
+- [ ] Evaluate the Vitest 4 migration in a dedicated testing sprint
 - [ ] Security audit of authentication and authorization flows
-- [ ] Implement automated vulnerability scanning in deployment pipeline
 - [ ] Regular dependency updates (establish monthly cadence)
 - [ ] Consider penetration testing by external security firm
-- [ ] Evaluate and implement Content Security Policy (CSP) headers
 
 ## Security Contacts
 
