@@ -224,6 +224,9 @@ export const FestivalScheduling = ({
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
           <CardTitle className="text-base sm:text-lg">Programación del Festival</CardTitle>
+          {/* These labels are hidden below sm, which left an icon with no
+              accessible name on a phone. Each aria-label contains the visible
+              text, so WCAG 2.5.3 still holds at the sizes that show it. */}
           <div className="flex gap-2">
             {!isViewOnly && onCreateWhatsappGroup && (
               <Button
@@ -231,6 +234,7 @@ export const FestivalScheduling = ({
                 variant="outline"
                 onClick={onCreateWhatsappGroup}
                 className="flex items-center gap-1"
+                aria-label="Crear grupo de WhatsApp"
               >
                 <MessageCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">WhatsApp</span>
@@ -242,6 +246,7 @@ export const FestivalScheduling = ({
                 variant="outline"
                 onClick={() => onOpenRiderLibrary(selectedDate)}
                 className="flex items-center gap-1"
+                aria-label="Biblioteca de riders"
               >
                 <Library className="h-4 w-4" />
                 <span className="hidden sm:inline">Riders</span>
@@ -252,6 +257,7 @@ export const FestivalScheduling = ({
                 size="sm"
                 onClick={() => setIsCreateShiftOpen(true)}
                 className="flex items-center gap-1"
+                aria-label="Crear turno"
               >
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Crear Turno</span>
@@ -263,6 +269,7 @@ export const FestivalScheduling = ({
               className="flex items-center gap-1"
               onClick={handleRefresh}
               disabled={isRefreshing}
+              aria-label="Actualizar programación"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Actualizar</span>

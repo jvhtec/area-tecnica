@@ -2,7 +2,7 @@ import { formatISO, addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { expect, test } from "@playwright/test";
 
-import { bootstrapApp } from "./support/app";
+import { bootstrapApp, isMobileViewport } from "./support/app";
 
 const MADRID_TIMEZONE = "Europe/Madrid";
 
@@ -71,7 +71,15 @@ test.describe("tour management smoke", () => {
 
     await expect(page.getByRole("heading", { name: "World Tour" })).toBeVisible();
     await expect(page.getByText("Áreas de Gestión")).toBeVisible();
-    await page.getByRole("button", { name: /grupo whatsapp/i }).click();
+    // Desktop shows the action as its own button; on a phone the header
+    // collapses into a "Más" sheet that holds it.
+    if (isMobileViewport(page)) {
+      // Exact: the bottom navbar also has a "Más opciones" control.
+      await page.getByRole("button", { name: "Más", exact: true }).click();
+      await page.getByRole("button", { name: /crear grupo de whatsapp/i }).click();
+    } else {
+      await page.getByRole("button", { name: /grupo whatsapp/i }).click();
+    }
     await expect(page.getByRole("heading", { name: /crear grupo de whatsapp/i })).toBeVisible();
   });
 
