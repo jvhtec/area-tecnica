@@ -74,7 +74,7 @@ Job
 | Serialized unit identity | Flex serial-unit grid |
 | Motor assigned to the job | Flex outbound prep/ship manifest |
 | Manufacturer and display model | Flex inventory-model endpoint |
-| Model allowlist | Shared `ESTRUCTURA_MOTOR_MODELS` domain constant |
+| Model allowlist | Serialized-only `ESTRUCTURA_MOTOR_MODELS` domain constant; preparation-only controllers are excluded |
 | Brand artwork | Supplied ChainMaster, LIFTKET and CM assets registered by `motorBrandLogos.ts` |
 | Inspection date, next inspection date, provider, and owner | `MOTOR_CERTIFICATE_SOURCE` |
 | Manufacturer-specific inspection scope | `public/certificates/motor-inspection-checklists-2026.json`, traced to the manuals listed below |

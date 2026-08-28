@@ -429,8 +429,9 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
     )}
     {isProjectManagementPage && isManagementUser && (
       <>
-        {job.job_type !== "dryhire" && (
+        {flexReportDepartment && job.job_type !== "dryhire" && (
           <PrepareMotorsAction
+            department={flexReportDepartment}
             jobId={job.id}
           />
         )}
