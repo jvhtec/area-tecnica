@@ -8,6 +8,7 @@ import {
 } from "@/utils/flex-folders/constants";
 import { getDepartmentCustomPullsheetMetadata, type DepartmentKey } from "@/utils/flex-folders/types";
 import { createComercialExtras } from "@/utils/flex-folders/folder-creation/createComercialExtras";
+import { ensureEstructuraFolders } from "@/utils/flex-folders/folder-creation/createEstructuraFolders";
 import {
   buildPullsheetTemplates,
   getJobDepartments,
@@ -30,6 +31,7 @@ type CreateStandardJobFoldersArgs = FolderCreationBaseArgs & ExistingFolderMaps 
 export const createStandardJobFolders = async ({
   documentNumber,
   existingDepartmentMap,
+  existingEstructuraPullSheetMap,
   existingMainFolder,
   existingWorkOrderMap,
   formattedEndDate,
@@ -96,6 +98,20 @@ export const createStandardJobFolders = async ({
   if (!topFolderId) {
     throw new Error("Unable to resolve main Flex folder for job");
   }
+
+  const estructuraFolder = await ensureEstructuraFolders({
+    jobId: job.id,
+    parentElementId: topFolderId,
+    parentTrackingId: topFolderId,
+    existingDepartmentFolder: existingDepartmentMap.get("estructura"),
+    existingPullSheets: existingEstructuraPullSheetMap,
+    departmentFolderName: `${safeJobTitle} - Estructura`,
+    pullSheetNamePrefix: safeJobTitle,
+    documentNumber,
+    plannedStartDate: formattedStartDate,
+    plannedEndDate: formattedEndDate,
+  });
+  existingDepartmentMap.set("estructura", estructuraFolder);
 
   const allDepartments: DepartmentKey[] = [
     "sound",

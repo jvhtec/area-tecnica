@@ -13,7 +13,7 @@ The motor certificate workflow replaces a repetitive administrative process:
 - exporting and renaming separate files,
 - and checking that the client receives only the relevant certificates.
 
-Área Técnica derives the certificate selection from the job's Flex preparation or shipping manifest. The generated PDF therefore follows the same operational source of truth as the equipment movement.
+Área Técnica derives automatic certificate selection exclusively from outbound preparation or shipping manifests belonging to the job's two tracked Estructura Pull Sheets. The generated PDF therefore follows the warehouse sheets that own motor movement without scanning unrelated Sound, Lights, PA, Tour Pack, or arbitrary equipment lists.
 
 The main business outcomes are:
 
@@ -54,9 +54,9 @@ Manifest selection is the default. Manual selection is a fallback, not a second 
 
 ```text
 Job
-  -> flex_folders rows for the job
-  -> Flex root element and tracked pull sheets
-  -> related equipment lists
+  -> flex_folders rows with department = estructura
+  -> source_department = sound or lights
+  -> exactly the two tracked Estructura Pull Sheets
   -> outbound prep/ship manifests
   -> serialized MOTOR rows in the manifest
   -> Flex inventory-model manufacturer and display name
@@ -74,7 +74,7 @@ Job
 | Serialized unit identity | Flex serial-unit grid |
 | Motor assigned to the job | Flex outbound prep/ship manifest |
 | Manufacturer and display model | Flex inventory-model endpoint |
-| Model allowlist | `MOTOR_MODELS` in the Edge Function |
+| Model allowlist | Shared `ESTRUCTURA_MOTOR_MODELS` domain constant |
 | Brand artwork | Supplied ChainMaster, LIFTKET and CM assets registered by `motorBrandLogos.ts` |
 | Inspection date, next inspection date, provider, and owner | `MOTOR_CERTIFICATE_SOURCE` |
 | Manufacturer-specific inspection scope | `public/certificates/motor-inspection-checklists-2026.json`, traced to the manuals listed below |
@@ -84,12 +84,7 @@ No separate certificate table is created. The document is generated on demand fr
 
 ## Manifest resolution
 
-The Edge Function first resolves the job's relevant Flex elements from `flex_folders`:
-
-- preferred root folder types: `main_event`, `main`, then `tourdate`,
-- directly tracked equipment lists: `pull_sheet`.
-
-It also searches the Flex job tree for additional equipment lists. For each candidate list, it reads the warehouse state and selects the relevant outbound preparation or shipping manifest. The manifest line items are then matched to normalized serialized MOTOR units.
+The Edge Function queries only `flex_folders` rows matching the job ID, `department = 'estructura'`, `folder_type = 'pull_sheet'`, and a source department of Sound or Lights. It does not recursively search the job tree. For each tracked sheet it reads warehouse state, selects the existing outbound preparation/shipping manifest, and matches manifest lines to approved serialized MOTOR units. Results from both sheets are merged and serialized unit IDs are deduplicated.
 
 The function returns one of four manifest states:
 
@@ -101,6 +96,8 @@ The function returns one of four manifest states:
 | `error` | Flex data could not be read completely |
 
 When the status is not `found`, the dialog explains the condition and exposes manual selection.
+
+If one Estructura sheet is readable and the other fails, valid units are retained with a partial warning. If both reads fail, the automatic source reports an error. Missing sheets or sheets without an outbound manifest report `unavailable`; a readable manifest with no approved motors reports `empty`.
 
 ## Manual selection and unit eligibility
 
@@ -172,7 +169,7 @@ The `fetch-flex-motor-units` Edge Function:
 - validates and sanitizes the response before the client uses it,
 - limits Flex request concurrency to five operations,
 - limits model pagination to 20 pages of 25 units,
-- and inspects at most 100 equipment lists for manifest discovery.
+- and never falls back to arbitrary job-tree equipment lists.
 
 The client validates the complete Edge Function response again before presenting or generating certificates.
 
@@ -180,7 +177,7 @@ The client validates the complete Edge Function response again before presenting
 
 | Condition | Behaviour |
 |---|---|
-| No related Flex lists | Show `unavailable`; offer manual selection |
+| No tracked Estructura Pull Sheets | Show `unavailable`; offer manual selection |
 | No outbound prep/ship manifest yet | Show `unavailable`; offer manual selection |
 | Manifest has no matching certified motors | Show `empty`; offer manual selection |
 | Flex manufacturer/model metadata fails | Keep configured model fallback and omit the brand logo |
@@ -241,7 +238,8 @@ The current hardcoded campaign is intentionally simple. If several certificate c
 | Client response validation | `src/services/flexMotorUnits.test.ts` |
 | PDF page count, branding fallback, and filenames | `src/utils/pdf/__tests__/motorInspectionCertificates.test.ts` |
 | Flex model/unit parsing and request contract | `supabase/functions/fetch-flex-motor-units/motorUnits.test.ts` |
-| Manifest discovery and matching | `supabase/functions/fetch-flex-motor-units/manifestUnits.test.ts` |
+| Estructura manifest selection, merge, dedupe, and partial states | `supabase/functions/fetch-flex-motor-units/estructuraManifestSelection.test.ts` |
+| Manifest parsing and serialized-unit matching | `supabase/functions/fetch-flex-motor-units/manifestUnits.test.ts` |
 | Concurrency limits | `supabase/functions/fetch-flex-motor-units/concurrency.test.ts` |
 
 ## Invariants

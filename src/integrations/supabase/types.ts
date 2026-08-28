@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
-  }
   public: {
     Tables: {
       achievement_progress: {
@@ -451,6 +446,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      anonymous_security_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          resource: string
+          severity: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          resource: string
+          severity: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          resource?: string
+          severity?: string
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       app_changelog: {
         Row: {
@@ -973,6 +1001,7 @@ export type Database = {
       }
       corporate_email_logs: {
         Row: {
+          body_hash: string | null
           body_html: string | null
           body_text: string | null
           created_at: string | null
@@ -985,6 +1014,7 @@ export type Database = {
           subject: string | null
         }
         Insert: {
+          body_hash?: string | null
           body_html?: string | null
           body_text?: string | null
           created_at?: string | null
@@ -997,6 +1027,7 @@ export type Database = {
           subject?: string | null
         }
         Update: {
+          body_hash?: string | null
           body_html?: string | null
           body_text?: string | null
           created_at?: string | null
@@ -1289,6 +1320,36 @@ export type Database = {
           },
         ]
       }
+      edge_rate_limit_counters: {
+        Row: {
+          first_seen_at: string
+          identifier_hash: string
+          last_seen_at: string
+          request_count: number
+          scope: string
+          window_seconds: number
+          window_start: string
+        }
+        Insert: {
+          first_seen_at?: string
+          identifier_hash: string
+          last_seen_at?: string
+          request_count?: number
+          scope: string
+          window_seconds: number
+          window_start: string
+        }
+        Update: {
+          first_seen_at?: string
+          identifier_hash?: string
+          last_seen_at?: string
+          request_count?: number
+          scope?: string
+          window_seconds?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       equipment: {
         Row: {
           category: Database["public"]["Enums"]["equipment_category"]
@@ -1493,6 +1554,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      external_api_usage: {
+        Row: {
+          actor_id: string
+          id: number
+          request_date: string
+          requested_at: string
+          service: string
+        }
+        Insert: {
+          actor_id: string
+          id?: number
+          request_date?: string
+          requested_at?: string
+          service: string
+        }
+        Update: {
+          actor_id?: string
+          id?: number
+          request_date?: string
+          requested_at?: string
+          service?: string
+        }
+        Relationships: []
       }
       feature_requests: {
         Row: {
@@ -1950,130 +2035,6 @@ export type Database = {
           },
         ]
       }
-      festival_push_delivery_log: {
-        Row: {
-          created_at: string
-          due_at: string
-          event_key: string
-          event_kind: string
-          id: string
-          job_id: string
-          payload: Json
-          sent_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          due_at: string
-          event_key: string
-          event_kind: string
-          id?: string
-          job_id: string
-          payload?: Json
-          sent_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          due_at?: string
-          event_key?: string
-          event_kind?: string
-          id?: string
-          job_id?: string
-          payload?: Json
-          sent_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "festival_push_delivery_log_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "festival_push_delivery_log_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "v_job_staffing_summary"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "festival_push_delivery_log_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "festival_push_delivery_log_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      festival_push_subscriptions: {
-        Row: {
-          created_at: string
-          enabled: boolean
-          id: string
-          job_id: string
-          stages: number[]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          enabled?: boolean
-          id?: string
-          job_id: string
-          stages?: number[]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          enabled?: boolean
-          id?: string
-          job_id?: string
-          stages?: number[]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "festival_push_subscriptions_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "festival_push_subscriptions_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "v_job_staffing_summary"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "festival_push_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "festival_push_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       festival_gear_setups: {
         Row: {
           available_analog_runs: number | null
@@ -2230,6 +2191,130 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "v_job_staffing_summary"
             referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      festival_push_delivery_log: {
+        Row: {
+          created_at: string
+          due_at: string
+          event_key: string
+          event_kind: string
+          id: string
+          job_id: string
+          payload: Json
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_at: string
+          event_key: string
+          event_kind: string
+          id?: string
+          job_id: string
+          payload?: Json
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string
+          event_key?: string
+          event_kind?: string
+          id?: string
+          job_id?: string
+          payload?: Json
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_push_delivery_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_delivery_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "festival_push_delivery_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_delivery_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      festival_push_subscriptions: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          job_id: string
+          stages: number[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          job_id: string
+          stages?: number[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          job_id?: string
+          stages?: number[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_push_subscriptions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_subscriptions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "festival_push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2623,6 +2708,7 @@ export type Database = {
           id: string
           job_id: string | null
           parent_id: string | null
+          source_department: string | null
           tour_date_id: string | null
         }
         Insert: {
@@ -2634,6 +2720,7 @@ export type Database = {
           id?: string
           job_id?: string | null
           parent_id?: string | null
+          source_department?: string | null
           tour_date_id?: string | null
         }
         Update: {
@@ -2645,6 +2732,7 @@ export type Database = {
           id?: string
           job_id?: string | null
           parent_id?: string | null
+          source_department?: string | null
           tour_date_id?: string | null
         }
         Relationships: [
@@ -4719,7 +4807,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           date: string
+          fixed_amount_eur: number | null
           job_id: string
+          rate_mode: string
           technician_id: string
           updated_at: string
           updated_by: string | null
@@ -4729,7 +4819,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date: string
+          fixed_amount_eur?: number | null
           job_id: string
+          rate_mode: string
           technician_id: string
           updated_at?: string
           updated_by?: string | null
@@ -4739,7 +4831,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date?: string
+          fixed_amount_eur?: number | null
           job_id?: string
+          rate_mode?: string
           technician_id?: string
           updated_at?: string
           updated_by?: string | null
@@ -5205,6 +5299,8 @@ export type Database = {
           project_name: string
           rigging_plot_url: string | null
           soundvision_report_url: string | null
+          stage_name: string | null
+          stage_number: number | null
           updated_at: string | null
           weight_report_url: string | null
         }
@@ -5220,6 +5316,8 @@ export type Database = {
           project_name: string
           rigging_plot_url?: string | null
           soundvision_report_url?: string | null
+          stage_name?: string | null
+          stage_number?: number | null
           updated_at?: string | null
           weight_report_url?: string | null
         }
@@ -5235,6 +5333,8 @@ export type Database = {
           project_name?: string
           rigging_plot_url?: string | null
           soundvision_report_url?: string | null
+          stage_name?: string | null
+          stage_number?: number | null
           updated_at?: string | null
           weight_report_url?: string | null
         }
@@ -5435,6 +5535,8 @@ export type Database = {
           project_name: string
           rigging_plot_url: string | null
           soundvision_report_url: string | null
+          stage_name: string | null
+          stage_number: number | null
           updated_at: string | null
           weight_report_url: string | null
         }
@@ -5450,6 +5552,8 @@ export type Database = {
           project_name: string
           rigging_plot_url?: string | null
           soundvision_report_url?: string | null
+          stage_name?: string | null
+          stage_number?: number | null
           updated_at?: string | null
           weight_report_url?: string | null
         }
@@ -5465,6 +5569,8 @@ export type Database = {
           project_name?: string
           rigging_plot_url?: string | null
           soundvision_report_url?: string | null
+          stage_name?: string | null
+          stage_number?: number | null
           updated_at?: string | null
           weight_report_url?: string | null
         }
@@ -5706,6 +5812,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      place_api_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          expires_at: string | null
+          kind: string
+          payload: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          expires_at?: string | null
+          kind: string
+          payload: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          expires_at?: string | null
+          kind?: string
+          payload?: Json
+        }
+        Relationships: []
       }
       power_requirement_tables: {
         Row: {
@@ -6107,11 +6237,11 @@ export type Database = {
           push_notifications_enabled: boolean | null
           residencia: string | null
           role: Database["public"]["Enums"]["user_role"]
-          selected_job_statuses: string[] | null
-          selected_job_types: string[] | null
           seasonal_house_tech: boolean
           seasonal_house_tech_end_date: string | null
           seasonal_house_tech_start_date: string | null
+          selected_job_statuses: string[] | null
+          selected_job_types: string[] | null
           soundvision_access_enabled: boolean | null
           soundvision_tool_access_enabled: boolean
           time_span: string | null
@@ -6148,11 +6278,11 @@ export type Database = {
           push_notifications_enabled?: boolean | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
-          selected_job_statuses?: string[] | null
-          selected_job_types?: string[] | null
           seasonal_house_tech?: boolean
           seasonal_house_tech_end_date?: string | null
           seasonal_house_tech_start_date?: string | null
+          selected_job_statuses?: string[] | null
+          selected_job_types?: string[] | null
           soundvision_access_enabled?: boolean | null
           soundvision_tool_access_enabled?: boolean
           time_span?: string | null
@@ -6189,11 +6319,11 @@ export type Database = {
           push_notifications_enabled?: boolean | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
-          selected_job_statuses?: string[] | null
-          selected_job_types?: string[] | null
           seasonal_house_tech?: boolean
           seasonal_house_tech_end_date?: string | null
           seasonal_house_tech_start_date?: string | null
+          selected_job_statuses?: string[] | null
+          selected_job_types?: string[] | null
           soundvision_access_enabled?: boolean | null
           soundvision_tool_access_enabled?: boolean
           time_span?: string | null
@@ -6203,6 +6333,71 @@ export type Database = {
           warehouse_duty_exempt?: boolean
         }
         Relationships: []
+      }
+      programa_push_delivery_log: {
+        Row: {
+          created_at: string
+          due_at: string
+          event_key: string
+          event_kind: string
+          id: string
+          job_id: string
+          payload: Json
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_at: string
+          event_key: string
+          event_kind?: string
+          id?: string
+          job_id: string
+          payload?: Json
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string
+          event_key?: string
+          event_kind?: string
+          id?: string
+          job_id?: string
+          payload?: Json
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programa_push_delivery_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programa_push_delivery_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "programa_push_delivery_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programa_push_delivery_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_cron_config: {
         Row: {
@@ -6387,90 +6582,6 @@ export type Database = {
         }
         Relationships: []
       }
-      rate_cards_2025: {
-        Row: {
-          base_day_eur: number
-          base_day_hours: number
-          category: string
-          id: string
-          mid_tier_hours: number
-          overtime_hour_eur: number
-          plus_10_12_eur: number
-        }
-        Insert: {
-          base_day_eur: number
-          base_day_hours?: number
-          category: string
-          id?: string
-          mid_tier_hours?: number
-          overtime_hour_eur: number
-          plus_10_12_eur: number
-        }
-        Update: {
-          base_day_eur?: number
-          base_day_hours?: number
-          category?: string
-          id?: string
-          mid_tier_hours?: number
-          overtime_hour_eur?: number
-          plus_10_12_eur?: number
-        }
-        Relationships: []
-      }
-      rate_cards_tour_2025: {
-        Row: {
-          base_day_eur: number
-          category: string
-        }
-        Insert: {
-          base_day_eur: number
-          category: string
-        }
-        Update: {
-          base_day_eur?: number
-          category?: string
-        }
-        Relationships: []
-      }
-      rate_extras_2025: {
-        Row: {
-          amount_eur: number
-          extra_type: Database["public"]["Enums"]["job_extra_type"]
-        }
-        Insert: {
-          amount_eur: number
-          extra_type: Database["public"]["Enums"]["job_extra_type"]
-        }
-        Update: {
-          amount_eur?: number
-          extra_type?: Database["public"]["Enums"]["job_extra_type"]
-        }
-        Relationships: []
-      }
-      required_docs: {
-        Row: {
-          department: string
-          id: number
-          is_required: boolean
-          key: string
-          label: string
-        }
-        Insert: {
-          department: string
-          id?: number
-          is_required?: boolean
-          key: string
-          label: string
-        }
-        Update: {
-          department?: string
-          id?: number
-          is_required?: boolean
-          key?: string
-          label?: string
-        }
-        Relationships: []
-      }
       rack_builder_connectors: {
         Row: {
           category: string
@@ -6644,17 +6755,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "rack_builder_layout_items_layout_id_fkey"
-            columns: ["layout_id"]
-            isOneToOne: false
-            referencedRelation: "rack_builder_layouts"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "rack_builder_layout_items_device_id_fkey"
             columns: ["device_id"]
             isOneToOne: false
             referencedRelation: "rack_builder_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rack_builder_layout_items_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "rack_builder_layouts"
             referencedColumns: ["id"]
           },
           {
@@ -6925,6 +7036,90 @@ export type Database = {
           rack_units?: number
           updated_at?: string
           width?: Database["public"]["Enums"]["rack_builder_rack_width"]
+        }
+        Relationships: []
+      }
+      rate_cards_2025: {
+        Row: {
+          base_day_eur: number
+          base_day_hours: number
+          category: string
+          id: string
+          mid_tier_hours: number
+          overtime_hour_eur: number
+          plus_10_12_eur: number
+        }
+        Insert: {
+          base_day_eur: number
+          base_day_hours?: number
+          category: string
+          id?: string
+          mid_tier_hours?: number
+          overtime_hour_eur: number
+          plus_10_12_eur: number
+        }
+        Update: {
+          base_day_eur?: number
+          base_day_hours?: number
+          category?: string
+          id?: string
+          mid_tier_hours?: number
+          overtime_hour_eur?: number
+          plus_10_12_eur?: number
+        }
+        Relationships: []
+      }
+      rate_cards_tour_2025: {
+        Row: {
+          base_day_eur: number
+          category: string
+        }
+        Insert: {
+          base_day_eur: number
+          category: string
+        }
+        Update: {
+          base_day_eur?: number
+          category?: string
+        }
+        Relationships: []
+      }
+      rate_extras_2025: {
+        Row: {
+          amount_eur: number
+          extra_type: Database["public"]["Enums"]["job_extra_type"]
+        }
+        Insert: {
+          amount_eur: number
+          extra_type: Database["public"]["Enums"]["job_extra_type"]
+        }
+        Update: {
+          amount_eur?: number
+          extra_type?: Database["public"]["Enums"]["job_extra_type"]
+        }
+        Relationships: []
+      }
+      required_docs: {
+        Row: {
+          department: string
+          id: number
+          is_required: boolean
+          key: string
+          label: string
+        }
+        Insert: {
+          department: string
+          id?: number
+          is_required?: boolean
+          key: string
+          label: string
+        }
+        Update: {
+          department?: string
+          id?: number
+          is_required?: boolean
+          key?: string
+          label?: string
         }
         Relationships: []
       }
@@ -8713,16 +8908,16 @@ export type Database = {
           id: string
           is_tour_pack_only: boolean | null
           lights_default_set_id: string | null
-          lights_package_size: "xl" | "l" | "m" | "s" | null
+          lights_package_size: string | null
           location_id: string | null
           rehearsal_days: number | null
           sound_default_set_id: string | null
-          sound_package_size: "xl" | "l" | "m" | "s" | null
+          sound_package_size: string | null
           start_date: string
           tour_date_type: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id: string | null
           video_default_set_id: string | null
-          video_package_size: "xl" | "l" | "m" | "s" | null
+          video_package_size: string | null
         }
         Insert: {
           created_at?: string
@@ -8732,16 +8927,16 @@ export type Database = {
           id?: string
           is_tour_pack_only?: boolean | null
           lights_default_set_id?: string | null
-          lights_package_size?: "xl" | "l" | "m" | "s" | null
+          lights_package_size?: string | null
           location_id?: string | null
           rehearsal_days?: number | null
           sound_default_set_id?: string | null
-          sound_package_size?: "xl" | "l" | "m" | "s" | null
+          sound_package_size?: string | null
           start_date: string
           tour_date_type?: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id?: string | null
           video_default_set_id?: string | null
-          video_package_size?: "xl" | "l" | "m" | "s" | null
+          video_package_size?: string | null
         }
         Update: {
           created_at?: string
@@ -8751,16 +8946,16 @@ export type Database = {
           id?: string
           is_tour_pack_only?: boolean | null
           lights_default_set_id?: string | null
-          lights_package_size?: "xl" | "l" | "m" | "s" | null
+          lights_package_size?: string | null
           location_id?: string | null
           rehearsal_days?: number | null
           sound_default_set_id?: string | null
-          sound_package_size?: "xl" | "l" | "m" | "s" | null
+          sound_package_size?: string | null
           start_date?: string
           tour_date_type?: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id?: string | null
           video_default_set_id?: string | null
-          video_package_size?: "xl" | "l" | "m" | "s" | null
+          video_package_size?: string | null
         }
         Relationships: [
           {
@@ -8807,7 +9002,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
-          package_size: "xl" | "l" | "m" | "s" | null
+          package_size: string | null
           tour_id: string
           updated_at: string
         }
@@ -8817,7 +9012,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
-          package_size?: "xl" | "l" | "m" | "s" | null
+          package_size?: string | null
           tour_id: string
           updated_at?: string
         }
@@ -8827,7 +9022,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
-          package_size?: "xl" | "l" | "m" | "s" | null
+          package_size?: string | null
           tour_id?: string
           updated_at?: string
         }
@@ -9456,6 +9651,7 @@ export type Database = {
           end_date: string | null
           flex_comercial_folder_id: string | null
           flex_comercial_folder_number: string | null
+          flex_estructura_folder_id: string | null
           flex_folders_created: boolean | null
           flex_lights_folder_id: string | null
           flex_lights_folder_number: string | null
@@ -9492,6 +9688,7 @@ export type Database = {
           end_date?: string | null
           flex_comercial_folder_id?: string | null
           flex_comercial_folder_number?: string | null
+          flex_estructura_folder_id?: string | null
           flex_folders_created?: boolean | null
           flex_lights_folder_id?: string | null
           flex_lights_folder_number?: string | null
@@ -9528,6 +9725,7 @@ export type Database = {
           end_date?: string | null
           flex_comercial_folder_id?: string | null
           flex_comercial_folder_number?: string | null
+          flex_estructura_folder_id?: string | null
           flex_folders_created?: boolean | null
           flex_lights_folder_id?: string | null
           flex_lights_folder_number?: string | null
@@ -10488,6 +10686,8 @@ export type Database = {
           pixel_map_url: string | null
           power_report_url: string | null
           project_name: string
+          stage_name: string | null
+          stage_number: number | null
           updated_at: string | null
           weight_report_url: string | null
         }
@@ -10501,6 +10701,8 @@ export type Database = {
           pixel_map_url?: string | null
           power_report_url?: string | null
           project_name: string
+          stage_name?: string | null
+          stage_number?: number | null
           updated_at?: string | null
           weight_report_url?: string | null
         }
@@ -10514,6 +10716,8 @@ export type Database = {
           pixel_map_url?: string | null
           power_report_url?: string | null
           project_name?: string
+          stage_name?: string | null
+          stage_number?: number | null
           updated_at?: string | null
           weight_report_url?: string | null
         }
@@ -11107,28 +11311,6 @@ export type Database = {
         }
       }
       assert_soundvision_access: { Args: never; Returns: boolean }
-      delete_festival_artist_file_reference: {
-        Args: { p_artist_id?: string; p_file_id: string }
-        Returns: {
-          deleted_file_id: string
-          file_path: string
-          should_delete_storage: boolean
-        }[]
-      }
-      import_artist_rider_to_job: {
-        Args: {
-          p_source_artist_id: string
-          p_target_date: string
-          p_target_job_id: string
-          p_target_stage: number
-        }
-        Returns: {
-          imported_artist_id: string
-          imported_file_count: number
-          target_date: string
-          target_stage: number
-        }[]
-      }
       attempt_whatsapp_send: {
         Args: {
           _actor_id: string
@@ -11148,12 +11330,25 @@ export type Database = {
         Args: { task_assigned_department: string }
         Returns: boolean
       }
+      can_manage_festival_push_subscription: {
+        Args: {
+          p_enabled: boolean
+          p_job_id: string
+          p_stages: number[]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       can_manage_role_skill_mapping: {
         Args: { p_role_prefix: string; p_skill_name: string }
         Returns: boolean
       }
       can_manage_skill_category: {
         Args: { p_category: string }
+        Returns: boolean
+      }
+      can_manage_technician: {
+        Args: { p_technician_id: string }
         Returns: boolean
       }
       can_manage_users: { Args: never; Returns: boolean }
@@ -11184,6 +11379,7 @@ export type Database = {
         }
         Returns: Json
       }
+      cleanup_anonymous_security_audit_log: { Args: never; Returns: number }
       clear_tour_preset_assignments: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
@@ -11209,6 +11405,35 @@ export type Database = {
       compute_tour_job_rate_quote_2025: {
         Args: { _job_id: string; _tech_id: string }
         Returns: Json
+      }
+      consume_edge_rate_limit: {
+        Args: {
+          p_identifier_hash: string
+          p_max_requests: number
+          p_scope: string
+          p_window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          reset_at: string
+          retry_after_seconds: number
+        }[]
+      }
+      consume_external_api_dual_quota: {
+        Args: {
+          p_global_actor_id: string
+          p_global_daily_limit: number
+          p_global_service: string
+          p_user_actor_id: string
+          p_user_daily_limit: number
+          p_user_service: string
+        }
+        Returns: boolean
+      }
+      consume_external_api_quota: {
+        Args: { p_actor_id: string; p_daily_limit: number; p_service: string }
+        Returns: boolean
       }
       convert_to_timezone: {
         Args: { target_timezone?: string; timestamp_val: string }
@@ -11243,6 +11468,14 @@ export type Database = {
       deactivate_unassigned_prep_day_timesheet: {
         Args: { _date: string; _job_id: string; _technician_id: string }
         Returns: number
+      }
+      delete_festival_artist_file_reference: {
+        Args: { p_artist_id?: string; p_file_id: string }
+        Returns: {
+          deleted_file_id: string
+          file_path: string
+          should_delete_storage: boolean
+        }[]
       }
       department_for_role_prefix: {
         Args: { p_role_prefix: string }
@@ -11359,6 +11592,18 @@ export type Database = {
         }[]
       }
       get_current_user_role: { Args: never; Returns: string }
+      get_festival_assigned_stages: {
+        Args: { p_job_id: string; p_user_id: string }
+        Returns: number[]
+      }
+      get_hourly_rate_mode_dates_for_timesheets: {
+        Args: { _job_ids?: string[] }
+        Returns: {
+          date: string
+          job_id: string
+          technician_id: string
+        }[]
+      }
       get_job_staffing_summary: {
         Args: { p_job_ids: string[] }
         Returns: {
@@ -11563,6 +11808,20 @@ export type Database = {
           session: string
         }[]
       }
+      import_artist_rider_to_job: {
+        Args: {
+          p_source_artist_id: string
+          p_target_date: string
+          p_target_job_id: string
+          p_target_stage: number
+        }
+        Returns: {
+          imported_artist_id: string
+          imported_file_count: number
+          target_date: string
+          target_stage: number
+        }[]
+      }
       invoke_auto_timesheet_reminders: { Args: never; Returns: undefined }
       invoke_scheduled_push_notification: {
         Args: { event_type: string }
@@ -11629,6 +11888,45 @@ export type Database = {
         Returns: boolean
       }
       normalize_text_for_match: { Args: { input: string }; Returns: string }
+      prune_place_api_cache: { Args: never; Returns: undefined }
+      rack_builder_can_access_department: {
+        Args: { p_department: string }
+        Returns: boolean
+      }
+      rack_builder_can_access_layout: {
+        Args: { p_layout_id: string }
+        Returns: boolean
+      }
+      rack_builder_can_access_panel_layout: {
+        Args: { p_panel_layout_id: string }
+        Returns: boolean
+      }
+      rack_builder_can_access_project: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
+      rack_builder_can_use_tool: { Args: never; Returns: boolean }
+      rack_builder_layout_item_slot: {
+        Args: {
+          p_force_full_width: boolean
+          p_is_half_rack: boolean
+          p_preferred_lane: number
+          p_preferred_sub_lane: number
+          p_rack_width: Database["public"]["Enums"]["rack_builder_rack_width"]
+        }
+        Returns: {
+          inner_lane: number
+          outer_lane: number
+        }[]
+      }
+      rack_builder_layout_item_traits: {
+        Args: { p_device_id: string; p_panel_layout_id: string }
+        Returns: {
+          depth_mm: number
+          height_ru: number
+          is_half_rack: boolean
+        }[]
+      }
       rack_builder_rpc_create_panel_layout: {
         Args: {
           p_default_hole_count: number
@@ -11667,6 +11965,24 @@ export type Database = {
           p_rows: Json
         }
         Returns: undefined
+      }
+      rack_builder_slots_conflict: {
+        Args: {
+          p_inner_a: number
+          p_inner_b: number
+          p_outer_a: number
+          p_outer_b: number
+        }
+        Returns: boolean
+      }
+      rack_builder_u_ranges_overlap: {
+        Args: {
+          p_height_a: number
+          p_height_b: number
+          p_start_a: number
+          p_start_b: number
+        }
+        Returns: boolean
       }
       rank_staffing_candidates: {
         Args: {
@@ -11971,6 +12287,15 @@ export type Database = {
           p_state_region: string
         }
         Returns: string
+      }
+      validate_tour_date_default_set_pin: {
+        Args: {
+          p_default_set_id: string
+          p_department: string
+          p_package_size: string
+          p_tour_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
@@ -12357,6 +12682,9 @@ export const Constants = {
         "natural",
         "assigned_technicians",
       ],
+      rack_builder_device_facing: ["front", "rear"],
+      rack_builder_drawing_state: ["preliminary", "rev", "as_built"],
+      rack_builder_rack_width: ["single", "dual"],
       room_type: ["single", "double"],
       staffing_notification_scope: ["all_departments", "own_department"],
       task_status: ["not_started", "in_progress", "completed"],

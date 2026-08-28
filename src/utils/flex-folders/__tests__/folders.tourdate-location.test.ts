@@ -100,6 +100,7 @@ vi.mock("@/integrations/supabase/client", () => {
             id: this.filters["id"] ?? "tour-1",
             name: "Test Tour",
             flex_main_folder_id: "flex-main",
+            flex_estructura_folder_id: "flex-estructura",
             flex_sound_folder_id: "flex-sound",
             flex_lights_folder_id: "flex-lights",
             flex_video_folder_id: "flex-video",
@@ -184,6 +185,7 @@ describe("createAllFoldersForJob tourdate location naming", () => {
   it("uses job.location_data when job.location is missing", async () => {
     const job = {
       id: "job-1",
+      tour_date_id: "tour-date-1",
       job_type: "tourdate",
       tour_id: "tour-1",
       title: "Test Job",
@@ -207,6 +209,16 @@ describe("createAllFoldersForJob tourdate location naming", () => {
 
     expect(createdNames.some((name: unknown) => typeof name === "string" && name.includes("Madrid"))).toBe(true);
     expect(createdNames.some((name: unknown) => typeof name === "string" && name.includes("No Location"))).toBe(false);
+
+    const estructuraRows = testState.insertedFlexFolders.filter(
+      (row) => row?.department === "estructura",
+    );
+    expect(estructuraRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ folder_type: "tourdate" }),
+      expect.objectContaining({ folder_type: "pull_sheet", source_department: "sound" }),
+      expect.objectContaining({ folder_type: "pull_sheet", source_department: "lights" }),
+    ]));
+    expect(estructuraRows).toHaveLength(3);
   });
 
   it("reuses existing tourdate department root by tour_date_id and does not create a duplicate", async () => {

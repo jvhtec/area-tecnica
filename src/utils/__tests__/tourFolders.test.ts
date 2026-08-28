@@ -163,6 +163,7 @@ describe("createTourRootFoldersManual", () => {
     expect(result.success).toBe(true);
     expect(functionInvokeMock).not.toHaveBeenCalled();
     expect(createFlexFolderMock).toHaveBeenCalled();
+    expect(createFlexFolderMock.mock.calls.some(([payload]) => payload.name === "Kase-O - Estructura")).toBe(true);
 
     const [mainPayload] = createFlexFolderMock.mock.calls[0];
     expect(mainPayload).toMatchObject({
@@ -179,6 +180,7 @@ describe("createTourRootFoldersManual", () => {
         flex_main_folder_id: "flex-0",
         flex_main_folder_number: "F-0",
         flex_folders_created: true,
+        flex_estructura_folder_id: expect.any(String),
       },
     });
   });

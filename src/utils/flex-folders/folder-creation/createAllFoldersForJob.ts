@@ -5,11 +5,17 @@ import { createDryhireFolders } from "@/utils/flex-folders/folder-creation/creat
 import { createStandardJobFolders } from "@/utils/flex-folders/folder-creation/createStandardJobFolders";
 import { createTourdateFolders } from "@/utils/flex-folders/folder-creation/createTourdateFolders";
 import type { FlexFolderJob, FlexFolderRow } from "@/utils/flex-folders/folder-creation/types";
+import {
+  ESTRUCTURA_DEPARTMENT,
+  ESTRUCTURA_SOURCE_DEPARTMENTS,
+  type EstructuraSourceDepartment,
+} from "@/domain/estructura";
 
 const buildExistingFolderMaps = (existingFolders: FlexFolderRow[] | null | undefined) => {
   const existingDepartmentMap = new Map<string, FlexFolderRow>();
   const existingWorkOrderMap = new Map<string, FlexFolderRow>();
   const existingTourDateDepartmentMap = new Map<string, FlexFolderRow>();
+  const existingEstructuraPullSheetMap = new Map<EstructuraSourceDepartment, FlexFolderRow>();
 
   for (const folder of existingFolders ?? []) {
     if (folder.folder_type === "department" && folder.department) {
@@ -21,10 +27,19 @@ const buildExistingFolderMaps = (existingFolders: FlexFolderRow[] | null | undef
     if (folder.folder_type === "tourdate" && folder.department) {
       existingTourDateDepartmentMap.set(folder.department, folder);
     }
+    if (
+      folder.folder_type === "pull_sheet" &&
+      folder.department === ESTRUCTURA_DEPARTMENT &&
+      folder.source_department &&
+      ESTRUCTURA_SOURCE_DEPARTMENTS.includes(folder.source_department)
+    ) {
+      existingEstructuraPullSheetMap.set(folder.source_department, folder);
+    }
   }
 
   return {
     existingDepartmentMap,
+    existingEstructuraPullSheetMap,
     existingTourDateDepartmentMap,
     existingWorkOrderMap,
   };
@@ -42,7 +57,7 @@ export async function createAllFoldersForJob(
 ) {
   const { data: existingFolders, error: existingFoldersError } = await supabase
     .from("flex_folders")
-    .select("id, element_id, parent_id, folder_type, department")
+    .select("id, element_id, parent_id, folder_type, department, source_department")
     .eq("job_id", job.id);
 
   if (existingFoldersError) {
@@ -57,12 +72,14 @@ export async function createAllFoldersForJob(
   const isLegacyMainFolder = existingMainFolder?.folder_type === "main";
   const {
     existingDepartmentMap,
+    existingEstructuraPullSheetMap,
     existingTourDateDepartmentMap,
     existingWorkOrderMap,
   } = buildExistingFolderMaps(typedExistingFolders);
 
   if (isLegacyMainFolder) {
     existingDepartmentMap.clear();
+    existingEstructuraPullSheetMap.clear();
     existingWorkOrderMap.clear();
   }
 
@@ -79,6 +96,7 @@ export async function createAllFoldersForJob(
     return createTourdateFolders({
       documentNumber,
       existingFolders: typedExistingFolders,
+      existingEstructuraPullSheetMap,
       existingTourDateDepartmentMap,
       formattedEndDate,
       formattedStartDate,
@@ -91,6 +109,7 @@ export async function createAllFoldersForJob(
   return createStandardJobFolders({
     documentNumber,
     existingDepartmentMap,
+    existingEstructuraPullSheetMap,
     existingMainFolder,
     existingTourDateDepartmentMap,
     existingWorkOrderMap,

@@ -2,6 +2,11 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { requireAdminOrManagement } from "../_shared/auth.ts";
+import {
+  ESTRUCTURA_DEPARTMENT,
+  ESTRUCTURA_PULL_SHEETS,
+  ESTRUCTURA_SOURCE_DEPARTMENTS,
+} from "../../../src/domain/estructura.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import {
   createHttpHandler,
@@ -18,13 +23,7 @@ import {
   type FlexMotorUnit,
   type MotorModelDefinition,
 } from "./motorUnits.ts";
-import {
-  findEquipmentListsInTree,
-  matchMotorUnitsInManifest,
-  selectOutboundManifest,
-  type FlexEquipmentListReference,
-  type FlexManifestSource,
-} from "./manifestUnits.ts";
+import { discoverEstructuraManifestSelection } from "./estructuraManifestSelection.ts";
 import { allSettledWithConcurrency } from "./concurrency.ts";
 
 const FLEX_API_BASE_URL =
@@ -32,17 +31,8 @@ const FLEX_API_BASE_URL =
   "https://sectorpro.flexrentalsolutions.com/f5/api";
 const PAGE_SIZE = 25;
 const MAX_PAGES_PER_MODEL = 20;
-const MAX_EQUIPMENT_LISTS = 100;
 const FLEX_REQUEST_CONCURRENCY = 5;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-type ManifestSelection = {
-  status: "found" | "empty" | "unavailable" | "error";
-  unitIds: string[];
-  sources: FlexManifestSource[];
-  message: string;
-  warnings: string[];
-};
 
 const flexHeaders = (flexAuthToken: string): Record<string, string> => ({
   "X-Auth-Token": flexAuthToken,
@@ -150,120 +140,6 @@ async function fetchUnitsForModel(
   );
 }
 
-async function discoverManifestSelection(options: {
-  rootElementId: string | null;
-  trackedEquipmentLists: FlexEquipmentListReference[];
-  units: FlexMotorUnit[];
-  flexAuthToken: string;
-}): Promise<ManifestSelection> {
-  const { rootElementId, trackedEquipmentLists, units, flexAuthToken } = options;
-  const equipmentLists = new Map(
-    trackedEquipmentLists.map((list) => [list.id, list]),
-  );
-  const warnings: string[] = [];
-
-  if (rootElementId) {
-    try {
-      const tree = await fetchFlexJson(
-        `/element/${encodeURIComponent(rootElementId)}/tree`,
-        flexAuthToken,
-      );
-      findEquipmentListsInTree(tree).forEach((list) => equipmentLists.set(list.id, list));
-    } catch (error) {
-      console.error("Unable to fetch the Flex job tree for motor manifests", {
-        rootElementId,
-        error,
-      });
-      warnings.push("No se ha podido completar la búsqueda en el árbol Flex del trabajo.");
-    }
-  }
-
-  const candidates = Array.from(equipmentLists.values()).slice(0, MAX_EQUIPMENT_LISTS);
-  if (candidates.length === 0) {
-    return {
-      status: warnings.length ? "error" : "unavailable",
-      unitIds: [],
-      sources: [],
-      message: "El trabajo no tiene listas de material de Flex relacionadas.",
-      warnings,
-    };
-  }
-
-  const stateResults = await allSettledWithConcurrency(
-    candidates,
-    FLEX_REQUEST_CONCURRENCY,
-    async (equipmentList) => {
-      const state = await fetchFlexJson(
-        `/equipment-list/warehouse-state/${encodeURIComponent(equipmentList.id)}`,
-        flexAuthToken,
-      );
-      return selectOutboundManifest(state, equipmentList);
-    },
-  );
-  const sources = new Map<string, FlexManifestSource>();
-  let stateFailures = 0;
-
-  stateResults.forEach((result) => {
-    if (result.status === "fulfilled" && result.value) {
-      sources.set(result.value.manifestId, result.value);
-    } else if (result.status === "rejected") {
-      stateFailures += 1;
-      console.error("Unable to fetch Flex warehouse state for a job equipment list", result.reason);
-    }
-  });
-  if (stateFailures > 0) {
-    warnings.push(`No se han podido consultar ${stateFailures} listas de material en Flex.`);
-  }
-
-  const manifestSources = Array.from(sources.values());
-  if (manifestSources.length === 0) {
-    return {
-      status: stateFailures === candidates.length ? "error" : "unavailable",
-      unitIds: [],
-      sources: [],
-      message: "Todavía no hay un manifiesto de salida preparado o enviado para este trabajo.",
-      warnings,
-    };
-  }
-
-  const rowResults = await allSettledWithConcurrency(
-    manifestSources,
-    FLEX_REQUEST_CONCURRENCY,
-    async (source) => {
-      const rowData = await fetchFlexJson(
-        `/line-item/${encodeURIComponent(source.manifestId)}/row-data/`,
-        flexAuthToken,
-        { codeList: ["name", "barcode", "serial", "stencil"] },
-      );
-      return matchMotorUnitsInManifest(rowData, units);
-    },
-  );
-  const unitIds = new Set<string>();
-  let rowFailures = 0;
-
-  rowResults.forEach((result) => {
-    if (result.status === "fulfilled") {
-      result.value.forEach((unitId) => unitIds.add(unitId));
-    } else {
-      rowFailures += 1;
-      console.error("Unable to fetch Flex manifest line items", result.reason);
-    }
-  });
-  if (rowFailures > 0) {
-    warnings.push(`No se han podido leer ${rowFailures} manifiestos de Flex.`);
-  }
-
-  return {
-    status: unitIds.size > 0 ? "found" : rowFailures === manifestSources.length ? "error" : "empty",
-    unitIds: Array.from(unitIds),
-    sources: manifestSources,
-    message: unitIds.size > 0
-      ? `${unitIds.size} motores encontrados en el manifiesto del trabajo.`
-      : "El manifiesto no contiene motores de los modelos certificados.",
-    warnings,
-  };
-}
-
 serve(createHttpHandler(async (req: Request) => {
   const {
     SUPABASE_URL,
@@ -306,9 +182,11 @@ serve(createHttpHandler(async (req: Request) => {
     ),
     supabase
       .from("flex_folders")
-      .select("element_id, folder_type, department")
+      .select("element_id, source_department")
       .eq("job_id", jobId)
-      .in("folder_type", ["main_event", "main", "tourdate", "pull_sheet"]),
+      .eq("department", ESTRUCTURA_DEPARTMENT)
+      .eq("folder_type", "pull_sheet")
+      .in("source_department", [...ESTRUCTURA_SOURCE_DEPARTMENTS]),
   ]);
   if (folderResult.error) {
     throw new HttpError(500, "Unable to resolve Flex folders for the job", {
@@ -345,22 +223,34 @@ serve(createHttpHandler(async (req: Request) => {
     a.serial.localeCompare(b.serial, "es", { numeric: true, sensitivity: "base" })
   );
 
-  const folderRows = folderResult.data ?? [];
-  const rootPreference = ["main_event", "main", "tourdate"];
-  const rootElementId = rootPreference
-    .map((folderType) => folderRows.find((row) => row.folder_type === folderType)?.element_id)
-    .find((value): value is string => typeof value === "string" && value.length > 0) ?? null;
-  const trackedEquipmentLists = folderRows
-    .filter((row) => row.folder_type === "pull_sheet" && typeof row.element_id === "string")
+  const estructuraRows = folderResult.data ?? [];
+  const trackedEquipmentLists = estructuraRows
+    .filter((row) => typeof row.element_id === "string")
     .map((row) => ({
       id: row.element_id,
-      name: row.department ? `Material ${row.department}` : "Lista de material",
+      name: row.source_department === "sound"
+        ? ESTRUCTURA_PULL_SHEETS.sound.nameSuffix
+        : ESTRUCTURA_PULL_SHEETS.lights.nameSuffix,
     }));
-  const manifest = await discoverManifestSelection({
-    rootElementId,
+  const presentSources = new Set(estructuraRows.map((row) => row.source_department));
+  const missingSourceDepartments = [
+    !presentSources.has("sound") ? ESTRUCTURA_PULL_SHEETS.sound.label : null,
+    !presentSources.has("lights") ? ESTRUCTURA_PULL_SHEETS.lights.label : null,
+  ].filter((value): value is string => Boolean(value));
+  const manifest = await discoverEstructuraManifestSelection({
     trackedEquipmentLists,
+    missingSourceDepartments,
     units,
-    flexAuthToken,
+    concurrency: FLEX_REQUEST_CONCURRENCY,
+    fetchWarehouseState: (equipmentListId) => fetchFlexJson(
+      `/equipment-list/warehouse-state/${encodeURIComponent(equipmentListId)}`,
+      flexAuthToken,
+    ),
+    fetchManifestRows: (manifestId) => fetchFlexJson(
+      `/line-item/${encodeURIComponent(manifestId)}/row-data/`,
+      flexAuthToken,
+      { codeList: ["name", "barcode", "serial", "stencil"] },
+    ),
   });
 
   return jsonResponse({

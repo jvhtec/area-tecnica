@@ -32,6 +32,7 @@ import {
   type JobFlexEquipmentTarget,
   type StrictGroupedPushResult,
 } from '@/services/flexPullsheets';
+import { resolveEstructuraPullSheetTargets } from '@/services/estructuraMotorPreparation';
 import {
   extractFlexElementId,
   extractFlexEquipmentDocumentType,
@@ -70,7 +71,37 @@ interface XmlpFlexExportDialogProps {
 interface XmlpFlexPushOutcome extends StrictGroupedPushResult {
   skippedUnmappedItems: XmlpFlexCandidate[];
   skippedAmbiguousItems: XmlpFlexCandidate[];
+  standardPushError?: string;
+  estructuraSoundPushError?: string;
 }
+
+const emptyPushResult = (): StrictGroupedPushResult => ({
+  groupsCreated: [],
+  groupsReused: [],
+  groupsFailed: [],
+  equipmentLinesAdded: 0,
+  totalQuantitiesRepresented: 0,
+  childrenSkippedBecauseParentFailed: [],
+  failedChildItems: [],
+  warnings: [],
+});
+
+const mergePushResults = (
+  results: readonly StrictGroupedPushResult[],
+): StrictGroupedPushResult => results.reduce((merged, current) => ({
+  groupsCreated: [...merged.groupsCreated, ...current.groupsCreated],
+  groupsReused: [...merged.groupsReused, ...current.groupsReused],
+  groupsFailed: [...merged.groupsFailed, ...current.groupsFailed],
+  equipmentLinesAdded: merged.equipmentLinesAdded + current.equipmentLinesAdded,
+  totalQuantitiesRepresented:
+    merged.totalQuantitiesRepresented + current.totalQuantitiesRepresented,
+  childrenSkippedBecauseParentFailed: [
+    ...merged.childrenSkippedBecauseParentFailed,
+    ...current.childrenSkippedBecauseParentFailed,
+  ],
+  failedChildItems: [...merged.failedChildItems, ...current.failedChildItems],
+  warnings: [...merged.warnings, ...current.warnings],
+}), emptyPushResult());
 
 export function XmlpFlexExportDialog({
   open,
@@ -145,6 +176,12 @@ export function XmlpFlexExportDialog({
     ) ?? [],
     [plan, selectedIds],
   );
+  const selectedMotorCandidates = selectedCandidates.filter(
+    (item) => item.flexCategoryKey === 'motores_controles',
+  );
+  const selectedStandardCandidates = selectedCandidates.filter(
+    (item) => item.flexCategoryKey !== 'motores_controles',
+  );
   const allCandidates = plan
     ? [...plan.groups.flatMap((group) => group.items), ...plan.unassignedItems]
     : [];
@@ -199,27 +236,70 @@ export function XmlpFlexExportDialog({
   };
 
   const handlePush = async () => {
-    if (!target || selectedCandidates.length === 0 || !confirmedAdditive) return;
+    if (
+      selectedCandidates.length === 0 ||
+      !confirmedAdditive ||
+      (selectedStandardCandidates.length > 0 && !target) ||
+      (selectedMotorCandidates.length > 0 && !session.jobId)
+    ) return;
     setIsPushing(true);
     setResult(null);
     try {
-      const pushed = await pushEquipmentToFlexDocumentStrict(
-        target,
-        selectedCandidates.map((item) => ({
+      const toEquipment = (items: readonly XmlpFlexCandidate[]) => items.map((item) => ({
           resourceId: item.resourceId!,
           quantity: item.quantity,
           name: item.displayName,
           flexCategoryKey: item.flexCategoryKey!,
-        })),
-      );
+      }));
+      const standardPush = selectedStandardCandidates.length > 0
+        ? pushEquipmentToFlexDocumentStrict(target!, toEquipment(selectedStandardCandidates))
+        : Promise.resolve(emptyPushResult());
+      const estructuraSoundPush = selectedMotorCandidates.length > 0
+        ? resolveEstructuraPullSheetTargets(session.jobId!).then(({ targets: estructuraTargets }) => {
+            const estructuraSound = estructuraTargets.sound;
+            if (!estructuraSound) {
+              throw new Error('Falta el Pull Sheet Estructura Sonido. Reconcilia las carpetas Flex del trabajo.');
+            }
+            return pushEquipmentToFlexDocumentStrict(
+              { elementId: estructuraSound.elementId, documentType: 'pullsheet' },
+              toEquipment(selectedMotorCandidates),
+            );
+          })
+        : Promise.resolve(emptyPushResult());
+      const [standardOutcome, estructuraOutcome] = await Promise.allSettled([
+        standardPush,
+        estructuraSoundPush,
+      ]);
+      const everyRequestedPushFailed =
+        (selectedStandardCandidates.length === 0 || standardOutcome.status === 'rejected') &&
+        (selectedMotorCandidates.length === 0 || estructuraOutcome.status === 'rejected');
+      if (everyRequestedPushFailed) {
+        const messages = [standardOutcome, estructuraOutcome]
+          .filter((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected')
+          .map((outcome) => outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason));
+        throw new Error(messages.join(' ') || 'El envío no pudo completarse.');
+      }
+      const fulfilled = [standardOutcome, estructuraOutcome]
+        .filter((outcome): outcome is PromiseFulfilledResult<StrictGroupedPushResult> => outcome.status === 'fulfilled')
+        .map((outcome) => outcome.value);
+      const pushed = mergePushResults(fulfilled);
+      const standardPushError = standardOutcome.status === 'rejected'
+        ? standardOutcome.reason instanceof Error ? standardOutcome.reason.message : 'Falló el envío al documento de Sonido.'
+        : undefined;
+      const estructuraSoundPushError = estructuraOutcome.status === 'rejected'
+        ? estructuraOutcome.reason instanceof Error ? estructuraOutcome.reason.message : 'Falló el envío a Estructura Sonido.'
+        : undefined;
       setResult({
         ...pushed,
         skippedUnmappedItems: unmapped,
         skippedAmbiguousItems: ambiguous,
+        standardPushError,
+        estructuraSoundPushError,
       });
       setConfirmedAdditive(false);
       setSelectedIds(new Set());
-      const failed = pushed.groupsFailed.length + pushed.failedChildItems.length;
+      const failed = pushed.groupsFailed.length + pushed.failedChildItems.length +
+        Number(Boolean(standardPushError)) + Number(Boolean(estructuraSoundPushError));
       toast({
         title: failed === 0 ? 'Paquete enviado a Flex' : 'Envío parcial a Flex',
         description: `${pushed.equipmentLinesAdded} líneas y ${pushed.totalQuantitiesRepresented} unidades añadidas.`,
@@ -265,6 +345,17 @@ export function XmlpFlexExportDialog({
                 Flex no ofrece aquí una lectura fiable para reconciliar líneas y anidación existentes. Repetir el envío puede duplicar cantidades.
               </AlertDescription>
             </Alert>
+
+            {selectedMotorCandidates.length > 0 && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Motores separados por responsabilidad</AlertTitle>
+                <AlertDescription>
+                  Los motores derivados de Pesos/XMLP se añadirán exclusivamente a Estructura Sonido. El resto del paquete irá al documento de Sonido seleccionado.
+                  {!session.jobId && ' Vincula la importación a un trabajo para resolver ese destino sin una URL manual.'}
+                </AlertDescription>
+              </Alert>
+            )}
 
             <XmlpFlexPlanPreview plan={plan} selectedIds={selectedIds} onSelectedIdsChange={setSelectedIds} />
 
@@ -346,6 +437,8 @@ export function XmlpFlexExportDialog({
                 </AlertTitle>
                 <AlertDescription>
                   {result.groupsCreated.length} grupos creados; {result.equipmentLinesAdded} líneas añadidas; {result.groupsFailed.length} grupos fallidos; {result.failedChildItems.length} líneas hijas fallidas; {result.childrenSkippedBecauseParentFailed.length} hijas omitidas por fallo de cabecera; {result.skippedUnmappedItems.length} sin mapear omitidas; {result.skippedAmbiguousItems.length} ambiguas omitidas.
+                  {result.standardPushError && ` Sonido: ${result.standardPushError}`}
+                  {result.estructuraSoundPushError && ` Estructura Sonido: ${result.estructuraSoundPushError}`}
                 </AlertDescription>
               </Alert>
             )}
@@ -354,7 +447,16 @@ export function XmlpFlexExportDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPushing}>Cerrar</Button>
-          <Button onClick={() => void handlePush()} disabled={!target || selectedCandidates.length === 0 || !confirmedAdditive || isPushing}>
+          <Button
+            onClick={() => void handlePush()}
+            disabled={
+              selectedCandidates.length === 0 ||
+              !confirmedAdditive ||
+              isPushing ||
+              (selectedStandardCandidates.length > 0 && !target) ||
+              (selectedMotorCandidates.length > 0 && !session.jobId)
+            }
+          >
             {isPushing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             Enviar seleccionados a Flex
           </Button>

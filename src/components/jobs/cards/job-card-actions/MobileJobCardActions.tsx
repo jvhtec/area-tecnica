@@ -25,6 +25,7 @@ import { TechnicianIncidentReportDialog } from "@/components/incident-reports/Te
 import { ArchiveToFlexAction } from "@/components/jobs/cards/job-card-actions/ArchiveToFlexAction";
 import { BackfillDocTecnicaAction } from "@/components/jobs/cards/job-card-actions/BackfillDocTecnicaAction";
 import { MotorCertificateAction } from "@/components/jobs/cards/job-card-actions/MotorCertificateAction";
+import { PrepareMotorsAction } from "@/components/jobs/cards/job-card-actions/PrepareMotorsAction";
 import { PrintFlexReportAction } from "@/components/jobs/cards/job-card-actions/PrintFlexReportAction";
 import { SoundvisionXmlpFlexJobAction } from "@/components/jobs/cards/job-card-actions/SoundvisionXmlpFlexJobAction";
 import type {
@@ -342,6 +343,12 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
                 </>
               )}
               {isProductionDepartment && isManagementUser && <PrintFlexReportAction job={job} />}
+              {isProjectManagementPage && isManagementUser && job.job_type !== "dryhire" && (
+                <PrepareMotorsAction
+                  jobId={job.id}
+                  onCreateFlexFolders={canCreateFlexFolders ? onCreateFlexFolders : undefined}
+                />
+              )}
               {isProjectManagementPage && isManagementUser && <MotorCertificateAction job={job} />}
               {!isProductionDepartment && <ArchiveToFlexAction job={job} />}
               {!isProductionDepartment && <BackfillDocTecnicaAction job={job} />}
