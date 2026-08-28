@@ -399,3 +399,21 @@ export async function bootstrapApp(page: Page, options: SupabaseMockOptions = {}
   await seedAppState(page, options.auth);
   return installSupabaseMocks(page, options);
 }
+
+/**
+ * Whether the page is below the app's mobile breakpoint.
+ *
+ * The UI genuinely differs across it — the matrix hides its filters behind a
+ * toggle, the expenses page swaps its table for a card list, tour management
+ * moves its actions into a sheet — so specs that touch those surfaces have to
+ * drive whichever one is on screen rather than assuming the desktop layout.
+ * Read from the viewport rather than the project name so it stays right for
+ * any spec that sets its own size. Mirrors MOBILE_BREAKPOINT in
+ * src/hooks/use-mobile.tsx.
+ */
+export const MOBILE_BREAKPOINT = 768;
+
+export function isMobileViewport(page: Page): boolean {
+  const width = page.viewportSize()?.width;
+  return width !== undefined && width < MOBILE_BREAKPOINT;
+}

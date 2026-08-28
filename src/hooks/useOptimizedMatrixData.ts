@@ -1,17 +1,55 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
-import { isWithinInterval, isSameDay } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
+import { addMadridCalendarDays } from "@/utils/timezoneUtils";
 const MADRID_TIMEZONE = 'Europe/Madrid';
+const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
 
 function toMadridDateKey(date: Date | undefined): string {
   return date ? formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy-MM-dd') : '';
 }
+
+/**
+ * Seasonal house techs get their unavailability derived client-side, so the
+ * availability cache entry has to change whenever their seasonal window does.
+ */
+export const buildSeasonalAvailabilityKey = (
+  technicians: Array<Pick<SeasonalHouseTechProfile, 'id' | 'role' | 'seasonal_house_tech' | 'seasonal_house_tech_start_date' | 'seasonal_house_tech_end_date'>>,
+): string =>
+  technicians
+    .filter((technician) => technician.seasonal_house_tech === true)
+    .map((technician) => [
+      technician.id,
+      technician.role ?? '',
+      technician.seasonal_house_tech_start_date ?? '',
+      technician.seasonal_house_tech_end_date ?? '',
+    ].join(':'))
+    .sort()
+    .join('|');
+
+/**
+ * Query keys are built here (rather than inline at each call site) so the
+ * prefetch in JobAssignmentMatrix warms the exact entry the matrix reads back.
+ */
+export const matrixAssignmentsQueryKey = (
+  jobIds: string[],
+  technicianIds: string[],
+  start: Date | undefined,
+  end: Date | undefined,
+) => queryKeys.scope('optimized-matrix-assignments', jobIds, technicianIds, toMadridDateKey(start), toMadridDateKey(end));
+
+export const matrixAvailabilityQueryKey = (
+  technicianIds: string[],
+  seasonalAvailabilityKey: string,
+  start: Date | undefined,
+  end: Date | undefined,
+) => queryKeys.scope('optimized-matrix-availability', technicianIds, seasonalAvailabilityKey, toMadridDateKey(start), toMadridDateKey(end));
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 export interface MatrixJob {
@@ -66,6 +104,31 @@ export const buildAssignmentDateMap = (
   });
 
   return map;
+};
+
+/**
+ * Groups jobs by the Madrid day each column represents.
+ *
+ * Both sides are compared as Madrid day keys. The previous isSameDay /
+ * isWithinInterval check read the browser's calendar day, so once the range
+ * carried Madrid-midnight instants a job disappeared from its own column for
+ * anyone west of Madrid.
+ */
+export const buildJobsByDate = (jobs: MatrixJob[], dates: Date[]) => {
+  const jobsByDate = new Map<string, MatrixJob[]>();
+
+  dates.forEach((date) => {
+    const dateKey = toMadridDateKey(date);
+    jobsByDate.set(dateKey, jobs.filter((job) => {
+      const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
+      if (hasTypedDate) return true;
+      const jobStartKey = toMadridDateKey(new Date(job.start_time));
+      const jobEndKey = toMadridDateKey(new Date(job.end_time));
+      return dateKey >= jobStartKey && dateKey <= jobEndKey;
+    }));
+  });
+
+  return jobsByDate;
 };
 
 interface FetchMatrixTimesheetArgs {
@@ -257,11 +320,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     isLoading: assignmentsInitialLoading,
     isFetching: assignmentsFetching,
   } = useQuery({
-    queryKey: queryKeys.scope('optimized-matrix-assignments', jobIds, technicianIds, toMadridDateKey(dateRange.start), toMadridDateKey(dateRange.end)),
+    queryKey: matrixAssignmentsQueryKey(jobIds, technicianIds, dateRange.start, dateRange.end),
     queryFn: async (): Promise<MatrixTimesheetAssignment[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
-
-      console.log('Fetching timesheet assignments for', jobIds.length, 'jobs and', technicianIds.length, 'technicians');
 
       try {
         return await fetchMatrixTimesheetAssignments({
@@ -285,16 +346,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Availability (unavailability) merged from per-day schedules and legacy table
   const seasonalAvailabilityKey = useMemo(
-    () => technicians
-      .filter((technician) => technician.seasonal_house_tech === true)
-      .map((technician) => [
-        technician.id,
-        technician.role ?? '',
-        technician.seasonal_house_tech_start_date ?? '',
-        technician.seasonal_house_tech_end_date ?? '',
-      ].join(':'))
-      .sort()
-      .join('|'),
+    () => buildSeasonalAvailabilityKey(technicians),
     [technicians],
   );
 
@@ -303,13 +355,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     isLoading: availabilityInitialLoading,
     isFetching: availabilityFetching,
   } = useQuery({
-    queryKey: queryKeys.scope(
-      'optimized-matrix-availability',
-      technicianIds,
-      seasonalAvailabilityKey,
-      toMadridDateKey(dateRange.start),
-      toMadridDateKey(dateRange.end),
-    ),
+    queryKey: matrixAvailabilityQueryKey(technicianIds, seasonalAvailabilityKey, dateRange.start, dateRange.end),
     queryFn: async () => {
       if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string; notes?: string }>;
 
@@ -325,11 +371,6 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       buildSeasonalUnavailability(technicians, dateStart, dateEnd).forEach((row) => {
         perDay.set(`${row.user_id}-${row.date}`, row);
       });
-      const startDay = new Date(dateRange.start);
-      startDay.setHours(0,0,0,0);
-      const endDay = new Date(dateRange.end);
-      endDay.setHours(0,0,0,0);
-
       const runBatches = async <T,>(
         batches: string[][],
         worker: (batch: string[]) => Promise<T[]>,
@@ -434,14 +475,24 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         );
 
         vacs.forEach((r) => {
-          const s = new Date(r.start_date);
-          const e = new Date(r.end_date);
-          const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
-          const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
-          for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
-            const dateKey = toMadridDateKey(d);
+          // vacation_requests dates and dateStart/dateEnd are all Madrid day
+          // keys, so clamp and iterate in key space. Round-tripping them through
+          // local midnights shifted the marked days outside Europe/Madrid.
+          const vacationStart = String(r.start_date ?? '');
+          const vacationEnd = String(r.end_date ?? '');
+          if (!vacationStart || !vacationEnd) return;
+
+          const clampStart = vacationStart > dateStart ? vacationStart : dateStart;
+          const clampEnd = vacationEnd < dateEnd ? vacationEnd : dateEnd;
+          if (clampStart > clampEnd) return;
+
+          let dateKey = clampStart;
+          while (dateKey <= clampEnd) {
             const key = `${r.technician_id}-${dateKey}`;
             if (!perDay.has(key)) perDay.set(key, { user_id: r.technician_id, date: dateKey, status: 'unavailable' });
+            const nextDateKey = addMadridCalendarDays(dateKey, 1);
+            if (nextDateKey === dateKey) break;
+            dateKey = nextDateKey;
           }
         });
       } catch (e: unknown) {
@@ -525,28 +576,11 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [availabilityData]);
 
-  // Fixed getJobsForDate function with proper typing
   const getJobsForDate = useMemo(() => {
-    const jobsByDate = new Map<string, MatrixJob[]>();
-    
-    dates.forEach(date => {
-      const dateKey = toMadridDateKey(date);
-      const dateJobs = jobs.filter((job: MatrixJob) => {
-        const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
-        if (hasTypedDate) return true;
-        const jobStart = new Date(job.start_time);
-        const jobEnd = new Date(job.end_time);
-        
-        return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
-               isSameDay(date, jobStart) || 
-               isSameDay(date, jobEnd);
-      });
-      
-      jobsByDate.set(dateKey, dateJobs);
-    });
-    
+    const jobsByDate = buildJobsByDate(jobs, dates);
     return (date: Date): MatrixJob[] => {
-      return jobsByDate.get(toMadridDateKey(date)) || [];
+      // Shared empty array, not a fresh []: DateHeader is memoized on this prop.
+      return jobsByDate.get(toMadridDateKey(date)) || EMPTY_JOBS_FOR_DATE;
     };
   }, [jobs, dates]);
 
@@ -570,21 +604,18 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Invalidate specific queries for real-time updates
   const invalidateAssignmentQueries = useCallback(async () => {
-    console.log('Invalidating assignment queries...');
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') }) // Also invalidate jobs to refresh the matrix
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') }), // Also invalidate jobs to refresh the matrix
+      invalidateMatrixHeaderCounts(queryClient),
     ]);
-    console.log('Assignment queries invalidated');
   }, [queryClient]);
 
   // Realtime subscription for job_assignments table
   useEffect(() => {
-    console.log('🔔 Setting up job_assignments realtime subscription for matrix');
-
     const channel = supabase
       .channel('matrix-job-assignments')
       .on(
@@ -594,26 +625,20 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'job_assignments'
         },
-        (payload) => {
-          console.log('🔔 job_assignments change detected in matrix:', payload.eventType, payload);
+        () => {
           // Immediately invalidate and refetch
           invalidateAssignmentQueries();
         }
       )
-      .subscribe((status) => {
-        console.log('🔔 job_assignments subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔔 Cleaning up job_assignments realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [invalidateAssignmentQueries]);
 
   // Realtime subscription for per-day timesheets updates
   useEffect(() => {
-    console.log('🔔 Setting up timesheets realtime subscription for matrix');
-
     const channel = supabase
       .channel('matrix-timesheets')
       .on(
@@ -625,14 +650,13 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         },
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
+          // Confirmed and open-slot badges are counted off timesheets too.
+          void invalidateMatrixHeaderCounts(queryClient);
         }
       )
-      .subscribe((status) => {
-        console.log('🔔 timesheets subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔔 Cleaning up timesheets realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [queryClient]);

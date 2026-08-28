@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { format } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
+import { invalidateMatrixHeaderCounts } from '@/lib/matrix-header-counts';
+import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
-import { useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
+import { useCancelStaffingRequest, useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
@@ -85,7 +85,10 @@ export const OptimizedAssignmentMatrix = ({
   // Staffing functionality
   useStaffingRealtime();
   const { toast } = useToast();
-  const { mutate: sendStaffingEmail } = useSendStaffingEmail();
+  // Owned here rather than in every cell: the grid renders hundreds of cells,
+  // and each useMutation call registers its own observer.
+  const { mutate: sendStaffingEmail, isPending: isSendingStaffingEmail } = useSendStaffingEmail();
+  const { mutate: cancelStaffing, isPending: isCancellingStaffing } = useCancelStaffingRequest();
 
   // Cell dimensions (overridable for mobile)
   const CELL_WIDTH = cellWidth ?? 160;
@@ -133,6 +136,8 @@ export const OptimizedAssignmentMatrix = ({
   useEffect(() => {
     const handler = () => {
       qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') });
+      // The date-header invitation/offer badges are counted off staffing_requests.
+      void invalidateMatrixHeaderCounts(qc);
     };
     window.addEventListener('staffing-updated', handler);
     return () => window.removeEventListener('staffing-updated', handler);
@@ -227,7 +232,7 @@ export const OptimizedAssignmentMatrix = ({
   }, [invalidateAssignmentQueries]);
 
   const handleDirectToggleUnavailable = useCallback(async (technicianId: string, date: Date) => {
-    const dateStr = formatInTimeZone(date, 'Europe/Madrid', 'yyyy-MM-dd');
+    const dateStr = formatMadridDateKey(date);
     const existing = getAvailabilityForCell(technicianId, date);
     if (existing) {
       const { error } = await dataLayerClient.from('technician_availability')
@@ -254,9 +259,7 @@ export const OptimizedAssignmentMatrix = ({
   }, [getAvailabilityForCell, toast]);
 
   const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email' | 'toggle-unavailable', selectedJobId?: string) => {
-    console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
-    console.log('Assignment data:', assignment);
     // Block assignment/staffing interactions if technician is in fridge
     const isFridge = fridgeSet?.has(technicianId);
     if (isFridge && (action === 'select-job' || action === 'assign' || action === 'select-job-for-staffing' || action === 'confirm' || action === 'offer-details' || action === 'offer-details-wa' || action === 'availability-wa')) {
@@ -265,7 +268,6 @@ export const OptimizedAssignmentMatrix = ({
     }
     // Gate direct assign-related actions behind allowDirectAssign
     if (!allowDirectAssign && (action === 'select-job' || action === 'assign')) {
-      console.log('Direct assign disabled by UI toggle; ignoring click');
       return;
     }
     // Gate unavailability actions behind management/admin role
@@ -280,9 +282,8 @@ export const OptimizedAssignmentMatrix = ({
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
       if (targetJobId) {
         setAvailabilityChannel('whatsapp');
-        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true, channel: 'whatsapp' });
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: formatMadridDateKey(date), singleDay: true, channel: 'whatsapp' });
       } else {
-        console.log('Setting WhatsApp intent for staffing job selection');
         setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment, intendedPhase: 'availability', intendedChannel: 'whatsapp' });
       }
       return;
@@ -293,7 +294,7 @@ export const OptimizedAssignmentMatrix = ({
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
       if (targetJobId) {
         setAvailabilityChannel('email');
-        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true, channel: 'email' });
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: formatMadridDateKey(date), singleDay: true, channel: 'email' });
       } else {
         setAvailabilityPreferredChannel('email');
         setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
@@ -348,7 +349,7 @@ export const OptimizedAssignmentMatrix = ({
 
 
   const handleCellSelect = useCallback((technicianId: string, date: Date, selected: boolean) => {
-    const cellKey = `${technicianId}-${format(date, 'yyyy-MM-dd')}`;
+    const cellKey = `${technicianId}-${formatMadridDateKey(date)}`;
     const newSelected = new Set(selectedCells);
 
     if (selected) {
@@ -367,13 +368,6 @@ export const OptimizedAssignmentMatrix = ({
   }, [selectedCells, selectCell, isGlobalCellSelected, clearGlobalSelection]);
 
   const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
-    console.log('🚀 OptimizedAssignmentMatrix: handleStaffingActionSelected called', {
-      jobId,
-      action,
-      cellAction,
-      technicianId: cellAction?.technicianId
-    });
-
     if (cellAction?.type === 'select-job-for-staffing') {
       // If the technician already declined this job, block staffing for this job only
       const declinedSet = declinedJobsByTech.get(cellAction.technicianId);
@@ -393,7 +387,7 @@ export const OptimizedAssignmentMatrix = ({
       (async () => {
         const technicianId = cellAction.technicianId;
         const conflictResult = await checkTimeConflictEnhanced(technicianId, jobId, {
-          targetDateIso: format(cellAction.date, 'yyyy-MM-dd'),
+          targetDateIso: formatMadridDateKey(cellAction.date),
           singleDayOnly: !!options?.singleDay,
           includePending: true,
         });
@@ -411,13 +405,12 @@ export const OptimizedAssignmentMatrix = ({
         const intentChannel = cellAction.intendedChannel;
         const defaultChannel = intentChannel || availabilityPreferredChannel || 'email';
 
-        console.log('Opening availability dialog with channel:', defaultChannel);
         setAvailabilityChannel(defaultChannel);
         setAvailabilityDialog({
           open: true,
           jobId,
           profileId: technicianId,
-          dateIso: format(cellAction.date, 'yyyy-MM-dd'),
+          dateIso: formatMadridDateKey(cellAction.date),
           singleDay: !!options?.singleDay,
           channel: defaultChannel
         });
@@ -522,25 +515,36 @@ export const OptimizedAssignmentMatrix = ({
     }
   };
 
+  // Read at seed time only, so a selection change does not re-seed an open dialog.
+  // Synced in an effect rather than during render: a render React discards would
+  // otherwise leave the ref holding a selection that was never committed. This
+  // effect is declared before the seeding effect so the ref is current when it runs.
+  const selectedCellsRef = React.useRef(selectedCells);
   useEffect(() => {
-    if (availabilityDialog?.open) {
-      setAvailabilityCoverage(availabilityDialog.singleDay ? 'single' : 'full');
+    selectedCellsRef.current = selectedCells;
+  }, [selectedCells]);
+  const availabilityDialogOpen = !!availabilityDialog?.open;
+  const availabilityDialogProfileId = availabilityDialog?.profileId;
+  const availabilityDialogDateIso = availabilityDialog?.dateIso;
+  const availabilityDialogSingleDay = availabilityDialog?.singleDay;
+
+  useEffect(() => {
+    if (availabilityDialogOpen) {
+      setAvailabilityCoverage(availabilityDialogSingleDay ? 'single' : 'full');
       try {
         // Extract dates from selectedCells for this technician
-        const technicianId = availabilityDialog.profileId;
+        const technicianId = availabilityDialogProfileId;
         const selectedDatesForTech: Date[] = [];
 
         // Parse selectedCells to find all dates for this technician
-        for (const cellKey of selectedCells) {
+        for (const cellKey of selectedCellsRef.current) {
           // cellKey format: "${technicianId}-yyyy-MM-dd"
           if (cellKey.startsWith(`${technicianId}-`)) {
             const dateStr = cellKey.substring(technicianId.length + 1); // Remove "techId-" prefix
-            try {
-              const parsedDate = new Date(`${dateStr}T00:00:00`);
-              if (!isNaN(parsedDate.getTime())) {
-                selectedDatesForTech.push(parsedDate);
-              }
-            } catch { /* ignore invalid dates */ }
+            const parsedDate = madridDateKeyToCalendarDate(dateStr);
+            if (parsedDate) {
+              selectedDatesForTech.push(parsedDate);
+            }
           }
         }
 
@@ -552,13 +556,15 @@ export const OptimizedAssignmentMatrix = ({
           setAvailabilityCoverage('multi');
         } else {
           // Single date or no selection - use the clicked date
-          const clickedDate = availabilityDialog.dateIso ? new Date(`${availabilityDialog.dateIso}T00:00:00`) : null;
+          const clickedDate = availabilityDialogDateIso ? madridDateKeyToCalendarDate(availabilityDialogDateIso) : null;
           setAvailabilitySingleDate(clickedDate);
           setAvailabilityMultiDates(clickedDate ? [clickedDate] : []);
         }
       } catch { /* ignore */ }
     }
-  }, [availabilityDialog?.open, selectedCells]);
+    // Seeds once per opening. Depending on selectedCells re-ran this while the
+    // dialog was open, discarding the coverage and dates the user had picked.
+  }, [availabilityDialogOpen, availabilityDialogProfileId, availabilityDialogDateIso, availabilityDialogSingleDay]);
 
   if (isInitialLoading) {
     return (
@@ -587,6 +593,7 @@ export const OptimizedAssignmentMatrix = ({
     declinedJobsByTech, cellAction, currentTechnician, closeDialogs,
     handleJobSelected, handleStaffingActionSelected, forcedStaffingAction, forcedStaffingChannel,
     jobs, offerChannel, toast, sendStaffingEmail, checkTimeConflictEnhanced,
+    isSendingStaffingEmail, cancelStaffing, isCancellingStaffing,
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,

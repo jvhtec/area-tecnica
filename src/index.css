@@ -402,6 +402,26 @@
     .coarse-hit-target-40.h-10.w-10 {
       margin-inline: 2px;
     }
+
+    /* Grows a control's tap area to fill its layout cell instead of to a fixed
+       44px. For dense fixed-width chrome (the 110x64 assignment-matrix corner)
+       a 44px target is wider than the pitch between controls, so neighbouring
+       targets overlap and a near-miss fires the wrong action. Filling the cell
+       has no such failure mode: the cells are flex siblings that tile their
+       row, so the targets tile it too and cannot overlap by construction.
+
+       Requires a `position: relative` wrapper — the pseudo-element resolves
+       against the nearest positioned ancestor, which must be the cell and not
+       the control itself. */
+    .hit-target-fill {
+      position: static;
+    }
+
+    .hit-target-fill::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+    }
   }
 
   .pt-safe { padding-top: var(--safe-area-top); }

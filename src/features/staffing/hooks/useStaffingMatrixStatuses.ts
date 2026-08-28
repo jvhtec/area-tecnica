@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import { format } from 'date-fns'
 import { CARLOS_AGENT_NAME } from '@/features/staffing/carlos'
+import { formatMadridDateKey } from '@/utils/timezoneUtils'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -284,14 +284,16 @@ export function useStaffingMatrixStatuses(
       technicianIds.forEach(tid => {
         const reqs = byTech.get(tid) || []
         dates.forEach(d => {
-          const dStr = format(d, 'yyyy-MM-dd')
+          // target_date rows are Madrid calendar days, so key the map the same
+          // way — and the matrix reads these keys back with the same helper.
+          const dStr = formatMadridDateKey(d)
           // Filter requests based on type:
           // - Single-day requests: exact target_date match (prevents following job reschedules)
           // - Full-span requests: show on all dates within the job's date range
           const matchingRequests = reqs.filter(r => {
             // Single-day requests with target_date: exact match only
             if (r.single_day && r.target_date) {
-              const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
+              const rDate = typeof r.target_date === 'string' ? r.target_date : formatMadridDateKey(r.target_date)
               return rDate === dStr
             }
 
@@ -299,13 +301,10 @@ export function useStaffingMatrixStatuses(
             if (!r.single_day) {
               const job = jobLookup.get(r.job_id)
               if (!job) return false
-              const cellDate = new Date(d)
-              cellDate.setHours(0, 0, 0, 0)
-              const start = new Date(job.start)
-              start.setHours(0, 0, 0, 0)
-              const end = new Date(job.end)
-              end.setHours(0, 0, 0, 0)
-              return cellDate >= start && cellDate <= end
+              // dStr is a Madrid day, so the job bounds have to be Madrid days too.
+              // Comparing local midnights here put the badge on the neighbouring
+              // column in browsers east or west of Madrid.
+              return dStr >= formatMadridDateKey(job.start) && dStr <= formatMadridDateKey(job.end)
             }
 
             return false

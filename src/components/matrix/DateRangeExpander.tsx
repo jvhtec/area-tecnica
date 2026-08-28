@@ -2,8 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Calendar, RotateCcw, Maximize2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { ChevronLeft, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 
 interface DateRangeExpanderProps {
   canExpandBefore: boolean;
@@ -22,6 +21,8 @@ interface DateRangeExpanderProps {
     isAtMaxBefore: boolean;
     isAtMaxAfter: boolean;
   };
+  /** Mobile layout: drops the verbose range label and tightens the controls. */
+  compact?: boolean;
 }
 
 export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
@@ -31,7 +32,8 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
   onExpandAfter,
   onReset,
   onJumpToMonth,
-  rangeInfo
+  rangeInfo,
+  compact = false
 }) => {
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 1, currentYear, currentYear + 1];
@@ -56,7 +58,7 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+    <div className="flex flex-wrap items-center gap-2 p-2 bg-muted/50 rounded-lg">
       <div className="flex items-center gap-1">
         <Calendar className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Rango de fechas:</span>
@@ -77,12 +79,14 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
 
       {/* Range Info */}
       <div className="flex items-center gap-2">
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-xs whitespace-nowrap">
           {rangeInfo.totalWeeks} s ({rangeInfo.totalDays} d)
         </Badge>
-        <span className="text-sm font-medium text-muted-foreground">
-          Rango: {rangeInfo.startFormatted} - {rangeInfo.endFormatted}
-        </span>
+        {!compact && (
+          <span className="text-sm font-medium text-muted-foreground">
+            Rango: {rangeInfo.startFormatted} - {rangeInfo.endFormatted}
+          </span>
+        )}
       </div>
 
       {/* Expand After Button */}

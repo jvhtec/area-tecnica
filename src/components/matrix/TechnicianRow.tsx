@@ -24,6 +24,19 @@ import { queryKeys } from "@/lib/react-query";
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Error desconocido";
 
+/**
+ * Picks a list entry from a seed. Math.random() here made render impure: the
+ * medal tooltip drew a different line on every re-render of the matrix.
+ */
+const pickStableIndex = (seed: string, length: number) => {
+  if (length <= 0) return 0;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % length;
+};
+
 interface TechnicianRowProps {
   technician: {
     id: string;
@@ -298,7 +311,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     return initials ? initials.toUpperCase() : 'T';
   };
 
-  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Technician';
+  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico';
 
   const getDepartmentColor = (department: string) => {
     switch (department?.toLowerCase()) {
@@ -365,7 +378,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     };
 
     const list = comments[rank];
-    return list[Math.floor(Math.random() * list.length)];
+    return list[pickStableIndex(`${technician.id}:${rank}`, list.length)];
   };
 
   const getLastYearSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
@@ -410,7 +423,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     };
 
     const list = comments[rank];
-    return list[Math.floor(Math.random() * list.length)];
+    return list[pickStableIndex(`${technician.id}:last:${rank}`, list.length)];
   };
 
   const getMedalIcon = (rank?: 'gold' | 'silver' | 'bronze', size: 'sm' | 'md' = 'sm') => {
@@ -455,9 +468,9 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
             title={compact ? displayName : undefined}
           >
             {compact ? (
-              <div className="h-full flex flex-col items-center justify-center">
+              <div className="h-full flex flex-col items-center justify-center w-full min-w-0">
                 <div className="relative">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-7 w-7">
                     <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
                     <AvatarFallback className="text-xs">
                       {getInitials()}
@@ -472,7 +485,12 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                     </div>
                   )}
                 </div>
-                <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
+                {/* Initials alone are unidentifiable on touch, where there is no
+                    hover to reveal the title. */}
+                <div className="mt-0.5 w-full truncate text-center text-xs font-medium leading-tight">
+                  {displayName}
+                </div>
+                <div className="text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
               </div>
             ) : (
               <div className="flex items-center gap-3 h-full">

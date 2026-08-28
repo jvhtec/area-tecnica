@@ -13,11 +13,12 @@ import { Button } from '@/components/ui/button';
 // import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
+import { MADRID_TIMEZONE, formatMadridDateKey } from '@/utils/timezoneUtils';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import { format as formatDate } from 'date-fns';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -67,7 +68,7 @@ export const MarkUnavailableDialog = ({
       // Determine target dates: selectedDate + any additional selectedCells for this technician
       const selectedDates = new Set<string>();
       // Always include the primary selectedDate
-      selectedDates.add(formatDate(selectedDate, 'yyyy-MM-dd'));
+      selectedDates.add(formatMadridDateKey(selectedDate));
       // Include additional dates from multi-select matching this technician
       for (const key of selectedCells) {
         // Keys are formatted as `${technicianId}-yyyy-MM-dd`
@@ -114,7 +115,7 @@ export const MarkUnavailableDialog = ({
           <DialogTitle>Marcar como No Disponible</DialogTitle>
           <DialogDescription>
             Marcar a {technician?.first_name} {technician?.last_name} como no disponible el{' '}
-            {format(selectedDate, 'EEEE, d MMMM, yyyy')}
+            {formatInTimeZone(selectedDate, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy', { locale: es })}
           </DialogDescription>
         </DialogHeader>
 
@@ -133,7 +134,7 @@ export const MarkUnavailableDialog = ({
               <span className="font-medium">Fecha</span>
             </div>
             <div className="text-sm">
-              {format(selectedDate, 'EEEE, d MMMM, yyyy')}
+              {formatInTimeZone(selectedDate, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy', { locale: es })}
             </div>
             {selectedCells.length > 1 && (
               <div className="text-xs text-muted-foreground mt-1">

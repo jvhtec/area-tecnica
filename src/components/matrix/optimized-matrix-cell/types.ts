@@ -1,3 +1,20 @@
+import type { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+
+/**
+ * The matrix owns these mutations and threads `mutate` down to the cells, which
+ * call it with an options object (`{ onSuccess, onError }`) to clear their own
+ * retry spinner and to settle the promise the cancel dialog awaits.
+ *
+ * They are derived from the hooks rather than restated so the payload shapes
+ * stay checked at the call sites. Previously these props were declared unary
+ * (`(payload: unknown) => void`) and re-declared as `any` one level down, which
+ * hid both the second argument and the payload: a handler typed to satisfy that
+ * contract could legally drop the callbacks, leaving the retry button stuck on
+ * "Reenviando…" and the cancel dialog's `Promise.all` pending forever.
+ */
+export type SendStaffingEmailMutate = ReturnType<typeof useSendStaffingEmail>['mutate'];
+export type CancelStaffingMutate = ReturnType<typeof useCancelStaffingRequest>['mutate'];
+
 export type MatrixCellAction =
   | 'select-job'
   | 'select-job-for-staffing'
@@ -58,10 +75,13 @@ export interface OptimizedMatrixCellProps {
   width: number;
   height: number;
   isSelected: boolean;
-  onSelect: (selected: boolean) => void;
-  onClick: (action: MatrixCellAction, selectedJobId?: string) => void;
-  onPrefetch?: () => void;
-  onOptimisticUpdate?: (status: string) => void;
+  // The cell passes its own identity back rather than being handed a closure
+  // bound to it: one stable handler shared by every cell is what lets the memo
+  // around OptimizedMatrixCell actually hold.
+  onSelect: (technicianId: string, date: Date, selected: boolean) => void;
+  onClick: (technicianId: string, date: Date, action: MatrixCellAction, selectedJobId?: string) => void;
+  onPrefetch?: (technicianId: string) => void;
+  onOptimisticUpdate?: (technicianId: string, jobId: string, status: string) => void;
   onRender?: () => void;
   jobId?: string;
   allowDirectAssign?: boolean;
@@ -75,6 +95,12 @@ export interface OptimizedMatrixCellProps {
   staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
+  // Owned by the matrix, not the cell: one mutation observer for the grid
+  // instead of two per rendered cell.
+  sendStaffingEmail: SendStaffingEmailMutate;
+  isSendingStaffingEmail?: boolean;
+  cancelStaffing: CancelStaffingMutate;
+  isCancellingStaffing?: boolean;
 }
 
 export type AssignmentLifecycleResult = {

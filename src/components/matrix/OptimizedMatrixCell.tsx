@@ -3,9 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Calendar, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle } from 'lucide-react';
-import { format, isToday, isWeekend } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
@@ -13,8 +13,10 @@ import { pickTextColor, rgbaFromHex } from '@/utils/color';
 import { OptimizedMatrixCellDialogs } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellDialogs';
 import { OptimizedMatrixCellTooltip } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellTooltip';
 import { assignmentStatusLabel, EMPTY_PROFILE_NAMES_MAP, normalizeStatus } from '@/components/matrix/optimized-matrix-cell/helpers';
-import type { OptimizedMatrixCellProps } from '@/components/matrix/optimized-matrix-cell/types';
+import type { MatrixCellAction, OptimizedMatrixCellProps } from '@/components/matrix/optimized-matrix-cell/types';
 import { useMatrixCellAssignmentRemoval } from '@/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval';
+
+const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
 
 export const OptimizedMatrixCell = memo(({
   technician,
@@ -24,15 +26,15 @@ export const OptimizedMatrixCell = memo(({
   width,
   height,
   isSelected,
-  onSelect,
-  onClick,
-  onPrefetch,
-  onOptimisticUpdate,
+  onSelect: onSelectProp,
+  onClick: onClickProp,
+  onPrefetch: onPrefetchProp,
+  onOptimisticUpdate: onOptimisticUpdateProp,
   onRender,
   jobId,
   allowDirectAssign = false,
   allowMarkUnavailable = false,
-  declinedJobIdsSet = new Set<string>(),
+  declinedJobIdsSet = EMPTY_DECLINED_JOB_IDS,
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
   profileNamesMap = EMPTY_PROFILE_NAMES_MAP,
@@ -41,14 +43,37 @@ export const OptimizedMatrixCell = memo(({
   staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
+  sendStaffingEmail,
+  isSendingStaffingEmail = false,
+  cancelStaffing,
+  isCancellingStaffing = false,
 }: OptimizedMatrixCellProps) => {
+  // The parent's handlers are shared by every cell; bind this cell's identity
+  // here so the rest of the component keeps its simple call signatures.
+  const technicianId = technician.id;
+  const onSelect = useCallback(
+    (selected: boolean) => onSelectProp(technicianId, date, selected),
+    [onSelectProp, technicianId, date],
+  );
+  const onClick = useCallback(
+    (action: MatrixCellAction, selectedJobId?: string) => onClickProp(technicianId, date, action, selectedJobId),
+    [onClickProp, technicianId, date],
+  );
+  const onPrefetch = useCallback(() => onPrefetchProp?.(technicianId), [onPrefetchProp, technicianId]);
+  const onOptimisticUpdate = useCallback(
+    (status: string) => {
+      if (assignment?.job_id) onOptimisticUpdateProp?.(technicianId, assignment.job_id, status);
+    },
+    [onOptimisticUpdateProp, technicianId, assignment?.job_id],
+  );
+
   // Track cell renders for performance monitoring
   React.useEffect(() => {
     onRender?.();
   }, [onRender]);
 
-  const isTodayCell = isToday(date);
-  const isWeekendCell = isWeekend(date);
+  const isTodayCell = isMadridToday(date);
+  const isWeekendCell = isMadridWeekend(date);
   const hasAssignment = !!assignment;
   const assignmentStatus = hasAssignment ? normalizeStatus(assignment.status) : null;
   const isConfirmedAssignment = assignmentStatus === 'confirmed';
@@ -62,8 +87,6 @@ export const OptimizedMatrixCell = memo(({
   // Staffing status: use provided batched data exclusively for performance
   const staffingStatusByJob = staffingStatusProvided;
   const staffingStatusByDate = staffingStatusByDateProvided;
-  const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
-  const { mutate: cancelStaffing, isPending: isCancelling } = useCancelStaffingRequest();
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null, allJobIds?: string[] }>(null);
@@ -78,21 +101,6 @@ export const OptimizedMatrixCell = memo(({
 
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = isConfirmedAssignment ? null : (hasAssignment ? staffingStatusByJob : staffingStatusByDate);
-
-  // Debug logging for staffing status changes
-  React.useEffect(() => {
-    if (staffingStatus?.availability_status || staffingStatus?.offer_status) {
-      console.log('🔵 CELL STATUS:', {
-        tech: technician.id,
-        date: format(date, 'yyyy-MM-dd'),
-        hasAssignment,
-        availabilityStatus: staffingStatus?.availability_status,
-        offerStatus: staffingStatus?.offer_status,
-        byDateJobId: staffingStatusByDate?.availability_job_id,
-        pendingJobIds: staffingStatusByDate?.pending_availability_job_ids
-      });
-    }
-  }, [staffingStatus?.availability_status, staffingStatus?.offer_status, technician.id, date, hasAssignment, staffingStatusByDate]);
 
   // Handle staffing email actions
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
@@ -109,7 +117,6 @@ export const OptimizedMatrixCell = memo(({
       // Determine target job id: assignment > prop (do not auto-pick by status)
       const targetJobId = jobId || assignment?.job_id;
       if (!targetJobId) {
-        console.log('📋 No resolvable job for offer; opening job selection (email-intent)');
         onClick('offer-details-email');
         return;
       }
@@ -149,17 +156,13 @@ export const OptimizedMatrixCell = memo(({
     }
 
     if (hasAssignment) {
-      if (allowDirectAssign) {
-        onClick('assign'); // Edit existing assignment
-      } else {
-      }
+      // Without direct assign the cell is read-only; the staffing icon buttons
+      // stay available either way.
+      if (allowDirectAssign) onClick('assign'); // Edit existing assignment
     } else if (isUnavailable) {
       onClick('unavailable'); // Edit unavailability
-    } else {
-      if (allowDirectAssign) {
-        onClick('select-job'); // Create new assignment
-      } else {
-      }
+    } else if (allowDirectAssign) {
+      onClick('select-job'); // Create new assignment
     }
   }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, technician, date, assignment, allowDirectAssign, allowMarkUnavailable]);
 
@@ -221,7 +224,12 @@ export const OptimizedMatrixCell = memo(({
 
   // Get staffing button states
   const canAskAvailability = !hasAssignment && !isUnavailable && (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired');
-  const canSendOffer = staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
+  // !hasAssignment matches canAskAvailability and canOfferFallback below: an
+  // offer is for staffing someone who is not on the job yet. Without it, an
+  // assigned cell whose availability is confirmed rendered the desktop action
+  // group over the remove button — same top-right corner, and the actions carry
+  // z-10 — so the assignment could not be removed.
+  const canSendOffer = !hasAssignment && staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
   // Manual progression: allow offering even if availability isn't in confirmed state
   const canOfferFallback = !hasAssignment && !isUnavailable && !canSendOffer;
   const canShowOfferAction = canSendOffer || canOfferFallback;
@@ -232,17 +240,35 @@ export const OptimizedMatrixCell = memo(({
   const hasVisibleStaffingAction =
     showAvailabilityEmail || showAvailabilityWhatsapp || showOfferEmail || showOfferWhatsapp;
 
-  // Skip noisy debug logs in production
+  // Corner budget, so nothing stacks on top of anything else:
+  //   top-left     status indicators (fridge / declined), side by side
+  //   top-right    remove-assignment (assigned cells) or staffing actions (desktop)
+  //   bottom-left  staffing status badges — lifted one row on mobile, where the
+  //                actions share the bottom edge
+  //   bottom-right assignment status badge (assigned) or staffing actions (mobile)
+  // The remove button and the staffing actions never coexist: the actions are
+  // only offered on cells without an assignment.
+  const statusBadgesPosClass = mobile ? 'absolute bottom-9 left-1' : 'absolute bottom-1 left-1';
+  const actionButtonsPosClass = mobile ? 'absolute bottom-1 right-1' : 'absolute top-1 right-1';
+  // Four 32px buttons plus gaps overflow a 140px mobile cell, so these are 28px.
+  // Deliberately NOT coarse-hit-target: its 44px ::after on a 30px centre pitch
+  // overlaps the neighbour by 14px, so a near-miss would fire the wrong staffing
+  // action. Four 44px targets cannot fit 132px of usable width — the Email and
+  // WhatsApp toggles are how a user drops to two comfortable controls.
+  const actionBtnSize = mobile ? 'h-7 w-7' : 'h-5 w-5';
 
-  const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
-  const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
-  const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
+  // A plain click only does something in one of the edit modes; without one the
+  // cell is read-only and should not advertise itself as clickable.
+  const plainClickIsActionable =
+    allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div
           className={cn(
-            'border-r border-b cursor-pointer transition-colors duration-150',
+            'border-r border-b transition-colors duration-150',
+            plainClickIsActionable ? 'cursor-pointer' : 'cursor-default',
             'flex flex-col justify-between p-1 text-xs relative',
             getCellBackground(),
             getBorderColor()
@@ -257,6 +283,7 @@ export const OptimizedMatrixCell = memo(({
               ? assignment.job.color
               : undefined
           }}
+          data-matrix-cell="true"
           onClick={handleCellClick}
           onContextMenu={handleRightClick}
           onMouseEnter={handleMouseEnter}
@@ -265,15 +292,24 @@ export const OptimizedMatrixCell = memo(({
           {isSelected && (
             <div className="absolute top-0 right-0 z-20" title="Celda seleccionada para shortcuts">
               <div className="bg-blue-600 text-white px-1.5 py-0.5 text-[10px] font-bold rounded-bl">
-                ✓ SELECTED
+                ✓ SEL.
               </div>
             </div>
           )}
 
-          {/* Fridge indicator */}
-          {isFridge && (
-            <div className="absolute top-1 left-1 z-10" title="En la nevera: no asignable">
-              <Refrigerator className="h-3.5 w-3.5 text-sky-600" />
+          {/* Status indicators — one row so they never stack on each other */}
+          {(isFridge || isDeclinedAssignment) && (
+            <div className="absolute top-1 left-1 z-10 flex items-center gap-0.5">
+              {isFridge && (
+                <span title="En la nevera: no asignable">
+                  <Refrigerator className="h-3.5 w-3.5 text-sky-600" />
+                </span>
+              )}
+              {isDeclinedAssignment && (
+                <span title="Rechazado: no se puede reasignar a este trabajo">
+                  <Ban className="h-3.5 w-3.5 text-rose-600" />
+                </span>
+              )}
             </div>
           )}
           {/* Staffing Status Badges */}
@@ -370,16 +406,9 @@ export const OptimizedMatrixCell = memo(({
             </div>
           )}
 
-          {/* Declined lock indicator for the job to prevent re-assigning to the same job */}
-          {isDeclinedAssignment && (
-            <div className="absolute top-1 left-1 z-10" title="Rechazado: no se puede reasignar a este trabajo">
-              <Ban className="h-3.5 w-3.5 text-rose-600" />
-            </div>
-          )}
-
           {/* Staffing Action Buttons */}
           {hasVisibleStaffingAction && (
-            <div className={`${actionButtonsPosClass} flex gap-1 z-10`}>
+            <div className={`${actionButtonsPosClass} flex ${mobile ? 'gap-0.5' : 'gap-1'} z-10`}>
               {canAskAvailability && (
                 <>
                   {showAvailabilityEmail && (
@@ -388,7 +417,7 @@ export const OptimizedMatrixCell = memo(({
                       size={mobile ? 'default' : 'sm'}
                       className={`${actionBtnSize} p-0 hover:bg-blue-100`}
                       onClick={(e) => handleStaffingEmail(e, 'availability')}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title="Solicitar disponibilidad"
                     >
                       <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
@@ -403,7 +432,7 @@ export const OptimizedMatrixCell = memo(({
                         e.stopPropagation();
                         onClick('availability-wa');
                       }}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title="Solicitar disponibilidad por WhatsApp"
                     >
                       <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
@@ -419,7 +448,7 @@ export const OptimizedMatrixCell = memo(({
                       size={mobile ? 'default' : 'sm'}
                       className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
                       onClick={(e) => handleStaffingEmail(e, 'offer')}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title={canSendOffer ? 'Enviar oferta' : 'Enviar oferta (progreso manual)'}
                     >
                       <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
@@ -434,7 +463,7 @@ export const OptimizedMatrixCell = memo(({
                         e.stopPropagation();
                         onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
                       }}
-                      disabled={isSendingEmail}
+                      disabled={isSendingStaffingEmail}
                       title={canSendOffer ? 'Enviar oferta por WhatsApp' : 'Enviar oferta por WhatsApp (progreso manual)'}
                     >
                       <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
@@ -550,7 +579,7 @@ export const OptimizedMatrixCell = memo(({
             pendingCancel={pendingCancel}
             setPendingCancel={setPendingCancel}
             cancelStaffing={cancelStaffing}
-            isCancelling={isCancelling}
+            isCancelling={isCancellingStaffing}
             multiDateRemoval={multiDateRemoval}
             setMultiDateRemoval={setMultiDateRemoval}
             handleRemoveAssignment={handleRemoveAssignment}

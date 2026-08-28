@@ -264,8 +264,8 @@ export const MatrixPageControls = ({
       </div>
     </div>
 
-    <div className="md:hidden mt-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className="md:hidden flex-shrink-0 border-b bg-card px-2 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           className="text-sm font-medium px-3 py-2 border rounded-md bg-background"
           onClick={() => setFiltersOpen((v) => !v)}
@@ -292,16 +292,16 @@ export const MatrixPageControls = ({
             />
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto">
           <Users className="h-4 w-4" />
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs whitespace-nowrap">
             {filteredTechnicianCount} técnicos
           </Badge>
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs whitespace-nowrap">
             {jobsCount} trabajos
           </Badge>
           {isBackgroundFetchingMatrix && (
-            <Badge variant="outline" className="text-[10px] flex items-center gap-1">
+            <Badge variant="outline" className="text-[10px] flex items-center gap-1 whitespace-nowrap">
               <RefreshCw className="h-3 w-3 animate-spin" />
               Actualizando...
             </Badge>
@@ -309,7 +309,7 @@ export const MatrixPageControls = ({
         </div>
       </div>
       {filtersOpen && (
-        <div id="mobile-filters" className="mt-2 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-muted/30 space-y-2">
+        <div id="mobile-filters" className="mt-2 max-h-[50dvh] overflow-y-auto p-2 border rounded-md bg-muted/30 space-y-2">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
             <span className="text-sm font-medium">Filtros</span>
@@ -320,7 +320,9 @@ export const MatrixPageControls = ({
                   resetDepartmentToDefault();
                   setSearchTerm('');
                   setSelectedSkills([]);
-                  setHideFridge(false);
+                  // The fridge is hidden by default — clearing filters restores
+                  // that default rather than revealing fridged technicians.
+                  setHideFridge(true);
                   setAllowDirectAssign(false);
                   setAllowMarkUnavailable(false);
                   setHideStaffingEmailButtons(false);
@@ -404,6 +406,16 @@ export const MatrixPageControls = ({
               aria-label="Mostrar botones de WhatsApp"
             />
           </div>
+          <DateRangeExpander
+            compact
+            canExpandBefore={canExpandBefore}
+            canExpandAfter={canExpandAfter}
+            onExpandBefore={expandBefore}
+            onExpandAfter={expandAfter}
+            onReset={resetRange}
+            onJumpToMonth={jumpToMonth}
+            rangeInfo={rangeInfo}
+          />
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
 
 import React from 'react';
-import { format, isToday, isWeekend } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
+import { MADRID_TIMEZONE, formatMadridDateKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar, Clock, Users } from 'lucide-react';
@@ -22,6 +23,8 @@ interface DateHeaderProps {
     _assigned_count?: number;
   }>;
   technicianIds?: string[];
+  /** Mobile layout: drops the month/year lines and puts the badges on one row. */
+  compact?: boolean;
   onJobClick?: (jobId: string) => void;
 }
 
@@ -111,15 +114,17 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
 
       return { invitations, offers, confirmations } as const;
     },
-    staleTime: 2_000,
-    gcTime: 60_000,
+    // Kept fresh by invalidateAssignmentQueries (which now covers these count
+    // scopes) rather than by a 2s staleTime that refetched on every scroll.
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
     enabled: !!jobId,
   });
 }
 
-const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: DateHeaderProps) => {
-  const isTodayHeader = isToday(date);
-  const isWeekendHeader = isWeekend(date);
+const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false, onJobClick }: DateHeaderProps) => {
+  const isTodayHeader = isMadridToday(date);
+  const isWeekendHeader = isMadridWeekend(date);
   const hasJobs = jobs.length > 0;
 
   const getJobIndicatorColors = () => {
@@ -193,8 +198,11 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
       const open = Math.max(required - assigned, 0);
       return { required, assigned, open };
     },
-    staleTime: 10_000,
-    enabled: hasJobs,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    // The "libres" badge this feeds is desktop-only, so a compact header would
+    // pay for two table reads per date column and render nothing with them.
+    enabled: hasJobs && !compact,
   });
 
   return (
@@ -218,21 +226,38 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
             height: '100%'
           }}
         >
-          <div className="font-semibold text-xs">
-            {format(date, 'EEE', { locale: es })}
-          </div>
-          <div className={cn('text-base font-bold leading-tight', {
-            'text-orange-700 dark:text-orange-300': isTodayHeader
-          })}>
-            {format(date, 'd')}
-          </div>
-          <div className="text-xs text-muted-foreground leading-tight">
-            {format(date, 'MMM', { locale: es })}
-          </div>
-          {format(date, 'd') === '1' && (
-            <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
-              {format(date, 'yyyy')}
+          {compact ? (
+            // 50px of header height cannot fit weekday + day + month + a badge
+            // column, so mobile shows "Sáb 14" on one line.
+            <div className="flex items-baseline gap-1 leading-none">
+              <span className="text-xs font-semibold capitalize">
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
+              </span>
+              <span className={cn('text-sm font-bold', {
+                'text-orange-700 dark:text-orange-300': isTodayHeader
+              })}>
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+              </span>
             </div>
+          ) : (
+            <>
+              <div className="font-semibold text-xs">
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
+              </div>
+              <div className={cn('text-base font-bold leading-tight', {
+                'text-orange-700 dark:text-orange-300': isTodayHeader
+              })}>
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+              </div>
+              <div className="text-xs text-muted-foreground leading-tight">
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'MMM', { locale: es })}
+              </div>
+              {formatInTimeZone(date, MADRID_TIMEZONE, 'd') === '1' && (
+                <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
+                  {formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy')}
+                </div>
+              )}
+            </>
           )}
 
           {/* Job indicators */}
@@ -253,14 +278,19 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
 
           {/* Job count badge */}
           {hasJobs && (
-            <div className="absolute top-0.5 right-0.5 flex flex-col items-end gap-0.5">
+            <div
+              className={cn(
+                'absolute top-0.5 right-0.5 flex gap-0.5',
+                compact ? 'flex-row items-center' : 'flex-col items-end',
+              )}
+            >
               <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 leading-none" title="Trabajos en esta fecha">
                 {jobs.length}
               </Badge>
               <Badge variant="default" className="text-[10px] px-1 py-0 h-4 leading-none" title="Técnicos confirmados en esta fecha">
                 {confirmedForDate ?? 0}
               </Badge>
-              {openSlots && openSlots.required > 0 && (
+              {!compact && openSlots && openSlots.required > 0 && (
                 <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 leading-none" title="Vacantes en todos los trabajos">
                   {openSlots.open} libres
                 </Badge>
@@ -276,7 +306,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <span className="font-medium">
-                {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
+                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy', { locale: es })}
               </span>
             </div>
 
@@ -316,7 +346,7 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
           <div className="font-medium text-sm">{job.title}</div>
           <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
             <Clock className="h-3 w-3" />
-            {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+            {formatInTimeZone(job.start_time, MADRID_TIMEZONE, 'HH:mm')} - {formatInTimeZone(job.end_time, MADRID_TIMEZONE, 'HH:mm')}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -346,7 +376,8 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
 // Total confirmed/scheduled technicians for a specific date across the provided jobs
 // Timesheets are the source of truth for actual scheduled assignments
 function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technicianIds?: string[]) {
-  const dateStr = format(date, 'yyyy-MM-dd');
+  // timesheets.date is a Madrid calendar day, so key off the same calendar.
+  const dateStr = formatMadridDateKey(date);
   const jobIds = (jobs || []).map(j => j.id);
   return useQuery({
     queryKey: queryKeys.scope('matrix-date-confirmed-count', dateStr, jobIds.join(','), (technicianIds || []).join(',')),
@@ -376,8 +407,8 @@ function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technici
       (data || []).forEach((r: any) => { if (r.technician_id) unique.add(r.technician_id); });
       return unique.size;
     },
-    staleTime: 2_000,
-    gcTime: 60_000,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
     enabled: jobIds.length > 0,
   });
 }

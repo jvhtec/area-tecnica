@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { bootstrapApp } from "./support/app";
+import { bootstrapApp, isMobileViewport } from "./support/app";
 
 test("loads the expenses review page and approves a submitted expense", async ({ page }) => {
   const calls = await bootstrapApp(page, {
@@ -43,10 +43,18 @@ test("loads the expenses review page and approves a submitted expense", async ({
   await page.goto("/gastos");
 
   await expect(page.getByRole("heading", { name: /gastos de técnicos/i })).toBeVisible();
-  await expect(page.getByRole("table").getByText("Smoke Expenses Job")).toBeVisible();
-  await expect(page.getByRole("table").getByText("Alex Doe")).toBeVisible();
 
-  await page.locator('tr', { hasText: 'Taxi aeropuerto' }).locator('input[type="checkbox"]').check();
+  // The same expense is a table row on desktop and a card below md. Both are in
+  // the DOM at every width — only one is displayed — so the locator has to pick
+  // the one on screen rather than matching the hidden copy.
+  const expenseEntry = isMobileViewport(page)
+    ? page.locator("article", { hasText: "Taxi aeropuerto" })
+    : page.locator("tr", { hasText: "Taxi aeropuerto" });
+
+  await expect(expenseEntry.getByText("Smoke Expenses Job")).toBeVisible();
+  await expect(expenseEntry.getByText("Alex Doe")).toBeVisible();
+
+  await expenseEntry.locator('input[type="checkbox"]').check();
   await page.getByRole("button", { name: /aprobar seleccionados/i }).click();
 
   await expect(page.getByText(/gastos aprobados/i)).toBeVisible();

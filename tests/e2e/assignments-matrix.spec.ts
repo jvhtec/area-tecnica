@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { bootstrapApp } from "./support/app";
+import { bootstrapApp, isMobileViewport } from "./support/app";
 
 test("renders the assignments matrix and lets management toggle direct assign mode", async ({
   page,
@@ -57,6 +57,12 @@ test("renders the assignments matrix and lets management toggle direct assign mo
   await page.goto("/job-assignment-matrix");
 
   await expect(page.getByRole("heading", { name: /matriz de asignación de trabajos/i })).toBeVisible();
+
+  // The department tabs are always on screen on desktop; on a phone they live
+  // inside the collapsed "Filtros" panel, so open it to reach them.
+  if (isMobileViewport(page)) {
+    await page.getByRole("button", { name: /^Filtros/ }).click();
+  }
   await expect(page.getByRole("tab", { name: "Sonido" })).toHaveAttribute("data-state", "active");
 
   const directAssignSwitch = page

@@ -1,6 +1,7 @@
 import React from "react";
-import { format } from "date-fns";
-import { ArrowUpDown, UserPlus } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
+
+import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,14 @@ import { TechnicianRow } from "../TechnicianRow";
 import { OptimizedMatrixCell } from "../OptimizedMatrixCell";
 import { DateHeader } from "../DateHeader";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
+import type {
+  CancelStaffingMutate,
+  MatrixCellAction,
+  SendStaffingEmailMutate,
+} from "@/components/matrix/optimized-matrix-cell/types";
+
+// Shared so cells for technicians with no declined jobs keep a stable prop.
+const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
 
 export interface OptimizedAssignmentMatrixViewProps {
   isFetching: boolean;
@@ -54,9 +63,9 @@ export interface OptimizedAssignmentMatrixViewProps {
   staffingMaps: any;
   profileNamesMap: Map<string, string>;
   handleCellSelect: (technicianId: string, date: Date, selected: boolean) => void;
-  handleCellClick: (technicianId: string, date: Date, action: any, selectedJobId?: string) => void;
+  handleCellClick: (technicianId: string, date: Date, action: MatrixCellAction, selectedJobId?: string) => void;
   handleCellPrefetch: (technicianId: string) => void;
-  handleOptimisticUpdate: (technicianId: string, jobId: string, status: any) => void;
+  handleOptimisticUpdate: (technicianId: string, jobId: string, status: string) => void;
   incrementCellRender: () => void;
   declinedJobsByTech: Map<string, Set<string>>;
   cellAction: any;
@@ -69,7 +78,10 @@ export interface OptimizedAssignmentMatrixViewProps {
   jobs: any[];
   offerChannel: "email" | "whatsapp";
   toast: any;
-  sendStaffingEmail: any;
+  sendStaffingEmail: SendStaffingEmailMutate;
+  isSendingStaffingEmail: boolean;
+  cancelStaffing: CancelStaffingMutate;
+  isCancellingStaffing: boolean;
   checkTimeConflictEnhanced: any;
   availabilityDialog: any;
   setAvailabilityDialog: (value: any) => void;
@@ -150,6 +162,9 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   offerChannel,
   toast,
   sendStaffingEmail,
+  isSendingStaffingEmail,
+  cancelStaffing,
+  isCancellingStaffing,
   checkTimeConflictEnhanced,
   availabilityDialog,
   setAvailabilityDialog,
@@ -170,6 +185,14 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
 }: OptimizedAssignmentMatrixViewProps) => {
   void _isGlobalCellSelected;
 
+  // DateHeader is memoized and runs queries keyed off these props; rebuilding
+  // them inline per render defeated the memo and re-fired those queries.
+  const technicianIds = React.useMemo(() => technicians.map((t) => t.id), [technicians]);
+  const handleDateHeaderJobClick = React.useCallback(
+    (jobId: string) => setSortJobId((prev) => (prev === jobId ? null : jobId)),
+    [setSortJobId],
+  );
+
   return (
     <div className="matrix-layout relative">
       {isFetching && !isInitialLoading && (
@@ -186,38 +209,98 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           height: HEADER_HEIGHT,
         }}
       >
-        <div className="flex flex-col h-full bg-card border-r border-b">
-          <div className="flex items-center justify-between px-2 py-1 border-b">
-            <button
-              className="flex items-center gap-1 font-semibold hover:text-primary transition-colors cursor-pointer group"
+        {/* overflow-hidden is a backstop: the corner is a fixed TECHNICIAN_WIDTH
+            box, and anything that outgrows it spills across the borders into the
+            first date column instead of being clipped. */}
+        <div className="flex flex-col h-full overflow-hidden bg-card border-r border-b">
+          <div className={`flex border-b ${mobile ? "items-stretch gap-0.5 px-0.5 py-0.5" : "items-center justify-between px-2 py-1"}`}>
+            {/* size="inline" so the primitive adds no box of its own: this row
+                is 28px tall on a phone, and the default size's h-10 plus its
+                44px hit pseudo-element would both overflow the corner and
+                overlap the control beside it. */}
+            <Button
+              variant="ghost"
+              size="inline"
+              className={`group flex cursor-pointer items-center gap-1 font-semibold hover:bg-transparent hover:text-primary ${
+                mobile
+                  ? // min-h-6 is a floor, not a change: items-stretch on the row
+                    // already gives this 24px. But it gets that by matching the
+                    // height of the button beside it, so shrinking that one
+                    // would silently drop this under the 24px WCAG minimum.
+                    "min-h-6 min-w-0 flex-1 justify-start overflow-hidden [&_svg]:size-3"
+                  : "[&_svg]:size-3.5"
+              }`}
               onClick={cycleTechSort}
               title="Cambia el orden de técnicos"
             >
-              {mobile ? <span className="text-sm">Técnicos</span> : <span>Técnicos</span>}
-              <ArrowUpDown className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100" />
-            </button>
+              <span className={mobile ? "min-w-0 flex-1 truncate text-left text-xs" : ""}>Técnicos</span>
+              <ArrowUpDown className="shrink-0 opacity-50 group-hover:opacity-100" />
+            </Button>
             {isManagementUser &&
               (mobile ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 w-7 p-0"
-                  onClick={() => setCreateUserOpen(true)}
-                  aria-label="Añadir usuario"
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                </Button>
+                // icon-xs, not sm: the sm variant's px-3/h-9 intrinsics
+                // overflowed this 109px corner even with h-6 w-6 p-0 applied.
+                // hit-target-fill grows the tap area to this cell rather than
+                // to 44px, which at this pitch would overlap the sort control.
+                <span className="relative flex shrink-0 items-center">
+                  <Button
+                    variant="outline"
+                    size="icon-xs"
+                    className="hit-target-fill shrink-0"
+                    onClick={() => setCreateUserOpen(true)}
+                    aria-label="Añadir usuario"
+                  >
+                    <UserPlus />
+                  </Button>
+                </span>
               ) : (
                 <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
                   <UserPlus className="h-3.5 w-3.5 mr-1" /> Añadir
                 </Button>
               ))}
           </div>
-          {getSortLabel() && (
-            <div className="flex items-center justify-center px-2 py-1 flex-1">
-              <span className="text-xs font-medium text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">
-                {getSortLabel()}
-              </span>
+          {(mobile || getSortLabel()) && (
+            <div className={`flex items-center justify-center flex-1 min-h-0 px-1 ${mobile ? "gap-1 py-0.5" : "gap-2 py-1"}`}>
+              {/* Mobile date paging. It used to be an overlay inside the header's
+                  scroll container, which both scrolled away with the content and
+                  covered the first and last visible columns. */}
+              {mobile && (
+                <>
+                  {/* Each arrow sits in its own stretched flex cell so its tap
+                      area fills that cell. The cells tile the row, so the two
+                      targets meet without overlapping — the 44px pseudo-element
+                      the default sizes carry would overlap at this pitch. */}
+                  <span className="relative flex flex-1 items-center justify-center self-stretch">
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Fechas anteriores"
+                      className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavLeft ? "opacity-100" : "opacity-40"}`}
+                      onClick={() => handleMobileNav("left")}
+                      disabled={!canNavLeft}
+                    >
+                      <ChevronLeft aria-hidden="true" />
+                    </Button>
+                  </span>
+                  <span className="relative flex flex-1 items-center justify-center self-stretch">
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Fechas siguientes"
+                      className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavRight ? "opacity-100" : "opacity-40"}`}
+                      onClick={() => handleMobileNav("right")}
+                      disabled={!canNavRight}
+                    >
+                      <ChevronRight aria-hidden="true" />
+                    </Button>
+                  </span>
+                </>
+              )}
+              {getSortLabel() && (
+                <span className="truncate text-xs font-medium text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">
+                  {getSortLabel()}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -234,34 +317,6 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         }}
         onScroll={handleDateHeadersScroll}
       >
-        {mobile && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-1">
-            <button
-              aria-label="Fechas anteriores"
-              className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavLeft ? "opacity-100" : "opacity-40"}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMobileNav("left");
-              }}
-              disabled={!canNavLeft}
-            >
-              <span className="sr-only">Anterior</span>
-              {"<"}
-            </button>
-            <button
-              aria-label="Fechas siguientes"
-              className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavRight ? "opacity-100" : "opacity-40"}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMobileNav("right");
-              }}
-              disabled={!canNavRight}
-            >
-              <span className="sr-only">Siguiente</span>
-              {">"}
-            </button>
-          </div>
-        )}
         <div style={{ width: matrixWidth, height: "100%", display: "flex", position: "relative" }}>
           {/* Leading spacer for virtualized columns */}
           <div style={{ width: visibleCols.start * CELL_WIDTH }} />
@@ -271,10 +326,9 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               date={date}
               width={CELL_WIDTH}
               jobs={getJobsForDate(date)}
-              technicianIds={technicians.map((t) => t.id)}
-              onJobClick={(jobId) => {
-                setSortJobId((prev) => (prev === jobId ? null : jobId));
-              }}
+              technicianIds={technicianIds}
+              compact={mobile}
+              onJobClick={handleDateHeaderJobClick}
             />
           ))}
           {/* Trailing spacer to fill remaining width */}
@@ -336,11 +390,11 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                       const dateIndex = visibleCols.start + jdx;
                       const assignment = getAssignmentForCell(technician.id, date);
                       const availability = getAvailabilityForCell(technician.id, date);
-                      const cellKey = `${technician.id}-${format(date, "yyyy-MM-dd")}`;
+                      const cellKey = `${technician.id}-${formatMadridDateKey(date)}`;
                       const isSelected = selectedCells.has(cellKey);
                       const jobId = assignment?.job_id;
                       const byJobKey = jobId ? `${jobId}-${technician.id}` : "";
-                      const byDateKey = `${technician.id}-${format(date, "yyyy-MM-dd")}`;
+                      const byDateKey = cellKey;
                       const providedByJob =
                         jobId && staffingMaps?.byJob.get(byJobKey) ? (staffingMaps?.byJob.get(byJobKey) as any) : null;
                       const providedByDate = staffingMaps?.byDate.get(byDateKey)
@@ -365,17 +419,13 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             width={CELL_WIDTH}
                             height={CELL_HEIGHT}
                             isSelected={isSelected}
-                            onSelect={(selected) => handleCellSelect(technician.id, date, selected)}
-                            onClick={(action, selectedJobId) =>
-                              handleCellClick(technician.id, date, action, selectedJobId)
-                            }
-                            onPrefetch={() => handleCellPrefetch(technician.id)}
-                            onOptimisticUpdate={(status) =>
-                              assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)
-                            }
-                            onRender={() => incrementCellRender()}
+                            onSelect={handleCellSelect}
+                            onClick={handleCellClick}
+                            onPrefetch={handleCellPrefetch}
+                            onOptimisticUpdate={handleOptimisticUpdate}
+                            onRender={incrementCellRender}
                             jobId={jobId}
-                            declinedJobIdsSet={declinedJobsByTech.get(technician.id) || new Set<string>()}
+                            declinedJobIdsSet={declinedJobsByTech.get(technician.id) ?? EMPTY_DECLINED_JOB_IDS}
                             allowDirectAssign={allowDirectAssign}
                             allowMarkUnavailable={allowMarkUnavailable}
                             staffingStatusProvided={providedByJob}
@@ -386,6 +436,10 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             staffingDepartment={staffingDepartment}
                             hideStaffingEmailButtons={hideStaffingEmailButtons}
                             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
+                            sendStaffingEmail={sendStaffingEmail}
+                            isSendingStaffingEmail={isSendingStaffingEmail}
+                            cancelStaffing={cancelStaffing}
+                            isCancellingStaffing={isCancellingStaffing}
                           />
                         </div>
                       );

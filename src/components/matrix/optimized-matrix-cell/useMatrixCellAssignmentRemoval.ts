@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { format } from 'date-fns';
+import { formatMadridDateKey } from '@/utils/timezoneUtils';
 import { toast } from 'sonner';
 
 import { dataLayerClient } from '@/services/dataLayerClient';
@@ -37,7 +37,7 @@ export const useMatrixCellAssignmentRemoval = ({
   const checkMultiDateAssignment = useCallback(async () => {
     if (!assignment?.job_id) return;
 
-    const currentDateStr = format(date, 'yyyy-MM-dd');
+    const currentDateStr = formatMadridDateKey(date);
     setMultiDateRemoval((prev) => ({ ...prev, isOpen: true, isLoading: true, currentDate: currentDateStr }));
 
     try {

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildAssignmentDateMap } from '../useOptimizedMatrixData';
+import {
+  buildAssignmentDateMap,
+  buildJobsByDate,
+  buildSeasonalAvailabilityKey,
+  matrixAssignmentsQueryKey,
+  matrixAvailabilityQueryKey,
+} from '@/hooks/useOptimizedMatrixData';
 
 const createDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
@@ -66,5 +72,117 @@ describe('buildAssignmentDateMap', () => {
     expect(map.get('tech-b-2025-03-02')).toBe(assignments[3]);
     expect(map.get('tech-b-2025-03-01')).toBeUndefined();
     expect(map.get('tech-b-2025-03-03')).toBeUndefined();
+  });
+});
+
+describe('matrix query key builders', () => {
+  it('keys assignments and availability on Madrid calendar days', () => {
+    // 22:30 UTC on 31 May is already 1 June in Madrid (CEST).
+    const start = new Date('2026-05-31T22:30:00Z');
+    const end = new Date('2026-06-14T10:00:00Z');
+
+    expect(matrixAssignmentsQueryKey(['job-a'], ['tech-a'], start, end)).toEqual([
+      'optimized-matrix-assignments',
+      ['job-a'],
+      ['tech-a'],
+      '2026-06-01',
+      '2026-06-14',
+    ]);
+
+    expect(matrixAvailabilityQueryKey(['tech-a'], 'seasonal-key', start, end)).toEqual([
+      'optimized-matrix-availability',
+      ['tech-a'],
+      'seasonal-key',
+      '2026-06-01',
+      '2026-06-14',
+    ]);
+  });
+});
+
+type SeasonalKeyInput = Parameters<typeof buildSeasonalAvailabilityKey>[0][number];
+
+describe('buildSeasonalAvailabilityKey', () => {
+  it('covers only seasonal house techs and is order-independent', () => {
+    const seasonal: SeasonalKeyInput = {
+      id: 'tech-a',
+      role: 'house_tech',
+      seasonal_house_tech: true,
+      seasonal_house_tech_start_date: '2026-06-01',
+      seasonal_house_tech_end_date: '2026-09-30',
+    };
+    const other: SeasonalKeyInput = {
+      id: 'tech-b',
+      role: 'technician',
+      seasonal_house_tech: false,
+      seasonal_house_tech_start_date: null,
+      seasonal_house_tech_end_date: null,
+    };
+
+    const key = buildSeasonalAvailabilityKey([seasonal, other]);
+
+    expect(key).toBe('tech-a:house_tech:2026-06-01:2026-09-30');
+    expect(buildSeasonalAvailabilityKey([other, seasonal])).toBe(key);
+
+    // A changed seasonal window has to produce a different cache entry.
+    expect(
+      buildSeasonalAvailabilityKey([{ ...seasonal, seasonal_house_tech_end_date: '2026-10-31' }]),
+    ).not.toBe(key);
+  });
+});
+
+describe('buildJobsByDate', () => {
+  const job = {
+    id: 'job-a',
+    title: 'Single Madrid Day',
+    // 08:00-20:00 Madrid on 2026-04-10 (CEST, UTC+2)
+    start_time: '2026-04-10T06:00:00.000Z',
+    end_time: '2026-04-10T18:00:00.000Z',
+    status: 'Confirmado',
+    job_type: 'single',
+  } as Parameters<typeof buildJobsByDate>[0][number];
+
+  // Madrid midnight instants, as the range now produces.
+  const madridMidnight = (key: string) => new Date(`${key}T00:00:00+02:00`);
+
+  it('puts a job on the Madrid day it runs on', () => {
+    const map = buildJobsByDate([job], [
+      madridMidnight('2026-04-09'),
+      madridMidnight('2026-04-10'),
+      madridMidnight('2026-04-11'),
+    ]);
+
+    expect(map.get('2026-04-10')?.map((j) => j.id)).toEqual(['job-a']);
+    expect(map.get('2026-04-09')).toEqual([]);
+    expect(map.get('2026-04-11')).toEqual([]);
+  });
+
+  it('spans every Madrid day of a multi-day job', () => {
+    const multiDay = {
+      ...job,
+      id: 'job-multi',
+      start_time: '2026-04-10T06:00:00.000Z',
+      end_time: '2026-04-12T18:00:00.000Z',
+    };
+    const map = buildJobsByDate([multiDay], [
+      madridMidnight('2026-04-10'),
+      madridMidnight('2026-04-11'),
+      madridMidnight('2026-04-12'),
+      madridMidnight('2026-04-13'),
+    ]);
+
+    expect(map.get('2026-04-10')).toHaveLength(1);
+    expect(map.get('2026-04-11')).toHaveLength(1);
+    expect(map.get('2026-04-12')).toHaveLength(1);
+    expect(map.get('2026-04-13')).toEqual([]);
+  });
+
+  it('honours an explicit job_date_types entry', () => {
+    const typed = {
+      ...job,
+      id: 'job-typed',
+      job_date_types: [{ date: '2026-04-15', type: 'travel' }],
+    };
+    const map = buildJobsByDate([typed], [madridMidnight('2026-04-15')]);
+    expect(map.get('2026-04-15')?.map((j) => j.id)).toEqual(['job-typed']);
   });
 });

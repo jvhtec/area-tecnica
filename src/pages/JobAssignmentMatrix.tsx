@@ -5,6 +5,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { hasTechnicianSelfServiceAccess, isManagementRole } from '@/utils/permissions';
+import {
+  buildSeasonalAvailabilityKey,
+  fetchMatrixTimesheetAssignments,
+  matrixAssignmentsQueryKey,
+  matrixAvailabilityQueryKey,
+} from '@/hooks/useOptimizedMatrixData';
 import { MatrixPageControls } from '@/pages/job-assignment-matrix/MatrixPageControls';
 import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingReminderDialogs';
 import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
@@ -14,7 +20,6 @@ import {
   DEPARTMENT_LABELS,
   FALLBACK_DEPARTMENT,
   OUTSTANDING_STORAGE_KEY,
-  fetchAssignmentsForWindow,
   fetchAvailabilityForWindow,
   fetchJobsForWindow,
   formatLabel,
@@ -280,6 +285,10 @@ export default function JobAssignmentMatrix() {
 
   const filteredTechnicianIds = useMemo(() => filteredTechnicians.map((tech: { id: string }) => tech.id), [filteredTechnicians]);
   const filteredTechnicianIdsKey = useMemo(() => filteredTechnicianIds.join(','), [filteredTechnicianIds]);
+  const seasonalAvailabilityKey = useMemo(
+    () => buildSeasonalAvailabilityKey(filteredTechnicians),
+    [filteredTechnicians],
+  );
 
   // Optimized jobs query with smart date filtering
   const {
@@ -287,7 +296,7 @@ export default function JobAssignmentMatrix() {
     isInitialLoading: isInitialLoadingJobs,
     isFetching: isFetchingJobs,
   } = useQuery<any[]>({
-    queryKey: queryKeys.scope('optimized-matrix-jobs', rangeInfo.startFormatted, rangeInfo.endFormatted, selectedDepartment),
+    queryKey: queryKeys.scope('optimized-matrix-jobs', rangeInfo.startKey, rangeInfo.endKey, selectedDepartment),
     queryFn: async () => {
       return fetchJobsForWindow(rangeInfo.start, rangeInfo.end, selectedDepartment);
     },
@@ -310,12 +319,14 @@ export default function JobAssignmentMatrix() {
     if (!projection) return;
 
     const { rangeInfo: projectedRange } = projection;
-    const { start, end, startFormatted, endFormatted } = projectedRange;
+    const { start, end, startKey, endKey } = projectedRange;
     if (!start || !end) return;
 
     const technicianIds = filteredTechnicianIds;
     const technicianKey = filteredTechnicianIdsKey;
-    const windowKey = [startFormatted, endFormatted, selectedDepartment, technicianKey].join('|');
+    // seasonalAvailabilityKey is part of matrixAvailabilityQueryKey, so a
+    // seasonal change needs a distinct window or the 'done' guard skips it.
+    const windowKey = [startKey, endKey, selectedDepartment, technicianKey, seasonalAvailabilityKey].join('|');
 
     const currentStatus = prefetchStatusRef.current.get(windowKey);
     if (currentStatus === 'pending' || currentStatus === 'done') return;
@@ -324,7 +335,7 @@ export default function JobAssignmentMatrix() {
     prefetchStatusRef.current.set(windowKey, 'pending');
 
     const runPrefetch = async () => {
-      const jobCacheKey = ['optimized-matrix-jobs', startFormatted, endFormatted, selectedDepartment] as const;
+      const jobCacheKey = queryKeys.scope('optimized-matrix-jobs', startKey, endKey, selectedDepartment);
       const jobsData = await qc.prefetchQuery({
         queryKey: jobCacheKey,
         queryFn: () => fetchJobsForWindow(start, end, selectedDepartment),
@@ -340,9 +351,19 @@ export default function JobAssignmentMatrix() {
       const jobIds = jobsForWindow.map((job) => job.id).filter(Boolean);
 
       if (!cancelled && jobIds.length && technicianIds.length) {
+        const jobsById = new Map<string, MatrixJob>();
+        jobsForWindow.forEach((job) => { if (job?.id) jobsById.set(job.id, job); });
         await qc.prefetchQuery({
-          queryKey: queryKeys.scope('optimized-matrix-assignments', jobIds, technicianIds, startFormatted),
-          queryFn: () => fetchAssignmentsForWindow(jobIds, technicianIds, jobsForWindow),
+          // Same builder + same fetcher as useOptimizedMatrixData, so the matrix
+          // reads this entry back instead of refetching on expand.
+          queryKey: matrixAssignmentsQueryKey(jobIds, technicianIds, start, end),
+          queryFn: () => fetchMatrixTimesheetAssignments({
+            jobIds,
+            technicianIds,
+            jobsById,
+            startDate: start,
+            endDate: end,
+          }),
           staleTime: 30 * 1000,
           gcTime: 2 * 60 * 1000,
         });
@@ -350,15 +371,11 @@ export default function JobAssignmentMatrix() {
 
       if (!cancelled && technicianIds.length) {
         await qc.prefetchQuery({
-          queryKey: queryKeys.scope('optimized-matrix-availability', technicianIds, startFormatted, endFormatted),
+          queryKey: matrixAvailabilityQueryKey(technicianIds, seasonalAvailabilityKey, start, end),
           queryFn: () => fetchAvailabilityForWindow(technicianIds, start, end),
           staleTime: 60 * 1000,
           gcTime: 10 * 60 * 1000,
         });
-      }
-
-      if (!cancelled && canExpandAfter) {
-        expandAfter();
       }
     };
 
@@ -384,11 +401,11 @@ export default function JobAssignmentMatrix() {
   }, [
     qc,
     canExpandAfter,
-    expandAfter,
     filteredTechnicianIds,
     filteredTechnicianIdsKey,
     getProjectedRangeInfo,
     isInitialMatrixLoad,
+    seasonalAvailabilityKey,
     selectedDepartment,
   ]);
 
@@ -596,8 +613,10 @@ export default function JobAssignmentMatrix() {
     if (selectedDepartment !== defaultDepartment) c++;
     if (debouncedSearch) c++;
     if (selectedSkills.length) c += selectedSkills.length;
-    if (hideFridge) c++;
+    // Hiding the fridge is the default, so only the opened fridge is a filter.
+    if (!hideFridge) c++;
     if (allowDirectAssign) c++;
+    if (allowMarkUnavailable) c++;
     if (hideStaffingEmailButtons) c++;
     if (hideStaffingWhatsappButtons) c++;
     return c;
@@ -608,6 +627,7 @@ export default function JobAssignmentMatrix() {
     selectedSkills,
     hideFridge,
     allowDirectAssign,
+    allowMarkUnavailable,
     hideStaffingEmailButtons,
     hideStaffingWhatsappButtons,
   ]);
@@ -690,7 +710,7 @@ export default function JobAssignmentMatrix() {
             cellWidth={isMobile ? 140 : undefined}
             cellHeight={isMobile ? 80 : undefined}
             technicianWidth={isMobile ? 110 : undefined}
-            headerHeight={isMobile ? 50 : undefined}
+            headerHeight={isMobile ? 64 : undefined}
             onNearEdgeScroll={(direction) => {
               if (direction === 'before' && canExpandBefore) {
                 expandBefore();

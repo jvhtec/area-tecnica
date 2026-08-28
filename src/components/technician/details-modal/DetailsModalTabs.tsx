@@ -1,6 +1,6 @@
-import { parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
+import { formatMadridDayKey } from "@/utils/timezoneUtils";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -116,7 +116,7 @@ export const InfoTab = ({ vm }: TabProps) => {
                       <div className="flex items-center gap-2 min-w-0">
                         <CalendarIcon size={14} className={theme.textMuted} />
                         <span className={`text-sm font-medium ${theme.textMain}`}>
-                          {formatInTimeZone(parseISO(date), "Europe/Madrid", "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                          {formatMadridDayKey(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
                         </span>
                       </div>
                       {dateTypeValue && (

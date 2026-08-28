@@ -54,44 +54,6 @@ type RawJobDateTypeRow = {
   jobs?: RawMatrixJobRow | RawMatrixJobRow[] | null;
 };
 
-type RawAssignmentJobRef = {
-  id: string;
-  title: string;
-  start_time: string;
-  end_time: string;
-  color?: string | null;
-};
-
-type RawAssignmentRow = {
-  job_id: string;
-  technician_id: string;
-  sound_role: string | null;
-  lights_role: string | null;
-  video_role: string | null;
-  production_role: string | null;
-  single_day: boolean | null;
-  assignment_date: string | null;
-  status: string | null;
-  assigned_at: string | null;
-  jobs?: RawAssignmentJobRef | RawAssignmentJobRef[] | null;
-};
-
-type AssignmentQueryResult = { data: RawAssignmentRow[] | null; error: { message?: string } | null };
-
-export type MatrixAssignment = {
-  job_id: string;
-  technician_id: string;
-  sound_role: string | null;
-  lights_role: string | null;
-  video_role: string | null;
-  production_role: string | null;
-  single_day: boolean | null;
-  assignment_date: string | null;
-  status: string | null;
-  assigned_at: string | null;
-  job: MatrixJob | RawAssignmentJobRef | undefined;
-};
-
 type AvailabilityScheduleRow = { user_id: string; date: string; status: string; notes?: string | null; source?: string | null };
 type LegacyAvailabilityRow = { technician_id: string; date: string; status: string };
 type VacationRow = { technician_id: string; start_date: string | null; end_date: string | null; status: string };
@@ -207,79 +169,6 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
       } as MatrixJob;
     })
     .filter(shouldShowMatrixJob);
-}
-
-export async function fetchAssignmentsForWindow(
-  jobIds: string[],
-  technicianIds: string[],
-  jobs: MatrixJob[],
-): Promise<MatrixAssignment[]> {
-  if (!jobIds.length || !technicianIds.length) return [];
-
-  const jobsById = new Map<string, MatrixJob>();
-  jobs.forEach((job) => {
-    if (job?.id) jobsById.set(job.id, job);
-  });
-
-  const batchSize = 25;
-  // The query builders are PromiseLike; the awaited result is asserted below.
-  const promises = [];
-
-  for (let i = 0; i < jobIds.length; i += batchSize) {
-    const jobBatch = jobIds.slice(i, i + batchSize);
-    promises.push(
-      dataLayerClient.from("job_assignments")
-        .select(
-          `
-          job_id,
-          technician_id,
-          sound_role,
-          lights_role,
-          video_role,
-          production_role,
-          single_day,
-          assignment_date,
-          status,
-          assigned_at,
-          jobs!job_id (
-            id,
-            title,
-            start_time,
-            end_time,
-            color
-          )
-        `
-        )
-        .in("job_id", jobBatch)
-        .in("technician_id", technicianIds)
-        .limit(500)
-    );
-  }
-
-  const results = (await Promise.all(promises)) as AssignmentQueryResult[];
-  const allData = results.flatMap((result) => {
-    if (result.error) {
-      console.error("Assignment prefetch error:", result.error);
-      return [] as RawAssignmentRow[];
-    }
-    return result.data || [];
-  });
-
-  return allData
-    .map((item) => ({
-      job_id: item.job_id,
-      technician_id: item.technician_id,
-      sound_role: item.sound_role,
-      lights_role: item.lights_role,
-      video_role: item.video_role,
-      production_role: item.production_role,
-      single_day: item.single_day,
-      assignment_date: item.assignment_date,
-      status: item.status,
-      assigned_at: item.assigned_at,
-      job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs),
-    }))
-    .filter((item) => !!item.job);
 }
 
 export async function fetchAvailabilityForWindow(technicianIds: string[], start: Date, end: Date) {

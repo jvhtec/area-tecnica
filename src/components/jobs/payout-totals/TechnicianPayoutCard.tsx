@@ -1,7 +1,6 @@
 import React from 'react';
-import { parseISO } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
+import { formatMadridDayKey } from '@/utils/timezoneUtils';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -586,7 +585,8 @@ function RateModeDateRow({
   setTechnicianRateModeMutation,
 }: RateModeDateRowProps) {
   const inheritedLabel = inheritsRehearsal ? 'Ensayo' : 'Estándar';
-  const dateLabel = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'EEE d MMM', { locale: es });
+  // dateStr is a Madrid day key, not an instant — see formatMadridDayKey.
+  const dateLabel = formatMadridDayKey(dateStr, 'EEE d MMM', { locale: es });
 
   const [fixedInput, setFixedInput] = React.useState<string>(
     fixedAmount != null ? String(fixedAmount) : '',

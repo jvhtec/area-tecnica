@@ -148,8 +148,10 @@ beforeEach(() => {
     rangeInfo: {
       start: new Date('2024-05-01T00:00:00Z'),
       end: new Date('2024-05-03T00:00:00Z'),
-      startFormatted: '2024-05-01',
-      endFormatted: '2024-05-03',
+      startFormatted: '1 de mayo de 2024',
+      endFormatted: '3 de mayo de 2024',
+      startKey: '2024-05-01',
+      endKey: '2024-05-03',
     },
     getProjectedRangeInfo: vi.fn(),
   });
