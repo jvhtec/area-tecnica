@@ -123,8 +123,12 @@ describe("Flex motor unit normalization", () => {
     ]);
   });
 
-  it("contains the nine supplied motor models without duplicate ids", () => {
-    expect(MOTOR_MODELS).toHaveLength(9);
-    expect(new Set(MOTOR_MODELS.map(({ id }) => id))).toHaveProperty("size", 9);
+  it("contains the ten approved serialized motor models without duplicate ids", () => {
+    expect(MOTOR_MODELS).toHaveLength(10);
+    expect(MOTOR_MODELS).toContainEqual(expect.objectContaining({
+      id: "db804d32-3d5d-4a8e-9796-e886a00d34a2",
+      name: "ChainMaster 1Tn D8+",
+    }));
+    expect(new Set(MOTOR_MODELS.map(({ id }) => id))).toHaveProperty("size", 10);
   });
 });

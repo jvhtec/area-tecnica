@@ -3,9 +3,8 @@ import { Boxes, Loader2, Minus, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
-  ESTRUCTURA_MOTOR_MODELS,
+  ESTRUCTURA_PREPARATION_MODELS,
   ESTRUCTURA_PULL_SHEETS,
-  ESTRUCTURA_SOURCE_DEPARTMENTS,
   type EstructuraSourceDepartment,
 } from "@/domain/estructura";
 import {
@@ -28,16 +27,18 @@ import { Input } from "@/components/ui/input";
 type QuantityState = Record<EstructuraSourceDepartment, Record<string, number>>;
 
 const emptyQuantities = (): QuantityState => ({
-  sound: Object.fromEntries(ESTRUCTURA_MOTOR_MODELS.map((model) => [model.id, 0])),
-  lights: Object.fromEntries(ESTRUCTURA_MOTOR_MODELS.map((model) => [model.id, 0])),
+  sound: Object.fromEntries(ESTRUCTURA_PREPARATION_MODELS.map((model) => [model.id, 0])),
+  lights: Object.fromEntries(ESTRUCTURA_PREPARATION_MODELS.map((model) => [model.id, 0])),
 });
 
 const sourceLabel = (source: EstructuraSourceDepartment) =>
   ESTRUCTURA_PULL_SHEETS[source].label;
 
 export function PrepareMotorsAction({
+  department,
   jobId,
 }: {
+  department: EstructuraSourceDepartment;
   jobId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -54,15 +55,10 @@ export function PrepareMotorsAction({
     staleTime: 0,
   });
 
-  const totals = useMemo(() => {
-    const bySource = Object.fromEntries(
-      ESTRUCTURA_SOURCE_DEPARTMENTS.map((source) => [
-        source,
-        Object.values(quantities[source]).reduce((total, quantity) => total + quantity, 0),
-      ]),
-    ) as Record<EstructuraSourceDepartment, number>;
-    return { bySource, total: bySource.sound + bySource.lights };
-  }, [quantities]);
+  const total = useMemo(
+    () => Object.values(quantities[department]).reduce((sum, quantity) => sum + quantity, 0),
+    [department, quantities],
+  );
 
   const updateQuantity = (
     source: EstructuraSourceDepartment,
@@ -78,21 +74,19 @@ export function PrepareMotorsAction({
   };
 
   const handlePush = async () => {
-    if (totals.total === 0 || isPushing) return;
+    if (total === 0 || isPushing) return;
     setIsPushing(true);
     setPushResult(null);
     try {
-      const selections: Parameters<typeof pushEstructuraMotorQuantities>[1] = {
-        sound: ESTRUCTURA_MOTOR_MODELS.map((model) => ({
+      const selectionsFor = (source: EstructuraSourceDepartment) =>
+        ESTRUCTURA_PREPARATION_MODELS.map((model) => ({
           modelId: model.id,
           modelName: model.name,
-          quantity: quantities.sound[model.id] ?? 0,
-        })),
-        lights: ESTRUCTURA_MOTOR_MODELS.map((model) => ({
-            modelId: model.id,
-            modelName: model.name,
-          quantity: quantities.lights[model.id] ?? 0,
-        })),
+          quantity: source === department ? quantities[department][model.id] ?? 0 : 0,
+        }));
+      const selections: Parameters<typeof pushEstructuraMotorQuantities>[1] = {
+        sound: selectionsFor("sound"),
+        lights: selectionsFor("lights"),
       };
       const result = await pushEstructuraMotorQuantities(jobId, selections);
       setPushResult(result);
@@ -124,8 +118,8 @@ export function PrepareMotorsAction({
         type="button"
         variant="outline"
         size="sm"
-        className="min-h-11 gap-2"
-        title="Añadir motores a los Pull Sheets de Estructura"
+        className="gap-2"
+        title={`Añadir motores y controles a Estructura ${sourceLabel(department)}`}
         onClick={(event) => {
           event.stopPropagation();
           setOpen(true);
@@ -141,9 +135,9 @@ export function PrepareMotorsAction({
           onClick={(event) => event.stopPropagation()}
         >
           <DialogHeader>
-            <DialogTitle>Preparar motores</DialogTitle>
+            <DialogTitle>Preparar motores y controles</DialogTitle>
             <DialogDescription>
-              Indica cantidades de modelos de inventario. La asignación de números de serie se realiza después en Flex.
+              Indica las cantidades para Estructura {sourceLabel(department)}. La asignación de números de serie se realiza después en Flex.
             </DialogDescription>
           </DialogHeader>
 
@@ -155,10 +149,10 @@ export function PrepareMotorsAction({
             </p>
           ) : null}
 
-          {targetsQuery.data?.missing.length ? (
+          {targetsQuery.data?.missing.includes(department) ? (
             <div className="rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
               <p>
-                Faltan los Pull Sheets de Estructura de {targetsQuery.data.missing.map(sourceLabel).join(" y ")}.
+                Falta el Pull Sheet de Estructura de {sourceLabel(department)}.
               </p>
               <Button
                 type="button"
@@ -185,64 +179,60 @@ export function PrepareMotorsAction({
           ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="grid gap-4 lg:grid-cols-2">
-              {ESTRUCTURA_SOURCE_DEPARTMENTS.map((source) => (
-                <section key={source} className="rounded-lg border p-3" aria-label={`Motores para ${sourceLabel(source)}`}>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-semibold uppercase tracking-wide">{sourceLabel(source)}</h3>
-                    <span className="text-sm text-muted-foreground">{totals.bySource[source]} motores</span>
-                  </div>
-                  <div className="space-y-2">
-                    {ESTRUCTURA_MOTOR_MODELS.map((model) => {
-                      const quantity = quantities[source][model.id] ?? 0;
-                      return (
-                        <div key={model.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-muted/40 p-2">
-                          <label className="text-sm leading-tight" htmlFor={`motor-${source}-${model.id}`}>
-                            {model.name}
-                          </label>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-11 w-11 shrink-0"
-                              aria-label={`Restar ${model.name} de ${sourceLabel(source)}`}
-                              onClick={() => updateQuantity(source, model.id, quantity - 1)}
-                              disabled={quantity === 0 || isPushing}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <Input
-                              id={`motor-${source}-${model.id}`}
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              step={1}
-                              value={quantity}
-                              className="h-11 w-16 px-2 text-center text-base"
-                              aria-label={`Cantidad de ${model.name} para ${sourceLabel(source)}`}
-                              onChange={(event) => updateQuantity(source, model.id, Number(event.target.value))}
-                              disabled={isPushing}
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-11 w-11 shrink-0"
-                              aria-label={`Sumar ${model.name} a ${sourceLabel(source)}`}
-                              onClick={() => updateQuantity(source, model.id, quantity + 1)}
-                              disabled={isPushing}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
+            <section className="rounded-lg border p-3" aria-label={`Motores y controles para ${sourceLabel(department)}`}>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-semibold uppercase tracking-wide">{sourceLabel(department)}</h3>
+                <span className="text-sm text-muted-foreground">{total} unidades</span>
+              </div>
+              <div className="space-y-2">
+                {ESTRUCTURA_PREPARATION_MODELS.map((model) => {
+                  const quantity = quantities[department][model.id] ?? 0;
+                  return (
+                    <div key={model.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-muted/40 p-2">
+                      <label className="text-sm leading-tight" htmlFor={`motor-${department}-${model.id}`}>
+                        {model.name}
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 shrink-0"
+                          aria-label={`Restar ${model.name} de ${sourceLabel(department)}`}
+                          onClick={() => updateQuantity(department, model.id, quantity - 1)}
+                          disabled={quantity === 0 || isPushing}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          id={`motor-${department}-${model.id}`}
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          step={1}
+                          value={quantity}
+                          className="h-11 w-16 px-2 text-center text-base"
+                          aria-label={`Cantidad de ${model.name} para ${sourceLabel(department)}`}
+                          onChange={(event) => updateQuantity(department, model.id, Number(event.target.value))}
+                          disabled={isPushing}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 shrink-0"
+                          aria-label={`Sumar ${model.name} a ${sourceLabel(department)}`}
+                          onClick={() => updateQuantity(department, model.id, quantity + 1)}
+                          disabled={isPushing}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
 
           <div className="rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
@@ -251,25 +241,22 @@ export function PrepareMotorsAction({
           </div>
 
           {pushResult ? (
-            <div className="grid gap-2 sm:grid-cols-2" aria-live="polite">
-              {ESTRUCTURA_SOURCE_DEPARTMENTS.map((source) => (
-                <p
-                  key={source}
-                  className={pushResult[source].status === "success"
-                    ? "rounded-md border border-emerald-500/40 p-2 text-sm text-emerald-700"
-                    : pushResult[source].status === "error"
-                      ? "rounded-md border border-destructive/40 p-2 text-sm text-destructive"
-                      : "rounded-md border p-2 text-sm text-muted-foreground"}
-                >
-                  <strong>{sourceLabel(source)}:</strong> {pushResult[source].message}
-                </p>
-              ))}
+            <div aria-live="polite">
+              <p
+                className={pushResult[department].status === "success"
+                  ? "rounded-md border border-emerald-500/40 p-2 text-sm text-emerald-700"
+                  : pushResult[department].status === "error"
+                    ? "rounded-md border border-destructive/40 p-2 text-sm text-destructive"
+                    : "rounded-md border p-2 text-sm text-muted-foreground"}
+              >
+                <strong>{sourceLabel(department)}:</strong> {pushResult[department].message}
+              </p>
             </div>
           ) : null}
 
           <DialogFooter className="shrink-0 items-stretch border-t pt-3 sm:items-center sm:justify-between">
             <span className="text-sm text-muted-foreground">
-              Sonido: {totals.bySource.sound} · Luces: {totals.bySource.lights} · Total: {totals.total}
+              {sourceLabel(department)}: {total} unidades
             </span>
             <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
               <Button type="button" variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => setOpen(false)} disabled={isPushing || isReconciling}>
@@ -279,10 +266,10 @@ export function PrepareMotorsAction({
                 type="button"
                 className="min-h-11 w-full sm:w-auto"
                 onClick={() => void handlePush()}
-                disabled={totals.total === 0 || isPushing || isReconciling || targetsQuery.isLoading || targetsQuery.isError}
+                disabled={total === 0 || isPushing || isReconciling || targetsQuery.isLoading || targetsQuery.isError}
               >
                 {isPushing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Añadir {totals.total} {totals.total === 1 ? "motor" : "motores"}
+                Añadir {total} {total === 1 ? "unidad" : "unidades"}
               </Button>
             </div>
           </DialogFooter>

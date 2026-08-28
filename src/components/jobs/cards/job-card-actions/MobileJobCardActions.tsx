@@ -343,8 +343,9 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
                 </>
               )}
               {isProductionDepartment && isManagementUser && <PrintFlexReportAction job={job} />}
-              {isProjectManagementPage && isManagementUser && job.job_type !== "dryhire" && (
+              {flexReportDepartment && isProjectManagementPage && isManagementUser && job.job_type !== "dryhire" && (
                 <PrepareMotorsAction
+                  department={flexReportDepartment}
                   jobId={job.id}
                 />
               )}

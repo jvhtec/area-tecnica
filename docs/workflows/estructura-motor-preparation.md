@@ -19,12 +19,12 @@ Both rows retain `department = 'estructura'` and `folder_type = 'pull_sheet'`. T
 
 1. Open `Motores` / `Preparar motores`.
 2. If the job predates Estructura tracking, choose `Crear Estructura y Pull Sheets` inside the dialog.
-3. Enter inventory-model quantities independently for Sonido and Luces using the numeric inputs or step buttons.
-4. Review the per-side and combined totals.
-5. Read the additive warning and choose `Añadir N motores`.
-6. Review the independent result for each destination. One side may succeed while the other reports an error.
+3. On an Estructura Sound or Lights job card, enter inventory-model quantities for that department using the numeric inputs or step buttons. Sound cards target only Estructura Sonido; Lights cards target only Estructura Luces. The action is not available on Production cards.
+4. Review the department total.
+5. Read the additive warning and choose `Añadir N unidades`.
+6. Review the result for the current department.
 
-The dialog uses the same approved motor-model definition as automatic certificate eligibility. It requests inventory-model quantities only; warehouse staff assign serialized units later in Flex.
+The preparation catalog contains the approved serialized motor allowlist plus the approved motor-controller model IDs. Automatic certificate eligibility continues to use only the serialized motor allowlist, so controllers never appear in the certificate selector. The dialog requests inventory-model quantities only; warehouse staff assign serialized units later in Flex.
 
 The dialog is mobile-ready: it uses the dynamic viewport and safe-area inset, confines scrolling to the model list, stacks footer actions on narrow screens, and keeps quantity/recovery controls at a minimum 44 px touch target.
 
@@ -40,6 +40,6 @@ Legacy jobs without tracked Estructura sheets repair themselves from the motor d
 
 ## Deliberately deferred inventory
 
-Controller and cabling rows are not exposed yet. The repository does not contain a reviewed set of approved controller/cable `equipment.resource_id` mappings or a documented quantity rule. No ratios are inferred. The shared Estructura equipment push model can accept additional inventory rows once those identifiers and business rules are approved.
+The reviewed motor-controller rows are exposed as explicit inventory models. Cabling remains deferred because the repository does not contain a reviewed set of cable `equipment.resource_id` mappings or a documented quantity rule. No ratios are inferred. The shared Estructura equipment push model can accept additional inventory rows once those identifiers and business rules are approved.
 
 Dry hire retains its existing department-specific commercial folder/Presupuesto hierarchy. The standard Estructura hierarchy and motor-preparation action are not forced into that special workflow.
