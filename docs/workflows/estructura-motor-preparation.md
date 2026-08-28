@@ -19,7 +19,7 @@ Both rows retain `department = 'estructura'` and `folder_type = 'pull_sheet'`. T
 
 1. Open `Motores` / `Preparar motores`.
 2. If the job predates Estructura tracking, choose `Crear Estructura y Pull Sheets` inside the dialog.
-3. Enter inventory-model quantities for the current job-card department using the numeric inputs or step buttons. Sound cards target only Estructura Sonido; Lights cards target only Estructura Luces.
+3. On an Estructura Sound or Lights job card, enter inventory-model quantities for that department using the numeric inputs or step buttons. Sound cards target only Estructura Sonido; Lights cards target only Estructura Luces. The action is not available on Production cards.
 4. Review the department total.
 5. Read the additive warning and choose `Añadir N unidades`.
 6. Review the result for the current department.
