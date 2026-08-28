@@ -60,6 +60,10 @@ vi.mock("@/integrations/supabase/client", () => {
         return { data: testState.folders, error: null };
       }
 
+      if (this.table === "flex_crew_calls") {
+        return { data: [], error: null };
+      }
+
       throw new Error(`Unexpected table in dryhire sync test: ${this.table}`);
     }
 

@@ -1,190 +1,29 @@
-import { format } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
 import { supabase } from "@/integrations/supabase/client";
 import { updateFlexElementHeader } from "@/utils/flex-folders/api";
 import { getElementTree, FlexElementNode } from "@/utils/flex-folders/getElementTree";
+import {
+  capitalize,
+  collectAllElements,
+  extractDocumentNumberSuffix,
+  FlexCrewCallSyncRow,
+  FlexFolderSyncRow,
+  formatDateForDisplay,
+  formatDateForFlex,
+  generateBaseDocumentNumber,
+  generateFolderName,
+  getCrewCallDocumentSuffix,
+  getCrewCallName,
+  getEffectiveTimezone,
+  getErrorMessage,
+  getKnownDocumentSuffix,
+  getRecordedElementFromTree,
+  mergeSyncResults,
+  runWithConcurrency,
+  SyncResult,
+} from "@/utils/flex-folders/syncDateChange.helpers";
 
-const DEFAULT_TIMEZONE = "Europe/Madrid";
-
-export interface SyncResult {
-  success: number;
-  failed: number;
-  errors: string[];
-}
-
-/**
- * Extract error message from unknown error type
- */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  return String(error);
-}
-
-/**
- * Format a date string for Flex API (ISO-like format with milliseconds)
- * Uses the job timezone for consistency with the app
- */
-function formatDateForFlex(date: Date, timezone = DEFAULT_TIMEZONE): string {
-  const zonedDate = toZonedTime(date, timezone);
-  // Format as ISO-like wall-clock time for Flex.
-  const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm:ss");
-  return formatted + ".000Z";
-}
-
-/**
- * Generate a YYMMDD document number from a date
- * Uses the job timezone for consistency with the app
- */
-function generateBaseDocumentNumber(date: Date, timezone = DEFAULT_TIMEZONE): string {
-  const zonedDate = toZonedTime(date, timezone);
-  return format(zonedDate, "yyMMdd");
-}
-
-/**
- * Format date for display in folder names (e.g., "Jan 15, 2026")
- * Uses the job timezone for consistency with the app
- */
-function formatDateForDisplay(date: Date, timezone = DEFAULT_TIMEZONE): string {
-  const zonedDate = toZonedTime(date, timezone);
-  return format(zonedDate, "MMM d, yyyy");
-}
-
-function getEffectiveTimezone(timezone: unknown): string {
-  return typeof timezone === "string" && timezone.trim()
-    ? timezone.trim()
-    : DEFAULT_TIMEZONE;
-}
-
-/**
- * Capitalize first letter of a string
- */
-function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-/**
- * Extract the suffix from an existing document number
- * Document numbers follow pattern: YYMMDD + suffix(es)
- * Examples: 260212S, 260212SDT, 260212HR, 260212HRDT
- */
-function extractDocumentNumberSuffix(docNumber: string): string {
-  if (!docNumber || docNumber.length <= 6) return "";
-
-  // The base document number is always 6 characters (YYMMDD)
-  return docNumber.slice(6);
-}
-
-/**
- * Recursively collect all element IDs and their document numbers from a tree
- */
-function collectAllElements(
-  nodes: FlexElementNode[]
-): Array<{ elementId: string; documentNumber?: string; displayName?: string }> {
-  const result: Array<{ elementId: string; documentNumber?: string; displayName?: string }> = [];
-
-  for (const node of nodes) {
-    if (node.elementId) {
-      result.push({
-        elementId: node.elementId,
-        documentNumber: node.documentNumber,
-        displayName: node.displayName,
-      });
-    }
-
-    if (node.children && node.children.length > 0) {
-      result.push(...collectAllElements(node.children));
-    }
-  }
-
-  return result;
-}
-
-function findElementInTree(
-  nodes: FlexElementNode[],
-  elementId: string
-): { elementId: string; documentNumber?: string; displayName?: string } | null {
-  for (const node of nodes) {
-    if (node.elementId === elementId) {
-      return {
-        elementId: node.elementId,
-        documentNumber: node.documentNumber,
-        displayName: node.displayName,
-      };
-    }
-
-    if (node.children && node.children.length > 0) {
-      const match = findElementInTree(node.children, elementId);
-      if (match) return match;
-    }
-  }
-
-  return null;
-}
-
-function getRecordedElementFromTree(
-  tree: FlexElementNode[],
-  elementId: string
-): { elementId: string; documentNumber?: string; displayName?: string } {
-  const element = findElementInTree(tree, elementId);
-  if (element) return element;
-
-  const treeWithSyntheticRoot: FlexElementNode[] = [
-    {
-      elementId,
-      displayName: "",
-      documentNumber: undefined,
-    },
-    ...tree,
-  ];
-
-  return findElementInTree(treeWithSyntheticRoot, elementId)!;
-}
-
-/**
- * Generate folder name based on folder type and job data
- */
-function generateFolderName(
-  folderType: string,
-  department: string,
-  jobTitle: string,
-  locationName: string,
-  displayDate: string
-): string | null {
-  const deptLabel = capitalize(department);
-
-  switch (folderType) {
-    // Tour date folders use location + date + department
-    case "tourdate":
-      return `${locationName} - ${displayDate} - ${deptLabel}`;
-
-    // Regular job department folders use title + department
-    case "department":
-      return `${jobTitle} - ${deptLabel}`;
-
-    // Subfolders for regular jobs
-    case "documentacion_tecnica":
-      return `${jobTitle} - Documentación Técnica - ${deptLabel}`;
-    case "presupuestos_recibidos":
-      return `${jobTitle} - Presupuestos Recibidos - ${deptLabel}`;
-    case "hoja_gastos":
-      return `${jobTitle} - Hoja de Gastos - ${deptLabel}`;
-
-    // Other folder types don't include title/date in names
-    default:
-      return null;
-  }
-}
-
-interface FlexFolderSyncRow {
-  element_id: string;
-  department: string | null;
-  folder_type: string | null;
-}
+export { haveJobDatesChanged } from "@/utils/flex-folders/syncDateChange.helpers";
+export type { SyncResult } from "@/utils/flex-folders/syncDateChange.helpers";
 
 function getDryhireDocumentSuffix(folder: FlexFolderSyncRow): string | null {
   const department = folder.department;
@@ -287,7 +126,10 @@ async function syncRecordedFlexFolderRowsForDateChange(
   newBaseDocNumber: string,
   formattedStartDate: string,
   formattedEndDate: string,
-  getFolderName: (folder: FlexFolderSyncRow) => string | null,
+  getFolderName: (
+    folder: FlexFolderSyncRow,
+    element: { elementId: string; documentNumber?: string; displayName?: string }
+  ) => string | null,
   scopeLabel: string
 ): Promise<SyncResult> {
   const results: SyncResult = { success: 0, failed: 0, errors: [] };
@@ -296,21 +138,23 @@ async function syncRecordedFlexFolderRowsForDateChange(
     `[syncFlexElements] Syncing ${folders.length} recorded ${scopeLabel} element(s) without tree traversal updates.`
   );
 
-  for (const folder of folders) {
+  await runWithConcurrency(folders, 4, async (folder) => {
     try {
       const tree = await getElementTree(folder.element_id);
       const element = getRecordedElementFromTree(tree, folder.element_id);
       const suffix = element.documentNumber
         ? extractDocumentNumberSuffix(element.documentNumber)
-        : "";
-      const newDocNumber = `${newBaseDocNumber}${suffix}`;
+        : getKnownDocumentSuffix(folder);
+      const newDocNumber = suffix === null ? null : `${newBaseDocNumber}${suffix}`;
       const updates: Promise<void>[] = [
-        updateFlexElementHeader(folder.element_id, "documentNumber", newDocNumber),
         updateFlexElementHeader(folder.element_id, "plannedStartDate", formattedStartDate),
         updateFlexElementHeader(folder.element_id, "plannedEndDate", formattedEndDate),
       ];
+      if (newDocNumber !== null) {
+        updates.unshift(updateFlexElementHeader(folder.element_id, "documentNumber", newDocNumber));
+      }
 
-      const newName = getFolderName(folder);
+      const newName = getFolderName(folder, element);
       if (newName) {
         updates.push(updateFlexElementHeader(folder.element_id, "name", newName));
       }
@@ -325,7 +169,7 @@ async function syncRecordedFlexFolderRowsForDateChange(
 
       results.success++;
       console.log(
-        `[syncFlexElements] Updated recorded ${scopeLabel} element ${folder.element_id}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber}`
+        `[syncFlexElements] Updated recorded ${scopeLabel} element ${folder.element_id}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber || "(document number unchanged)"}`
       );
     } catch (error: unknown) {
       results.failed++;
@@ -333,11 +177,222 @@ async function syncRecordedFlexFolderRowsForDateChange(
       results.errors.push(errorMsg);
       console.error(`[syncFlexElements] ${errorMsg}`);
     }
-  }
+  });
 
   console.log(
     `[syncFlexElements] ${scopeLabel} sync complete: ${results.success} succeeded, ${results.failed} failed`
   );
+
+  return results;
+}
+
+async function syncRecordedCrewCallsForJobDateChange(
+  crewCalls: FlexCrewCallSyncRow[],
+  newBaseDocNumber: string,
+  formattedStartDate: string,
+  formattedEndDate: string,
+  jobTitle: string,
+  updateNames: boolean
+): Promise<SyncResult> {
+  const results: SyncResult = { success: 0, failed: 0, errors: [] };
+
+  await runWithConcurrency(crewCalls, 4, async (crewCall) => {
+    try {
+      const suffix = getCrewCallDocumentSuffix(crewCall.department);
+      if (!suffix) {
+        throw new Error(`Unsupported crew-call department: ${crewCall.department}`);
+      }
+
+      const updates: Promise<void>[] = [
+        updateFlexElementHeader(
+          crewCall.flex_element_id,
+          "documentNumber",
+          `${newBaseDocNumber}${suffix}`
+        ),
+        updateFlexElementHeader(
+          crewCall.flex_element_id,
+          "plannedStartDate",
+          formattedStartDate
+        ),
+        updateFlexElementHeader(
+          crewCall.flex_element_id,
+          "plannedEndDate",
+          formattedEndDate
+        ),
+      ];
+
+      const crewCallName = updateNames
+        ? getCrewCallName(crewCall.department, jobTitle)
+        : null;
+      if (crewCallName) {
+        updates.push(updateFlexElementHeader(crewCall.flex_element_id, "name", crewCallName));
+      }
+
+      await Promise.all(updates);
+      results.success++;
+    } catch (error: unknown) {
+      results.failed++;
+      const errorMsg = `Crew call ${crewCall.flex_element_id}: ${getErrorMessage(error)}`;
+      results.errors.push(errorMsg);
+      console.error(`[syncFlexElements] ${errorMsg}`);
+    }
+  });
+
+  return results;
+}
+
+async function syncStandardFlexElementsForJobDateChange(
+  folders: FlexFolderSyncRow[],
+  crewCalls: FlexCrewCallSyncRow[],
+  newBaseDocNumber: string,
+  formattedStartDate: string,
+  formattedEndDate: string,
+  jobTitle: string,
+  locationName: string,
+  displayDate: string,
+  newTitle?: string,
+  previousTitle?: string
+): Promise<SyncResult> {
+  const results: SyncResult = { success: 0, failed: 0, errors: [] };
+  const roots = folders.filter(
+    (folder) => folder.folder_type === "main_event" || folder.folder_type === "main"
+  );
+
+  if (roots.length === 0) {
+    const recordedResult = await syncRecordedFlexFolderRowsForDateChange(
+      folders,
+      newBaseDocNumber,
+      formattedStartDate,
+      formattedEndDate,
+      (folder, element) =>
+        newTitle && folder.folder_type
+          ? generateFolderName(
+              folder.folder_type,
+              folder.department,
+              jobTitle,
+              locationName,
+              displayDate,
+              element.displayName,
+              previousTitle
+            )
+          : null,
+      "legacy job"
+    );
+    const crewResult = await syncRecordedCrewCallsForJobDateChange(
+      crewCalls,
+      newBaseDocNumber,
+      formattedStartDate,
+      formattedEndDate,
+      jobTitle,
+      Boolean(newTitle)
+    );
+    return mergeSyncResults(recordedResult, crewResult);
+  }
+
+  const elementsById = new Map<
+    string,
+    { elementId: string; documentNumber?: string; displayName?: string }
+  >();
+  const folderByElementId = new Map(folders.map((folder) => [folder.element_id, folder]));
+  const crewCallByElementId = new Map(
+    crewCalls.map((crewCall) => [crewCall.flex_element_id, crewCall])
+  );
+
+  await runWithConcurrency(roots, 2, async (root) => {
+    try {
+      const tree = await getElementTree(root.element_id);
+      const treeElements = collectAllElements(tree);
+      if (!treeElements.some((element) => element.elementId === root.element_id)) {
+        treeElements.unshift({ elementId: root.element_id });
+      }
+
+      treeElements.forEach((element) => {
+        if (element.elementId && !elementsById.has(element.elementId)) {
+          elementsById.set(element.elementId, element);
+        }
+      });
+    } catch (error: unknown) {
+      results.failed++;
+      const errorMsg = `Root ${root.element_id}: ${getErrorMessage(error)}`;
+      results.errors.push(errorMsg);
+      console.error(`[syncFlexElements] ${errorMsg}`);
+    }
+  });
+
+  folders.forEach((folder) => {
+    if (!elementsById.has(folder.element_id)) {
+      elementsById.set(folder.element_id, { elementId: folder.element_id });
+    }
+  });
+  crewCalls.forEach((crewCall) => {
+    if (!elementsById.has(crewCall.flex_element_id)) {
+      elementsById.set(crewCall.flex_element_id, { elementId: crewCall.flex_element_id });
+    }
+  });
+
+  const elements = Array.from(elementsById.values());
+  console.log(
+    `[syncFlexElements] Syncing ${elements.length} unique standard-job element(s) from ${roots.length} root tree(s).`
+  );
+
+  await runWithConcurrency(elements, 4, async (element) => {
+    try {
+      const folder = folderByElementId.get(element.elementId);
+      const crewCall = crewCallByElementId.get(element.elementId);
+      const suffix = element.documentNumber
+        ? extractDocumentNumberSuffix(element.documentNumber)
+        : folder
+          ? getKnownDocumentSuffix(folder)
+          : crewCall
+            ? getCrewCallDocumentSuffix(crewCall.department)
+            : null;
+      const updates: Promise<void>[] = [
+        updateFlexElementHeader(element.elementId, "plannedStartDate", formattedStartDate),
+        updateFlexElementHeader(element.elementId, "plannedEndDate", formattedEndDate),
+      ];
+
+      if (suffix !== null) {
+        updates.unshift(
+          updateFlexElementHeader(
+            element.elementId,
+            "documentNumber",
+            `${newBaseDocNumber}${suffix}`
+          )
+        );
+      }
+
+      let newName: string | null = null;
+      if (newTitle) {
+        if (crewCall) {
+          newName = getCrewCallName(crewCall.department, jobTitle);
+        } else if (folder?.folder_type) {
+          newName = generateFolderName(
+            folder.folder_type,
+            folder.department || "",
+            jobTitle,
+            locationName,
+            displayDate,
+            element.displayName,
+            previousTitle
+          );
+        } else if (previousTitle && element.displayName?.includes(previousTitle)) {
+          newName = element.displayName.replace(previousTitle, jobTitle);
+        }
+      }
+
+      if (newName) {
+        updates.push(updateFlexElementHeader(element.elementId, "name", newName));
+      }
+
+      await Promise.all(updates);
+      results.success++;
+    } catch (error: unknown) {
+      results.failed++;
+      const errorMsg = `Element ${element.elementId}: ${getErrorMessage(error)}`;
+      results.errors.push(errorMsg);
+      console.error(`[syncFlexElements] ${errorMsg}`);
+    }
+  });
 
   return results;
 }
@@ -356,7 +411,8 @@ export async function syncFlexElementsForJobDateChange(
   jobId: string,
   newStartTime: string,
   newEndTime: string,
-  newTitle?: string
+  newTitle?: string,
+  previousTitle?: string
 ): Promise<SyncResult> {
   const results: SyncResult = { success: 0, failed: 0, errors: [] };
 
@@ -399,7 +455,7 @@ export async function syncFlexElementsForJobDateChange(
   // Fetch all flex_folders for this job
   const { data: folders, error: foldersError } = await supabase
     .from("flex_folders")
-    .select("element_id, department, folder_type")
+    .select("element_id, department, folder_type, parent_id")
     .eq("job_id", jobId);
 
   if (foldersError) {
@@ -412,24 +468,50 @@ export async function syncFlexElementsForJobDateChange(
     return results;
   }
 
+  const { data: crewCalls, error: crewCallsError } = await supabase
+    .from("flex_crew_calls")
+    .select("flex_element_id, department")
+    .eq("job_id", jobId);
+
+  if (crewCallsError) {
+    console.error("[syncFlexElements] Error fetching flex_crew_calls:", crewCallsError);
+    results.failed++;
+    results.errors.push(`Failed to fetch Flex crew calls: ${crewCallsError.message}`);
+  }
+
+  const recordedCrewCalls = crewCalls || [];
+
   if (jobData?.job_type === "dryhire") {
-    return syncDryhireFlexElementsForJobDateChange(
+    const dryhireResult = await syncDryhireFlexElementsForJobDateChange(
       folders,
       newBaseDocNumber,
       formattedStartDate,
       formattedEndDate,
       newTitle
     );
+    const crewResult = await syncRecordedCrewCallsForJobDateChange(
+      recordedCrewCalls,
+      newBaseDocNumber,
+      formattedStartDate,
+      formattedEndDate,
+      jobTitle,
+      Boolean(newTitle)
+    );
+    return mergeSyncResults(results, dryhireResult, crewResult);
   }
 
   if (isTourDateJob) {
-    return syncRecordedFlexFolderRowsForDateChange(
+    const folderResult = await syncRecordedFlexFolderRowsForDateChange(
       folders,
       newBaseDocNumber,
       formattedStartDate,
       formattedEndDate,
-      (folder) => {
+      (folder, element) => {
         if (!folder.department || !folder.folder_type) {
+          return null;
+        }
+
+        if (folder.folder_type !== "tourdate" && !newTitle) {
           return null;
         }
 
@@ -438,104 +520,37 @@ export async function syncFlexElementsForJobDateChange(
           folder.department,
           jobTitle,
           locationName,
-          displayDate
+          displayDate,
+          element.displayName,
+          previousTitle
         );
       },
       "tour date job"
     );
+    const crewResult = await syncRecordedCrewCallsForJobDateChange(
+      recordedCrewCalls,
+      newBaseDocNumber,
+      formattedStartDate,
+      formattedEndDate,
+      jobTitle,
+      Boolean(newTitle)
+    );
+    return mergeSyncResults(results, folderResult, crewResult);
   }
 
-  console.log(`[syncFlexElements] Found ${folders.length} root folders to sync`);
-
-  // Process each root folder and its tree
-  for (const folder of folders) {
-    try {
-      // Fetch the element tree starting from this folder
-      const tree = await getElementTree(folder.element_id);
-
-      // Collect all elements (including the root and all nested children)
-      const allElements = collectAllElements(tree);
-
-      // Also add the root folder itself if not in tree response
-      const hasRoot = allElements.some((e) => e.elementId === folder.element_id);
-      if (!hasRoot) {
-        allElements.unshift({ elementId: folder.element_id, documentNumber: undefined });
-      }
-
-      console.log(
-        `[syncFlexElements] Processing folder ${folder.element_id} (${folder.department}): ${allElements.length} elements`
-      );
-
-      // Update each element
-      for (const element of allElements) {
-        try {
-          // Build new document number preserving the suffix
-          const suffix = element.documentNumber
-            ? extractDocumentNumberSuffix(element.documentNumber)
-            : "";
-          const newDocNumber = `${newBaseDocNumber}${suffix}`;
-
-          // Build array of updates to batch
-          const updates: Promise<void>[] = [
-            updateFlexElementHeader(element.elementId, "documentNumber", newDocNumber),
-            updateFlexElementHeader(element.elementId, "plannedStartDate", formattedStartDate),
-            updateFlexElementHeader(element.elementId, "plannedEndDate", formattedEndDate),
-          ];
-
-          // Update name for folders that include title/date in their names
-          // Only update if this is the root folder (element_id matches folder.element_id)
-          let newName: string | null = null;
-          if (
-            element.elementId === folder.element_id &&
-            folder.department &&
-            folder.folder_type
-          ) {
-            newName = generateFolderName(
-              folder.folder_type,
-              folder.department,
-              jobTitle,
-              locationName,
-              displayDate
-            );
-
-            if (newName) {
-              updates.push(updateFlexElementHeader(element.elementId, "name", newName));
-            }
-          }
-
-          // Execute all updates for this element in parallel
-          await Promise.all(updates);
-
-          if (newName) {
-            console.log(
-              `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
-            );
-          }
-
-          results.success++;
-          console.log(
-            `[syncFlexElements] Updated element ${element.elementId}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber}`
-          );
-        } catch (elementError: unknown) {
-          results.failed++;
-          const errorMsg = `Element ${element.elementId}: ${getErrorMessage(elementError)}`;
-          results.errors.push(errorMsg);
-          console.error(`[syncFlexElements] ${errorMsg}`);
-        }
-      }
-    } catch (treeError: unknown) {
-      results.failed++;
-      const errorMsg = `Folder ${folder.element_id}: ${getErrorMessage(treeError)}`;
-      results.errors.push(errorMsg);
-      console.error(`[syncFlexElements] ${errorMsg}`);
-    }
-  }
-
-  console.log(
-    `[syncFlexElements] Sync complete: ${results.success} succeeded, ${results.failed} failed`
+  const standardResult = await syncStandardFlexElementsForJobDateChange(
+    folders,
+    recordedCrewCalls,
+    newBaseDocNumber,
+    formattedStartDate,
+    formattedEndDate,
+    jobTitle,
+    locationName,
+    displayDate,
+    newTitle,
+    previousTitle
   );
-
-  return results;
+  return mergeSyncResults(results, standardResult);
 }
 
 /**

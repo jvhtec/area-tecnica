@@ -18,6 +18,10 @@ const { getElementTreeMock, updateFlexElementHeaderMock, testState } = vi.hoiste
       department: string | null;
       folder_type: string | null;
     }>,
+    crewCalls: [] as Array<{
+      flex_element_id: string;
+      department: string;
+    }>,
   },
 }));
 
@@ -65,6 +69,10 @@ vi.mock("@/integrations/supabase/client", () => {
 
       if (this.table === "flex_folders") {
         return { data: testState.folders, error: null };
+      }
+
+      if (this.table === "flex_crew_calls") {
+        return { data: testState.crewCalls, error: null };
       }
 
       throw new Error(`Unexpected table in tourdate sync test: ${this.table}`);
@@ -118,6 +126,7 @@ describe("syncFlexElementsForTourDateChange scoping", () => {
         folder_type: "presupuestos_recibidos",
       },
     ];
+    testState.crewCalls = [];
 
     getElementTreeMock.mockImplementation((elementId: string) => {
       if (elementId === "tourdate-sound-folder") {
@@ -232,7 +241,7 @@ describe("syncFlexElementsForTourDateChange scoping", () => {
     expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
       "tourdate-sound-folder",
       "documentNumber",
-      "260603"
+      "260603S"
     );
     expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
       "tourdate-sound-folder",
@@ -246,6 +255,43 @@ describe("syncFlexElementsForTourDateChange scoping", () => {
     );
   });
 
+  it("syncs recorded crew calls without traversing shared siblings", async () => {
+    testState.folders = [
+      {
+        element_id: "tourdate-sound-folder",
+        department: "sound",
+        folder_type: "tourdate",
+      },
+    ];
+    testState.crewCalls = [
+      {
+        flex_element_id: "tourdate-sound-crew-call",
+        department: "sound",
+      },
+    ];
+
+    const result = await syncFlexElementsForJobDateChange(
+      "job-1",
+      "2026-06-03T00:00:00.000Z",
+      "2026-06-03T21:59:00.000Z",
+      "Updated Tour Job",
+      "Loquillo - Mallorca"
+    );
+
+    expect(result).toEqual({ success: 2, failed: 0, errors: [] });
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
+      "tourdate-sound-crew-call",
+      "documentNumber",
+      "260603HRCCS"
+    );
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
+      "tourdate-sound-crew-call",
+      "name",
+      "Crew Call Sonido - Updated Tour Job"
+    );
+    expect(getElementTreeMock).not.toHaveBeenCalledWith("tourdate-sound-crew-call");
+  });
+
   it("keeps tour date job date sync scoped to recorded rows too", async () => {
     const result = await syncFlexElementsForJobDateChange(
       "job-1",
@@ -255,7 +301,7 @@ describe("syncFlexElementsForTourDateChange scoping", () => {
 
     expect(result).toEqual({ success: 2, failed: 0, errors: [] });
     expect(getElementTreeMock).toHaveBeenCalledTimes(2);
-    expect(updateFlexElementHeaderMock).toHaveBeenCalledTimes(8);
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledTimes(7);
     expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
       "tourdate-sound-folder",
       "documentNumber",
@@ -271,7 +317,7 @@ describe("syncFlexElementsForTourDateChange scoping", () => {
       "name",
       "Mallorca - Jun 3, 2026 - Sound"
     );
-    expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
+    expect(updateFlexElementHeaderMock).not.toHaveBeenCalledWith(
       "tourdate-sound-quote",
       "name",
       "Loquillo - Mallorca - Presupuestos Recibidos - Sound"

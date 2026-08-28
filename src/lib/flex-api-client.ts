@@ -11,6 +11,8 @@ interface FlexProxyEnvelope {
   error?: string;
 }
 
+const FLEX_PROXY_TIMEOUT_MS = 20_000;
+
 export interface FlexApiResponse {
   ok: boolean;
   status: number;
@@ -56,6 +58,7 @@ export async function flexApiFetch(
   init: RequestInit = {},
 ): Promise<FlexApiResponse> {
   const method = (init.method || "GET").toUpperCase();
+  const normalizedEndpoint = normalizeFlexEndpoint(endpoint);
   const headers = serializeHeaders(init.headers);
   const body = typeof init.body === "string" ? init.body : undefined;
 
@@ -65,34 +68,46 @@ export async function flexApiFetch(
 
   const invocation = supabase.functions.invoke<FlexProxyEnvelope>("secure-flex-api", {
     body: {
-      endpoint: normalizeFlexEndpoint(endpoint),
+      endpoint: normalizedEndpoint,
       method,
       headers,
       body,
     },
   });
 
-  const canTimeoutLocally = method === "GET" || method === "HEAD";
+  // Supabase's invocation cannot be cancelled. Only race requests whose late
+  // completion is safe; timing out folder creation could leave an untracked
+  // Flex element behind and a retry could create a duplicate.
+  const canTimeoutLocally =
+    method === "GET" ||
+    method === "HEAD" ||
+    normalizedEndpoint.endsWith("/header-update");
+  if (!canTimeoutLocally) {
+    return createFlexApiResponse(await invocation);
+  }
+
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
-  const timeout = canTimeoutLocally
-    ? new Promise<never>((_, reject) => {
-        timeoutId = globalThis.setTimeout(
-          () => reject(new DOMException("Flex API request timed out", "AbortError")),
-          15_000,
-        );
-      })
-    : undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = globalThis.setTimeout(
+      () => reject(new DOMException("Flex API request timed out", "AbortError")),
+      FLEX_PROXY_TIMEOUT_MS,
+    );
+  });
   let result: Awaited<typeof invocation>;
   try {
-    result = timeout
-      ? await Promise.race([invocation, timeout])
-      : await invocation;
+    result = await Promise.race([invocation, timeout]);
   } finally {
     if (timeoutId !== undefined) {
       globalThis.clearTimeout(timeoutId);
     }
   }
 
+  return createFlexApiResponse(result);
+}
+
+function createFlexApiResponse(
+  result: Awaited<ReturnType<typeof supabase.functions.invoke<FlexProxyEnvelope>>>,
+): FlexApiResponse {
   const { data, error } = result;
 
   if (error) {
