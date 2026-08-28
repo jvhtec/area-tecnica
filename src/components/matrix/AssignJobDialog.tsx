@@ -19,7 +19,6 @@ import {
   type AssignmentConflictWarning,
 } from "@/components/matrix/assignJobConflicts";
 import {
-  formatDateKey,
   getAssignableJobDateKeys,
   getErrorCode,
   getErrorMessage,
@@ -42,6 +41,19 @@ export type {
 /** Madrid-midnight instant from the matrix -> the local calendar day it stands for. */
 const toCalendarDate = (date: Date): Date => madridDateKeyToCalendarDate(formatMadridDateKey(date)) ?? date;
 
+/**
+ * Day key for a value that belongs to the calendar pickers.
+ *
+ * Everything the pickers touch is a calendar day — a local midnight standing
+ * for a date — because that is what react-day-picker renders and returns from
+ * onSelect. Local `format` round-trips those in every timezone, which is what
+ * `assignmentDate` already relies on. `formatDateKey` must not be used on them:
+ * it converts a Date as an *instant* into Madrid, so a picked local midnight
+ * came back a day early east of Madrid (in Asia/Tokyo, picking 2026-03-12
+ * submitted 2026-03-11).
+ */
+const toPickerDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
+
 export const AssignJobDialog = ({
   open,
   onClose,
@@ -56,7 +68,7 @@ export const AssignJobDialog = ({
   // Coverage mode: full job span, single day, multiple days
   const [coverageMode, setCoverageMode] = useState<CoverageMode>(existingAssignment?.single_day ? 'single' : 'full');
   const [singleDate, setSingleDate] = useState<Date | null>(() => toCalendarDate(date));
-  const [multiDates, setMultiDates] = useState<Date[]>(date ? [date] : []);
+  const [multiDates, setMultiDates] = useState<Date[]>(date ? [toCalendarDate(date)] : []);
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -270,7 +282,7 @@ export const AssignJobDialog = ({
 
       const coverageDates: string[] = await (async () => {
         if (coverageMode === 'multi') {
-          const uniqueKeys = sortDateKeys((multiDates || []).map((multiDate) => formatDateKey(multiDate)));
+          const uniqueKeys = sortDateKeys((multiDates || []).map((multiDate) => toPickerDateKey(multiDate)));
           if (uniqueKeys.length === 0) {
             throw new Error('Selecciona al menos una fecha');
           }
@@ -679,7 +691,7 @@ export const AssignJobDialog = ({
   }, [selectedJob]);
 
   const isAllowedDate = React.useCallback((d: Date) => {
-    const key = formatDateKey(d);
+    const key = toPickerDateKey(d);
     if (existingTimesheetDateSet.has(key)) return true;
     if (!selectedJobMeta || selectedJobMeta.dateKeys.size === 0) return true;
     return selectedJobMeta.dateKeys.has(key);
@@ -694,11 +706,11 @@ export const AssignJobDialog = ({
       const nextByKey = new Map<string, Date>();
       currentDates.forEach((currentDate) => {
         if (isAllowedDate(currentDate)) {
-          nextByKey.set(formatDateKey(currentDate), currentDate);
+          nextByKey.set(toPickerDateKey(currentDate), currentDate);
         }
       });
       existingTimesheetDateKeys.forEach((existingDateKey) => {
-        const existingDate = parseDateKey(existingDateKey);
+        const existingDate = madridDateKeyToCalendarDate(existingDateKey) ?? parseDateKey(existingDateKey);
         if (isAllowedDate(existingDate)) {
           nextByKey.set(existingDateKey, existingDate);
         }
@@ -707,8 +719,8 @@ export const AssignJobDialog = ({
       const nextDates = Array.from(nextByKey.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([, nextDate]) => nextDate);
-      const currentKey = currentDates.map(formatDateKey).sort().join('|');
-      const nextKey = nextDates.map(formatDateKey).join('|');
+      const currentKey = currentDates.map(toPickerDateKey).sort().join('|');
+      const nextKey = nextDates.map(toPickerDateKey).join('|');
       return currentKey === nextKey ? currentDates : nextDates;
     });
   }, [

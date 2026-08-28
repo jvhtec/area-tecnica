@@ -224,7 +224,12 @@ export const OptimizedMatrixCell = memo(({
 
   // Get staffing button states
   const canAskAvailability = !hasAssignment && !isUnavailable && (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired');
-  const canSendOffer = staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
+  // !hasAssignment matches canAskAvailability and canOfferFallback below: an
+  // offer is for staffing someone who is not on the job yet. Without it, an
+  // assigned cell whose availability is confirmed rendered the desktop action
+  // group over the remove button — same top-right corner, and the actions carry
+  // z-10 — so the assignment could not be removed.
+  const canSendOffer = !hasAssignment && staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
   // Manual progression: allow offering even if availability isn't in confirmed state
   const canOfferFallback = !hasAssignment && !isUnavailable && !canSendOffer;
   const canShowOfferAction = canSendOffer || canOfferFallback;

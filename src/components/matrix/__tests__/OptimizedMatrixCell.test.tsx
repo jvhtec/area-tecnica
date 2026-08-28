@@ -390,6 +390,38 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.getByTitle('Enviar oferta por WhatsApp')).toBeInTheDocument();
   });
 
+  // The remove button and the desktop staffing actions share the top-right
+  // corner and the actions carry z-10, so they must never both render. The
+  // other two gates already excluded assigned cells; canSendOffer did not, so a
+  // confirmed-availability assignment covered its own remove button.
+  it('keeps the remove button reachable on an assigned cell with confirmed availability', () => {
+    const staffingStatus: MatrixStaffingStatus = {
+      availability_status: 'confirmed',
+      offer_status: null,
+    };
+
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        // Not confirmed: a confirmed assignment nulls staffingStatus outright,
+        // and with an assignment the cell reads the by-job status, not by-date.
+        assignment={{ ...mockAssignment, status: 'invited' }}
+        staffingStatusProvided={staffingStatus}
+      />
+    );
+
+    expect(screen.getByTitle('Eliminar asignación')).toBeInTheDocument();
+    expect(screen.queryByTitle('Enviar oferta')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Enviar oferta por WhatsApp')).not.toBeInTheDocument();
+  });
+
   it('can hide email staffing action buttons without hiding WhatsApp buttons', () => {
     render(
       <OptimizedMatrixCell

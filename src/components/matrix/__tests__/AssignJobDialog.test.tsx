@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import { createMockQueryBuilder } from '@/test/mockSupabase';
 import { AssignJobDialog } from '../AssignJobDialog';
+import { fromMadridDateKey } from '@/utils/timezoneUtils';
 
 const {
   useQueryMock,
@@ -282,6 +283,50 @@ describe('AssignJobDialog conflict handling', () => {
     expect(screen.queryByText(/conflicto de horario/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  // Everything the pickers hold is a calendar day — a local midnight standing
+  // for a date — because that is what react-day-picker renders and returns.
+  // Keying those with formatDateKey converts them as instants into Madrid, so a
+  // picked day was submitted one early east of Madrid. This pins the day that
+  // actually reaches the row; it fails if the picker layer goes back to
+  // formatDateKey while holding calendar values.
+  it('submits the technician\'s own day for multi-day coverage', async () => {
+    checkTimeConflictEnhancedMock.mockResolvedValue({
+      hasHardConflict: false,
+      hasSoftConflict: false,
+      hardConflicts: [],
+      softConflicts: [],
+      unavailabilityConflicts: [],
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <AssignJobDialog
+        open
+        onClose={vi.fn()}
+        technicianId="tech-3"
+        // The matrix passes the instant of Madrid midnight, not a local one.
+        date={fromMadridDateKey('2024-05-01')}
+        availableJobs={[baseJob]}
+        preSelectedJobId="job-1"
+      />
+    );
+
+    await user.click(screen.getByRole('combobox'));
+    await user.click(await screen.findByRole('option', { name: /foh\s+—\s+responsable/i }));
+
+    await user.click(screen.getByRole('tab', { name: /varios días/i }));
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    });
+    expect(insertMock.mock.calls[0][0]).toMatchObject({
+      assignment_date: '2024-05-01',
+      single_day: true,
     });
   });
 });
