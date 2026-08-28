@@ -30,6 +30,7 @@ const { getElementTreeMock, updateFlexElementHeaderMock, testState } = vi.hoiste
         department: "sound",
       },
     ],
+    crewCallsError: null as { message: string } | null,
   },
 }));
 
@@ -42,7 +43,7 @@ vi.mock("@/utils/flex-folders/getElementTree", () => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
-  type SupabaseResponse<T> = { data: T; error: null };
+  type SupabaseResponse<T> = { data: T; error: { message: string } | null };
   type SupabaseResult<T> = Promise<SupabaseResponse<T>>;
 
   class MockQueryBuilder {
@@ -76,7 +77,10 @@ vi.mock("@/integrations/supabase/client", () => {
       }
 
       if (this.table === "flex_crew_calls") {
-        return { data: testState.crewCalls, error: null };
+        return {
+          data: testState.crewCallsError ? null : testState.crewCalls,
+          error: testState.crewCallsError,
+        };
       }
 
       throw new Error(`Unexpected table in standard sync test: ${this.table}`);
@@ -106,6 +110,7 @@ import {
 
 describe("syncFlexElementsForJobDateChange standard jobs", () => {
   beforeEach(() => {
+    testState.crewCallsError = null;
     updateFlexElementHeaderMock.mockReset();
     updateFlexElementHeaderMock.mockResolvedValue(undefined);
     getElementTreeMock.mockReset();
@@ -192,6 +197,33 @@ describe("syncFlexElementsForJobDateChange standard jobs", () => {
       "sound-crew-call",
       "documentNumber",
       "260203HRCCS"
+    );
+  });
+
+  it("continues folder synchronization when the crew-call lookup fails", async () => {
+    testState.crewCallsError = { message: "temporarily unavailable" };
+
+    const result = await syncFlexElementsForJobDateChange(
+      "job-1",
+      "2026-02-03T10:00:00.000Z",
+      "2026-02-03T20:00:00.000Z",
+      "New Job",
+      "Old Job"
+    );
+
+    expect(result.failed).toBe(1);
+    expect(result.errors).toEqual([
+      "Failed to fetch Flex crew calls: temporarily unavailable",
+    ]);
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
+      "main-folder",
+      "documentNumber",
+      "260203"
+    );
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
+      "sound-folder",
+      "documentNumber",
+      "260203S"
     );
   });
 });

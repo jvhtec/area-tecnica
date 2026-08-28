@@ -58,6 +58,7 @@ export async function flexApiFetch(
   init: RequestInit = {},
 ): Promise<FlexApiResponse> {
   const method = (init.method || "GET").toUpperCase();
+  const normalizedEndpoint = normalizeFlexEndpoint(endpoint);
   const headers = serializeHeaders(init.headers);
   const body = typeof init.body === "string" ? init.body : undefined;
 
@@ -67,12 +68,23 @@ export async function flexApiFetch(
 
   const invocation = supabase.functions.invoke<FlexProxyEnvelope>("secure-flex-api", {
     body: {
-      endpoint: normalizeFlexEndpoint(endpoint),
+      endpoint: normalizedEndpoint,
       method,
       headers,
       body,
     },
   });
+
+  // Supabase's invocation cannot be cancelled. Only race requests whose late
+  // completion is safe; timing out folder creation could leave an untracked
+  // Flex element behind and a retry could create a duplicate.
+  const canTimeoutLocally =
+    method === "GET" ||
+    method === "HEAD" ||
+    normalizedEndpoint.endsWith("/header-update");
+  if (!canTimeoutLocally) {
+    return createFlexApiResponse(await invocation);
+  }
 
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -90,6 +102,12 @@ export async function flexApiFetch(
     }
   }
 
+  return createFlexApiResponse(result);
+}
+
+function createFlexApiResponse(
+  result: Awaited<ReturnType<typeof supabase.functions.invoke<FlexProxyEnvelope>>>,
+): FlexApiResponse {
   const { data, error } = result;
 
   if (error) {

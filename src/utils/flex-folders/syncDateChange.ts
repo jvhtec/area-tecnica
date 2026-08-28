@@ -474,7 +474,9 @@ export async function syncFlexElementsForJobDateChange(
     .eq("job_id", jobId);
 
   if (crewCallsError) {
-    throw new Error(`Failed to fetch Flex crew calls: ${crewCallsError.message}`);
+    console.error("[syncFlexElements] Error fetching flex_crew_calls:", crewCallsError);
+    results.failed++;
+    results.errors.push(`Failed to fetch Flex crew calls: ${crewCallsError.message}`);
   }
 
   const recordedCrewCalls = crewCalls || [];
@@ -495,7 +497,7 @@ export async function syncFlexElementsForJobDateChange(
       jobTitle,
       Boolean(newTitle)
     );
-    return mergeSyncResults(dryhireResult, crewResult);
+    return mergeSyncResults(results, dryhireResult, crewResult);
   }
 
   if (isTourDateJob) {
@@ -533,10 +535,10 @@ export async function syncFlexElementsForJobDateChange(
       jobTitle,
       Boolean(newTitle)
     );
-    return mergeSyncResults(folderResult, crewResult);
+    return mergeSyncResults(results, folderResult, crewResult);
   }
 
-  return syncStandardFlexElementsForJobDateChange(
+  const standardResult = await syncStandardFlexElementsForJobDateChange(
     folders,
     recordedCrewCalls,
     newBaseDocNumber,
@@ -548,6 +550,7 @@ export async function syncFlexElementsForJobDateChange(
     newTitle,
     previousTitle
   );
+  return mergeSyncResults(results, standardResult);
 }
 
 /**
