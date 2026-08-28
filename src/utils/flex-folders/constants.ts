@@ -28,6 +28,7 @@ export const FLEX_FOLDER_IDS = {
 export const DEPARTMENT_IDS = {
   sound: "cdd5e372-d124-11e1-bba1-00e08175e43e",
   lights: "d5af7892-d124-11e1-bba1-00e08175e43e",
+  estructura: "90160552-20b4-48a8-bac6-7917fe831eb1",
   video: "a89d124d-7a95-4384-943e-49f5c0f46b23",
   production: "890811c3-fe3f-45d7-af6b-7ca4a807e84d",
   personnel: "b972d682-598d-4802-a390-82e28dc4480e",
@@ -52,6 +53,7 @@ export const RESPONSIBLE_PERSON_IDS = {
 export const DEPARTMENT_SUFFIXES = {
   sound: "S",
   lights: "L",
+  estructura: "E",
   video: "V",
   production: "P",
   personnel: "HR",

@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ImportedLaSession } from '../importedLaSession';
 import type { StrictGroupedPushResult } from '@/services/flexPullsheets';
 
-const { getTargetsMock, pushMock, toastMock, equipmentRangeMock, equipmentRows } = vi.hoisted(() => ({
+const { getTargetsMock, resolveEstructuraTargetsMock, pushMock, toastMock, equipmentRangeMock, equipmentRows } = vi.hoisted(() => ({
   getTargetsMock: vi.fn(),
+  resolveEstructuraTargetsMock: vi.fn(),
   pushMock: vi.fn(),
   toastMock: vi.fn(),
   equipmentRangeMock: vi.fn(),
@@ -36,6 +37,9 @@ vi.mock('@/services/flexPullsheets', async (importOriginal) => {
     pushEquipmentToFlexDocumentStrict: pushMock,
   };
 });
+vi.mock('@/services/estructuraMotorPreparation', () => ({
+  resolveEstructuraPullSheetTargets: resolveEstructuraTargetsMock,
+}));
 
 import { XmlpFlexExportDialog } from '../XmlpFlexExportDialog';
 
@@ -96,6 +100,12 @@ describe('XmlpFlexExportDialog', () => {
       },
     ]);
     pushMock.mockResolvedValue(successfulResult);
+    resolveEstructuraTargetsMock.mockResolvedValue({
+      targets: {
+        sound: { id: 'estructura-sound-row', elementId: 'estructura-sound-id', sourceDepartment: 'sound' },
+      },
+      missing: ['lights'],
+    });
   });
 
   it('previews mapped/unmapped lines, auto-selects one Presupuesto, and sends only confirmed selections', async () => {
@@ -164,6 +174,57 @@ describe('XmlpFlexExportDialog', () => {
     expect(selected).toBeChecked();
     expect(confirmation).toBeChecked();
     expect(send).toBeEnabled();
+  });
+
+  it('routes only Pesos/XMLP motors to the tracked Estructura Sonido Pull Sheet', async () => {
+    const motorModelId = 'eb81f94a-55b9-4b52-b47b-05744093add5';
+    equipmentRangeMock.mockResolvedValue({
+      data: [
+        ...equipmentRows,
+        {
+          id: 'motor-row',
+          name: 'Motor Elevacion ChainMaster D8+ 750kg - 24 m',
+          department: 'lights',
+          category: 'rigging',
+          resource_id: motorModelId,
+        },
+      ],
+      error: null,
+    });
+    const imported = session('job-id');
+    Object.assign(imported.map.flysheet!.arrays[0], {
+      deployment: 'flown',
+      totalMassKg: 600,
+      pickupConfiguration: 'F: 1 / R: 2',
+    });
+
+    render(<XmlpFlexExportDialog open onOpenChange={vi.fn()} session={imported} />);
+    expect(await screen.findByText('Motores separados por responsabilidad')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Entiendo que el envío es aditivo/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar seleccionados a Flex' }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledTimes(2));
+    expect(pushMock).toHaveBeenCalledWith(
+      { elementId: 'quote-id', documentType: 'presupuesto' },
+      expect.arrayContaining([
+        expect.objectContaining({ resourceId: 'k2-resource', flexCategoryKey: 'pa_mains' }),
+      ]),
+    );
+    expect(pushMock).toHaveBeenCalledWith(
+      { elementId: 'estructura-sound-id', documentType: 'pullsheet' },
+      [{
+        resourceId: motorModelId,
+        quantity: 2,
+        name: 'MOTOR 750Kg',
+        flexCategoryKey: 'motores_controles',
+      }],
+    );
+    const ordinaryPush = pushMock.mock.calls.find(
+      ([destination]) => destination.elementId === 'quote-id',
+    );
+    expect(ordinaryPush?.[1]).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ flexCategoryKey: 'motores_controles' }),
+    ]));
   });
 
   it('allows deselecting a complete group', async () => {

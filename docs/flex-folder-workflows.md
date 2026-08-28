@@ -3,6 +3,23 @@
 ## Overview
 This document summarizes how Flex folders are provisioned for jobs, tours, and tour dates in the application. It captures entry points, supporting utilities, Supabase functions, and database side effects so future updates can maintain parity across workflows.
 
+## Estructura operational invariant
+
+`Estructura` is an always-created Flex/warehouse department, not a selectable job department. It owns motors, motor controllers, and their associated control/power cabling. Bumpers, frames, truss, steels, and other general rigging remain with Sound or Lights according to their technical origin.
+
+For every standard job with normal Flex folders, the tracked hierarchy is:
+
+```text
+<Job>
+└── Estructura                         260828E
+    ├── <Job> - Estructura Sonido      260828ES
+    └── <Job> - Estructura Luces       260828EL
+```
+
+Both children are `folder_type = 'pull_sheet'` and `department = 'estructura'`. Their source is persisted explicitly as `source_department = 'sound'` or `'lights'`; names are display text, never the primary discriminator. The Sound sheet uses the Sound responsible person and the Lights sheet uses the Lights responsible person. The parent uses the existing main/general responsible.
+
+Creation and reconciliation do not depend on `job_departments` or folder-picker options. The selectable technical department union remains unchanged, so Estructura does not appear in job creation, job editing, or the Flex folder picker. Partial unique indexes permit at most one tracked Estructura Pull Sheet per source for either a linked job or a tour date whose job has not been linked yet, while legacy rows with a null discriminator continue to work.
+
 ## Job Flex Folder Creation
 
 ### Entry Points in the UI
@@ -17,6 +34,10 @@ The heavy lifting lives in `src/utils/flex-folders/folders.ts`. The helper orche
 * **Tour date jobs.** Require existing tour root folders, look up selected departments, and create department subfolders beneath the tour’s saved Flex IDs. Each folder is stored locally (`folder_type: "tourdate"`) and optional structures (hoja info, documentación técnica, pull sheets, crew calls, etc.) are gated by department selections and UI options.【F:src/utils/flex-folders/folders.ts†L252-L533】 Crew call elements update `flex_crew_calls` so the job retains pointers back to Flex.【F:src/utils/flex-folders/folders.ts†L506-L533】
 * **Standard jobs.** Create the main event folder, persist it (`folder_type: "main_event"`), and then iterate per department. The helper respects department enablement, provisions specialty elements (hoja info, documentación técnica, presupuestos, gastos, comercial extras, crew calls), and writes the relationships into `flex_folders` with `folder_type: "department"` for traceability.【F:src/utils/flex-folders/folders.ts†L538-L737】
 
+The Estructura hierarchy is created immediately below the standard-job root before selectable departments are processed. Re-running creation reuses the locally tracked Estructura folder and source-discriminated sheets instead of blindly creating remote duplicates.
+
+Dry hire deliberately retains its existing department-specific folder plus Presupuesto model. Applying the standard Estructura hierarchy there would conflict with that special commercial structure, so `Preparar motores` is also hidden for dry-hire jobs.
+
 All branches call the shared `createFlexFolder` fetch wrapper (Flex API `POST /element`) and rely on `supabase` inserts to mirror the Flex hierarchy locally.【F:src/utils/flex-folders/api.ts†L1-L28】【F:src/utils/flex-folders/folders.ts†L556-L609】
 
 ## Tour and Tour-Date Flex Folder Workflows
@@ -26,6 +47,8 @@ Tours can trigger folder creation via the edge function at `supabase/functions/c
 
 * **Root folders.** The function determines enabled departments from tour jobs, creates the main folder plus department subfolders in Flex, persists created IDs back onto the `tours` row, and logs management-visible activity events.【F:supabase/functions/create-flex-folders/index.ts†L138-L235】
 * **Date folders.** When asked to build tour-date folders, it enumerates dates, creates a date folder under the tour’s main element, conditionally creates department folders beneath each date, and inserts a `flex_folders` record tied to the `tour_date_id`. It also broadcasts a `flex.tourdate_folder.created` push notification and logs activity.【F:supabase/functions/create-flex-folders/index.ts†L237-L378】
+
+Tour roots always reconcile `Tour / Estructura` and persist its UUID in `tours.flex_estructura_folder_id`, including legacy tours already marked `flex_folders_created`. Each tour date then reconciles an Estructura date folder and its two source-discriminated Pull Sheets independently of selected tour departments. Rows created by bulk date creation before a linked job exists use `tour_date_id`; the job workflow adopts those rows by adding `job_id` instead of creating duplicates.
 
 The UI wires into this function through `createTourRootFolders` and `createTourDateFolders` utilities, which invoke the function with the appropriate payload and bubble errors to the calling components.【F:src/utils/tourFolders.ts†L14-L63】 `TourCard` exposes these flows to users, blocking date-folder creation until root folders exist.【F:src/components/tours/TourCard.tsx†L110-L160】
 

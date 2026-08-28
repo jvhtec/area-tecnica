@@ -137,6 +137,9 @@ describe("createAllFoldersForJob folder picker options", () => {
     const names = createFlexFolderMock.mock.calls.map(([payload]) => payload?.name);
 
     expect(names).toContain("Test Job - Documentación Técnica - Sound");
+    expect(names).toContain("Test Job - Estructura");
+    expect(names).toContain("Test Job - Estructura Sonido");
+    expect(names).toContain("Test Job - Estructura Luces");
     expect(names.some((name: string) => name.includes(" - Documentación Técnica - Production"))).toBe(false);
     expect(names.some((name: string) => name.includes("Presupuestos Recibidos"))).toBe(false);
     expect(names.some((name: string) => name.includes("Hoja de Gastos"))).toBe(false);

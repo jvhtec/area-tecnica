@@ -1,5 +1,6 @@
 import type { Database } from "@/integrations/supabase/types";
 import type { CreateFoldersOptions } from "@/utils/flex-folders/types";
+import type { EstructuraSourceDepartment } from "@/domain/estructura";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 
@@ -32,6 +33,7 @@ export type FlexFolderRow = {
   parent_id: string | null;
   folder_type: string | null;
   department: string | null;
+  source_department: EstructuraSourceDepartment | null;
 };
 
 export type FolderCreationBaseArgs = {
@@ -45,6 +47,7 @@ export type FolderCreationBaseArgs = {
 
 export type ExistingFolderMaps = {
   existingDepartmentMap: Map<string, FlexFolderRow>;
+  existingEstructuraPullSheetMap: Map<EstructuraSourceDepartment, FlexFolderRow>;
   existingTourDateDepartmentMap: Map<string, FlexFolderRow>;
   existingWorkOrderMap: Map<string, FlexFolderRow>;
 };

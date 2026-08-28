@@ -1,5 +1,9 @@
 import { formatInTimeZone } from "date-fns-tz";
 
+import {
+  ESTRUCTURA_DEPARTMENT,
+  isEstructuraSourceDepartment,
+} from "@/domain/estructura";
 import { supabase } from "@/integrations/supabase/client";
 import { createFlexFolder } from "@/utils/flex-folders/api";
 import {
@@ -10,6 +14,7 @@ import {
 } from "@/utils/flex-folders/constants";
 import { getDepartmentCustomPullsheetMetadata, type DepartmentKey } from "@/utils/flex-folders/types";
 import { createComercialExtras } from "@/utils/flex-folders/folder-creation/createComercialExtras";
+import { ensureEstructuraFolders } from "@/utils/flex-folders/folder-creation/createEstructuraFolders";
 import {
   buildPullsheetTemplates,
   getTourJobDepartments,
@@ -27,7 +32,7 @@ import type {
 
 type CreateTourdateFoldersArgs = FolderCreationBaseArgs & Pick<
   ExistingFolderMaps,
-  "existingTourDateDepartmentMap"
+  "existingEstructuraPullSheetMap" | "existingTourDateDepartmentMap"
 > & {
   existingFolders: FlexFolderRow[];
 };
@@ -37,6 +42,7 @@ const FOLDER_LABEL_TIMEZONE = "Europe/Madrid";
 export const createTourdateFolders = async ({
   documentNumber,
   existingFolders,
+  existingEstructuraPullSheetMap,
   existingTourDateDepartmentMap,
   formattedEndDate,
   formattedStartDate,
@@ -59,6 +65,7 @@ export const createTourdateFolders = async ({
       id,
       name,
       flex_main_folder_id,
+      flex_estructura_folder_id,
       flex_sound_folder_id,
       flex_lights_folder_id,
       flex_video_folder_id,
@@ -81,7 +88,7 @@ export const createTourdateFolders = async ({
   if (job.tour_date_id) {
     const { data: existingTourDateFolders, error: existingTourDateFoldersError } = await supabase
       .from("flex_folders")
-      .select("id, element_id, parent_id, folder_type, department")
+      .select("id, element_id, parent_id, folder_type, department, source_department")
       .eq("tour_date_id", job.tour_date_id)
       .eq("folder_type", "tourdate");
 
@@ -96,6 +103,33 @@ export const createTourdateFolders = async ({
     for (const folder of existingTourDateFolders ?? []) {
       if (folder.department && !existingTourDateDepartmentMap.has(folder.department)) {
         existingTourDateDepartmentMap.set(folder.department, folder as FlexFolderRow);
+      }
+    }
+
+    const { data: existingEstructuraRows, error: existingEstructuraError } = await supabase
+      .from("flex_folders")
+      .select("id, element_id, parent_id, folder_type, department, source_department, job_id")
+      .eq("tour_date_id", job.tour_date_id)
+      .eq("department", ESTRUCTURA_DEPARTMENT);
+    if (existingEstructuraError) throw existingEstructuraError;
+
+    for (const folder of existingEstructuraRows ?? []) {
+      if (!folder.job_id) {
+        const { error: adoptionError } = await supabase
+          .from("flex_folders")
+          .update({ job_id: job.id })
+          .eq("id", folder.id);
+        if (adoptionError) throw adoptionError;
+      }
+      const typedFolder = { ...folder, job_id: job.id } as FlexFolderRow;
+      if (folder.folder_type === "tourdate") {
+        existingTourDateDepartmentMap.set(ESTRUCTURA_DEPARTMENT, typedFolder);
+      }
+      if (
+        folder.folder_type === "pull_sheet" &&
+        isEstructuraSourceDepartment(folder.source_department)
+      ) {
+        existingEstructuraPullSheetMap.set(folder.source_department, typedFolder);
       }
     }
   }
@@ -126,6 +160,32 @@ export const createTourdateFolders = async ({
   ];
   const locationName = resolveTourdateLocationName(job);
   const formattedDate = formatInTimeZone(new Date(job.start_time), FOLDER_LABEL_TIMEZONE, "MMM d, yyyy");
+
+  if (!tourData.flex_estructura_folder_id) {
+    throw new Error("La gira todavía no tiene la carpeta operativa Estructura. Reconcilia primero las carpetas raíz de la gira.");
+  }
+  const { data: estructuraTourRows, error: estructuraTourError } = await supabase
+    .from("flex_folders")
+    .select("id")
+    .eq("element_id", tourData.flex_estructura_folder_id)
+    .limit(1);
+  if (estructuraTourError) throw estructuraTourError;
+
+  const estructuraDateFolder = await ensureEstructuraFolders({
+    jobId: job.id,
+    tourDateId: job.tour_date_id ?? null,
+    parentElementId: tourData.flex_estructura_folder_id,
+    parentTrackingId: estructuraTourRows?.[0]?.id ?? tourData.flex_estructura_folder_id,
+    existingDepartmentFolder: existingTourDateDepartmentMap.get("estructura"),
+    existingPullSheets: existingEstructuraPullSheetMap,
+    departmentFolderName: `${locationName} - ${formattedDate} - Estructura`,
+    pullSheetNamePrefix: safeJobTitle,
+    documentNumber,
+    plannedStartDate: formattedStartDate,
+    plannedEndDate: formattedEndDate,
+  });
+  existingTourDateDepartmentMap.set("estructura", estructuraDateFolder);
+
   const existingPersonnelSubfolderMap = new Map<string, FlexFolderRow>();
   for (const folder of existingFolders) {
     if (folder.department !== "personnel") continue;

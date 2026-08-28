@@ -126,7 +126,7 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
     };
 
     // Include all departments to match the job creation
-    const departments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial'] as const;
+    const departments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial', 'estructura'] as const;
     
     for (const dept of departments) {
       const subFolderPayload = {
@@ -141,7 +141,9 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
         departmentId: DEPARTMENT_IDS[dept],
         notes: `Manual subfolder creation for ${dept}`,
         documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`,
-        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
+        personResponsibleId: dept === 'estructura'
+          ? FLEX_FOLDER_IDS.mainResponsible
+          : RESPONSIBLE_PERSON_IDS[dept]
       };
 
       console.log(`Creating subfolder for ${dept} with payload:`, subFolderPayload);
@@ -151,7 +153,9 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
         console.log(`${dept} subfolder created:`, subFolder);
 
         folderUpdates[`flex_${dept}_folder_id`] = subFolder.elementId;
-        folderUpdates[`flex_${dept}_folder_number`] = subFolder.elementNumber;
+        if (dept !== 'estructura') {
+          folderUpdates[`flex_${dept}_folder_number`] = subFolder.elementNumber;
+        }
 
         await supabase
           .from("flex_folders")
@@ -164,7 +168,7 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
           });
 
         // Create department-specific hojaInfo elements for sound, lights, and video only
-        if (["sound", "lights", "video"].includes(dept)) {
+        if (dept === "sound" || dept === "lights" || dept === "video") {
           const hojaInfoType = dept === "sound" 
             ? FLEX_FOLDER_IDS.hojaInfoSx 
             : dept === "lights" 
@@ -196,7 +200,7 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
         }
 
         // Create additional subfolders only for technical departments (sound, lights, video, production)
-        if (["sound", "lights", "video", "production"].includes(dept)) {
+        if (dept === "sound" || dept === "lights" || dept === "video" || dept === "production") {
           const additionalSubfolders = [
             {
               definitionId: FLEX_FOLDER_IDS.documentacionTecnica,

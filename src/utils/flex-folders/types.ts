@@ -9,6 +9,9 @@ export type DepartmentKey =
   | "personnel"
   | "comercial";
 
+export type OperationalFlexDepartment = "estructura";
+export type FlexDepartmentKey = DepartmentKey | OperationalFlexDepartment;
+
 // Toggleable items per department
 export type SubfolderKey =
   | "hojaInfo" // SIP/LIP/VIP (only for sound/lights/video)

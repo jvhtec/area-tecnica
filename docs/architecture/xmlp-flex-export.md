@@ -12,7 +12,8 @@ normalized NwmMap (React memory only)
        ↓ exact equipment/resource resolution
      inspectable selection preview
        ↓ strict grouped writer
-     Pull Sheet or Presupuesto
+     ordinary Sound Pull Sheet or Presupuesto
+       + tracked Estructura Sonido Pull Sheet for motor lines only
 
 Separate NM/SV designer
   ↓ same parse-la-session boundary
@@ -71,6 +72,8 @@ Motor selection remains inside `buildXmlpWeightTables`:
 - no fallback to an undersized motor;
 - structured requirements returned alongside Pesos tables.
 
+At write time the XMLP package is partitioned by ownership. `motores_controles` candidates derived from Pesos are sent only to the tracked `Estructura Sonido` Pull Sheet resolved by job ID and `source_department = 'sound'`. Speakers, amplifiers, PDUs, bumpers, frames, and other `rigging_hardware` remain in the ordinary Sound document selected by the operator. A pasted arbitrary URL is never accepted as the motor destination. If the import is not linked to a job, the motor portion cannot be sent because its deterministic Estructura target cannot be resolved.
+
 PDU selection remains inside the Consumos path. `buildCalculatedXmlpPowerRequirements` uses the Sound component catalog, 20% safety margin, 0.95 power factor, three-phase 400 V settings, existing PDU options, and the 80% planning-load recommendation. Flex consumes only its structured PDU result; XMLP amplifier units remain the only source of amplifier equipment lines.
 
 Compatible LA4/LA4X/LA8/LA12X units share one container-only packaging calculation:
@@ -110,6 +113,8 @@ Transports are:
 - Presupuesto: `/financial-document-line-item/{document}/add-resource/{resource}`.
 
 For each selected non-empty group, the strict writer creates its header and captures the returned line-item ID before adding children with `parentLineItemId`. If the header fails, every child in that group is skipped and reported; children never fall back to the root. Other groups continue independently.
+
+The ordinary Sound and Estructura Sonido writes settle independently and a partial failure is reported. This XMLP route is optional: XMLP state is deliberately transient React memory, so it is not used as a hidden persistent default for the job-card motor dialog. The manual `Preparar motores` workflow remains authoritative for jobs with or without XMLP.
 
 ## Duplicate behavior and security
 

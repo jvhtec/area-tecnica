@@ -3,6 +3,17 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
+import {
+  ESTRUCTURA_DEPARTMENT,
+  ESTRUCTURA_PULL_SHEETS,
+  ESTRUCTURA_SOURCE_DEPARTMENTS,
+} from "../../../src/domain/estructura.ts";
+import {
+  DEPARTMENT_IDS,
+  DEPARTMENT_SUFFIXES,
+  FLEX_FOLDER_IDS,
+  RESPONSIBLE_PERSON_IDS,
+} from "../../../src/utils/flex-folders/constants.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +23,8 @@ const corsHeaders = {
 }
 
 const FLEX_API_BASE_URL = 'https://api.intranet.sectorpro.es';
+const FLEX_DIRECT_API_BASE_URL = Deno.env.get('FLEX_API_BASE_URL') ||
+  'https://sectorpro.flexrentalsolutions.com/f5/api';
 
 interface FlexFolderPayload {
   parent_id?: string;
@@ -24,6 +37,72 @@ interface FlexFolderResponse {
   name: string;
   parent_id?: string;
 }
+
+interface TypedFlexElementResponse {
+  elementId: string;
+}
+
+type AppSupabaseClient = ReturnType<typeof createClient>;
+
+interface TourFlexRecord {
+  id: string;
+  name: string;
+  flex_main_folder_id: string | null;
+  flex_estructura_folder_id: string | null;
+}
+
+interface TourDateRecord {
+  id: string;
+  date: string;
+}
+
+interface LinkedTourDateJob {
+  id: string;
+  tour_date_id: string | null;
+  title: string | null;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+interface EstructuraTrackedRow {
+  id: string;
+  element_id: string;
+  folder_type: string;
+  source_department: string | null;
+  job_id: string | null;
+}
+
+async function createTypedFlexElement(
+  payload: Record<string, unknown>,
+  authToken: string,
+): Promise<TypedFlexElementResponse> {
+  const response = await fetchWithRetry(`${FLEX_DIRECT_API_BASE_URL}/element`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Auth-Token': authToken,
+      apikey: authToken,
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-API-Client': 'flex5-desktop',
+    },
+    body: JSON.stringify(payload),
+  }, { retryOnTimeout: false });
+  if (!response.ok) {
+    throw new Error(`Flex returned ${response.status} while creating an Estructura element`);
+  }
+  const result = await response.json() as TypedFlexElementResponse;
+  if (!result.elementId) throw new Error('Flex returned no elementId for an Estructura element');
+  return result;
+}
+
+const flexDate = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid Flex date: ${value}`);
+  return `${date.toISOString().split('.')[0]}.000Z`;
+};
+
+const tourDateDocumentNumber = (value: string): string =>
+  new Date(value).toISOString().slice(2, 10).replaceAll('-', '');
 
 async function resolveActorName(supabase: ReturnType<typeof createClient>, actorId: string | null): Promise<string | null> {
   if (!actorId) return null;
@@ -113,6 +192,146 @@ function shouldCreateDepartmentFolder(department: string, selectedDepartments: s
   return false;
 }
 
+async function ensureTrackedTourEstructuraRoot(
+  supabase: AppSupabaseClient,
+  tour: TourFlexRecord,
+  authToken: string,
+): Promise<string> {
+  if (!tour.flex_main_folder_id) {
+    throw new Error('Tour root folder must exist before Estructura');
+  }
+
+  let elementId = tour.flex_estructura_folder_id as string | null;
+  if (!elementId) {
+    const created = await createFlexFolder({
+      parent_id: tour.flex_main_folder_id,
+      name: 'Estructura',
+      description: `Estructura folder for ${tour.name}`,
+    }, authToken);
+    elementId = created.id;
+    const { error: updateError } = await supabase
+      .from('tours')
+      .update({ flex_estructura_folder_id: elementId })
+      .eq('id', tour.id);
+    if (updateError) throw updateError;
+    tour.flex_estructura_folder_id = elementId;
+  }
+
+  const { data: tracked, error: trackedError } = await supabase
+    .from('flex_folders')
+    .select('id')
+    .eq('element_id', elementId)
+    .limit(1);
+  if (trackedError) throw trackedError;
+  if (!tracked?.length) {
+    const { error: insertError } = await supabase.from('flex_folders').insert({
+      job_id: null,
+      parent_id: tour.flex_main_folder_id,
+      element_id: elementId,
+      department: ESTRUCTURA_DEPARTMENT,
+      folder_type: 'tour_department',
+    });
+    if (insertError) throw insertError;
+  }
+
+  return elementId;
+}
+
+async function ensureTourDateEstructura(
+  supabase: AppSupabaseClient,
+  tour: TourFlexRecord,
+  tourDate: TourDateRecord,
+  linkedJob: LinkedTourDateJob | undefined,
+  authToken: string,
+): Promise<void> {
+  const parentElementId = await ensureTrackedTourEstructuraRoot(supabase, tour, authToken);
+  const { data: existingRows, error: existingError } = await supabase
+    .from('flex_folders')
+    .select('id, element_id, folder_type, source_department, job_id')
+    .eq('tour_date_id', tourDate.id)
+    .eq('department', ESTRUCTURA_DEPARTMENT);
+  if (existingError) throw existingError;
+
+  const jobId = linkedJob?.id ?? null;
+  const dateValue = String(linkedJob?.start_time || tourDate.date);
+  const endValue = String(linkedJob?.end_time || `${String(tourDate.date).slice(0, 10)}T23:59:59Z`);
+  const dateLabel = new Date(tourDate.date).toISOString().split('T')[0];
+  const documentNumber = tourDateDocumentNumber(dateValue);
+  const trackedRows = (existingRows || []) as EstructuraTrackedRow[];
+  let dateFolder = trackedRows.find((row) => row.folder_type === 'tourdate');
+
+  if (!dateFolder) {
+    const created = await createTypedFlexElement({
+      definitionId: FLEX_FOLDER_IDS.subFolder,
+      parentElementId,
+      open: true,
+      locked: false,
+      name: `${dateLabel} - ${tour.name} - Estructura`,
+      plannedStartDate: flexDate(dateValue),
+      plannedEndDate: flexDate(endValue),
+      locationId: FLEX_FOLDER_IDS.location,
+      departmentId: DEPARTMENT_IDS.estructura,
+      documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES.estructura}`,
+      personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
+    }, authToken);
+    const { data, error } = await supabase
+      .from('flex_folders')
+      .insert({
+        tour_date_id: tourDate.id,
+        job_id: jobId,
+        parent_id: parentElementId,
+        element_id: created.elementId,
+        folder_type: 'tourdate',
+        department: ESTRUCTURA_DEPARTMENT,
+      })
+      .select('id, element_id, folder_type, source_department, job_id')
+      .single();
+    if (error || !data) throw error || new Error('Unable to track Estructura tour-date folder');
+    dateFolder = data;
+  } else if (!dateFolder.job_id && jobId) {
+    const { error } = await supabase.from('flex_folders').update({ job_id: jobId }).eq('id', dateFolder.id);
+    if (error) throw error;
+  }
+
+  for (const sourceDepartment of ESTRUCTURA_SOURCE_DEPARTMENTS) {
+    const existing = trackedRows.find(
+      (row) => row.folder_type === 'pull_sheet' && row.source_department === sourceDepartment,
+    );
+    if (existing) {
+      if (!existing.job_id && jobId) {
+        const { error } = await supabase.from('flex_folders').update({ job_id: jobId }).eq('id', existing.id);
+        if (error) throw error;
+      }
+      continue;
+    }
+
+    const config = ESTRUCTURA_PULL_SHEETS[sourceDepartment];
+    const created = await createTypedFlexElement({
+      definitionId: FLEX_FOLDER_IDS.pullSheet,
+      parentElementId: dateFolder.element_id,
+      open: true,
+      locked: false,
+      name: `${linkedJob?.title || `${dateLabel} - ${tour.name}`} - ${config.nameSuffix}`,
+      plannedStartDate: flexDate(dateValue),
+      plannedEndDate: flexDate(endValue),
+      locationId: FLEX_FOLDER_IDS.location,
+      departmentId: DEPARTMENT_IDS.estructura,
+      documentNumber: `${documentNumber}${config.documentSuffix}`,
+      personResponsibleId: RESPONSIBLE_PERSON_IDS[sourceDepartment],
+    }, authToken);
+    const { error } = await supabase.from('flex_folders').insert({
+      tour_date_id: tourDate.id,
+      job_id: jobId,
+      parent_id: dateFolder.id,
+      element_id: created.elementId,
+      folder_type: 'pull_sheet',
+      department: ESTRUCTURA_DEPARTMENT,
+      source_department: sourceDepartment,
+    });
+    if (error) throw error;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -159,6 +378,7 @@ serve(async (req) => {
       // Idempotency guard: a re-run (double click, client retry) must not
       // create a duplicate folder tree in Flex.
       console.log("Root folders already exist for tour, skipping creation:", tour.name)
+      await ensureTrackedTourEstructuraRoot(supabase, tour, authToken)
     } else if (createRootFolders) {
       console.log("Creating root folders for tour:", tour.name)
 
@@ -191,6 +411,13 @@ serve(async (req) => {
         folderIds[dept] = deptFolder.id
       }
 
+      const estructuraFolder = await createFlexFolder({
+        parent_id: mainFolder.id,
+        name: 'Estructura',
+        description: `Estructura folder for ${tour.name}`,
+      }, authToken)
+      folderIds.estructura = estructuraFolder.id
+
       // Update tour with folder IDs (only for created folders)
       const updateData: any = {
         flex_folders_created: true,
@@ -204,6 +431,7 @@ serve(async (req) => {
       if (folderIds.production) updateData.flex_production_folder_id = folderIds.production
       if (folderIds.personnel) updateData.flex_personnel_folder_id = folderIds.personnel
       if (folderIds.comercial) updateData.flex_comercial_folder_id = folderIds.comercial
+      updateData.flex_estructura_folder_id = folderIds.estructura
 
       const { error: updateError } = await supabase
         .from('tours')
@@ -211,6 +439,17 @@ serve(async (req) => {
         .eq('id', tourId)
 
       if (updateError) throw updateError
+
+      const { error: estructuraTrackingError } = await supabase.from('flex_folders').insert({
+        job_id: null,
+        parent_id: folderIds.main,
+        element_id: folderIds.estructura,
+        department: ESTRUCTURA_DEPARTMENT,
+        folder_type: 'tour_department',
+      })
+      if (estructuraTrackingError) throw estructuraTrackingError
+
+      Object.assign(tour, updateData)
 
       result.data = { ...tour, ...folderIds, flex_folders_created: true }
 
@@ -251,6 +490,18 @@ serve(async (req) => {
       const selectedDepartments = await getTourDepartments(supabase, tourId);
       console.log("Selected departments for date folder creation:", selectedDepartments);
 
+      const { data: linkedJobs, error: linkedJobsError } = await supabase
+        .from('jobs')
+        .select('id, tour_date_id, title, start_time, end_time')
+        .eq('tour_id', tourId);
+      if (linkedJobsError) throw linkedJobsError;
+      const typedLinkedJobs = (linkedJobs || []) as LinkedTourDateJob[];
+      const jobsByTourDate = new Map<string, LinkedTourDateJob>(
+        typedLinkedJobs
+          .filter((job): job is LinkedTourDateJob & { tour_date_id: string } => Boolean(job.tour_date_id))
+          .map((job) => [job.tour_date_id, job]),
+      );
+
       // Idempotency guard: skip dates that already have a Flex folder so a
       // re-run only fills in the missing ones. A failed read must abort —
       // treating it as "no folders" would recreate the whole tree in Flex.
@@ -267,6 +518,13 @@ serve(async (req) => {
       // Create folders for each tour date
       let createdDateCount = 0
       for (const tourDate of tourDates) {
+        await ensureTourDateEstructura(
+          supabase,
+          tour,
+          tourDate,
+          jobsByTourDate.get(tourDate.id),
+          authToken,
+        )
         if (datesWithFolders.has(tourDate.id)) {
           console.log("Date folder already exists, skipping:", tourDate.date)
           continue

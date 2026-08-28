@@ -3,6 +3,7 @@ import { Department } from "@/types/department";
 import { InvoicingCompany } from "@/types/job";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { createFlexFolder } from "@/utils/flex-folders/api";
+import { ESTRUCTURA_DEPARTMENT } from "@/domain/estructura";
 import { 
   FLEX_FOLDER_IDS, 
   DEPARTMENT_IDS, 
@@ -55,7 +56,15 @@ export const useTourCreationMutation = () => {
       };
 
       // Include all departments to match the job creation
-      const departments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial'] as const;
+      const departments = [
+        'sound',
+        'lights',
+        'video',
+        'production',
+        'personnel',
+        'comercial',
+        ESTRUCTURA_DEPARTMENT,
+      ] as const;
       
       for (const dept of departments) {
         const subFolderPayload = {
@@ -70,7 +79,9 @@ export const useTourCreationMutation = () => {
           departmentId: DEPARTMENT_IDS[dept],
           notes: `Automated subfolder creation for ${dept}`,
           documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
+          personResponsibleId: dept === ESTRUCTURA_DEPARTMENT
+            ? FLEX_FOLDER_IDS.mainResponsible
+            : RESPONSIBLE_PERSON_IDS[dept]
         };
 
         console.log(`Creating subfolder for ${dept} with payload:`, subFolderPayload);
@@ -80,7 +91,9 @@ export const useTourCreationMutation = () => {
           console.log(`${dept} subfolder created:`, subFolder);
 
           folderUpdates[`flex_${dept}_folder_id`] = subFolder.elementId;
-          folderUpdates[`flex_${dept}_folder_number`] = subFolder.elementNumber;
+          if (dept !== ESTRUCTURA_DEPARTMENT) {
+            folderUpdates[`flex_${dept}_folder_number`] = subFolder.elementNumber;
+          }
 
           await supabase
             .from("flex_folders")
@@ -93,7 +106,7 @@ export const useTourCreationMutation = () => {
             });
 
           // Create department-specific hojaInfo elements for sound, lights, and video only
-          if (["sound", "lights", "video"].includes(dept)) {
+          if (dept === "sound" || dept === "lights" || dept === "video") {
             const hojaInfoType = dept === "sound" 
               ? FLEX_FOLDER_IDS.hojaInfoSx 
               : dept === "lights" 
@@ -126,7 +139,7 @@ export const useTourCreationMutation = () => {
 
           // Create additional subfolders only for technical departments (sound, lights, video, production)
           // Skip personnel and comercial departments to keep them empty
-          if (["sound", "lights", "video", "production"].includes(dept)) {
+          if (dept === "sound" || dept === "lights" || dept === "video" || dept === "production") {
             const additionalSubfolders = [
               {
                 definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
