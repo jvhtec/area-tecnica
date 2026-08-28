@@ -28,7 +28,10 @@ import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
-import { syncFlexElementsForJobDateChange } from "@/utils/flex-folders/syncDateChange";
+import {
+  haveJobDatesChanged,
+  syncFlexElementsForJobDateChange,
+} from "@/utils/flex-folders/syncDateChange";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -393,10 +396,27 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       } catch { /* best-effort push notification; ignore delivery failures */ }
 
       // Sync Flex elements if dates or title changed and job has flex folders
-      const datesChanged =
-        job.start_time !== startTimeUTC.toISOString() ||
-        job.end_time !== endTimeUTC.toISOString();
+      const datesChanged = haveJobDatesChanged(
+        job.start_time,
+        job.end_time,
+        startTimeUTC.toISOString(),
+        endTimeUTC.toISOString()
+      );
       const titleChanged = job.title !== title;
+
+      toast({
+        title: "Job updated successfully",
+        description: "The job has been updated.",
+      });
+
+      // Refresh app data and close as soon as the app save succeeds. Flex is a
+      // downstream one-way sync and must not keep the edit dialog blocked.
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-tech-prep-days", job.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("hoja-de-ruta", job.id) });
+      setIsLoading(false);
+      onOpenChange(false);
 
       if ((datesChanged || titleChanged) && job.flex_folders_created) {
         try {
@@ -405,7 +425,8 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             job.id,
             startTimeUTC.toISOString(),
             endTimeUTC.toISOString(),
-            titleChanged ? title : undefined
+            titleChanged ? title : undefined,
+            titleChanged ? job.title : undefined
           );
           if (syncResult.failed > 0) {
             console.warn(
@@ -435,18 +456,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           });
         }
       }
-
-      toast({
-        title: "Job updated successfully",
-        description: "The job has been updated.",
-      });
-
-      // Refresh jobs and Hoja de Ruta that depends on the job location
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-tech-prep-days", job.id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("hoja-de-ruta", job.id) });
-      onOpenChange(false);
     } catch (error: any) {
       console.error("Error updating job:", error);
       toast({

@@ -11,6 +11,8 @@ interface FlexProxyEnvelope {
   error?: string;
 }
 
+const FLEX_PROXY_TIMEOUT_MS = 20_000;
+
 export interface FlexApiResponse {
   ok: boolean;
   status: number;
@@ -72,21 +74,16 @@ export async function flexApiFetch(
     },
   });
 
-  const canTimeoutLocally = method === "GET" || method === "HEAD";
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
-  const timeout = canTimeoutLocally
-    ? new Promise<never>((_, reject) => {
-        timeoutId = globalThis.setTimeout(
-          () => reject(new DOMException("Flex API request timed out", "AbortError")),
-          15_000,
-        );
-      })
-    : undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = globalThis.setTimeout(
+      () => reject(new DOMException("Flex API request timed out", "AbortError")),
+      FLEX_PROXY_TIMEOUT_MS,
+    );
+  });
   let result: Awaited<typeof invocation>;
   try {
-    result = timeout
-      ? await Promise.race([invocation, timeout])
-      : await invocation;
+    result = await Promise.race([invocation, timeout]);
   } finally {
     if (timeoutId !== undefined) {
       globalThis.clearTimeout(timeoutId);
