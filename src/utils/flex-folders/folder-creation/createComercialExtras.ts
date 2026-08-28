@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createFlexFolder } from "@/utils/flex-folders/api";
 import {
   DEPARTMENT_IDS,
+  DEPARTMENT_SUFFIXES,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
 } from "@/utils/flex-folders/constants";
@@ -36,6 +37,9 @@ export const createComercialExtras = async ({
   tourDateId,
 }: CreateComercialExtrasArgs) => {
   const parentDoc = parentDocumentNumber ?? "";
+  const quoteDocumentBase = parentDoc.endsWith(DEPARTMENT_SUFFIXES.comercial)
+    ? parentDoc.slice(0, -DEPARTMENT_SUFFIXES.comercial.length)
+    : parentDoc;
   const extrasMetadata = getDepartmentExtrasPresupuestoMetadata(options?.comercial);
   const replacements = [
     {
@@ -73,7 +77,7 @@ export const createComercialExtras = async ({
       plannedEndDate: formattedEndDate,
       locationId: FLEX_FOLDER_IDS.location,
       departmentId: DEPARTMENT_IDS[extra.dept],
-      documentNumber: `${parentDoc}${extra.suffix}`,
+      documentNumber: `${quoteDocumentBase}${extra.suffix}`,
       personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept],
     };
 
