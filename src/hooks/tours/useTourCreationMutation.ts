@@ -106,7 +106,7 @@ export const useTourCreationMutation = () => {
             });
 
           // Create department-specific hojaInfo elements for sound, lights, and video only
-          if (["sound", "lights", "video"].includes(dept)) {
+          if (dept === "sound" || dept === "lights" || dept === "video") {
             const hojaInfoType = dept === "sound" 
               ? FLEX_FOLDER_IDS.hojaInfoSx 
               : dept === "lights" 
@@ -139,7 +139,7 @@ export const useTourCreationMutation = () => {
 
           // Create additional subfolders only for technical departments (sound, lights, video, production)
           // Skip personnel and comercial departments to keep them empty
-          if (["sound", "lights", "video", "production"].includes(dept)) {
+          if (dept === "sound" || dept === "lights" || dept === "video" || dept === "production") {
             const additionalSubfolders = [
               {
                 definitionId: FLEX_FOLDER_IDS.documentacionTecnica,

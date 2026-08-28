@@ -32,21 +32,27 @@ vi.mock("@/integrations/supabase/client", () => ({
         if (table === "tours") {
           return {
             select: () => ({
-              single: async () => ({ data: { id: "tour-1", name: "Test Tour" }, error: null }),
+              single: async (): Promise<{ data: { id: string; name: string }; error: null }> => ({
+                data: { id: "tour-1", name: "Test Tour" }, error: null,
+              }),
             }),
           };
         }
         if (table === "tour_dates") {
           return {
             select: () => ({
-              single: async () => ({ data: { id: "tour-date-1", date: "2026-08-30" }, error: null }),
+              single: async (): Promise<{ data: { id: string; date: string }; error: null }> => ({
+                data: { id: "tour-date-1", date: "2026-08-30" }, error: null,
+              }),
             }),
           };
         }
         if (table === "jobs") {
           return {
             select: () => ({
-              single: async () => ({ data: { id: "job-1" }, error: null }),
+              single: async (): Promise<{ data: { id: string }; error: null }> => ({
+                data: { id: "job-1" }, error: null,
+              }),
             }),
           };
         }
@@ -56,12 +62,14 @@ vi.mock("@/integrations/supabase/client", () => ({
         return Promise.resolve({ error: null });
       },
       update: (payload: Record<string, unknown>) => ({
-        eq: async () => {
+        eq: async (): Promise<{ error: null }> => {
           if (table === "tours") testState.tourUpdates.push(payload);
           return { error: null };
         },
       }),
-      delete: () => ({ eq: async () => ({ error: null }) }),
+      delete: () => ({
+        eq: async (): Promise<{ error: null }> => ({ error: null }),
+      }),
     })),
   },
 }));
