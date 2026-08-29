@@ -151,3 +151,80 @@ test("gives touch users the cell action sheet and long-press multi-select", asyn
   await expect(page.getByRole("button", { name: /^Acciones$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Limpiar$/ })).toBeVisible();
 });
+
+test("walks the touch staffing flow from cell to coverage", async ({ page }) => {
+  test.skip(!isMobileViewport(page), "The sheet chain is the touch surface; desktop keeps the inline icons.");
+
+  // Fixtures hang off today so the job lands inside the matrix's default window.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dayKey = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+  const iso = (offset: number, hour: number) => `${dayKey(offset)}T${pad(hour)}:00:00.000Z`;
+
+  await bootstrapApp(page, {
+    auth: { role: "management", department: "sound" },
+    tables: {
+      "jobs": [
+        {
+          id: "flow-job-1",
+          title: "Fiestas de Cuenca",
+          start_time: iso(0, 8),
+          end_time: iso(2, 20),
+          color: "#7c3aed",
+          status: "Confirmado",
+          job_type: "single",
+          job_departments: [{ department: "sound" }],
+          job_assignments: [],
+        },
+      ],
+      "job_date_types": [],
+      "technician_fridge": [],
+      "availability_schedules": [],
+      "technician_availability": [],
+      "vacation_requests": [],
+      "timesheets": [],
+      "job_assignments": [],
+      "staffing_requests": [],
+      "profiles": [],
+      "skills": [],
+      "job_required_roles_summary": [],
+    },
+    rpc: {
+      "get_profiles_with_skills": [
+        { id: "tech-1", first_name: "Pat", last_name: "Jones", email: "pat@example.com", department: "sound", role: "technician", skills: [] },
+      ],
+      "get_job_staffing_summary": [],
+      "get_active_timesheet_counts_by_technician": [],
+      "get_assignment_matrix_staffing": [],
+      "get_assignment_matrix_staffing_filtered": [],
+      "get_staffing_requests_matrix_filtered": [],
+    },
+  });
+
+  await page.goto("/job-assignment-matrix");
+  await expect(page.getByRole("heading", { name: /matriz de asignación de trabajos/i })).toBeVisible();
+
+  const todayCell = page.locator('[data-matrix-cell-state="today"]').first();
+  await todayCell.scrollIntoViewIfNeeded();
+  await todayCell.click();
+
+  await page.getByRole("button", { name: /pedir disponibilidad por whatsapp/i }).click();
+
+  // Step 2: the job picker, with rows a thumb can hit.
+  const jobOption = page.getByRole("radio", { name: /Fiestas de Cuenca/ });
+  await expect(jobOption).toBeVisible();
+  const jobBox = await jobOption.boundingBox();
+  expect(jobBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  await jobOption.click();
+  await page.getByRole("button", { name: /pedir disponibilidad/i }).last().click();
+
+  // Step 3: coverage, as segmented buttons rather than 13px native radios.
+  await expect(page.getByRole("radio", { name: /duración completa/i })).toBeVisible();
+  await page.getByRole("radio", { name: /varios días/i }).click();
+
+  // The calendar is bounded to the job span and the CTA counts the days.
+  await expect(page.getByRole("button", { name: /^Enviar \(\d+ días?\)$/ })).toBeVisible();
+});

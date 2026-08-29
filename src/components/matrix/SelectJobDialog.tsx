@@ -1,18 +1,19 @@
 
 import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
+import { Button } from '@/components/ui/button';
+import { JobPickerList, type PickableJob } from '@/components/matrix/staffing/JobPickerList';
+import { SHEET_BODY, SHEET_FOOTER, SHEET_HEADER } from '@/components/matrix/staffing/sheetLayout';
 
 interface SelectJobDialogProps {
   open: boolean;
@@ -20,15 +21,7 @@ interface SelectJobDialogProps {
   onJobSelected: (jobId: string) => void;
   technicianName: string;
   date: Date;
-  availableJobs: Array<{
-    id: string;
-    title: string;
-    start_time: string;
-    end_time: string;
-    color?: string;
-    status: string;
-    _assigned_count?: number;
-  }>;
+  availableJobs: Array<PickableJob & { _assigned_count?: number }>;
 }
 
 export const SelectJobDialog = ({
@@ -40,10 +33,6 @@ export const SelectJobDialog = ({
   availableJobs
 }: SelectJobDialogProps) => {
   const [selectedJobId, setSelectedJobId] = useState<string>('');
-
-  const handleJobSelect = (jobId: string) => {
-    setSelectedJobId(jobId);
-  };
 
   const handleContinue = () => {
     if (selectedJobId) {
@@ -57,65 +46,32 @@ export const SelectJobDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Seleccionar Trabajo</DialogTitle>
-          <DialogDescription>
-            Selecciona un trabajo para asignar a {technicianName} el{' '}
-            {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
-          </DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={(value) => { if (!value) handleClose(); }}>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader className={SHEET_HEADER}>
+          <ResponsiveDialogTitle>Seleccionar trabajo</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="first-letter:uppercase">
+            {`Para ${technicianName} el ${format(date, "EEEE d 'de' MMMM", { locale: es })}`}
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <div className="space-y-3">
-          {availableJobs.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                No hay trabajos disponibles para esta fecha
-              </p>
-            </div>
-          ) : (
-            availableJobs.map((job) => (
-              <div
-                key={job.id}
-                className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedJobId === job.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:bg-accent/50'
-                  }`}
-                onClick={() => handleJobSelect(job.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="font-medium">{job.title}</div>
-                    <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                      <Clock className="h-3 w-3" />
-                      {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {job.status === 'Cancelado' && (
-                      <Badge variant="destructive" className="text-[10px]">Llamar para cancelar</Badge>
-                    )}
-                    <Badge variant="secondary">{job.status}</Badge>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+        <div className={SHEET_BODY}>
+          <JobPickerList
+            jobs={availableJobs}
+            selectedJobId={selectedJobId}
+            onSelect={setSelectedJobId}
+          />
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+        <ResponsiveDialogFooter className={SHEET_FOOTER}>
+          <Button variant="outline" className="min-h-11" onClick={handleClose}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleContinue}
-            disabled={!selectedJobId}
-          >
+          <Button className="min-h-11 flex-1 sm:flex-none" onClick={handleContinue} disabled={!selectedJobId}>
             Continuar
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

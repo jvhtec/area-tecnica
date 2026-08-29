@@ -387,7 +387,9 @@ describe('OptimizedAssignmentMatrixView', () => {
 
     render(<OptimizedAssignmentMatrixView {...props} />);
 
-    expect(screen.getByText(/Enviar solicitud de disponibilidad/i)).toBeInTheDocument();
+    // Retitled with the flow's rebuild: the sheet leads with the action and puts
+    // the technician, job and channel in its description line.
+    expect(screen.getByText(/Pedir disponibilidad/i)).toBeInTheDocument();
   });
 
   it('opens conflict dialog when conflictDialog is set', () => {

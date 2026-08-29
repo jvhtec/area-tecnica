@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { useCancelStaffingRequest } from '@/features/staffing/hooks/useStaffing';
-import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Clock, Mail, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { CheckCircle, Mail } from 'lucide-react';
+
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { useCancelStaffingRequest } from '@/features/staffing/hooks/useStaffing';
+import { JobPickerList, type PickableJob } from '@/components/matrix/staffing/JobPickerList';
+import { SHEET_BODY, SHEET_FOOTER, SHEET_HEADER } from '@/components/matrix/staffing/sheetLayout';
 // Note: This dialog only collects a choice and delegates handling upstream.
 
 interface StaffingJobSelectionDialogProps {
@@ -24,15 +27,7 @@ interface StaffingJobSelectionDialogProps {
   technicianId: string;
   technicianName: string;
   date: Date;
-  availableJobs: Array<{
-    id: string;
-    title: string;
-    start_time: string;
-    end_time: string;
-    color?: string;
-    status: string;
-    _assigned_count?: number;
-  }>;
+  availableJobs: Array<PickableJob & { _assigned_count?: number }>;
   declinedJobIds?: string[];
   preselectedJobId?: string | null;
   forcedAction?: 'availability' | 'offer';
@@ -61,17 +56,11 @@ export const StaffingJobSelectionDialog = ({
   const effectiveAction: 'availability' | 'offer' = forcedAction || selectedAction;
   const forcedChannelLabel = forcedChannel === 'whatsapp' ? 'WhatsApp' : forcedChannel === 'email' ? 'Email' : null;
 
-  const handleJobSelect = (jobId: string) => {
-    setSelectedJobId(jobId);
-  };
-
   const handleContinue = () => {
     if (selectedJobId) {
       // Call the callback to let parent handle it.
       // Do NOT call onClose() here to avoid racing with parent state transitions (e.g., opening OfferDetails).
       onStaffingActionSelected(selectedJobId, effectiveAction, { singleDay });
-    } else {
-      console.log('❌ StaffingJobSelectionDialog: No job selected');
     }
   };
 
@@ -94,150 +83,133 @@ export const StaffingJobSelectionDialog = ({
     }
   }, [forcedAction]);
 
-  const primaryActionLabel = effectiveAction === 'availability' ? 'Pedir Disponibilidad' : 'Enviar Oferta';
-  const primaryButtonLabel = forcedChannelLabel ? `${primaryActionLabel} vía ${forcedChannelLabel}` : primaryActionLabel;
+  const primaryActionLabel = effectiveAction === 'availability' ? 'Pedir disponibilidad' : 'Enviar oferta';
+  const primaryButtonLabel = forcedChannelLabel ? `${primaryActionLabel} · ${forcedChannelLabel}` : primaryActionLabel;
+
+  const actionOptions: Array<{ value: 'availability' | 'offer'; label: string; hint: string; icon: typeof Mail }> = [
+    {
+      value: 'availability',
+      label: 'Pedir disponibilidad',
+      hint: 'Pregunta al técnico si puede ese día',
+      icon: Mail,
+    },
+    {
+      value: 'offer',
+      label: 'Enviar oferta',
+      hint: 'Ofrece el trabajo directamente',
+      icon: CheckCircle,
+    },
+  ];
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Solicitud de Personal</DialogTitle>
-          <DialogDescription>
-            Selecciona un trabajo y acción para {technicianName} el{' '}
-            {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
-          </DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={(value) => { if (!value) handleClose(); }}>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader className={SHEET_HEADER}>
+          <ResponsiveDialogTitle>Solicitud de personal</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="first-letter:uppercase">
+            {`${technicianName} · ${format(date, "EEEE d 'de' MMMM", { locale: es })}`}
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <div className="space-y-4">
+        <div className={cn(SHEET_BODY, "space-y-4")}>
           {forcedAction && (
-            <div className="rounded-md border border-muted-foreground/30 bg-muted/40 p-3 text-sm text-muted-foreground">
+            <p className="rounded-xl border bg-muted/40 p-3 text-xs text-muted-foreground">
               {forcedAction === 'availability'
-                ? `Este atajo pedirá disponibilidad${forcedChannelLabel ? ` vía ${forcedChannelLabel}` : ''}.`
-                : `Este atajo enviará una oferta de trabajo${forcedChannelLabel ? ` vía ${forcedChannelLabel}` : ''}.`}
-            </div>
+                ? `Se pedirá disponibilidad${forcedChannelLabel ? ` vía ${forcedChannelLabel}` : ''}.`
+                : `Se enviará una oferta de trabajo${forcedChannelLabel ? ` vía ${forcedChannelLabel}` : ''}.`}
+            </p>
           )}
 
-          {/* Job Selection */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Seleccionar Trabajo</h4>
-            {availableJobs.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  No hay trabajos disponibles para esta fecha
-                </p>
-              </div>
-            ) : (
-              availableJobs.map((job) => {
-                const isDeclined = declinedJobIds.includes(job.id);
-                const selected = selectedJobId === job.id;
-                return (
-                  <div
-                    key={job.id}
-                    className={`p-3 border rounded-lg transition-colors ${selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/50'
-                      } ${isDeclined ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                    onClick={() => {
-                      if (isDeclined) return;
-                      handleJobSelect(job.id);
-                    }}
-                    title={isDeclined ? 'El técnico rechazó este trabajo' : undefined}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium">{job.title}</div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isDeclined && <Badge variant="destructive">Rechazado</Badge>}
-                        {job.status === 'Cancelado' && (
-                          <Badge variant="destructive" className="text-[10px]">Llamar para cancelar</Badge>
-                        )}
-                        <Badge variant="secondary">{job.status}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Trabajo
+            </span>
+            <JobPickerList
+              jobs={availableJobs}
+              selectedJobId={selectedJobId}
+              onSelect={setSelectedJobId}
+              declinedJobIds={declinedJobIds}
+            />
           </div>
 
-          {/* Single-Day Scope - Always show when job is selected */}
           {selectedJobId && (
-            <div className="space-y-2 pt-2 border-t">
-              <div className="flex items-center gap-2">
-                <input
-                  id="scope-single-day"
-                  type="checkbox"
-                  checked={singleDay}
-                  onChange={(e) => setSingleDay(e.target.checked)}
-                />
-                <Label htmlFor="scope-single-day" className="text-sm cursor-pointer">
-                  Solicitar solo para este día
-                </Label>
-              </div>
-              <p className="text-xs text-muted-foreground ml-6">
-                Para trabajos de varios días, marca esto para solicitar disponibilidad/oferta solo para esta fecha específica
-              </p>
+            <div className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3">
+              <Label htmlFor="scope-single-day" className="cursor-pointer text-sm font-medium">
+                Solo para este día
+                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                  Para trabajos de varios días, limita la solicitud a esta fecha
+                </span>
+              </Label>
+              <Switch
+                id="scope-single-day"
+                checked={singleDay}
+                onCheckedChange={(value) => setSingleDay(Boolean(value))}
+                aria-label="Solicitar solo para este día"
+              />
             </div>
           )}
 
-          {/* Action Selection (hidden if forced) */}
           {selectedJobId && !forcedAction && (
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium">Elegir Acción</h4>
-              <RadioGroup value={selectedAction} onValueChange={(value) => setSelectedAction(value as 'availability' | 'offer')}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="availability" id="availability" />
-                  <Label htmlFor="availability" className="flex items-center gap-2 cursor-pointer">
-                    <Mail className="h-4 w-4 text-blue-600" />
-                    Pedir Disponibilidad
-                    <span className="text-sm text-muted-foreground">
-                      Enviar email para comprobar si el técnico está disponible
+            <div className="space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Acción
+              </span>
+              <div className="grid gap-2" role="radiogroup" aria-label="Acción">
+                {actionOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selectedAction === option.value}
+                    onClick={() => setSelectedAction(option.value)}
+                    className={cn(
+                      'flex min-h-14 items-center gap-3 rounded-xl border p-3 text-left transition-colors',
+                      selectedAction === option.value
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:bg-accent/50',
+                    )}
+                  >
+                    <option.icon
+                      className={cn(
+                        'h-5 w-5 shrink-0',
+                        option.value === 'availability' ? 'text-sky-600 dark:text-sky-400' : 'text-emerald-600 dark:text-emerald-400',
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{option.label}</span>
+                      <span className="block text-xs text-muted-foreground">{option.hint}</span>
                     </span>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="offer" id="offer" />
-                  <Label htmlFor="offer" className="flex items-center gap-2 cursor-pointer">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    Enviar Oferta de Trabajo
-                    <span className="text-sm text-muted-foreground">
-                      Enviar email ofreciendo el trabajo al técnico
-                    </span>
-                  </Label>
-                </div>
-              </RadioGroup>
-
-              <div className="flex items-center justify-between pt-2">
-                <Button
-                  variant="outline"
-                  disabled={!selectedJobId}
-                  onClick={() => {
-                    if (!selectedJobId) return;
-                    cancelStaffing({ job_id: selectedJobId, profile_id: technicianId, phase: effectiveAction });
-                  }}
-                >
-                  {isCancelling ? 'Cancelando…' : `Cancelar ${effectiveAction === 'availability' ? 'Disponibilidad' : 'Oferta'}`}
-                </Button>
+                  </button>
+                ))}
               </div>
+
+              <Button
+                variant="outline"
+                className="min-h-11 w-full"
+                disabled={!selectedJobId || isCancelling}
+                onClick={() => {
+                  if (!selectedJobId) return;
+                  cancelStaffing({ job_id: selectedJobId, profile_id: technicianId, phase: effectiveAction });
+                }}
+              >
+                {isCancelling
+                  ? 'Cancelando…'
+                  : `Cancelar ${effectiveAction === 'availability' ? 'disponibilidad' : 'oferta'}`}
+              </Button>
             </div>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+        <ResponsiveDialogFooter className={SHEET_FOOTER}>
+          <Button variant="outline" className="min-h-11" onClick={handleClose}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleContinue}
-            disabled={!selectedJobId}
-          >
+          <Button className="min-h-11 flex-1 sm:flex-none" onClick={handleContinue} disabled={!selectedJobId}>
             {primaryButtonLabel}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };
