@@ -219,10 +219,12 @@ describe('JobAssignmentMatrix', () => {
   it('displays department tabs', async () => {
     render(<JobAssignmentMatrix />);
 
+    // Addressed by role: the redesigned header also names the active department
+    // in its breadcrumb, so a bare text match now hits two elements.
     await waitFor(() => {
-      expect(screen.getByText(/Sonido/i)).toBeInTheDocument();
-      expect(screen.getByText(/Luces/i)).toBeInTheDocument();
-      expect(screen.getByText(/Video/i)).toBeInTheDocument();
+      expect(screen.getAllByRole('tab', { name: /Sonido/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('tab', { name: /Luces/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('tab', { name: /Video/i }).length).toBeGreaterThan(0);
     });
   });
 
@@ -405,7 +407,7 @@ describe('JobAssignmentMatrix', () => {
     render(<JobAssignmentMatrix />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Ver recordatorio de staffing/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Ver recordatorio de staffing/i })).toBeInTheDocument();
     });
   });
 
@@ -445,10 +447,10 @@ describe('JobAssignmentMatrix', () => {
     render(<JobAssignmentMatrix />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Ver recordatorio de staffing/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Ver recordatorio de staffing/i })).toBeInTheDocument();
     });
 
-    const reminderButton = screen.getByText(/Ver recordatorio de staffing/i);
+    const reminderButton = screen.getByRole('button', { name: /Ver recordatorio de staffing/i });
     await user.click(reminderButton);
 
     await waitFor(() => {
@@ -593,10 +595,10 @@ describe('JobAssignmentMatrix', () => {
     render(<JobAssignmentMatrix />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Ver recordatorio de staffing/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Ver recordatorio de staffing/i })).toBeInTheDocument();
     });
 
-    const reminderButton = screen.getByText(/Ver recordatorio de staffing/i);
+    const reminderButton = screen.getByRole('button', { name: /Ver recordatorio de staffing/i });
     await user.click(reminderButton);
 
     await waitFor(() => {

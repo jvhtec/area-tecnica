@@ -196,7 +196,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   return (
     <div className="matrix-layout relative">
       {isFetching && !isInitialLoading && (
-        <div className="pointer-events-none absolute top-2 right-4 flex items-center gap-2 text-xs text-muted-foreground bg-background/80 backdrop-blur rounded-full px-3 py-1 shadow-sm border border-border/60">
+        <div className="pointer-events-none absolute bottom-3 right-4 z-[60] flex items-center gap-2 rounded-full border border-border/60 bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-lg backdrop-blur">
           <span className="h-2 w-2 rounded-full bg-primary animate-pulse" aria-hidden="true" />
           <span>Actualizando...</span>
         </div>
@@ -213,7 +213,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
             box, and anything that outgrows it spills across the borders into the
             first date column instead of being clipped. */}
         <div className="flex flex-col h-full overflow-hidden bg-card border-r border-b">
-          <div className={`flex border-b ${mobile ? "items-stretch gap-0.5 px-0.5 py-0.5" : "items-center justify-between px-2 py-1"}`}>
+          <div className={`flex border-b border-border/60 ${mobile ? "items-stretch gap-0.5 px-0.5 py-0.5" : "items-center justify-between px-2 py-1"}`}>
             {/* size="inline" so the primitive adds no box of its own: this row
                 is 28px tall on a phone, and the default size's h-10 plus its
                 44px hit pseudo-element would both overflow the corner and
@@ -233,7 +233,15 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               onClick={cycleTechSort}
               title="Cambia el orden de técnicos"
             >
-              <span className={mobile ? "min-w-0 flex-1 truncate text-left text-xs" : ""}>Técnicos</span>
+              <span
+                className={
+                  mobile
+                    ? "min-w-0 flex-1 truncate text-left text-xs"
+                    : "text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                }
+              >
+                Técnicos
+              </span>
               <ArrowUpDown className="shrink-0 opacity-50 group-hover:opacity-100" />
             </Button>
             {isManagementUser &&
@@ -297,7 +305,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 </>
               )}
               {getSortLabel() && (
-                <span className="truncate text-xs font-medium text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">
+                <span className="truncate rounded-full border border-border/60 bg-accent/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {getSortLabel()}
                 </span>
               )}

@@ -90,9 +90,11 @@ export const OptimizedAssignmentMatrix = ({
   const { mutate: sendStaffingEmail, isPending: isSendingStaffingEmail } = useSendStaffingEmail();
   const { mutate: cancelStaffing, isPending: isCancellingStaffing } = useCancelStaffingRequest();
 
-  // Cell dimensions (overridable for mobile)
+  // Cell dimensions (overridable for mobile). The desktop row is 72px so the
+  // redesigned status card (job, role, and a "día único" line) fits without the
+  // corner controls landing on top of the text.
   const CELL_WIDTH = cellWidth ?? 160;
-  const CELL_HEIGHT = cellHeight ?? 60;
+  const CELL_HEIGHT = cellHeight ?? 72;
   const TECHNICIAN_WIDTH = technicianWidth ?? 256;
   const HEADER_HEIGHT = headerHeight ?? 80;
 
