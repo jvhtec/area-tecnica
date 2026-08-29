@@ -1,10 +1,11 @@
 import React from "react";
-import { ArrowUpDown, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
+import { ArrowUpDown, CalendarCheck, ChevronLeft, ChevronRight, UserPlus, X } from "lucide-react";
 
-import { formatMadridDateKey } from "@/utils/timezoneUtils";
+import { formatMadridDateKey, isMadridToday, madridDateKeyToCalendarDate } from "@/utils/timezoneUtils";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { MatrixMobileCellSheet, type MatrixMobileCellTarget } from "@/components/matrix/MatrixMobileCellSheet";
 
 import { TechnicianRow } from "../TechnicianRow";
 import { OptimizedMatrixCell } from "../OptimizedMatrixCell";
@@ -100,6 +101,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   isGlobalCellSelected: (technicianId: string, date: Date) => boolean;
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
+  clearCellSelection: () => void;
 }
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
@@ -182,8 +184,52 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   isGlobalCellSelected: _isGlobalCellSelected,
   techMedalRankings,
   techLastYearMedalRankings,
+  clearCellSelection,
 }: OptimizedAssignmentMatrixViewProps) => {
   void _isGlobalCellSelected;
+
+  // Touch action sheet: one instance for the grid, opened by tapping a cell.
+  const [sheetTarget, setSheetTarget] = React.useState<MatrixMobileCellTarget | null>(null);
+  const handleOpenSheet = React.useCallback(
+    (technicianId: string, date: Date) => {
+      const technician = technicians.find((t) => t.id === technicianId);
+      if (technician) setSheetTarget({ technician, date });
+    },
+    [technicians],
+  );
+  const closeSheet = React.useCallback(() => setSheetTarget(null), []);
+
+  const selectionActive = mobile && selectedCells.size > 0;
+
+  // Cell keys are `${technicianId}-${yyyy-MM-dd}`, and the id is a uuid that
+  // carries dashes of its own, so the day key is read off the end.
+  const selectionAnchor = React.useMemo(() => {
+    if (!selectedCells.size) return null;
+    const [first] = Array.from(selectedCells);
+    const technicianId = first.slice(0, -11);
+    const date = madridDateKeyToCalendarDate(first.slice(-10));
+    return date ? { technicianId, date } : null;
+  }, [selectedCells]);
+
+  const selectedCountForSheet = React.useMemo(() => {
+    if (!sheetTarget) return 0;
+    const prefix = `${sheetTarget.technician.id}-`;
+    let count = 0;
+    selectedCells.forEach((key) => { if (key.startsWith(prefix)) count += 1; });
+    return count;
+  }, [selectedCells, sheetTarget]);
+
+  // Anchored to the viewport, not to this layout: the matrix container runs past
+  // the fold on a phone, so an absolutely positioned control at its bottom edge
+  // lands off-screen. The offset clears the app's fixed bottom nav and the home
+  // indicator below it.
+  const floatingBottom = 'calc(4.75rem + env(safe-area-inset-bottom))';
+
+  const scrollToToday = React.useCallback(() => {
+    const index = dates.findIndex((date) => isMadridToday(date));
+    if (index < 0 || !mainScrollRef.current) return;
+    mainScrollRef.current.scrollTo({ left: index * CELL_WIDTH, behavior: "smooth" });
+  }, [dates, mainScrollRef, CELL_WIDTH]);
 
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
@@ -429,6 +475,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             isSelected={isSelected}
                             onSelect={handleCellSelect}
                             onClick={handleCellClick}
+                            onOpenSheet={handleOpenSheet}
+                            selectionActive={selectionActive}
                             onPrefetch={handleCellPrefetch}
                             onOptimisticUpdate={handleOptimisticUpdate}
                             onRender={incrementCellRender}
@@ -459,6 +507,80 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           </div>
         </TooltipProvider>
       </div>
+
+      {/* Touch affordances over the grid */}
+      {mobile && !selectionActive && !sheetTarget && (
+        // The wrapper carries the positioning: Button's size variants add
+        // `coarse-hit-target`, whose `position: relative` wins over a `fixed`
+        // utility on a coarse pointer.
+        <div className="fixed z-30" style={{ left: TECHNICIAN_WIDTH + 8, bottom: floatingBottom }}>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={scrollToToday}
+            className="h-9 gap-1.5 rounded-full border px-3 shadow-lg"
+          >
+            <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+            <span className="text-xs font-semibold">Hoy</span>
+          </Button>
+        </div>
+      )}
+
+      {selectionActive && (
+        <div
+          className="fixed inset-x-2 z-30 flex items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-xl backdrop-blur"
+          style={{ bottom: floatingBottom }}
+        >
+          <span className="pl-1 text-xs font-semibold">
+            {selectedCells.size} {selectedCells.size === 1 ? 'día' : 'días'}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            className="ml-auto h-9 flex-1 rounded-xl text-xs font-semibold"
+            onClick={() => {
+              if (selectionAnchor) handleOpenSheet(selectionAnchor.technicianId, selectionAnchor.date);
+            }}
+          >
+            Acciones
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 rounded-xl px-3 text-xs"
+            onClick={clearCellSelection}
+          >
+            <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            Limpiar
+          </Button>
+        </div>
+      )}
+
+      <MatrixMobileCellSheet
+        target={sheetTarget}
+        onClose={closeSheet}
+        assignment={sheetTarget ? getAssignmentForCell(sheetTarget.technician.id, sheetTarget.date) : undefined}
+        availability={sheetTarget ? getAvailabilityForCell(sheetTarget.technician.id, sheetTarget.date) : undefined}
+        staffingStatus={
+          sheetTarget
+            ? (staffingMaps?.byDate.get(`${sheetTarget.technician.id}-${formatMadridDateKey(sheetTarget.date)}`) ?? null)
+            : null
+        }
+        selectedDateCount={selectedCountForSheet}
+        allowDirectAssign={allowDirectAssign}
+        canMarkUnavailable={isManagementUser}
+        isFridge={sheetTarget ? fridgeSet?.has(sheetTarget.technician.id) || false : false}
+        staffingDepartment={staffingDepartment}
+        onAction={(action, actionJobId) => {
+          if (!sheetTarget) return;
+          handleCellClick(sheetTarget.technician.id, sheetTarget.date, action, actionJobId);
+        }}
+        sendStaffingEmail={sendStaffingEmail}
+        cancelStaffing={cancelStaffing}
+        isCancellingStaffing={isCancellingStaffing}
+      />
 
       <MatrixDialogs
         cellAction={cellAction}

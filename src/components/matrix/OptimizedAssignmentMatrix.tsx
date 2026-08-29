@@ -369,6 +369,11 @@ export const OptimizedAssignmentMatrix = ({
     setSelectedCells(newSelected);
   }, [selectedCells, selectCell, isGlobalCellSelected, clearGlobalSelection]);
 
+  const clearCellSelection = useCallback(() => {
+    setSelectedCells(new Set());
+    clearGlobalSelection();
+  }, [clearGlobalSelection]);
+
   const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     if (cellAction?.type === 'select-job-for-staffing') {
       // If the technician already declined this job, block staffing for this job only
@@ -600,6 +605,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
+    clearCellSelection,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;

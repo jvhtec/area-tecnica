@@ -5,7 +5,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { Check, X, UserX, Ban, Refrigerator, Plus } from 'lucide-react';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { formatMadridDayKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
+import { formatMadridDateKey, formatMadridDayKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
@@ -42,6 +42,8 @@ export const OptimizedMatrixCell = memo(({
   onSelect: onSelectProp,
   onClick: onClickProp,
   onPrefetch: onPrefetchProp,
+  onOpenSheet: onOpenSheetProp,
+  selectionActive = false,
   onOptimisticUpdate: onOptimisticUpdateProp,
   onRender,
   jobId,
@@ -73,6 +75,7 @@ export const OptimizedMatrixCell = memo(({
     [onClickProp, technicianId, date],
   );
   const onPrefetch = useCallback(() => onPrefetchProp?.(technicianId), [onPrefetchProp, technicianId]);
+  const onOpenSheet = useCallback(() => onOpenSheetProp?.(technicianId, date), [onOpenSheetProp, technicianId, date]);
   const onOptimisticUpdate = useCallback(
     (status: string) => {
       if (assignment?.job_id) onOptimisticUpdateProp?.(technicianId, assignment.job_id, status);
@@ -153,12 +156,54 @@ export const OptimizedMatrixCell = memo(({
     onPrefetch?.();
   }, [onPrefetch]);
 
+  // A long press is the only multi-select gesture a phone has: ctrl/alt-click
+  // cannot be produced on touch, so batch staffing was unreachable there.
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = React.useRef(false);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleTouchStart = useCallback(() => {
+    if (!mobile) return;
+    longPressFired.current = false;
+    clearLongPress();
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      onSelect(!isSelected);
+      // Confirms the mode switch on devices that support it; harmless elsewhere.
+      navigator.vibrate?.(15);
+    }, 450);
+  }, [mobile, clearLongPress, onSelect, isSelected]);
+
+  React.useEffect(() => clearLongPress, [clearLongPress]);
+
   const handleCellClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
 
     // Ctrl+Click or Alt+Click to toggle cell selection (for Stream Deck shortcuts)
     if (e.ctrlKey || e.altKey || e.metaKey) {
       onSelect(!isSelected);
+      return;
+    }
+
+    if (mobile) {
+      // The long press already acted; browsers still deliver its click.
+      if (longPressFired.current) {
+        longPressFired.current = false;
+        return;
+      }
+      // Once a selection exists, tapping extends it — the familiar phone
+      // multi-select model — and the sheet is reached from the selection bar.
+      if (selectionActive) {
+        onSelect(!isSelected);
+        return;
+      }
+      onOpenSheet();
       return;
     }
 
@@ -177,7 +222,7 @@ export const OptimizedMatrixCell = memo(({
     } else if (allowDirectAssign) {
       onClick('select-job'); // Create new assignment
     }
-  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, allowDirectAssign, allowMarkUnavailable]);
+  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, allowDirectAssign, allowMarkUnavailable, mobile, selectionActive, onOpenSheet]);
 
   const handleRightClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -223,8 +268,10 @@ export const OptimizedMatrixCell = memo(({
   const showAvailabilityWhatsapp = canAskAvailability && !hideStaffingWhatsappButtons;
   const showOfferEmail = canShowOfferAction && !hideStaffingEmailButtons;
   const showOfferWhatsapp = canShowOfferAction && !hideStaffingWhatsappButtons;
+  // On touch the four-icon cluster is gone: it never had room for real tap
+  // targets, and every one of its actions now lives in the action sheet.
   const hasVisibleStaffingAction =
-    showAvailabilityEmail || showAvailabilityWhatsapp || showOfferEmail || showOfferWhatsapp;
+    !mobile && (showAvailabilityEmail || showAvailabilityWhatsapp || showOfferEmail || showOfferWhatsapp);
 
   // Corner budget, so nothing stacks on top of anything else:
   //   top-left     status indicators (fridge / declined), side by side
@@ -234,13 +281,13 @@ export const OptimizedMatrixCell = memo(({
   //   bottom-right assignment status badge (assigned) or staffing actions (mobile)
   // The remove button and the staffing actions never coexist: the actions are
   // only offered on cells without an assignment.
-  const statusBadgesPosClass = mobile ? 'absolute bottom-9 left-1.5' : 'absolute bottom-1.5 left-1.5';
-  const actionButtonsPosClass = mobile ? 'absolute bottom-1.5 right-1.5' : 'absolute top-1.5 right-1.5';
+  const statusBadgesPosClass = 'absolute bottom-1.5 left-1.5';
+  const actionButtonsPosClass = 'absolute top-1.5 right-1.5';
 
   // A plain click only does something in one of the edit modes; without one the
   // cell is read-only and should not advertise itself as clickable.
   const plainClickIsActionable =
-    allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
+    mobile || allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
 
   // The staffing conversation gets its own caption line so an empty-looking cell
   // says what is in flight, instead of only being tinted.
@@ -253,6 +300,18 @@ export const OptimizedMatrixCell = memo(({
     : null;
 
   const showStatusCard = hasAssignment || isUnavailable || !!staffingCaption;
+
+  // A phone cell is a button, so it needs a name: the grid position plus what
+  // the cell is currently showing.
+  const cellAriaLabel = `${displayName}, ${formatMadridDayKey(formatMadridDateKey(date), "d 'de' MMMM", { locale: es })}: ${
+    hasAssignment
+      ? `${assignment.job?.title || 'asignación'} (${assignmentStatusLabel(assignment.status)})`
+      : isUnavailable
+        ? 'no disponible'
+        : staffingCaption
+          ? `${staffingCaption.title.toLowerCase()} ${staffingCaption.detail?.toLowerCase() ?? ''}`.trim()
+          : 'sin actividad'
+  }`;
 
   // The corner controls (confirm/decline, the P/R badge, the staffing chips) are
   // drawn over the card, so the card's own text has to step out of their way.
@@ -289,9 +348,17 @@ export const OptimizedMatrixCell = memo(({
           }}
           data-matrix-cell="true"
           data-matrix-cell-state={cellState}
+          role={mobile ? 'button' : undefined}
+          tabIndex={mobile ? 0 : undefined}
+          aria-label={mobile ? cellAriaLabel : undefined}
+          aria-pressed={mobile && selectionActive ? isSelected : undefined}
           onClick={handleCellClick}
           onContextMenu={handleRightClick}
           onMouseEnter={handleMouseEnter}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={clearLongPress}
+          onTouchMove={clearLongPress}
+          onTouchCancel={clearLongPress}
         >
           {/* Selection indicator */}
           {isSelected && (
@@ -400,6 +467,7 @@ export const OptimizedMatrixCell = memo(({
               staffingStatus={staffingStatusForBadges}
               availabilityRetrying={availabilityRetrying}
               positionClass={statusBadgesPosClass}
+              interactive={!mobile}
               onRetryAvailability={() => {
                 const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.availability_job_id;
                 if (targetJobId) {
@@ -458,8 +526,9 @@ export const OptimizedMatrixCell = memo(({
             />
           )}
 
-          {/* Assignment controls, drawn over the status card */}
-          {hasAssignment && (
+          {/* Assignment controls, drawn over the status card. Desktop only: on a
+              phone these 20px buttons are in the action sheet instead. */}
+          {hasAssignment && !mobile && (
             <>
               {assignment.status === 'invited' && (
                 <div className="absolute bottom-1.5 left-1.5 z-10 flex gap-1">
@@ -505,6 +574,14 @@ export const OptimizedMatrixCell = memo(({
                 </Button>
               </div>
             </>
+          )}
+
+          {hasAssignment && mobile && !isConfirmedAssignment && (
+            <div className="absolute bottom-1.5 right-1.5 z-10" title={assignmentStatusLabel(assignment.status)}>
+              <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
+                {isDeclinedAssignment ? 'R' : 'SC'}
+              </Badge>
+            </div>
           )}
 
           <OptimizedMatrixCellDialogs

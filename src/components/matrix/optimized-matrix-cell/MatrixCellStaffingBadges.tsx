@@ -30,6 +30,12 @@ interface MatrixCellStaffingBadgesProps {
   staffingStatus: MatrixStaffingStatus;
   availabilityRetrying: boolean;
   positionClass: string;
+  /**
+   * False on touch: the chips stay as status, and their retry/cancel actions are
+   * offered as full-width rows in the cell's action sheet instead of as 15px
+   * buttons nobody can hit.
+   */
+  interactive?: boolean;
   onRetryAvailability: () => void;
   onCancelAvailability: () => void;
   onRetryOffer: () => void;
@@ -40,6 +46,7 @@ export const MatrixCellStaffingBadges: React.FC<MatrixCellStaffingBadgesProps> =
   staffingStatus,
   availabilityRetrying,
   positionClass,
+  interactive = true,
   onRetryAvailability,
   onCancelAvailability,
   onRetryOffer,
@@ -49,6 +56,23 @@ export const MatrixCellStaffingBadges: React.FC<MatrixCellStaffingBadgesProps> =
     event.stopPropagation();
     handler();
   };
+
+  if (!interactive) {
+    return (
+      <div className={cn(positionClass, 'z-10 flex items-center gap-1')}>
+        {staffingStatus.availability_status && (
+          <span className={cn(chipClass, toneFor(staffingStatus.availability_status))}>
+            {`A:${glyphFor(staffingStatus.availability_status)}`}
+          </span>
+        )}
+        {staffingStatus.offer_status && (
+          <span className={cn(chipClass, toneFor(staffingStatus.offer_status))}>
+            {`O:${glyphFor(staffingStatus.offer_status)}`}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn(positionClass, 'z-10 flex items-center gap-1')}>

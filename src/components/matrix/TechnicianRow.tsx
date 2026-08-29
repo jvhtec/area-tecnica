@@ -449,7 +449,12 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           </div>
         </PopoverTrigger>
 
-        <PopoverContent className="w-80" side="right">
+        <PopoverContent
+          className={compact ? 'w-[calc(100vw-1.5rem)] max-w-sm' : 'w-80'}
+          side={compact ? 'bottom' : 'right'}
+          align={compact ? 'start' : 'center'}
+          collisionPadding={12}
+        >
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">

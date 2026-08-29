@@ -81,6 +81,13 @@ export interface OptimizedMatrixCellProps {
   onSelect: (technicianId: string, date: Date, selected: boolean) => void;
   onClick: (technicianId: string, date: Date, action: MatrixCellAction, selectedJobId?: string) => void;
   onPrefetch?: (technicianId: string) => void;
+  /**
+   * Touch entry point. A phone cell is one big target that opens the action
+   * sheet instead of hosting four icon buttons it has no room for.
+   */
+  onOpenSheet?: (technicianId: string, date: Date) => void;
+  /** True while any cell is selected: on touch, a tap then extends the selection. */
+  selectionActive?: boolean;
   onOptimisticUpdate?: (technicianId: string, jobId: string, status: string) => void;
   onRender?: () => void;
   jobId?: string;
