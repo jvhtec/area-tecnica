@@ -488,7 +488,7 @@ export const OptimizedMatrixCell = memo(({
               {!isConfirmedAssignment && (
                 <div className="absolute bottom-1.5 right-1.5 z-10" title={assignmentStatusLabel(assignment.status)}>
                   <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
-                    {isDeclinedAssignment ? 'R' : 'P'}
+                    {isDeclinedAssignment ? 'R' : 'SC'}
                   </Badge>
                 </div>
               )}

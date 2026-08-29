@@ -81,7 +81,9 @@ export const resolveMatrixCellState = ({
 export const MATRIX_CELL_SURFACE: Record<MatrixCellState, string> = {
   selected: 'bg-primary/15 ring-2 ring-primary ring-inset',
   confirmed: 'bg-emerald-50/70 dark:bg-emerald-950/30',
-  pending: 'bg-amber-50/70 dark:bg-amber-950/25',
+  // Cyan, not amber: amber already means "disponibilidad pedida", and a manual
+  // assignment nobody has confirmed is a different thing entirely.
+  pending: 'bg-cyan-50/70 dark:bg-cyan-950/25',
   declined: 'bg-rose-50/70 dark:bg-rose-950/25',
   unavailable: 'bg-muted/60',
   'offer-sent': 'bg-indigo-50/70 dark:bg-indigo-950/25',
@@ -121,9 +123,11 @@ export const MATRIX_CELL_CHIP: Record<MatrixCellState, MatrixChipStyle> = {
     detail: 'text-emerald-700/80 dark:text-emerald-300/80',
   },
   pending: {
-    card: 'border-amber-500/40 bg-amber-500/10',
-    caption: 'text-amber-700 dark:text-amber-300',
-    detail: 'text-amber-700/80 dark:text-amber-300/80',
+    // Dashed: provisional until someone confirms it, which also keeps the state
+    // apart from the solid offer chip without relying on hue alone.
+    card: 'border-dashed border-cyan-500/60 bg-cyan-500/10',
+    caption: 'text-cyan-700 dark:text-cyan-300',
+    detail: 'text-cyan-700/80 dark:text-cyan-300/80',
   },
   declined: {
     card: 'border-rose-500/40 bg-rose-500/10',
@@ -193,7 +197,11 @@ export const MATRIX_CELL_CHIP: Record<MatrixCellState, MatrixChipStyle> = {
  */
 export const MATRIX_LEGEND_ITEMS: Array<{ state: MatrixCellState; label: string; hint: string }> = [
   { state: 'confirmed', label: 'Confirmado', hint: 'Asignación confirmada, pintada con el color del trabajo' },
-  { state: 'pending', label: 'Pendiente', hint: 'Asignado pero sin respuesta del técnico' },
+  {
+    state: 'pending',
+    label: 'Asignado manualmente (sin confirmar)',
+    hint: 'Asignación creada a mano, todavía sin confirmar',
+  },
   { state: 'declined', label: 'Rechazado', hint: 'El técnico rechazó este trabajo' },
   { state: 'availability-requested', label: 'Disponibilidad pedida', hint: 'Solicitud enviada, esperando respuesta' },
   { state: 'availability-confirmed', label: 'Disponible', hint: 'El técnico confirmó que está disponible' },
