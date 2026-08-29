@@ -60,6 +60,7 @@ type MatrixDialogsProps = Pick<
   | "createUserOpen"
   | "setCreateUserOpen"
   | "qc"
+  | "offerSeedDates"
 >;
 
 export const MatrixDialogs = ({
@@ -96,6 +97,7 @@ export const MatrixDialogs = ({
   createUserOpen,
   setCreateUserOpen,
   qc,
+  offerSeedDates,
 }: MatrixDialogsProps) => (
   <>
     {cellAction?.type === "select-job" && currentTechnician && (
@@ -160,6 +162,7 @@ export const MatrixDialogs = ({
         jobStartTimeIso={jobs.find((j) => j.id === cellAction.selectedJobId)?.start_time}
         jobEndTimeIso={jobs.find((j) => j.id === cellAction.selectedJobId)?.end_time}
         defaultDateIso={formatMadridDateKey(cellAction.date)}
+        defaultDates={offerSeedDates}
         onSubmit={({ role, message, singleDay, dates }) => {
           if (!cellAction.selectedJobId) return;
           void (async () => {

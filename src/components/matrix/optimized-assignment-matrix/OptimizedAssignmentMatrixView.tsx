@@ -102,6 +102,8 @@ export interface OptimizedAssignmentMatrixViewProps {
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   clearCellSelection: () => void;
+  /** Grid-selected days for the offer's technician, clamped to the job. */
+  offerSeedDates?: string[];
 }
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
@@ -185,6 +187,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   techMedalRankings,
   techLastYearMedalRankings,
   clearCellSelection,
+  offerSeedDates,
 }: OptimizedAssignmentMatrixViewProps) => {
   void _isGlobalCellSelected;
 
@@ -611,6 +614,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         handleEmailError={handleEmailError}
         conflictDialog={conflictDialog}
         setConflictDialog={setConflictDialog}
+        offerSeedDates={offerSeedDates}
         selectedCells={selectedCells}
         isManagementUser={isManagementUser}
         createUserOpen={createUserOpen}

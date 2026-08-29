@@ -33,9 +33,15 @@ interface OfferDetailsDialogProps {
   jobStartTimeIso?: string;
   jobEndTimeIso?: string;
   defaultDateIso?: string;
+  /**
+   * Days the technician has selected in the grid. More than one opens the
+   * dialog on "varios días" with exactly those days, the same way an
+   * availability request treats a multi-select.
+   */
+  defaultDates?: string[];
 }
 
-export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, jobDescription, technicianDepartment, onSubmit, defaultSingleDay, jobStartTimeIso, jobEndTimeIso, defaultDateIso }) => {
+export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, jobDescription, technicianDepartment, onSubmit, defaultSingleDay, jobStartTimeIso, jobEndTimeIso, defaultDateIso, defaultDates }) => {
   const [role, setRole] = useState(''); // stores code
   const [message, setMessage] = useState('');
   const [coverageMode, setCoverageMode] = useState<CoverageMode>(defaultSingleDay ? 'single' : 'full');
@@ -64,12 +70,26 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
     if (open && roleOptions.length && !role) setRole(roleOptions[0].code);
   }, [open, technicianDepartment]);
 
+  // Seeds once per opening, like the availability dialog: a selection change
+  // behind the modal must not discard what the user has picked in here.
+  const seededDatesKey = (defaultDates || []).join(',');
   React.useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const seeded = (defaultDates || [])
+      .map((dayKey) => madridDateKeyToCalendarDate(dayKey))
+      .filter((date): date is Date => !!date);
+    if (seeded.length > 1) {
+      setCoverageMode('multi');
+      setMultiDates(seeded);
+      setSingleDate(null);
+    } else {
       setCoverageMode(defaultSingleDay ? 'single' : 'full');
-      setMessage(jobDescription || '');
     }
-  }, [open, defaultSingleDay, jobDescription]);
+    setMessage(jobDescription || '');
+    // seededDatesKey stands in for defaultDates: depending on the array itself
+    // would re-seed (and discard the user's edits) on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultSingleDay, jobDescription, seededDatesKey]);
 
   // Job timestamps are real instants, so their day is the Madrid one. Picker
   // values are local calendar days that round-trip through local format(), so

@@ -534,26 +534,65 @@ export const OptimizedAssignmentMatrix = ({
   const availabilityDialogProfileId = availabilityDialog?.profileId;
   const availabilityDialogDateIso = availabilityDialog?.dateIso;
   const availabilityDialogSingleDay = availabilityDialog?.singleDay;
+  const availabilityDialogJobId = availabilityDialog?.jobId;
+
+  // Read through a ref for the same reason as selectedCells: a jobs refetch must
+  // not re-seed a dialog the user is already editing.
+  const jobsRef = React.useRef(jobs);
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+
+  /** The day keys this technician has selected in the grid, oldest first. */
+  const collectSelectedDayKeys = useCallback((technicianId?: string) => {
+    if (!technicianId) return [] as string[];
+    const prefix = `${technicianId}-`;
+    const keys: string[] = [];
+    selectedCellsRef.current.forEach((cellKey) => {
+      if (cellKey.startsWith(prefix)) keys.push(cellKey.slice(prefix.length));
+    });
+    return keys.sort();
+  }, []);
+
+  /**
+   * A grid selection can span days the chosen job does not run on. Those days
+   * would be seeded into the picker, counted by the CTA and sent — while the
+   * calendar itself refuses to select them. Clamp at the source.
+   */
+  const clampDayKeysToJob = useCallback((dayKeys: string[], jobId?: string | null) => {
+    const job = jobId ? jobsRef.current.find((candidate) => candidate.id === jobId) : null;
+    if (!job?.start_time) return dayKeys;
+    const startKey = formatMadridDateKey(job.start_time);
+    const endKey = job.end_time ? formatMadridDateKey(job.end_time) : startKey;
+    return dayKeys.filter((key) => key >= startKey && key <= endKey);
+  }, []);
+
+  /**
+   * Offers honour the grid selection exactly as availability requests do, so a
+   * long-press multi-select means the same thing whichever action follows it.
+   */
+  const offerSeedDates = useMemo(() => {
+    if (cellAction?.type !== 'offer-details') return undefined;
+    const keys = clampDayKeysToJob(
+      collectSelectedDayKeys(cellAction.technicianId),
+      cellAction.selectedJobId,
+    );
+    return keys.length > 1 ? keys : undefined;
+    // selectedCells is a dependency in spirit: it is read through the ref that
+    // the effect above keeps current, and it cannot change while a modal is up.
+  }, [cellAction, clampDayKeysToJob, collectSelectedDayKeys]);
 
   useEffect(() => {
     if (availabilityDialogOpen) {
       setAvailabilityCoverage(availabilityDialogSingleDay ? 'single' : 'full');
       try {
-        // Extract dates from selectedCells for this technician
-        const technicianId = availabilityDialogProfileId;
-        const selectedDatesForTech: Date[] = [];
-
-        // Parse selectedCells to find all dates for this technician
-        for (const cellKey of selectedCellsRef.current) {
-          // cellKey format: "${technicianId}-yyyy-MM-dd"
-          if (cellKey.startsWith(`${technicianId}-`)) {
-            const dateStr = cellKey.substring(technicianId.length + 1); // Remove "techId-" prefix
-            const parsedDate = madridDateKeyToCalendarDate(dateStr);
-            if (parsedDate) {
-              selectedDatesForTech.push(parsedDate);
-            }
-          }
-        }
+        // The grid selection, minus any day this job does not run on.
+        const selectedDatesForTech = clampDayKeysToJob(
+          collectSelectedDayKeys(availabilityDialogProfileId),
+          availabilityDialogJobId,
+        )
+          .map((dayKey) => madridDateKeyToCalendarDate(dayKey))
+          .filter((date): date is Date => !!date);
 
         // If we have multiple selected cells, use them; otherwise fall back to the clicked date
         if (selectedDatesForTech.length > 1) {
@@ -571,7 +610,17 @@ export const OptimizedAssignmentMatrix = ({
     }
     // Seeds once per opening. Depending on selectedCells re-ran this while the
     // dialog was open, discarding the coverage and dates the user had picked.
-  }, [availabilityDialogOpen, availabilityDialogProfileId, availabilityDialogDateIso, availabilityDialogSingleDay]);
+    // availabilityDialogJobId is fixed for the life of one opening, so it can
+    // sit here without re-seeding mid-edit.
+  }, [
+    availabilityDialogOpen,
+    availabilityDialogProfileId,
+    availabilityDialogDateIso,
+    availabilityDialogSingleDay,
+    availabilityDialogJobId,
+    clampDayKeysToJob,
+    collectSelectedDayKeys,
+  ]);
 
   if (isInitialLoading) {
     return (
@@ -604,6 +653,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
+    offerSeedDates,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
     clearCellSelection,
   };
