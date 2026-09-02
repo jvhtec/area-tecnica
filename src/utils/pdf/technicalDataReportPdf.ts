@@ -20,12 +20,12 @@ import {
   type ReportMetaItem,
 } from "@/utils/pdf/technicalDataReportLayout";
 import {
+  buildPowerAuxSupplyNote,
   buildPowerOverviewRows,
   buildPowerReportSummary,
   buildWeightPointSummaries,
   formatTechnicalReportDate,
   formatTechnicalReportNumber,
-  HOIST_PDU_LABEL,
   type PowerCircuitSummary,
   type TechnicalReportKind,
 } from "@/utils/pdf/technicalDataReportModel";
@@ -122,6 +122,7 @@ const tableStyles = (fontFamily: string) => ({
 const drawOverviewTable = ({
   autoTable,
   doc,
+  fohSchukoRequired,
   fontFamily,
   powerCircuits,
   startY,
@@ -130,6 +131,7 @@ const drawOverviewTable = ({
 }: {
   autoTable: AutoTableFn;
   doc: jsPDF;
+  fohSchukoRequired: boolean;
   fontFamily: string;
   powerCircuits: PowerCircuitSummary[];
   startY: number;
@@ -137,9 +139,12 @@ const drawOverviewTable = ({
   weightRows: ReturnType<typeof buildWeightPointSummaries>;
 }) => {
   if (type === "power") {
-    const overviewRows = buildPowerOverviewRows(powerCircuits);
-    const hoistRowIndexes = new Set(
-      overviewRows.flatMap((row, index) => (row.kind === "hoist" ? [index] : [])),
+    const overviewRows = buildPowerOverviewRows(powerCircuits, {
+      fohSchukoRequired,
+    });
+    const auxRowIndexes = new Set(
+      overviewRows.flatMap((row, index) =>
+        row.kind === "circuit" ? [] : [index]),
     );
     const body = overviewRows.length
       ? overviewRows.map((row) => row.cells)
@@ -153,7 +158,7 @@ const drawOverviewTable = ({
       },
       didParseCell: (data) => {
         if (data.section !== "body") return;
-        if (!hoistRowIndexes.has(data.row.index)) return;
+        if (!auxRowIndexes.has(data.row.index)) return;
         data.cell.styles.textColor = [...REPORT_COLORS.soft] as [
           number,
           number,
@@ -163,17 +168,10 @@ const drawOverviewTable = ({
       head: [["Circuito", "PDU", "Posición", "Potencia", "Corriente"]],
       startY,
     });
-    if (hoistRowIndexes.size > 0) {
-      const noticeY = ensureReportSpace(doc, tableEndY(doc, startY) + 4, 20);
-      return (
-        drawNotice(
-          doc,
-          `Las tomas de motores (${HOIST_PDU_LABEL}) son suministros auxiliares por posición: se listan aquí para evitar omisiones, pero quedan excluidas de la potencia y la corriente de cálculo.`,
-          noticeY,
-          "neutral",
-          fontFamily,
-        ) + 8
-      );
+    const auxNote = buildPowerAuxSupplyNote(overviewRows);
+    if (auxNote) {
+      const noticeY = ensureReportSpace(doc, tableEndY(doc, startY) + 3, 20);
+      return drawNotice(doc, auxNote, noticeY, "neutral", fontFamily) + 5;
     }
   } else {
     const body = weightRows.length
@@ -509,6 +507,7 @@ export const exportTechnicalDataReportPdf = async ({
   y = drawOverviewTable({
     autoTable,
     doc,
+    fohSchukoRequired,
     fontFamily: reportFont,
     powerCircuits: powerSummary?.circuits ?? [],
     startY: y,
@@ -538,13 +537,6 @@ export const exportTechnicalDataReportPdf = async ({
     y = drawNotice(
       doc,
       `La corriente global no es agregable: ${powerSummary.aggregationReason || "faltan datos eléctricos compatibles."}`,
-      y + 3,
-    );
-  }
-  if (type === "power" && fohSchukoRequired) {
-    drawNotice(
-      doc,
-      "Suministro auxiliar de FOH: 16 A en formato Schuko hembra, excluido de los totales.",
       y + 3,
     );
   }

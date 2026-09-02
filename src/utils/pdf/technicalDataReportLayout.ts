@@ -267,7 +267,9 @@ export const drawPowerHeadline = ({
   pduRating: number | null;
   supportingText: string;
 }) => {
-  const startY = 105;
+  // Sits right under the metadata grid: keeping the headline high leaves room
+  // for the summary table, which grows with the auxiliary supply rows.
+  const startY = 96;
   setText(doc, REPORT_COLORS.soft, 6.4, "bold");
   doc.text("CORRIENTE RESULTANTE", REPORT_PAGE.left, startY);
   if (currentLine === null) {
@@ -300,7 +302,7 @@ export const drawPowerHeadline = ({
   setText(doc, REPORT_COLORS.soft, 6.5);
   const supportLines = doc.splitTextToSize(supportingText, 72).slice(0, 3) as string[];
   doc.text(supportLines, rightX, startY + 20, { lineHeightFactor: 1.15 });
-  return 142;
+  return startY + 37;
 };
 
 /**

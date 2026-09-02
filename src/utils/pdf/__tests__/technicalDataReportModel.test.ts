@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildPowerAuxSupplyNote,
   buildPowerOverviewRows,
   buildPowerReportSummary,
+  FOH_PDU_LABEL,
   formatTechnicalReportDate,
   formatTechnicalReportNumber,
   HOIST_PDU_LABEL,
@@ -87,5 +89,32 @@ describe("technicalDataReportModel", () => {
     expect(hoistRow.cells[1]).toBe(HOIST_PDU_LABEL);
     expect(hoistRow.cells[2]).toBe(rows[0].cells[2]);
     expect(hoistRow.cells.slice(3)).toEqual(["Excluida", "Excluida"]);
+    expect(buildPowerAuxSupplyNote(rows)).toContain("motores");
+    expect(buildPowerAuxSupplyNote(rows)).not.toContain("FOH");
+  });
+
+  it("lists the auxiliary FOH supply once when the job requires it", () => {
+    const circuits = buildPowerReportSummary([
+      { name: "Monitores", position: "DSC", pduType: "CEE32A 3P+N+G", rows: [] },
+    ]).circuits;
+
+    expect(buildPowerOverviewRows(circuits).map((row) => row.kind)).toEqual([
+      "circuit",
+    ]);
+
+    const rows = buildPowerOverviewRows(circuits, { fohSchukoRequired: true });
+    expect(rows.map((row) => row.kind)).toEqual(["circuit", "foh"]);
+    expect(rows[1].cells).toEqual([
+      "Toma auxiliar de FOH",
+      FOH_PDU_LABEL,
+      "FOH",
+      "Excluida",
+      "Excluida",
+    ]);
+
+    const note = buildPowerAuxSupplyNote(rows);
+    expect(note).toContain("FOH");
+    expect(note).not.toContain("motores");
+    expect(buildPowerAuxSupplyNote([{ cells: [], kind: "circuit" }])).toBeNull();
   });
 });

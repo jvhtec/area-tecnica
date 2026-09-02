@@ -40,7 +40,7 @@ export type PowerReportSummary = {
 
 export type PowerOverviewRow = {
   cells: string[];
-  kind: "circuit" | "hoist";
+  kind: "circuit" | "hoist" | "foh";
 };
 
 export type WeightPointSummary = {
@@ -51,6 +51,9 @@ export type WeightPointSummary = {
 
 /** Auxiliary motor supply connector, shown next to the circuit it accompanies. */
 export const HOIST_PDU_LABEL = "CEE32A 3P+N+G";
+
+/** Auxiliary FOH supply connector, listed once for the whole report. */
+export const FOH_PDU_LABEL = "Schuko 16A hembra";
 
 const NBSP = "\u00A0";
 
@@ -188,12 +191,14 @@ const buildCircuitSummary = (
 };
 
 /**
- * Rows of the "Resumen de circuitos" table. Circuits that carry an auxiliary
- * motor supply get a second, non-aggregable row right below them so the 32 A
- * feed is visible in the summary and not only in the stage plot.
+ * Rows of the "Resumen de circuitos" table. Auxiliary supplies excluded from
+ * the totals — the motor feed of each circuit and the FOH feed of the whole
+ * report — get their own non-aggregable rows so they are visible in the
+ * summary and not only in the detail pages and the stage plot.
  */
 export const buildPowerOverviewRows = (
   circuits: PowerCircuitSummary[],
+  { fohSchukoRequired = false }: { fohSchukoRequired?: boolean } = {},
 ): PowerOverviewRow[] => {
   const rows: PowerOverviewRow[] = [];
   circuits.forEach((circuit) => {
@@ -221,7 +226,38 @@ export const buildPowerOverviewRows = (
       kind: "hoist",
     });
   });
+  if (fohSchukoRequired) {
+    rows.push({
+      cells: [
+        "Toma auxiliar de FOH",
+        FOH_PDU_LABEL,
+        "FOH",
+        "Excluida",
+        "Excluida",
+      ],
+      kind: "foh",
+    });
+  }
   return rows;
+};
+
+/**
+ * Wording of the note under the summary table, naming only the auxiliary
+ * supplies actually listed above it.
+ */
+export const buildPowerAuxSupplyNote = (rows: PowerOverviewRow[]) => {
+  const hasHoist = rows.some((row) => row.kind === "hoist");
+  const hasFoh = rows.some((row) => row.kind === "foh");
+  if (!hasHoist && !hasFoh) return null;
+  const subject = hasHoist && hasFoh
+    ? `motores (${HOIST_PDU_LABEL}) y FOH (${FOH_PDU_LABEL})`
+    : hasHoist
+      ? `motores (${HOIST_PDU_LABEL})`
+      : `FOH (${FOH_PDU_LABEL})`;
+  return (
+    `Tomas auxiliares por posición — ${subject}: ` +
+    "excluidas de la potencia y la corriente de cálculo."
+  );
 };
 
 export const buildPowerReportSummary = (
