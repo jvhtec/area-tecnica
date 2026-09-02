@@ -15,7 +15,7 @@ import {
   drawReportChrome,
   drawSectionHeading,
   drawTitleBlock,
-  drawWeightHeadline,
+  drawWeightIntro,
   ensureReportSpace,
   type ReportMetaItem,
 } from "@/utils/pdf/technicalDataReportLayout";
@@ -434,7 +434,6 @@ export const exportTechnicalDataReportPdf = async ({
       : null;
   const weightRows =
     type === "weight" ? buildWeightPointSummaries(tables, summaryRows) : [];
-  const totalWeight = weightRows.reduce((sum, row) => sum + row.totalWeight, 0);
   const weightPointCount = weightRows.filter(
     (row) => row.motorCount !== "—",
   ).length;
@@ -494,11 +493,10 @@ export const exportTechnicalDataReportPdf = async ({
         `${powerSummary.totalVa === null ? "Potencia aparente no agregable" : `${formatTechnicalReportNumber(powerSummary.totalVa / 1000, 2)} kVA`}`,
     });
   } else {
-    y = drawWeightHeadline({
+    y = drawWeightIntro({
       componentCount: tables.reduce((sum, table) => sum + table.rows.length, 0),
       doc,
       pointCount: weightPointCount,
-      totalWeight,
     });
   }
 

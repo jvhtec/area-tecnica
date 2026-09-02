@@ -303,51 +303,40 @@ export const drawPowerHeadline = ({
   return 142;
 };
 
-export const drawWeightHeadline = ({
+/**
+ * Weight reports intentionally show no grand total: adding up independent
+ * rigging points is not a meaningful load figure, so the page goes straight
+ * from the metadata to the per-point summary with the capacity caveat.
+ */
+export const drawWeightIntro = ({
   componentCount,
   doc,
   pointCount,
-  totalWeight,
 }: {
   componentCount: number;
   doc: jsPDF;
   pointCount: number;
-  totalWeight: number;
 }) => {
-  const startY = 105;
+  // Sits right under the metadata grid: with no aggregate figure to show, the
+  // page has no reason to keep the tall headline band the power report needs.
+  const startY = 94;
   setText(doc, REPORT_COLORS.soft, 6.4, "bold");
-  doc.text("PESO TOTAL SUSPENDIDO", REPORT_PAGE.left, startY);
-  setText(doc, REPORT_COLORS.ink, 24, "bold");
+  doc.text("ALCANCE DEL INFORME", REPORT_PAGE.left, startY);
+  setText(doc, REPORT_COLORS.ink, 12, "bold");
   doc.text(
-    `${formatTechnicalReportNumber(totalWeight, 1)} kg`,
+    `${pointCount} ${pointCount === 1 ? "punto" : "puntos"}  ·  ` +
+      `${componentCount} ${componentCount === 1 ? "componente" : "componentes"}`,
     REPORT_PAGE.left,
-    startY + 12,
+    startY + 8,
   );
-  setText(doc, REPORT_COLORS.soft, 6.5);
-  doc.text(
-    `${formatTechnicalReportNumber(totalWeight * 2.2046226218, 1)} lb  ·  ${pointCount} puntos  ·  ${componentCount} componentes`,
-    REPORT_PAGE.left,
-    startY + 20,
-  );
-
-  const rightX = 117;
-  setText(doc, REPORT_COLORS.soft, 6.4, "bold");
-  doc.text("CARGA SOBRE EL PUNTO", rightX, startY);
-  doc.setDrawColor(...REPORT_COLORS.rule);
-  doc.setLineWidth(1.4);
-  doc.line(rightX, startY + 12, REPORT_PAGE.right, startY + 12);
-  setText(doc, REPORT_COLORS.soft, 5.5);
-  doc.text("0 kg", rightX, startY + 17);
-  doc.text("Capacidad sin definir", REPORT_PAGE.right, startY + 17, {
-    align: "right",
-  });
   setText(doc, REPORT_COLORS.soft, 6.2);
   const note = doc.splitTextToSize(
-    "La capacidad admisible del punto no se recoge actualmente; por ello no se calcula su porcentaje de utilización.",
-    REPORT_PAGE.right - rightX,
+    "Cada punto se verifica por separado, por lo que no se ofrece un peso agregado del conjunto: consulte el peso de cada punto en el resumen. " +
+      "La capacidad admisible del punto no se recoge actualmente; por ello no se calcula su porcentaje de utilización.",
+    REPORT_PAGE.right - REPORT_PAGE.left,
   ) as string[];
-  doc.text(note, rightX, startY + 23, { lineHeightFactor: 1.12 });
-  return 142;
+  doc.text(note, REPORT_PAGE.left, startY + 15, { lineHeightFactor: 1.12 });
+  return startY + 15 + note.length * 3.6;
 };
 
 export const ensureReportSpace = (
