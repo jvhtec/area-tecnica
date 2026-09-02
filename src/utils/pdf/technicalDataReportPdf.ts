@@ -20,10 +20,12 @@ import {
   type ReportMetaItem,
 } from "@/utils/pdf/technicalDataReportLayout";
 import {
+  buildPowerOverviewRows,
   buildPowerReportSummary,
   buildWeightPointSummaries,
   formatTechnicalReportDate,
   formatTechnicalReportNumber,
+  HOIST_PDU_LABEL,
   type PowerCircuitSummary,
   type TechnicalReportKind,
 } from "@/utils/pdf/technicalDataReportModel";
@@ -135,16 +137,12 @@ const drawOverviewTable = ({
   weightRows: ReturnType<typeof buildWeightPointSummaries>;
 }) => {
   if (type === "power") {
-    const body = powerCircuits.length
-      ? powerCircuits.map((circuit) => [
-          circuit.name,
-          circuit.pduLabel,
-          circuit.positionLabel,
-          `${formatTechnicalReportNumber(circuit.adjustedWatts / 1000, 2)}${NBSP}kW`,
-          circuit.currentLine === null
-            ? "No agregable"
-            : `${formatTechnicalReportNumber(circuit.currentLine, 2)}${NBSP}A`,
-        ])
+    const overviewRows = buildPowerOverviewRows(powerCircuits);
+    const hoistRowIndexes = new Set(
+      overviewRows.flatMap((row, index) => (row.kind === "hoist" ? [index] : [])),
+    );
+    const body = overviewRows.length
+      ? overviewRows.map((row) => row.cells)
       : [["Sin circuitos guardados", "—", "—", "0,00 kW", "—"]];
     autoTable(doc, {
       ...tableStyles(fontFamily),
@@ -153,9 +151,30 @@ const drawOverviewTable = ({
         3: { halign: "right" },
         4: { halign: "right" },
       },
+      didParseCell: (data) => {
+        if (data.section !== "body") return;
+        if (!hoistRowIndexes.has(data.row.index)) return;
+        data.cell.styles.textColor = [...REPORT_COLORS.soft] as [
+          number,
+          number,
+          number,
+        ];
+      },
       head: [["Circuito", "PDU", "Posición", "Potencia", "Corriente"]],
       startY,
     });
+    if (hoistRowIndexes.size > 0) {
+      const noticeY = ensureReportSpace(doc, tableEndY(doc, startY) + 4, 20);
+      return (
+        drawNotice(
+          doc,
+          `Las tomas de motores (${HOIST_PDU_LABEL}) son suministros auxiliares por posición: se listan aquí para evitar omisiones, pero quedan excluidas de la potencia y la corriente de cálculo.`,
+          noticeY,
+          "neutral",
+          fontFamily,
+        ) + 8
+      );
+    }
   } else {
     const body = weightRows.length
       ? weightRows.map((row) => [

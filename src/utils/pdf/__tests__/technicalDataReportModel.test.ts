@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildPowerOverviewRows,
   buildPowerReportSummary,
   formatTechnicalReportDate,
   formatTechnicalReportNumber,
+  HOIST_PDU_LABEL,
 } from "@/utils/pdf/technicalDataReportModel";
 import { buildPowerCalculationSnapshot } from "@/features/technical-tools/power/powerCalculations";
 
@@ -36,5 +38,54 @@ describe("technicalDataReportModel", () => {
     expect(summary.currentLine).toBeNull();
     expect(summary.aggregationReason).toContain("asignación de fase");
     expect(summary.totalWatts).toBe(2000);
+  });
+
+  it("lists the auxiliary motor supply in the circuit summary rows", () => {
+    const calculation = buildPowerCalculationSnapshot({
+      powerFactorSource: "global",
+      settings: {
+        phaseMode: "three",
+        powerFactor: 0.95,
+        safetyMargin: 20,
+        voltage: 400,
+      },
+      totalWatts: 5000,
+    });
+    const summary = buildPowerReportSummary([
+      {
+        calculation,
+        includesHoist: true,
+        name: "PA izquierda",
+        position: "DSL",
+        pduType: "CEE63A 3P+N+G",
+        rows: [],
+      },
+      {
+        calculation,
+        name: "Monitores",
+        position: "DSC",
+        pduType: "CEE32A 3P+N+G",
+        rows: [],
+      },
+    ]);
+
+    expect(summary.circuits.map((circuit) => circuit.includesHoist)).toEqual([
+      true,
+      false,
+    ]);
+
+    const rows = buildPowerOverviewRows(summary.circuits);
+    expect(rows.map((row) => row.kind)).toEqual([
+      "circuit",
+      "hoist",
+      "circuit",
+    ]);
+
+    const hoistRow = rows[1];
+    expect(hoistRow.cells[0]).toContain("Toma de motores");
+    expect(hoistRow.cells[0]).toContain("PA izquierda");
+    expect(hoistRow.cells[1]).toBe(HOIST_PDU_LABEL);
+    expect(hoistRow.cells[2]).toBe(rows[0].cells[2]);
+    expect(hoistRow.cells.slice(3)).toEqual(["Excluida", "Excluida"]);
   });
 });

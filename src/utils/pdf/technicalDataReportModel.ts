@@ -14,6 +14,8 @@ export type TechnicalReportKind = "power" | "weight";
 
 export type PowerCircuitSummary = {
   currentLine: number | null;
+  /** Auxiliary motor supply (CEE32A 3P+N+G), excluded from the totals. */
+  includesHoist: boolean;
   margin: number | null;
   name: string;
   pduLabel: string;
@@ -36,11 +38,21 @@ export type PowerReportSummary = {
   totalWatts: number;
 };
 
+export type PowerOverviewRow = {
+  cells: string[];
+  kind: "circuit" | "hoist";
+};
+
 export type WeightPointSummary = {
   motorCount: string;
   name: string;
   totalWeight: number;
 };
+
+/** Auxiliary motor supply connector, shown next to the circuit it accompanies. */
+export const HOIST_PDU_LABEL = "CEE32A 3P+N+G";
+
+const NBSP = "\u00A0";
 
 const numberFormatterCache = new Map<string, Intl.NumberFormat>();
 
@@ -156,6 +168,7 @@ const buildCircuitSummary = (
   return {
     adjustedWatts,
     currentLine,
+    includesHoist: Boolean(table.includesHoist),
     margin,
     name: table.name || "Circuito sin nombre",
     pduLabel,
@@ -172,6 +185,43 @@ const buildCircuitSummary = (
     totalVa: calculation?.totalVa ?? table.totalVa ?? null,
     totalWatts,
   };
+};
+
+/**
+ * Rows of the "Resumen de circuitos" table. Circuits that carry an auxiliary
+ * motor supply get a second, non-aggregable row right below them so the 32 A
+ * feed is visible in the summary and not only in the stage plot.
+ */
+export const buildPowerOverviewRows = (
+  circuits: PowerCircuitSummary[],
+): PowerOverviewRow[] => {
+  const rows: PowerOverviewRow[] = [];
+  circuits.forEach((circuit) => {
+    rows.push({
+      cells: [
+        circuit.name,
+        circuit.pduLabel,
+        circuit.positionLabel,
+        `${formatTechnicalReportNumber(circuit.adjustedWatts / 1000, 2)}${NBSP}kW`,
+        circuit.currentLine === null
+          ? "No agregable"
+          : `${formatTechnicalReportNumber(circuit.currentLine, 2)}${NBSP}A`,
+      ],
+      kind: "circuit",
+    });
+    if (!circuit.includesHoist) return;
+    rows.push({
+      cells: [
+        `Toma de motores${NBSP}— ${circuit.name}`,
+        HOIST_PDU_LABEL,
+        circuit.positionLabel,
+        "Excluida",
+        "Excluida",
+      ],
+      kind: "hoist",
+    });
+  });
+  return rows;
 };
 
 export const buildPowerReportSummary = (
