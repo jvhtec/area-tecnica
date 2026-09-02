@@ -118,7 +118,7 @@ describe('exportToPDF', () => {
     );
   });
 
-  it('prints the FOH schuko note on power summaries when requested', async () => {
+  it('lists the FOH schuko supply in the circuit summary when requested', async () => {
     await exportToPDF(
       'Potencia XL',
       [
@@ -149,10 +149,21 @@ describe('exportToPDF', () => {
       true
     );
 
+    expect(pdfMocks.autoTable).toHaveBeenCalledWith(
+      pdf,
+      expect.objectContaining({
+        head: [['Circuito', 'PDU', 'Posición', 'Potencia', 'Corriente']],
+        body: expect.arrayContaining([
+          ['Toma auxiliar de FOH', 'Schuko 16A hembra', 'FOH', 'Excluida', 'Excluida'],
+        ]),
+      })
+    );
+
     const renderedText = pdf.text.mock.calls
       .flatMap(([text]) => Array.isArray(text) ? text : [text])
       .join('\n');
-    expect(renderedText).toContain('formato Schuko hembra');
+    expect(renderedText).toContain('Tomas auxiliares por posición');
+    expect(renderedText).toContain('Schuko 16A hembra');
   });
 
   it('uses each table snapshot and withholds invalid single-phase aggregate totals', async () => {
