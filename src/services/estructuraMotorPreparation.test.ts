@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   createAllFolders: vi.fn(),
   from: vi.fn(),
   invoke: vi.fn(),
+  ensureTourRoot: vi.fn(),
   pushStrict: vi.fn(),
 }));
 
@@ -13,6 +14,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/utils/flex-folders", () => ({
   createAllFoldersForJob: mocks.createAllFolders,
+}));
+
+vi.mock("@/utils/flex-folders/tourEstructuraRoot", () => ({
+  ensureTourEstructuraRoot: mocks.ensureTourRoot,
 }));
 
 vi.mock("@/services/flexPullsheets", () => ({
@@ -57,6 +62,10 @@ describe("Estructura motor preparation", () => {
     vi.clearAllMocks();
     mocks.createAllFolders.mockResolvedValue(undefined);
     mocks.invoke.mockResolvedValue({ data: { success: true }, error: null });
+    mocks.ensureTourRoot.mockResolvedValue({
+      elementId: "tour-estructura",
+      trackingId: "tour-estructura-row",
+    });
     mocks.pushStrict.mockResolvedValue(successfulPush);
   });
 
@@ -211,15 +220,9 @@ describe("Estructura motor preparation", () => {
 
     await reconcileEstructuraFoldersForJob("job-1");
 
-    expect(mocks.invoke).toHaveBeenCalledWith("create-flex-folders", {
-      body: {
-        tourId: "tour-1",
-        createRootFolders: true,
-        createDateFolders: false,
-      },
-    });
+    expect(mocks.ensureTourRoot).toHaveBeenCalledWith("tour-1");
     expect(mocks.createAllFolders).toHaveBeenCalledTimes(1);
-    expect(mocks.invoke.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mocks.ensureTourRoot.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.createAllFolders.mock.invocationCallOrder[0],
     );
   });

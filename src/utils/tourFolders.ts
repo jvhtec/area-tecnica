@@ -7,6 +7,7 @@ import {
   DEPARTMENT_SUFFIXES 
 } from "@/utils/flex-folders/constants";
 import { createFlexFolder } from "@/utils/flex-folders/api";
+import { ensureTourEstructuraRoot } from "@/utils/flex-folders/tourEstructuraRoot";
 
 export interface TourFolderCreationResult {
   success: boolean;
@@ -31,8 +32,12 @@ export async function createTourRootFolders(tourId: string): Promise<TourFolderC
       return { success: false, error: error.message || "Failed to create tour root folders" };
     }
 
+    const estructuraRoot = await ensureTourEstructuraRoot(tourId);
     console.log("Successfully created tour root folders:", data);
-    return { success: true, data };
+    return {
+      success: true,
+      data: { ...data, flex_estructura_folder_id: estructuraRoot.elementId },
+    };
   } catch (error: any) {
     console.error("Exception creating tour root folders:", error);
     return { success: false, error: error.message || "Unknown error occurred" };
@@ -42,6 +47,7 @@ export async function createTourRootFolders(tourId: string): Promise<TourFolderC
 export async function createTourDateFolders(tourId: string): Promise<TourFolderCreationResult> {
   try {
     console.log("Creating tour date folders for:", tourId);
+    await ensureTourEstructuraRoot(tourId);
     
     const { data, error } = await supabase.functions.invoke('create-flex-folders', {
       body: {

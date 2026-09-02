@@ -15,6 +15,7 @@ import {
 import { getDepartmentCustomPullsheetMetadata, type DepartmentKey } from "@/utils/flex-folders/types";
 import { createComercialExtras } from "@/utils/flex-folders/folder-creation/createComercialExtras";
 import { ensureEstructuraFolders } from "@/utils/flex-folders/folder-creation/createEstructuraFolders";
+import { ensureTourEstructuraRoot } from "@/utils/flex-folders/tourEstructuraRoot";
 import {
   buildPullsheetTemplates,
   getTourJobDepartments,
@@ -161,21 +162,14 @@ export const createTourdateFolders = async ({
   const locationName = resolveTourdateLocationName(job);
   const formattedDate = formatInTimeZone(new Date(job.start_time), FOLDER_LABEL_TIMEZONE, "MMM d, yyyy");
 
-  if (!tourData.flex_estructura_folder_id) {
-    throw new Error("La gira todavía no tiene la carpeta operativa Estructura. Reconcilia primero las carpetas raíz de la gira.");
-  }
-  const { data: estructuraTourRows, error: estructuraTourError } = await supabase
-    .from("flex_folders")
-    .select("id")
-    .eq("element_id", tourData.flex_estructura_folder_id)
-    .limit(1);
-  if (estructuraTourError) throw estructuraTourError;
+  const estructuraRoot = await ensureTourEstructuraRoot(job.tour_id);
+  tourData.flex_estructura_folder_id = estructuraRoot.elementId;
 
   const estructuraDateFolder = await ensureEstructuraFolders({
     jobId: job.id,
     tourDateId: job.tour_date_id ?? null,
     parentElementId: tourData.flex_estructura_folder_id,
-    parentTrackingId: estructuraTourRows?.[0]?.id ?? tourData.flex_estructura_folder_id,
+    parentTrackingId: estructuraRoot.trackingId,
     existingDepartmentFolder: existingTourDateDepartmentMap.get("estructura"),
     existingPullSheets: existingEstructuraPullSheetMap,
     departmentFolderName: `${locationName} - ${formattedDate} - Estructura`,

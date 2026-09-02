@@ -11,6 +11,7 @@ import {
   type StrictGroupedPushResult,
 } from "@/services/flexPullsheets";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { ensureTourEstructuraRoot } from "@/utils/flex-folders/tourEstructuraRoot";
 import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
@@ -131,16 +132,7 @@ export async function reconcileEstructuraFoldersForJob(
     if (!job.tour_id) {
       throw new Error("La fecha de gira no tiene una gira asociada para crear la raíz Estructura.");
     }
-    const { error: tourRootError } = await supabase.functions.invoke("create-flex-folders", {
-      body: {
-        tourId: job.tour_id,
-        createRootFolders: true,
-        createDateFolders: false,
-      },
-    });
-    if (tourRootError) {
-      throw new Error(`No se pudo reconciliar la raíz Estructura de la gira: ${tourRootError.message}`);
-    }
+    await ensureTourEstructuraRoot(job.tour_id);
   }
 
   const startDate = new Date(job.start_time);

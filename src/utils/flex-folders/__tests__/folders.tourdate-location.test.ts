@@ -1,15 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createFlexFolderMock, testState } = vi.hoisted(() => ({
+const { createFlexFolderMock, ensureTourEstructuraRootMock, testState } = vi.hoisted(() => ({
   createFlexFolderMock: vi.fn(),
+  ensureTourEstructuraRootMock: vi.fn(),
   testState: {
     existingTourDateRows: [] as any[],
     insertedFlexFolders: [] as any[],
+    selectedDepartments: [] as string[],
+    tourEstructuraFolderId: "flex-estructura" as string | null,
   },
 }));
 
 vi.mock("../api", () => ({
   createFlexFolder: createFlexFolderMock,
+}));
+
+vi.mock("@/utils/flex-folders/tourEstructuraRoot", () => ({
+  ensureTourEstructuraRoot: ensureTourEstructuraRootMock,
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -90,7 +97,9 @@ vi.mock("@/integrations/supabase/client", () => {
 
         if (this.table === "jobs") {
           return {
-            data: [{ job_departments: [] }],
+            data: [{
+              job_departments: testState.selectedDepartments.map((department) => ({ department })),
+            }],
             error: null,
           };
         }
@@ -100,12 +109,13 @@ vi.mock("@/integrations/supabase/client", () => {
             id: this.filters["id"] ?? "tour-1",
             name: "Test Tour",
             flex_main_folder_id: "flex-main",
-            flex_estructura_folder_id: "flex-estructura",
+            flex_estructura_folder_id: testState.tourEstructuraFolderId,
             flex_sound_folder_id: "flex-sound",
             flex_lights_folder_id: "flex-lights",
             flex_video_folder_id: "flex-video",
             flex_production_folder_id: "flex-production",
             flex_personnel_folder_id: "flex-personnel",
+            flex_comercial_folder_id: "flex-comercial",
           };
 
           return this.wantsSingle
@@ -175,6 +185,13 @@ describe("createAllFoldersForJob tourdate location naming", () => {
     createFlexFolderMock.mockReset();
     testState.existingTourDateRows = [];
     testState.insertedFlexFolders = [];
+    testState.selectedDepartments = [];
+    testState.tourEstructuraFolderId = "flex-estructura";
+    ensureTourEstructuraRootMock.mockReset();
+    ensureTourEstructuraRootMock.mockResolvedValue({
+      elementId: "flex-estructura",
+      trackingId: "db-flex-estructura",
+    });
 
     let counter = 0;
     createFlexFolderMock.mockImplementation(async () => ({
@@ -264,5 +281,47 @@ describe("createAllFoldersForJob tourdate location naming", () => {
       (row: any) => row?.department === "production" && row?.folder_type === "tourdate"
     );
     expect(insertedProductionTourdateRoots).toHaveLength(0);
+  });
+
+  it("repairs a missing tour Estructura root before creating any selected tour-date folders", async () => {
+    testState.tourEstructuraFolderId = null;
+    testState.selectedDepartments = ["sound", "lights", "video"];
+
+    await expect(createAllFoldersForJob(
+      {
+        id: "job-legacy-tourdate",
+        tour_date_id: "tour-date-1",
+        job_type: "tourdate",
+        tour_id: "tour-1",
+        title: "Legacy tour date",
+        start_time: "2025-01-01T10:00:00.000Z",
+        end_time: "2025-01-01T12:00:00.000Z",
+        location_data: { name: "Madrid", formatted_address: "Madrid, ES" },
+      },
+      "2025-01-01T10:00:00.000Z",
+      "2025-01-01T12:00:00.000Z",
+      "250101",
+      {
+        sound: { subfolders: [] },
+        lights: { subfolders: [] },
+        video: { subfolders: [] },
+        production: { subfolders: [] },
+        personnel: { subfolders: [] },
+        comercial: { subfolders: [] },
+      },
+    )).resolves.toBeUndefined();
+
+    expect(createFlexFolderMock).toHaveBeenCalled();
+    expect(ensureTourEstructuraRootMock).toHaveBeenCalledWith("tour-1");
+    const createdParentIds = createFlexFolderMock.mock.calls.map(([payload]) => payload?.parentElementId);
+    expect(createdParentIds).toEqual(expect.arrayContaining([
+      "flex-estructura",
+      "flex-sound",
+      "flex-lights",
+      "flex-video",
+      "flex-production",
+      "flex-personnel",
+      "flex-comercial",
+    ]));
   });
 });
