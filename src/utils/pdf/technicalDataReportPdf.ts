@@ -15,11 +15,13 @@ import {
   drawReportChrome,
   drawSectionHeading,
   drawTitleBlock,
-  drawWeightHeadline,
+  drawWeightIntro,
   ensureReportSpace,
   type ReportMetaItem,
 } from "@/utils/pdf/technicalDataReportLayout";
 import {
+  buildPowerAuxSupplyNote,
+  buildPowerOverviewRows,
   buildPowerReportSummary,
   buildWeightPointSummaries,
   formatTechnicalReportDate,
@@ -120,6 +122,7 @@ const tableStyles = (fontFamily: string) => ({
 const drawOverviewTable = ({
   autoTable,
   doc,
+  fohSchukoRequired,
   fontFamily,
   powerCircuits,
   startY,
@@ -128,6 +131,7 @@ const drawOverviewTable = ({
 }: {
   autoTable: AutoTableFn;
   doc: jsPDF;
+  fohSchukoRequired: boolean;
   fontFamily: string;
   powerCircuits: PowerCircuitSummary[];
   startY: number;
@@ -135,16 +139,15 @@ const drawOverviewTable = ({
   weightRows: ReturnType<typeof buildWeightPointSummaries>;
 }) => {
   if (type === "power") {
-    const body = powerCircuits.length
-      ? powerCircuits.map((circuit) => [
-          circuit.name,
-          circuit.pduLabel,
-          circuit.positionLabel,
-          `${formatTechnicalReportNumber(circuit.adjustedWatts / 1000, 2)}${NBSP}kW`,
-          circuit.currentLine === null
-            ? "No agregable"
-            : `${formatTechnicalReportNumber(circuit.currentLine, 2)}${NBSP}A`,
-        ])
+    const overviewRows = buildPowerOverviewRows(powerCircuits, {
+      fohSchukoRequired,
+    });
+    const auxRowIndexes = new Set(
+      overviewRows.flatMap((row, index) =>
+        row.kind === "circuit" ? [] : [index]),
+    );
+    const body = overviewRows.length
+      ? overviewRows.map((row) => row.cells)
       : [["Sin circuitos guardados", "—", "—", "0,00 kW", "—"]];
     autoTable(doc, {
       ...tableStyles(fontFamily),
@@ -153,9 +156,23 @@ const drawOverviewTable = ({
         3: { halign: "right" },
         4: { halign: "right" },
       },
+      didParseCell: (data) => {
+        if (data.section !== "body") return;
+        if (!auxRowIndexes.has(data.row.index)) return;
+        data.cell.styles.textColor = [...REPORT_COLORS.soft] as [
+          number,
+          number,
+          number,
+        ];
+      },
       head: [["Circuito", "PDU", "Posición", "Potencia", "Corriente"]],
       startY,
     });
+    const auxNote = buildPowerAuxSupplyNote(overviewRows);
+    if (auxNote) {
+      const noticeY = ensureReportSpace(doc, tableEndY(doc, startY) + 3, 20);
+      return drawNotice(doc, auxNote, noticeY, "neutral", fontFamily) + 5;
+    }
   } else {
     const body = weightRows.length
       ? weightRows.map((row) => [
@@ -415,7 +432,6 @@ export const exportTechnicalDataReportPdf = async ({
       : null;
   const weightRows =
     type === "weight" ? buildWeightPointSummaries(tables, summaryRows) : [];
-  const totalWeight = weightRows.reduce((sum, row) => sum + row.totalWeight, 0);
   const weightPointCount = weightRows.filter(
     (row) => row.motorCount !== "—",
   ).length;
@@ -475,11 +491,10 @@ export const exportTechnicalDataReportPdf = async ({
         `${powerSummary.totalVa === null ? "Potencia aparente no agregable" : `${formatTechnicalReportNumber(powerSummary.totalVa / 1000, 2)} kVA`}`,
     });
   } else {
-    y = drawWeightHeadline({
+    y = drawWeightIntro({
       componentCount: tables.reduce((sum, table) => sum + table.rows.length, 0),
       doc,
       pointCount: weightPointCount,
-      totalWeight,
     });
   }
 
@@ -492,6 +507,7 @@ export const exportTechnicalDataReportPdf = async ({
   y = drawOverviewTable({
     autoTable,
     doc,
+    fohSchukoRequired,
     fontFamily: reportFont,
     powerCircuits: powerSummary?.circuits ?? [],
     startY: y,
@@ -521,13 +537,6 @@ export const exportTechnicalDataReportPdf = async ({
     y = drawNotice(
       doc,
       `La corriente global no es agregable: ${powerSummary.aggregationReason || "faltan datos eléctricos compatibles."}`,
-      y + 3,
-    );
-  }
-  if (type === "power" && fohSchukoRequired) {
-    drawNotice(
-      doc,
-      "Suministro auxiliar de FOH: 16 A en formato Schuko hembra, excluido de los totales.",
       y + 3,
     );
   }
