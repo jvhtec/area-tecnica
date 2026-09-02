@@ -15,9 +15,10 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { createTourRootFolders, createTourDateFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
+import { createTourDateFolders } from "@/utils/tourFolders";
 import { useQueryClient } from "@tanstack/react-query";
 import { canUseCustomFolderStructure } from "@/utils/permissions";
+import { useTourRootFolderAction } from "@/hooks/tours/useTourRootFolderAction";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -82,6 +83,12 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   const isMobile = useIsMobile();
+  const {
+    handleCreateTourRootFolders,
+    hasTourRootFolders,
+    isCreatingTourRootFolders,
+    needsEstructuraRoot,
+  } = useTourRootFolderAction(tour);
 
   // Fetch tour logo
   useEffect(() => {
@@ -146,42 +153,6 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       onTourClick(tour.id);
     } else {
       navigate(`/tour-management/${tour.id}`);
-    }
-  };
-
-  const handleCreateTourRootFolders = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsMobileMenuOpen(false);
-
-    if (tour.flex_folders_created) {
-      toast({
-        title: "Las carpetas raíz ya existen",
-        description: "Las carpetas raíz de esta gira ya están creadas.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      console.log("Creating tour root folders manually for tour:", tour.id);
-
-      const result = await createTourRootFoldersManual(tour.id);
-
-      if (!result.success) {
-        throw new Error(result.error || "No se pudieron crear las carpetas raíz de la gira");
-      }
-
-      toast({
-        title: "Carpetas creadas",
-        description: "Las carpetas raíz de la gira se han creado correctamente."
-      });
-    } catch (error: any) {
-      console.error("Error creating tour root folders manually:", error);
-      toast({
-        title: "Error al crear las carpetas raíz de la gira",
-        description: error.message,
-        variant: "destructive"
-      });
     }
   };
 
@@ -507,13 +478,18 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
           <span>Reactivar gira</span>
         </div>
       )}
-      {!tour.flex_folders_created && (
+      {(!hasTourRootFolders || needsEstructuraRoot) && (
         <div
-          className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
-          onClick={handleCreateTourRootFolders}
+          className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${isCreatingTourRootFolders ? 'opacity-50 cursor-not-allowed' : ''}`}
+          onClick={isCreatingTourRootFolders ? undefined : (event) => {
+            setIsMobileMenuOpen(false);
+            void handleCreateTourRootFolders(event);
+          }}
         >
           <FolderPlus className="h-4 w-4 mr-3" />
-          <span>Crear carpetas raíz de gira</span>
+          <span>
+            {needsEstructuraRoot ? "Crear carpeta Estructura" : "Crear carpetas raíz de gira"}
+          </span>
         </div>
       )}
       <div
@@ -652,10 +628,13 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                       Reactivar gira
                     </DropdownMenuItem>
                   )}
-                  {!tour.flex_folders_created && (
-                    <DropdownMenuItem onClick={handleCreateTourRootFolders}>
+                  {(!hasTourRootFolders || needsEstructuraRoot) && (
+                    <DropdownMenuItem
+                      onClick={handleCreateTourRootFolders}
+                      disabled={isCreatingTourRootFolders}
+                    >
                       <FolderPlus className="h-4 w-4 mr-2" />
-                      Crear carpetas raíz de gira
+                      {needsEstructuraRoot ? "Crear carpeta Estructura" : "Crear carpetas raíz de gira"}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem
@@ -729,10 +708,15 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                   Cancelada
                 </Badge>
               )}
-              {tour.flex_folders_created ? (
+              {tour.flex_folders_created && !needsEstructuraRoot ? (
                 <Badge variant="secondary" className="text-xs">
                   <FileText className="h-3 w-3 mr-1" />
                   Flex preparado
+                </Badge>
+              ) : needsEstructuraRoot ? (
+                <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
+                  <FolderPlus className="h-3 w-3 mr-1" />
+                  Falta Estructura
                 </Badge>
               ) : (
                 <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
