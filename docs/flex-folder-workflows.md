@@ -50,6 +50,8 @@ Tours can trigger folder creation via the edge function at `supabase/functions/c
 
 Tour roots always reconcile `Tour / Estructura` and persist its UUID in `tours.flex_estructura_folder_id`, including legacy tours already marked `flex_folders_created`. Each tour date then reconciles an Estructura date folder and its two source-discriminated Pull Sheets independently of selected tour departments. Rows created by bulk date creation before a linked job exists use `tour_date_id`; the job workflow adopts those rows by adding `job_id` instead of creating duplicates.
 
+Legacy tours whose main Flex root predates Estructura show `Falta Estructura` on the tour card. The card menu exposes `Crear carpeta Estructura`, which reuses the authenticated root reconciliation path, creates only the missing Estructura child, tracks it in `flex_folders`, and refreshes the tour queries. Tours that already track `flex_estructura_folder_id` do not show the recovery action.
+
 The UI wires into this function through `createTourRootFolders` and `createTourDateFolders` utilities, which invoke the function with the appropriate payload and bubble errors to the calling components.【F:src/utils/tourFolders.ts†L14-L63】 `TourCard` exposes these flows to users, blocking date-folder creation until root folders exist.【F:src/components/tours/TourCard.tsx†L110-L160】
 
 ### Manual Root Folder Creation

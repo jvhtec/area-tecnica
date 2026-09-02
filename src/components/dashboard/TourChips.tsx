@@ -47,6 +47,7 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
           status,
           flex_folders_created,
           flex_main_folder_id,
+          flex_estructura_folder_id,
           tour_dates (
             id,
             date,
