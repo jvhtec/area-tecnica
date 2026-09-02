@@ -30,7 +30,7 @@ interface FlexFolderMockResponse {
   elementNumber: string;
 }
 
-const { createFlexFolderMock, functionInvokeMock, state } = vi.hoisted(() => {
+const { createFlexFolderMock, ensureTourEstructuraRootMock, functionInvokeMock, state } = vi.hoisted(() => {
   const state: TestState = {
     flexFolderInserts: [],
     tourUpdates: [],
@@ -40,6 +40,7 @@ const { createFlexFolderMock, functionInvokeMock, state } = vi.hoisted(() => {
   return {
     createFlexFolderMock:
       vi.fn<(payload: Record<string, unknown>) => Promise<FlexFolderMockResponse>>(),
+    ensureTourEstructuraRootMock: vi.fn(),
     functionInvokeMock: vi.fn<() => Promise<unknown>>(),
     state,
   };
@@ -47,6 +48,10 @@ const { createFlexFolderMock, functionInvokeMock, state } = vi.hoisted(() => {
 
 vi.mock("@/utils/flex-folders/api", () => ({
   createFlexFolder: createFlexFolderMock,
+}));
+
+vi.mock("@/utils/flex-folders/tourEstructuraRoot", () => ({
+  ensureTourEstructuraRoot: ensureTourEstructuraRootMock,
 }));
 
 vi.mock("@/lib/supabase", () => {
@@ -131,12 +136,22 @@ vi.mock("@/lib/supabase", () => {
   };
 });
 
-import { createTourRootFoldersManual } from "@/utils/tourFolders";
+import {
+  createTourDateFolders,
+  createTourRootFolders,
+  createTourRootFoldersManual,
+} from "@/utils/tourFolders";
 
 describe("createTourRootFoldersManual", () => {
   beforeEach(() => {
     createFlexFolderMock.mockReset();
     functionInvokeMock.mockReset();
+    functionInvokeMock.mockResolvedValue({ data: { success: true }, error: null });
+    ensureTourEstructuraRootMock.mockReset();
+    ensureTourEstructuraRootMock.mockResolvedValue({
+      elementId: "estructura-element",
+      trackingId: "estructura-tracking",
+    });
     state.flexFolderInserts = [];
     state.tourUpdates = [];
     state.tour = {
@@ -183,5 +198,37 @@ describe("createTourRootFoldersManual", () => {
         flex_estructura_folder_id: expect.any(String),
       },
     });
+  });
+
+  it("verifies and repairs Estructura after the root Edge Function returns success", async () => {
+    await expect(createTourRootFolders("tour-1")).resolves.toMatchObject({
+      success: true,
+      data: { flex_estructura_folder_id: "estructura-element" },
+    });
+
+    expect(functionInvokeMock).toHaveBeenCalledWith("create-flex-folders", {
+      body: {
+        tourId: "tour-1",
+        createRootFolders: true,
+        createDateFolders: false,
+      },
+    });
+    expect(ensureTourEstructuraRootMock).toHaveBeenCalledWith("tour-1");
+  });
+
+  it("repairs Estructura before requesting bulk tour-date folders", async () => {
+    await expect(createTourDateFolders("tour-1")).resolves.toMatchObject({ success: true });
+
+    expect(ensureTourEstructuraRootMock).toHaveBeenCalledWith("tour-1");
+    expect(functionInvokeMock).toHaveBeenCalledWith("create-flex-folders", {
+      body: {
+        tourId: "tour-1",
+        createRootFolders: false,
+        createDateFolders: true,
+      },
+    });
+    expect(ensureTourEstructuraRootMock.mock.invocationCallOrder[0]).toBeLessThan(
+      functionInvokeMock.mock.invocationCallOrder[0],
+    );
   });
 });
