@@ -184,14 +184,16 @@ export const StaffingJobSelectionDialog = ({
                 ))}
               </div>
 
+              {/* This block only renders with a job selected, so the guards this
+                  button used to carry against an empty selection were dead code
+                  (CodeQL "useless conditional"). */}
               <Button
                 variant="outline"
                 className="min-h-11 w-full"
-                disabled={!selectedJobId || isCancelling}
-                onClick={() => {
-                  if (!selectedJobId) return;
-                  cancelStaffing({ job_id: selectedJobId, profile_id: technicianId, phase: effectiveAction });
-                }}
+                disabled={isCancelling}
+                onClick={() =>
+                  cancelStaffing({ job_id: selectedJobId, profile_id: technicianId, phase: effectiveAction })
+                }
               >
                 {isCancelling
                   ? 'Cancelando…'
