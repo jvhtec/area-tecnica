@@ -72,30 +72,31 @@ SELECT ok(
   'The subsystem allowlist constraint is present'
 );
 
--- The exact set, so adding a name to the TypeScript union without a migration
--- (or vice versa) is caught here rather than at runtime.
+-- The exact set, compared in BOTH directions.
+--
+-- An earlier version of this assertion only checked that each expected name
+-- appeared somewhere in the constraint definition. That is one-directional: a
+-- later migration adding, say, 'billing' to the constraint while `SystemName`
+-- stayed unchanged would still have passed, despite the drift this test exists
+-- to catch. Extracting the allowlist and comparing it as a set catches a
+-- missing value and an extra one alike.
 SELECT is(
   (
-    SELECT array_agg(value ORDER BY value)
-    FROM (
-      SELECT DISTINCT unnest(ARRAY[
-        'timesheets', 'assignments', 'ui', 'auth', 'jobs', 'tours',
-        'festivals', 'staffing', 'equipment', 'logistics', 'documents', 'flex'
-      ]) AS value
-    ) expected
-    WHERE EXISTS (
-      SELECT 1
-      FROM pg_constraint
-      WHERE conname = 'system_errors_system_check'
-        AND conrelid = 'public.system_errors'::regclass
-        AND pg_get_constraintdef(oid) LIKE '%''' || expected.value || '''%'
-    )
+    SELECT array_agg(match[1] ORDER BY match[1])
+    FROM pg_constraint c
+    CROSS JOIN LATERAL regexp_matches(
+      pg_get_constraintdef(c.oid),
+      '''([^'']+)''::text',
+      'g'
+    ) AS match
+    WHERE c.conname = 'system_errors_system_check'
+      AND c.conrelid = 'public.system_errors'::regclass
   ),
   ARRAY[
     'assignments', 'auth', 'documents', 'equipment', 'festivals', 'flex',
     'jobs', 'logistics', 'staffing', 'timesheets', 'tours', 'ui'
   ],
-  'Every subsystem in the TypeScript SystemName union is on the DB allowlist'
+  'The DB allowlist is exactly the TypeScript SystemName union — no missing or extra values'
 );
 
 SELECT * FROM finish();
