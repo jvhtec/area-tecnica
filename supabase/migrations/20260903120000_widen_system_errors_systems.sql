@@ -30,6 +30,24 @@
 -- accepted. RLS and grants are unchanged.
 -- =============================================================================
 
+-- Rollout note: the new constraint is added `NOT VALID`.
+--
+-- A plain `ADD CONSTRAINT` makes PostgreSQL scan every existing row while
+-- holding ACCESS EXCLUSIVE, which blocks concurrent inserts for the duration.
+-- On this table specifically that is self-defeating: the writes it would block
+-- are exactly the browser error reports this change exists to start capturing,
+-- so a deploy would blind the very system it is switching on.
+--
+-- `NOT VALID` skips the scan and takes only a brief catalog lock. It does NOT
+-- weaken enforcement: every INSERT and UPDATE is still checked against the
+-- constraint from this migration onward — `NOT VALID` governs existing rows
+-- only. Those are provably fine here anyway, since the constraint being
+-- replaced admitted a strict subset of the new allowlist.
+--
+-- The companion migration 20260903120500 runs `VALIDATE CONSTRAINT`, which
+-- takes SHARE UPDATE EXCLUSIVE and does not block inserts, to clear the
+-- `convalidated` flag and keep the catalog tidy.
+
 ALTER TABLE "public"."system_errors"
   DROP CONSTRAINT IF EXISTS "system_errors_system_check";
 
@@ -52,7 +70,7 @@ ALTER TABLE "public"."system_errors"
     'logistics'::"text",
     'documents'::"text",
     'flex'::"text"
-  ]));
+  ])) NOT VALID;
 
 COMMENT ON CONSTRAINT "system_errors_system_check" ON "public"."system_errors" IS
   'Allowlist of subsystems permitted to report through trackError(). Widen deliberately: the constraint is what keeps this table queryable by system.';

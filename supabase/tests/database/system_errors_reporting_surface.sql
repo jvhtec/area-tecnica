@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(9);
+SELECT plan(10);
 
 -- ---------------------------------------------------------------------------
 -- `public.system_errors` is the only server-side sink the browser has for error
@@ -97,6 +97,20 @@ SELECT is(
     'jobs', 'logistics', 'staffing', 'timesheets', 'tours', 'ui'
   ],
   'The DB allowlist is exactly the TypeScript SystemName union — no missing or extra values'
+);
+
+-- The widening lands as NOT VALID (20260903120000) and is validated by its
+-- companion migration (20260903120500). Assert the pair completed: a NOT VALID
+-- constraint still enforces new rows, so a half-applied rollout would pass
+-- every other assertion here and only show up as a stale catalog flag.
+SELECT ok(
+  (
+    SELECT convalidated
+    FROM pg_constraint
+    WHERE conname = 'system_errors_system_check'
+      AND conrelid = 'public.system_errors'::regclass
+  ),
+  'The allowlist constraint has been validated, not left NOT VALID'
 );
 
 SELECT * FROM finish();

@@ -16,7 +16,9 @@ Authors and the license as the SIL Open Font License, Version 1.1. The reports
 use this static file for Spanish/Latin text and the electrical notation
 `1φ`, `3φ`, `ΣP`, and `ΣQ`.
 
-`src/utils/pdf/pdfUnicodeFont.ts` is the only consumer — it fetches
-`/fonts/NotoSansPdf-Regular.ttf` at runtime. Adding a font here adds it to
-every page load, so prefer generating a subset instance over shipping a full
-face.
+`src/utils/pdf/pdfUnicodeFont.ts` is the only consumer. It fetches
+`/fonts/NotoSansPdf-Regular.ttf` inside `registerPdfUnicodeFont`, which runs
+when a report is generated — not on page load. Adding a font here therefore
+costs deployed asset size rather than startup time, and is paid at PDF-export
+time by the users who generate reports. Prefer generating a subset instance
+over shipping a full face.
