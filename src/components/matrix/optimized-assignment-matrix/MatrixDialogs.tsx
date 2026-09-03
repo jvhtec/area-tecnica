@@ -1,8 +1,7 @@
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
-import { formatMadridDateKey } from "@/utils/timezoneUtils";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { formatMadridDateKey, madridDateKeyToCalendarDate } from "@/utils/timezoneUtils";
 
 import { AssignmentStatusDialog } from "@/components/matrix/AssignmentStatusDialog";
 import { AssignJobDialog } from "@/components/matrix/AssignJobDialog";
@@ -11,11 +10,17 @@ import { OfferDetailsDialog } from "@/components/matrix/OfferDetailsDialog";
 import { SelectJobDialog } from "@/components/matrix/SelectJobDialog";
 import { StaffingJobSelectionDialog } from "@/components/matrix/StaffingJobSelectionDialog";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarPicker } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
+import { CoverageSelector } from "@/components/matrix/staffing/CoverageSelector";
+import { SHEET_BODY, SHEET_FOOTER, SHEET_HEADER } from "@/components/matrix/staffing/sheetLayout";
+import { cn } from "@/lib/utils";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { queryKeys } from "@/lib/react-query";
 import type { OptimizedAssignmentMatrixViewProps } from "@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView";
@@ -55,6 +60,7 @@ type MatrixDialogsProps = Pick<
   | "createUserOpen"
   | "setCreateUserOpen"
   | "qc"
+  | "offerSeedDates"
 >;
 
 export const MatrixDialogs = ({
@@ -91,6 +97,7 @@ export const MatrixDialogs = ({
   createUserOpen,
   setCreateUserOpen,
   qc,
+  offerSeedDates,
 }: MatrixDialogsProps) => (
   <>
     {cellAction?.type === "select-job" && currentTechnician && (
@@ -155,6 +162,7 @@ export const MatrixDialogs = ({
         jobStartTimeIso={jobs.find((j) => j.id === cellAction.selectedJobId)?.start_time}
         jobEndTimeIso={jobs.find((j) => j.id === cellAction.selectedJobId)?.end_time}
         defaultDateIso={formatMadridDateKey(cellAction.date)}
+        defaultDates={offerSeedDates}
         onSubmit={({ role, message, singleDay, dates }) => {
           if (!cellAction.selectedJobId) return;
           void (async () => {
@@ -256,181 +264,139 @@ export const MatrixDialogs = ({
       />
     )}
 
-    {availabilityDialog?.open && (
-      <Dialog open={true} onOpenChange={(v) => { if (!v) setAvailabilityDialog(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enviar solicitud de disponibilidad</DialogTitle>
-            <DialogDescription>
-              Pide disponibilidad a {currentTechnician?.first_name} {currentTechnician?.last_name} vía{" "}
-              {availabilityDialog.channel === "whatsapp" ? "WhatsApp" : "Email"}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <div className="space-y-3">
-              <Label className="font-medium text-sm text-foreground">Cobertura</Label>
-              <RadioGroup
+    {availabilityDialog?.open && (() => {
+      const job = jobs.find((j) => j.id === availabilityDialog.jobId);
+      // Job timestamps are real instants, so they convert to Madrid days.
+      const toMadridDay = (value: Date | string) => formatInTimeZone(value, "Europe/Madrid", "yyyy-MM-dd");
+      const startDay = job?.start_time ? toMadridDay(job.start_time) : undefined;
+      const endDay = job?.end_time ? toMadridDay(job.end_time) : startDay;
+      const isAllowed = (d: Date) => {
+        if (!startDay || !endDay) return true;
+        // Picker values are NOT instants: they are local-midnight calendar
+        // values standing for a Madrid day (see madridDateKeyToCalendarDate),
+        // and they are submitted with the same local format below. Running
+        // them through formatInTimeZone shifted them a day east of Madrid.
+        const day = format(d, "yyyy-MM-dd");
+        return day >= startDay && day <= endDay;
+      };
+      const dayCount =
+        availabilityCoverage === "multi"
+          ? availabilityMultiDates.length
+          : availabilityCoverage === "single"
+            ? 1
+            : 0;
+      const sendLabel = availabilitySending
+        ? "Enviando…"
+        : availabilityCoverage === "full"
+          ? "Enviar solicitud"
+          : `Enviar (${dayCount} ${dayCount === 1 ? "día" : "días"})`;
+
+      return (
+        <ResponsiveDialog open={true} onOpenChange={(v) => { if (!v) setAvailabilityDialog(null) }}>
+          <ResponsiveDialogContent className="sm:max-w-md">
+            <ResponsiveDialogHeader className={SHEET_HEADER}>
+              <ResponsiveDialogTitle>Pedir disponibilidad</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>
+                {`${currentTechnician?.first_name ?? ""} ${currentTechnician?.last_name ?? ""}`.trim()}
+                {job?.title ? ` · ${job.title}` : ""}
+                {` · ${availabilityDialog.channel === "whatsapp" ? "WhatsApp" : "Email"}`}
+              </ResponsiveDialogDescription>
+            </ResponsiveDialogHeader>
+
+            <div className={SHEET_BODY}>
+              <CoverageSelector
                 value={availabilityCoverage}
-                onValueChange={(value) => setAvailabilityCoverage(value as "full" | "single" | "multi")}
-                className="flex items-center gap-4"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem id="availability-coverage-full" value="full" />
-                  <Label htmlFor="availability-coverage-full" className="cursor-pointer">
-                    Todo el trabajo
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem id="availability-coverage-single" value="single" />
-                  <Label htmlFor="availability-coverage-single" className="cursor-pointer">
-                    Un día
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem id="availability-coverage-multi" value="multi" />
-                  <Label htmlFor="availability-coverage-multi" className="cursor-pointer">
-                    Varios días
-                  </Label>
-                </div>
-              </RadioGroup>
-              {(() => {
-                const job = jobs.find((j) => j.id === availabilityDialog.jobId);
-                // Job timestamps are real instants, so they convert to Madrid days.
-                const toMadridDay = (value: Date | string) =>
-                  formatInTimeZone(value, "Europe/Madrid", "yyyy-MM-dd");
-                const startDay = job?.start_time ? toMadridDay(job.start_time) : undefined;
-                const endDay = job?.end_time ? toMadridDay(job.end_time) : startDay;
-                const isAllowed = (d: Date) => {
-                  if (!startDay || !endDay) return true;
-                  // Picker values are NOT instants: they are local-midnight calendar
-                  // values standing for a Madrid day (see madridDateKeyToCalendarDate),
-                  // and they are submitted with the same local format below. Running
-                  // them through formatInTimeZone shifted them a day east of Madrid.
-                  const day = format(d, "yyyy-MM-dd");
-                  return day >= startDay && day <= endDay;
-                };
-                return (
-                  <>
-                    {availabilityCoverage === "single" && (
-                      <div className="flex items-center gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="gap-2">
-                              <CalendarIcon className="h-4 w-4" />
-                              {availabilitySingleDate
-                                ? format(availabilitySingleDate, "PPP")
-                                : availabilityDialog.dateIso}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarPicker
-                              mode="single"
-                              selected={availabilitySingleDate ?? undefined}
-                              onSelect={(d) => {
-                                if (d && isAllowed(d)) setAvailabilitySingleDate(d);
-                              }}
-                              disabled={(d) => !isAllowed(d)}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <p className="text-xs text-muted-foreground">Enviar solo para la fecha seleccionada.</p>
-                      </div>
-                    )}
-                    {availabilityCoverage === "multi" && (
-                      <div className="space-y-2">
-                        <CalendarPicker
-                          mode="multiple"
-                          selected={availabilityMultiDates}
-                          onSelect={(ds) => setAvailabilityMultiDates((ds || []).filter((d) => isAllowed(d)))}
-                          disabled={(d) => !isAllowed(d)}
-                          numberOfMonths={2}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Crea una solicitud de un solo día por cada fecha seleccionada.
-                        </p>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+                onChange={setAvailabilityCoverage}
+                singleDate={availabilitySingleDate}
+                onSingleDateChange={setAvailabilitySingleDate}
+                multiDates={availabilityMultiDates}
+                onMultiDatesChange={setAvailabilityMultiDates}
+                isAllowed={isAllowed}
+                rangeStart={startDay ? madridDateKeyToCalendarDate(startDay) : null}
+                rangeEnd={endDay ? madridDateKeyToCalendarDate(endDay) : null}
+                fullHint="Pregunta por todas las fechas del trabajo."
+                singleHint="Envía la solicitud solo para la fecha seleccionada."
+                multiHint="Crea una solicitud de un día por cada fecha seleccionada."
+              />
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAvailabilityDialog(null)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                if (!availabilityDialog) return;
-                setAvailabilitySending(true);
-                const jobId = availabilityDialog.jobId;
-                const profileId = availabilityDialog.profileId;
-                const via = availabilityDialog.channel;
-                if (availabilityCoverage === "full") {
-                  const payload = { job_id: jobId, profile_id: profileId, phase: "availability", channel: via, department: staffingDepartment, single_day: false };
-                  sendStaffingEmail(payload as any, {
+
+            <ResponsiveDialogFooter className={SHEET_FOOTER}>
+              <Button variant="outline" className="min-h-11" onClick={() => setAvailabilityDialog(null)}>
+                Cancelar
+              </Button>
+              <Button
+                className="min-h-11 flex-1 sm:flex-none"
+                onClick={() => {
+                  if (!availabilityDialog) return;
+                  setAvailabilitySending(true);
+                  const jobId = availabilityDialog.jobId;
+                  const profileId = availabilityDialog.profileId;
+                  const via = availabilityDialog.channel;
+                  if (availabilityCoverage === "full") {
+                    const payload = { job_id: jobId, profile_id: profileId, phase: "availability", channel: via, department: staffingDepartment, single_day: false };
+                    sendStaffingEmail(payload as any, {
+                      onSuccess: (data: any) => {
+                        setAvailabilitySending(false);
+                        setAvailabilityDialog(null);
+                        toast({
+                          title: "Solicitud enviada",
+                          description: `Solicitud de disponibilidad enviada por ${data?.channel || via}.`,
+                        });
+                        closeDialogs();
+                      },
+                      onError: (error: any) => handleEmailError(error, payload),
+                    });
+                    return;
+                  }
+                  const dates =
+                    availabilityCoverage === "single"
+                      ? availabilitySingleDate
+                        ? [format(availabilitySingleDate, "yyyy-MM-dd")]
+                        : [availabilityDialog.dateIso]
+                      : Array.from(new Set((availabilityMultiDates || []).map((d) => format(d, "yyyy-MM-dd"))));
+                  if (dates.length === 0) {
+                    setAvailabilitySending(false);
+                    toast({
+                      title: "Selecciona fecha(s)",
+                      description: "Elige al menos una fecha dentro del rango del trabajo.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  const payload: any = {
+                    job_id: jobId,
+                    profile_id: profileId,
+                    phase: "availability",
+                    channel: via,
+                    department: staffingDepartment,
+                    single_day: true,
+                    dates,
+                  };
+                  if (availabilityCoverage === "single" || dates.length === 1) {
+                    payload.target_date = dates[0];
+                  }
+                  sendStaffingEmail(payload, {
                     onSuccess: (data: any) => {
                       setAvailabilitySending(false);
                       setAvailabilityDialog(null);
                       toast({
                         title: "Solicitud enviada",
-                        description: `Solicitud de disponibilidad enviada por ${data?.channel || via}.`,
+                        description: `Solicitud de disponibilidad enviada para ${dates.length} día${dates.length > 1 ? "s" : ""} por ${data?.channel || via}.`,
                       });
                       closeDialogs();
                     },
                     onError: (error: any) => handleEmailError(error, payload),
                   });
-                  return;
-                }
-                const dates =
-                  availabilityCoverage === "single"
-                    ? availabilitySingleDate
-                      ? [format(availabilitySingleDate, "yyyy-MM-dd")]
-                      : [availabilityDialog.dateIso]
-                    : Array.from(new Set((availabilityMultiDates || []).map((d) => format(d, "yyyy-MM-dd"))));
-                if (dates.length === 0) {
-                  setAvailabilitySending(false);
-                  toast({
-                    title: "Selecciona fecha(s)",
-                    description: "Elige al menos una fecha dentro del rango del trabajo.",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                const payload: any = {
-                  job_id: jobId,
-                  profile_id: profileId,
-                  phase: "availability",
-                  channel: via,
-                  department: staffingDepartment,
-                  single_day: true,
-                  dates,
-                };
-                if (availabilityCoverage === "single" || dates.length === 1) {
-                  payload.target_date = dates[0];
-                }
-                sendStaffingEmail(payload, {
-                  onSuccess: (data: any) => {
-                    setAvailabilitySending(false);
-                    setAvailabilityDialog(null);
-                    toast({
-                      title: "Solicitud enviada",
-                      description: `Solicitud de disponibilidad enviada para ${dates.length} día${dates.length > 1 ? "s" : ""} por ${data?.channel || via}.`,
-                    });
-                    closeDialogs();
-                  },
-                  onError: (error: any) => handleEmailError(error, payload),
-                });
-              }}
-              disabled={availabilitySending}
-            >
-              {availabilitySending ? "Enviando…" : "Enviar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    )}
+                }}
+                disabled={availabilitySending}
+              >
+                {sendLabel}
+              </Button>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
+      );
+    })()}
 
     {cellAction?.type === "unavailable" && (
       <MarkUnavailableDialog
@@ -455,13 +421,13 @@ export const MatrixDialogs = ({
     )}
 
     {conflictDialog?.open && (
-      <Dialog open={true} onOpenChange={(v) => { if (!v) setConflictDialog(null) }}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Conflicto de agenda detectado</DialogTitle>
-            <DialogDescription>El técnico tiene conflictos o no está disponible durante este periodo.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[400px] overflow-y-auto">
+      <ResponsiveDialog open={true} onOpenChange={(v) => { if (!v) setConflictDialog(null) }}>
+        <ResponsiveDialogContent className="sm:max-w-2xl">
+          <ResponsiveDialogHeader className={SHEET_HEADER}>
+            <ResponsiveDialogTitle>Conflicto de agenda detectado</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>El técnico tiene conflictos o no está disponible durante este periodo.</ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          <div className={cn(SHEET_BODY, "space-y-4 sm:max-h-[400px]")}>
             {conflictDialog.details?.conflicts && conflictDialog.details.conflicts.length > 0 && (
               <div className="space-y-2">
                 <h4 className="font-semibold text-red-600 dark:text-red-400">Trabajos solapados:</h4>
@@ -522,12 +488,13 @@ export const MatrixDialogs = ({
               </div>
             )}
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConflictDialog(null)}>
+          <ResponsiveDialogFooter className={SHEET_FOOTER}>
+            <Button variant="outline" className="min-h-11" onClick={() => setConflictDialog(null)}>
               Cancelar
             </Button>
             <Button
               variant="destructive"
+              className="min-h-11 flex-1 sm:flex-none"
               onClick={() => {
                 const payloadWithOverride = {
                   ...conflictDialog.originalPayload,
@@ -556,9 +523,9 @@ export const MatrixDialogs = ({
             >
               Enviar igualmente
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     )}
   </>
 );

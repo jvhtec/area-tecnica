@@ -16,16 +16,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { SHEET_BODY, SHEET_FOOTER, SHEET_HEADER } from '@/components/matrix/staffing/sheetLayout';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
@@ -44,6 +46,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { labelForCode, roleOptionsForDiscipline } from '@/utils/roles';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { CalendarDays, Calendar as CalendarIcon, CalendarRange, Clock, Loader2 } from 'lucide-react';
 import type { Dispatch, SetStateAction } from "react";
 
@@ -104,17 +107,19 @@ export const AssignJobDialogView = ({
     value === "full" || value === "single" || value === "multi";
   return (
     <>
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isReassignment ? 'Reasignar Trabajo' : 'Asignar Trabajo'}</DialogTitle>
-            <DialogDescription>
-              {isReassignment ? 'Reasignar a' : 'Asignar a'} {technician?.first_name} {technician?.last_name} a un trabajo el{' '}
-              {format(date, 'EEEE, d MMMM, yyyy')}
-            </DialogDescription>
-          </DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+        <ResponsiveDialogContent className="sm:max-w-md">
+          <ResponsiveDialogHeader className={SHEET_HEADER}>
+            <ResponsiveDialogTitle>{isReassignment ? 'Reasignar trabajo' : 'Asignar trabajo'}</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription className="first-letter:uppercase">
+              {isReassignment ? 'Reasignar a' : 'Asignar a'} {technician?.first_name} {technician?.last_name} el{' '}
+              {format(date, "EEEE d 'de' MMMM", { locale: es })}
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
 
-          <div className="space-y-4">
+          {/* The form is taller than a phone: give it its own scroll area rather
+              than letting the sheet grow past the viewport. */}
+          <div className={cn(SHEET_BODY, "space-y-4")}>
             {technician && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Técnico:</span>
@@ -124,10 +129,10 @@ export const AssignJobDialogView = ({
             )}
 
             {isReassignment && existingAssignment?.jobs && (
-              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                <div className="text-sm font-medium text-yellow-800">Asignación Actual:</div>
-                <div className="text-sm text-yellow-700">{existingAssignment.jobs.title}</div>
-                <div className="text-xs text-yellow-600">
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                <div className="text-sm font-medium text-amber-800 dark:text-amber-200">Asignación actual:</div>
+                <div className="text-sm text-amber-700 dark:text-amber-300">{existingAssignment.jobs.title}</div>
+                <div className="text-xs text-amber-700/80 dark:text-amber-300/80">
                   Estado: <Badge variant="secondary">{existingAssignment.status}</Badge>
                 </div>
               </div>
@@ -189,8 +194,8 @@ export const AssignJobDialogView = ({
               <div className="space-y-4">
                 {/* Modification mode toggle - only show when modifying the same job */}
                 {isModifyingSelectedJob && coverageMode !== 'full' && existingTimesheets && existingTimesheets.length > 0 && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <label className="text-sm font-medium text-blue-900 block mb-2">
+                  <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 p-3">
+                    <label className="mb-2 block text-sm font-medium text-sky-900 dark:text-sky-200">
                       Modo de Modificación
                     </label>
                     <div className="flex gap-2">
@@ -213,7 +218,7 @@ export const AssignJobDialogView = ({
                         Reemplazar Fechas
                       </Button>
                     </div>
-                    <p className="text-xs text-blue-700 mt-2">
+                    <p className="mt-2 text-xs text-sky-700 dark:text-sky-300">
                       {modificationMode === 'add'
                         ? `Añadir: Las fechas seleccionadas se añadirán a las ${existingTimesheets.length} fecha(s) existente(s).`
                         : `Reemplazar: Las fechas existentes serán reemplazadas por las fechas seleccionadas.`
@@ -351,11 +356,12 @@ export const AssignJobDialogView = ({
             )}
           </div>
 
-          <DialogFooter className="flex items-center justify-between gap-2">
-            <div className="mr-auto">
+          <ResponsiveDialogFooter className={cn(SHEET_FOOTER, "flex-col sm:flex-row sm:items-center sm:justify-between")}>
+            <div className="sm:mr-auto">
               {isReassignment && (
                 <Button
                   variant="destructive"
+                  className="min-h-11 w-full sm:w-auto"
                   onClick={handleRemoveAssignment}
                   disabled={isRemoving}
                 >
@@ -365,15 +371,16 @@ export const AssignJobDialogView = ({
                       Eliminando...
                     </>
                   ) : (
-                    'Eliminar Asignación'
+                    'Eliminar asignación'
                   )}
                 </Button>
               )}
             </div>
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" className="min-h-11" onClick={onClose}>
               Cancelar
             </Button>
             <Button
+              className="min-h-11"
               onClick={handleAssign}
               disabled={!selectedJobId || !selectedRole || isAssigning}
             >
@@ -383,12 +390,12 @@ export const AssignJobDialogView = ({
                   Asignando...
                 </>
               ) : (
-                `${isReassignment ? 'Reasignar' : 'Asignar'} Trabajo`
+                `${isReassignment ? 'Reasignar' : 'Asignar'} trabajo`
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
       <AlertDialog
         open={!!conflictWarning}
         onOpenChange={(openState) => {

@@ -18,7 +18,7 @@ export const assignmentStatusLabel = (status?: string | null) => {
   const normalizedStatus = normalizeStatus(status);
   if (normalizedStatus === 'confirmed') return 'Confirmado';
   if (normalizedStatus === 'declined') return 'Rechazado';
-  if (normalizedStatus === 'invited') return 'Invitado';
+  if (normalizedStatus === 'invited') return 'Asignado manualmente (sin confirmar)';
   return 'Pendiente';
 };
 

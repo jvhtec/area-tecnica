@@ -1,16 +1,25 @@
 import React, { useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { format } from 'date-fns';
+import { Send } from 'lucide-react';
+
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Department } from '@/types/department';
-import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { formatMadridDateKey } from '@/utils/timezoneUtils';
+import { roleOptionsForDiscipline } from '@/utils/roles';
+import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
+import { CoverageSelector, type CoverageMode } from '@/components/matrix/staffing/CoverageSelector';
+import { SHEET_BODY, SHEET_FOOTER, SHEET_HEADER } from '@/components/matrix/staffing/sheetLayout';
 
 interface OfferDetailsDialogProps {
   open: boolean;
@@ -24,24 +33,21 @@ interface OfferDetailsDialogProps {
   jobStartTimeIso?: string;
   jobEndTimeIso?: string;
   defaultDateIso?: string;
+  /**
+   * Days the technician has selected in the grid. More than one opens the
+   * dialog on "varios días" with exactly those days, the same way an
+   * availability request treats a multi-select.
+   */
+  defaultDates?: string[];
 }
 
-export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, jobDescription, technicianDepartment, onSubmit, defaultSingleDay, jobStartTimeIso, jobEndTimeIso, defaultDateIso }) => {
+export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, jobDescription, technicianDepartment, onSubmit, defaultSingleDay, jobStartTimeIso, jobEndTimeIso, defaultDateIso, defaultDates }) => {
   const [role, setRole] = useState(''); // stores code
   const [message, setMessage] = useState('');
-  const [coverageMode, setCoverageMode] = useState<'full' | 'single' | 'multi'>(defaultSingleDay ? 'single' : 'full');
-  const [singleDate, setSingleDate] = useState<Date | null>(() => {
-    if (defaultDateIso) {
-      try { return new Date(`${defaultDateIso}T00:00:00`); } catch { return null; }
-    }
-    return null;
-  });
-  const [multiDates, setMultiDates] = useState<Date[]>(() => {
-    if (defaultDateIso) {
-      try { return [new Date(`${defaultDateIso}T00:00:00`)]; } catch { return []; }
-    }
-    return [];
-  });
+  const [coverageMode, setCoverageMode] = useState<CoverageMode>(defaultSingleDay ? 'single' : 'full');
+  const defaultDate = defaultDateIso ? madridDateKeyToCalendarDate(defaultDateIso) : null;
+  const [singleDate, setSingleDate] = useState<Date | null>(defaultDate);
+  const [multiDates, setMultiDates] = useState<Date[]>(defaultDate ? [defaultDate] : []);
 
   const handleSubmit = () => {
     const trimmedRole = role.trim();
@@ -64,12 +70,26 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
     if (open && roleOptions.length && !role) setRole(roleOptions[0].code);
   }, [open, technicianDepartment]);
 
+  // Seeds once per opening, like the availability dialog: a selection change
+  // behind the modal must not discard what the user has picked in here.
+  const seededDatesKey = (defaultDates || []).join(',');
   React.useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const seeded = (defaultDates || [])
+      .map((dayKey) => madridDateKeyToCalendarDate(dayKey))
+      .filter((date): date is Date => !!date);
+    if (seeded.length > 1) {
+      setCoverageMode('multi');
+      setMultiDates(seeded);
+      setSingleDate(null);
+    } else {
       setCoverageMode(defaultSingleDay ? 'single' : 'full');
-      setMessage(jobDescription || '');
     }
-  }, [open, defaultSingleDay, jobDescription]);
+    setMessage(jobDescription || '');
+    // seededDatesKey stands in for defaultDates: depending on the array itself
+    // would re-seed (and discard the user's edits) on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultSingleDay, jobDescription, seededDatesKey]);
 
   // Job timestamps are real instants, so their day is the Madrid one. Picker
   // values are local calendar days that round-trip through local format(), so
@@ -86,21 +106,28 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
     return dayKey >= jobSpan.startKey && dayKey <= jobSpan.endKey;
   };
 
+  // The CTA states how many days are going out, so a multi-day send is never a
+  // surprise — the count is the thing people get wrong.
+  const dayCount = coverageMode === 'multi' ? multiDates.length : coverageMode === 'single' ? 1 : 0;
+  const submitLabel = coverageMode === 'full'
+    ? 'Enviar oferta'
+    : `Enviar oferta (${dayCount} ${dayCount === 1 ? 'día' : 'días'})`;
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Enviar Oferta {jobTitle ? `- ${jobTitle}` : ''}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          <div>
-            <Label>Técnico</Label>
-            <div className="text-sm text-muted-foreground">{technicianName}</div>
-          </div>
-          <div>
+    <ResponsiveDialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader className={SHEET_HEADER}>
+          <ResponsiveDialogTitle>Enviar oferta</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
+            {jobTitle ? `${jobTitle} · ${technicianName}` : technicianName}
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
+
+        <div className={cn(SHEET_BODY, "space-y-4")}>
+          <div className="space-y-1.5">
             <Label htmlFor="role">Rol</Label>
             <Select value={role} onValueChange={setRole}>
-              <SelectTrigger id="role">
+              <SelectTrigger id="role" className="min-h-11">
                 <SelectValue placeholder="Seleccionar rol" />
               </SelectTrigger>
               <SelectContent>
@@ -110,67 +137,46 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
               </SelectContent>
             </Select>
           </div>
-          <div>
+
+          <div className="space-y-1.5">
             <Label htmlFor="message">Mensaje (opcional)</Label>
-            <Textarea id="message" placeholder="Detalles adicionales para incluir en el correo" value={message} onChange={(e) => setMessage(e.target.value)} />
+            <Textarea
+              id="message"
+              rows={3}
+              placeholder="Detalles adicionales para incluir en el mensaje"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Cobertura</Label>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="offer-coverage" checked={coverageMode === 'full'} onChange={() => setCoverageMode('full')} />
-                <span>Duración completa del trabajo</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="offer-coverage" checked={coverageMode === 'single'} onChange={() => setCoverageMode('single')} />
-                <span>Día suelto</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="offer-coverage" checked={coverageMode === 'multi'} onChange={() => setCoverageMode('multi')} />
-                <span>Varios días</span>
-              </label>
-            </div>
-          </div>
-          {coverageMode === 'single' && (
-            <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    {singleDate ? format(singleDate, 'PPP') : (defaultDateIso || 'Seleccionar fecha')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarPicker
-                    mode="single"
-                    selected={singleDate ?? undefined}
-                    onSelect={(d) => { if (d && isAllowedDate(d)) setSingleDate(d); }}
-                    disabled={(d) => !isAllowedDate(d)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <p className="text-xs text-muted-foreground">Crea una oferta de un solo día para la fecha elegida.</p>
-            </div>
-          )}
-          {coverageMode === 'multi' && (
-            <div className="space-y-2">
-              <CalendarPicker
-                mode="multiple"
-                selected={multiDates}
-                onSelect={(ds) => setMultiDates((ds || []).filter(d => isAllowedDate(d)))}
-                disabled={(d) => !isAllowedDate(d)}
-                numberOfMonths={2}
-              />
-              <p className="text-xs text-muted-foreground">Crea una oferta de un solo día por cada fecha seleccionada.</p>
-            </div>
-          )}
+
+          <CoverageSelector
+            value={coverageMode}
+            onChange={setCoverageMode}
+            singleDate={singleDate}
+            onSingleDateChange={setSingleDate}
+            multiDates={multiDates}
+            onMultiDatesChange={setMultiDates}
+            isAllowed={isAllowedDate}
+            rangeStart={jobSpan.startKey ? madridDateKeyToCalendarDate(jobSpan.startKey) : null}
+            rangeEnd={jobSpan.endKey ? madridDateKeyToCalendarDate(jobSpan.endKey) : null}
+            fullHint="Oferta por toda la duración del trabajo."
+            singleHint="Crea una oferta de un solo día para la fecha elegida."
+            multiHint="Crea una oferta de un día por cada fecha seleccionada."
+          />
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!role.trim()}>Enviar Oferta</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+        <ResponsiveDialogFooter className={SHEET_FOOTER}>
+          <Button variant="outline" className="min-h-11" onClick={onClose}>Cancelar</Button>
+          <Button
+            className="min-h-11 flex-1 gap-2 sm:flex-none"
+            onClick={handleSubmit}
+            disabled={!role.trim() || (coverageMode === 'multi' && !multiDates.length)}
+          >
+            <Send className="h-4 w-4" aria-hidden="true" />
+            {submitLabel}
+          </Button>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

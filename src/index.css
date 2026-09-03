@@ -251,6 +251,9 @@
   background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
   border-bottom: 1px solid hsl(var(--border));
+  /* Same drop shadow as the technician column so the frozen corner and the
+     frozen column read as one surface floating over the grid. */
+  box-shadow: 4px 0 12px -6px hsl(var(--foreground) / 0.18);
 }
 
 /* Date Headers - Simplified and consistent */
@@ -260,6 +263,7 @@
   z-index: 40;
   background: hsl(var(--card));
   border-bottom: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 12px -8px hsl(var(--foreground) / 0.25);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -278,6 +282,7 @@
   background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
   overflow: hidden;
+  box-shadow: 4px 0 12px -6px hsl(var(--foreground) / 0.18);
 }
 
 .matrix-technician-scroll {
@@ -339,7 +344,7 @@
 /* Grid Layout */
 .matrix-grid {
   position: relative;
-  background: hsl(var(--background));
+  background: hsl(var(--muted) / 0.35);
   contain: layout style paint;
   will-change: transform;
 }
@@ -349,13 +354,15 @@
   width: 100%;
   contain: layout style;
   content-visibility: auto;
-  contain-intrinsic-size: 60px;
+  contain-intrinsic-size: 72px;
 }
 
 .matrix-cell-wrapper {
   position: absolute;
-  border-right: 1px solid hsl(var(--border));
-  border-bottom: 1px solid hsl(var(--border));
+  /* Hairlines, not full-strength borders: the redesign reads the grid from the
+     status cards inside the cells, so the rules only need to hint at the pitch. */
+  border-right: 1px solid hsl(var(--border) / 0.55);
+  border-bottom: 1px solid hsl(var(--border) / 0.55);
   contain: layout style paint;
   will-change: transform;
   backface-visibility: hidden;
@@ -368,6 +375,10 @@
   }
   .matrix-row {
     contain-intrinsic-size: 80px;
+  }
+  .matrix-technician-column,
+  .matrix-corner {
+    box-shadow: 2px 0 8px -6px hsl(var(--foreground) / 0.25);
   }
 }
 

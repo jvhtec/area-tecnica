@@ -18,24 +18,19 @@ import { Building, ChevronDown, ChevronUp, Edit, IdCard, Mail, MapPin, Medal, Ph
 import React from 'react';
 
 
+import { DEPARTMENT_LABELS } from "@/types/department";
+
 import { TechnicianRowEditForm, type TechnicianEditData } from "@/components/matrix/TechnicianRowEditForm";
+import {
+  currentYearMedalComment,
+  lastYearMedalComment,
+  MEDAL_COLORS,
+  type MedalRank,
+} from "@/components/matrix/technicianMedalComments";
 import { queryKeys } from "@/lib/react-query";
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Error desconocido";
-
-/**
- * Picks a list entry from a seed. Math.random() here made render impure: the
- * medal tooltip drew a different line on every re-render of the matrix.
- */
-const pickStableIndex = (seed: string, length: number) => {
-  if (length <= 0) return 0;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash) % length;
-};
 
 interface TechnicianRowProps {
   technician: {
@@ -313,139 +308,53 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
   const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico';
 
+  // Tinted chips rather than fixed light-mode pastels: the matrix is read on
+  // dark FOH laptops as often as on a bright office screen.
   const getDepartmentColor = (department: string) => {
     switch (department?.toLowerCase()) {
       case 'sound':
-        return 'bg-blue-100 text-blue-800';
+        return 'border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-300';
       case 'lights':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300';
       case 'video':
-        return 'bg-purple-100 text-purple-800';
+        return 'border-violet-500/40 bg-violet-500/15 text-violet-700 dark:text-violet-300';
+      case 'production':
+        return 'border-teal-500/40 bg-teal-500/15 text-teal-700 dark:text-teal-300';
+      case 'logistics':
+        return 'border-orange-500/40 bg-orange-500/15 text-orange-700 dark:text-orange-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'border-border bg-muted text-muted-foreground';
     }
   };
 
   const getRoleColor = (role: string) => {
     switch (role?.toLowerCase()) {
       case 'house_tech':
-        return 'bg-green-100 text-green-800';
+        return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
       case 'technician':
-        return 'bg-orange-100 text-orange-800';
+        return 'border-border bg-muted/60 text-muted-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'border-border bg-muted/60 text-muted-foreground';
     }
   };
 
-  const getRandomSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
-    const comments = {
-      gold: [
-        '¡El campeón indiscutible! ¿Será que no tiene vida fuera del trabajo?',
-        'Oro puro. Probablemente duerme con el móvil debajo de la almohada.',
-        'El número uno. Los demás técnicos lloran en la esquina.',
-        '¡Medalla de oro! ¿Seguro que no eres un robot?',
-        'Primer puesto. Tu cuenta bancaria debe estar feliz.',
-        '¡Oro! Los demás están tomando notas furiosamente.',
-        'Rey o reina de los bolos. ¿Cuándo descansas?',
-        'Medalla dorada. Hasta tu sombra trabaja más que los demás.',
-        '¡Campeón! Probablemente rechazas vacaciones por diversión.',
-        'Número uno con bala. Los otros técnicos necesitan un plan.',
-      ],
-      silver: [
-        'Plata. Cerca pero no lo suficiente. ¿Quizás el próximo mes?',
-        'Segundo lugar. El primer perdedor, como dicen por ahí.',
-        'Medalla de plata. Al menos no eres bronce.',
-        '¡Subcampeón! Tan cerca y tan lejos a la vez.',
-        'Plata reluciente. El oro te mira desde arriba.',
-        'Número dos. Como Pepsi, siempre detrás de Coca-Cola.',
-        'Medalla plateada. Tu esfuerzo es... respetable.',
-        '¡Plata! Casi oro, pero casi no cuenta.',
-        'Segundo puesto. El primero de los perdedores.',
-        'Plata brillante. El oro te envía saludos desde el podio.',
-      ],
-      bronze: [
-        'Bronce. Al menos estás en el podio... apenas.',
-        'Tercer lugar. Mejor que nada, ¿no?',
-        'Medalla de bronce. Los demás te miran con lástima.',
-        '¡Bronce! Felicidades por ser el último en el podio.',
-        'Tercero. Es como decir "casi competente".',
-        'Medalla de bronce. Al menos no eres cuarto.',
-        '¡Bronce! Tu mamá está orgullosa, probablemente.',
-        'Tercer puesto. Los otros dos te saludan desde arriba.',
-        'Bronce resplandeciente. Bueno, más o menos resplandeciente.',
-        'Número tres. Podría ser peor... o mejor.',
-      ]
-    };
-
-    const list = comments[rank];
-    return list[pickStableIndex(`${technician.id}:${rank}`, list.length)];
-  };
-
-  const getLastYearSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
+  const getLastYearSnarkyComment = (rank: MedalRank): string => {
     const lastYear = new Date().getFullYear() - 1;
-    const comments = {
-      gold: [
-        'Fuiste oro el año pasado. ¿Qué pasó? ¿Te jubilaste?',
-        'Campeón del año pasado. Ahora... no tanto. ¿Nostalgia?',
-        `Oro en ${lastYear}. ¿Dónde quedó esa energía?`,
-        'Eras el número uno. Pasado perfecto, presente... dudoso.',
-        '¡Medalla de oro histórica! Énfasis en "histórica".',
-        'Top del año pasado. Las glorias pasadas no pagan facturas.',
-        'Fuiste el rey. Ahora más bien... plebeyo.',
-        'Eras imparable. ¿Te pararon?',
-        `Oro ${lastYear}. ¿Ya te cansaste o simplemente te dio pereza?`,
-        'Campeón que fue. La clave está en "fue".',
-      ],
-      silver: [
-        'Plata el año pasado. Ni oro entonces, ni ahora.',
-        `Segundo en ${lastYear}. Al menos eres consistente... en no ganar.`,
-        'Medalla plateada histórica. ¿Sigues casi ganando?',
-        'Subcampeón del pasado. ¿Cuándo será tu año de verdad?',
-        `Plata en ${lastYear}. Eternamente segundo, ¿no?`,
-        'Casi ganaste el año pasado. Casi. Como siempre.',
-        'Segundo puesto histórico. ¿Te suena familiar?',
-        'Plata vintage. Tu zona de confort es el segundo lugar.',
-        'Fuiste plata. Sorpresa: sigues sin ser oro.',
-        'Subcampeón perenne. El oro te envía saludos del pasado.',
-      ],
-      bronze: [
-        'Bronce el año pasado. ¿Bajaste o ya estabas abajo?',
-        `Tercero en ${lastYear}. ¿Vas pa bajo o qué?`,
-        'Medalla de bronce histórica. Última del podio... qué logro.',
-        'Tercer puesto del pasado. ¿Al menos mantienes el ritmo?',
-        `Bronce ${lastYear}. Podio por los pelos, como siempre.`,
-        'Último en el podio el año pasado. ¿Sigues ahí?',
-        'Bronce vintage. Sigues siendo el tercero más motivado.',
-        'Tercer lugar histórico. Los otros dos no te extrañan.',
-        'Fuiste bronce. ¿Fuiste, eres o vas para allá?',
-        'Podio del año pasado. Énfasis en "último del podio".',
-      ]
-    };
-
-    const list = comments[rank];
-    return list[pickStableIndex(`${technician.id}:last:${rank}`, list.length)];
+    return lastYearMedalComment(technician.id, rank, lastYear);
   };
 
-  const getMedalIcon = (rank?: 'gold' | 'silver' | 'bronze', size: 'sm' | 'md' = 'sm') => {
+  const getMedalIcon = (rank?: MedalRank, size: 'sm' | 'md' = 'sm') => {
     if (!rank) return null;
     const sizeClass = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
-    const colorMap = {
-      gold: '#FFD700',
-      silver: '#C0C0C0',
-      bronze: '#CD7F32'
-    };
-
-    // Generate a random comment on each render
-    const comment = getRandomSnarkyComment(rank);
 
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Medal className={sizeClass} style={{ color: colorMap[rank], cursor: 'help' }} />
+            <Medal className={sizeClass} style={{ color: MEDAL_COLORS[rank], cursor: 'help' }} />
           </TooltipTrigger>
           <TooltipContent>
-            <p className="max-w-xs">{comment}</p>
+            <p className="max-w-xs">{currentYearMedalComment(technician.id, rank)}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -453,16 +362,19 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   };
 
   const deptAbbrev = (technician.department || '').slice(0, 3).toUpperCase();
+  // The UI language is Spanish; `technician.department` is the English enum value.
+  const departmentLabel =
+    DEPARTMENT_LABELS[technician.department as keyof typeof DEPARTMENT_LABELS] || technician.department;
 
   return (
     <>
       <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
         <PopoverTrigger asChild>
           <div
-            className="border-b hover:bg-accent/50 cursor-pointer transition-colors overflow-hidden"
+            className="group/tech relative cursor-pointer overflow-hidden border-b border-border/60 transition-colors hover:bg-accent/40"
             style={{
               height,
-              padding: compact ? '0.25rem' : '0.5rem',
+              padding: compact ? '0.25rem' : '0.5rem 0.625rem',
               backgroundColor: technician.bg_color || undefined
             }}
             title={compact ? displayName : undefined}
@@ -470,14 +382,14 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
             {compact ? (
               <div className="h-full flex flex-col items-center justify-center w-full min-w-0">
                 <div className="relative">
-                  <Avatar className="h-7 w-7">
+                  <Avatar className="h-7 w-7 rounded-lg">
                     <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
-                    <AvatarFallback className="text-xs">
+                    <AvatarFallback className="rounded-lg bg-primary/10 text-xs font-semibold text-primary">
                       {getInitials()}
                     </AvatarFallback>
                   </Avatar>
                   {isFridge && (
-                    <Refrigerator className="absolute -top-1 -right-1 h-3.5 w-3.5 text-sky-600" />
+                    <Refrigerator className="absolute -top-1 -right-1 h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
                   )}
                   {medalRank && !isFridge && (
                     <div className="absolute -top-1 -right-1">
@@ -493,35 +405,43 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                 <div className="text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
               </div>
             ) : (
-              <div className="flex items-center gap-3 h-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
-                  <AvatarFallback className="text-xs">
-                    {getInitials()}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate flex items-center gap-1">
-                    <span>{displayName}</span>
-                    {medalRank && !isFridge && getMedalIcon(medalRank, 'sm')}
-                    {isFridge && (
-                      <Refrigerator className="inline-block h-3.5 w-3.5 text-sky-600" />
-                    )}
-                  </div>
-                  <div className="flex gap-1 mt-1 flex-nowrap overflow-hidden">
-                    <Badge
-                      variant="secondary"
-                      className={`text-xs whitespace-nowrap ${getDepartmentColor(technician.department)}`}
+              <div className="flex h-full items-center gap-2.5">
+                <div className="relative shrink-0">
+                  <Avatar className="h-9 w-9 rounded-xl ring-1 ring-border">
+                    <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
+                    <AvatarFallback className="rounded-xl bg-primary/10 text-xs font-semibold text-primary">
+                      {getInitials()}
+                    </AvatarFallback>
+                  </Avatar>
+                  {isFridge ? (
+                    <span
+                      className="absolute -top-1 -right-1 rounded-full bg-background p-[1px] shadow-sm"
+                      title="En la nevera"
                     >
-                      {technician.department}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs whitespace-nowrap ${getRoleColor(technician.role)}`}
+                      <Refrigerator className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                    </span>
+                  ) : medalRank ? (
+                    <span className="absolute -top-1 -right-1 rounded-full bg-background p-[1px] shadow-sm">
+                      {getMedalIcon(medalRank, 'sm')}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold leading-tight transition-colors group-hover/tech:text-primary">
+                    {displayName}
+                  </div>
+                  <div className="mt-1 flex flex-nowrap gap-1 overflow-hidden">
+                    <span
+                      className={`inline-flex h-5 items-center whitespace-nowrap rounded-md border px-1.5 text-xs font-semibold leading-none ${getDepartmentColor(technician.department)}`}
+                    >
+                      {departmentLabel}
+                    </span>
+                    <span
+                      className={`inline-flex h-5 items-center whitespace-nowrap rounded-md border px-1.5 text-xs font-medium leading-none ${getRoleColor(technician.role)}`}
                     >
                       {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
-                    </Badge>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -529,7 +449,12 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           </div>
         </PopoverTrigger>
 
-        <PopoverContent className="w-80" side="right">
+        <PopoverContent
+          className={compact ? 'w-[calc(100vw-1.5rem)] max-w-sm' : 'w-80'}
+          side={compact ? 'bottom' : 'right'}
+          align={compact ? 'start' : 'center'}
+          collisionPadding={12}
+        >
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
@@ -567,8 +492,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                 <div className="flex items-center gap-2">
                   <Building className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Departamento:</span>
-                  <Badge className={getDepartmentColor(technician.department)}>
-                    {technician.department?.charAt(0).toUpperCase() + technician.department?.slice(1)}
+                  <Badge variant="outline" className={getDepartmentColor(technician.department)}>
+                    {departmentLabel}
                   </Badge>
                 </div>
 

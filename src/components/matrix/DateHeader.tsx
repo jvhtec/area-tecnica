@@ -205,18 +205,31 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
     enabled: hasJobs && !compact,
   });
 
+  // Coverage for the date: how many of the required role slots across the day's
+  // jobs are actually filled. Desktop only — openSlots is not fetched in compact
+  // mode, where there is no room to draw the bar anyway.
+  const coverage = React.useMemo(() => {
+    if (!openSlots || !openSlots.required) return null;
+    const filled = Math.min(openSlots.assigned, openSlots.required);
+    return {
+      filled,
+      required: openSlots.required,
+      percent: Math.round((filled / openSlots.required) * 100),
+      isComplete: filled >= openSlots.required,
+    };
+  }, [openSlots]);
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <div
           className={cn(
-            'border-r text-center text-xs font-medium bg-card cursor-pointer',
-            'flex flex-col justify-center items-center relative transition-colors',
-            'hover:bg-accent/50 flex-shrink-0',
+            'relative flex flex-shrink-0 cursor-pointer flex-col items-center justify-center',
+            'border-r border-border/60 bg-card text-center text-xs font-medium transition-colors',
+            'hover:bg-accent/50',
             {
-              'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300': isTodayHeader,
-              'bg-muted/50 text-muted-foreground': isWeekendHeader && !isTodayHeader,
-              'ring-2 ring-blue-500/30 ring-inset': hasJobs,
+              'bg-primary/[0.07] dark:bg-primary/10': isTodayHeader,
+              'bg-muted/40 text-muted-foreground': isWeekendHeader && !isTodayHeader,
             }
           )}
           style={{
@@ -226,6 +239,9 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
             height: '100%'
           }}
         >
+          {/* Today rail: the same accent the cells in this column carry. */}
+          {isTodayHeader && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-primary" aria-hidden="true" />}
+
           {compact ? (
             // 50px of header height cannot fit weekday + day + month + a badge
             // column, so mobile shows "Sáb 14" on one line.
@@ -234,49 +250,74 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
                 {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
               </span>
               <span className={cn('text-sm font-bold', {
-                'text-orange-700 dark:text-orange-300': isTodayHeader
+                'text-primary': isTodayHeader
               })}>
                 {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
               </span>
             </div>
           ) : (
             <>
-              <div className="font-semibold text-xs">
+              <div className="text-xs font-semibold uppercase leading-none tracking-wider text-muted-foreground">
                 {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
               </div>
-              <div className={cn('text-base font-bold leading-tight', {
-                'text-orange-700 dark:text-orange-300': isTodayHeader
-              })}>
-                {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+              <div className="flex items-baseline gap-1 leading-none">
+                <span className={cn('text-lg font-bold leading-none', {
+                  'text-primary': isTodayHeader
+                })}>
+                  {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+                </span>
+                <span className="text-xs lowercase text-muted-foreground">
+                  {formatInTimeZone(date, MADRID_TIMEZONE, 'MMM', { locale: es })}
+                  {formatInTimeZone(date, MADRID_TIMEZONE, 'd') === '1'
+                    ? ` ${formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy')}`
+                    : ''}
+                </span>
               </div>
-              <div className="text-xs text-muted-foreground leading-tight">
-                {formatInTimeZone(date, MADRID_TIMEZONE, 'MMM', { locale: es })}
-              </div>
-              {formatInTimeZone(date, MADRID_TIMEZONE, 'd') === '1' && (
-                <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
-                  {formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy')}
+
+              {/* Staffing coverage for the day, the header's headline number. */}
+              {hasJobs && coverage && (
+                <div
+                  className="mt-1 w-[78%]"
+                  title={`${coverage.filled} de ${coverage.required} puestos cubiertos · ${openSlots?.open ?? 0} libres`}
+                >
+                  <div className="mb-0.5 flex items-center justify-between text-xs font-medium leading-none tabular-nums text-muted-foreground">
+                    <span className="inline-flex items-center gap-0.5">
+                      <Users className="h-2.5 w-2.5" aria-hidden="true" />
+                      {confirmedForDate ?? 0}
+                    </span>
+                    <span>{coverage.filled}/{coverage.required}</span>
+                    <span>{coverage.percent}%</span>
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn('h-full rounded-full transition-all', coverage.isComplete ? 'bg-emerald-500' : 'bg-primary')}
+                      style={{ width: `${coverage.percent}%` }}
+                    />
+                  </div>
                 </div>
               )}
             </>
           )}
 
-          {/* Job indicators */}
+          {/* Job colour indicators */}
           {hasJobs && (
-            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-1">
+            <div className="absolute top-1 left-1 flex gap-0.5">
               {jobColors.slice(0, 3).map((color, index) => (
                 <div
                   key={index}
-                  className="w-1.5 h-1.5 rounded-full border border-white dark:border-gray-800"
+                  className="h-1.5 w-1.5 rounded-full ring-1 ring-background"
                   style={{ backgroundColor: color }}
                 />
               ))}
               {jobColors.length > 3 && (
-                <div className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-600 border border-white dark:border-gray-800" />
+                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 ring-1 ring-background" />
               )}
             </div>
           )}
 
-          {/* Job count badge */}
+          {/* Counts. On desktop the coverage bar already carries the confirmed
+              technicians and the open slots, so only the job count is chipped
+              here; a phone has no bar and keeps both numbers. */}
           {hasJobs && (
             <div
               className={cn(
@@ -284,14 +325,16 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
                 compact ? 'flex-row items-center' : 'flex-col items-end',
               )}
             >
-              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 leading-none" title="Trabajos en esta fecha">
+              <Badge variant="secondary" className="h-4 px-1 py-0 text-[10px] leading-none" title="Trabajos en esta fecha">
                 {jobs.length}
               </Badge>
-              <Badge variant="default" className="text-[10px] px-1 py-0 h-4 leading-none" title="Técnicos confirmados en esta fecha">
-                {confirmedForDate ?? 0}
-              </Badge>
-              {!compact && openSlots && openSlots.required > 0 && (
-                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 leading-none" title="Vacantes en todos los trabajos">
+              {(compact || !coverage) && (
+                <Badge variant="default" className="h-4 px-1 py-0 text-[10px] leading-none" title="Técnicos confirmados en esta fecha">
+                  {confirmedForDate ?? 0}
+                </Badge>
+              )}
+              {!compact && !coverage && openSlots && openSlots.required > 0 && (
+                <Badge variant="outline" className="h-4 px-1 py-0 text-[10px] leading-none" title="Vacantes en todos los trabajos">
                   {openSlots.open} libres
                 </Badge>
               )}

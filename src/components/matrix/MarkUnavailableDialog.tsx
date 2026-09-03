@@ -1,15 +1,17 @@
 
 import React, { useState } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
 // Reason selection removed per request
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { SHEET_BODY, SHEET_FOOTER, SHEET_HEADER } from '@/components/matrix/staffing/sheetLayout';
 // import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar } from 'lucide-react';
@@ -109,17 +111,17 @@ export const MarkUnavailableDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Marcar como No Disponible</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader className={SHEET_HEADER}>
+          <ResponsiveDialogTitle>Marcar como no disponible</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="first-letter:uppercase">
             Marcar a {technician?.first_name} {technician?.last_name} como no disponible el{' '}
             {formatInTimeZone(selectedDate, MADRID_TIMEZONE, 'EEEE, d MMMM, yyyy', { locale: es })}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <div className="space-y-4">
+        <div className={cn(SHEET_BODY, "space-y-4")}>
           {technician && (
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Técnico:</span>
@@ -146,11 +148,12 @@ export const MarkUnavailableDialog = ({
           {/* Reason removed; defaulting to day_off */}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <ResponsiveDialogFooter className={SHEET_FOOTER}>
+          <Button variant="outline" className="min-h-11" onClick={onClose}>
             Cancelar
           </Button>
           <Button
+            className="min-h-11 flex-1 sm:flex-none"
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
@@ -160,11 +163,11 @@ export const MarkUnavailableDialog = ({
                 Marcando...
               </>
             ) : (
-              'Marcar No Disponible'
+              'Marcar no disponible'
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 };

@@ -523,8 +523,10 @@ describe('OptimizedMatrixCell', () => {
     );
 
     expect(screen.getByText('✓ SEL.')).toBeInTheDocument();
-    const cell = container.querySelector('.border-blue-600');
-    expect(cell).toBeInTheDocument();
+    // The palette is owned by matrixCellVisuals, so assert the state the cell
+    // resolved to rather than the class that state currently paints with.
+    const cell = container.querySelector('[data-matrix-cell="true"]');
+    expect(cell).toHaveAttribute('data-matrix-cell-state', 'selected');
   });
 
   it('calls onPrefetch when hovering over cell', async () => {

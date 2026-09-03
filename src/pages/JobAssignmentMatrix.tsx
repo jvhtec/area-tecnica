@@ -707,7 +707,10 @@ export default function JobAssignmentMatrix() {
             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
             staffingDepartment={selectedDepartment}
             mobile={isMobile}
-            cellWidth={isMobile ? 140 : undefined}
+            // Narrower than the old 140 now that the phone cell shows status
+            // only: the action icons that needed the width live in the sheet,
+            // and this fits another day-and-a-bit on a 390px screen.
+            cellWidth={isMobile ? 118 : undefined}
             cellHeight={isMobile ? 80 : undefined}
             technicianWidth={isMobile ? 110 : undefined}
             headerHeight={isMobile ? 64 : undefined}
