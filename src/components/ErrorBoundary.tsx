@@ -201,11 +201,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
    * boundary that has to survive that client failing; and a boundary that never
    * catches never pays for it. Every failure is swallowed — reporting an error
    * must never raise a second one from inside the handler.
+   *
+   * Routed through `trackUnhandledError` rather than `trackError` so boundary
+   * crashes share the same per-page-load budget as the global handlers. A
+   * render loop is the textbook write-storm case and it surfaces *here*, not at
+   * `window.onerror`: React re-renders, the boundary catches again, and an
+   * unbudgeted path would insert on every cycle.
    */
   private reportToServer(error: Error, errorInfo: React.ErrorInfo, label: string): void {
     void import('@/lib/errorTracking')
-      .then(({ trackError }) =>
-        trackError(error, {
+      .then(({ trackUnhandledError }) =>
+        trackUnhandledError(error, {
           system: 'ui',
           operation: label,
           componentStack: errorInfo.componentStack ?? undefined,

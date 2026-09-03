@@ -1,26 +1,36 @@
 import { supabase } from '@/lib/supabase'
 
 /**
- * Subsystems permitted to report through `trackError`.
+ * Subsystems permitted to report through `trackError` — the single source of
+ * truth for that allowlist.
  *
- * This union must stay in sync with the `system_errors_system_check`
- * constraint (20260903120000_widen_system_errors_systems.sql) — the database
- * rejects any value not on that allowlist, so adding a name here alone is not
- * enough.
+ * This is a value, not just a type, so the contract can be *checked* rather
+ * than remembered. The same list is duplicated by necessity in two SQL files
+ * (the migration that defines the CHECK constraint, and the pgTAP test that
+ * verifies the live database matches it), and SQL cannot import TypeScript.
+ * `src/lib/__tests__/systemNames.contract.test.ts` closes that loop by parsing
+ * both SQL files and asserting they equal this array, so drift in any of the
+ * three copies fails in CI rather than at INSERT time in production.
+ *
+ * Adding a name here therefore requires a migration too — and the contract test
+ * will tell you so.
  */
-export type SystemName =
-  | 'timesheets'
-  | 'assignments'
-  | 'ui'
-  | 'auth'
-  | 'jobs'
-  | 'tours'
-  | 'festivals'
-  | 'staffing'
-  | 'equipment'
-  | 'logistics'
-  | 'documents'
-  | 'flex'
+export const SYSTEM_NAMES = [
+  'timesheets',
+  'assignments',
+  'ui',
+  'auth',
+  'jobs',
+  'tours',
+  'festivals',
+  'staffing',
+  'equipment',
+  'logistics',
+  'documents',
+  'flex',
+] as const
+
+export type SystemName = (typeof SYSTEM_NAMES)[number]
 
 export interface ErrorTrackingContext {
   system: SystemName
@@ -31,11 +41,37 @@ export interface ErrorTrackingContext {
 
 const REDACTED_CONTEXT_KEYS = /(?:authorization|password|token|secret|api.?key|cookie|email|phone|dni|address|signed.?url|body|payload)/i
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
+
+/**
+ * Free-form secret patterns.
+ *
+ * These matter more than they used to. Redaction was written when `trackError`
+ * had a handful of deliberate call sites, where the author chose what to pass.
+ * The global handlers and the error boundary now persist *arbitrary* uncaught
+ * exception text, which routinely carries whatever a failing request was
+ * holding — a `fetch` rejection quoting a URL, a library error echoing an
+ * `Authorization` header. Nobody curates that string, so the patterns have to.
+ *
+ * Order matters below: bearer/JWT run before the URL rules so a token inside a
+ * URL is not merely swallowed by the coarser `[REDACTED_URL]` replacement.
+ */
+// `Bearer <token>` / `token=<value>` style credentials in free text.
+const BEARER_PATTERN = /\b(bearer|token|api[-_]?key|secret)\s*[:=]?\s+[A-Za-z0-9._~+/=-]{12,}/gi
+// Three base64url segments — a JWT, however it was embedded.
+const JWT_PATTERN = /\beyJ[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]{5,}/g
+// Absolute URLs carrying a query string.
 const URL_QUERY_PATTERN = /https?:\/\/[^\s?]+\?[^\s]+/gi
+// Root-relative paths carrying a query string — `/callback?token=abc`. Just as
+// capable of holding a one-time code, and previously not redacted at all.
+const RELATIVE_URL_QUERY_PATTERN = /(?:^|[\s"'(<])(\/[A-Za-z0-9._~\-/]*\?[^\s"')>]+)/g
 
 export const redactErrorText = (value: string): string => value
   .replace(EMAIL_PATTERN, '[REDACTED_EMAIL]')
+  .replace(JWT_PATTERN, '[REDACTED_TOKEN]')
+  .replace(BEARER_PATTERN, '[REDACTED_TOKEN]')
   .replace(URL_QUERY_PATTERN, '[REDACTED_URL]')
+  .replace(RELATIVE_URL_QUERY_PATTERN, (match, path: string) =>
+    match.slice(0, match.length - path.length) + '[REDACTED_URL]')
   .slice(0, 500)
 
 const sanitizeValue = (value: unknown, key?: string, depth = 0): unknown => {

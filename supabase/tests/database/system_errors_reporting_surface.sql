@@ -12,7 +12,10 @@ SELECT plan(10);
 -- that exists to report failures. These tests pin the allowlist so that drift
 -- fails in CI instead.
 --
--- Keep this list in sync with `SystemName` in src/lib/errorTracking.ts.
+-- The names below are pinned to `SYSTEM_NAMES` in src/lib/errorTracking.ts by
+-- src/lib/__tests__/systemNames.contract.test.ts — editing one without the
+-- other fails that test, so this is a checked duplicate rather than a
+-- remembered one.
 -- ---------------------------------------------------------------------------
 
 SELECT has_table(
@@ -72,14 +75,21 @@ SELECT ok(
   'The subsystem allowlist constraint is present'
 );
 
--- The exact set, compared in BOTH directions.
+-- The live constraint against the canonical allowlist, compared as a set so
+-- both a missing and an extra value fail.
 --
--- An earlier version of this assertion only checked that each expected name
--- appeared somewhere in the constraint definition. That is one-directional: a
--- later migration adding, say, 'billing' to the constraint while `SystemName`
--- stayed unchanged would still have passed, despite the drift this test exists
--- to catch. Extracting the allowlist and comparing it as a set catches a
--- missing value and an extra one alike.
+-- Scope, stated precisely: this proves *migration -> live database*. It cannot
+-- prove anything about the TypeScript `SystemName` union, because the array
+-- below is hard-coded here and pgTAP cannot import TypeScript — both sides
+-- could be wrong together and this would still pass. An earlier version of this
+-- file claimed the stronger property in its assertion message, which is worse
+-- than not testing it: it tells a future reader a contract has been verified
+-- when it has not.
+--
+-- The TypeScript half is enforced separately, by
+-- src/lib/__tests__/systemNames.contract.test.ts, which imports SYSTEM_NAMES
+-- and parses the array below (and the migration's) to assert all three agree.
+-- Chained with this assertion, that gives the real end-to-end property.
 SELECT is(
   (
     SELECT array_agg(match[1] ORDER BY match[1])
@@ -96,7 +106,7 @@ SELECT is(
     'assignments', 'auth', 'documents', 'equipment', 'festivals', 'flex',
     'jobs', 'logistics', 'staffing', 'timesheets', 'tours', 'ui'
   ],
-  'The DB allowlist is exactly the TypeScript SystemName union — no missing or extra values'
+  'The live constraint matches the canonical allowlist — no missing or extra values'
 );
 
 -- The widening lands as NOT VALID (20260903120000) and is validated by its

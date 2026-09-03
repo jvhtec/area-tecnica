@@ -48,6 +48,14 @@
 -- takes SHARE UPDATE EXCLUSIVE and does not block inserts, to clear the
 -- `convalidated` flag and keep the catalog tidy.
 
+-- Fail fast rather than queue. `NOT VALID` keeps the lock brief once acquired,
+-- but says nothing about how long we wait to acquire it: behind a long-running
+-- transaction, DROP/ADD CONSTRAINT would sit in the lock queue indefinitely,
+-- and every INSERT arriving after us queues behind that. A bounded timeout
+-- turns "deployment wedged for an unknown duration" into "migration failed,
+-- run it again in a quieter minute", which is the better failure.
+SET lock_timeout = '5s';
+
 ALTER TABLE "public"."system_errors"
   DROP CONSTRAINT IF EXISTS "system_errors_system_check";
 

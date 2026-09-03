@@ -35,6 +35,51 @@ describe('error tracking redaction', () => {
   })
 })
 
+describe('free-form secret redaction', () => {
+  // These cases exist because this PR turns arbitrary uncaught browser
+  // exceptions into persisted telemetry. Before that, redaction only had to
+  // cope with strings a developer chose to pass.
+
+  it('redacts a JWT wherever it appears', () => {
+    const jwt =
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk'
+
+    expect(redactErrorText(`request failed with ${jwt}`)).toBe(
+      'request failed with [REDACTED_TOKEN]',
+    )
+  })
+
+  it('redacts a bearer credential in free text', () => {
+    expect(redactErrorText('401 from Authorization: Bearer sk_live_abcdef123456789')).toBe(
+      '401 from Authorization: [REDACTED_TOKEN]',
+    )
+  })
+
+  it('redacts a root-relative URL carrying a query string', () => {
+    expect(redactErrorText('navigation to /callback?token=abc123 failed')).toBe(
+      'navigation to [REDACTED_URL] failed',
+    )
+  })
+
+  it('leaves a relative path with no query string alone', () => {
+    // Over-redaction costs debuggability; a bare route is the most useful part
+    // of many error messages.
+    expect(redactErrorText('render failed at /dashboard/jobs')).toBe(
+      'render failed at /dashboard/jobs',
+    )
+  })
+
+  it('redacts a token embedded in an absolute URL', () => {
+    const redacted = redactErrorText('GET https://example.com/x?access_token=abc123def456 failed')
+
+    expect(redacted).not.toContain('abc123def456')
+  })
+
+  it('still truncates to 500 characters after redaction', () => {
+    expect(redactErrorText('x'.repeat(900))).toHaveLength(500)
+  })
+})
+
 describe('unhandled error budget', () => {
   beforeEach(() => {
     resetUnhandledErrorBudget()

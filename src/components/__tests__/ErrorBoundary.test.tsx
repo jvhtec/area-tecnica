@@ -11,14 +11,16 @@ import {
 } from '@/utils/chunkErrorConstants';
 
 const trackErrorMock = vi.hoisted(() =>
-  vi.fn((_error: unknown, _context: Record<string, unknown>) => Promise.resolve()),
+  vi.fn((_error: unknown, _context: Record<string, unknown>) => true),
 );
 
 // The boundary reports crashes to the server-side sink via a lazy import of
 // this module. Mocked here so the suite does not attempt a real Supabase write
-// every time a test deliberately throws.
+// every time a test deliberately throws. It calls `trackUnhandledError`, not
+// `trackError`, so boundary crashes are covered by the same per-page-load
+// budget as the global handlers.
 vi.mock('@/lib/errorTracking', () => ({
-  trackError: trackErrorMock,
+  trackUnhandledError: trackErrorMock,
 }));
 
 const TOGGLE: { throwOnRender: boolean } = { throwOnRender: true };
@@ -110,7 +112,9 @@ describe('ErrorBoundary', () => {
   });
 
   it('still renders the fallback when server-side reporting rejects', async () => {
-    trackErrorMock.mockRejectedValueOnce(new Error('sink unreachable'));
+    trackErrorMock.mockImplementationOnce(() => {
+      throw new Error('sink unreachable');
+    });
 
     render(
       <ErrorBoundary>

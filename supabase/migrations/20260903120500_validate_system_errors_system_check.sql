@@ -23,5 +23,13 @@
 -- every pre-existing row already satisfies it.
 -- =============================================================================
 
+-- Bounded on both axes. `lock_timeout` caps how long we wait for the (weak)
+-- SHARE UPDATE EXCLUSIVE lock; `statement_timeout` caps the row scan itself, so
+-- an unexpectedly large table cannot hold that lock — and block other DDL —
+-- indefinitely. 60s is generous for an append-only error log; if it is ever hit,
+-- that is information worth having rather than a deploy to wait out.
+SET lock_timeout = '5s';
+SET statement_timeout = '60s';
+
 ALTER TABLE "public"."system_errors"
   VALIDATE CONSTRAINT "system_errors_system_check";
