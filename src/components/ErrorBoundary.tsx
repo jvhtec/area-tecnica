@@ -154,6 +154,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       console.warn('[ErrorBoundary] Failed to record telemetry', telemetryError);
     }
 
+    this.reportToServer(error, errorInfo, label);
+
     if (onError) {
       try {
         onError(error, errorInfo);
@@ -184,6 +186,37 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         console.error(`[${label}] Max auto-reload attempts reached. Showing error UI.`);
       }
     }
+  }
+
+  /**
+   * Forward the crash to the server-side sink so it outlives this browser
+   * session.
+   *
+   * `recordBoundaryError` above only reaches sessionStorage, and the production
+   * build strips the `console.error` beside it, so without this a crash in
+   * production leaves no trace the team can query.
+   *
+   * The tracking module is imported lazily for two reasons: it pulls in the
+   * Supabase client, which has no business in the render-critical path of the
+   * boundary that has to survive that client failing; and a boundary that never
+   * catches never pays for it. Every failure is swallowed — reporting an error
+   * must never raise a second one from inside the handler.
+   */
+  private reportToServer(error: Error, errorInfo: React.ErrorInfo, label: string): void {
+    void import('@/lib/errorTracking')
+      .then(({ trackError }) =>
+        trackError(error, {
+          system: 'ui',
+          operation: label,
+          componentStack: errorInfo.componentStack ?? undefined,
+          route: typeof window !== 'undefined' ? window.location.pathname : undefined,
+          chunkLoadError: isChunkLoadError(error),
+          silent: Boolean(this.props.silent),
+        }),
+      )
+      .catch(() => {
+        // Intentionally empty: the boundary is the last line of defence.
+      });
   }
 
   private handleReload = () => {

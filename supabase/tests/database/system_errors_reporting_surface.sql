@@ -1,0 +1,101 @@
+CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
+
+SET search_path TO public, extensions;
+
+SELECT plan(9);
+
+-- ---------------------------------------------------------------------------
+-- `public.system_errors` is the only server-side sink the browser has for error
+-- context (src/lib/errorTracking.ts). Its `system` allowlist is duplicated as a
+-- TypeScript union, and the two drift silently: a name added to the union but
+-- not to the constraint fails at INSERT time, in production, on the very path
+-- that exists to report failures. These tests pin the allowlist so that drift
+-- fails in CI instead.
+--
+-- Keep this list in sync with `SystemName` in src/lib/errorTracking.ts.
+-- ---------------------------------------------------------------------------
+
+SELECT has_table(
+  'public',
+  'system_errors',
+  'The error reporting sink exists'
+);
+
+SELECT has_column(
+  'public',
+  'system_errors',
+  'system',
+  'Errors are attributed to a reporting subsystem'
+);
+
+-- The two original values must keep working: widening the allowlist must never
+-- invalidate rows already written by the timesheet and assignment paths.
+SELECT lives_ok(
+  $$INSERT INTO public.system_errors (system, error_type) VALUES ('timesheets', 'PgTapProbe')$$,
+  'The original timesheets subsystem is still accepted'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO public.system_errors (system, error_type) VALUES ('assignments', 'PgTapProbe')$$,
+  'The original assignments subsystem is still accepted'
+);
+
+-- 'ui' is what the React error boundary reports under. Without it, every
+-- unhandled render crash silently fails to persist.
+SELECT lives_ok(
+  $$INSERT INTO public.system_errors (system, error_type) VALUES ('ui', 'PgTapProbe')$$,
+  'The error boundary can report unhandled render crashes'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO public.system_errors (system, error_type) VALUES ('staffing', 'PgTapProbe')$$,
+  'A domain subsystem can report through the sink'
+);
+
+-- The constraint is what keeps the table queryable by system: without it a
+-- typo'd or caller-invented name fragments the data into one-off buckets.
+SELECT throws_ok(
+  $$INSERT INTO public.system_errors (system, error_type) VALUES ('not_a_subsystem', 'PgTapProbe')$$,
+  '23514',
+  NULL,
+  'An unrecognised subsystem is still rejected'
+);
+
+-- Guards against a future migration widening the allowlist by dropping it.
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'system_errors_system_check'
+      AND conrelid = 'public.system_errors'::regclass
+  ),
+  'The subsystem allowlist constraint is present'
+);
+
+-- The exact set, so adding a name to the TypeScript union without a migration
+-- (or vice versa) is caught here rather than at runtime.
+SELECT is(
+  (
+    SELECT array_agg(value ORDER BY value)
+    FROM (
+      SELECT DISTINCT unnest(ARRAY[
+        'timesheets', 'assignments', 'ui', 'auth', 'jobs', 'tours',
+        'festivals', 'staffing', 'equipment', 'logistics', 'documents', 'flex'
+      ]) AS value
+    ) expected
+    WHERE EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'system_errors_system_check'
+        AND conrelid = 'public.system_errors'::regclass
+        AND pg_get_constraintdef(oid) LIKE '%''' || expected.value || '''%'
+    )
+  ),
+  ARRAY[
+    'assignments', 'auth', 'documents', 'equipment', 'festivals', 'flex',
+    'jobs', 'logistics', 'staffing', 'timesheets', 'tours', 'ui'
+  ],
+  'Every subsystem in the TypeScript SystemName union is on the DB allowlist'
+);
+
+SELECT * FROM finish();

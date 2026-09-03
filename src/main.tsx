@@ -120,12 +120,40 @@ try {
   // Ignore - will be handled by ErrorBoundary after mount delay
 }
 
+// Forward a failure that reached a global handler to the server-side sink.
+//
+// Chunk-load errors are excluded: they are already handled above by reloading,
+// and they say more about a stale deploy than about app code. Everything else
+// reaching here is an async failure nobody caught — the class of bug that is
+// otherwise invisible in production, since ErrorBoundary only sees errors
+// raised during render and the production build strips `console.*`.
+//
+// Imported lazily to keep the Supabase client out of the entry chunk, and
+// budgeted inside `trackUnhandledError` so a repeating failure cannot flood
+// the table.
+const reportUnhandled = (error: unknown, operation: string) => {
+  void import('@/lib/errorTracking')
+    .then(({ trackUnhandledError }) => {
+      trackUnhandledError(error, {
+        system: 'ui',
+        operation,
+        route: window.location.pathname,
+      });
+    })
+    .catch(() => {
+      // Reporting must never become the failure it is reporting on.
+    });
+};
+
 // Listen for unhandled promise rejections (e.g., dynamic import failures)
 window.addEventListener('unhandledrejection', (event) => {
   if (isChunkLoadPromiseRejection(event)) {
     event.preventDefault();
     void handleChunkLoadError();
+    return;
   }
+
+  reportUnhandled(event.reason, 'unhandledrejection');
 });
 
 // Listen for global errors
@@ -133,7 +161,10 @@ window.addEventListener('error', (event) => {
   if (isChunkLoadErrorEvent(event)) {
     event.preventDefault();
     void handleChunkLoadError();
+    return;
   }
+
+  reportUnhandled(event.error ?? event.message, 'window.error');
 });
 
 const rootElement = document.getElementById('root')

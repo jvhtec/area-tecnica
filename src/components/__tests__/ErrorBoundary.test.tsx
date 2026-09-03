@@ -10,6 +10,17 @@ import {
   CHUNK_ERROR_RELOAD_OWNER_KEY,
 } from '@/utils/chunkErrorConstants';
 
+const trackErrorMock = vi.hoisted(() =>
+  vi.fn((_error: unknown, _context: Record<string, unknown>) => Promise.resolve()),
+);
+
+// The boundary reports crashes to the server-side sink via a lazy import of
+// this module. Mocked here so the suite does not attempt a real Supabase write
+// every time a test deliberately throws.
+vi.mock('@/lib/errorTracking', () => ({
+  trackError: trackErrorMock,
+}));
+
 const TOGGLE: { throwOnRender: boolean } = { throwOnRender: true };
 
 function Thrower({ message = 'boom' }: { message?: string }): React.ReactElement {
@@ -26,6 +37,7 @@ describe('ErrorBoundary', () => {
     TOGGLE.throwOnRender = true;
     clearBoundaryErrors();
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    trackErrorMock.mockClear();
   });
 
   afterEach(() => {
@@ -77,6 +89,37 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>,
     );
     expect(container.firstChild).toBeNull();
+  });
+
+  it('reports caught errors to the server-side sink', async () => {
+    render(
+      <ErrorBoundary boundaryName="test-zone">
+        <Thrower message="reportable" />
+      </ErrorBoundary>,
+    );
+
+    // The report is fired through a dynamic import, so it lands a microtask
+    // after componentDidCatch rather than synchronously.
+    await vi.waitFor(() => expect(trackErrorMock).toHaveBeenCalledTimes(1));
+
+    const [error, context] = trackErrorMock.mock.calls[0];
+    expect((error as Error).message).toBe('reportable');
+    expect(context.system).toBe('ui');
+    expect(context.operation).toBe('test-zone');
+    expect(context.componentStack).toEqual(expect.any(String));
+  });
+
+  it('still renders the fallback when server-side reporting rejects', async () => {
+    trackErrorMock.mockRejectedValueOnce(new Error('sink unreachable'));
+
+    render(
+      <ErrorBoundary>
+        <Thrower message="kaboom" />
+      </ErrorBoundary>,
+    );
+
+    await vi.waitFor(() => expect(trackErrorMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('Algo salió mal')).toBeInTheDocument();
   });
 
   it('auto-resets when resetKeys change', () => {
