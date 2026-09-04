@@ -1,4 +1,4 @@
-import type { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
 import { sendPayloadToUsers } from "./broadcast/delivery.ts";
@@ -20,7 +20,7 @@ import {
   type FestivalFeedSubscription,
 } from "./festivalFeedUtils.ts";
 
-type FestivalFeedClient = ReturnType<typeof createClient>;
+type FestivalFeedClient = SupabaseClient;
 
 type FestivalPushSubscriptionRow = {
   user_id: string;

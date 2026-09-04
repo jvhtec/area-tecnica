@@ -5,7 +5,7 @@
 // address with Mapbox instead of Google, and (2) cache results persistently so
 // each venue is searched at most once per cache window.
 
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { getCachedPayload, setCachedPayload } from '../_shared/placeCache.ts'
 import { mapboxGeocode } from '../_shared/mapboxGeocode.ts'
 
@@ -52,7 +52,7 @@ function normalizePositiveInteger(value: unknown, fallback: number, max: number)
 }
 
 async function consumePaidApiQuota(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   userId: string,
 ): Promise<boolean> {
   const { data: allowed, error: quotaError } = await supabase.rpc(

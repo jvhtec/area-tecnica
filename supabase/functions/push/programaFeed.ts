@@ -1,4 +1,4 @@
-import type { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
 import { sendPayloadToUsers } from "./broadcast/delivery.ts";
@@ -16,7 +16,7 @@ import {
   type ProgramaProgramDay,
 } from "./programaFeedUtils.ts";
 
-type ProgramaFeedClient = ReturnType<typeof createClient>;
+type ProgramaFeedClient = SupabaseClient;
 
 type JobRow = {
   id: string;

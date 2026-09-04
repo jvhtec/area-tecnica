@@ -8,6 +8,7 @@ import {
 } from "./recipientUtils.ts";
 import type { Dept } from "./recipientUtils.ts";
 import { checkAndRecordWhatsappQuota } from "../_shared/whatsappQuota.ts";
+import { joinedSingle } from "../_shared/joins.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -462,7 +463,9 @@ serve(async (req: Request) => {
       });
 
       for (const r of rows) {
-        addProfilePhoneRecipient(r.profiles);
+        // `profiles` is an embedded join: PostgREST may return it as an array, in which
+        // case reading `.phone` off it yields undefined and the crew member is skipped.
+        addProfilePhoneRecipient(joinedSingle(r.profiles));
       }
     }
 
