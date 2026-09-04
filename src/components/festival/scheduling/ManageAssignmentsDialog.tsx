@@ -224,7 +224,7 @@ export const ManageAssignmentsDialog = ({
       setTechnicianId("");
       setExternalTechnicianName("");
       setRole("");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error adding assignment:", error);
       toast({
         title: "Error",
@@ -237,7 +237,7 @@ export const ManageAssignmentsDialog = ({
   const handleRemoveAssignment = async (assignmentId: string) => {
     try {
       await removeAssignmentMutation.mutateAsync(assignmentId);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error removing assignment:", error);
       toast({
         title: "Error",

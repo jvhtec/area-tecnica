@@ -12,6 +12,7 @@ import type {
   MultiDateRemovalState,
   SendStaffingEmailMutate,
 } from '@/components/matrix/optimized-matrix-cell/types';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type PendingRetry = { jobId: string } | null;
 type PendingCancel = { phase: 'availability' | 'offer'; jobId: string | null; allJobIds?: string[] } | null;
@@ -168,8 +169,8 @@ export const OptimizedMatrixCellDialogs = ({
                 );
                 setPendingCancel(null);
                 toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`);
-              } catch (e: any) {
-                toast.error(e?.message || 'No se pudo cancelar');
+              } catch (e) {
+                toast.error(getErrorMessage(e, 'No se pudo cancelar'));
               }
             }} disabled={isCancelling}>
               {isCancelling ? 'Cancelando…' : 'Cancelar'}

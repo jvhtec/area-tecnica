@@ -22,6 +22,7 @@ import { canManageFestivalGear } from "@/utils/permissions";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface StageInfo {
   id?: string;
   number: number;
@@ -299,7 +300,7 @@ const FestivalGearManagement = () => {
         title: "Éxito",
         description: `Actualizado a ${newMaxStages} escenarios`,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating max stages:", error);
       toast({
         title: "Error",
@@ -429,11 +430,11 @@ const FestivalGearManagement = () => {
         title: "Éxito",
         description: 'Documentación de configuración de equipo generada exitosamente'
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating gear setup PDF:', error);
       toast({
         title: "Error",
-        description: `Error al generar documentación: ${error.message}`,
+        description: `Error al generar documentación: ${getErrorMessage(error, 'No se pudo generar el PDF de equipamiento')}`,
         variant: "destructive"
       });
     } finally {
@@ -468,11 +469,11 @@ const FestivalGearManagement = () => {
         title: "Éxito",
         description: 'Documentación generada exitosamente'
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating documentation:', error);
       toast({
         title: "Error",
-        description: `Error al generar documentación: ${error.message}`,
+        description: `Error al generar documentación: ${getErrorMessage(error, 'No se pudo generar el PDF de documentación')}`,
         variant: "destructive"
       });
     } finally {

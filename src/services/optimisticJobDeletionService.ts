@@ -1,5 +1,6 @@
 
 import { deleteJobWithCleanup } from "./jobDeletionService";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface DeletionResult {
   success: boolean;
@@ -17,11 +18,11 @@ export const deleteJobOptimistically = async (jobId: string): Promise<DeletionRe
       success: true,
       details: "Job deleted successfully and cleanup completed"
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Optimistic deletion service: Error deleting job:", error);
     return {
       success: false,
-      error: error.message || "Unknown deletion error"
+      error: getErrorMessage(error, "Unknown deletion error")
     };
   }
 };

@@ -14,6 +14,7 @@ import { format } from "date-fns";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface JobAssignmentsProps {
   jobId: string;
   department?: Department;
@@ -76,7 +77,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       ]);
 
       toast.success("Assignment deleted successfully");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting assignment:", error);
       toast.error("Failed to delete assignment");
     }
@@ -113,9 +114,9 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       } else {
         toast.success('Flex sync completed');
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error('Flex sync exception:', e);
-      toast.error(`Flex sync failed: ${e?.message || 'Unknown error'}`);
+      toast.error(`Error al sincronizar con Flex: ${getErrorMessage(e, 'Error desconocido')}`);
     } finally {
       setIsSyncing(false);
     }

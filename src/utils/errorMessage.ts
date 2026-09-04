@@ -35,8 +35,13 @@ function stringifySafe(value: unknown): string {
     // Fall through to String(value)
   }
 
-  const text = String(value);
-  if (text && text !== '[object Object]') return text;
+  try {
+    const text = String(value);
+    if (text && text !== '[object Object]') return text;
+  } catch {
+    // Some thrown values have no prototype or define a throwing toString().
+  }
+
   return 'Unexpected error';
 }
 
@@ -58,15 +63,23 @@ function uniqueParts(parts: Array<string | null>): string[] {
  * Convert unknown runtime errors (including Supabase/PostgREST objects)
  * into deterministic, user-readable strings.
  */
-export function getErrorMessage(error: unknown): string {
+function getErrorMessageInternal(
+  error: unknown,
+  fallback: string,
+  seen: WeakSet<object>,
+): string {
   if (error instanceof Error) {
     const msg = toText(error.message);
-    return msg ?? error.name ?? 'Unexpected error';
+    const specificName = error.name === 'Error' ? null : toText(error.name);
+    return msg ?? specificName ?? fallback;
   }
 
   if (Array.isArray(error)) {
-    const nested = uniqueParts(error.map((item) => getErrorMessage(item)));
-    return nested.length > 0 ? nested.join('; ') : 'Unexpected error';
+    if (seen.has(error)) return '';
+    seen.add(error);
+    const nested = uniqueParts(error.map((item) => getErrorMessageInternal(item, fallback, seen)));
+    seen.delete(error);
+    return nested.length > 0 ? nested.join('; ') : fallback;
   }
 
   if (isRecord(error)) {
@@ -89,6 +102,57 @@ export function getErrorMessage(error: unknown): string {
 
   const direct = toText(error);
   if (direct) return direct;
-  return stringifySafe(error);
+  if (error == null || typeof error === 'string') return fallback;
+  const serialized = stringifySafe(error);
+  return serialized === 'Unexpected error' ? fallback : serialized;
 }
 
+export function getErrorMessage(error: unknown, fallback = 'Unexpected error'): string {
+  return getErrorMessageInternal(error, fallback, new WeakSet<object>());
+}
+
+/**
+ * Reads the `name` of an unknown thrown value — used to branch on well-known
+ * `Error`/`DOMException` names such as 'AbortError' or 'NotSupportedError'.
+ */
+export function getErrorName(error: unknown): string | undefined {
+  if (error instanceof Error) return error.name;
+  if (isRecord(error)) {
+    const name = toText(error.name);
+    if (name) return name;
+  }
+  return undefined;
+}
+
+/** Reads the stack of an unknown thrown value, for diagnostic logging only. */
+export function getErrorStack(error: unknown): string | undefined {
+  if (error instanceof Error) return error.stack;
+  if (isRecord(error)) {
+    const stack = toText(error.stack);
+    if (stack) return stack;
+  }
+  return undefined;
+}
+
+/**
+ * Reads an HTTP-ish status off an unknown error — Supabase/PostgREST errors and
+ * fetch wrappers both carry one, and retry policies branch on it.
+ */
+export function getErrorStatus(error: unknown): number | undefined {
+  if (!isRecord(error)) return undefined;
+
+  for (const status of [error.status, error.statusCode]) {
+    const numericStatus =
+      typeof status === 'number'
+        ? status
+        : typeof status === 'string' && status.trim().length > 0
+          ? Number(status)
+          : Number.NaN;
+
+    if (Number.isInteger(numericStatus) && numericStatus >= 400 && numericStatus <= 599) {
+      return numericStatus;
+    }
+  }
+
+  return undefined;
+}

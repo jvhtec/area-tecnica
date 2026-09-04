@@ -10,6 +10,7 @@ import { resolveJobDocLocation } from "@/utils/jobDocuments";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export const useJobManagement = (
   selectedDepartment: Department,
   startDate: Date,
@@ -126,11 +127,11 @@ export const useJobManagement = (
         title: "Document deleted",
         description: "The document has been successfully deleted."
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("useJobManagement: Error deleting document:", error);
       toast({
         title: "Error",
-        description: "Failed to delete document: " + error.message,
+        description: getErrorMessage(error, "No se pudo eliminar el documento"),
         variant: "destructive"
       });
     }
@@ -150,11 +151,11 @@ export const useJobManagement = (
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("useJobManagement: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive"
       });
       throw error;

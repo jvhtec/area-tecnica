@@ -319,7 +319,7 @@ export async function createFoldersForDate(
       throw updateError;
     }
     return true;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating folders for tour date:", error);
     throw error;
   }

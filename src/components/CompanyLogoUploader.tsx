@@ -31,7 +31,7 @@ export const CompanyLogoUploader = () => {
       toast.success("Success", {
         description: "Company logo has been uploaded"
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading logo:', error);
       toast.error("Error", {
         description: "Could not upload logo"

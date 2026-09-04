@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardDisplay } from './Wallboard';
 import { exchangeWallboardToken } from '@/lib/wallboard-api';
+import { getErrorMessage, getErrorStack, getErrorStatus } from '@/utils/errorMessage';
 
 /**
  * WallboardPublic - Tokenized access to wallboard with JWT-based authentication
@@ -59,14 +60,14 @@ export default function WallboardPublic() {
         setIsValid(true);
         setIsValidating(false);
         setAuthComplete(true);
-      } catch (err: any) {
+      } catch (err) {
         console.error('❌ Wallboard token exchange failed:', err);
         console.error('Error details:', {
-          message: err?.message,
-          status: err?.status,
-          stack: err?.stack,
+          message: getErrorMessage(err),
+          status: getErrorStatus(err),
+          stack: getErrorStack(err),
         });
-        setError(`Failed to initialize wallboard session: ${err?.message || 'Unknown error'}. Please refresh your shared link.`);
+        setError(`Failed to initialize wallboard session: ${getErrorMessage(err, 'Unknown error')}. Please refresh your shared link.`);
         setIsValid(false);
         setIsValidating(false);
         setAuthComplete(true);

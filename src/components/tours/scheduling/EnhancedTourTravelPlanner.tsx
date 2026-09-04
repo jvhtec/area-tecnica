@@ -273,7 +273,7 @@ export const EnhancedTourTravelPlanner: React.FC<
         title: "Plan de viajes generado",
         description: `Se generaron ${segments.length} segmentos de viaje con detección inteligente de descansos`,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error generating travel plan:", error);
       toast({
         title: "Error",
@@ -315,7 +315,7 @@ export const EnhancedTourTravelPlanner: React.FC<
       });
 
       onSave();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving travel plan:", error);
       toast({
         title: "Error",

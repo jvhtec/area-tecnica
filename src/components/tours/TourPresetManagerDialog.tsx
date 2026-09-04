@@ -15,6 +15,7 @@ import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -109,8 +110,12 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
       setCopyingPreset(null);
       setIsCreating(false);
       toast({ title: 'Éxito', description: 'Preset guardado' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: getErrorMessage(e, 'No se pudo guardar el preset'),
+        variant: 'destructive',
+      });
     }
   };
 

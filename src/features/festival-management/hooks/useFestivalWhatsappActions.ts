@@ -10,6 +10,7 @@ import { normalizeFestivalWhatsappStage } from "@/features/festival-management/s
 import type { FestivalWhatsappDepartment } from "@/features/festival-management/types";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type ToastFn = (props: { description?: string; title: string; variant?: "default" | "destructive" }) => void;
 
@@ -96,11 +97,11 @@ export const useFestivalWhatsappActions = ({
       });
       setIsWhatsappDialogOpen(false);
       await refreshWhatsappState();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating WhatsApp group:", error);
       toast({
         title: "Error",
-        description: error.message || "Error al crear grupo de WhatsApp",
+        description: getErrorMessage(error, "Error al crear grupo de WhatsApp"),
         variant: "destructive",
       });
       await refreshWhatsappState();
@@ -141,10 +142,10 @@ export const useFestivalWhatsappActions = ({
 
       await refreshWhatsappState();
       await handleCreateWhatsappGroup();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: `Error al reintentar: ${error.message}`,
+        description: `Error al reintentar: ${getErrorMessage(error, 'No se pudo reintentar la creación del grupo')}`,
         variant: "destructive",
       });
       await refreshWhatsappState();
@@ -163,8 +164,12 @@ export const useFestivalWhatsappActions = ({
       await sendWarehouseMessage({ highlight: isDefault, jobId, message: finalMsg });
       toast({ title: "Enviado", description: "Mensaje enviado a Almacén sonido." });
       setIsAlmacenDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: "Error", description: error?.message || String(error), variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getErrorMessage(error, "No se pudo enviar el mensaje a Almacén"),
+        variant: "destructive",
+      });
     } finally {
       setIsSendingWa(false);
     }

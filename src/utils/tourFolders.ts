@@ -8,6 +8,7 @@ import {
 } from "@/utils/flex-folders/constants";
 import { createFlexFolder } from "@/utils/flex-folders/api";
 import { ensureTourEstructuraRoot } from "@/utils/flex-folders/tourEstructuraRoot";
+import { getErrorMessage } from "@/utils/errorMessage";
 
 export interface TourFolderCreationResult {
   success: boolean;
@@ -38,9 +39,9 @@ export async function createTourRootFolders(tourId: string): Promise<TourFolderC
       success: true,
       data: { ...data, flex_estructura_folder_id: estructuraRoot.elementId },
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Exception creating tour root folders:", error);
-    return { success: false, error: error.message || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }
 
@@ -64,9 +65,9 @@ export async function createTourDateFolders(tourId: string): Promise<TourFolderC
 
     console.log("Successfully created tour date folders:", data);
     return { success: true, data };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Exception creating tour date folders:", error);
-    return { success: false, error: error.message || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }
 
@@ -266,9 +267,9 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
     }
 
     return { success: true, data: folderUpdates };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Exception creating tour root folders manually:", error);
-    return { success: false, error: error.message || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }
 
@@ -291,8 +292,8 @@ export async function createAllTourFolders(tourId: string): Promise<TourFolderCr
 
     console.log("Successfully created all tour folders:", data);
     return { success: true, data };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Exception creating all tour folders:", error);
-    return { success: false, error: error.message || "Unknown error occurred" };
+    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
   }
 }

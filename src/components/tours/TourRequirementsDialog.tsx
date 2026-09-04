@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { roleOptionsForDiscipline } from '@/types/roles'
 import { dataLayerClient } from '@/services/dataLayerClient';
+import { getErrorMessage } from '@/utils/errorMessage';
 import { useToast } from '@/hooks/use-toast'
 import type { Json } from '@/integrations/supabase/types'
 
@@ -102,9 +103,13 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
 
       toast({ title: 'Applied', description: `Requirements applied to ${jobIds.length} job(s)` })
       onOpenChange(false)
-    } catch (e: any) {
+    } catch (e) {
       console.error('Tour requirements apply error:', e)
-      toast({ title: 'Error', description: e?.message || 'Failed to apply requirements', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: getErrorMessage(e, 'No se pudieron aplicar los requisitos'),
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }

@@ -19,6 +19,7 @@ import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/stora
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -229,8 +230,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
             body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
           });
         } catch { /* best-effort push notification; ignore delivery failures */ }
-      } catch (err: any) {
-        failedMessages.push(`${file.name}: ${err?.message || String(err)}`);
+      } catch (err) {
+        failedMessages.push(`${file.name}: ${getErrorMessage(err, "No se pudo subir el documento")}`);
       }
     }
 
@@ -310,11 +311,11 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
           body: { action: 'broadcast', type: 'document.deleted', job_id: job.id, file_name: doc.file_name }
         });
       } catch { /* best-effort push notification; ignore delivery failures */ }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error in handleDeleteDocument:", err);
       toast({
-        title: "Error deleting document",
-        description: err.message,
+        title: "Error al eliminar el documento",
+        description: getErrorMessage(err, "Error desconocido al eliminar el documento"),
         variant: "destructive"
       });
     }

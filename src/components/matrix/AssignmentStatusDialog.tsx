@@ -20,6 +20,7 @@ import { labelForCode } from '@/utils/roles';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorName } from '@/utils/errorMessage';
 interface AssignmentStatusDialogProps {
   open: boolean;
   onClose: () => void;
@@ -141,8 +142,8 @@ export const AssignmentStatusDialog = ({
             }
             return oldData;
           });
-        } catch (e: any) {
-          if (typeof window !== 'undefined' && e?.name === 'InvalidStateError') {
+        } catch (e) {
+          if (typeof window !== 'undefined' && getErrorName(e) === 'InvalidStateError') {
             console.warn('Broadcast channel closed; skipping optimistic update');
           }
         }

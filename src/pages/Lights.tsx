@@ -23,6 +23,7 @@ import { isManagementRole } from "@/utils/permissions";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 const Lights = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -145,11 +146,11 @@ const Lights = () => {
         } else {
           throw new Error(result.error || "Error desconocido al eliminar");
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error("Lights page: Error in optimistic job deletion:", error);
         toast({
           title: "Error al eliminar el trabajo",
-          description: error.message,
+          description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
           variant: "destructive"
         });
       }

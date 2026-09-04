@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { ShiftTimeCalculator } from "./ShiftTimeCalculator";
+import { getErrorMessage } from "@/utils/errorMessage";
 
 interface EditShiftDialogProps {
   open: boolean;
@@ -81,11 +82,11 @@ export const EditShiftDialog = ({
         title: "Éxito",
         description: "Turno actualizado exitosamente",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating shift:", error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el turno",
+        description: getErrorMessage(error, "No se pudo actualizar el turno"),
         variant: "destructive",
       });
     } finally {

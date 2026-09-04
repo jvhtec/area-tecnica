@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { queryKeys } from "@/lib/react-query";
 import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type Options = { isManagementUser: boolean; tourDates: any[] };
 
@@ -127,8 +128,12 @@ export const useTourWhatsappGroup = ({ isManagementUser, tourDates }: Options) =
         setIsWaDialogOpen(false);
       }
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: getErrorMessage(e, 'No se pudo crear el grupo de WhatsApp'),
+        variant: 'destructive',
+      });
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } finally {
       setIsCreatingWaGroup(false);
@@ -201,10 +206,10 @@ export const useTourWhatsappGroup = ({ isManagementUser, tourDates }: Options) =
       // Call the create handler directly (no setTimeout needed)
       await handleCreateWaGroup();
 
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: 'Error',
-        description: `Error al reintentar: ${err.message}`,
+        description: `Error al reintentar: ${getErrorMessage(err, 'No se pudo reintentar la creación del grupo')}`,
         variant: 'destructive'
       });
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);

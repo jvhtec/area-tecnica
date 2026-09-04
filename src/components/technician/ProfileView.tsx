@@ -14,6 +14,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/api-config';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface ProfileUser {
     id: string;
     email?: string;
@@ -104,8 +105,11 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                     .maybeSingle();
                 if (error) throw error;
                 setAppVersion(data?.version || 'N/A');
-            } catch (e: any) {
-                console.warn('Failed to load app version', e?.message || e);
+            } catch (e) {
+                console.warn(
+                    'Failed to load app version',
+                    getErrorMessage(e, 'Error desconocido al cargar la versión de la aplicación'),
+                );
                 setAppVersion('N/A');
             }
         };

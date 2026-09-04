@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Theme } from "@/components/technician/types";
 import { isManagementRole } from "@/utils/permissions";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface VacationRequestHistoryProps {
   theme: Theme;
@@ -60,8 +61,8 @@ export const VacationRequestHistory: React.FC<VacationRequestHistoryProps> = ({ 
       });
       if (error) throw error;
       toast({ title: 'Correo reenviado', description: 'El correo con la decisión y PDF se ha reenviado.' });
-    } catch (e: any) {
-      toast({ title: 'Error al reenviar', description: e?.message || 'No se pudo reenviar el correo de decisión.', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Error al reenviar', description: getErrorMessage(e, 'No se pudo reenviar el correo de decisión.'), variant: 'destructive' });
     } finally {
       setSendingIds(prev => prev.filter(id => id !== request.id));
     }

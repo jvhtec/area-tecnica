@@ -396,7 +396,7 @@ const PesosTool: React.FC = () => {
       setCurrentSetName('');
       setTables([]);
       resetCurrentTable();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving default set:', error);
       toast({
         title: 'Error',
@@ -460,7 +460,7 @@ const PesosTool: React.FC = () => {
         await syncDefaultDocumentsAfterMutation();
       }
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving tour default:', error);
       toast({
         title: 'Error',
@@ -494,7 +494,7 @@ const PesosTool: React.FC = () => {
           description: 'Override saved for tour date',
         });
         return;
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error saving override:', error);
         toast({
           title: 'Error',
@@ -527,7 +527,7 @@ const PesosTool: React.FC = () => {
         title: 'Success',
         description: 'Override saved for this tour date',
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving override:', error);
       toast({
         title: 'Error',

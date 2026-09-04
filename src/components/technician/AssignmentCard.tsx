@@ -22,6 +22,7 @@ import { OBLIQUE_STRATEGIES } from "./obliqueStrategies";
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { isPreventiveResourceForJob } from '@/utils/preventiveResource';
 import { hasPrepDayDateType } from '@/utils/timesheetPrepDays';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type Assignment = any;
 
@@ -135,8 +136,12 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
     try {
       const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
       window.open(url, '_blank');
-    } catch (err: any) {
-      toast({ title: 'Error', description: `No se pudo abrir el documento: ${err.message}`, variant: 'destructive' });
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: `No se pudo abrir el documento: ${getErrorMessage(err, 'Error desconocido')}`,
+        variant: 'destructive',
+      });
     } finally {
       setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
     }
@@ -153,8 +158,12 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (err: any) {
-      toast({ title: 'Error', description: `No se pudo descargar el documento: ${err.message}`, variant: 'destructive' });
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: `No se pudo descargar el documento: ${getErrorMessage(err, 'Error desconocido')}`,
+        variant: 'destructive',
+      });
     } finally {
       setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
     }

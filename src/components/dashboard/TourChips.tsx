@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface TourChipsProps {
   onTourClick?: (tourId: string) => void;
   readOnly?: boolean;
@@ -99,11 +100,11 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
         title: "Calendario exportado",
         description: "El calendario de la gira se ha exportado correctamente"
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error exporting PDF:", error);
       toast({
         title: "Error",
-        description: "No se pudo exportar el PDF: " + (error.message || "Error desconocido"),
+        description: "No se pudo exportar el PDF: " + getErrorMessage(error, "Error desconocido"),
         variant: "destructive"
       });
     }

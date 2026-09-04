@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { downloadBlobInBrowser, generateFestivalDocumentation } from "@/features/festival-management/commands";
 import type { FestivalPdfProgress } from "@/utils/pdf/festivalPdfGenerator";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 
@@ -52,11 +53,11 @@ export const useFestivalPrintActions = ({
             : "Documentación generada exitosamente",
         });
         setIsPrintDialogOpen(false);
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error generating documentation:", error);
         toast({
           title: "Error",
-          description: `Error al generar documentación: ${error.message}`,
+          description: `Error al generar documentación: ${getErrorMessage(error, 'Error desconocido')}`,
           variant: "destructive",
         });
       } finally {

@@ -19,6 +19,7 @@ import { createTourDateFolders } from "@/utils/tourFolders";
 import { useQueryClient } from "@tanstack/react-query";
 import { canUseCustomFolderStructure } from "@/utils/permissions";
 import { useTourRootFolderAction } from "@/hooks/tours/useTourRootFolderAction";
+import { getErrorMessage, getErrorName } from "@/utils/errorMessage";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -183,11 +184,11 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         title: "Carpetas creadas",
         description: "Las carpetas de fechas de la gira se han creado correctamente."
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating tour date folders:", error);
       toast({
         title: "Error al crear las carpetas de fechas",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudieron crear las carpetas de fechas"),
         variant: "destructive"
       });
     }
@@ -371,20 +372,21 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         description: `Se creó la estructura ${isCustom ? 'personalizada' : 'predeterminada'} de la gira en "${rootFolderName}"`
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("TourCard: Error creating local folders:", error);
-      if (error.name === 'AbortError') {
+      if (getErrorName(error) === 'AbortError') {
         // User cancelled, don't show error
         return;
       }
 
+      const errorDetail = getErrorMessage(error, "");
       let errorMessage = "No se pudieron crear las carpetas";
-      if (error.message?.includes("Name is not allowed")) {
+      if (errorDetail.includes("Name is not allowed")) {
         errorMessage = "Se detectó un nombre de carpeta no válido. Inténtalo de nuevo o contacta con soporte.";
-      } else if (error.message?.includes("getDirectoryHandle")) {
+      } else if (errorDetail.includes("getDirectoryHandle")) {
         errorMessage = "No se pudo crear la estructura. Comprueba los caracteres especiales de los nombres.";
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else if (errorDetail) {
+        errorMessage = errorDetail;
       }
 
       toast({
@@ -433,11 +435,11 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
         title: newStatus === "cancelled" ? "Gira cancelada" : "Gira reactivada",
         description: newStatus === "cancelled" ? "La gira se ha marcado como cancelada." : "La gira se ha reactivado.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Error ${actionWord}ing tour:`, error);
       toast({
         title: "Error",
-        description: `No se pudo actualizar la gira: ${error.message}`,
+        description: `No se pudo actualizar la gira: ${getErrorMessage(error, 'Error desconocido')}`,
         variant: "destructive",
       });
     }

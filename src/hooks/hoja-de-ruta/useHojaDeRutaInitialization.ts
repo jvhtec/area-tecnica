@@ -7,6 +7,7 @@ import {
   mergeStaffWithAssignments,
   remapAccommodationStaffReferences,
 } from '@/utils/hoja-de-ruta/staffSync';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 export const resolvePowerRequirementsForHojaInitialization = ({
   savedPowerRequirements,
@@ -257,11 +258,11 @@ export const useHojaDeRutaInitialization = (
           ? `Se han cargado los datos básicos del trabajo con ${description}.`
           : "Se han cargado los datos básicos del trabajo seleccionado.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("❌ INITIALIZATION: Error auto-populating basic job data:", error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los datos básicos del trabajo.",
+        description: getErrorMessage(error, "No se pudieron cargar los datos básicos del trabajo."),
         variant: "destructive",
       });
     }

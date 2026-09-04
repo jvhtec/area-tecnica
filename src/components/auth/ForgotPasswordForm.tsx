@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface ForgotPasswordFormProps {
   onBack: () => void;
@@ -32,9 +33,9 @@ export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
       await requestPasswordReset(email);
       console.log('[ForgotPassword] Reset request successful');
       setSuccess(true);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[ForgotPassword] Error:', err);
-      setError(err.message || "Failed to send password reset email. Please try again.");
+      setError(getErrorMessage(err, "No se pudo enviar el correo de recuperación. Inténtalo de nuevo."));
     }
   };
 

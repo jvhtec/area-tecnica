@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export const useTourCreation = (
   currentDepartment: Department,
   onSuccess: () => void
@@ -111,11 +112,11 @@ export const useTourCreation = (
       setStartDate("");
       setEndDate("");
       setInvoicingCompany(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating tour:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create tour",
+        description: getErrorMessage(error, "No se pudo crear la gira"),
         variant: "destructive",
       });
     } finally {

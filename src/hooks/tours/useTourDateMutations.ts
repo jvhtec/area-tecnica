@@ -13,6 +13,7 @@ import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDate
 import { cleanupTourDefaultDocumentsForDate } from "@/utils/tourDefaultDocumentSync";
 import { queryKeys } from "@/lib/react-query";
 import { buildTourDateJobTitle, emptyDefaultSetSelection, emptyPackageSelection, type DefaultSetSelectionState, type PackageSelectionState } from "@/components/tours/tourDateManagementModel";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type TourDateTableType = Exclude<DateType, "prep_day">;
 type DynamicSupabaseClient = { from: (table: string) => any };
@@ -189,11 +190,11 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
         title: "Fecha creada",
         description: "La fecha de gira y el trabajo se crearon correctamente.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error adding date:", error);
       toast({
         title: "Error al añadir la fecha",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudo crear la fecha de gira"),
         variant: "destructive",
       });
     }
@@ -400,11 +401,11 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
           description: "La fecha de gira se actualizó correctamente.",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error editing date:", error);
       toast({
         title: "Error al editar la fecha",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudo actualizar la fecha de gira"),
         variant: "destructive",
       });
     }
@@ -618,11 +619,11 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
           : "La fecha de gira se eliminó correctamente."
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting date:", error);
       toast({
         title: "Error al eliminar la fecha",
-        description: error.message || "Se produjo un error inesperado al eliminar la fecha de gira.",
+        description: getErrorMessage(error, "Se produjo un error inesperado al eliminar la fecha de gira."),
         variant: "destructive",
       });
     } finally {

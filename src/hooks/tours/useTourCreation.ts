@@ -8,6 +8,7 @@ import { useTourCreationMutation } from "./useTourCreationMutation";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 export const useTourCreation = (
   currentDepartment: Department,
   onSuccess: () => void
@@ -75,11 +76,11 @@ export const useTourCreation = (
       setColor("#7E69AB");
       setStartDate("");
       setEndDate("");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating tour:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create tour",
+        description: getErrorMessage(error, "No se pudo crear la gira"),
         variant: "destructive",
       });
     }

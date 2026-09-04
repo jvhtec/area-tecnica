@@ -20,6 +20,7 @@ import { canAccessDashboard, canViewPendingExpenses, isManagementRole } from "@/
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 const DashboardMobileHub = lazy(() =>
   import("@/components/dashboard/DashboardMobileHub").then((m) => ({ default: m.DashboardMobileHub }))
 );
@@ -189,11 +190,11 @@ const Dashboard = () => {
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Dashboard: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive"
       });
     }

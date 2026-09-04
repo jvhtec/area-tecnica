@@ -19,6 +19,7 @@ import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface TourManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -151,11 +152,11 @@ export const TourManagementDialog = ({
           description: `Todas las fechas de gira ${tourPackOnly ? 'configuradas en' : 'eliminadas de'} modo Solo Tour Pack.`,
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating tour dates:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudieron actualizar las fechas de la gira"),
         variant: "destructive",
       });
     } finally {
@@ -198,11 +199,11 @@ export const TourManagementDialog = ({
         title: "Éxito",
         description: `Gira ${newStatus === 'cancelled' ? 'cancelada' : 'reactivada'} exitosamente`,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Error ${actionWord}ing tour:`, error);
       toast({
         title: "Error",
-        description: `Error al ${newStatus === 'cancelled' ? 'cancelar' : 'reactivar'} la gira: ${error.message}`,
+        description: `Error al ${newStatus === 'cancelled' ? 'cancelar' : 'reactivar'} la gira: ${getErrorMessage(error, 'No se pudo actualizar el estado de la gira')}`,
         variant: "destructive",
       });
     } finally {

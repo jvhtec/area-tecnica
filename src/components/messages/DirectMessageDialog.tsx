@@ -97,7 +97,7 @@ export const DirectMessageDialog = ({
       
       setMessage("");
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error sending message:", error);
       toast({
         title: "Error",

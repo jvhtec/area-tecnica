@@ -25,6 +25,7 @@ import { isManagementRole } from "@/utils/permissions";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 const Video = () => {
   const isMobile = useIsMobile();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -143,10 +144,10 @@ const Video = () => {
         description: "El trabajo se ha eliminado correctamente.",
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error al eliminar el trabajo",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudo eliminar el trabajo"),
         variant: "destructive",
       });
     }

@@ -9,6 +9,7 @@ import { buildTourSchedulePdfBlob } from '@/lib/tourPdfExport';
 import { uploadTourPdfWithRecord } from '@/utils/tourDocumentsUpload';
 import { isDepartmentManagementRole, isTechnicianRole } from '@/utils/permissions';
 import { isWithinSeasonalAvailability, type SeasonalHouseTechProfile } from '@/utils/seasonalHouseTech';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type TourDateLite = {
   id: string;
@@ -119,9 +120,13 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
       }
       toast({ title: 'Availability request sent', description: channel === 'whatsapp' ? 'Sent via WhatsApp' : 'Sent via Email' });
       onOpenChange(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[RequestTourAvailability] Failed to send', err);
-      toast({ title: 'Failed to send', description: err.message || String(err), variant: 'destructive' });
+      toast({
+        title: 'Error al enviar',
+        description: getErrorMessage(err, 'No se pudo enviar la solicitud de disponibilidad'),
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

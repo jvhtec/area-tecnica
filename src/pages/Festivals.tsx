@@ -20,6 +20,7 @@ import { FestivalsPagination } from "@/components/ui/festivals-pagination";
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
 import { isFestivalLikeJobType } from "@/utils/jobType";
 import { canPrintFestivalDocuments, isAdminRole } from "@/utils/permissions";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -184,9 +185,9 @@ const Festivals = () => {
       URL.revokeObjectURL(url);
       
       toast.success('Documentación generada exitosamente');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating documentation:', error);
-      toast.error(`Error al generar documentación: ${error.message}`);
+      toast.error(`Error al generar documentación: ${getErrorMessage(error, 'No se pudo generar la documentación')}`);
     } finally {
       setIsPrinting(prev => ({ ...prev, [selectedJobForPrint.id]: false }));
     }

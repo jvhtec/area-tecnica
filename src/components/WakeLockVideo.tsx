@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { getErrorName } from '@/utils/errorMessage';
 
 /**
  * WakeLockVideo
@@ -20,9 +21,9 @@ export const WakeLockVideo: React.FC = () => {
             try {
                 await video.play();
                 console.log('WakeLockVideo: playing successfully');
-            } catch (err: any) {
+            } catch (err) {
                 // NotSupportedError means the video format isn't supported - this is expected on some browsers
-                if (err?.name === 'NotSupportedError') {
+                if (getErrorName(err) === 'NotSupportedError') {
                     // Silently ignore - wake lock video is optional and only works on specific devices
                     return;
                 }

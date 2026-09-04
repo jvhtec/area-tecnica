@@ -9,6 +9,7 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { buildFlexUrlByIntent } from '@/utils/flex-folders/urlBuilder';
 import { getFlexViewId } from '@/utils/flex-folders/config';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -115,9 +116,13 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
         if (error) throw error;
       }
       toast({ title: 'Saved', description: `Linked ${dept} crew call` });
-    } catch (e: any) {
+    } catch (e) {
       console.error('Save crew call error:', e);
-      toast({ title: 'Save failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+      toast({
+        title: 'Error al guardar',
+        description: getErrorMessage(e, 'No se pudo guardar la convocatoria'),
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { optimizeImageForUpload, validateImageFile } from "@/utils/imageOptimization";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface FestivalLogoManagerProps {
   jobId: string;
@@ -59,17 +60,17 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
               setLogoUrl(publicUrlData.publicUrl);
             }
           }
-        } catch (e: any) {
+        } catch (e) {
           console.error('Error getting logo public URL:', e);
-          setErrorDetails(`Failed to get logo URL: ${e.message}`);
+          setErrorDetails(`No se pudo obtener la URL del logo: ${getErrorMessage(e, 'Error desconocido')}`);
         }
       } else {
         console.log("No logo found for festival job", jobId);
         setLogoUrl(null);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Unexpected error in fetchExistingLogo:', error);
-      setErrorDetails(`Unexpected error: ${error.message}`);
+      setErrorDetails(`Error inesperado: ${getErrorMessage(error, 'Error desconocido')}`);
     }
   }, [jobId]);
 
@@ -194,9 +195,9 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         title: "Éxito",
         description: "El logo del festival ha sido actualizado",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading logo:', error);
-      const errorMessage = error.message || "No se pudo subir el logo";
+      const errorMessage = getErrorMessage(error, "No se pudo subir el logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",
@@ -270,9 +271,9 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       } else {
         console.log("No logo found to delete");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting logo:', error);
-      const errorMessage = error.message || "No se pudo eliminar el logo";
+      const errorMessage = getErrorMessage(error, "No se pudo eliminar el logo");
       setErrorDetails(errorMessage);
       toast({
         title: "Error",

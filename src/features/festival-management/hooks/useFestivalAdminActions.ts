@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { NavigateFunction } from "react-router-dom";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 import {
   archiveDocumentsToFlex,
@@ -64,11 +65,11 @@ export const useFestivalAdminActions = ({
         title: "Éxito",
         description: data?.message || "Carpetas locales creadas exitosamente",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating local folders:", error);
       toast({
         title: "Error",
-        description: error.message || "Error al crear carpetas locales",
+        description: getErrorMessage(error, "Error al crear carpetas locales"),
         variant: "destructive",
       });
     } finally {
@@ -97,12 +98,12 @@ export const useFestivalAdminActions = ({
       if (!archiveDryRun && (data?.uploaded ?? 0) > 0) {
         fetchDocuments();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Archive error", error);
-      setArchiveError(error?.message || "Failed to archive");
+      setArchiveError(getErrorMessage(error, "No se pudo archivar el trabajo"));
       toast({
         title: "Error al archivar",
-        description: error?.message || "Error al archivar",
+        description: getErrorMessage(error, "Error al archivar"),
         variant: "destructive",
       });
     } finally {
@@ -134,12 +135,12 @@ export const useFestivalAdminActions = ({
         title: "Relleno completado",
         description: `Insertados ${data?.inserted ?? 0}, ya existían ${data?.already ?? 0}`,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Backfill error", error);
-      setBackfillMessage(error?.message || "Backfill failed");
+      setBackfillMessage(getErrorMessage(error, "No se pudo regenerar la documentación técnica"));
       toast({
         title: "Error al rellenar",
-        description: error?.message || "Error al rellenar",
+        description: getErrorMessage(error, "Error al rellenar"),
         variant: "destructive",
       });
     } finally {
@@ -158,11 +159,11 @@ export const useFestivalAdminActions = ({
         description: "Trabajo eliminado exitosamente",
       });
       navigate("/project-management");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting job:", error);
       toast({
         title: "Error",
-        description: error.message || "Error al eliminar trabajo",
+        description: getErrorMessage(error, "Error al eliminar trabajo"),
         variant: "destructive",
       });
     } finally {

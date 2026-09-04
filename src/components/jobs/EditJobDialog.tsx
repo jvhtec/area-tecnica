@@ -32,6 +32,7 @@ import {
   haveJobDatesChanged,
   syncFlexElementsForJobDateChange,
 } from "@/utils/flex-folders/syncDateChange";
+import { getErrorMessage } from "@/utils/errorMessage";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -456,11 +457,11 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           });
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating job:", error);
       toast({
         title: "Error updating job",
-        description: error.message,
+        description: getErrorMessage(error, "No se pudo actualizar el trabajo"),
         variant: "destructive",
       });
     } finally {

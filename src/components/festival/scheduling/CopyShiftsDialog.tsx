@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface CopyShiftsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -129,9 +130,9 @@ export const CopyShiftsDialog = ({
       onShiftsCopied();
       onOpenChange(false);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error copying shifts:", error);
-      toast.error(`Error al copiar turnos: ${error.message || 'Error desconocido'}`);
+      toast.error(`Error al copiar turnos: ${getErrorMessage(error, 'Error desconocido')}`);
     } finally {
       setIsLoading(false);
     }

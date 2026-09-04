@@ -65,7 +65,7 @@ export const MessageReplyDialog = ({ message, open, onOpenChange }: MessageReply
       
       setReply("");
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error sending reply:", error);
       toast({
         title: "Error",

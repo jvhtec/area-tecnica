@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface TransportRequestDialogProps {
   open: boolean;
@@ -140,8 +141,12 @@ export function TransportRequestDialog({
       toast({ title: 'Transport request saved' });
       onSubmitted?.();
       onOpenChange(false);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to save request', variant: 'destructive' });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: getErrorMessage(error, 'No se pudo guardar la solicitud'),
+        variant: 'destructive',
+      });
     }
   };
 

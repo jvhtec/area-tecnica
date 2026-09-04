@@ -19,6 +19,7 @@ import {
 } from '@/utils/documentUploadValidation';
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 const DEPARTMENT_NAME: Record<'sound' | 'lights' | 'video', string> = {
   sound: 'sonido',
   lights: 'luces',
@@ -148,8 +149,12 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       }
       setNewAssignee(undefined);
       await refetch();
-    } catch (e: any) {
-      toast({ title: 'Create failed', description: e?.message || String(e), variant: 'destructive' });
+    } catch (e) {
+      toast({
+        title: 'Error al crear',
+        description: getErrorMessage(e, 'No se pudo crear la tarea'),
+        variant: 'destructive',
+      });
     }
   };
 
@@ -192,8 +197,12 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         description: `Se borraron ${deletedCount} tarea(s) de tipo ${newType}.`,
       });
       await refetch();
-    } catch (e: any) {
-      toast({ title: 'Bulk delete failed', description: e?.message || String(e), variant: 'destructive' });
+    } catch (e) {
+      toast({
+        title: 'Error al eliminar',
+        description: getErrorMessage(e, 'No se pudieron eliminar las tareas'),
+        variant: 'destructive',
+      });
     }
   };
 
@@ -213,8 +222,8 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       try {
         await uploadAttachment(taskId, file);
         uploadedCount += 1;
-      } catch (e: any) {
-        failedMessages.push(`${file.name}: ${e?.message || String(e)}`);
+      } catch (e) {
+        failedMessages.push(`${file.name}: ${getErrorMessage(e, 'No se pudo subir el adjunto')}`);
       }
     }
 
@@ -253,8 +262,12 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       await deleteAttachment(docId, filePath);
       toast({ title: 'Attachment deleted' });
       await refetch();
-    } catch (e: any) {
-      toast({ title: 'Delete failed', description: e?.message || String(e), variant: 'destructive' });
+    } catch (e) {
+      toast({
+        title: 'Error al eliminar',
+        description: getErrorMessage(e, 'No se pudo eliminar el adjunto'),
+        variant: 'destructive',
+      });
     }
   };
 

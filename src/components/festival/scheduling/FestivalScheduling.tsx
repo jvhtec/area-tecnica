@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
@@ -176,11 +177,11 @@ export const FestivalScheduling = ({
         title: "Éxito",
         description: "Turno eliminado exitosamente",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting shift:", error);
       toast({
         title: "Error",
-        description: `No se pudo eliminar el turno: ${error.message}`,
+        description: `No se pudo eliminar el turno: ${getErrorMessage(error, 'Error desconocido')}`,
         variant: "destructive",
       });
     } finally {

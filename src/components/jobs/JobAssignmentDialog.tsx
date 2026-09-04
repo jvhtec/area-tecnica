@@ -41,6 +41,7 @@ import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { useDirectJobAssignments } from '@/hooks/useDirectJobAssignments';
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 import {
   formatAssignmentTechnicianName,
   formatDepartmentName,
@@ -192,9 +193,13 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       } else {
         toast({ title: 'Flex sync completed' });
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error('Flex sync exception:', e);
-      toast({ title: 'Flex sync failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+      toast({
+        title: 'Error al sincronizar con Flex',
+        description: getErrorMessage(e, 'Error desconocido'),
+        variant: 'destructive',
+      });
     } finally {
       setIsSyncing(false);
     }
@@ -348,11 +353,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 });
                                 refetchCurrentAssignments();
                                 onAssignmentChange();
-                              } catch (error: any) {
+                              } catch (error) {
                                 console.error("Error updating role:", error);
                                 toast({
                                   title: "Error",
-                                  description: error.message || "No se pudo actualizar el rol",
+                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
                                   variant: "destructive",
                                 });
                               }
@@ -401,11 +406,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 });
                                 refetchCurrentAssignments();
                                 onAssignmentChange();
-                              } catch (error: any) {
+                              } catch (error) {
                                 console.error("Error updating role:", error);
                                 toast({
                                   title: "Error",
-                                  description: error.message || "No se pudo actualizar el rol",
+                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
                                   variant: "destructive",
                                 });
                               }
@@ -454,11 +459,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 });
                                 refetchCurrentAssignments();
                                 onAssignmentChange();
-                              } catch (error: any) {
+                              } catch (error) {
                                 console.error("Error updating role:", error);
                                 toast({
                                   title: "Error",
-                                  description: error.message || "No se pudo actualizar el rol",
+                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
                                   variant: "destructive",
                                 });
                               }

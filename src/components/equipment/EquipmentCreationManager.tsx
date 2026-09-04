@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useOptionalDepartment } from '@/contexts/DepartmentContext';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 // UUID regex for extracting Flex resource IDs
 const UUID_REGEX = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
@@ -98,8 +99,8 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
       if (mapped.imageId) setImageId(mapped.imageId);
 
       toast({ title: 'Datos obtenidos', description: 'Los datos del equipo se han rellenado desde Flex.' });
-    } catch (e: any) {
-      toast({ title: 'Error al obtener datos', description: e?.message || 'Error desconocido', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Error al obtener datos', description: getErrorMessage(e, 'Error desconocido'), variant: 'destructive' });
     } finally {
       setIsFetchingFlex(false);
     }
@@ -296,8 +297,8 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
       if (mapped.imageId) setImageId(mapped.imageId);
 
       toast({ title: 'Datos obtenidos', description: 'Los datos del equipo se han rellenado desde Flex.' });
-    } catch (e: any) {
-      toast({ title: 'Error al obtener datos', description: e?.message || 'Error desconocido', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Error al obtener datos', description: getErrorMessage(e, 'Error desconocido'), variant: 'destructive' });
     } finally {
       setIsFetchingFlex(false);
     }
