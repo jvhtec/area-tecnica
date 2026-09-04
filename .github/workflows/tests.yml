@@ -16,6 +16,7 @@ permissions:
 
 env:
   NODE_VERSION: 20
+  DENO_VERSION: 2.9.4
   SUPABASE_CLI_VERSION: 2.107.0
   SUPABASE_START_EXCLUDES: gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
@@ -79,6 +80,53 @@ jobs:
 
       - name: Run TypeScript no-emit check
         run: npm run typecheck
+
+  functions_typecheck:
+    name: npm run typecheck:functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Installed from the pinned GitHub release archive rather than a third-party
+      # action (keeps the workflow within the SHA-pinning rule that
+      # governance:actions enforces) and rather than `curl install.sh | sh`, which
+      # would execute a mutable remote script. The archive is verified against the
+      # checksum published alongside the release before anything is extracted.
+      - name: Install Deno
+        run: |
+          set -euo pipefail
+          base="https://github.com/denoland/deno/releases/download/v${DENO_VERSION}"
+          archive="deno-x86_64-unknown-linux-gnu.zip"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$base/$archive" -o "$tmp/$archive"
+          curl -fsSL "$base/$archive.sha256sum" -o "$tmp/$archive.sha256sum"
+          (cd "$tmp" && sha256sum -c "$archive.sha256sum")
+          mkdir -p "$HOME/.deno/bin"
+          unzip -q "$tmp/$archive" -d "$HOME/.deno/bin"
+          chmod +x "$HOME/.deno/bin/deno"
+          rm -rf "$tmp"
+          echo "$HOME/.deno/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Deno dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/deno
+          key: deno-${{ runner.os }}-${{ env.DENO_VERSION }}-${{ hashFiles('supabase/functions/**/*.ts') }}
+          restore-keys: |
+            deno-${{ runner.os }}-${{ env.DENO_VERSION }}-
+
+      - name: Type-check Supabase Edge Functions
+        run: npm run typecheck:functions
 
   governance:
     name: Governance gates

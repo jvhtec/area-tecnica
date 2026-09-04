@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
 
@@ -70,7 +70,7 @@ function findDocTec(nodes: any[]): string[] {
   return Array.from(new Set(ids));
 }
 
-async function getMainElementId(sb: ReturnType<typeof createClient>, jobId: string): Promise<string | null> {
+async function getMainElementId(sb: SupabaseClient, jobId: string): Promise<string | null> {
   try {
     const { data, error } = await sb
       .from('flex_folders')
@@ -89,7 +89,7 @@ async function getMainElementId(sb: ReturnType<typeof createClient>, jobId: stri
 }
 
 async function getTourDeptFolderElementId(
-  sb: ReturnType<typeof createClient>,
+  sb: SupabaseClient,
   jobId: string,
   dept: Dept,
 ): Promise<string | null> {

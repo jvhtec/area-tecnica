@@ -1,4 +1,4 @@
-import { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import { jsonResponse } from "./http.ts";
 import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
@@ -6,7 +6,7 @@ import type { NativePushTokenRow, PushSubscriptionRow, TestBody } from "./types.
 import { pushTargetFingerprint } from "./targetId.ts";
 
 export async function handleTest(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   userId: string,
   body: TestBody,
 ) {

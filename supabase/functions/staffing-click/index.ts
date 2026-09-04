@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { detectConflictForAssignment, type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
 import {
@@ -58,7 +58,7 @@ function normalizePhone(raw: string, defaultCountry: string): { ok: true; value:
 }
 
 async function sendStaffingClickWhatsappFollowup(params: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: SupabaseClient;
   staffingRequestId: string;
   channelHint: string;
   profileId: string;

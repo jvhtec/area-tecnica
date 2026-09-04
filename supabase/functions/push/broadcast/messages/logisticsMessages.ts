@@ -4,7 +4,7 @@ import { formatSpanishDateTime } from "../date.ts";
 
 export function buildLogisticsTransportRequestedMessage(
   actor: string,
-  jobTitle: string,
+  jobTitle: string | null,
   body: BroadcastBody,
 ): { title: string; text: string } {
   const department = body.department;
@@ -26,7 +26,7 @@ export function buildLogisticsTransportRequestedMessage(
 
 export function buildLogisticsEventMessage(
   type: string,
-  jobTitle: string,
+  jobTitle: string | null,
   body: BroadcastBody,
 ): { title: string; text: string } {
   const eventType = body.event_type;

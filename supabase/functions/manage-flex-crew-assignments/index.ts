@@ -1,8 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { requireAdminOrManagement } from "../_shared/auth.ts"
 import { businessRoleLookupFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
+import { getErrorStatus } from "../_shared/http.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -108,7 +109,7 @@ async function discoverLineItemId(
  * Set business role for a line item in a crew call when the Flex dictionary ID is known.
  */
 async function setBusinessRole(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   department: string,
   jobId: string,
   technicianId: string,
@@ -685,8 +686,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in manage-flex-crew-assignments:', error);
-    const status = typeof error?.status === 'number' ? error.status : 500;
-    const message = status >= 500 ? 'Internal server error' : error.message;
+    const status = getErrorStatus(error, 500);
+    const message = status >= 500
+      ? 'Internal server error'
+      : (error instanceof Error ? error.message : String(error));
     return new Response(
       JSON.stringify({ error: message }),
       { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
