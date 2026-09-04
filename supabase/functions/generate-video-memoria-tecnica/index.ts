@@ -280,6 +280,6 @@ serve(createHttpHandler(async (req) => {
     // Requested format: Memoria Tecnica Video - Job Name (DDMMYY).pdf
     const fileName = `Memoria Tecnica Video - ${displayProjectName} (${dd}${mm}${yy}).pdf`;
     return jsonResponse(await uploadGeneratedMemoriaPdf(supabase, projectName, fileName, pdfBytes));
-}), {
+}, {
   onError: (error) => console.error("generate-video-memoria-tecnica failed", error),
-});
+}));

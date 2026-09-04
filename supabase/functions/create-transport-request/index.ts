@@ -273,6 +273,6 @@ serve(createHttpHandler(async (req) => {
     message: "Solicitud de transporte creada correctamente",
     description,
   });
-}), {
+}, {
   onError: (error) => console.error("create-transport-request failed", error),
-});
+}));

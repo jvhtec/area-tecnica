@@ -13,6 +13,7 @@
     "lint": "npm run lint:all",
     "lint:app": "eslint src tests vite.config.ts",
     "lint:functions": "eslint supabase/functions",
+    "typecheck:functions": "node scripts/ci/check-edge-function-types.mjs",
     "lint:all": "npm run lint:app && npm run lint:functions",
     "test": "vitest",
     "test:run": "vitest run",

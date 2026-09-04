@@ -21,11 +21,11 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   evento: 'Evento',
 };
 
-const jobLabel = (jobTitle: string) => jobTitle || 'Trabajo';
+const jobLabel = (jobTitle: string | null) => jobTitle || 'Trabajo';
 
 export function buildJobUpdatedText(
   actor: string,
-  jobTitle: string,
+  jobTitle: string | null,
   changes: BroadcastBody['changes'],
 ): string {
   if (changes && typeof changes === 'object') {
@@ -41,7 +41,7 @@ export function buildJobUpdatedText(
 
 export function buildJobRequirementsUpdatedText(
   actor: string,
-  jobTitle: string,
+  jobTitle: string | null,
   summaryText: string,
 ): string {
   return summaryText
@@ -51,7 +51,7 @@ export function buildJobRequirementsUpdatedText(
 
 export function buildJobInvoicingCompanyChangedText(
   actor: string,
-  jobTitle: string,
+  jobTitle: string | null,
   changes: BroadcastBody['changes'],
 ): string {
   const companyChanges = changes as Record<string, { from?: unknown; to?: unknown }> | undefined;
@@ -64,7 +64,7 @@ export function buildJobInvoicingCompanyChangedText(
 export function buildJobDateTypeChangedMessage(
   type: string,
   actor: string,
-  jobTitle: string,
+  jobTitle: string | null,
   body: BroadcastBody,
 ): { title: string; text: string } {
   const jobName = jobTitle || 'trabajo';
@@ -98,7 +98,7 @@ export function buildJobDateTypeChangedMessage(
 export function buildJobTypeChangedMessage(
   type: string,
   actor: string,
-  jobTitle: string,
+  jobTitle: string | null,
   body: BroadcastBody,
 ): { title: string; text: string } {
   const jobName = jobTitle || 'trabajo';

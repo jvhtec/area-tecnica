@@ -1,4 +1,4 @@
-import { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import type { BroadcastBody, DepartmentRoleSummary } from "./types.ts";
 
 type IdRow = { id?: string | null };
@@ -22,7 +22,7 @@ function getStringIds(rows: IdRow[] | null | undefined): string[] {
     .filter((id): id is string => Boolean(id));
 }
 
-export async function getManagementUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+export async function getManagementUserIds(client: SupabaseClient): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
@@ -32,7 +32,7 @@ export async function getManagementUserIds(client: ReturnType<typeof createClien
   return getStringIds(data);
 }
 
-export async function getSoundDepartmentUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+export async function getSoundDepartmentUserIds(client: SupabaseClient): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
@@ -42,7 +42,7 @@ export async function getSoundDepartmentUserIds(client: ReturnType<typeof create
   return getStringIds(data);
 }
 
-export async function getManagementOnlyUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+export async function getManagementOnlyUserIds(client: SupabaseClient): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
@@ -52,7 +52,7 @@ export async function getManagementOnlyUserIds(client: ReturnType<typeof createC
   return getStringIds(data);
 }
 
-export async function getLogisticsManagementRecipients(client: ReturnType<typeof createClient>): Promise<string[]> {
+export async function getLogisticsManagementRecipients(client: SupabaseClient): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
@@ -64,7 +64,7 @@ export async function getLogisticsManagementRecipients(client: ReturnType<typeof
 }
 
 // Admin helpers and department-scoped management targeting
-export async function getAdminUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+export async function getAdminUserIds(client: SupabaseClient): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
@@ -81,7 +81,7 @@ export async function getAdminUserIds(client: ReturnType<typeof createClient>): 
  * @returns Array of admin profile IDs to notify: includes admins whose staffing scope is `all_departments` or unset, and includes admins with `own_department` only when `jobDepartment` matches their department.
  */
 export async function getAdminUserIdsForStaffingNotifications(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   jobDepartment?: string | null
 ): Promise<string[]> {
   try {
@@ -128,7 +128,7 @@ export async function getAdminUserIdsForStaffingNotifications(
   }
 }
 
-export async function getManagementByDepartmentUserIds(client: ReturnType<typeof createClient>, department: string): Promise<string[]> {
+export async function getManagementByDepartmentUserIds(client: SupabaseClient, department: string): Promise<string[]> {
   if (!department) return [];
   const { data, error } = await client
     .from('profiles')
@@ -141,7 +141,7 @@ export async function getManagementByDepartmentUserIds(client: ReturnType<typeof
 }
 
 export async function getManagementAndAdminByDepartmentUserIds(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   department: string,
 ): Promise<string[]> {
   if (!department) return [];
@@ -162,7 +162,7 @@ export async function getManagementAndAdminByDepartmentUserIds(
  * @returns The technician's department name, or `null` if not found or if `technicianId` is not provided
  */
 export async function getTechnicianDepartment(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   technicianId?: string | null
 ): Promise<string | null> {
   if (!technicianId) return null;
@@ -177,7 +177,7 @@ export async function getTechnicianDepartment(
  * @returns An object with `department` set to the technician's department or `null` if unknown, and `error` set to `true` if the data lookup failed, `false` otherwise
  */
 export async function lookupTechnicianDepartment(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   technicianId: string,
 ): Promise<{ department: string | null; error: boolean }> {
   try {
@@ -198,7 +198,7 @@ export async function lookupTechnicianDepartment(
 }
 
 export async function getTimesheetSubmittingTechDepartment(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   jobId?: string | null,
   actorId?: string | null,
 ): Promise<string | null> {
@@ -218,7 +218,7 @@ export async function getTimesheetSubmittingTechDepartment(
           .from('profiles')
           .select('department')
           .eq('id', actorId)
-          .returns<ProfileDepartmentRow>()
+          .returns<ProfileDepartmentRow[]>()
           .maybeSingle();
         return prof?.department ?? null;
       }
@@ -233,7 +233,7 @@ export async function getTimesheetSubmittingTechDepartment(
         .eq('status', 'submitted')
         .order('updated_at', { ascending: false })
         .limit(1)
-        .returns<TimesheetTechnicianRow>()
+        .returns<TimesheetTechnicianRow[]>()
         .maybeSingle();
       const techId = row?.technician_id ?? undefined;
       if (techId) {
@@ -241,7 +241,7 @@ export async function getTimesheetSubmittingTechDepartment(
           .from('profiles')
           .select('department')
           .eq('id', techId)
-          .returns<ProfileDepartmentRow>()
+          .returns<ProfileDepartmentRow[]>()
           .maybeSingle();
         return prof?.department ?? null;
       }
@@ -256,7 +256,7 @@ export async function getTimesheetSubmittingTechDepartment(
         .from('profiles')
         .select('department')
         .eq('id', actorId)
-        .returns<ProfileDepartmentRow>()
+        .returns<ProfileDepartmentRow[]>()
         .maybeSingle();
       return prof?.department ?? null;
     } catch (_) { /* ignore */ }
@@ -264,7 +264,7 @@ export async function getTimesheetSubmittingTechDepartment(
   return null;
 }
 
-export async function getJobParticipantUserIds(client: ReturnType<typeof createClient>, jobId: string): Promise<string[]> {
+export async function getJobParticipantUserIds(client: SupabaseClient, jobId: string): Promise<string[]> {
   if (!jobId) return [];
   const { data, error } = await client
     .from('job_assignments')
@@ -308,7 +308,7 @@ function parseDepartmentRoleSummary(raw: unknown): DepartmentRoleSummary | null 
 }
 
 export async function getJobRequiredRolesSummary(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   jobId?: string | null,
 ): Promise<DepartmentRoleSummary[]> {
   if (!jobId) return [];
@@ -359,7 +359,7 @@ export function getActiveAssignmentDepartmentsFromRow(
 }
 
 export async function getAssignmentRoleDepartments(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   jobId?: string | null,
   technicianId?: string | null,
 ): Promise<string[]> {
@@ -409,7 +409,7 @@ export function formatDepartmentRolesSummary(summary: DepartmentRoleSummary[]): 
     .join('\n');
 }
 
-export async function getJobTitle(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
+export async function getJobTitle(client: SupabaseClient, jobId?: string): Promise<string | null> {
   if (!jobId) return null;
   try {
     const { data, error } = await client.from('jobs').select('title').eq('id', jobId).maybeSingle();
@@ -424,7 +424,7 @@ export async function getJobTitle(client: ReturnType<typeof createClient>, jobId
   }
 }
 
-export async function getJobDepartment(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
+export async function getJobDepartment(client: SupabaseClient, jobId?: string): Promise<string | null> {
   if (!jobId) return null;
   try {
     const { data, error } = await client
@@ -455,7 +455,7 @@ export async function getJobDepartment(client: ReturnType<typeof createClient>, 
   }
 }
 
-export async function getJobType(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
+export async function getJobType(client: SupabaseClient, jobId?: string): Promise<string | null> {
   if (!jobId) return null;
   try {
     const { data, error } = await client.from('jobs').select('job_type').eq('id', jobId).maybeSingle();
@@ -470,7 +470,7 @@ export async function getJobType(client: ReturnType<typeof createClient>, jobId?
   }
 }
 
-export async function getTourName(client: ReturnType<typeof createClient>, tourId?: string): Promise<string | null> {
+export async function getTourName(client: SupabaseClient, tourId?: string): Promise<string | null> {
   if (!tourId) return null;
   try {
     const { data, error } = await client.from('tours').select('name').eq('id', tourId).maybeSingle();
@@ -485,7 +485,7 @@ export async function getTourName(client: ReturnType<typeof createClient>, tourI
   }
 }
 
-export async function getProfileDisplayName(client: ReturnType<typeof createClient>, userId?: string | null): Promise<string | null> {
+export async function getProfileDisplayName(client: SupabaseClient, userId?: string | null): Promise<string | null> {
   if (!userId) return null;
   try {
     const { data, error } = await client
@@ -509,7 +509,7 @@ export async function getProfileDisplayName(client: ReturnType<typeof createClie
 }
 
 export async function resolveSoundVisionVenueName(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   body: BroadcastBody,
 ): Promise<string | null> {
   if (body.venue_name) return body.venue_name;
@@ -527,7 +527,7 @@ export async function resolveSoundVisionVenueName(
         .from('soundvision_files')
         .select('venue:venues(name)')
         .eq('id', body.file_id)
-        .returns<SoundVisionFileVenueRow>()
+        .returns<SoundVisionFileVenueRow[]>()
         .maybeSingle();
       const venue = Array.isArray(data?.venue) ? data.venue[0] : data?.venue;
       const venueName = typeof venue?.name === 'string' ? venue.name : undefined;

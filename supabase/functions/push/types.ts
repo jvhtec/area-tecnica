@@ -92,6 +92,8 @@ export type BroadcastBody = {
   message_preview?: string;
   message_id?: string;
   task_id?: string;
+  // Sent by useGlobalTaskMutations alongside task_id; used to label the notification.
+  task_type?: string | null;
   // Tour/Tourdate optional hints
   tour_id?: string;
   tour_date_id?: string;

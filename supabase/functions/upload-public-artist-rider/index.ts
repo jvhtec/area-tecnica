@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   createHttpHandler,
   HttpError,
@@ -229,7 +229,7 @@ const readStoredFileMetadata = (storedFile: StorageListFile) => {
 
 async function loadUploadContext(
   req: Request,
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: SupabaseClient,
   token: string,
   rateLimitSalt: string,
 ): Promise<UploadContext | Response> {
@@ -322,7 +322,7 @@ async function loadUploadContext(
 }
 
 async function notifyRiderUpload(
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: SupabaseClient,
   context: UploadContext,
   insertedFiles: Array<Record<string, unknown>>,
 ) {
@@ -367,7 +367,7 @@ async function notifyRiderUpload(
 }
 
 async function clearArtistRiderFreshness(
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: SupabaseClient,
   artistId: string,
 ) {
   const { error } = await supabaseAdmin
@@ -387,7 +387,7 @@ async function clearArtistRiderFreshness(
 }
 
 async function insertUploadedRiderFiles(
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: SupabaseClient,
   context: UploadContext,
   files: Array<{ file_name: string; file_path: string; file_type: string | null; file_size: number }>,
 ) {
