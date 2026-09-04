@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { requireServiceRoleRequest } from "../_shared/auth.ts";
+import { getErrorStatus } from "../_shared/http.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -63,8 +64,10 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Error in recalc-timesheet-amount function:', error);
-    const status = typeof error?.status === "number" ? error.status : 500;
-    const message = status >= 500 ? "Server error" : error.message;
+    const status = getErrorStatus(error, 500);
+    const message = status >= 500
+      ? "Server error"
+      : (error instanceof Error ? error.message : String(error));
     return new Response(message, {
       status,
       headers: corsHeaders 

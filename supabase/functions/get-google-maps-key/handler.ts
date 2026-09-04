@@ -9,10 +9,10 @@ interface GetGoogleMapsKeyDeps {
     auth: {
       getUser: (
         accessToken: string,
-      ) => Promise<{ data: { user: { id: string } | null }; error: unknown }>;
+      ) => PromiseLike<{ data: { user: { id: string } | null }; error: unknown }>;
     };
     from: (table: string) => {
-      insert: (payload: Record<string, unknown>) => Promise<{ error: unknown }>;
+      insert: (payload: Record<string, unknown>) => PromiseLike<{ error: unknown }>;
     };
   };
   // Retained for signature compatibility with index.ts; no longer used.

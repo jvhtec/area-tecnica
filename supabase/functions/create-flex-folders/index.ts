@@ -1,8 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
+import { getErrorStatus, HttpError } from "../_shared/http.ts";
 import {
   ESTRUCTURA_DEPARTMENT,
   ESTRUCTURA_PULL_SHEETS,
@@ -42,7 +43,7 @@ interface TypedFlexElementResponse {
   elementId: string;
 }
 
-type AppSupabaseClient = ReturnType<typeof createClient>;
+type AppSupabaseClient = SupabaseClient;
 
 interface TourFlexRecord {
   id: string;
@@ -104,7 +105,7 @@ const flexDate = (value: string): string => {
 const tourDateDocumentNumber = (value: string): string =>
   new Date(value).toISOString().slice(2, 10).replaceAll('-', '');
 
-async function resolveActorName(supabase: ReturnType<typeof createClient>, actorId: string | null): Promise<string | null> {
+async function resolveActorName(supabase: SupabaseClient, actorId: string | null): Promise<string | null> {
   if (!actorId) return null;
   try {
     const { data } = await supabase
@@ -342,7 +343,7 @@ serve(async (req) => {
     const { tourId, createRootFolders, createDateFolders } = await req.json()
     
     if (!tourId) {
-      throw new Error('Tour ID is required')
+      throw new HttpError(400, 'Tour ID is required')
     }
 
     // Initialize Supabase client
@@ -635,8 +636,15 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Error in create-flex-folders:", error)
-    const status = typeof error?.status === 'number' ? error.status : 400
-    const message = status >= 500 ? 'Internal server error' : error.message
+    // Default to 500: nothing else in this function throws with a status, so a 400
+    // fallback reported env/database failures as client errors and echoed their raw
+    // messages back. Only explicit HttpErrors with exposeDetails surface their text.
+    const status = getErrorStatus(error, 500);
+    // Only errors we constructed deliberately may surface their text. A Supabase or
+    // env failure that happens to carry a 4xx status still gets the generic message.
+    const message = error instanceof HttpError && error.exposeDetails
+      ? error.message
+      : 'Internal server error';
     return new Response(
       JSON.stringify({ error: message }),
       { 

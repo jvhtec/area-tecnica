@@ -1,9 +1,9 @@
-import { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import { SERVICE_ROLE_KEY } from "./config.ts";
 import { corsHeaders } from "./http.ts";
 
 export async function resolveCaller(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   token: string,
   allowService = false,
 ): Promise<{ userId: string; isService: boolean }> {

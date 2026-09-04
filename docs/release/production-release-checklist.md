@@ -9,6 +9,7 @@ Use this checklist for production-bound PRs targeting `main`.
 - [ ] All required checks are passing:
   - [ ] `npm run lint`
   - [ ] `npm run typecheck`
+  - [ ] `npm run typecheck:functions`
   - [ ] `Governance gates`
   - [ ] `npm run test:critical`
   - [ ] `npm run test:run`

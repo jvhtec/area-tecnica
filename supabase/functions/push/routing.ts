@@ -1,8 +1,8 @@
-import { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import type { PushNotificationRoute } from "./types.ts";
 
 export async function getPushNotificationRoutes(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   eventCode: string,
 ): Promise<PushNotificationRoute[]> {
   if (!eventCode) return [];

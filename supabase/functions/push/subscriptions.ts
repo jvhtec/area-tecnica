@@ -1,11 +1,11 @@
-import { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import { jsonResponse } from "./http.ts";
 import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
 import type { SubscribeBody, SubscribeNativeBody, UnsubscribeBody, UnsubscribeNativeBody } from "./types.ts";
 
 export async function handleSubscribe(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   userId: string,
   body: SubscribeBody,
   req: Request,
@@ -65,7 +65,7 @@ export async function handleSubscribe(
 }
 
 export async function handleUnsubscribe(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   userId: string,
   body: UnsubscribeBody,
 ) {
@@ -88,7 +88,7 @@ export async function handleUnsubscribe(
 }
 
 export async function handleSubscribeNative(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   userId: string,
   body: SubscribeNativeBody,
 ) {
@@ -143,7 +143,7 @@ export async function handleSubscribeNative(
 }
 
 export async function handleUnsubscribeNative(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   userId: string,
   body: UnsubscribeNativeBody,
 ) {

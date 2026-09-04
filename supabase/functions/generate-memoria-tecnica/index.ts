@@ -275,6 +275,6 @@ serve(createHttpHandler(async (req) => {
     // Requested format: Memoria Tecnica Sonido - Job Name (DDMMYY).pdf
     const fileName = `Memoria Tecnica Sonido - ${displayProjectName} (${dd}${mm}${yy}).pdf`;
     return jsonResponse(await uploadGeneratedMemoriaPdf(supabase, projectName, fileName, pdfBytes));
-}), {
+}, {
   onError: (error) => console.error("generate-memoria-tecnica failed", error),
-});
+}));

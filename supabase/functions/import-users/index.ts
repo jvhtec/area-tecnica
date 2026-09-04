@@ -46,7 +46,10 @@ serve(async (req) => {
     }
 
     const text = await file.text();
-    const records = parse(text, { skipFirstRow: true, columns: true }) as CSVUserData[];
+    // `skipFirstRow` already keys each row by the header names. Passing `columns: true`
+    // as well made std's parser throw ("Number of fields found: undefined") on every
+    // upload — `columns` expects an array of column names, not a boolean.
+    const records = parse(text, { skipFirstRow: true }) as unknown as CSVUserData[];
 
     const results = {
       successful: [] as CSVUserData[],
@@ -88,7 +91,7 @@ serve(async (req) => {
       } catch (error) {
         results.failed.push({
           data: record,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -97,8 +100,12 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    const status = typeof error?.status === 'number' ? error.status : 500;
-    const message = status >= 500 ? 'Internal server error' : error.message;
+    const status = typeof (error as { status?: unknown })?.status === 'number'
+      ? (error as { status: number }).status
+      : 500;
+    const message = status >= 500
+      ? 'Internal server error'
+      : (error instanceof Error ? error.message : String(error));
     return new Response(JSON.stringify({ error: message }), {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
