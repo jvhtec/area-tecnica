@@ -1,4 +1,4 @@
-import { createClient, webpush } from "./deps.ts";
+import { webpush, type SupabaseClient } from "./deps.ts";
 import { CONTACT_EMAIL, PUSH_CONFIG, VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY } from "./config.ts";
 import type { PushPayload, PushSendResult, PushSubscriptionRow } from "./types.ts";
 
@@ -30,7 +30,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 export async function sendPushNotification(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   subscription: PushSubscriptionRow,
   payload: PushPayload,
 ): Promise<PushSendResult> {

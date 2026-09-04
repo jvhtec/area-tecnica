@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 import {
   createHttpHandler,
@@ -249,7 +249,7 @@ function parseQrJson(payload: Record<string, unknown>) {
     : { dataUrl: `data:${mimetype};base64,${data}`, mimetype };
 }
 
-async function getWahaConfig(supabaseAdmin: ReturnType<typeof createClient>, endpoint: string) {
+async function getWahaConfig(supabaseAdmin: SupabaseClient, endpoint: string) {
   const { data, error } = await supabaseAdmin.rpc("get_waha_config", { base_url: endpoint });
   if (error) {
     console.warn("get_waha_config RPC failed, falling back to env vars:", error.message);
@@ -369,7 +369,7 @@ function wahaEndpointErrorMessage(error: unknown) {
 }
 
 async function getEndpointStatuses(
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: SupabaseClient,
   extraEndpoints: Array<string | null | undefined> = [],
 ) {
   const timeoutMs = Number(Deno.env.get("WAHA_ENDPOINT_STATUS_TIMEOUT_MS") || 2500);
@@ -434,7 +434,7 @@ async function getQr(endpoint: string, session: string, apiKey: string) {
   };
 }
 
-async function loadActorProfile(supabaseAdmin: ReturnType<typeof createClient>, token: string) {
+async function loadActorProfile(supabaseAdmin: SupabaseClient, token: string) {
   const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
   const actorId = userData?.user?.id || null;
 
@@ -459,7 +459,7 @@ async function loadActorProfile(supabaseAdmin: ReturnType<typeof createClient>, 
   return actorProfile;
 }
 
-async function loadEndpointContext(supabaseAdmin: ReturnType<typeof createClient>, profile: ProfileRow) {
+async function loadEndpointContext(supabaseAdmin: SupabaseClient, profile: ProfileRow) {
   const endpoint = normalizeEndpointForStorage(profile.waha_endpoint);
   if (!endpoint) {
     return {

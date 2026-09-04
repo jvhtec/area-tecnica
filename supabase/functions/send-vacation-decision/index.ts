@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { joinedSingle } from "../_shared/joins.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 import { format as formatDate } from "https://esm.sh/date-fns@3.6.0";
@@ -429,7 +430,15 @@ serve(async (req) => {
 
     const results: any[] = [];
 
-    for (const reqRow of rows as VacationRequestRow[]) {
+    // `tech`/`approver` are embedded joins: PostgREST returns them as arrays here, so
+    // normalize before use — casting straight to VacationRequestRow left both undefined.
+    const vacationRows: VacationRequestRow[] = (rows ?? []).map((row) => ({
+      ...(row as unknown as VacationRequestRow),
+      tech: joinedSingle((row as { tech?: unknown }).tech) as ProfileLite | null,
+      approver: joinedSingle((row as { approver?: unknown }).approver) as ProfileLite | null,
+    }));
+
+    for (const reqRow of vacationRows) {
       try {
         // Generate PDF attachment
         const { bytes, filename } = await generateVacationPDF(reqRow, { sectorProLogoUrl: `${PUBLIC_LOGOS_BASE}/sectorpro.png` });

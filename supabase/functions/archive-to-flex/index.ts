@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
@@ -117,7 +117,7 @@ async function fetchFileBytes(url: string): Promise<number[]> {
 const DEF_ID_DOCUMENTACION_TECNICA = "3787806c-af2d-11df-b8d5-00e08175e43e"; // same id used in FE constants
 
 async function getDocTecnicaTargets(
-  sb: ReturnType<typeof createClient>,
+  sb: SupabaseClient,
   jobId: string,
   restrictTo?: Dept[]
 ): Promise<Map<Dept, string>> {
@@ -145,7 +145,7 @@ const deptFolderCache = new Map<string, string | null>(); // key `${jobId}:${dep
 const docTecCache = new Map<string, string | null>(); // key deptFolderElementId -> doc_tecnica element id
 
 async function getDepartmentFolderElementId(
-  sb: ReturnType<typeof createClient>,
+  sb: SupabaseClient,
   jobId: string,
   dept: Dept,
 ): Promise<string | null> {
@@ -234,7 +234,7 @@ async function resolveDocTecnicaByTree(
 }
 
 async function getMainElementId(
-  sb: ReturnType<typeof createClient>,
+  sb: SupabaseClient,
   jobId: string
 ): Promise<string | null> {
   try {
@@ -257,7 +257,7 @@ async function getMainElementId(
 }
 
 async function getTourDeptFolderElementId(
-  sb: ReturnType<typeof createClient>,
+  sb: SupabaseClient,
   jobId: string,
   dept: Dept,
 ): Promise<string | null> {
