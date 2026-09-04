@@ -661,10 +661,12 @@ export const Profile = () => {
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={handleRotateIcsToken}>
                   <RefreshCcw className="mr-2 h-4 w-4" />
-                  Rotar enlace
+                  {icsToken ? "Rotar enlace" : "Generar enlace"}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Si cambias de enlace, tendrás que volver a suscribirte.
+                  {icsToken
+                    ? "Si cambias de enlace, tendrás que volver a suscribirte."
+                    : "Genera un enlace para suscribirte desde tu calendario."}
                 </p>
               </CardContent>
             </Card>

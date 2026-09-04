@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { getErrorMessage } from "@/utils/errorMessage";
@@ -15,6 +15,11 @@ import { getErrorMessage } from "@/utils/errorMessage";
 export function useCalendarIcsToken() {
   const [token, setToken] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  // Set once a rotation has landed. The initial read is fired on mount and can
+  // still be in flight when the user rotates; without this its response would
+  // arrive later and overwrite the new token with the one the server has just
+  // revoked, leaving a calendar URL that 403s until reload.
+  const rotatedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +29,7 @@ export function useCalendarIcsToken() {
       if (cancelled) return;
       if (error) {
         console.error("Error fetching calendar token:", getErrorMessage(error));
-      } else {
+      } else if (!rotatedRef.current) {
         setToken((data as string | null) ?? "");
       }
       setLoading(false);
@@ -41,6 +46,7 @@ export function useCalendarIcsToken() {
     const { data, error } = await dataLayerClient.rpc("rotate_my_calendar_ics_token");
     if (error) throw error;
     const newToken = data as string;
+    rotatedRef.current = true;
     setToken(newToken);
     return newToken;
   }, []);
