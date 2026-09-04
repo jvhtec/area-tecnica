@@ -70,6 +70,13 @@ describe('workflow service', () => {
     mocks.single.mockResolvedValue({ data: null, error: { message: 'connection failed' } });
     await expect(updateWorkflowState('workflow-1', {})).rejects.toMatchObject({ code: 'persistence' });
   });
+  it('localizes server failures for toasts while retaining the original diagnostic cause', async () => {
+    const error = { code: '23505', message: 'duplicate_workflow: an active workflow already exists' };
+    mocks.single.mockResolvedValue({ data: null, error });
+    await expect(createWorkflow({ workflowType: 'job', entityId: 'job-1', departments: [] })).rejects.toMatchObject({
+      code: 'duplicate_workflow', message: 'Ya existe una preparación activa para este elemento.', cause: error,
+    });
+  });
   it('routes task and terminal helpers through the server transition gate', async () => {
     await completeTask('workflow-1', 'review');
     await skipTask('workflow-1', 'review');

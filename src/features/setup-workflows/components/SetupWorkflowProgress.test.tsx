@@ -14,13 +14,13 @@ describe('SetupWorkflowProgress', () => {
     expect(screen.getByText('Preparación del trabajo')).toBeInTheDocument();
     expect(screen.getByText(/1\/3 completadas/)).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '33');
-    expect(screen.getByText(/1 tareas bloqueadas/)).toBeInTheDocument();
+    expect(screen.getByText(/1 tarea bloqueada/)).toBeInTheDocument();
     expect(screen.getByText(/Obligatoria sin resolver/)).toBeInTheDocument();
     expect(screen.queryByText('Retired task')).not.toBeInTheDocument();
   });
   it('supports compact mode while keeping blockers visible', () => {
     render(<SetupWorkflowProgress compact workflow={workflowFixture} tasks={[taskFixture({ status: 'blocked' })]} />);
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
-    expect(screen.getByText(/tareas bloqueadas/)).toBeInTheDocument();
+    expect(screen.getByText(/tarea bloqueada/)).toBeInTheDocument();
   });
 });

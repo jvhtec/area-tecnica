@@ -38,7 +38,8 @@ export function SetupWorkflowProgress({ workflow, tasks, title, compact = false 
         <p className="text-sm text-muted-foreground">{progress.percentage}% resuelto</p>
         {progress.hasBlockers && (
           <p className="flex items-center gap-2 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4" aria-hidden="true" /> {progress.blockedTasks} tareas bloqueadas
+            <AlertCircle className="h-4 w-4" aria-hidden="true" />
+            {progress.blockedTasks} {progress.blockedTasks === 1 ? 'tarea bloqueada' : 'tareas bloqueadas'}
           </p>
         )}
       </CardHeader>

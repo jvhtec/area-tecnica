@@ -1,6 +1,6 @@
 import { workflowClient } from './database';
 import { assertWorkflowStep, getWorkflowDefinition } from './definitions';
-import { SetupWorkflowError, type WorkflowErrorCode } from './errors';
+import { SetupWorkflowError, workflowErrorMessages, type WorkflowErrorCode } from './errors';
 import { generateWorkflowTasks } from './taskGeneration';
 import type { GenerateTasksInput, JsonObject, SetupWorkflow, TaskStatus, WorkflowStatus, WorkflowType } from './types';
 
@@ -12,7 +12,7 @@ const errorCodes: readonly WorkflowErrorCode[] = [
 function persistenceError(error: { message: string; code?: string }): never {
   const code = errorCodes.find(value => error.message.startsWith(value + ':'))
     ?? (error.code === '42501' ? 'forbidden' : 'persistence');
-  throw new SetupWorkflowError(code, error.message, error);
+  throw new SetupWorkflowError(code, workflowErrorMessages[code], error);
 }
 
 async function mutate(action: string, workflowId: string | undefined, payload: JsonObject) {
