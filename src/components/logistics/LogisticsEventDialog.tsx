@@ -43,7 +43,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
-import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "./logisticsEventTypes";
+import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
 type LogisticsEventPayload = Database["public"]["Tables"]["logistics_events"]["Insert"];
 

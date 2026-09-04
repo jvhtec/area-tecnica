@@ -46,21 +46,40 @@ const {
     error: null as Error | null,
   },
   jobDepartmentsQueryState: {
-    data: ['sound', 'lights', 'video'] as any,
+    data: ['sound', 'lights', 'video'] as string[] | undefined,
     isLoading: false,
     isError: false,
-    error: null as any,
+    error: null as Error | null,
   },
   technicalPowerSummaryQueryState: {
-    data: undefined as any,
+    data: undefined as CombinedTechnicalPowerSummaryData | undefined,
     isLoading: false,
     isError: false,
-    error: null as any,
+    error: null as Error | null,
   },
 }));
 
-const createSupabaseBuilder = (response: { data: any; error: unknown }) => {
-  const filters: Array<{ type: 'eq' | 'in'; column: string; value: any }> = [];
+type MockSupabaseResponse = { data: unknown; error: unknown };
+type MockFilter =
+  | { type: 'eq'; column: string; value: unknown }
+  | { type: 'in'; column: string; value: unknown[] };
+
+type MockSupabaseBuilder = PromiseLike<MockSupabaseResponse> & {
+  select: ReturnType<typeof vi.fn>;
+  eq: ReturnType<typeof vi.fn>;
+  in: ReturnType<typeof vi.fn>;
+  single: ReturnType<typeof vi.fn>;
+  maybeSingle: ReturnType<typeof vi.fn>;
+  order: ReturnType<typeof vi.fn>;
+};
+
+const readColumn = (row: unknown, column: string): unknown =>
+  typeof row === 'object' && row !== null
+    ? (row as Record<string, unknown>)[column]
+    : undefined;
+
+const createSupabaseBuilder = (response: MockSupabaseResponse): MockSupabaseBuilder => {
+  const filters: MockFilter[] = [];
   const applyFilters = () => {
     if (!Array.isArray(response.data)) {
       return response.data;
@@ -68,29 +87,32 @@ const createSupabaseBuilder = (response: { data: any; error: unknown }) => {
 
     return response.data.filter((row) =>
       filters.every((filter) => {
+        const value = readColumn(row, filter.column);
         if (filter.type === 'eq') {
-          return row?.[filter.column] === filter.value;
+          return value === filter.value;
         }
 
-        return filter.value.includes(row?.[filter.column]);
+        return filter.value.includes(value);
       })
     );
   };
-  const builder: any = {};
+  const builder = {} as MockSupabaseBuilder;
   builder.select = vi.fn(() => builder);
-  builder.eq = vi.fn((column: string, value: any) => {
+  builder.eq = vi.fn((column: string, value: unknown) => {
     filters.push({ type: 'eq', column, value });
     return builder;
   });
-  builder.in = vi.fn((column: string, value: any[]) => {
+  builder.in = vi.fn((column: string, value: unknown[]) => {
     filters.push({ type: 'in', column, value });
     return builder;
   });
   builder.single = vi.fn(() => builder);
   builder.maybeSingle = vi.fn(() => builder);
   builder.order = vi.fn(() => builder);
-  builder.then = (resolve: (value: any) => void, reject?: (error: unknown) => void) =>
-    Promise.resolve({ data: applyFilters(), error: response.error }).then(resolve, reject);
+  builder.then = <TResult1 = MockSupabaseResponse, TResult2 = never>(
+    resolve?: ((value: MockSupabaseResponse) => TResult1 | PromiseLike<TResult1>) | null,
+    reject?: ((error: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ) => Promise.resolve({ data: applyFilters(), error: response.error }).then(resolve, reject);
   return builder;
 };
 

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { WallboardApi } from '@/lib/wallboard-api';
+import { WallboardApi, type PresetConfigFeed } from '@/lib/wallboard-api';
 import {
   PANEL_KEYS,
   DEFAULT_PANEL_DURATIONS,
@@ -29,13 +29,7 @@ type Params = {
   setIdx: Dispatch<SetStateAction<number>>;
 };
 
-type WallboardPresetConfig = {
-  panel_order: string[] | null;
-  panel_durations: unknown;
-  rotation_fallback_seconds: number | null;
-  highlight_ttl_seconds: number | null;
-  ticker_poll_interval_seconds: number | null;
-};
+type WallboardPresetConfig = PresetConfigFeed['config'];
 
 export function useWallboardPreset({
   effectiveSlug,
@@ -145,7 +139,8 @@ export function useWallboardPreset({
           .select('panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds')
           .eq('slug', effectiveSlug)
           .maybeSingle();
-        data = result.data;
+        // The JSON column stores the same five-field config returned by WallboardApi.
+        data = result.data as WallboardPresetConfig | null;
         error = result.error;
         console.log('💾 [Wallboard] Database query result:', {
           hasData: !!data,
