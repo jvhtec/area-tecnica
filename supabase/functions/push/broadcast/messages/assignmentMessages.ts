@@ -1,6 +1,6 @@
 export function buildAssignmentConfirmedText(
   recipName: string,
-  jobTitle: string,
+  jobTitle: string | null,
   singleDayFlag: boolean,
   formattedTargetDate: string | null,
 ): string {
@@ -18,7 +18,7 @@ export function buildAssignmentConfirmedText(
 export function buildDirectAssignmentTexts(
   actor: string,
   assignedTechName: string,
-  jobTitle: string,
+  jobTitle: string | null,
   assignmentStatus: string | undefined,
   singleDayFlag: boolean,
   formattedTargetDate: string | null,
@@ -50,7 +50,7 @@ export function buildDirectAssignmentTexts(
 export function buildAssignmentRemovedTexts(
   actor: string,
   removedTechName: string,
-  jobTitle: string,
+  jobTitle: string | null,
   singleDayFlag: boolean,
   formattedTargetDate: string | null,
 ): { techText: string; managementText: string } {

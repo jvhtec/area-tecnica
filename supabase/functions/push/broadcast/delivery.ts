@@ -1,10 +1,10 @@
-import type { createClient } from "../deps.ts";
+import type { SupabaseClient } from "../deps.ts";
 import { sendNativePushNotification } from "../apns.ts";
 import { sendPushNotification } from "../webpush.ts";
 import type { NativePushTokenRow, PushPayload } from "../types.ts";
 import { pushTargetFingerprint } from "../targetId.ts";
 
-type BroadcastClient = ReturnType<typeof createClient>;
+type BroadcastClient = SupabaseClient;
 
 type PushSubscriptionTarget = {
   endpoint: string;

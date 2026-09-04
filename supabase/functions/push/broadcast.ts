@@ -1,4 +1,4 @@
-import { createClient } from "./deps.ts";
+import type { SupabaseClient } from "./deps.ts";
 import {
   getAdminUserIds,
   getJobDepartment,
@@ -47,7 +47,7 @@ import type { BroadcastBody, PushPayload } from "./types.ts";
  * sends both web and native push notifications.
  */
 export async function handleBroadcast(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   userId: string,
   body: BroadcastBody,
 ) {

@@ -3,7 +3,7 @@ import { formatSpanishMediumDate } from "../date.ts";
 
 export function buildFestivalPublicFormMessage(
   body: BroadcastBody,
-  jobTitle: string,
+  jobTitle: string | null,
 ): { title: string; text: string } {
   const artistName = body.artist_name?.trim() || 'Un artista';
   const artistDate = body.artist_date?.trim() || '';
@@ -20,7 +20,7 @@ export function buildFestivalPublicFormMessage(
 
 export function buildFestivalPublicRiderMessage(
   body: BroadcastBody,
-  jobTitle: string,
+  jobTitle: string | null,
 ): { title: string; text: string } {
   const artistName = body.artist_name?.trim() || 'Un artista';
   const artistDate = body.artist_date?.trim() || '';
