@@ -270,6 +270,14 @@ category in the file — each is a potential stale-closure bug, not a style nit.
 Suggest splitting the baseline into `app` and `functions` halves so progress on one is not masked
 by the other, and setting a per-PR decrement target rather than a freeze.
 
+**The gate is also narrower than its own baseline file implies.**
+`scripts/governance/check-lint-warning-baseline.mjs` walks `snapshot.files` and compares each
+file/rule pair against `baseline.files`. It never reads `baseline.rules`, and it only *prints*
+`baseline.total` rather than asserting against it. So the `total` and `rules` fields are
+descriptive, not enforced: a change that moved warnings between files while holding every per-file
+ceiling would pass even if the global count rose. Enforcing both alongside the per-file ceilings is
+a few lines and belongs with the QLT-08 gate work below.
+
 ### QLT-07 — ~14,000 lines of unreferenced application code
 
 A module-graph sweep (99 unreferenced modules of 1,465 scanned; 11 are vendored shadcn/ui
@@ -347,7 +355,7 @@ inherited from the July roadmap.
 | 2 | SEC-12 | Drop the `true` term from the three anon-reachable SELECT policies; fix the `ja.job_id = ja.job_id` self-correlation in the same `festival_artists` policy; decide `activity_catalog`'s audience explicitly | 598 rows of unannounced line-ups readable with a key that ships in the bundle | S | Anon sweep returns zero rows from `festival_artists` and `rate_extras_2025`; pgTAP deny test per table |
 | 3 | **DB-06** | Reconcile production RLS with the migration chain, then add a CI drift check | **Highest structural leverage.** Until this closes, three CI jobs test a fiction, a restore-from-migrations silently re-opens SEC-12, and no migration-based RLS reasoning is sound — including this document's | M | One reconciliation migration lands; CI fails on any `pg_policies`/`pg_proc` diff between replay and production dump |
 | 4 | QLT-07 | Delete the 88 unreferenced modules (~13,955 LOC) in one reviewable PR | Cheapest large win: improves QLT-01, QLT-05 and review surface simultaneously; nothing depends on it | S–M (mechanical, but needs one careful review pass) | Modules deleted; `npm run lint`/`typecheck`/tests green; lint baseline regenerated downward |
-| 5 | QLT-08 | Close the gate blind spots: extend the file-size budget to `supabase/functions/`, wire `test:coverage` into CI, split the lint baseline into app/functions halves with a decrement target | Small config changes that make three existing gates tell the truth; prevents recurrence rather than fixing instances | S | File-size gate reports the six oversized functions; coverage thresholds actually fail a PR; lint baseline drops below par |
+| 5 | QLT-08 | Close the gate blind spots: extend the file-size budget to `supabase/functions/`, wire `test:coverage` into CI, enforce `baseline.total`/`baseline.rules` in the lint gate (today only per-file ceilings are checked), split the lint baseline into app/functions halves with a decrement target | Small config changes that make three existing gates tell the truth; prevents recurrence rather than fixing instances | S | File-size gate reports the six oversized functions; coverage thresholds actually fail a PR; lint baseline drops below par |
 | 6 | SEC-09 / SEC-15 | Adopt `structuredLogger` and `escapeHtml` at the mail and auth functions, and add the lint rules that make adoption enforceable | The primitives already exist and are tested; only adoption is missing. The lint rule is what stops it regressing again | M | No bare `console.*` in `supabase/functions/**` outside an allowlist; every email template escapes interpolated values |
 | 7 | QLT-03 | Continue draining the 195 legacy data-layer imports | Steady structural work with no acute risk; ranks below everything above | L | Baseline continues to fall each release |
 
