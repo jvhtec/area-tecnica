@@ -13,6 +13,7 @@ import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/ut
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 interface MobileLogisticsCalendarProps {
   date: Date;
   onDateSelect: (date: Date) => void;
@@ -26,7 +27,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
 
   const [currentDate, setCurrentDate] = useState(date);
   const [showEventDialog, setShowEventDialog] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [visibleEventsCount, setVisibleEventsCount] = useState(DEFAULT_VISIBLE_EVENTS);
   const { toast } = useToast();
@@ -118,7 +119,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
     onDateSelect(today);
   };
 
-  const handleEventClick = (e: React.MouseEvent, event: any) => {
+  const handleEventClick = (e: React.MouseEvent, event: LogisticsCalendarEvent) => {
     e.stopPropagation();
     setSelectedEvent(event);
     setShowEventDialog(true);

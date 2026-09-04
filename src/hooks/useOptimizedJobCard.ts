@@ -15,6 +15,7 @@ import {
 } from '@/utils/permissions';
 import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/storageUpload';
 import type { JobDateTypeForCard } from '@/utils/jobDateTypes';
+import { unwrapPostgrestRelation } from '@/utils/postgrestRelation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -44,6 +45,7 @@ export type JobProfileRef = {
   nickname?: string | null;
   last_name?: string | null;
   department?: string | null;
+  profile_picture_url?: string | null;
   [key: string]: unknown;
 };
 
@@ -82,9 +84,6 @@ export type OptimizedJobCardJob = {
   job_date_types?: JobDateTypeForCard[] | null;
   [key: string]: unknown;
 };
-
-const normalizeProfile = (profile: JobProfileRef | JobProfileRef[] | null | undefined): JobProfileRef | null =>
-  Array.isArray(profile) ? (profile[0] ?? null) : (profile ?? null);
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -185,7 +184,7 @@ export const useOptimizedJobCard = (
         existing.push(t.date);
         timesheetsByTech.set(t.technician_id, existing);
         if (t.profiles) {
-          timesheetProfileByTech.set(t.technician_id, normalizeProfile(t.profiles));
+          timesheetProfileByTech.set(t.technician_id, unwrapPostgrestRelation(t.profiles));
         }
       };
 
@@ -220,7 +219,7 @@ export const useOptimizedJobCard = (
 
       const mergedAssignments: JobAssignmentForCard[] = (baseAssignments || []).map((a) => ({
         ...a,
-        profiles: normalizeProfile(a.profiles),
+        profiles: unwrapPostgrestRelation(a.profiles),
         _timesheet_dates: normalizedTimesheetsByTech.get(a.technician_id) || [],
         _scheduled_work_dates: scheduledWorkDates,
       }));

@@ -588,7 +588,7 @@ export const useSoundVisionMap = ({ activeVenueId, city, country, drawerHeight, 
                 const source: any = mapInstance.getSource(SOURCE_ID);
                 if (!source || clusterId == null) return;
 
-                source.getClusterExpansionZoom(clusterId, (err: any, zoom: number) => {
+                source.getClusterExpansionZoom(clusterId, (err: unknown, zoom: number) => {
                     if (err) return;
                     programmaticMoveRef.current = true;
                     mapInstance.easeTo({

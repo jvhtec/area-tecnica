@@ -21,6 +21,7 @@ import { canAccessDashboard, canViewPendingExpenses, isManagementRole } from "@/
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 const DashboardMobileHub = lazy(() =>
   import("@/components/dashboard/DashboardMobileHub").then((m) => ({ default: m.DashboardMobileHub }))
 );
@@ -46,7 +47,7 @@ const JobDetailsDialog = lazy(() =>
   import("@/components/jobs/JobDetailsDialog").then((m) => ({ default: m.JobDetailsDialog }))
 );
 
-const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
+const getSelectedDateJobs = (date: Date | undefined, jobs: JobCardJob[]) => {
   if (!date || !jobs) return [];
 
   return jobs.filter(job => {
@@ -84,7 +85,7 @@ const Dashboard = () => {
   // Modal state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<JobCardJob | null>(null);
 
   // New Dialog States
   const [messagesOpen, setMessagesOpen] = useState(false);
@@ -150,7 +151,7 @@ const Dashboard = () => {
     setIsDetailsDialogOpen(true);
   }, [jobs]);
 
-  const handleEditClick = useCallback((job: any) => {
+  const handleEditClick = useCallback((job: JobCardJob) => {
     if (userRole === "logistics" || userRole === "oscar") return;
     setSelectedJob(job);
     setIsEditDialogOpen(true);

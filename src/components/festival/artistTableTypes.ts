@@ -1,4 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
+import type { WavesModelSelection } from '@/constants/wavesModels';
+
+/**
+ * Canonical shape of a `festival_artists` row across the festival UI — the table view
+ * and the mobile views (`MobileArtistList` / `MobileArtistCard` / `MobileArtistConfigEditor`)
+ * all share it. Do not re-declare a local `Artist` interface in those components: divergent
+ * copies are structurally incompatible under `strictFunctionTypes`.
+ */
 export interface Artist {
   id: string;
   name: string;
@@ -21,21 +29,22 @@ export interface Artist {
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_position?: string;
   monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
+  foh_waves_models?: WavesModelSelection[];
   foh_outboard?: string;
   foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_waves_models?: any[];
+  mon_waves_models?: WavesModelSelection[];
   mon_outboard?: string;
   mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  wireless_systems: any[];
+  wireless_systems: WirelessSystem[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
-  iem_systems: any[];
+  iem_systems: IEMSystem[];
   iem_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;
   extras_df: boolean;
   extras_djbooth: boolean;
+  extras_wired?: string;
   notes?: string;
   rider_missing?: boolean;
   rider_copied_from_date?: string | null;

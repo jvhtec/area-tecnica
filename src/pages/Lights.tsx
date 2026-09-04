@@ -24,6 +24,7 @@ import { isManagementRole } from "@/utils/permissions";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 const Lights = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -33,7 +34,7 @@ const Lights = () => {
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<JobCardJob | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "lights";
   const { userRole } = useOptimizedAuth();
@@ -52,7 +53,7 @@ const Lights = () => {
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
-  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
+  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -105,7 +106,7 @@ const Lights = () => {
     setIsAssignmentDialogOpen(true);
   }, []);
 
-  const handleEditClick = useCallback((job: any) => {
+  const handleEditClick = useCallback((job: JobCardJob) => {
     setSelectedJob(job);
     setIsEditDialogOpen(true);
   }, []);

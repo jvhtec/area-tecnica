@@ -10,6 +10,8 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from "@/lib/utils";
+import type { JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
+import { unwrapPostgrestRelation } from "@/utils/postgrestRelation";
 import {
   getScheduledWorkDateKeys,
   resolveAssignmentWorkDateKeys,
@@ -19,7 +21,7 @@ import {
 const MADRID_TIME_ZONE = "Europe/Madrid";
 
 interface JobCardAssignmentsProps {
-  assignments: any[];
+  assignments: JobAssignmentForCard[];
   department: Department;
   jobTimesheets?: { technician_id: string; status: string; date?: string | null }[];
   jobDateTypes?: Array<{ date?: string | null; type?: string | null }> | null;
@@ -102,20 +104,24 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
     let roleCode: string | null = null;
     switch (department) {
       case 'sound':
-        roleCode = assignment.sound_role; break;
+        roleCode = assignment.sound_role ?? null;
+        break;
       case 'lights':
-        roleCode = assignment.lights_role; break;
+        roleCode = assignment.lights_role ?? null;
+        break;
       case 'video':
-        roleCode = assignment.video_role; break;
+        roleCode = assignment.video_role ?? null;
+        break;
       default:
-        roleCode = assignment.sound_role || assignment.lights_role || assignment.video_role;
+        roleCode = assignment.sound_role || assignment.lights_role || assignment.video_role || null;
     }
     if (!roleCode) continue;
 
-    const isExternal = !assignment.profiles && !!assignment.external_technician_name;
-    const name = assignment.profiles
-      ? formatUserName(assignment.profiles.first_name, (assignment.profiles as any).nickname, assignment.profiles.last_name)
-      : (assignment.external_technician_name || 'Unknown');
+    const profile = unwrapPostgrestRelation(assignment.profiles);
+    const isExternal = !profile && !!assignment.external_technician_name;
+    const name = profile
+      ? formatUserName(profile.first_name, profile.nickname, profile.last_name)
+      : (String(assignment.external_technician_name ?? '') || 'Unknown');
 
     // Key by technician_id when available; otherwise by a stable external name key
     const key = assignment.technician_id ? `tech:${assignment.technician_id}` : `ext:${name}`;
@@ -130,7 +136,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
 
     if (!grouped.has(key)) {
       grouped.set(key, {
-        id: assignment.technician_id || assignment.id,
+        id: assignment.technician_id || String(assignment.id ?? ""),
         name,
         role: roleLabel,
         isFromTour,

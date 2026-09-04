@@ -28,12 +28,18 @@ import type { JobDocument } from "@/types/job";
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
+import { unwrapPostgrestRelation } from "@/utils/postgrestRelation";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
+
+type JobDetailsJob = Pick<JobCardJob, "id"> &
+  Partial<Pick<JobCardJob, "job_type" | "title" | "tour_id" | "job_documents">>;
 
 interface JobDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  job: any;
+  job: JobDetailsJob;
   department?: string;
 }
 
@@ -115,10 +121,11 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   const expenseTechnicianOptions = useMemo(() => {
     const map = new Map<string, string>();
-    (jobDetails?.job_assignments ?? []).forEach((assignment: any) => {
+    (jobDetails?.job_assignments ?? []).forEach((assignment: JobAssignmentForCard) => {
       const techId = assignment.technician_id;
       if (!techId || map.has(techId)) return;
-      const name = [assignment.profiles?.first_name, assignment.profiles?.last_name].filter(Boolean).join(" ").trim();
+      const techProfile = unwrapPostgrestRelation(assignment.profiles);
+      const name = [techProfile?.first_name, techProfile?.last_name].filter(Boolean).join(" ").trim();
       map.set(techId, name || techId);
     });
     (jobDetails?.timesheets ?? []).forEach((row: any) => {
@@ -132,9 +139,9 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   const visibleFinancialTechnicianIds = useMemo(() => {
     const assignmentTechnicians = (jobDetails?.job_assignments ?? [])
-      .map((assignment: any) => ({
+      .map((assignment: JobAssignmentForCard) => ({
         id: assignment.technician_id as string,
-        department: assignment.profiles?.department as string | null | undefined,
+        department: unwrapPostgrestRelation(assignment.profiles)?.department,
       }))
       .filter((assignment: { id?: string }) => Boolean(assignment.id));
 

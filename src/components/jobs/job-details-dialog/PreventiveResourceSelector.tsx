@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSetPreventiveResource } from '@/hooks/usePreventiveResource';
+import type { JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
 import {
   getPreventiveResourceOptions,
   getTechnicianDisplayName,
@@ -15,7 +16,7 @@ const UNASSIGNED_VALUE = '__unassigned__';
 
 interface PreventiveResourceSelectorProps {
   jobId: string;
-  assignments: any[];
+  assignments: JobAssignmentForCard[];
   selectedTechnicianId?: string | null;
   selectedProfile?: {
     first_name?: string | null;

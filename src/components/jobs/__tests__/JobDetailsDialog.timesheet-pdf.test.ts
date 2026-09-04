@@ -39,7 +39,7 @@ describe('JobDetailsDialog timesheet enrichment', () => {
     class ImageMock {
       crossOrigin: string | null = null;
       onload: (() => void) | null = null;
-      onerror: ((error: any) => void) | null = null;
+      onerror: ((error: unknown) => void) | null = null;
 
       set src(_value: string) {
         if (this.onload) {

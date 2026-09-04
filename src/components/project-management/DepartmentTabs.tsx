@@ -6,13 +6,15 @@ import { Loader2 } from "lucide-react";
 import { isToday, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
+import type { JobDocument } from "@/components/jobs/cards/JobCardDocuments";
 
 interface DepartmentTabsProps {
   selectedDepartment: Department;
   onDepartmentChange: (value: string) => void;
-  jobs: any[];
+  jobs: JobCardJob[];
   jobsLoading: boolean;
-  onDeleteDocument?: (jobId: string, document: any) => void;
+  onDeleteDocument?: (jobId: string, document: JobDocument) => void;
   userRole?: string | null;
   highlightToday?: boolean;
   openHojaDeRutaJobId?: string | null;
@@ -33,7 +35,7 @@ export const DepartmentTabs = ({
   const isMobile = useIsMobile();
   
   // Check if a job is happening today
-  const isJobToday = (job: any) => {
+  const isJobToday = (job: JobCardJob) => {
     const today = new Date();
     const jobStart = new Date(job.start_time);
     const jobEnd = new Date(job.end_time);

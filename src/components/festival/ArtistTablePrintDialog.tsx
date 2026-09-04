@@ -22,67 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { buildReadableFilename } from "@/utils/fileName";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { getErrorStack } from '@/utils/errorMessage';
-
-interface Artist {
-  id: string;
-  name: string;
-  stage: number;
-  date: string;
-  show_start: string;
-  show_end: string;
-  soundcheck: boolean;
-  soundcheck_start?: string;
-  soundcheck_end?: string;
-  line_check?: boolean;
-  line_check_start?: string;
-  line_check_end?: string;
-  load_in_time?: string;
-  foh_console: string;
-  foh_console_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_console: string;
-  mon_console_provided_by?: 'festival' | 'band' | 'mixed';
-  monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
-  foh_outboard?: string;
-  foh_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  mon_waves_models?: any[];
-  mon_outboard?: string;
-  mon_waves_provided_by?: 'festival' | 'band' | 'mixed';
-  wireless_systems: any[];
-  wireless_provided_by?: 'festival' | 'band' | 'mixed';
-  iem_systems: any[];
-  iem_provided_by?: 'festival' | 'band' | 'mixed';
-  monitors_enabled: boolean;
-  monitors_quantity: number;
-  extras_sf: boolean;
-  extras_df: boolean;
-  extras_djbooth: boolean;
-  notes?: string;
-  rider_missing?: boolean;
-  foh_tech?: boolean;
-  mon_tech?: boolean;
-  isaftermidnight?: boolean;
-  mic_kit?: 'festival' | 'band' | 'mixed';
-  wired_mics?: Array<{
-    model: string;
-    quantity: number;
-    exclusive_use?: boolean;
-    notes?: string;
-  }>;
-  job_id?: string;
-  // Infrastructure fields
-  infra_cat6?: boolean;
-  infra_cat6_quantity?: number;
-  infra_hma?: boolean;
-  infra_hma_quantity?: number;
-  infra_coax?: boolean;
-  infra_coax_quantity?: number;
-  infra_opticalcon_duo?: boolean;
-  infra_opticalcon_duo_quantity?: number;
-  infra_analog?: number;
-  other_infrastructure?: string;
-  infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
-}
+import type { Artist } from '@/components/festival/artistTableTypes';
 
 interface ArtistTablePrintDialogProps {
   artists: Artist[];

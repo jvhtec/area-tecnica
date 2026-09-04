@@ -17,64 +17,10 @@ import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtist
 import type { Database, Json } from "@/integrations/supabase/types";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
+import type { Artist } from "@/components/festival/artistTableTypes";
+import type { FestivalRadioSystem } from "@/types/festival-equipment";
 
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
-type ProviderType = Database["public"]["Enums"]["provider_type"];
-
-interface Artist {
-  id: string;
-  name: string;
-  stage: number;
-  date: string;
-  show_start: string;
-  show_end: string;
-  soundcheck: boolean;
-  soundcheck_start?: string;
-  soundcheck_end?: string;
-  foh_console: string;
-  foh_console_provided_by?: ProviderType | null;
-  foh_drive?: string | null;
-  foh_drive_position?: string | null;
-  mon_console: string;
-  mon_console_provided_by?: ProviderType | null;
-  mon_position?: string | null;
-  monitors_from_foh?: boolean;
-  foh_waves_models?: any[];
-  foh_outboard?: string;
-  foh_waves_provided_by?: ProviderType | null;
-  mon_waves_models?: any[];
-  mon_outboard?: string;
-  mon_waves_provided_by?: ProviderType | null;
-  wireless_systems: any[];
-  wireless_provided_by?: ProviderType | null;
-  iem_systems: any[];
-  iem_provided_by?: ProviderType | null;
-  monitors_enabled: boolean;
-  monitors_quantity: number;
-  extras_sf: boolean;
-  extras_df: boolean;
-  extras_djbooth: boolean;
-  extras_wired?: string;
-  notes?: string;
-  rider_missing?: boolean;
-  foh_tech?: boolean;
-  mon_tech?: boolean;
-  isaftermidnight?: boolean;
-  mic_kit?: 'festival' | 'band' | 'mixed';
-  wired_mics?: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }>;
-  infra_cat6?: boolean;
-  infra_cat6_quantity?: number;
-  infra_hma?: boolean;
-  infra_hma_quantity?: number;
-  infra_coax?: boolean;
-  infra_coax_quantity?: number;
-  infra_opticalcon_duo?: boolean;
-  infra_opticalcon_duo_quantity?: number;
-  infra_analog?: number;
-  other_infrastructure?: string;
-  infrastructure_provided_by?: ProviderType | null;
-  job_id?: string;
-}
 
 interface MobileArtistConfigEditorProps {
   artist: Artist;
@@ -115,7 +61,7 @@ const formatWiredMics = (
     .join(", ");
 };
 
-const formatSystems = (systems: any[] = []) => {
+const formatSystems = (systems: FestivalRadioSystem[] = []) => {
   if (!Array.isArray(systems) || systems.length === 0) return "Sin sistemas";
   return systems
     .map((system) => {
@@ -131,18 +77,7 @@ const formatSystems = (systems: any[] = []) => {
     .join(" · ");
 };
 
-type WirelessSystemLike = {
-  model?: string;
-  quantity?: number;
-  quantity_hh?: number;
-  quantity_bp?: number;
-  quantity_ch?: number;
-  band?: unknown;
-  provided_by?: string;
-  notes?: string;
-};
-
-const formatSystemBand = (category: "wireless" | "iem", system: WirelessSystemLike) => {
+const formatSystemBand = (category: "wireless" | "iem", system: FestivalRadioSystem) => {
   const rawBand = system.band;
   if (isFrequencyBandSelection(rawBand)) {
     return formatBandOptionLabel(rawBand);
@@ -161,7 +96,7 @@ const formatSystemBand = (category: "wireless" | "iem", system: WirelessSystemLi
   return "Sin especificar";
 };
 
-const formatSystemQuantity = (category: "wireless" | "iem", system: WirelessSystemLike) => {
+const formatSystemQuantity = (category: "wireless" | "iem", system: FestivalRadioSystem) => {
   const quantityCh = Number(system.quantity_ch || 0);
   const quantityHh = Number(system.quantity_hh || 0);
   const quantityBp = Number(system.quantity_bp || 0);
@@ -251,7 +186,7 @@ export const ReadOnlyArtistCategoryContent = ({
   }
 
   if (category === "wireless") {
-    const renderSystemDetails = (systems: WirelessSystemLike[], systemCategory: "wireless" | "iem") => {
+    const renderSystemDetails = (systems: FestivalRadioSystem[], systemCategory: "wireless" | "iem") => {
       if (!Array.isArray(systems) || systems.length === 0) {
         return <div className="text-muted-foreground">Sin sistemas</div>;
       }
@@ -281,13 +216,13 @@ export const ReadOnlyArtistCategoryContent = ({
           <div className="text-xs uppercase text-muted-foreground font-semibold">Wireless</div>
           <div className="font-medium break-words">{formatSystems(artist.wireless_systems || [])}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.wireless_provided_by)}</div>
-          <div className="mt-2">{renderSystemDetails((artist.wireless_systems || []) as WirelessSystemLike[], "wireless")}</div>
+          <div className="mt-2">{renderSystemDetails(artist.wireless_systems || [], "wireless")}</div>
         </div>
         <div>
           <div className="text-xs uppercase text-muted-foreground font-semibold">IEM</div>
           <div className="font-medium break-words">{formatSystems(artist.iem_systems || [])}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.iem_provided_by)}</div>
-          <div className="mt-2">{renderSystemDetails((artist.iem_systems || []) as WirelessSystemLike[], "iem")}</div>
+          <div className="mt-2">{renderSystemDetails(artist.iem_systems || [], "iem")}</div>
         </div>
       </div>
     );
@@ -475,7 +410,7 @@ export const MobileArtistConfigEditor = ({
     fetchFreshData();
   }, [artist.id]);
 
-  const updateFormData = (changes: any) => {
+  const updateFormData = (changes: Partial<ReturnType<typeof buildFormData>>) => {
     setFormData(prev => ({ ...prev, ...changes }));
   };
 

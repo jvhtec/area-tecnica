@@ -13,6 +13,7 @@ import { WiredMic } from "./gear-setup/WiredMicConfig";
 import { ArtistFormData, WirelessSetup } from "@/types/festival";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
 import type { WavesModelSelection } from "@/constants/wavesModels";
+import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
 
 interface ArtistManagementFormProps {
   artist?: any;
@@ -51,8 +52,8 @@ interface ArtistManagementFormData {
   mon_waves_models: WavesModelSelection[];
   mon_outboard: string;
   mon_waves_provided_by: string;
-  wireless_systems: any[];
-  iem_systems: any[];
+  wireless_systems: WirelessSystem[];
+  iem_systems: IEMSystem[];
   wireless_provided_by: string;
   iem_provided_by: string;
   monitors_enabled: boolean;

@@ -26,6 +26,7 @@ import { isManagementRole } from "@/utils/permissions";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 const Video = () => {
   const isMobile = useIsMobile();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -34,7 +35,7 @@ const Video = () => {
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<JobCardJob | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "video";
   const { userRole } = useOptimizedAuth();
@@ -58,7 +59,7 @@ const Video = () => {
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
-  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
+  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment, jobsRangeStart, jobsRangeEnd);
 
   // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
   useEffect(() => {
@@ -109,7 +110,7 @@ const Video = () => {
     setIsAssignmentDialogOpen(true);
   }, []);
 
-  const handleEditClick = useCallback((job: any) => {
+  const handleEditClick = useCallback((job: JobCardJob) => {
     setSelectedJob(job);
     setIsEditDialogOpen(true);
   }, []);

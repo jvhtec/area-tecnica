@@ -15,6 +15,7 @@ import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/ut
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 interface LogisticsCalendarProps {
   onDateSelect?: (date: Date) => void;
 }
@@ -22,7 +23,7 @@ interface LogisticsCalendarProps {
 export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showEventDialog, setShowEventDialog] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const { toast } = useToast();
 
@@ -122,7 +123,7 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
     }
   };
 
-  const handleEventClick = (e: React.MouseEvent, event: any) => {
+  const handleEventClick = (e: React.MouseEvent, event: LogisticsCalendarEvent) => {
     e.stopPropagation();
     setSelectedEvent(event);
     setShowEventDialog(true);

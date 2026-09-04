@@ -1,10 +1,37 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
+import { ALL_DEPARTMENTS, type Department } from "@/types/department";
+
+/**
+ * `TodaySchedule` is fed either job rows directly or assignment rows that wrap the
+ * job under `jobs`. Keep those two inputs explicit so typing the component does not
+ * add a runtime validation gate that could hide a previously renderable job card.
+ */
+type WrappedTodayScheduleJob = {
+  job_id?: string | null;
+  department?: string | null;
+  jobs: JobCardJob;
+};
+
+export type TodayScheduleEntry = JobCardJob | WrappedTodayScheduleJob;
+
+const isWrappedJob = (entry: TodayScheduleEntry): entry is WrappedTodayScheduleJob =>
+  "jobs" in entry && typeof entry.jobs === "object" && entry.jobs !== null;
+
+const unwrapJob = (entry: TodayScheduleEntry): JobCardJob =>
+  isWrappedJob(entry) ? entry.jobs : entry;
+
+const isDepartment = (value: unknown): value is Department =>
+  typeof value === "string" && (ALL_DEPARTMENTS as readonly string[]).includes(value);
+
+const resolveDepartment = (...candidates: unknown[]): Department =>
+  candidates.find(isDepartment) ?? "sound";
 
 interface TodayScheduleProps {
-  jobs: any[];
-  onEditClick: (job: any) => void;
+  jobs: TodayScheduleEntry[];
+  onEditClick: (job: JobCardJob) => void;
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
   userRole: string | null;
@@ -77,36 +104,34 @@ export const TodaySchedule = ({
     );
   }
 
+  const jobCards = jobs.map((entry) => {
+    if (import.meta.env.DEV) {
+      console.log("Rendering job in TodaySchedule:", entry);
+    }
+
+    const job = unwrapJob(entry);
+
+    return (
+      <JobCardNew
+        key={job.id}
+        job={job}
+        onEditClick={onEditClick}
+        onDeleteClick={onDeleteClick}
+        onJobClick={onJobClick}
+        userRole={userRole}
+        department={resolveDepartment(department, entry.department, job.department)}
+        hideTasks={hideTasks}
+        showManageArtists={isFestivalLikeJobType(job.job_type)}
+        detailsOnlyMode={detailsOnlyMode}
+        selectedDate={selectedDate}
+      />
+    );
+  });
+
   if (viewMode === "sidebar") {
     return (
       <div className="flex flex-col gap-3">
-        {jobs.map(job => {
-          const jobData = job.jobs || job;
-          const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
-
-          if (!jobId) return null;
-
-          let isFestivalJob = false;
-          if (typeof jobData === 'object' && 'job_type' in jobData) {
-            isFestivalJob = isFestivalLikeJobType(jobData.job_type);
-          }
-
-          return (
-            <JobCardNew
-              key={jobId}
-              job={jobData}
-              onEditClick={onEditClick}
-              onDeleteClick={onDeleteClick}
-              onJobClick={onJobClick}
-              userRole={userRole}
-              department={department || job.department || jobData.department || "sound"}
-              hideTasks={hideTasks}
-              showManageArtists={isFestivalJob}
-              detailsOnlyMode={detailsOnlyMode}
-              selectedDate={selectedDate}
-            />
-          );
-        })}
+        {jobCards}
       </div>
     );
   }
@@ -118,53 +143,7 @@ export const TodaySchedule = ({
       </CardHeader>
       <CardContent className="p-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {jobs.map(job => {
-            if (import.meta.env.DEV) {
-              console.log("Rendering job in TodaySchedule:", job);
-            }
-            const jobData = job.jobs || job;
-            const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
-
-            if (!jobId) {
-              if (import.meta.env.DEV) {
-                console.warn("Job is missing ID:", job);
-              }
-              return null;
-            }
-
-            // Check if this is a festival job
-            let isFestivalJob = false;
-
-            if (typeof jobData === 'object') {
-              if ('job_type' in jobData) {
-                isFestivalJob = isFestivalLikeJobType(jobData.job_type);
-              }
-            }
-
-            if (import.meta.env.DEV) {
-              console.log("Is festival job check for:", {
-                jobId,
-                isFestivalJob,
-                jobType: jobData?.job_type
-              });
-            }
-
-            return (
-              <JobCardNew
-                key={jobId}
-                job={jobData}
-                onEditClick={onEditClick}
-                onDeleteClick={onDeleteClick}
-                onJobClick={onJobClick}
-                userRole={userRole}
-                department={department || job.department || jobData.department || "sound"}
-                hideTasks={hideTasks}
-                showManageArtists={isFestivalJob}
-                detailsOnlyMode={detailsOnlyMode}
-                selectedDate={selectedDate}
-              />
-            );
-          })}
+          {jobCards}
         </div>
       </CardContent>
     </Card>

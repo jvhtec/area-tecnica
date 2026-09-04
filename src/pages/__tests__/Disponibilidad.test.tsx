@@ -94,7 +94,7 @@ describe("Disponibilidad", () => {
     );
   });
 
-  const configurePresetQuery = (result: { data: any; error: any }) => {
+  const configurePresetQuery = (result: { data: any; error: unknown }) => {
     const presetBuilder = createMockQueryBuilder(result);
 
     mockSupabase.from.mockImplementation((table: string) => {

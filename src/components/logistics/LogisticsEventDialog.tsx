@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Department } from "@/types/department";
+import { ALL_DEPARTMENTS, type Department } from "@/types/department";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +43,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
 type LogisticsEventPayload = Database["public"]["Tables"]["logistics_events"]["Insert"];
 
@@ -53,27 +54,12 @@ const departments: Department[] = [
   "video"
 ];
 
+
 interface LogisticsEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedDate?: Date;
-  selectedEvent?: {
-    id: string;
-    event_type: "load" | "unload";
-    transport_type: LogisticsTransportType;
-    event_time: string;
-    event_date: string;
-    loading_bay: string | null;
-    job_id: string | null;
-    license_plate: string | null;
-    title?: string;
-    color?: string;
-    transport_provider?: TransportProvider | null;
-    notes?: string | null;
-    is_hoja_relevant?: boolean;
-    hoja_categories?: LogisticsHojaCategory[];
-    departments: { department: Department }[];
-  };
+  selectedEvent?: LogisticsCalendarEvent | null;
   // Optional initial values when creating a new event
   initialJobId?: string | null;
   initialDepartments?: Department[];
@@ -158,10 +144,14 @@ export const LogisticsEventDialog = ({
       setLicensePlate(selectedEvent.license_plate || "");
       setTransportProvider(selectedEvent.transport_provider || null);
       setNotes(selectedEvent.notes || "");
-      setSelectedDepartments((selectedEvent.departments || []).map((d) => d.department));
+      setSelectedDepartments(
+        (selectedEvent.departments || [])
+          .map((department) => department.department)
+          .filter((department): department is Department => ALL_DEPARTMENTS.includes(department as Department))
+      );
       setColor(selectedEvent.color || "#7E69AB");
-      setIsHojaRelevant((selectedEvent as any).is_hoja_relevant ?? true);
-      setHojaCategories(normalizeCategories((selectedEvent as any).hoja_categories));
+      setIsHojaRelevant(selectedEvent.is_hoja_relevant ?? true);
+      setHojaCategories(normalizeCategories(selectedEvent.hoja_categories));
     } else {
       setEventType(initialEventType || "load");
       setTransportType(initialTransportType || "trailer");
@@ -281,7 +271,7 @@ export const LogisticsEventDialog = ({
 
     try {
       const broadcastLogisticsEvent = async (
-        event: typeof selectedEvent | { [key: string]: any } | null | undefined,
+        event: BroadcastLogisticsEvent | null | undefined,
         options: {
           type?: "logistics.event.created" | "logistics.event.updated" | "logistics.event.cancelled";
           autoCreatedUnload?: boolean;
@@ -393,11 +383,11 @@ export const LogisticsEventDialog = ({
         if ((selectedEvent.license_plate || "") !== (eventData.license_plate || "")) {
           changes.license_plate = { from: selectedEvent.license_plate, to: eventData.license_plate };
         }
-        const previousHojaRelevant = (selectedEvent as any).is_hoja_relevant ?? true;
+        const previousHojaRelevant = selectedEvent.is_hoja_relevant ?? true;
         if (previousHojaRelevant !== eventData.is_hoja_relevant) {
           changes.is_hoja_relevant = { from: previousHojaRelevant, to: eventData.is_hoja_relevant };
         }
-        const previousCategories = normalizeCategories((selectedEvent as any).hoja_categories).slice().sort();
+        const previousCategories = normalizeCategories(selectedEvent.hoja_categories).slice().sort();
         const nextCategories = normalizeCategories(eventData.hoja_categories).slice().sort();
         if (JSON.stringify(previousCategories) !== JSON.stringify(nextCategories)) {
           changes.hoja_categories = { from: previousCategories, to: nextCategories };
