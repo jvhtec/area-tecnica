@@ -24,6 +24,10 @@ export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, tou
     if (open) setActiveTab(initialDepartment);
   }, [initialDepartment, open]);
 
+  const selectTab = (value: string) => {
+    if (value === 'sound' || value === 'lights' || value === 'video') setActiveTab(value);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl w-[96vw] max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-hidden">
@@ -31,7 +35,7 @@ export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, tou
           <DialogTitle>Gestión de tareas</DialogTitle>
         </DialogHeader>
         <div className="mt-2 overflow-y-auto">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+          <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="sound">Sonido</TabsTrigger>
               <TabsTrigger value="lights">Luces</TabsTrigger>

@@ -5,7 +5,7 @@ import { generateWorkflowTasks } from './taskGeneration';
 import type { GenerateTasksInput, JsonObject, SetupWorkflow, TaskStatus, WorkflowStatus, WorkflowType } from './types';
 
 const errorCodes: readonly WorkflowErrorCode[] = [
-  'unknown_type', 'invalid_transition', 'invalid_task_transition', 'missing_workflow',
+  'unknown_type', 'unknown_department', 'invalid_step', 'invalid_transition', 'invalid_task_transition', 'missing_workflow',
   'missing_task', 'duplicate_workflow', 'incomplete_workflow', 'forbidden', 'invalid_input',
 ];
 

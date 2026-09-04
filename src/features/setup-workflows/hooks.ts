@@ -64,6 +64,15 @@ export function useCreateSetupWorkflow() {
   return useMutation({ mutationFn: service.createWorkflow, ...feedback });
 }
 
+export function useSetupWorkflowStatusMutation() {
+  const feedback = useWorkflowMutationFeedback();
+  return useMutation({
+    mutationFn: ({ workflowId, status }: { workflowId: string; status: WorkflowStatus }) =>
+      service.updateWorkflowStatus(workflowId, status),
+    ...feedback,
+  });
+}
+
 export type WorkflowUpdate =
   | { action: 'state'; state: JsonObject }
   | { action: 'step'; step: string }

@@ -22,6 +22,7 @@ import {
   useCreateSetupWorkflow,
   useLatestSetupWorkflowForEntity,
   useSetupWorkflowForEntity,
+  useSetupWorkflowStatusMutation,
   useSetupWorkflowTasks,
   useUpdateSetupWorkflow,
 } from '@/features/setup-workflows/hooks';
@@ -58,6 +59,7 @@ export default function JobSetup() {
   const workflowQuery = useSetupWorkflowForEntity('job', jobId);
   const latestWorkflowQuery = useLatestSetupWorkflowForEntity('job', jobId);
   const createWorkflow = useCreateSetupWorkflow();
+  const updateCreatedWorkflowStatus = useSetupWorkflowStatusMutation();
   const workflow = workflowQuery.data ?? latestWorkflowQuery.data;
   const tasksQuery = useSetupWorkflowTasks(workflow?.id);
   const updateWorkflow = useUpdateSetupWorkflow(workflow?.id ?? 'pending');
@@ -83,8 +85,7 @@ export default function JobSetup() {
         state: { source: 'job_setup_page' },
       });
       workflowCreated = true;
-      await import('@/features/setup-workflows/service').then(({ updateWorkflowStatus }) =>
-        updateWorkflowStatus(created.id, 'in_progress'));
+      await updateCreatedWorkflowStatus.mutateAsync({ workflowId: created.id, status: 'in_progress' });
     } catch (error) {
       if (workflowCreated) {
         toast({ title: 'Preparación creada en borrador', description: 'Pulsa Empezar para continuar.' });
@@ -174,7 +175,16 @@ export default function JobSetup() {
               <h2 id="setup-tasks-title" className="text-lg font-semibold">Tareas operativas</h2>
               <span className="text-sm text-muted-foreground">{progress.completedTasks} de {progress.totalTasks} completadas</span>
             </div>
-            {tasksQuery.isLoading ? <Skeleton className="h-40 w-full" /> : orderedTasks.filter(task => task.applicable).map(task => {
+            {tasksQuery.isError ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>No se pudieron cargar las tareas</AlertTitle>
+                <AlertDescription className="space-y-3">
+                  <p>{tasksQuery.error instanceof Error ? tasksQuery.error.message : 'Inténtalo de nuevo.'}</p>
+                  <Button variant="outline" size="sm" onClick={() => void tasksQuery.refetch()}>Reintentar</Button>
+                </AlertDescription>
+              </Alert>
+            ) : tasksQuery.isLoading ? <Skeleton className="h-40 w-full" /> : orderedTasks.filter(task => task.applicable).map(task => {
               const action = getJobSetupTaskAction(task, job.id);
               return (
                 <Card key={task.id} className={cn(task.status === 'blocked' && 'border-destructive/60', task.status === 'completed' && 'border-emerald-500/40')}>

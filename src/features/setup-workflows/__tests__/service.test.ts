@@ -60,7 +60,7 @@ describe('workflow service', () => {
     expect(await getWorkflowForEntity('tour', 'old-tour')).toBeNull();
     await expect(getWorkflow('unknown')).rejects.toMatchObject({ code: 'missing_workflow' });
   });
-  it.each(['duplicate_workflow', 'invalid_transition', 'invalid_task_transition', 'incomplete_workflow', 'missing_task', 'forbidden'])('preserves explicit %s server failures', async code => {
+  it.each(['unknown_department', 'invalid_step', 'duplicate_workflow', 'invalid_transition', 'invalid_task_transition', 'incomplete_workflow', 'missing_task', 'forbidden'])('preserves explicit %s server failures', async code => {
     mocks.single.mockResolvedValue({ data: null, error: { code: '22023', message: `${code}: rejected` } });
     await expect(completeWorkflow('workflow-1')).rejects.toMatchObject({ code });
   });

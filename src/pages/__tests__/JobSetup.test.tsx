@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   refetchWorkflow: vi.fn(),
   update: vi.fn(),
   updateStatus: vi.fn(),
+  refetchTasks: vi.fn(),
+  tasksError: null as Error | null,
   workflow: null as SetupWorkflow | null,
   latestWorkflow: null as SetupWorkflow | null,
 }));
@@ -37,11 +39,14 @@ vi.mock('@/features/setup-workflows/hooks', () => ({
   useCreateSetupWorkflow: () => ({ mutateAsync: mocks.create, isPending: false }),
   useSetupWorkflowForEntity: () => ({ data: mocks.workflow, isLoading: false, refetch: mocks.refetchWorkflow }),
   useLatestSetupWorkflowForEntity: () => ({ data: mocks.latestWorkflow, isLoading: false, refetch: vi.fn(), isError: false }),
-  useSetupWorkflowTasks: () => ({ data: mocks.workflow || mocks.latestWorkflow ? [task] : [], isLoading: false }),
+  useSetupWorkflowTasks: () => ({
+    data: mocks.workflow || mocks.latestWorkflow ? [task] : [], isLoading: false,
+    isError: Boolean(mocks.tasksError), error: mocks.tasksError, refetch: mocks.refetchTasks,
+  }),
+  useSetupWorkflowStatusMutation: () => ({ mutateAsync: mocks.updateStatus, isPending: false }),
   useUpdateSetupWorkflow: () => ({ mutateAsync: mocks.update, mutate: mocks.update, isPending: false }),
 }));
 
-vi.mock('@/features/setup-workflows/service', () => ({ updateWorkflowStatus: mocks.updateStatus }));
 vi.mock('@/hooks/useOptimizedAuth', () => ({ useOptimizedAuth: () => ({ userRole: 'management' }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@/components/jobs/EditJobDialog', () => ({ EditJobDialog: (): null => null }));
@@ -71,6 +76,8 @@ describe('JobSetup', () => {
     mocks.refetchWorkflow.mockReset().mockResolvedValue(undefined);
     mocks.update.mockReset().mockResolvedValue(undefined);
     mocks.updateStatus.mockReset().mockResolvedValue(undefined);
+    mocks.refetchTasks.mockReset().mockResolvedValue(undefined);
+    mocks.tasksError = null;
     mocks.latestWorkflow = null;
     mocks.workflow = {
       id: 'workflow-1', type: 'job', entity_id: 'job-1', job_id: 'job-1', tour_id: null,
@@ -101,8 +108,17 @@ describe('JobSetup', () => {
     await userEvent.click(screen.getByRole('button', { name: /iniciar preparación/i }));
 
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ workflowType: 'job', entityId: 'job-1', departments: ['sound'] }));
-    expect(mocks.updateStatus).toHaveBeenCalledWith('workflow-new', 'in_progress');
+    await waitFor(() => expect(mocks.updateStatus).toHaveBeenCalledWith({ workflowId: 'workflow-new', status: 'in_progress' }));
     expect(mocks.refetchWorkflow).toHaveBeenCalled();
+  });
+
+  it('shows task loading failures with a retry action', async () => {
+    mocks.tasksError = new Error('Sin conexión');
+    renderPage();
+
+    expect(screen.getByText('No se pudieron cargar las tareas')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /reintentar/i }));
+    expect(mocks.refetchTasks).toHaveBeenCalledOnce();
   });
 
   it('keeps a completed workflow visible and offers a new preparation', () => {

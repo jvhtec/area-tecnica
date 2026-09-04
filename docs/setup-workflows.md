@@ -111,7 +111,7 @@ and provisioning logic remains the only writer.
 
 When departments change, **Actualizar tareas** reconciles generated requirements.
 The service preserves status and audit history for unchanged or retired tasks. A
-workflow can enter review at any point, but database completion rejects unresolved
+Only an `in_progress` workflow can enter review; database completion rejects unresolved
 required tasks or blockers under the same row lock.
 
 Tour and Tour Date definitions remain ready for later route-level consumers. They
@@ -122,8 +122,9 @@ queries or task-key switches in React views.
 
 Run `npm run dev` and use `/jobs/setup/new` or the **Preparar** action on a Job card.
 This is the real application flow and requires the setup workflow migrations on the
-connected Supabase project. It writes only workflow orchestration records; tool
-actions continue through their established canonical services.
+connected Supabase project. `/jobs/setup/new` first creates the canonical Job and
+then writes workflow orchestration records. Tool actions continue through their
+established canonical services, so their normal domain writes remain expected.
 
 Vitest covers definitions, deterministic generation, reconciliation, progress,
 transitions, service failure/resume behavior and component rendering. pgTAP tests
