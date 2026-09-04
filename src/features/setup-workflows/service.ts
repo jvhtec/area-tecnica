@@ -57,6 +57,16 @@ export async function getWorkflowForEntity(type: WorkflowType, entityId: string)
   return data;
 }
 
+/** Latest history is separate from active lookup so duplicate-safe creation can
+ * still distinguish "nothing active" from "this entity has history". */
+export async function getLatestWorkflowForEntity(type: WorkflowType, entityId: string) {
+  getWorkflowDefinition(type);
+  const { data, error } = await workflowClient.from('setup_workflows').select('*')
+    .eq('type', type).eq('entity_id', entityId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (error) persistenceError(error);
+  return data;
+}
+
 export async function getWorkflowTasks(workflowId: string) {
   const { data, error } = await workflowClient.from('setup_workflow_tasks').select('*')
     .eq('workflow_id', workflowId).order('task_key');

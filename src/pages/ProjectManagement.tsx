@@ -80,6 +80,7 @@ const ProjectManagement = () => {
 
   // URL parameter for opening hoja de ruta modal
   const openHojaDeRutaJobId = searchParams.get('openHojaDeRuta');
+  const setupJobId = searchParams.get('setupJobId');
 
   // Memoized callback to clear URL parameter after modal is opened
   const handleHojaDeRutaOpened = useCallback(() => {
@@ -97,6 +98,27 @@ const ProjectManagement = () => {
       setSelectedDepartment((userDepartment as Department) ?? "sound");
     }
   }, [authLoading, userDepartment]);
+
+  useEffect(() => {
+    if (!setupJobId) return;
+    let active = true;
+    void dataLayerClient.from('jobs')
+      .select('title, start_time, job_departments(department)')
+      .eq('id', setupJobId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active || error || !data) return;
+        setSearchQuery(data.title);
+        setCurrentDate(new Date(data.start_time));
+        const supported = new Set<Department>(['sound', 'lights', 'video', 'production']);
+        const department = data.job_departments?.find(({ department }) => supported.has(department as Department))?.department;
+        if (department) setSelectedDepartment(department as Department);
+        const next = new URLSearchParams(searchParams);
+        next.delete('setupJobId');
+        setSearchParams(next, { replace: true });
+      });
+    return () => { active = false; };
+  }, [searchParams, setSearchParams, setupJobId]);
 
   // Use custom hook to keep the "jobs" tab active/visible.
   useTabVisibility(["optimized-jobs"]);
@@ -545,7 +567,14 @@ const ProjectManagement = () => {
         <Card>
           <CardHeader className={cn("flex flex-col space-y-4", isMobile ? "p-4 pb-3" : "p-6 pb-4")}>
           <div className="flex items-center justify-between">
-            <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Gestión de proyectos</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Gestión de proyectos</CardTitle>
+              {canCreateItems && (
+                <Button variant="outline" size="sm" onClick={() => navigate('/jobs/setup/new')}>
+                  Preparación guiada
+                </Button>
+              )}
+            </div>
             {isMobile && (
               <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
                 <SheetTrigger asChild>

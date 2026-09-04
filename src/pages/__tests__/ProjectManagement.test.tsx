@@ -116,6 +116,22 @@ describe("ProjectManagement department tabs", () => {
           }),
         };
       }
+      if (table === "jobs") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: {
+                  title: "Focused setup job",
+                  start_time: "2026-11-12T08:00:00.000Z",
+                  job_departments: [{ department: "lights" }],
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
       return {
         select: () => ({
           eq: () => ({
@@ -253,5 +269,18 @@ describe("ProjectManagement department tabs", () => {
       expect(screen.getByRole("button", { name: /confirmado/i })).toHaveAttribute("aria-pressed", "false");
       expect(screen.getByRole("button", { name: /tentativa/i })).toHaveAttribute("aria-pressed", "false");
     });
+  });
+
+  it("focuses the exact job returned from a setup workflow tool", async () => {
+    mockUseOptimizedAuth.mockReturnValue({ userDepartment: "sound", isLoading: false });
+
+    render(
+      <MemoryRouter initialEntries={["/project-management?setupJobId=job-1"]}>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByDisplayValue("Focused setup job")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("tab", { name: /luces/i })).toHaveAttribute("data-state", "active"));
   });
 });

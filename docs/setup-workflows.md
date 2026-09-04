@@ -1,14 +1,16 @@
-# Setup workflow foundation (PR 1)
+# Setup workflows
 
-This is an optional orchestration layer. No existing route imports it and no job,
-tour, date, Flex folder, personnel assignment, document or technical calculation
-is created or changed by it. Historical entities need no backfill.
+This is an optional orchestration layer for resumable preparation. Historical
+entities need no backfill. Canonical job data, personnel requirements, documents,
+Flex folders and technical calculations remain in their existing tables and tools.
 
 ## Architecture and access
 
 The feature lives in `src/features/setup-workflows`: pure definitions, generation,
 reconciliation, progress and transition helpers; a Supabase service; TanStack Query
-hooks; and the display-only `SetupWorkflowProgress` component (Spanish/shadcn).
+hooks; and the reusable `SetupWorkflowProgress` component (Spanish/shadcn).
+The operational Job flow is exposed at `/jobs/:jobId/setup`; `/jobs/setup/new`
+creates a normal Job with the existing dialog and then hands it to that flow.
 
 `setup_workflows` references an existing entity through `type` + `entity_id`.
 Generated, nullable foreign-key columns enforce references to jobs, tours and
@@ -19,7 +21,7 @@ User references use profiles and become null on profile deletion.
 Reads use RLS and the existing `is_admin_or_management()` policy. Browser writes
 are only allowed through `mutate_setup_workflow`, which verifies that same policy
 and the authenticated actor. Responsibility and assignment are metadata; assigning
-a technician does not grant access. Broader delegation is a later PR.
+a technician does not grant access.
 
 The generated database file is deliberately untouched (repository convention).
 `database.ts` adds manually maintained types using the existing typed-client
@@ -53,7 +55,7 @@ keys for independent drafts and send a complete subtree when editing that key.
 JSON null is a stored value, not a delete operation. Persist each meaningful form
 change; await mutations before navigation. Query hooks invalidate the entire feature
 scope after writes (including uncertain failures); ordinary refetch-on-focus handles
-other sessions. There is no new realtime infrastructure in PR 1.
+other sessions. There is no new realtime infrastructure for this feature.
 
 ## Definitions, keys and reconciliation
 
@@ -91,26 +93,37 @@ even optional, prevents completion. Pending optional tasks do not prevent
 administrative completion, so completion need not mean 100% of optional work.
 An empty active task list is 0% and cannot complete.
 
-## Future wizard integration
+## Job preparation integration
 
-1. Use `useSetupWorkflowForEntity(type, entityId)`; null is valid for historical data.
-2. Explicitly create a workflow for an existing canonical entity using
-   `useCreateSetupWorkflow` with its department identifiers. Creation does not
-   perform any canonical entity or provisioning work.
-3. Read via `useSetupWorkflow` and `useSetupWorkflowTasks`. Use central definitions
-   for steps and `useUpdateSetupWorkflow` for state, step, lifecycle, task and sync
-   changes. Render `SetupWorkflowProgress` with the fetched rows.
-4. When canonical departments change, explicitly sync the new requirements.
-   Mark tasks completed only after the canonical operation is confirmed.
-5. Later PRs own technical review screens, applicability policy, provisioning,
-   packages, inheritance/default resolution and wizard navigation.
+Project Management exposes two opt-in entry points without changing the existing
+creation flow: **Preparación guiada** for a new Job and **Preparar** on editable Job
+cards. Starting preparation generates tasks from the Job's canonical departments.
+The page persists the current step before navigation and requires the operator to
+confirm completion after doing the work; opening a tool never completes a task.
+
+`jobTaskActions.ts` is the central adapter from generated setup keys to existing
+tools. Basic fields and departments open `EditJobDialog`; personnel opens
+`JobRequirementsEditor`; Sound/Lights/Video document tasks open the existing task
+manager; Pesos, Consumos and Memoria tasks use their existing job-aware routes;
+Estructura reuses the motor preparation and certificate actions. Flex returns to
+the exact Job card in Project Management, where the established Flex folder picker
+and provisioning logic remains the only writer.
+
+When departments change, **Actualizar tareas** reconciles generated requirements.
+The service preserves status and audit history for unchanged or retired tasks. A
+workflow can enter review at any point, but database completion rejects unresolved
+required tasks or blockers under the same row lock.
+
+Tour and Tour Date definitions remain ready for later route-level consumers. They
+should use the same hooks and action-adapter pattern rather than putting Supabase
+queries or task-key switches in React views.
 
 ## Verification and release
 
-For a local, database-free component demo, run `npm run dev` and open
-`/setup-workflow-demo.html`. It supports department reconciliation and task-state
-changes in memory. Reloading resets this demonstration; it does not claim to test
-server persistence. The standalone entry is not included in the production build.
+Run `npm run dev` and use `/jobs/setup/new` or the **Preparar** action on a Job card.
+This is the real application flow and requires the setup workflow migrations on the
+connected Supabase project. It writes only workflow orchestration records; tool
+actions continue through their established canonical services.
 
 Vitest covers definitions, deterministic generation, reconciliation, progress,
 transitions, service failure/resume behavior and component rendering. pgTAP tests

@@ -10,27 +10,32 @@ interface TaskManagerDialogProps {
   userRole?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialDepartment?: 'sound' | 'lights' | 'video';
 }
 
 // Phase A: Wrapper that presents a unified entry point and opens
 // the existing department dialogs from each tab. Read-only parity.
-export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, tourId, userRole, open, onOpenChange }) => {
+export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, tourId, userRole, open, onOpenChange, initialDepartment = 'sound' }) => {
   const [activeTab, setActiveTab] = React.useState<'sound' | 'lights' | 'video'>('sound');
   const canEdit = canEditTasks(userRole);
   const canAssign = canAssignTasks(userRole);
+
+  React.useEffect(() => {
+    if (open) setActiveTab(initialDepartment);
+  }, [initialDepartment, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl w-[96vw] max-h-[calc(90vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Task Manager</DialogTitle>
+          <DialogTitle>Gestión de tareas</DialogTitle>
         </DialogHeader>
         <div className="mt-2 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="sound">Sound</TabsTrigger>
-              <TabsTrigger value="lights">Lights</TabsTrigger>
-              <TabsTrigger value="video">Video</TabsTrigger>
+              <TabsTrigger value="sound">Sonido</TabsTrigger>
+              <TabsTrigger value="lights">Luces</TabsTrigger>
+              <TabsTrigger value="video">Vídeo</TabsTrigger>
             </TabsList>
             <TabsContent value="sound" className="pt-4">
               <TaskList jobId={jobId} tourId={tourId} department="sound" canEdit={canEdit} canAssign={canAssign} canUpdateOwn={true} />

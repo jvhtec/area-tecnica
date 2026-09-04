@@ -10,6 +10,7 @@ export const setupWorkflowKeys = {
   detail: (id?: string) => queryKeys.scope('setup-workflows', 'detail', id),
   tasks: (id?: string) => queryKeys.scope('setup-workflows', 'tasks', id),
   entity: (type: WorkflowType, id?: string) => queryKeys.scope('setup-workflows', 'entity', type, id),
+  latestEntity: (type: WorkflowType, id?: string) => queryKeys.scope('setup-workflows', 'latest-entity', type, id),
 };
 
 export function useSetupWorkflow(id?: string) {
@@ -30,6 +31,13 @@ export function useSetupWorkflowForEntity(type: WorkflowType, entityId?: string)
   return useQuery({
     queryKey: setupWorkflowKeys.entity(type, entityId), enabled: Boolean(entityId),
     queryFn: () => service.getWorkflowForEntity(type, entityId!),
+  });
+}
+
+export function useLatestSetupWorkflowForEntity(type: WorkflowType, entityId?: string) {
+  return useQuery({
+    queryKey: setupWorkflowKeys.latestEntity(type, entityId), enabled: Boolean(entityId),
+    queryFn: () => service.getLatestWorkflowForEntity(type, entityId!),
   });
 }
 

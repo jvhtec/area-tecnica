@@ -9,7 +9,9 @@ import {
   LightsConsumosTool,
   LightsMemoriaTecnica,
   LightsPesosTool,
+  JobSetup,
   ModernHojaDeRuta,
+  NewJobSetup,
   PesosTool,
   RackBuilderConnectorManagerPage,
   RackBuilderDeviceManagerPage,
@@ -33,6 +35,22 @@ import {
 } from "@/routes/app-route-pages";
 
 export const secondaryAppRoutes: readonly AppRoute[] = [
+  {
+    id: "newJobSetup",
+    path: "/jobs/setup/new",
+    component: NewJobSetup,
+    layout: "app",
+    access: "management",
+    breadcrumb: { label: "Nuevo trabajo guiado", parentPath: "/project-management" },
+  },
+  {
+    id: "jobSetup",
+    path: "/jobs/:jobId/setup",
+    component: JobSetup,
+    layout: "app",
+    access: "management",
+    breadcrumb: { label: "Preparación del trabajo", parentPath: "/project-management" },
+  },
   {
     id: "feedback",
     path: "/feedback",
