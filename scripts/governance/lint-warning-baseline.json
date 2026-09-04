@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-09-04T15:21:32.820Z",
+  "generatedAt": "2026-09-04T15:50:06.999Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1267,
+  "total": 1259,
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 1046,
+    "@typescript-eslint/no-explicit-any": 1038,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -162,9 +162,6 @@
     },
     "src/components/jobs/cards/JobCardHeader.tsx": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/jobs/cards/JobCardProgress.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/jobs/CreateJobDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 2,
@@ -774,7 +771,7 @@
     },
     "src/pages/MorningSummary.tsx": {
       "react-hooks/exhaustive-deps": 1,
-      "@typescript-eslint/no-explicit-any": 6
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/pages/pesos-tool/PesosToolView.tsx": {
       "@typescript-eslint/no-explicit-any": 14
@@ -870,9 +867,6 @@
       "@typescript-eslint/no-explicit-any": 5
     },
     "src/utils/amplifierCalculationPdf.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/utils/artistTablePdfExport.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/utils/consoleCapture.ts": {

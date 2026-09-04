@@ -73,7 +73,8 @@ export function usePanelLayouts(projectId: string | undefined) {
       p_height_ru: safeHeight,
       p_facing: payload.facing,
       p_has_lacing_bar: payload.has_lacing_bar,
-      p_notes: payload.notes ?? null,
+      // `p_notes` is a nullable `text` argument; the generated types don't model that.
+      p_notes: (payload.notes ?? null) as string,
       p_weight_kg: payload.weight_kg ?? 0,
       p_default_hole_count: holeCount,
     })
@@ -112,7 +113,7 @@ export function usePanelLayouts(projectId: string | undefined) {
       p_drawing_state: meta.drawing_state,
       p_facing: meta.facing,
       p_has_lacing_bar: meta.has_lacing_bar,
-      p_notes: meta.notes,
+      p_notes: (meta.notes ?? null) as string,
       p_rows: rows.map((row) => ({
         row_index: row.row_index,
         hole_count: row.hole_count,

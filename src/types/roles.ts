@@ -65,7 +65,7 @@ const CODE_TO_LABEL = new Map<string, string>(
   Object.values(ROLE_REGISTRY).flat().map(r => [r.code, r.label] as const)
 )
 
-export function roleOptionsForDiscipline(discipline: string): RoleOption[] {
+export function roleOptionsForDiscipline(discipline: string | null | undefined): RoleOption[] {
   const key = (discipline || '').toLowerCase() as Discipline
   return ROLE_REGISTRY[key] ?? []
 }
@@ -82,7 +82,7 @@ export function isRoleCode(value: string | null | undefined): boolean {
 }
 
 // Best-effort mapping from human label to code, optionally constrained by discipline
-export function codeForLabel(label: string, discipline?: string): string | null {
+export function codeForLabel(label: string, discipline?: string | null): string | null {
   const normalized = (label || '').trim().toLowerCase()
   if (!normalized) return null
 

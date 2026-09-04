@@ -20,7 +20,8 @@ type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";
 interface JobStatusSelectorProps {
   jobId: string;
   currentStatus: JobStatus | null;
-  onStatusChange?: (status: JobStatus) => void;
+  // Nullable: the error path reverts to `currentStatus`, which may itself be null.
+  onStatusChange?: (status: JobStatus | null) => void;
   disabled?: boolean;
 }
 

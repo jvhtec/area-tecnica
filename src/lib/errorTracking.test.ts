@@ -191,8 +191,11 @@ describe('unhandled error budget', () => {
     const payload = lastInsertedPayload()
     expect(payload.context.errorStack).toBe('Error: boom\n at [REDACTED_URL]')
     if (typeof window !== 'undefined') {
-      expect(payload.context.runtime.host).toBe(window.location.host)
-      expect(payload.context.runtime.mode).toEqual(expect.any(String))
+      const runtime = payload.context.runtime
+      expect(runtime).toBeDefined()
+      if (!runtime) throw new Error('Expected browser runtime metadata')
+      expect(runtime.host).toBe(window.location.host)
+      expect(runtime.mode).toEqual(expect.any(String))
     }
   })
 })

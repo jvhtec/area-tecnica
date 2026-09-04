@@ -13,3 +13,7 @@ export const isTruthy = <T>(value: T): value is Exclude<T, null | undefined | fa
 /** Keeps only entries that are neither `null` nor `undefined`. */
 export const isPresent = <T>(value: T | null | undefined): value is T =>
   value !== null && value !== undefined;
+
+/** Keeps strings that contain visible content after trimming. */
+export const isNonBlankString = (value: string | null | undefined): value is string =>
+  typeof value === 'string' && value.trim().length > 0;

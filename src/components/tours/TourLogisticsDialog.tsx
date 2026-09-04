@@ -148,10 +148,12 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
         // Find existing request for job+department
         const existing = existingReqs.find(r => r.job_id === jobId)
         const { error } = await dataLayerClient.rpc('replace_transport_request_with_items', {
-          p_request_id: existing?.id || null,
+          // `p_request_id` / `p_note` are nullable text/uuid arguments; the generated
+          // types do not model argument nullability.
+          p_request_id: (existing?.id || null) as string,
           p_job_id: jobId,
           p_department: department,
-          p_note: note || null,
+          p_note: (note || null) as string,
           p_status: existing?.status || 'requested',
           p_created_by: existing?.created_by || userId,
           p_items: toTransportRequestRpcItems(items) as unknown as Json,

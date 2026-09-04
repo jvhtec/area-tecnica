@@ -58,9 +58,10 @@ export interface ArtistRiderFile {
   created_at?: string | null;
   uploaded_at?: string | null;
   uploaded_by?: string | null;
-  artist_id?: string;
+  // Nullable to match `festival_artist_files.artist_id` and the joined artist row.
+  artist_id?: string | null;
   festival_artists?: {
-    id: string;
+    id: string | null;
     name: string;
   } | null;
 }

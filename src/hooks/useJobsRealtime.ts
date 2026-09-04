@@ -205,7 +205,8 @@ export function useJobsRealtime() {
   };
   
   return {
-    jobs,
+    // The query has no `initialData`, so it is undefined until the first fetch resolves.
+    jobs: jobs ?? [],
     isLoading,
     isError,
     error,

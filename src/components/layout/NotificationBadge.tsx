@@ -26,26 +26,33 @@ export const NotificationBadge = ({
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const isLoadingRef = useRef(false)
   const refreshQueuedRef = useRef(false)
   const debounceTimerRef = useRef<number | null>(null)
   const navigate = useNavigate()
 
   const fetchUnreadMessages = useCallback(async () => {
-    if (isLoading) {
+    if (isLoadingRef.current) {
       refreshQueuedRef.current = true
       return
     }
 
     try {
+      isLoadingRef.current = true
       setIsLoading(true)
 
       let deptQuery = dataLayerClient.from("messages")
         .select("id", { count: "exact", head: true })
         .eq("status", "unread")
 
-      if (isDepartmentManagementRole(userRole)) {
+      // Mirrors useMessagesQuery: anyone without a scoped department — including a
+      // management profile whose department is null — falls back to their own sent
+      // messages. Leaving both filters off would count every department's unread
+      // messages (the messages SELECT policy shows management all rows), lighting the
+      // badge for messages the list will never show.
+      if (isDepartmentManagementRole(userRole) && userDepartment) {
         deptQuery = deptQuery.eq("department", userDepartment)
-      } else if (userRole === "technician") {
+      } else {
         deptQuery = deptQuery.eq("sender_id", userId)
       }
 
@@ -78,13 +85,14 @@ export const NotificationBadge = ({
     } catch (error) {
       console.error("Error checking unread messages:", error)
     } finally {
+      isLoadingRef.current = false
       setIsLoading(false)
       if (refreshQueuedRef.current) {
         refreshQueuedRef.current = false
         Promise.resolve().then(() => fetchUnreadMessages())
       }
     }
-  }, [userId, userRole, userDepartment, isLoading])
+  }, [userId, userRole, userDepartment])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

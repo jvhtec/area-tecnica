@@ -8,7 +8,7 @@ import { useTimesheets } from "@/hooks/useTimesheets";
 
 interface TimesheetSignatureProps {
   timesheetId: string;
-  currentSignature?: string;
+  currentSignature?: string | null;
   canSign: boolean;
   onSigned: (timesheetId: string, signatureData: string) => Promise<any>;
 }

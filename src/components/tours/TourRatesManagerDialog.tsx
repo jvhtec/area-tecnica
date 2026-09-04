@@ -427,6 +427,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       const job = tourJobs.find((j) => j.id === selectedJobId);
                       if (!job) return;
                       
+                      if (!selectedJobId) return;
                       const { data: lpoRows } = await dataLayerClient.from('flex_work_orders')
                         .select('technician_id, lpo_number')
                         .eq('job_id', selectedJobId);

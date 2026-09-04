@@ -463,6 +463,10 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         ? { next_run_at: new Date().toISOString() }
         : {}
 
+      if (!campaign?.id) {
+        throw new Error('No hay una campaña activa que actualizar')
+      }
+
       const { data, error } = await dataLayerClient.from('staffing_campaigns')
         .update({
           mode: formData.mode,
@@ -471,7 +475,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           updated_at: new Date().toISOString(),
           ...nextRunUpdate
         })
-        .eq('id', campaign?.id)
+        .eq('id', campaign.id)
         .select()
         .single()
 
@@ -486,7 +490,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${(await dataLayerClient.auth.getSession()).data.session?.access_token}`
             },
-            body: JSON.stringify({ campaign_id: campaign?.id })
+            body: JSON.stringify({ campaign_id: campaign.id })
           }
         )
         const payload = await response.json().catch(() => ({}))

@@ -523,7 +523,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
                           ))}
                           <div className="flex justify-between font-medium text-green-800 border-t border-green-300 pt-1 mt-2">
                             <span>Extras Total:</span>
-                            <span>{formatCurrency(quote.extras.total_eur)}</span>
+                            <span>{formatCurrency(quote.extras.total_eur ?? 0)}</span>
                           </div>
                         </div>
                       </div>

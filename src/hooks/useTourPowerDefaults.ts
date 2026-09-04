@@ -10,7 +10,7 @@ export interface TourPowerDefault {
   total_watts: number;
   current_per_phase: number;
   pdu_type: string;
-  custom_pdu_type?: string;
+  custom_pdu_type?: string | null;
   position?: string | null;
   custom_position?: string | null;
   includes_hoist: boolean;

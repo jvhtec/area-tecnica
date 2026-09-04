@@ -5,24 +5,25 @@ import { useToast } from "@/hooks/use-toast";
 
 import { queryKeys } from "@/lib/react-query";
 import { isPresent } from '@/utils/typeGuards';
+// Mirrors the nullable `incident_reports` / joined `profiles` columns.
 export interface IncidentReport {
   id: string;
   job_id: string;
   file_name: string;
   file_path: string;
-  file_type: string;
-  file_size: number;
-  uploaded_by: string;
-  uploaded_at: string;
+  file_type: string | null;
+  file_size: number | null;
+  uploaded_by: string | null;
+  uploaded_at: string | null;
   job?: {
     id: string;
     title: string;
     start_time: string;
     end_time: string;
-  };
+  } | null;
   uploaded_by_profile?: {
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
   } | null;
 }
 

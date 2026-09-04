@@ -19,7 +19,7 @@ type TimesheetVisibilityRow = Pick<
   'id' | 'amount_eur' | 'amount_breakdown' | 'amount_eur_visible' | 'amount_breakdown_visible'
 >;
 
-export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }) => {
+export const useTimesheets = (jobId: string | undefined, opts?: { userRole?: string | null }) => {
   console.log("useTimesheets hook called with jobId:", jobId);
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +33,12 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
   }, [jobId, queryClient]);
 
   const fetchTimesheets = useCallback(async () => {
+    if (!jobId) {
+      setTimesheets([]);
+      setIsLoading(false);
+      setIsError(false);
+      return;
+    }
     try {
       setIsLoading(true);
       setIsError(false);
@@ -141,6 +147,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
   }, [jobId]);
 
   const autoCreateTimesheets = useCallback(async () => {
+    if (!jobId) return;
     try {
       console.log("autoCreateTimesheets started for jobId:", jobId);
       
@@ -315,10 +322,16 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       console.log("jobId is empty or invalid, skipping fetch");
       setIsLoading(false);
       setTimesheets([]);
+      setIsError(false);
     }
   }, [jobId, fetchTimesheets, opts?.userRole]);
 
   const createTimesheet = async (technicianId: string, date: string, category?: 'tecnico' | 'especialista' | 'responsable') => {
+    if (!jobId) {
+      toast.error("Select a job before creating a timesheet");
+      return null;
+    }
+
     try {
       const insertData: any = {
         job_id: jobId,

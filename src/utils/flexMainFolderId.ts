@@ -7,22 +7,26 @@ export interface FlexFolder {
   folder_type: string;
 }
 
+/** The tour columns a job carries for Flex folder resolution. */
+export interface JobTourFlexFolders {
+  id: string;
+  flex_main_folder_id?: string | null;
+  flex_sound_folder_id?: string | null;
+  flex_lights_folder_id?: string | null;
+  flex_video_folder_id?: string | null;
+  flex_production_folder_id?: string | null;
+  flex_personnel_folder_id?: string | null;
+}
+
 export interface JobWithFlexFolders {
   id: string;
-  job_type?: string;
-  tour_id?: string;
-  tour_date_id?: string;
-  start_time?: string;
-  tour?: {
-    id: string;
-    flex_main_folder_id?: string | null;
-    flex_sound_folder_id?: string | null;
-    flex_lights_folder_id?: string | null;
-    flex_video_folder_id?: string | null;
-    flex_production_folder_id?: string | null;
-    flex_personnel_folder_id?: string | null;
-  };
-  flex_folders?: FlexFolder[];
+  // Nullable to match the `jobs` columns these are read from.
+  job_type?: string | null;
+  tour_id?: string | null;
+  tour_date_id?: string | null;
+  start_time?: string | null;
+  tour?: JobTourFlexFolders | null;
+  flex_folders?: FlexFolder[] | null;
 }
 
 /**

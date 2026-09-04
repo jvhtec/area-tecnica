@@ -5,7 +5,8 @@ import { MobileActionSheet } from "@/components/ui/mobile-action-sheet";
 
 interface TourManagementMobileActionsProps {
   flexUuid: string | null;
-  folderExists: boolean;
+  /** Null until `useFlexUuid` has resolved whether the folder exists. */
+  folderExists: boolean | null;
   isFlexLoading: boolean;
   isManagementUser: boolean;
   isPrintingSchedule: boolean;

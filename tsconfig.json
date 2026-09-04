@@ -9,11 +9,12 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "noImplicitAny": false,
+    /* Kept in sync with tsconfig.app.json (what CI type-checks) so editors report
+       the same errors as the `typecheck` gate. */
+    "strict": true,
     "noUnusedParameters": false,
     "skipLibCheck": true,
     "allowJs": true,
-    "noUnusedLocals": false,
-    "strictNullChecks": false
+    "noUnusedLocals": false
   }
 }

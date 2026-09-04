@@ -109,7 +109,7 @@ describe("mapPowerRequirementRowToTable", () => {
     expect(data.phaseMode).toBe("three");
     expect(data.voltage).toBe(400);
     expect(data.pf).toBe(0.95);
-    expect(data.rows).toEqual(baseRow.table_data.rows);
+    expect(data.rows).toEqual((baseRow.table_data as { rows: unknown }).rows);
   });
 
   it("falls back to defaults when table_data has no settings snapshot", () => {

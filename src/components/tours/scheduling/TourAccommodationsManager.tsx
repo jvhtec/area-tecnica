@@ -533,8 +533,8 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
               <Label>Buscar Hotel *</Label>
               <HotelAutocomplete
                 value={formData.hotel_name || ""}
-                checkIn={formData.check_in_date}
-                checkOut={formData.check_out_date}
+                checkIn={formData.check_in_date ?? ""}
+                checkOut={formData.check_out_date ?? ""}
                 onChange={(hotelName, address, coordinates) => {
                   setFormData({
                     ...formData,

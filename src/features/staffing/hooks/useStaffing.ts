@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client'
 
 
 import { queryKeys } from "@/lib/react-query";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/api-config";
 export function useStaffingStatus(jobId: string, profileId: string) {
   return useQuery({
     queryKey: queryKeys.scope('staffing', jobId, profileId),
@@ -75,17 +76,17 @@ export function useSendStaffingEmail() {
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
 
-      // Get Supabase URL and construct functions URL
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const functionUrl = `${supabaseUrl}/functions/v1/send-staffing-email`;
+      // Resolve config through api-config, which accepts either VITE_SUPABASE_ANON_KEY or
+      // VITE_SUPABASE_PUBLISHABLE_KEY. Reading the publishable name directly here meant a
+      // deployment that only set the primary name sent an empty `apikey` header.
+      const functionUrl = `${SUPABASE_URL}/functions/v1/send-staffing-email`;
 
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'apikey': anonKey,
+          'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify(payload)
       });

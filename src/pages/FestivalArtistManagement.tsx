@@ -426,8 +426,8 @@ const FestivalArtistManagement = () => {
             end: artist.show_end
           },
           soundcheck: artist.soundcheck ? {
-            start: artist.soundcheck_start,
-            end: artist.soundcheck_end
+            start: artist.soundcheck_start ?? '',
+            end: artist.soundcheck_end ?? ''
           } : undefined,
           technical: {
             fohTech: artist.foh_tech || false,

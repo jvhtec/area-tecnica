@@ -365,8 +365,11 @@ export const findSimilarOpsAccommodation = async (input: Partial<TourOpsAccommod
 };
 
 export const upsertOpsAccommodationFromHoja = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
-  const payload = opsAccommodationPayloadFromHotel(input);
-  if (!payload.check_in_date || !payload.check_out_date) return false;
+  // `tour_accommodations.check_in_date`/`check_out_date` are NOT NULL, so rebuild the
+  // payload from the narrowed locals rather than relying on property narrowing.
+  const { check_in_date, check_out_date, ...restPayload } = opsAccommodationPayloadFromHotel(input);
+  if (!check_in_date || !check_out_date) return false;
+  const payload = { ...restPayload, check_in_date, check_out_date };
 
   const existing = await findSimilarOpsAccommodation(input);
   if (existing?.id) {
@@ -425,10 +428,12 @@ export async function saveAccommodation(input: Partial<TourOpsAccommodation> & {
     return input.id;
   }
 
-  const payload = opsAccommodationPayloadFromHotel(input);
-  if (!payload.check_in_date || !payload.check_out_date) {
+  // See above: rebuild from narrowed locals so the NOT NULL columns type as `string`.
+  const { check_in_date, check_out_date, ...restPayload } = opsAccommodationPayloadFromHotel(input);
+  if (!check_in_date || !check_out_date) {
     throw new Error("Check-in y check-out son obligatorios");
   }
+  const payload = { ...restPayload, check_in_date, check_out_date };
 
   if (input.id && !isLegacyHotelInfo) {
     const { error } = await client.from("tour_accommodations").update(payload).eq("id", input.id);
@@ -588,7 +593,11 @@ export async function syncHojaRutaOpsData(model: TourOpsModel) {
         notes: hotel.notes,
         status: "planned",
       };
-    }).filter((row) => row.check_in_date && row.check_out_date);
+    }).flatMap((row) =>
+      row.check_in_date && row.check_out_date
+        ? [{ ...row, check_in_date: row.check_in_date, check_out_date: row.check_out_date }]
+        : []
+    );
     if (rows.length > 0) {
       const { error } = await client.from("tour_accommodations").insert(rows);
       if (error) throw error;

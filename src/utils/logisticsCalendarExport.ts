@@ -19,11 +19,12 @@ interface LogisticsEvent {
   transport_type: string;
   event_time: string;
   event_date: string;
-  transport_provider?: string;
+  // Nullable to match the `logistics_events` columns.
+  transport_provider?: string | null;
   job?: {
     title: string;
-  };
-  title?: string;
+  } | null;
+  title?: string | null;
   departments?: { department: string }[];
 }
 
@@ -56,7 +57,7 @@ const getTransportTypeLabel = (type: string): string => {
   return TRANSPORT_TYPE_LABELS[type] || type;
 };
 
-const getTransportProviderLabel = (provider?: string): string => {
+const getTransportProviderLabel = (provider?: string | null): string => {
   if (!provider) return "-";
   return TRANSPORT_PROVIDER_LABELS[provider] || provider;
 };

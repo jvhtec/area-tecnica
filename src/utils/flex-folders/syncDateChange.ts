@@ -368,7 +368,7 @@ async function syncStandardFlexElementsForJobDateChange(
         } else if (folder?.folder_type) {
           newName = generateFolderName(
             folder.folder_type,
-            folder.department || "",
+            folder.department,
             jobTitle,
             locationName,
             displayDate,

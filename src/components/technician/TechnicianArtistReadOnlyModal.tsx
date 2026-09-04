@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MobileArtistList } from "@/components/festival/mobile/MobileArtistList";
 import type { MobileArtistRiderFile } from "@/components/festival/mobile/MobileArtistCard";
+import type { Artist } from "@/components/festival/artistTableTypes";
 import { FestivalOfflineControls } from "@/components/festival/FestivalOfflineControls";
 import { Theme } from "./types";
 import { createQueryKey } from "@/lib/optimized-react-query";
@@ -26,6 +27,10 @@ import { canEditJobs } from "@/utils/permissions";
 import type { Tables } from "@/integrations/supabase/types";
 import type { IEMSystem, WirelessSystem } from '@/types/festival-equipment';
 import type { WavesModelSelection } from '@/constants/wavesModels';
+import {
+  buildTechnicianArtistStageOptions,
+  normalizeTechnicianArtistStage,
+} from "@/components/technician/technicianArtistStageFilters";
 
 type TechnicianArtistReadOnlyModalProps = {
   theme: Theme;
@@ -43,7 +48,8 @@ type TechnicianArtistReadOnlyModalProps = {
 type ReadOnlyArtist = {
   id: string;
   name: string;
-  stage: number;
+  /** Nullable to match the `festival_artists.stage` column. */
+  stage: number | null;
   date: string;
   show_start: string;
   show_end: string;
@@ -152,6 +158,68 @@ const mapRawToReadOnlyArtist = (artist: FestivalArtistRow): ReadOnlyArtist => ({
   extras_djbooth: Boolean(artist.extras_djbooth),
   mic_kit: asMicKit(artist.mic_kit),
   wired_mics: asArray<ReadOnlyWiredMic>(artist.wired_mics),
+});
+
+/** Mobile artist cards use the normalized festival UI model rather than raw nullable DB rows. */
+const normalizeReadOnlyArtistForMobile = (artist: ReadOnlyArtist): Artist => ({
+  id: artist.id,
+  name: artist.name,
+  // Stage 0 is the UI sentinel for an artist that has not been assigned a stage.
+  stage: normalizeTechnicianArtistStage(artist.stage),
+  date: artist.date,
+  show_start: artist.show_start,
+  show_end: artist.show_end,
+  soundcheck: artist.soundcheck,
+  soundcheck_start: artist.soundcheck_start ?? undefined,
+  soundcheck_end: artist.soundcheck_end ?? undefined,
+  line_check: artist.line_check ?? undefined,
+  line_check_start: artist.line_check_start ?? undefined,
+  line_check_end: artist.line_check_end ?? undefined,
+  load_in_time: artist.load_in_time ?? undefined,
+  foh_console: artist.foh_console ?? "",
+  foh_console_provided_by: artist.foh_console_provided_by ?? undefined,
+  foh_drive: artist.foh_drive ?? undefined,
+  foh_drive_position: artist.foh_drive_position ?? undefined,
+  mon_console: artist.mon_console ?? "",
+  mon_console_provided_by: artist.mon_console_provided_by ?? undefined,
+  mon_position: artist.mon_position ?? undefined,
+  monitors_from_foh: artist.monitors_from_foh ?? undefined,
+  foh_waves_models: artist.foh_waves_models ?? undefined,
+  foh_outboard: artist.foh_outboard ?? undefined,
+  mon_waves_models: artist.mon_waves_models ?? undefined,
+  mon_outboard: artist.mon_outboard ?? undefined,
+  wireless_systems: artist.wireless_systems,
+  wireless_provided_by: artist.wireless_provided_by ?? undefined,
+  iem_systems: artist.iem_systems,
+  iem_provided_by: artist.iem_provided_by ?? undefined,
+  monitors_enabled: artist.monitors_enabled,
+  monitors_quantity: artist.monitors_quantity,
+  extras_sf: artist.extras_sf,
+  extras_df: artist.extras_df,
+  extras_djbooth: artist.extras_djbooth,
+  notes: artist.notes ?? undefined,
+  rider_missing: artist.rider_missing ?? undefined,
+  foh_tech: artist.foh_tech ?? undefined,
+  mon_tech: artist.mon_tech ?? undefined,
+  isaftermidnight: artist.isaftermidnight ?? undefined,
+  mic_kit: artist.mic_kit ?? undefined,
+  wired_mics: artist.wired_mics ?? undefined,
+  infra_cat6: artist.infra_cat6 ?? undefined,
+  infra_cat6_quantity: artist.infra_cat6_quantity ?? undefined,
+  infra_hma: artist.infra_hma ?? undefined,
+  infra_hma_quantity: artist.infra_hma_quantity ?? undefined,
+  infra_coax: artist.infra_coax ?? undefined,
+  infra_coax_quantity: artist.infra_coax_quantity ?? undefined,
+  infra_opticalcon_duo: artist.infra_opticalcon_duo ?? undefined,
+  infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity ?? undefined,
+  infra_analog: artist.infra_analog ?? undefined,
+  other_infrastructure: artist.other_infrastructure ?? undefined,
+  infrastructure_provided_by: artist.infrastructure_provided_by ?? undefined,
+  artist_submitted: artist.artist_submitted ?? undefined,
+  stage_plot_file_path: artist.stage_plot_file_path,
+  stage_plot_file_name: artist.stage_plot_file_name,
+  stage_plot_file_type: artist.stage_plot_file_type,
+  stage_plot_uploaded_at: artist.stage_plot_uploaded_at,
 });
 
 const sortReadOnlyArtists = (rows: ReadOnlyArtist[]): ReadOnlyArtist[] =>
@@ -320,7 +388,7 @@ export function TechnicianArtistReadOnlyModal({
       id: string;
       file_name: string;
       file_path: string;
-      uploaded_at: string;
+      uploaded_at: string | null;
       artist_id: string | null;
     };
 
@@ -421,15 +489,7 @@ export function TechnicianArtistReadOnlyModal({
   };
 
   const stageOptions = useMemo(() => {
-    const uniqueStages = Array.from(new Set(artists.map((artist) => artist.stage)))
-      .filter((stage): stage is number => typeof stage === "number")
-      .sort((a, b) => a - b);
-
-    return uniqueStages.map((stageNumber) => ({
-      value: String(stageNumber),
-      label: stageNames[stageNumber] || `Escenario ${stageNumber}`,
-      count: artists.filter((artist) => artist.stage === stageNumber).length,
-    }));
+    return buildTechnicianArtistStageOptions(artists, stageNames);
   }, [artists, stageNames]);
 
   useEffect(() => {
@@ -442,7 +502,9 @@ export function TechnicianArtistReadOnlyModal({
 
   const stageFilteredArtists = useMemo(() => {
     if (selectedStage === "all") return artists;
-    return artists.filter((artist) => String(artist.stage) === selectedStage);
+    return artists.filter(
+      (artist) => String(normalizeTechnicianArtistStage(artist.stage)) === selectedStage,
+    );
   }, [artists, selectedStage]);
 
   const dayOptions = useMemo(() => {
@@ -481,10 +543,10 @@ export function TechnicianArtistReadOnlyModal({
   }, [selectedDay, dayOptions]);
 
   const artistsByDate = useMemo(() => {
-    const byDate = new Map<string, ReadOnlyArtist[]>();
+    const byDate = new Map<string, Artist[]>();
     filteredArtists.forEach((artist) => {
       if (!byDate.has(artist.date)) byDate.set(artist.date, []);
-      byDate.get(artist.date)!.push(artist);
+      byDate.get(artist.date)?.push(normalizeReadOnlyArtistForMobile(artist));
     });
 
     return Array.from(byDate.entries())
@@ -634,7 +696,7 @@ export function TechnicianArtistReadOnlyModal({
                   </div>
                   <MobileArtistList
                     artists={group.artists}
-                    stageNames={stageNames}
+                    stageNames={{ 0: "Sin escenario", ...stageNames }}
                     stagePlotUrls={stagePlotUrls}
                     gearComparisons={{}}
                     jobId={job.id}

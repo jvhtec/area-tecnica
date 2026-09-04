@@ -18,6 +18,7 @@ import { hasPrepDayDateType } from '@/utils/timesheetPrepDays';
 import { useQuery } from '@tanstack/react-query';
 import { fetchHourlyTourDateRateModes } from '@/services/hourlyTourDateTimesheets';
 import { queryKeys } from '@/lib/react-query';
+import { isNonBlankString } from '@/utils/typeGuards';
 
 export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -98,7 +99,7 @@ export default function Timesheets() {
   // Derived lists for filters
   const departments = useMemo(() => {
     if (!timesheets) return [];
-    return Array.from(new Set(timesheets.map(t => t.technician?.department).filter(Boolean))).sort();
+    return Array.from(new Set(timesheets.map(t => t.technician?.department))).filter(isNonBlankString).sort();
   }, [timesheets]);
 
   const technicians = useMemo(() => {

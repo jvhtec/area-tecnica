@@ -309,7 +309,7 @@ const fetchFestivalDocumentsOnline = async (jobId: string): Promise<FestivalDocu
       ...(file as ArtistRiderFile),
       festival_artists: {
         id: file.artist_id,
-        name: nameMap.get(file.artist_id) || "Unknown",
+        name: (file.artist_id ? nameMap.get(file.artist_id) : undefined) || "Unknown",
       },
     }));
   }

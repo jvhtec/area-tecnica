@@ -25,7 +25,8 @@ const DEFAULT_POWER_FACTOR: Record<TechnicalPowerDepartment, number> = {
 export interface NormalizedTourPowerTable {
   id: string;
   name: string;
-  rows: unknown[];
+  /** Always built by `getPowerTableRows`, so the concrete row type is known. */
+  rows: PowerTableRow[];
   totalWatts: number;
   totalVa: number;
   currentPerPhase: number;

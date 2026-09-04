@@ -15,7 +15,7 @@ interface ArtistInfrastructure {
   other_infrastructure?: string;
 }
 
-interface WirelessSystemPdf {
+export interface WirelessSystemPdf {
   model?: string;
   provided_by?: string;
   quantity?: number;

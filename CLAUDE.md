@@ -620,12 +620,18 @@ try {
 
 ## TypeScript Configuration
 
-- **Strict Mode**: Partially enabled (noImplicitAny: false, strictNullChecks: false)
+- **Strict Mode**: **On** (`strict: true` in `tsconfig.app.json`, which is what CI type-checks; `tsconfig.json` mirrors it so editors agree)
 - **Path Alias**: `@/*` → `./src/*`
 - **Skip Lib Check**: Enabled for faster builds
 - **Allow JS**: Enabled for gradual migration
+- **Not enabled**: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, `noUncheckedIndexedAccess`
 
-This is intentional for a large codebase in active development. Don't add strict type checks without extensive testing.
+`strict` was reached by a per-flag ratchet (QLT-02 in `docs/plans/2026-07-codebase-audit-roadmap.md`)
+and every violation was fixed at the type level. **Do not turn it back off, and do not
+silence new strict errors with `as` casts or `!`** — the usual cause is a hand-written
+type that claims a column is non-nullable when the DB says otherwise. Fix the type, or
+narrow properly. `filter(Boolean)` does not narrow: use `isTruthy` / `isPresent` from
+`@/utils/typeGuards`.
 
 ## Key Implementation Notes
 
@@ -1049,5 +1055,6 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **CI requires Node 20** — GitHub Actions workflow uses Node 20; match locally for consistency
 - **Playwright needs Chromium** — `npm run test:e2e` requires Playwright browsers installed (`npx playwright install chromium`)
 - **170+ SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
-- **Validate types with `npm run typecheck`, not bare `npx tsc --noEmit`** — CI gates on `tsc -p tsconfig.app.json`, which is stricter; a plain tsc run can pass while CI fails (e.g. typed-supabase-client casts)
+- **Validate types with `npm run typecheck`, not bare `npx tsc --noEmit`** — CI gates on `tsc -p tsconfig.app.json`; a plain tsc run picks a different config and can pass while CI fails
+- **`strict` is on — don't cast around it.** New strict errors on DB-backed code almost always mean a hand-written interface says `foo: string` where the column is `foo: string | null`. Widen the type to match the column rather than adding `as string` or `!`. Supabase's generated RPC `Args` types do *not* model argument nullability: for a `DEFAULT NULL` argument pass `undefined` (identical at runtime), and only cast when the argument has no default and must be sent as null.
 - **Don't manually edit archive/ or src/legacy/** — these are retained for reference only, no new runtime imports

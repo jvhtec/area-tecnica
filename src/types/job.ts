@@ -40,17 +40,18 @@ export interface StaffAssignment {
 export interface Job {
   id: string;
   title: string;
-  description?: string;
+  // Nullable to match the `jobs` columns these are read from.
+  description?: string | null;
   start_time: string;
   end_time: string;
-  location_id?: string;
-  tour_date_id?: string;
-  color?: string;
-  status?: string;
-  created_by?: string;
+  location_id?: string | null;
+  tour_date_id?: string | null;
+  color?: string | null;
+  status?: string | null;
+  created_by?: string | null;
   created_at: string;
   job_type: JobType;
-  flex_folders_created?: boolean;
+  flex_folders_created?: boolean | null;
   invoicing_company?: InvoicingCompany | null;
   preventive_resource_technician_id?: string | null;
   preventive_resource_assigned_at?: string | null;

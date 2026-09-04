@@ -57,7 +57,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import { resetTourRateSubscriptionsForTests, useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 
-function Harness(): React.JSX.Element {
+function Harness(): React.JSX.Element | null {
   useTourRateSubscriptions();
   return null;
 }

@@ -307,7 +307,8 @@ interface ShiftLike {
 
 interface AssignmentLike {
   id?: string;
-  shift_id: string;
+  /** Nullable to match the `festival_shift_assignments.shift_id` column. */
+  shift_id: string | null;
   technician_id?: string | null;
   external_technician_name?: string | null;
   role?: string | null;

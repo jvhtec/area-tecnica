@@ -22,7 +22,9 @@ interface JobRequirementsEditorProps {
 type EditableRowStatus = 'clean' | 'new' | 'updated'
 
 interface EditableRow
-  extends Pick<JobRequiredRoleRow, 'id' | 'job_id' | 'department' | 'role_code' | 'quantity' | 'notes'> {
+  extends Pick<JobRequiredRoleRow, 'job_id' | 'department' | 'role_code' | 'quantity' | 'notes'> {
+  /** Absent until the row has been persisted. */
+  id?: JobRequiredRoleRow['id']
   localId: string
   status: EditableRowStatus
 }

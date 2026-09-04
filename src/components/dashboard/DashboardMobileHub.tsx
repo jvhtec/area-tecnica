@@ -80,7 +80,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
   const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<{ first_name?: string; last_name?: string; profile_picture_url?: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ first_name?: string | null; last_name?: string | null; profile_picture_url?: string | null } | null>(null);
 
   const canEdit = isManagementRole(userRole);
 

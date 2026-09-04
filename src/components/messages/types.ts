@@ -3,15 +3,16 @@ export interface DirectMessage {
   content: string;
   created_at: string;
   status: 'read' | 'unread';
+  // Joined `profiles` columns, which are nullable.
   sender: {
     id: string;
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
   };
   recipient: {
     id: string;
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
   };
   sender_id: string;
   recipient_id: string;

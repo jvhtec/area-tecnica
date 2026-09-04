@@ -62,12 +62,21 @@ export const IncidentReportsManagement = () => {
       }
     });
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatNullableDate = (value: string | null, pattern: string) =>
+    value ? format(new Date(value), pattern, { locale: es }) : "N/A";
+
+  const formatUploaderName = (report: (typeof reports)[number]) => {
+    const profile = report.uploaded_by_profile;
+    if (!profile) return "N/A";
+    return [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "N/A";
   };
 
   if (isLoading) {
@@ -150,21 +159,14 @@ export const IncidentReportsManagement = () => {
                       </div>
                       <div>
                         <strong className="text-foreground">Técnico:</strong>
-                        <div className="truncate" title={
-                          report.uploaded_by_profile
-                            ? `${report.uploaded_by_profile.first_name} ${report.uploaded_by_profile.last_name}`
-                            : "N/A"
-                        }>
-                          {report.uploaded_by_profile
-                            ? `${report.uploaded_by_profile.first_name} ${report.uploaded_by_profile.last_name}`
-                            : "N/A"
-                          }
+                        <div className="truncate" title={formatUploaderName(report)}>
+                          {formatUploaderName(report)}
                         </div>
                       </div>
                       <div>
                         <strong className="text-foreground">Fecha:</strong>
                         <div>
-                          {format(new Date(report.uploaded_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                          {formatNullableDate(report.uploaded_at, "dd/MM/yyyy HH:mm")}
                         </div>
                       </div>
                     </div>

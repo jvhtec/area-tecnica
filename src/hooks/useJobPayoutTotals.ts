@@ -10,13 +10,15 @@ export interface UseJobPayoutTotalsOptions {
 }
 
 export function useJobPayoutTotals(
-  jobId: string,
+  jobId: string | undefined,
   technicianId?: string,
   options?: UseJobPayoutTotalsOptions
 ) {
   return useQuery({
     queryKey: queryKeys.scope('job-tech-payout', jobId, technicianId),
     queryFn: async (): Promise<JobPayoutTotals[]> => {
+      if (!jobId) return [];
+
       // 1. Fetch totals from view
       let query = supabase
         .from('v_job_tech_payout_2025')

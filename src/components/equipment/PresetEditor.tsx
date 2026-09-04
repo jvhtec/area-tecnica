@@ -22,7 +22,7 @@ import { useDepartment } from '@/contexts/DepartmentContext';
 
 import { queryKeys } from "@/lib/react-query";
 interface PresetEditorProps {
-  preset?: PresetWithItems;
+  preset?: PresetWithItems | null;
   isCopy?: boolean;
   onSave: (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[], tourId?: string | null) => void;
   onCancel: () => void;

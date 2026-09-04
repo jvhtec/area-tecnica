@@ -29,6 +29,7 @@ interface MessagesListProps {
 export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Add tab visibility hook to refresh messages when tab becomes visible
@@ -39,6 +40,7 @@ export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
       try {
         const { data: { user } } = await dataLayerClient.auth.getUser();
         if (!user) return;
+        setUserId(user.id);
 
         const { data: profile } = await dataLayerClient.from('profiles')
           .select('role, department')
@@ -57,7 +59,7 @@ export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
     fetchUserProfile();
   }, []);
 
-  const { messages, loading, isFetching, setMessages } = useMessagesQuery(userRole, userDepartment);
+  const { messages, loading, isFetching, setMessages } = useMessagesQuery(userRole, userDepartment, userId);
   const { handleDeleteMessage, handleMarkAsRead, handleGrantSoundVisionAccess } = useMessageOperations(messages, setMessages, toast);
   const isDepartmentManager = isDepartmentManagementRole(userRole);
 

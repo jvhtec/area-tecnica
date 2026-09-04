@@ -4,7 +4,10 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from '@/utils/seasonalHouseTech';
-import type { TechUnavailabilityStatus } from '@/types/availability';
+import type {
+  AvailabilitySchedule as SharedAvailabilitySchedule,
+  TechUnavailabilityStatus,
+} from "@/types/availability";
 
 interface TechnicianAvailability {
   id: number;
@@ -16,17 +19,10 @@ interface TechnicianAvailability {
   created_by: string | null;
 }
 
-interface AvailabilitySchedule {
-  id: string;
-  user_id: string;
-  department: string;
-  date: string;
-  status: 'available' | 'unavailable' | 'tentative';
-  notes?: string;
+/** Extends the shared row type with the source columns this hook selects. */
+interface AvailabilitySchedule extends SharedAvailabilitySchedule {
   source: string;
-  source_id?: string;
-  created_at: string;
-  updated_at: string;
+  source_id?: string | null;
 }
 
 type AvailabilityStatus = 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse';

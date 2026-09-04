@@ -75,13 +75,15 @@ export const useMatrixCellAssignmentRemoval = ({
 
   const handleRemoveAssignment = useCallback(async (removeAll: boolean) => {
     if (!assignment?.job_id) return;
+    // Hoisted so the narrowing survives the closures and awaits below.
+    const assignmentJobId = assignment.job_id;
 
     setIsRemovingAssignment(true);
 
     try {
       if (removeAll || multiDateRemoval.otherDatesCount === 0) {
         const { data, error } = await dataLayerClient.rpc('manage_assignment_lifecycle', {
-          p_job_id: assignment.job_id,
+          p_job_id: assignmentJobId,
           p_technician_id: technician.id,
           p_action: 'cancel',
           p_delete_mode: 'hard',
@@ -97,7 +99,7 @@ export const useMatrixCellAssignmentRemoval = ({
             flexDepartments.map(async (department) => {
               const { error: flexInvokeError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
                 body: {
-                  job_id: assignment.job_id,
+                  job_id: assignmentJobId,
                   technician_id: technician.id,
                   department,
                   action: 'remove',
@@ -120,7 +122,7 @@ export const useMatrixCellAssignmentRemoval = ({
             body: {
               action: 'broadcast',
               type: 'assignment.removed',
-              job_id: assignment.job_id,
+              job_id: assignmentJobId,
               recipient_id: technician.id,
               technician_id: technician.id,
               department: assignmentDepartments[0],
@@ -137,9 +139,12 @@ export const useMatrixCellAssignmentRemoval = ({
           : 'Asignación eliminada';
         toast.success(message);
       } else {
+        // `currentDate` is only null before the dialog has been opened for a cell.
+        if (!multiDateRemoval.currentDate) return;
+
         const { error } = await dataLayerClient.from('timesheets')
           .delete()
-          .eq('job_id', assignment.job_id)
+          .eq('job_id', assignmentJobId)
           .eq('technician_id', technician.id)
           .eq('date', multiDateRemoval.currentDate);
 
