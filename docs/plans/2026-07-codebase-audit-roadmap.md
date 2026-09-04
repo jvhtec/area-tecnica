@@ -11,11 +11,12 @@
 > the open risk register. Verified closed since this document: QLT-02, DATA-01, DATA-02, SEC-03,
 > SEC-07, SEC-08, SEC-10, REL-01, OPS-01. Still open: QLT-01 (ratchet frozen at par), QLT-03,
 > QLT-04, QLT-05, SEC-05, SEC-06, SEC-09, SEC-11, DB-01 through DB-05, PERF-01, REL-02, REL-03.
-> Three new findings supersede this register's priorities: **SEC-12** (eight tables readable with
-> the public anon key via `true OR` policies), **SEC-13** (`profiles` fully readable by any
-> authenticated user, exposing `calendar_ics_token` bearer credentials) and **SEC-14** (55
-> `SECURITY DEFINER` functions with a mutable `search_path`, including the four authorization
-> primitives). The counts below are dated 2026-07-09 and should not be quoted as current.
+> Two new findings, both verified against the production database, supersede this register's
+> priorities: **SEC-13** (`profiles` readable in full by any authenticated user — 313 rows, 313
+> `calendar_ics_token` bearer credentials, 286 national IDs) and **SEC-12** (three tables readable
+> with the public anon key, `festival_artists` at 598 rows materially; its policy also still
+> carries the `ja.job_id = ja.job_id` self-comparison SEC-03 fixed only for `sub_rentals`).
+> The counts below are dated 2026-07-09 and should not be quoted as current.
 
 ## Executive assessment
 

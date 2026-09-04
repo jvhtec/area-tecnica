@@ -4,7 +4,7 @@
 **Baseline reviewed:** `main` at `3ff4d13` (after the strict-mode / `no-explicit-any` / edge-type-gate PR series, #886–#891)
 **Previous audit:** [`docs/plans/2026-07-codebase-audit-roadmap.md`](plans/2026-07-codebase-audit-roadmap.md) (2026-07-09)
 **Scope:** React/Vite app, Supabase migrations/RLS/RPC/grants, all 74 Edge Functions, governance gates, tests/CI, PWA delivery, dependencies, bundle output.
-**Method:** every gate re-run locally on this commit; RLS reconstructed to final state by replaying the full migration chain; static data-flow tracing. Numbers below are measured, not carried forward.
+**Method:** every gate re-run locally on this commit; static data-flow tracing; **all SQL findings verified against the live production database** (`syldobdcdsgfgjtbuwxm`) via read-only catalog queries and role-impersonated (`SET LOCAL ROLE anon` / `authenticated`) row counts. Numbers below are measured, not carried forward.
 
 ---
 
@@ -29,10 +29,16 @@ look at**. Three examples carry most of the risk:
    the 74 Edge Functions are largely outside the ratchets, and that is where this audit's
    highest-severity findings are.
 
-**The single most important finding is new and unrelated to the recent work:** eight tables are
-readable by anyone holding the public anon key, because machine-generated RLS policies carry a
-`true OR …` prefix that short-circuits the role check. This was predicted as a *class* by SEC-05
-in July ("historical generated policy fragments"); the instances were never enumerated.
+**The single most important finding is new and unrelated to the recent work:** `profiles` is
+readable in full by every authenticated user — 313 rows, including 313 `calendar_ics_token`
+bearer credentials and 286 national-ID numbers. The February hardening migration narrowed insert,
+update and delete on that table and left select at `USING (true)`.
+
+A second, smaller instance of the same class: three tables are readable with the public anon key,
+`festival_artists` (598 rows) materially. Both were predicted as a *class* by SEC-05 in July
+("historical generated policy fragments"); the instances were never enumerated. The policy that
+exposes `festival_artists` also still carries the `ja.job_id = ja.job_id` self-comparison that
+SEC-03 fixed for `sub_rentals` — the fix was applied to one table rather than swept for.
 
 ---
 
@@ -51,6 +57,7 @@ in July ("historical generated policy fragments"); the instances were never enum
 | Governance | passes (grandfathered) | **passes**, all 11 sub-gates | see below |
 | Dependency audit | baseline-aware | **0 advisories, baseline is zero** | resolved |
 | Migrations | 180+ | **200**, timestamps unique/ordered | ok |
+| Live DB vs migration chain | not checked | **drifted** — replay mispredicts production RLS | see Method and limits |
 | Playwright | failed on Windows | **POSIX env syntax removed** (Node launcher) | config resolved; suite not runnable here |
 
 ### Governance gate detail
@@ -73,102 +80,75 @@ in July ("historical generated policy fragments"); the instances were never enum
 
 ## P0 — new findings, ship immediately
 
-### SEC-12 — Eight tables are readable with the public anon key (unauthenticated)
-
-**Severity: critical.** Ten SELECT policies in the schema baseline are written as
-`USING ((true OR <role check>))` or `USING ((<role check> OR true))`. The `true` short-circuits the
-disjunction, so the policy is unconditionally true. None of them carries a `TO` clause, so they
-apply to `PUBLIC` — which includes `anon`. Eight of the ten tables additionally hold a table-wide
-`GRANT SELECT … TO "anon"`, so nothing else stops the read.
-
-The `anon` key is embedded in the shipped client bundle by design. Any person on the internet can
-therefore read these tables in full, with no account.
-
-| Table | Policy (`00000000000000_production_schema.sql`) | anon reach |
-| --- | --- | --- |
-| `tours` | `p_tours_public_select_5a6a0b` (L9482) | **full table** (L10439) |
-| `tour_dates` | `p_tour_dates_public_select_8f4344` (L9440) | **full table** |
-| `tour_default_sets` | `p_tour_default_sets_public_select_8341a3` (L9444) | **full table** |
-| `tour_default_tables` | `p_tour_default_tables_public_select_fead6e` (L9448) | **full table** |
-| `tour_power_defaults` | `p_tour_power_defaults_public_select_5dba2b` (L9456) | **full table** |
-| `tour_weight_defaults` | `p_tour_weight_defaults_public_select_b2dacf` (L9478) | **full table** |
-| `rate_extras_2025` | `p_rate_extras_2025_public_select_0e3de6` (L9358) | **full table** |
-| `job_date_types` | `p_job_date_types_public_select_e0ccdb` (L9231) | **full table** |
-| `job_departments` | `p_job_departments_public_select_ce698d` (L9235) | column-only (`job_id`) |
-| `locations` | `p_locations_public_select_6df21f` (L9275) | column-only (`id`, `name`) |
-
-Exposed content includes the full tour roster and tour date schedule (client and venue
-information), and 2025 rate-extra pricing. The matching UPDATE/DELETE policies on these tables
-*are* correctly role-restricted, which is why this never surfaced as broken behaviour.
-
-**Remediation.** Replace the ten SELECT policies with the role predicate the `true OR` was
-masking, scope each to `TO authenticated` unless a public audience is deliberate, and revoke the
-table-wide `anon` grants that are not required by the tokenized wallboard path. Add a governance
-rule that fails any policy body matching `true OR`, `OR true`, or `USING (true)` without an
-explicit reviewed allowlist entry — the same shape as the existing SQL-grant gate. Cover each
-table with a pgTAP deny test asserting an `anon` role reads zero rows.
-
-**Verify first** (the schema baseline may not match the live database):
-
-```sql
-select tablename, policyname, roles, qual
-  from pg_policies
- where schemaname = 'public'
-   and (qual ilike '%true or%' or qual ilike '%or true%' or qual = 'true')
- order by tablename;
-```
-
 ### SEC-13 — `profiles` is fully readable by every authenticated user, exposing ICS bearer tokens
 
-**Severity: high.** `profiles_select` is `USING (true)` for `authenticated` (L9521) and was never
-narrowed — the 2026-02 phase-2 hardening migration altered only `profiles_insert`, `profiles_update`
-and `profiles_delete`. `authenticated` holds a table-wide SELECT grant (L10273). No masking view
-sits in front of the client path.
+**Severity: high. Confirmed on production.** `profiles_select` is `USING (true)` for
+`authenticated` and was never narrowed — the 2026-02 phase-2 hardening migration altered only
+`profiles_insert`, `profiles_update` and `profiles_delete`. Measured directly as the
+`authenticated` role:
+
+| Visible rows | `calendar_ics_token` readable | `dni` readable |
+| ---: | ---: | ---: |
+| 313 | 313 | 286 |
 
 Every logged-in user — including a freelance `technician` and the `wallboard` display role — can
-therefore read every row of `profiles`, which stores `dni` (Spanish national ID), `residencia`
-(home address), `phone`, `email` … and `calendar_ics_token`.
+read every row of `profiles`: `dni` (Spanish national ID), `residencia` (home address), `phone`,
+`email`.
 
-That last column is not merely PII, it is a **bearer credential**. `tech-calendar-ics`
+`calendar_ics_token` is not merely PII, it is a **bearer credential**. `tech-calendar-ics`
 (`index.ts:153-157`) authenticates a request purely by matching `?tid=<uuid>&token=<value>`
-against `profiles.calendar_ics_token`. Any authenticated user can read every other user's token
-and then fetch their personal calendar feed from an unauthenticated endpoint — a privilege
-escalation, not just an over-broad read.
+against `profiles.calendar_ics_token`. Any authenticated user can read all 313 tokens and fetch
+any colleague's personal calendar from an unauthenticated endpoint — privilege escalation, not
+just an over-broad read.
 
 **Remediation.** Narrow `profiles_select` to self + colleagues the caller legitimately needs
-(assignment/department correlated), with admin/management retaining full read. Independently, move
-`calendar_ics_token` out of the row the client can read — a side table readable only by
-`service_role`, or a column-level `REVOKE` on the `authenticated` grant — so that fixing the
-policy is not the only thing standing between a technician and everyone's calendar. `dni` and
-`residencia` deserve the same treatment. Add pgTAP coverage: today no pgTAP file asserts anything
-about `profiles` row visibility.
+(assignment/department correlated), with admin/management retaining full read. Independently move
+`calendar_ics_token` out of the client-readable row — a side table readable only by `service_role`,
+or a column-level `REVOKE` on the `authenticated` grant — so the policy is not the only thing
+between a technician and everyone's calendar. `dni` and `residencia` deserve the same treatment.
+No pgTAP file currently asserts anything about `profiles` row visibility.
 
----
+### SEC-12 — Three tables are readable with the public anon key
+
+**Severity: medium. Confirmed and bounded on production.** A sweep of every table on which `anon`
+holds `SELECT`, executed as the `anon` role, returns rows from exactly three:
+
+| Table | Rows readable by anon | Assessment |
+| --- | ---: | --- |
+| `festival_artists` | **598** | Unannounced festival line-ups, stage assignments, free-text `notes`, rider status flags. Commercially confidential; no contact or fee columns. |
+| `activity_catalog` | 54 | Static event-type reference data. Benign, likely intentional. |
+| `rate_extras_2025` | 4 | Rate-extra pricing rows. |
+
+The cause in each case is a SELECT policy whose predicate short-circuits to true and which carries
+no `TO` clause, so it applies to `PUBLIC` including `anon`:
+
+- `festival_artists` → `p_festival_artists_public_select_598f77`, which ORs a `true` term into the
+  middle of an otherwise correct role check. **The same policy also still contains the
+  `ja.job_id = ja.job_id` self-comparison** that SEC-03 fixed for `sub_rentals` in July — the
+  anti-pattern was fixed on one table, not swept for across the schema, exactly as SEC-05 warned.
+- `rate_extras_2025` → `p_rate_extras_2025_public_select_0e3de6` = `(is_admin_or_management() OR true)`.
+- `activity_catalog` → `activity_catalog_read` = `true`.
+
+The `anon` key ships in the client bundle by design, so these need no account to read.
+
+**Remediation.** Drop the `true` term from all three predicates and restore the role check the
+`OR true` was masking; scope each `TO authenticated` unless a public audience is deliberate
+(`activity_catalog` plausibly is — decide explicitly rather than by accident). Fix the
+`ja.job_id = ja.job_id` self-correlation in the same policy. Then add a governance rule that fails
+any policy body matching `true OR`, `OR true`, `USING (true)`, or a self-comparison, unless
+allowlisted with a rationale — the same shape as the existing SQL-grant gate — and a pgTAP deny
+test per table.
+
+Twelve further tables carry a `USING (true)` SELECT policy scoped to `authenticated`
+(`achievements`, `app_changelog`, `jobs`, `job_assignments`, `job_rehearsal_dates`,
+`rate_cards_2025`, `rate_cards_tour_2025`, `venues`, `madrid_holidays`, `role_skill_mapping`,
+`soundvision_file_reviews`, `technical_tool_quick_presets`, plus `tours` via
+"Allow wallboard to read tour status"). These are not anon-reachable and several are plausibly
+intended to be org-wide, but `jobs`, `job_assignments` and the two `rate_cards_*` tables mean any
+technician can read the entire job book and the full rate card. That is a business decision to
+confirm, not a defect to assume — but it should be confirmed rather than inherited.
 
 ## P1 — open, and older than they look
-
-### SEC-14 — `SECURITY DEFINER` authorization primitives have a mutable `search_path`
-
-136 `SECURITY DEFINER` functions are live; **55 have no `SET search_path`**. Four of them are the
-authorization primitives every RLS policy in the schema calls: `get_current_user_role`, `is_admin`,
-`is_admin_or_management`, `can_manage_users`.
-
-An unpinned `search_path` on a definer function is the standard Postgres escalation vector: an
-attacker who can create an object in an earlier schema on the path shadows what the function
-resolves. Exploitability depends on whether a non-superuser role holds `CREATE` on a schema in the
-path — no migration in this repo grants or revokes `CREATE ON SCHEMA`, so the live grant is
-inherited from project defaults and must be checked directly:
-
-```sql
-select has_schema_privilege('authenticated','public','CREATE'),
-       has_schema_privilege('anon','public','CREATE');
-```
-
-If either returns true, treat this as P0 alongside SEC-12.
-
-This survived because the `db_lint` CI job runs `--fail-on error`, and Supabase's
-`function_search_path_mutable` advisory (0011) is a **warning**. The gate is real but tuned past
-the finding. DB-03 in the July roadmap called for exactly this and has not been actioned.
 
 ### SEC-09 (carried) — structured logging shipped as dead code
 
@@ -308,18 +288,19 @@ reachable from a URL.
 
 ## Recommended sequence
 
-1. **Now.** SEC-12 — run the `pg_policies` verification query, fix the ten policies, revoke the
-   anon grants, add the policy-shape governance rule and pgTAP deny tests.
-2. **Now.** SEC-13 — get `calendar_ics_token` out of client reach first (fastest risk reduction),
-   then narrow `profiles_select`.
-3. **Within 7 days.** SEC-14 — check `has_schema_privilege` for `CREATE`; pin `search_path` on the
-   four authorization primitives regardless of the answer, then the remaining 51; change `db_lint`
-   to fail on the `0011` advisory so it cannot recur.
-4. **Within 30 days.** SEC-09 and SEC-15 — adopt `structuredLogger` and `escapeHtml` at the mail
+1. **Now.** SEC-13 — get `calendar_ics_token` out of client reach first (fastest risk reduction;
+   a column-level `REVOKE` is a one-line migration), then narrow `profiles_select`. Rotate the
+   existing tokens afterwards: they have been readable org-wide for as long as the policy has
+   existed, so treat them as disclosed.
+2. **Within 7 days.** SEC-12 — fix the three policy predicates, fix the `ja.job_id = ja.job_id`
+   self-correlation in the same `festival_artists` policy, decide `activity_catalog`'s audience
+   explicitly, and add the policy-shape governance rule plus pgTAP deny tests. Then confirm
+   whether org-wide read of `jobs`, `job_assignments` and the `rate_cards_*` tables is intended.
+3. **Within 30 days.** SEC-09 and SEC-15 — adopt `structuredLogger` and `escapeHtml` at the mail
    and auth functions, and add the lint rules that make adoption enforceable rather than optional.
-5. **Within 30 days.** QLT-07 — delete the 88 unreferenced modules in one reviewable PR; it
+4. **Within 30 days.** QLT-07 — delete the 88 unreferenced modules in one reviewable PR; it
    improves QLT-01, QLT-05 and review surface at once.
-6. **Ongoing.** Extend the file-size gate to `supabase/functions/`, split the lint baseline into
+5. **Ongoing.** Extend the file-size gate to `supabase/functions/`, split the lint baseline into
    app/functions halves with a decrement target, and wire `test:coverage` into CI so REL-02's
    thresholds are real.
 
@@ -334,10 +315,19 @@ reachable from a URL.
   the `e2e_smoke` and mobile jobs cover it in CI), and every
   container-backed database job (`migration_apply`, `db_lint`, `rls_rpc_security_tests`), so all
   SQL findings are derived from replaying the migration chain statically.
-- **RLS state was reconstructed, not observed.** The replay tracks `CREATE`/`DROP`/`ALTER POLICY`
-  and `DROP TABLE` in document order across all 200 migrations, resolving quoted and
-  schema-qualified identifiers. It cannot see drift applied directly to the production database.
-  Confirm SEC-12, SEC-13 and SEC-14 against `pg_policies` / `pg_proc` before and after remediation.
+- **SQL findings were verified against production, and that verification overturned two of them.**
+  An initial pass reconstructed RLS by replaying the migration chain. Checking it against the live
+  database showed the replay is not a reliable model of production:
+  - It reported eight tour/job tables as anon-readable. Measured as `anon`, all eight return
+    **zero** rows — those policies have been replaced in production outside the migration chain.
+    The real anon exposure is three tables, and only `festival_artists` materially.
+  - It reported 55 `SECURITY DEFINER` functions with a mutable `search_path`, including the
+    authorization primitives. **This was a false positive in the audit tooling**: the schema dump
+    writes `SET "search_path"` (quoted) and the scan matched only the unquoted form. Production has
+    **140 of 140 definer functions pinned**, and neither `anon` nor `authenticated` holds `CREATE`
+    on schema `public`. There is no finding here; the earlier SEC-14 entry has been withdrawn.
+  Treat the migration chain as the intent and `pg_policies` / `pg_proc` as the truth. The gap
+  between them is itself worth closing — see DB-01.
 - The dead-code sweep resolves `@/`-aliased and relative module specifiers and was spot-checked
   against dynamic `import()` calls. Modules reachable only through a string built at runtime would
   not be detected.
