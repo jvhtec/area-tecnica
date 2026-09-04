@@ -150,32 +150,42 @@ export function capitalize(str: string): string {
 
 export function generateFolderName(
   folderType: string,
-  department: string,
+  department: string | null,
   jobTitle: string,
   locationName: string,
   displayDate: string,
   displayName = "",
   previousTitle?: string
 ): string | null {
-  const deptLabel = capitalize(department);
+  const departmentLabel = () => department ? capitalize(department) : null;
 
   switch (folderType) {
-    case "tourdate":
-      return `${locationName} - ${displayDate} - ${deptLabel}`;
-    case "department":
-      return `${jobTitle} - ${deptLabel}`;
+    case "tourdate": {
+      const deptLabel = departmentLabel();
+      return deptLabel ? `${locationName} - ${displayDate} - ${deptLabel}` : null;
+    }
+    case "department": {
+      const deptLabel = departmentLabel();
+      return deptLabel ? `${jobTitle} - ${deptLabel}` : null;
+    }
     case "main":
     case "main_event":
       return jobTitle;
     case "doc_tecnica":
-    case "documentacion_tecnica":
-      return `${jobTitle} - Documentación Técnica - ${deptLabel}`;
-    case "presupuestos_recibidos":
-      return `${jobTitle} - Presupuestos Recibidos - ${deptLabel}`;
+    case "documentacion_tecnica": {
+      const deptLabel = departmentLabel();
+      return deptLabel ? `${jobTitle} - Documentación Técnica - ${deptLabel}` : null;
+    }
+    case "presupuestos_recibidos": {
+      const deptLabel = departmentLabel();
+      return deptLabel ? `${jobTitle} - Presupuestos Recibidos - ${deptLabel}` : null;
+    }
     case "hoja_gastos":
       return department === "personnel"
         ? `Gastos de Personal - ${jobTitle}`
-        : `${jobTitle} - Hoja de Gastos - ${deptLabel}`;
+        : departmentLabel()
+          ? `${jobTitle} - Hoja de Gastos - ${departmentLabel()}`
+          : null;
     case "work_orders":
       return `Orden de Trabajo - ${jobTitle}`;
     case "hoja_info_sx":

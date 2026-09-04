@@ -215,9 +215,10 @@ export default function MorningSummary() {
 
         const bySource: Record<string, string[]> = {};
         for (const u of (unavailableMerged || [])) {
-          const source = (u as any).source || 'other';
+          const source = u.source || 'other';
           if (!bySource[source]) bySource[source] = [];
-          bySource[source].push((u as any).profile.nickname || (u as any).profile.first_name);
+          const technicianName = u.profile?.nickname?.trim() || u.profile?.first_name?.trim() || 'Unknown';
+          bySource[source].push(technicianName);
         }
 
         summaries.push({

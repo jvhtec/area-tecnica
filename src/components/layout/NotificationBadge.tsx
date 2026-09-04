@@ -26,17 +26,19 @@ export const NotificationBadge = ({
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const isLoadingRef = useRef(false)
   const refreshQueuedRef = useRef(false)
   const debounceTimerRef = useRef<number | null>(null)
   const navigate = useNavigate()
 
   const fetchUnreadMessages = useCallback(async () => {
-    if (isLoading) {
+    if (isLoadingRef.current) {
       refreshQueuedRef.current = true
       return
     }
 
     try {
+      isLoadingRef.current = true
       setIsLoading(true)
 
       let deptQuery = dataLayerClient.from("messages")
@@ -83,13 +85,14 @@ export const NotificationBadge = ({
     } catch (error) {
       console.error("Error checking unread messages:", error)
     } finally {
+      isLoadingRef.current = false
       setIsLoading(false)
       if (refreshQueuedRef.current) {
         refreshQueuedRef.current = false
         Promise.resolve().then(() => fetchUnreadMessages())
       }
     }
-  }, [userId, userRole, userDepartment, isLoading])
+  }, [userId, userRole, userDepartment])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

@@ -107,6 +107,7 @@ import {
   haveJobDatesChanged,
   syncFlexElementsForJobDateChange,
 } from "@/utils/flex-folders/syncDateChange";
+import { generateFolderName } from "@/utils/flex-folders/syncDateChange.helpers";
 
 describe("syncFlexElementsForJobDateChange standard jobs", () => {
   beforeEach(() => {
@@ -150,6 +151,11 @@ describe("syncFlexElementsForJobDateChange standard jobs", () => {
         "2026-02-03T20:00:00.000Z"
       )
     ).toBe(false);
+  });
+
+  it("keeps root names usable while rejecting department folder names without a department", () => {
+    expect(generateFolderName("main_event", null, "New Job", "Madrid", "Feb 3, 2026")).toBe("New Job");
+    expect(generateFolderName("department", null, "New Job", "Madrid", "Feb 3, 2026")).toBeNull();
   });
 
   it("traverses the main tree once and updates each owned element once", async () => {

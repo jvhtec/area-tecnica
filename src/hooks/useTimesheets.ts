@@ -36,6 +36,7 @@ export const useTimesheets = (jobId: string | undefined, opts?: { userRole?: str
     if (!jobId) {
       setTimesheets([]);
       setIsLoading(false);
+      setIsError(false);
       return;
     }
     try {
@@ -321,10 +322,16 @@ export const useTimesheets = (jobId: string | undefined, opts?: { userRole?: str
       console.log("jobId is empty or invalid, skipping fetch");
       setIsLoading(false);
       setTimesheets([]);
+      setIsError(false);
     }
   }, [jobId, fetchTimesheets, opts?.userRole]);
 
   const createTimesheet = async (technicianId: string, date: string, category?: 'tecnico' | 'especialista' | 'responsable') => {
+    if (!jobId) {
+      toast.error("Select a job before creating a timesheet");
+      return null;
+    }
+
     try {
       const insertData: any = {
         job_id: jobId,

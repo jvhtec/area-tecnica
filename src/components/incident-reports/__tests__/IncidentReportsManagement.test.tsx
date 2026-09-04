@@ -125,4 +125,30 @@ describe("IncidentReportsManagement", () => {
     expect(deleteReport).toHaveBeenCalledWith("report-1");
     expect(badgeMock).toHaveBeenCalledWith("management");
   });
+
+  it("renders incomplete legacy report metadata without false dates or null names", async () => {
+    useIncidentReportsMock.mockReturnValue({
+      reports: [
+        createIncidentReport({
+          id: "legacy-report",
+          file_name: "legacy.pdf",
+          uploaded_at: null,
+          file_size: null,
+          uploaded_by_profile: { first_name: null, last_name: null },
+        }),
+      ],
+      isLoading: false,
+      deleteReport: vi.fn(),
+      isDeleting: false,
+      downloadReport: vi.fn(),
+    });
+
+    renderWithProviders(<IncidentReportsManagement />);
+
+    expect(await screen.findByText("legacy.pdf")).toBeInTheDocument();
+    expect(screen.queryByText(/01\/01\/1970/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/null null/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText("N/A").length).toBeGreaterThan(0);
+    expect(screen.getByText("Tamaño: 0 Bytes")).toBeInTheDocument();
+  });
 });

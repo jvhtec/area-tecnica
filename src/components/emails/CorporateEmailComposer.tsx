@@ -34,7 +34,7 @@ import type {
 
 
 import { queryKeys } from "@/lib/react-query";
-import { isPresent } from '@/utils/typeGuards';
+import { isNonBlankString } from '@/utils/typeGuards';
 export function CorporateEmailComposer() {
   const { toast } = useToast();
   const [subject, setSubject] = useState("");
@@ -413,7 +413,7 @@ export function CorporateEmailComposer() {
   }, [subject, bodyHtml, selectedRecipients, pdfAttachments, inlineImages, toast, sendEmailMutation]);
 
   // Get unique departments and roles for quick selection
-  const uniqueDepartments = Array.from(new Set(profiles.map((p) => p.department))).filter(isPresent);
+  const uniqueDepartments = Array.from(new Set(profiles.map((p) => p.department))).filter(isNonBlankString);
   const roleOptions: Array<{ value: CorporateEmailRole; label: string }> = [
     { value: "admin", label: "Administradores" },
     { value: "management", label: "Gestión" },

@@ -32,7 +32,7 @@ export const useMatrixScrollState = ({
   canExpandAfter,
   onNearEdgeScroll,
 }: UseMatrixScrollStateArgs) => {
-  const technicianScrollRef = useRef<HTMLDivElement>(null);
+  const technicianScrollRef = useRef<HTMLDivElement | null>(null);
   // `HTMLDivElement | null` (rather than a bare `RefObject`) so `current` stays writable —
   // the scroll sync assigns to it, and so do the tests.
   const dateHeadersRef = useRef<HTMLDivElement | null>(null);

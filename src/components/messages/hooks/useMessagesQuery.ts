@@ -8,11 +8,17 @@ import { isDepartmentManagementRole } from '@/utils/permissions';
 
 
 import { queryKeys } from "@/lib/react-query";
-export const useMessagesQuery = (userRole: string | null, userDepartment: string | null) => {
+export const useMessagesQuery = (
+  userRole: string | null,
+  userDepartment: string | null,
+  userId: string | null,
+) => {
   const [messages, setMessages] = useState<Message[]>([]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: queryKeys.scope('messages', userRole, userDepartment),
+    // Technician and departmentless-management results are scoped by sender.
+    // Include the user so React Query cannot reuse another account's messages after a login change.
+    queryKey: queryKeys.scope('messages', userRole, userDepartment, userId),
     queryFn: async () => {
       console.log('Fetching messages for role:', userRole, 'department:', userDepartment);
       
@@ -41,10 +47,9 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
       if (isDepartmentManagementRole(userRole) && userDepartment) {
         query.eq('department', userDepartment);
       } else {
-        const { data: authData } = await dataLayerClient.auth.getUser();
         // No signed-in user means no messages to scope to.
-        if (!authData.user?.id) return [];
-        query.eq('sender_id', authData.user.id);
+        if (!userId) return [];
+        query.eq('sender_id', userId);
       }
 
       const { data, error } = await query;
@@ -73,7 +78,7 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
     refetchOnReconnect: true,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: !!userRole,
+    enabled: !!userRole && !!userId,
   });
 
   useEffect(() => {
@@ -82,19 +87,8 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
     }
   }, [data]);
 
-  // Set up real-time subscription
-  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const { data: { user } } = await dataLayerClient.auth.getUser();
-      if (mounted) setCurrentUserId(user?.id);
-    })();
-    return () => { mounted = false; };
-  }, []);
-
-  useMessagesSubscription(currentUserId, () => {
+  // Use the same identity as the query so auth changes also move the realtime scope.
+  useMessagesSubscription(userId ?? undefined, () => {
     if (data) {
       setMessages(data);
     }

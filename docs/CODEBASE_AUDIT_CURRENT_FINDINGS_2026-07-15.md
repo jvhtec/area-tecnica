@@ -21,25 +21,26 @@ new modules. It produced two new defects with file:line evidence — **CUR-04a**
 (High, payroll integrity) and **CUR-25** (Low) — plus a "Fresh-pass results with
 no finding" section recording what was cleared.
 
-## Validation snapshot (2026-09-04, audited QLT-01 stack through #889)
+## Validation snapshot (2026-09-04, audited QLT-01/QLT-02 stack through #886)
 
 | Check | Result | Interpretation |
 | --- | --- | --- |
-| `npm run typecheck` | Pass | App compiles with five strict-family checks enabled; nullability remains staged for #886. |
-| `npm run lint` | Pass with 1,267 warnings | Warning baseline 1,901 → 1,267. App/test `no-explicit-any` 1,343 → 762 (−43%) after the error, callback, payload, map, job-card, assignment, logistics, festival JSON, PDF, and test-mock clusters were typed; 78 `react-hooks/exhaustive-deps` and 43 `react-refresh/only-export-components` remain as the next targets. |
+| `npm run typecheck` | Pass | The app compiles with full TypeScript strict mode, including `strictNullChecks`; indexed access and the separate Edge Functions project remain follow-up work. |
+| `npm run lint` | Pass with 1,259 warnings | Warning baseline 1,901 → 1,259. App/test `no-explicit-any` 1,343 → 754 (−44%) after the error, callback, payload, map, job-card, assignment, logistics, festival JSON, PDF, test-mock, and strict-boundary clusters were typed; 78 `react-hooks/exhaustive-deps` and 43 `react-refresh/only-export-components` remain as the next targets. |
 | `npm run governance` | Pass | All sub-gates green; baselines ratchet downward (see below). |
-| Source-boundary gate | `ui-data-layer-client-import` 197 (baseline 213); `scheduling-new-date` 88 (baseline 107); `direct-protected-route-allowed-roles` 0 (baseline 64) | Real progress; the direct-role-guard debt is fully eliminated. |
-| File-size gate | 43 files over 800 lines (baseline 45) | Unchanged since 2026-07-10; largest handwritten modules unchanged (`TourOpsManagementHub.tsx` 2,116; `tourSchedulingService.ts` 1,885; `useConsumosTool.ts` 1,806; `TourDefaultsManager.tsx` 1,706). |
-| Edge Function gate | 69 entrypoints: 36 `createHttpHandler`, 33 legacy manual | +1 wrapper migration since 2026-07-10; queue persists. |
-| Exposure inventory | 14 public-token, 14 authenticated-user, 34 privileged-role, 7 service-only | Unchanged classification; semantic negative testing still incomplete (CUR-04). |
+| Source-boundary gate | `ui-data-layer-client-import` 195 (baseline 213); `scheduling-new-date` 67 (baseline 107); `direct-protected-route-allowed-roles` 0 (baseline 64) | Real progress; the direct-role-guard debt is fully eliminated. |
+| File-size gate | 0 files over the current 800-line governance threshold (baseline 0) | The checked-in gate has eliminated its previous oversized-file allowance. |
+| Edge Function gate | 71 entrypoints: 38 `createHttpHandler`, 33 legacy manual | No new unexempted manual entrypoints; the legacy queue persists. |
+| Exposure inventory | 14 public-token, 14 authenticated-user, 36 privileged-role, 7 service-only | All 71 deployable functions are classified; semantic negative testing still remains incomplete (CUR-04). |
 | SQL grant gate | 82 anon/PUBLIC-executable `SECURITY DEFINER` functions, all allowlisted, 0 new | The two new migrations since 2026-07-10 grant only to `service_role`. |
 | CSP governance gate | Pass — enforced policy, 7 hashed inline scripts, no unsafe script execution | New gate since the last register; see CUR-14 closure. |
-| Dependency audit | 10 vulnerabilities: 6 high, 3 moderate, 1 low (12 allowlisted advisory IDs) | `npm audit --omit=dev` shows only 3 (1 low, 2 moderate: `quill@2.0.3`, `minimatch` chain). All 6 highs are dev-only chains (`replace`→`minimatch`, `tar`). See CUR-22. |
-| Migration ordering | Pass — 191 migrations, unique ordered timestamps | Was 189 at the previous audit. |
-| `npm run test:run` | Pass — 254 files, 1,392 tests | |
+| Dependency audit | Pass — 0 current advisories | The former dependency-audit allowance has been cleared. |
+| Migration ordering | Pass — 200 migrations, unique ordered timestamps | Static ordering is green; database behavior remains covered by the dedicated CI jobs. |
+| `npm run test:run` | Pass — 356 files, 1,979 tests | |
 | `npm run test:critical` | Pass with enforced coverage thresholds | CUR-12's gate is active and green. |
-| `npm run build` | Pass | Vite still warns about >500 kB raw chunks (maps-lib 1.75 MB raw / 497 kB gzip). |
-| `npm run budget:bundle` | Pass at exactly the cap: **JS gzip total 3.01 MB vs 3.01 MB max** | Zero headroom. See CUR-18 (escalated). |
+| `npm run build` | Pass | Vite still warns about >500 kB raw chunks (maps-lib 1.87 MB raw / 522 kB gzip). |
+| `npm run budget:bundle` | Pass — JS gzip total 3.10 MB vs 3.32 MB rolling / 3.34 MB absolute maxima | The build has about 220 kB of rolling-budget headroom, still below CUR-18's 15% target. |
+| `npm run test:e2e` | Pass — 22 Chromium smoke tests; 7 device-specific tests skipped by configuration | Public auth, role routing, management, technician, festival, tour, equipment, expenses, and incident journeys passed. |
 | `npm run test:e2e` (Linux, Chromium) | Pass — 20 specs including axe accessibility and mobile-navbar checks | CUR-10 closure confirmed on Linux. |
 
 Database behavior tests (pgTAP) were not rerun locally (they require the local
@@ -233,10 +234,10 @@ Verified on current `main`; keep the regression tests, do not reopen:
 - **Severity:** High
 - **Status:** In progress — the per-rule/per-file ratchet is active and the
   first explicit-any milestone has been exceeded.
-- **Evidence:** Warning baseline is 1,267. App/test `no-explicit-any` is 762,
+- **Evidence:** Warning baseline is 1,259. App/test `no-explicit-any` is 754,
   with another 284 in Edge Functions. `react-hooks/exhaustive-deps` remains
-  78. Five strict-family checks are active; full `strict` and
-  `strictNullChecks` remain staged for #886.
+  78. Full `strict`, including `strictNullChecks`, is enabled for the app;
+  `noUncheckedIndexedAccess` and the Edge Functions project remain outstanding.
 - **Action:** As before: fail new warnings by rule/file, eliminate hook
   warnings first, then ratchet `any` debt and introduce strict subprojects.
   Add a per-rule count check so "reduce warnings" PRs cannot regress silently.
