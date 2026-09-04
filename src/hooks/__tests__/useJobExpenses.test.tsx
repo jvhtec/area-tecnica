@@ -19,7 +19,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
-import { useJobExpenses } from "../useJobExpenses";
+import { useJobApprovedExpenses, useJobExpenses } from "../useJobExpenses";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -73,5 +73,36 @@ describe("useJobExpenses", () => {
 
     expect(builder.eq).toHaveBeenCalledWith("job_id", "job-1");
     expect(builder.eq).not.toHaveBeenCalledWith("technician_id", "manager-1");
+  });
+
+  it("refetches approved expenses when the same user's access scope changes", async () => {
+    const builder = createMockQueryBuilder({ data: [], error: null });
+    mockSupabase.from.mockReturnValue(builder);
+    useOptimizedAuthMock.mockReturnValue(
+      createAuthState({
+        user: { id: "user-1", email: "user@example.com" },
+        userRole: "technician",
+      }),
+    );
+
+    const { rerender, result } = renderHook(
+      () => useJobApprovedExpenses("job-1"),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(builder.eq).toHaveBeenCalledWith("technician_id", "user-1");
+    expect(mockSupabase.from).toHaveBeenCalledTimes(1);
+
+    useOptimizedAuthMock.mockReturnValue(
+      createAuthState({
+        user: { id: "user-1", email: "user@example.com" },
+        userRole: "management",
+      }),
+    );
+    rerender();
+
+    await waitFor(() => expect(mockSupabase.from).toHaveBeenCalledTimes(2));
+    expect(builder.eq.mock.calls.filter(([column]) => column === "technician_id")).toHaveLength(1);
   });
 });

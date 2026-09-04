@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { inferPdfImageFormat } from "@/utils/pdf/shared/pdfExportShared";
+import { inferPdfImageFormat, setFontStyle } from "@/utils/pdf/shared/pdfExportShared";
+import type { jsPDF } from "jspdf";
 
 describe("inferPdfImageFormat", () => {
   it.each([
@@ -15,5 +16,19 @@ describe("inferPdfImageFormat", () => {
     expect(inferPdfImageFormat("https://example.com/image/123", "JPEG")).toBe(
       "JPEG",
     );
+  });
+});
+
+describe("setFontStyle", () => {
+  it("keeps the active font family while changing style", () => {
+    const calls: unknown[][] = [];
+    const doc = {
+      getFont: () => ({ fontName: "SectorSans" }),
+      setFont: (...args: unknown[]) => { calls.push(args); },
+    } as unknown as jsPDF;
+
+    setFontStyle(doc, "bold");
+
+    expect(calls).toEqual([["SectorSans", "bold"]]);
   });
 });

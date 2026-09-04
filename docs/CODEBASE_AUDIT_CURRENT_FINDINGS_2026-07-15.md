@@ -25,8 +25,8 @@ no finding" section recording what was cleared.
 
 | Check | Result | Interpretation |
 | --- | --- | --- |
-| `npm run typecheck` | Pass | App compiles with `useUnknownInCatchVariables`; broader strict options remain staged. |
-| `npm run lint` | Pass with 1,277 warnings | Warning baseline 1,901 → 1,277. App/test `no-explicit-any` 1,343 → 772 (−43%) after the error, callback, payload, map, job-card, assignment, logistics, festival JSON, and test-mock clusters were typed; 78 `react-hooks/exhaustive-deps` and 43 `react-refresh/only-export-components` remain as the next targets. |
+| `npm run typecheck` | Pass | App compiles with five strict-family checks enabled; nullability remains staged for #886. |
+| `npm run lint` | Pass with 1,267 warnings | Warning baseline 1,901 → 1,267. App/test `no-explicit-any` 1,343 → 762 (−43%) after the error, callback, payload, map, job-card, assignment, logistics, festival JSON, PDF, and test-mock clusters were typed; 78 `react-hooks/exhaustive-deps` and 43 `react-refresh/only-export-components` remain as the next targets. |
 | `npm run governance` | Pass | All sub-gates green; baselines ratchet downward (see below). |
 | Source-boundary gate | `ui-data-layer-client-import` 197 (baseline 213); `scheduling-new-date` 88 (baseline 107); `direct-protected-route-allowed-roles` 0 (baseline 64) | Real progress; the direct-role-guard debt is fully eliminated. |
 | File-size gate | 43 files over 800 lines (baseline 45) | Unchanged since 2026-07-10; largest handwritten modules unchanged (`TourOpsManagementHub.tsx` 2,116; `tourSchedulingService.ts` 1,885; `useConsumosTool.ts` 1,806; `TourDefaultsManager.tsx` 1,706). |
@@ -233,9 +233,10 @@ Verified on current `main`; keep the regression tests, do not reopen:
 - **Severity:** High
 - **Status:** In progress — the per-rule/per-file ratchet is active and the
   first explicit-any milestone has been exceeded.
-- **Evidence:** Warning baseline is 1,277. App/test `no-explicit-any` is 772,
+- **Evidence:** Warning baseline is 1,267. App/test `no-explicit-any` is 762,
   with another 284 in Edge Functions. `react-hooks/exhaustive-deps` remains
-  78; full `strict` and `strictNullChecks` remain off.
+  78. Five strict-family checks are active; full `strict` and
+  `strictNullChecks` remain staged for #886.
 - **Action:** As before: fail new warnings by rule/file, eliminate hook
   warnings first, then ratchet `any` debt and introduce strict subprojects.
   Add a per-rule count check so "reduce warnings" PRs cannot regress silently.

@@ -42,6 +42,10 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
     onAvailabilityRemove?.(technician.id, date);
   };
 
+  if (!onAvailabilityChange && !onAvailabilityRemove) {
+    return <>{children}</>;
+  }
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>

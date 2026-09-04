@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { JobPayoutTotals } from '@/types/jobExtras';
+import { normalizeJobPayoutRows } from '@/utils/jobPayoutTotals';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -64,25 +65,7 @@ export function useJobPayoutTotals(
         approvalMap.set(techId, allApproved);
       });
       
-      // Every column of `v_job_tech_payout_2025` is nullable in the generated types
-      // because it is a view; rows without a job/technician are not payouts.
-      return (viewData || []).flatMap((item) =>
-        item.job_id && item.technician_id
-          ? [{
-              ...item,
-              job_id: item.job_id,
-              technician_id: item.technician_id,
-              timesheets_total_eur: Number(item.timesheets_total_eur ?? 0),
-              extras_total_eur: Number(item.extras_total_eur ?? 0),
-              expenses_total_eur: Number(item.expenses_total_eur ?? 0),
-              total_eur: Number(item.total_eur ?? 0),
-              vehicle_disclaimer: Boolean(item.vehicle_disclaimer),
-              extras_breakdown: (item.extras_breakdown ?? {}) as JobPayoutTotals['extras_breakdown'],
-              expenses_breakdown: (item.expenses_breakdown ?? []) as unknown as JobPayoutTotals['expenses_breakdown'],
-              payout_approved: approvalMap.get(item.technician_id) ?? false,
-            }]
-          : []
-      );
+      return normalizeJobPayoutRows(viewData, approvalMap);
     },
     enabled: (!!jobId) && (options?.enabled ?? true),
     staleTime: 30 * 1000, // 30 seconds
@@ -99,23 +82,7 @@ export function useMyJobPayoutTotals() {
         .order('job_id');
       
       if (error) throw error;
-      // See the note above: the view's columns are all nullable in the generated types.
-      return (data || []).flatMap((item) =>
-        item.job_id && item.technician_id
-          ? [{
-              ...item,
-              job_id: item.job_id,
-              technician_id: item.technician_id,
-              timesheets_total_eur: Number(item.timesheets_total_eur ?? 0),
-              extras_total_eur: Number(item.extras_total_eur ?? 0),
-              expenses_total_eur: Number(item.expenses_total_eur ?? 0),
-              total_eur: Number(item.total_eur ?? 0),
-              vehicle_disclaimer: Boolean(item.vehicle_disclaimer),
-              extras_breakdown: (item.extras_breakdown ?? {}) as JobPayoutTotals['extras_breakdown'],
-              expenses_breakdown: (item.expenses_breakdown ?? []) as unknown as JobPayoutTotals['expenses_breakdown'],
-            }]
-          : []
-      );
+      return normalizeJobPayoutRows(data);
     },
     staleTime: 30 * 1000, // 30 seconds
   });

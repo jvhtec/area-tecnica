@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { JobPayoutTotals } from '@/types/jobExtras';
+import { normalizeJobPayoutRows, type RawJobPayoutRow } from '@/utils/jobPayoutTotals';
 
 export interface TechnicianProfileWithEmail {
   id: string;
@@ -76,7 +77,7 @@ async function fetchPayouts(
 
   if (error) throw error;
 
-  return (data || []) as JobPayoutTotals[];
+  return normalizeJobPayoutRows((data ?? []) as RawJobPayoutRow[]);
 }
 
 /**
