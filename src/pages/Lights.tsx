@@ -53,7 +53,7 @@ const Lights = () => {
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
-  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
+  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -106,7 +106,7 @@ const Lights = () => {
     setIsAssignmentDialogOpen(true);
   }, []);
 
-  const handleEditClick = useCallback((job: any) => {
+  const handleEditClick = useCallback((job: JobCardJob) => {
     setSelectedJob(job);
     setIsEditDialogOpen(true);
   }, []);

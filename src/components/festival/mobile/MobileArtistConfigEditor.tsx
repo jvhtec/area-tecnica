@@ -18,6 +18,7 @@ import type { Database, Json } from "@/integrations/supabase/types";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
 import type { Artist } from "@/components/festival/artistTableTypes";
+import type { FestivalRadioSystem } from "@/types/festival-equipment";
 
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
 
@@ -60,7 +61,7 @@ const formatWiredMics = (
     .join(", ");
 };
 
-const formatSystems = (systems: any[] = []) => {
+const formatSystems = (systems: FestivalRadioSystem[] = []) => {
   if (!Array.isArray(systems) || systems.length === 0) return "Sin sistemas";
   return systems
     .map((system) => {
@@ -76,18 +77,7 @@ const formatSystems = (systems: any[] = []) => {
     .join(" · ");
 };
 
-type WirelessSystemLike = {
-  model?: string;
-  quantity?: number;
-  quantity_hh?: number;
-  quantity_bp?: number;
-  quantity_ch?: number;
-  band?: unknown;
-  provided_by?: string;
-  notes?: string;
-};
-
-const formatSystemBand = (category: "wireless" | "iem", system: WirelessSystemLike) => {
+const formatSystemBand = (category: "wireless" | "iem", system: FestivalRadioSystem) => {
   const rawBand = system.band;
   if (isFrequencyBandSelection(rawBand)) {
     return formatBandOptionLabel(rawBand);
@@ -106,7 +96,7 @@ const formatSystemBand = (category: "wireless" | "iem", system: WirelessSystemLi
   return "Sin especificar";
 };
 
-const formatSystemQuantity = (category: "wireless" | "iem", system: WirelessSystemLike) => {
+const formatSystemQuantity = (category: "wireless" | "iem", system: FestivalRadioSystem) => {
   const quantityCh = Number(system.quantity_ch || 0);
   const quantityHh = Number(system.quantity_hh || 0);
   const quantityBp = Number(system.quantity_bp || 0);
@@ -196,7 +186,7 @@ export const ReadOnlyArtistCategoryContent = ({
   }
 
   if (category === "wireless") {
-    const renderSystemDetails = (systems: WirelessSystemLike[], systemCategory: "wireless" | "iem") => {
+    const renderSystemDetails = (systems: FestivalRadioSystem[], systemCategory: "wireless" | "iem") => {
       if (!Array.isArray(systems) || systems.length === 0) {
         return <div className="text-muted-foreground">Sin sistemas</div>;
       }
@@ -226,13 +216,13 @@ export const ReadOnlyArtistCategoryContent = ({
           <div className="text-xs uppercase text-muted-foreground font-semibold">Wireless</div>
           <div className="font-medium break-words">{formatSystems(artist.wireless_systems || [])}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.wireless_provided_by)}</div>
-          <div className="mt-2">{renderSystemDetails((artist.wireless_systems || []) as WirelessSystemLike[], "wireless")}</div>
+          <div className="mt-2">{renderSystemDetails(artist.wireless_systems || [], "wireless")}</div>
         </div>
         <div>
           <div className="text-xs uppercase text-muted-foreground font-semibold">IEM</div>
           <div className="font-medium break-words">{formatSystems(artist.iem_systems || [])}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.iem_provided_by)}</div>
-          <div className="mt-2">{renderSystemDetails((artist.iem_systems || []) as WirelessSystemLike[], "iem")}</div>
+          <div className="mt-2">{renderSystemDetails(artist.iem_systems || [], "iem")}</div>
         </div>
       </div>
     );
@@ -420,7 +410,7 @@ export const MobileArtistConfigEditor = ({
     fetchFreshData();
   }, [artist.id]);
 
-  const updateFormData = (changes: any) => {
+  const updateFormData = (changes: Partial<ReturnType<typeof buildFormData>>) => {
     setFormData(prev => ({ ...prev, ...changes }));
   };
 

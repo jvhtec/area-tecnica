@@ -9,7 +9,7 @@ import { useState } from "react";
 
 
 import { queryKeys } from "@/lib/react-query";
-import type { LogisticsCalendarEvent } from "@/components/logistics/LogisticsEventDialog";
+import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 interface TodayLogisticsProps {
   selectedDate: Date;
 }
@@ -47,7 +47,7 @@ export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
     }
   });
 
-  const handleEventClick = (event: any) => {
+  const handleEventClick = (event: LogisticsCalendarEvent) => {
     setSelectedEvent(event);
     setShowEventDialog(true);
   };

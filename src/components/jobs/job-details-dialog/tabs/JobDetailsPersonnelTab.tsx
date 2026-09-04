@@ -11,7 +11,8 @@ import { PreventiveResourceSelector } from "@/components/jobs/job-details-dialog
 import { labelForCode } from "@/utils/roles";
 import { isPreventiveResourceForJob } from "@/utils/preventiveResource";
 import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
-import { normalizeProfile, type JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
+import type { JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
+import { unwrapPostgrestRelation } from "@/utils/postgrestRelation";
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
 
@@ -36,7 +37,7 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({
       return assignments;
     }
     return assignments.filter((assignment: JobAssignmentForCard) => {
-      const profileDept = normalizeProfile(assignment.profiles)?.department?.toLowerCase?.();
+      const profileDept = unwrapPostgrestRelation(assignment.profiles)?.department?.toLowerCase?.();
       if (profileDept === normalizedDepartment) {
         return true;
       }
@@ -115,7 +116,7 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({
         ) : assignmentsWithDates.length > 0 ? (
           <div className="space-y-3">
             {assignmentsWithDates.map(({ assignment, workDateKeys }) => {
-              const profile = normalizeProfile(assignment.profiles);
+              const profile = unwrapPostgrestRelation(assignment.profiles);
               return (
               <div
                 key={assignment.technician_id}

@@ -59,7 +59,7 @@ const Video = () => {
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
-  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
+  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment, jobsRangeStart, jobsRangeEnd);
 
   // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
   useEffect(() => {
@@ -110,7 +110,7 @@ const Video = () => {
     setIsAssignmentDialogOpen(true);
   }, []);
 
-  const handleEditClick = useCallback((job: any) => {
+  const handleEditClick = useCallback((job: JobCardJob) => {
     setSelectedJob(job);
     setIsEditDialogOpen(true);
   }, []);

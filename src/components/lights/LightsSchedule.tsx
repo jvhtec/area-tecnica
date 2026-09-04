@@ -8,7 +8,7 @@ interface LightsScheduleProps {
   jobs: JobCardJob[];
   isLoading: boolean;
   onJobClick: (jobId: string) => void;
-  onEditClick: (job: any) => void;
+  onEditClick: (job: JobCardJob) => void;
   onDeleteClick: (jobId: string) => void;
   userRole?: string | null;
   department?: "sound" | "lights" | "video";

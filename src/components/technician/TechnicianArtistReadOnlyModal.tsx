@@ -633,7 +633,7 @@ export function TechnicianArtistReadOnlyModal({
                     <Badge variant="outline">{group.artists.length}</Badge>
                   </div>
                   <MobileArtistList
-                    artists={group.artists as any}
+                    artists={group.artists}
                     stageNames={stageNames}
                     stagePlotUrls={stagePlotUrls}
                     gearComparisons={{}}

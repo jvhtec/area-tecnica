@@ -1,4 +1,4 @@
-export interface FrequencyBandSelection {
+export type FrequencyBandSelection = {
   code: string;
   from_mhz: number;
   to_mhz: number;

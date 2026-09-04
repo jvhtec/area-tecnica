@@ -1,6 +1,10 @@
-import { getErrorMessage } from '@/utils/errorMessage';
 import { Capacitor } from '@capacitor/core'
-import { PushNotifications, type PermissionStatus, type Token } from '@capacitor/push-notifications'
+import {
+  PushNotifications,
+  type PermissionStatus,
+  type RegistrationError,
+  type Token,
+} from '@capacitor/push-notifications'
 
 import { supabase } from '@/lib/supabase'
 
@@ -92,12 +96,12 @@ const waitForRegistrationToken = async (): Promise<string> => {
           void cleanup().then(() => resolve(token.value))
         })
 
-        errorHandle = await PushNotifications.addListener('registrationError', (error: unknown) => {
+        errorHandle = await PushNotifications.addListener('registrationError', (error: RegistrationError) => {
           if (resolved) {
             return
           }
           resolved = true
-          const message = getErrorMessage(error, 'Unable to register for native push notifications.')
+          const message = error.error || 'Unable to register for native push notifications.'
           void cleanup().then(() => reject(new Error(message)))
         })
 

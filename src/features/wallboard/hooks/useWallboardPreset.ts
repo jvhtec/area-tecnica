@@ -29,6 +29,14 @@ type Params = {
   setIdx: Dispatch<SetStateAction<number>>;
 };
 
+type WallboardPresetConfig = {
+  panel_order: string[] | null;
+  panel_durations: unknown;
+  rotation_fallback_seconds: number | null;
+  highlight_ttl_seconds: number | null;
+  ticker_poll_interval_seconds: number | null;
+};
+
 export function useWallboardPreset({
   effectiveSlug,
   isApiMode,
@@ -48,7 +56,7 @@ export function useWallboardPreset({
     setPresetMessage(null);
 
     const loadPreset = async () => {
-      let data: any = null;
+      let data: WallboardPresetConfig | null = null;
       let error: unknown = null;
 
       console.log('🎨 [Wallboard] Loading preset configuration...', {

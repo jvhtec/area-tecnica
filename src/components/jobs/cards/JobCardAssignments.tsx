@@ -10,7 +10,8 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from "@/lib/utils";
-import { normalizeProfile, type JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
+import type { JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
+import { unwrapPostgrestRelation } from "@/utils/postgrestRelation";
 import {
   getScheduledWorkDateKeys,
   resolveAssignmentWorkDateKeys,
@@ -112,11 +113,11 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
         roleCode = assignment.video_role ?? null;
         break;
       default:
-        roleCode = assignment.sound_role ?? assignment.lights_role ?? assignment.video_role ?? null;
+        roleCode = assignment.sound_role || assignment.lights_role || assignment.video_role || null;
     }
     if (!roleCode) continue;
 
-    const profile = normalizeProfile(assignment.profiles);
+    const profile = unwrapPostgrestRelation(assignment.profiles);
     const isExternal = !profile && !!assignment.external_technician_name;
     const name = profile
       ? formatUserName(profile.first_name, profile.nickname, profile.last_name)

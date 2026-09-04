@@ -16,7 +16,7 @@ describe('preventiveResource', () => {
       {
         technician_id: 'lights-tech',
         status: 'confirmed',
-        profiles: { first_name: 'Luis', last_name: 'Luces', department: 'lights', role: 'house_tech' },
+        profiles: [{ first_name: 'Luis', last_name: 'Luces', department: 'lights', role: 'house_tech' }],
       },
       {
         technician_id: 'pending-tech',

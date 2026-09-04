@@ -1,27 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
-import { isFestivalLikeJobType, isKnownJobType } from "@/utils/jobType";
+import { isFestivalLikeJobType } from "@/utils/jobType";
 import type { JobCardJob } from "@/features/jobs/job-card-new/jobCardNewTypes";
 import { ALL_DEPARTMENTS, type Department } from "@/types/department";
 
 /**
  * `TodaySchedule` is fed either job rows directly or assignment rows that wrap the
- * job under `jobs` — hence the `job.jobs || job` unwrapping below. Modelled as one
- * shape with both sides optional rather than a union, so the unwrap stays readable.
+ * job under `jobs`. Keep those two inputs explicit so typing the component does not
+ * add a runtime validation gate that could hide a previously renderable job card.
  */
-export type TodayScheduleEntry = Partial<JobCardJob> & {
+type WrappedTodayScheduleJob = {
   job_id?: string | null;
   department?: string | null;
-  jobs?: JobCardJob | null;
+  jobs: JobCardJob;
 };
 
-const isJobCardJob = (job: Partial<JobCardJob>): job is JobCardJob =>
-  typeof job.id === "string" &&
-  typeof job.title === "string" &&
-  typeof job.start_time === "string" &&
-  typeof job.end_time === "string" &&
-  typeof job.created_at === "string" &&
-  isKnownJobType(job.job_type);
+export type TodayScheduleEntry = JobCardJob | WrappedTodayScheduleJob;
+
+const isWrappedJob = (entry: TodayScheduleEntry): entry is WrappedTodayScheduleJob =>
+  "jobs" in entry && typeof entry.jobs === "object" && entry.jobs !== null;
+
+const unwrapJob = (entry: TodayScheduleEntry): JobCardJob =>
+  isWrappedJob(entry) ? entry.jobs : entry;
 
 const isDepartment = (value: unknown): value is Department =>
   typeof value === "string" && (ALL_DEPARTMENTS as readonly string[]).includes(value);
@@ -109,13 +109,7 @@ export const TodaySchedule = ({
       console.log("Rendering job in TodaySchedule:", entry);
     }
 
-    const job = entry.jobs ?? entry;
-    if (!isJobCardJob(job)) {
-      if (import.meta.env.DEV) {
-        console.warn("TodaySchedule entry is missing required job fields:", entry);
-      }
-      return null;
-    }
+    const job = unwrapJob(entry);
 
     return (
       <JobCardNew

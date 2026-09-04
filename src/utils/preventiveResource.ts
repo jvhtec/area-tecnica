@@ -1,3 +1,5 @@
+import { unwrapPostgrestRelation } from '@/utils/postgrestRelation';
+
 export const PREVENTIVE_RESOURCE_EXTRA_EUR = 10;
 export const PREVENTIVE_RESOURCE_EXTRA_TYPE = 'recurso_preventivo';
 
@@ -35,16 +37,8 @@ export function isPreventiveResourceForJob(job: JobLike | null | undefined, tech
   return Boolean(job?.preventive_resource_technician_id && technicianId && job.preventive_resource_technician_id === technicianId);
 }
 
-type AssignmentProfile = NonNullable<Exclude<AssignmentLike['profiles'], unknown[]>>;
-
-/** Takes the single embedded profile, unwrapping PostgREST's array form. */
-function singleProfile(profile: AssignmentLike['profiles']): AssignmentProfile | null {
-  if (Array.isArray(profile)) return profile[0] ?? null;
-  return profile ?? null;
-}
-
 export function getTechnicianDisplayName(profile?: AssignmentLike['profiles']): string {
-  const single = singleProfile(profile);
+  const single = unwrapPostgrestRelation(profile);
   const name = [single?.first_name, single?.last_name].filter(Boolean).join(' ').trim();
   return name || 'Técnico sin nombre';
 }
@@ -58,11 +52,12 @@ export function getPreventiveResourceOptions(assignments: AssignmentLike[] = [])
       return;
     }
 
+    const profile = unwrapPostgrestRelation(assignment.profiles);
     optionsById.set(technicianId, {
       id: technicianId,
-      name: getTechnicianDisplayName(assignment.profiles),
-      department: singleProfile(assignment.profiles)?.department ?? null,
-      role: singleProfile(assignment.profiles)?.role ?? null,
+      name: getTechnicianDisplayName(profile),
+      department: profile?.department ?? null,
+      role: profile?.role ?? null,
     });
   });
 

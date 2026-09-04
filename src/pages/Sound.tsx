@@ -246,7 +246,7 @@ const Sound = () => {
     setIsAssignmentDialogOpen(true);
   };
 
-  const handleEditClick = (job: any) => {
+  const handleEditClick = (job: JobCardJob) => {
     setSelectedJob(job);
     setIsEditDialogOpen(true);
   };

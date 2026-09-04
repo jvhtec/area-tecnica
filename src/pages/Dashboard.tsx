@@ -47,7 +47,7 @@ const JobDetailsDialog = lazy(() =>
   import("@/components/jobs/JobDetailsDialog").then((m) => ({ default: m.JobDetailsDialog }))
 );
 
-const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
+const getSelectedDateJobs = (date: Date | undefined, jobs: JobCardJob[]) => {
   if (!date || !jobs) return [];
 
   return jobs.filter(job => {
@@ -151,7 +151,7 @@ const Dashboard = () => {
     setIsDetailsDialogOpen(true);
   }, [jobs]);
 
-  const handleEditClick = useCallback((job: any) => {
+  const handleEditClick = useCallback((job: JobCardJob) => {
     if (userRole === "logistics" || userRole === "oscar") return;
     setSelectedJob(job);
     setIsEditDialogOpen(true);

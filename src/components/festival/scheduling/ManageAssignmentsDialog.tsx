@@ -23,7 +23,8 @@ import { Switch } from "@/components/ui/switch";
 
 
 import { queryKeys } from "@/lib/react-query";
-import { normalizeProfile, type JobAssignmentForCard } from "@/hooks/useOptimizedJobCard";
+import { unwrapPostgrestRelation } from "@/utils/postgrestRelation";
+import type { Database } from "@/integrations/supabase/types";
 interface ManageAssignmentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -32,20 +33,13 @@ interface ManageAssignmentsDialogProps {
   isViewOnly?: boolean;
 }
 
-// Define a type for the technician object
-interface Technician {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  department: string;
-  role: string;
-}
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type Technician = Pick<ProfileRow, "id" | "first_name" | "last_name" | "department" | "role">;
 
 // Define the structure for the job_assignments response from Supabase
 interface JobAssignmentResponse {
   technician_id: string;
-  profiles: Technician;
+  profiles: Technician | Technician[] | null;
 }
 
 export const ManageAssignmentsDialog = ({ 
@@ -98,12 +92,13 @@ export const ManageAssignmentsDialog = ({
       }
 
       // Filter by department and map to get just the profiles
-      const filteredTechnicians = data
-        .map((assignment: JobAssignmentForCard) => normalizeProfile(assignment.profiles))
-        .filter((profile) => profile?.department === departmentFilter);
+      const assignments = (data ?? []) as JobAssignmentResponse[];
+      const filteredTechnicians = assignments
+        .map((assignment) => unwrapPostgrestRelation(assignment.profiles))
+        .filter((profile): profile is Technician => profile?.department === departmentFilter);
 
       console.log(`Found ${filteredTechnicians.length} technicians assigned to job ${shift.job_id} for department ${departmentFilter}`);
-      return filteredTechnicians as unknown as Technician[];
+      return filteredTechnicians;
     },
   });
 
@@ -123,14 +118,15 @@ export const ManageAssignmentsDialog = ({
       if (a.role !== 'house_tech' && b.role === 'house_tech') return 1;
       
       // Then sort by name
-      return (a.first_name + a.last_name).localeCompare(b.first_name + b.last_name);
+      return formatTechnicianName(a).localeCompare(formatTechnicianName(b), "es");
     });
   };
 
   // Format technician display name
   const formatTechnicianName = (technician: Technician) => {
     const isHouseTech = technician.role === 'house_tech';
-    return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
+    const name = [technician.first_name, technician.last_name].filter(Boolean).join(" ") || technician.id;
+    return `${name}${isHouseTech ? ' (House Tech)' : ''}`;
   };
 
   const addAssignmentMutation = useMutation({
