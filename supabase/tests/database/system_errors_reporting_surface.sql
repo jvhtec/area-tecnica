@@ -109,8 +109,8 @@ SELECT is(
   'The live constraint matches the canonical allowlist — no missing or extra values'
 );
 
--- The widening lands as NOT VALID (20260903120000) and is validated by its
--- companion migration (20260903120500). Assert the pair completed: a NOT VALID
+-- The widening lands as NOT VALID (20260904130000) and is validated by its
+-- companion migration (20260904130500). Assert the pair completed: a NOT VALID
 -- constraint still enforces new rows, so a half-applied rollout would pass
 -- every other assertion here and only show up as a stale catalog flag.
 SELECT ok(

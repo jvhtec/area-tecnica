@@ -16,6 +16,9 @@ test-results/
 *.local
 *.tsbuildinfo
 
+# Generated intermediate; the subset copy under public/fonts is committed.
+scripts/fonts/NotoSansPdf-Regular.ttf
+
 # Environment variables
 .env
 .env.*

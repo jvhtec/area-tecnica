@@ -56,7 +56,7 @@ const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
  * URL is not merely swallowed by the coarser `[REDACTED_URL]` replacement.
  */
 // `Bearer <token>` / `token=<value>` style credentials in free text.
-const BEARER_PATTERN = /\b(bearer|token|api[-_]?key|secret)\s*[:=]?\s+[A-Za-z0-9._~+/=-]{12,}/gi
+const BEARER_PATTERN = /\b(?:bearer|token|access[-_]?token|refresh[-_]?token|api[-_]?key|secret)(?:\s*[:=]\s*|\s+)[A-Za-z0-9._~+/=-]{12,}/gi
 // Three base64url segments — a JWT, however it was embedded.
 const JWT_PATTERN = /\beyJ[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]{5,}/g
 // Absolute URLs carrying a query string.
@@ -94,17 +94,43 @@ const normalizeError = (error: unknown): Error => {
   if (error instanceof Error) return error
   if (typeof error === 'string') return new Error(error)
   try {
-    return new Error(JSON.stringify(error))
+    // DOMException and errors from another JavaScript realm are often not
+    // `instanceof Error`, while their useful fields are non-enumerable and
+    // would otherwise collapse to `{}` when stringified.
+    if (error && typeof error === 'object') {
+      const errorLike = error as { message?: unknown; name?: unknown; stack?: unknown }
+      if (typeof errorLike.message === 'string') {
+        const normalized = new Error(errorLike.message)
+        if (typeof errorLike.name === 'string') normalized.name = errorLike.name
+        if (typeof errorLike.stack === 'string') normalized.stack = errorLike.stack
+        return normalized
+      }
+    }
+
+    const serialized = JSON.stringify(sanitizeValue(error))
+    return new Error(serialized ?? String(error))
   } catch {
     return new Error('Unknown error')
   }
 }
 
+const safeErrorName = (error: Error): string =>
+  redactErrorText(error.name || 'Error').slice(0, 120)
+
 export const sanitizeErrorContext = (context: ErrorTrackingContext) => sanitizeValue(context) as Record<string, unknown>
 
 export const trackError = async (error: unknown, context: ErrorTrackingContext) => {
   const normalized = normalizeError(error)
-  const payloadContext = sanitizeErrorContext(context)
+  const errorName = safeErrorName(normalized)
+  const payloadContext = sanitizeErrorContext({
+    ...context,
+    errorStack: normalized.stack,
+    runtime: typeof window === 'undefined' ? undefined : {
+      host: window.location.host,
+      mode: import.meta.env.MODE,
+      version: import.meta.env.VITE_APP_VERSION || 'unknown',
+    },
+  })
   const safeUserId = typeof context.userId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(context.userId)
     ? context.userId
     : null
@@ -112,7 +138,7 @@ export const trackError = async (error: unknown, context: ErrorTrackingContext) 
   try {
     const { error: dbError } = await supabase.from('system_errors').insert({
       system: context.system,
-      error_type: normalized.name,
+      error_type: errorName,
       error_message: redactErrorText(normalized.message),
       context: payloadContext,
       user_id: safeUserId,
@@ -124,7 +150,7 @@ export const trackError = async (error: unknown, context: ErrorTrackingContext) 
     console.error('[monitoring] Failed to record error context', loggingError)
   } finally {
     console.error(`[${context.system}] ${context.operation}:`, {
-      name: normalized.name,
+      name: errorName,
       message: redactErrorText(normalized.message),
     })
   }
@@ -162,7 +188,7 @@ export const trackUnhandledError = (
   context: ErrorTrackingContext,
 ): boolean => {
   const normalized = normalizeError(error)
-  const signature = `${context.system}:${normalized.name}:${redactErrorText(normalized.message)}`
+  const signature = `${context.system}:${safeErrorName(normalized)}:${redactErrorText(normalized.message)}`
 
   if (reportedSignatures.has(signature)) return false
   if (unhandledReportsSent >= UNHANDLED_REPORT_BUDGET) return false

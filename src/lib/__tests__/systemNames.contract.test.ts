@@ -29,7 +29,7 @@ const repoRoot = join(__dirname, '..', '..', '..')
 
 const MIGRATION = join(
   repoRoot,
-  'supabase/migrations/20260903120000_widen_system_errors_systems.sql',
+  'supabase/migrations/20260904130000_widen_system_errors_systems.sql',
 )
 const PGTAP = join(
   repoRoot,

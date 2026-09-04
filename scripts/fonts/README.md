@@ -13,8 +13,8 @@ deploy for no runtime benefit. Keep them here.
 `NotoSans-VariableFont_wdth,wght.ttf`. jsPDF does not reliably embed
 variable-font instances, so the axes are pinned first.
 
-Run everything below from the repository root, so the paths resolve the same
-way regardless of your shell's working directory:
+Run everything below from the repository root. The commands use
+repository-root-relative paths and work the same way in Bash and PowerShell:
 
 ```bash
 fonttools varLib.instancer "scripts/fonts/NotoSans-VariableFont_wdth,wght.ttf" \

@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Observability: validate the widened `system_errors.system` allowlist
 -- =============================================================================
--- Companion to 20260903120000_widen_system_errors_systems.sql, which added
+-- Companion to 20260904130000_widen_system_errors_systems.sql, which added
 -- `system_errors_system_check` as `NOT VALID` so the widening would not scan
 -- the table under ACCESS EXCLUSIVE and block the very error writes it exists
 -- to enable.
@@ -33,3 +33,7 @@ SET statement_timeout = '60s';
 
 ALTER TABLE "public"."system_errors"
   VALIDATE CONSTRAINT "system_errors_system_check";
+
+-- Restore session defaults for any later migrations on the same connection.
+RESET statement_timeout;
+RESET lock_timeout;

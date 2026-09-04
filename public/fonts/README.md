@@ -2,9 +2,9 @@
 
 `NotoSansPdf-Regular.ttf` is a static instance used by jsPDF for electrical
 report notation. It is the **only** font in this directory, and the only one
-that ships: everything under `public/` is served to every visitor, so the
-variable fonts it is generated from live in `scripts/fonts/` instead and are
-never deployed. See `scripts/fonts/README.md` for how to regenerate this file.
+copied into the deploy output. The variable fonts it is generated from live in
+`scripts/fonts/` instead and are never deployed. See `scripts/fonts/README.md`
+for how to regenerate this file.
 
 The static file pins the source axes to `wght=400` and `wdth=100`, then subsets
 to Basic/Latin Extended-A, Greek, and general punctuation

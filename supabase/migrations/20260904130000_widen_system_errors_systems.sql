@@ -44,7 +44,7 @@
 -- only. Those are provably fine here anyway, since the constraint being
 -- replaced admitted a strict subset of the new allowlist.
 --
--- The companion migration 20260903120500 runs `VALIDATE CONSTRAINT`, which
+-- The companion migration 20260904130500 runs `VALIDATE CONSTRAINT`, which
 -- takes SHARE UPDATE EXCLUSIVE and does not block inserts, to clear the
 -- `convalidated` flag and keep the catalog tidy.
 
@@ -82,3 +82,7 @@ ALTER TABLE "public"."system_errors"
 
 COMMENT ON CONSTRAINT "system_errors_system_check" ON "public"."system_errors" IS
   'Allowlist of subsystems permitted to report through trackError(). Widen deliberately: the constraint is what keeps this table queryable by system.';
+
+-- Do not leak the bounded deployment setting if the migration runner reuses
+-- this database session for later files.
+RESET lock_timeout;

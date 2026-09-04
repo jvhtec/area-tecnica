@@ -137,13 +137,18 @@ try {
  * @param operation - Which global handler caught it, recorded as the context's
  *   operation so the two entry points stay distinguishable in `system_errors`.
  */
-const reportUnhandled = (error: unknown, operation: string) => {
+const reportUnhandled = (
+  error: unknown,
+  operation: string,
+  details: Record<string, unknown> = {},
+) => {
   void import('@/lib/errorTracking')
     .then(({ trackUnhandledError }) => {
       trackUnhandledError(error, {
         system: 'ui',
         operation,
         route: window.location.pathname,
+        ...details,
       });
     })
     .catch(() => {
@@ -170,7 +175,11 @@ window.addEventListener('error', (event) => {
     return;
   }
 
-  reportUnhandled(event.error ?? event.message, 'window.error');
+  reportUnhandled(event.error ?? event.message, 'window.error', {
+    source: event.filename || undefined,
+    line: event.lineno || undefined,
+    column: event.colno || undefined,
+  });
 });
 
 const rootElement = document.getElementById('root')
