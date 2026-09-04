@@ -3,13 +3,26 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
-vi.mock("@/services/dataLayerClient", () => ({ dataLayerClient: { rpc: (...args: unknown[]) => rpc(...args) } }));
+const getUser = vi.fn();
+const maybeSingle = vi.fn();
+const eq = vi.fn(() => ({ maybeSingle }));
+const select = vi.fn(() => ({ eq }));
+const from = vi.fn((_table: string) => ({ select }));
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: {
+    rpc: (...args: unknown[]) => rpc(...args),
+    auth: { getUser: () => getUser() },
+    from: (table: string) => from(table),
+  },
+}));
 
 import { useCalendarIcsToken } from "../useCalendarIcsToken";
 
 describe("useCalendarIcsToken", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getUser.mockResolvedValue({ data: { user: { id: "user-id" } }, error: null });
+    maybeSingle.mockResolvedValue({ data: { calendar_ics_token: "legacy-token" }, error: null });
   });
 
   it("returns the token from the self-scoped read RPC", async () => {
@@ -29,6 +42,31 @@ describe("useCalendarIcsToken", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.token).toBe("");
+  });
+
+  it("falls back to the owner profile while the read RPC is not deployed", async () => {
+    rpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: "PGRST202", message: "get_my_calendar_ics_token is not in the schema cache" },
+    });
+
+    const { result } = renderHook(() => useCalendarIcsToken());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.token).toBe("legacy-token");
+    expect(from).toHaveBeenCalledWith("profiles");
+    expect(select).toHaveBeenCalledWith("calendar_ics_token");
+    expect(eq).toHaveBeenCalledWith("id", "user-id");
+  });
+
+  it("does not fall back on authorization or network failures", async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "permission denied" } });
+
+    const { result } = renderHook(() => useCalendarIcsToken());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.token).toBe("");
+    expect(from).not.toHaveBeenCalled();
   });
 
   // Regression: the initial read is fired on mount and can still be in flight

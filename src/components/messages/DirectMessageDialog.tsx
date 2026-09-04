@@ -48,9 +48,9 @@ export const DirectMessageDialog = ({
   useEffect(() => {
     const fetchProfiles = async () => {
       console.log("Fetching profiles for direct message dialog");
-      const { data, error } = await dataLayerClient.from('profiles')
-        .select('id, first_name, last_name')
-        .order('first_name');
+      const { data, error } = await dataLayerClient.rpc('get_profile_directory', {
+        p_profile_ids: null,
+      });
 
       if (error) {
         console.error('Error fetching profiles:', error);
@@ -58,7 +58,11 @@ export const DirectMessageDialog = ({
       }
 
       console.log("Fetched profiles:", data);
-      setProfiles(data || []);
+      setProfiles((data || []).map(({ id, first_name, last_name }) => ({
+        id,
+        first_name,
+        last_name,
+      })));
     };
 
     fetchProfiles();

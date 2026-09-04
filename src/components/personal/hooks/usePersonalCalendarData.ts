@@ -7,7 +7,6 @@ export interface HouseTech {
   first_name: string | null;
   last_name: string | null;
   department: string | null;
-  phone: string | null;
 }
 
 interface Assignment {
@@ -57,17 +56,25 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         const startDate = subDays(startOfMonth(currentMonth), 7);
         const endDate = addDays(endOfMonth(currentMonth), 7);
 
-        const { data: techsData, error: techsError } = await dataLayerClient.from('profiles')
-          .select('id, first_name, last_name, department, phone')
-          .eq('role', 'house_tech')
-          .eq('warehouse_duty_exempt', false)
-          .order('first_name');
+        const { data: directoryData, error: techsError } = await dataLayerClient.rpc(
+          'get_profile_directory',
+          { p_profile_ids: null },
+        );
 
         if (techsError) {
           throw techsError;
         }
 
-        const techIds = (techsData ?? []).map((tech) => tech.id);
+        const techsData = (directoryData ?? [])
+          .filter((profile) => profile.role === 'house_tech' && !profile.warehouse_duty_exempt)
+          .map(({ id, first_name, last_name, department }) => ({
+            id,
+            first_name,
+            last_name,
+            department,
+          }));
+
+        const techIds = techsData.map((tech) => tech.id);
 
         let assignmentResults: Assignment[] = [];
 

@@ -11,10 +11,10 @@ Function
 
 Security
 --------
-- Each profile has a secret ICS token that is required in the URL. The function validates `tid` and `token` against `public.profile_calendar_tokens` using the service role key, with a constant-time comparison, and returns 403 on any mismatch.
-- **The token is a bearer credential and deliberately does not live on the profile row.** `profiles` is readable by every authenticated user (`profiles_select` is `USING (true)`), so a token stored there was readable by any colleague, who could then fetch that person's calendar from this unauthenticated endpoint. `public.profile_calendar_tokens` holds one row per profile with RLS scoped to the owner, and no `INSERT`/`UPDATE`/`DELETE` policy for `authenticated` at all — the only write path is the definer function below.
-- **Tokens are created lazily, not by default.** A new profile has no token row until one is generated. The UI handles this: the technician profile view generates on first sync, and the profile page's button reads "Generar enlace" until a token exists.
-- Clients read their own token with `get_my_calendar_ics_token()` and generate or rotate it with `rotate_my_calendar_ics_token()`. Both are `SECURITY DEFINER` with a pinned `search_path`, revoked from `anon`/`PUBLIC`, granted to `authenticated`, and scoped to `auth.uid()` — they ignore any argument, so one user cannot address another's token.
+- Each profile has a secret ICS token that is required in the URL. The function validates `tid` and `token` against `public.profile_calendar_tokens` using the service role key, with a constant-time comparison. Missing rows and mismatches return 403; lookup failures return a retryable 503 so calendar clients do not discard a valid subscription during a transient outage.
+- **The token is a bearer credential and does not remain on the client-readable profile row.** `public.profile_calendar_tokens` holds one row per profile with owner-only RLS and no authenticated write policy. The deprecated `profiles.calendar_ics_token` column remains temporarily so cached clients can select it, but its values and default are removed.
+- The security migration generates a fresh token for every existing profile. This intentionally invalidates subscriptions that used credentials exposed by the former broad profile read.
+- Clients read their own token with the RLS-backed, `SECURITY INVOKER` `get_my_calendar_ics_token()` function. They generate or rotate it through the self-scoped `SECURITY DEFINER` `rotate_my_calendar_ics_token()` function. Both are revoked from `anon`/`PUBLIC` and granted explicitly to `authenticated`.
 - Rotating replaces the token and the previous URL stops working; the subscriber must re-add the feed.
 - Operators should not `UPDATE` tokens by hand. To rotate everyone's token at once (for example after a suspected disclosure):
   ```sql
@@ -30,11 +30,11 @@ Database changes
   - Added `profiles.calendar_ics_token text unique not null default encode(gen_random_bytes(18), 'hex')`. **Superseded — see below.**
 - Migration: `20260904160000_move_calendar_ics_token_out_of_profiles.sql` (SEC-13)
   - Creates `public.profile_calendar_tokens` (`profile_id` PK → `profiles(id) ON DELETE CASCADE`, `token`, `created_at`, `rotated_at`), owner-only RLS, `SELECT` granted to `authenticated` and revoked from `anon`/`PUBLIC`.
-  - Backfills every existing token before dropping the column, so live subscriptions survive the deploy.
+  - Rotates every existing token instead of copying disclosed credentials.
   - Redefines `rotate_my_calendar_ics_token()` to upsert into the new table (signature and return value unchanged) and adds `get_my_calendar_ics_token()`.
-  - Drops `profiles.calendar_ics_token`.
-  - **Deploy order:** deploy this Edge Function **before** applying the migration. Both orderings would otherwise break a public endpoint, so the Function falls back to the legacy `profiles.calendar_ics_token` while `profile_calendar_tokens` does not yet exist; that makes Function-first seamless. The fallback is dead code once the migration has run everywhere and should be removed in a follow-up.
-  - Coverage: `supabase/tests/database/profile_calendar_token_isolation.sql` proves one technician cannot read another's token.
+  - Removes the default and values from `profiles.calendar_ics_token` while keeping the nullable column for one compatibility release. A later migration will drop it after older PWA bundles have aged out.
+  - **Deploy order:** deploy the dual-read Edge Function and compatible web client first, then apply the migration. The Function falls back to the legacy column only when the vault table is absent; after migration it fails closed and accepts only rotated vault tokens.
+  - Coverage proves owner isolation, direct-write and anonymous RPC denial, token rotation, and pre/post-migration reader behavior.
 
 Parameters
 ----------
@@ -52,7 +52,7 @@ Event contents
 
 Caching
 -------
-- Response headers include `Cache-Control: public, max-age=900` and an `ETag` based on the body.
+- Response headers include `Cache-Control: private, max-age=900` and an `ETag` based on the body so personal schedules are not retained by shared caches.
 
 Notes & next steps
 ------------------

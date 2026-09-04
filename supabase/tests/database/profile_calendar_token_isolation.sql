@@ -5,18 +5,48 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(11);
+SELECT plan(19);
 
 -- --- structure -------------------------------------------------------------
 
-SELECT hasnt_column(
+SELECT has_column(
   'public', 'profiles', 'calendar_ics_token',
-  'the ICS token no longer lives on the broadly-readable profiles row'
+  'the deprecated column remains temporarily for cached-client compatibility'
+);
+
+SELECT ok(
+  NOT (SELECT attnotnull FROM pg_attribute
+        WHERE attrelid = 'public.profiles'::regclass
+          AND attname = 'calendar_ics_token'),
+  'the compatibility column is nullable'
+);
+
+SELECT ok(
+  (SELECT pg_get_expr(adbin, adrelid)
+     FROM pg_attrdef
+    WHERE adrelid = 'public.profiles'::regclass
+      AND adnum = (
+        SELECT attnum FROM pg_attribute
+         WHERE attrelid = 'public.profiles'::regclass
+           AND attname = 'calendar_ics_token'
+      )) IS NULL,
+  'new profiles no longer generate credentials in the compatibility column'
 );
 
 SELECT has_table(
   'public', 'profile_calendar_tokens',
   'tokens live in their own table'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+      FROM pg_constraint
+     WHERE conrelid = 'public.profile_calendar_tokens'::regclass
+       AND conname = 'profile_calendar_tokens_token_key'
+       AND contype = 'u'
+  ),
+  'calendar bearer tokens retain a database uniqueness invariant'
 );
 
 SELECT ok(
@@ -48,6 +78,16 @@ SELECT ok(
 SELECT ok(
   NOT has_table_privilege('anon', 'public.profile_calendar_tokens', 'SELECT'),
   'anon cannot read the token table at all'
+);
+
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.get_my_calendar_ics_token()', 'EXECUTE'),
+  'anon cannot execute the token read RPC'
+);
+
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.rotate_my_calendar_ics_token()', 'EXECUTE'),
+  'anon cannot execute the token rotation RPC'
 );
 
 -- --- behaviour: one user must not see another user's token ------------------
@@ -112,6 +152,24 @@ SELECT is(
   public.get_my_calendar_ics_token(),
   'token-belongs-to-ana',
   'the self-scoped RPC returns the caller''s own token'
+);
+
+SELECT throws_ok(
+  $$UPDATE public.profile_calendar_tokens SET token = 'direct-write'$$,
+  '42501',
+  NULL,
+  'authenticated users cannot mutate the vault directly'
+);
+
+SELECT lives_ok(
+  $$SELECT public.rotate_my_calendar_ics_token()$$,
+  'an authenticated owner can rotate through the self-scoped RPC'
+);
+
+SELECT isnt(
+  (SELECT token FROM public.profile_calendar_tokens),
+  'token-belongs-to-ana',
+  'rotation replaces the caller token'
 );
 
 RESET ROLE;

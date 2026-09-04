@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { isServiceRoleRequest, requireAdminOrManagement } from "../_shared/auth.ts";
+import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
 import {
   corsHeaders,
   createHttpHandler,
@@ -109,8 +110,16 @@ serve(createHttpHandler(async (req) => {
       }).catch(() => undefined);
     } catch (_) {}
 
-    const subject = phase === 'availability' ? `Solicitud cancelada: ${job.title}` : `Oferta cancelada: ${job.title}`;
     const reason = phase === 'availability' ? 'La solicitud de disponibilidad' : 'La oferta';
+    const subject = phase === 'availability' ? `Solicitud cancelada: ${job.title}` : `Oferta cancelada: ${job.title}`;
+    const safeSubject = escapeHtml(subject);
+    const safeFullName = escapeHtml(fullName || '');
+    const safeReason = escapeHtml(reason);
+    const safeJobTitle = escapeHtml(String(job.title ?? ''));
+    const safeStartDate = escapeHtml(startDate);
+    const safeEndDate = escapeHtml(endDate);
+    const safeCallTime = escapeHtml(callTime);
+    const safeLocation = escapeHtml(loc);
 
     if (channel === 'whatsapp') {
       // Validate phone and WAHA access
@@ -172,7 +181,7 @@ serve(createHttpHandler(async (req) => {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${subject}</title>
+        <title>${safeSubject}</title>
       </head>
       <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
@@ -199,9 +208,9 @@ serve(createHttpHandler(async (req) => {
                 </tr>
                 <tr>
                   <td style="padding:24px 24px 8px 24px;">
-                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${fullName || ''},</h2>
+                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeFullName},</h2>
                     <p style="margin:0;color:#374151;line-height:1.55;">
-                      ${reason} para <b>${job.title}</b> ya no está vigente.
+                      ${safeReason} para <b>${safeJobTitle}</b> ya no está vigente.
                     </p>
                   </td>
                 </tr>
@@ -212,9 +221,9 @@ serve(createHttpHandler(async (req) => {
                         <td style="padding:16px;">
                           <div style="color:#111827;font-weight:bold;margin-bottom:4px;">Detalles del trabajo</div>
                           <div style="color:#374151;line-height:1.55;">
-                            <div><b>Fechas:</b> ${startDate}${job.end_time ? ` — ${endDate}` : ''}</div>
-                            <div><b>Horario:</b> ${callTime}</div>
-                            <div><b>Ubicación:</b> ${loc}</div>
+                            <div><b>Fechas:</b> ${safeStartDate}${job.end_time ? ` — ${safeEndDate}` : ''}</div>
+                            <div><b>Horario:</b> ${safeCallTime}</div>
+                            <div><b>Ubicación:</b> ${safeLocation}</div>
                           </div>
                         </td>
                       </tr>

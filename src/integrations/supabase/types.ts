@@ -6249,6 +6249,7 @@ export type Database = {
           assignable_as_tech: boolean
           autonomo: boolean
           bg_color: string | null
+          calendar_ics_token: string | null
           created_at: string
           custom_folder_structure: Json | null
           custom_tour_folder_structure: Json | null
@@ -6289,6 +6290,7 @@ export type Database = {
           assignable_as_tech?: boolean
           autonomo?: boolean
           bg_color?: string | null
+          calendar_ics_token?: string | null
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -6329,6 +6331,7 @@ export type Database = {
           assignable_as_tech?: boolean
           autonomo?: boolean
           bg_color?: string | null
+          calendar_ics_token?: string | null
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -11852,6 +11855,20 @@ export type Database = {
         }[]
       }
       get_my_calendar_ics_token: { Args: never; Returns: string }
+      get_profile_directory: {
+        Args: { p_profile_ids?: string[] | null }
+        Returns: {
+          assignable_as_tech: boolean
+          department: string
+          first_name: string
+          id: string
+          last_name: string
+          nickname: string
+          profile_picture_url: string
+          role: Database["public"]["Enums"]["user_role"]
+          warehouse_duty_exempt: boolean
+        }[]
+      }
       get_profiles_with_skills: {
         Args: never
         Returns: {
@@ -12975,4 +12992,3 @@ export const Constants = {
     },
   },
 } as const
-

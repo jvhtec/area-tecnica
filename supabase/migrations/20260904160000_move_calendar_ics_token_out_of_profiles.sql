@@ -1,89 +1,36 @@
 -- =============================================================================
--- SEC-13: move `calendar_ics_token` out of the client-readable `profiles` row
+-- SEC-13: isolate and rotate the bearer token used by tech-calendar-ics
 -- =============================================================================
--- `profiles_select` is `USING (true)` for `authenticated`, so every logged-in
--- account can read every profile row. Measured on production at audit time:
--- 313 rows visible, including all 313 `calendar_ics_token` values.
+-- Safe rollout order:
+--   1. Deploy the dual-read Edge Function and the RPC-compatible web client.
+--   2. Apply this migration.
 --
--- That column is not merely PII. `tech-calendar-ics` authenticates a request
--- purely by matching `?tid=<uuid>&token=<value>` against it, so any
--- authenticated user could read a colleague's token and fetch their personal
--- calendar from an unauthenticated endpoint. That is privilege escalation, not
--- an over-broad read, which is why the token is separated here ahead of the
--- broader `profiles_select` narrowing (tracked separately).
---
--- Why a separate table rather than a column-level REVOKE
--- -----------------------------------------------------
--- Postgres consults column privileges only when the role lacks the table-level
--- privilege, so restricting one column means revoking table-level SELECT and
--- re-granting every other column by name. That buys the same protection at the
--- cost of two permanent hazards: `SELECT *` on profiles would fail for
--- `authenticated` forever (this repo has 177 `select('*')` call sites), and
--- every future `ALTER TABLE profiles ADD COLUMN` would be silently unreadable
--- until someone remembered to grant it. A separate table carries neither, and
--- expresses the real rule — this row belongs to exactly one user — as RLS,
--- which is row-aware in the way column grants are not.
---
--- Deploy order — deploy the Edge Function FIRST
--- --------------------------------------------
--- This migration drops `profiles.calendar_ics_token`, and migrations and
--- Function deploys are separate commands, so one necessarily lands first.
--- `tech-calendar-ics` is publicly reachable, so a gap there is a real outage
--- for every subscribed calendar, and naively both orderings produce one: the
--- new Function would query a table that does not exist yet, and the previous
--- Function would read a column that has been dropped.
---
--- The updated Function therefore falls back to `profiles.calendar_ics_token`
--- when `profile_calendar_tokens` is unavailable, which makes Function-first
--- ordering seamless:
---   1. Deploy `tech-calendar-ics`. The new table does not exist yet, so it
---      falls back to the legacy column and serves feeds exactly as before.
---   2. Apply this migration. The table now exists and is backfilled, the
---      primary read succeeds, and the fallback stops being reached.
--- The fallback is dead code from step 2 onwards and should be deleted in a
--- follow-up once every environment has run this migration.
---
--- No token values change here, so no subscription needs to be re-added.
---
--- Existing tokens are carried over as-is rather than regenerated. They have
--- been readable org-wide for as long as the policy has existed and should be
--- treated as disclosed, but rotating them invalidates every user's existing
--- calendar subscription and forces a manual re-add. That is a visible user
--- impact and therefore an owner's decision, not this migration's. Once decided,
--- a full rotation is:
---     UPDATE public.profile_calendar_tokens
---        SET token = encode(extensions.gen_random_bytes(18), 'hex'),
---            rotated_at = now();
+-- Before this migration, the new Function falls back to the legacy profiles
+-- column only when PostgREST reports that this table does not exist. Once the
+-- table exists it fails closed and never accepts the legacy token. This
+-- migration rotates every existing token and NULLs the compatibility column,
+-- invalidating credentials that were exposed by the broad profiles policy.
+-- The nullable column remains for one release so cached PWA bundles can still
+-- select it without making their entire profile query fail. A later migration
+-- may drop it after those bundles have aged out.
 -- =============================================================================
 
 SET lock_timeout = '5s';
 
-CREATE TABLE IF NOT EXISTS "public"."profile_calendar_tokens" (
+CREATE TABLE "public"."profile_calendar_tokens" (
   "profile_id" "uuid" PRIMARY KEY
     REFERENCES "public"."profiles"("id") ON DELETE CASCADE,
   "token" "text" NOT NULL,
   "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-  "rotated_at" timestamp with time zone
+  "rotated_at" timestamp with time zone,
+  CONSTRAINT "profile_calendar_tokens_token_key" UNIQUE ("token")
 );
 
 COMMENT ON TABLE "public"."profile_calendar_tokens" IS
   'Bearer tokens for the tech-calendar-ics feed. One row per profile, readable only by its owner. Separated from profiles so a broad profile read cannot disclose a credential (SEC-13).';
 
--- Carry existing tokens over before the column is dropped, so live calendar
--- subscriptions keep working across the deploy.
-INSERT INTO "public"."profile_calendar_tokens" ("profile_id", "token")
-SELECT "id", "calendar_ics_token"
-  FROM "public"."profiles"
- WHERE "calendar_ics_token" IS NOT NULL
-ON CONFLICT ("profile_id") DO NOTHING;
-
 ALTER TABLE "public"."profile_calendar_tokens" ENABLE ROW LEVEL SECURITY;
 
--- Owner-only read. There is deliberately no INSERT/UPDATE/DELETE policy for
--- `authenticated`: rotation is the only legitimate write and it goes through
--- `rotate_my_calendar_ics_token()`, which is SECURITY DEFINER and self-scoped.
--- Without a policy those commands are denied even though the grants below
--- would otherwise permit them.
 CREATE POLICY "profile_calendar_tokens_select_own"
   ON "public"."profile_calendar_tokens"
   FOR SELECT TO "authenticated"
@@ -94,15 +41,28 @@ CREATE POLICY "profile_calendar_tokens_service_role_all"
   FOR ALL TO "service_role"
   USING (true) WITH CHECK (true);
 
--- SELECT only for authenticated; the write path is the definer function.
 GRANT SELECT ON TABLE "public"."profile_calendar_tokens" TO "authenticated";
 GRANT ALL ON TABLE "public"."profile_calendar_tokens" TO "service_role";
 REVOKE ALL ON TABLE "public"."profile_calendar_tokens" FROM "anon", PUBLIC;
 
--- -----------------------------------------------------------------------------
--- Rotation now targets the new table. Signature and return value are unchanged,
--- so `dataLayerClient.rpc('rotate_my_calendar_ics_token')` keeps working.
--- -----------------------------------------------------------------------------
+-- Generate fresh credentials instead of copying values that were readable by
+-- every authenticated account. rotated_at records the incident-wide rotation.
+INSERT INTO "public"."profile_calendar_tokens" ("profile_id", "token", "rotated_at")
+SELECT "id", encode(extensions.gen_random_bytes(18), 'hex'), now()
+  FROM "public"."profiles";
+
+-- Preserve the column shape for cached clients while removing every secret and
+-- preventing future profile inserts from generating a credential there.
+ALTER TABLE "public"."profiles"
+  ALTER COLUMN "calendar_ics_token" DROP DEFAULT,
+  ALTER COLUMN "calendar_ics_token" DROP NOT NULL;
+
+UPDATE "public"."profiles" SET "calendar_ics_token" = NULL
+ WHERE "calendar_ics_token" IS NOT NULL;
+
+COMMENT ON COLUMN "public"."profiles"."calendar_ics_token" IS
+  'Deprecated compatibility column. Always NULL; remove after pre-SEC-13 PWA bundles have aged out.';
+
 CREATE OR REPLACE FUNCTION "public"."rotate_my_calendar_ics_token"() RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'extensions'
@@ -128,14 +88,9 @@ $$;
 COMMENT ON FUNCTION "public"."rotate_my_calendar_ics_token"() IS
   'Generates, stores and returns a new ICS token for the calling profile.';
 
--- -----------------------------------------------------------------------------
--- Read path for the owner's current token. The client previously obtained this
--- by selecting the column off its own profile row; that read now needs a
--- definer function because the value no longer lives on `profiles`.
--- Self-scoped by construction: it ignores any argument and keys off auth.uid().
--- -----------------------------------------------------------------------------
+-- RLS already self-scopes this read, so it does not need definer privileges.
 CREATE OR REPLACE FUNCTION "public"."get_my_calendar_ics_token"() RETURNS "text"
-    LANGUAGE "sql" STABLE SECURITY DEFINER
+    LANGUAGE "sql" STABLE SECURITY INVOKER
     SET "search_path" TO 'public'
     AS $$
   SELECT t.token
@@ -150,11 +105,5 @@ REVOKE ALL ON FUNCTION "public"."rotate_my_calendar_ics_token"() FROM "anon", PU
 REVOKE ALL ON FUNCTION "public"."get_my_calendar_ics_token"() FROM "anon", PUBLIC;
 GRANT EXECUTE ON FUNCTION "public"."rotate_my_calendar_ics_token"() TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."get_my_calendar_ics_token"() TO "authenticated";
-
--- -----------------------------------------------------------------------------
--- Remove the credential from the broadly-readable row. This is the actual fix;
--- everything above exists so that dropping it is non-breaking.
--- -----------------------------------------------------------------------------
-ALTER TABLE "public"."profiles" DROP COLUMN IF EXISTS "calendar_ics_token";
 
 RESET lock_timeout;

@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2.48.1';
 import { sendBrevoEmail } from '../_shared/brevo.ts';
+import { escapeHtml } from '../_shared/corporateEmailTemplate.ts';
+import { logEvent } from '../_shared/structuredLogger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +36,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`[Password Reset] Processing request for: ${normalizedEmail}`);
+    logEvent('info', 'password_reset.request_received');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -73,7 +75,9 @@ const handler = async (req: Request): Promise<Response> => {
     const rawOrigin = req.headers.get('origin') || req.headers.get('referer');
     const originBase = rawOrigin ? toOrigin(rawOrigin.split('?')[0]) : undefined;
     const baseUrl = envBase || originBase || 'http://localhost:3000';
-    console.log('[Password Reset] Using baseUrl:', baseUrl, '(envRaw:', envBaseRaw, ')');
+    logEvent('info', 'password_reset.redirect_origin_resolved', {
+      source: envBase ? 'configured' : (originBase ? 'request_origin' : 'fallback'),
+    });
     const redirectUrl = `${baseUrl}/auth?type=recovery`;
     
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
@@ -85,20 +89,23 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (linkError || !linkData) {
-      console.error("[Password Reset] Error generating link:", linkError);
+      logEvent('error', 'password_reset.link_generation_failed', {
+        error_code: linkError?.code ?? null,
+      });
       throw new Error("Failed to generate recovery link");
     }
 
     const resetLink = linkData.properties?.action_link;
     if (!resetLink) {
-      console.error("[Password Reset] No action link in response");
+      logEvent('error', 'password_reset.link_missing');
       throw new Error("Invalid recovery link generated");
     }
 
-    console.log(`[Password Reset] Generated recovery link for: ${normalizedEmail}`);
+    logEvent('info', 'password_reset.link_generated');
 
     // Basic personalization without metadata lookup
     const userName = normalizedEmail.split('@')[0] || 'User';
+    const safeUserName = escapeHtml(userName);
 
     // Branding assets (same defaults as staffing function)
     const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${supabaseUrl}/storage/v1/object/public/company-assets/sectorlogow.png`;
@@ -138,7 +145,7 @@ const handler = async (req: Request): Promise<Response> => {
                 </tr>
                 <tr>
                   <td style="padding:24px 24px 8px 24px;">
-                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${userName},</h2>
+                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeUserName},</h2>
                     <p style="margin:0;color:#374151;line-height:1.55;">
                       Has solicitado restablecer tu contraseña. Haz clic en el botón de abajo para crear una nueva.
                     </p>
@@ -149,7 +156,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;">
                       <tr>
                         <td align="center" style="padding:8px 0;">
-                          <a href="${resetLink}" style="display:inline-block;background:#3b82f6;color:#ffffff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Restablecer contraseña</a>
+                          <a href="${escapeHtml(resetLink)}" style="display:inline-block;background:#3b82f6;color:#ffffff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Restablecer contraseña</a>
                         </td>
                       </tr>
                     </table>
@@ -165,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
                     </p>
                     <p style="margin:16px 0 0 0;color:#6b7280;font-size:12px;line-height:1.55;">
                       Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>
-                      <a href="${resetLink}" style="color:#3b82f6;text-decoration:underline;word-break:break-all;">${resetLink}</a>
+                      <a href="${escapeHtml(resetLink)}" style="color:#3b82f6;text-decoration:underline;word-break:break-all;">${escapeHtml(resetLink)}</a>
                     </p>
                   </td>
                 </tr>
@@ -200,12 +207,14 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (!brevoResponse.ok) {
-      const brevoError = await brevoResponse.text();
-      console.error("[Password Reset] Brevo API error:", brevoError);
+      await brevoResponse.text().catch(() => '');
+      logEvent('error', 'password_reset.delivery_failed', {
+        status: brevoResponse.status,
+      });
       throw new Error(`Brevo API failed: ${brevoResponse.status}`);
     }
 
-    console.log(`[Password Reset] Email sent successfully to: ${normalizedEmail}`);
+    logEvent('info', 'password_reset.delivery_succeeded');
 
     return new Response(
       JSON.stringify({ 
@@ -219,7 +228,9 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
   } catch (error: any) {
-    console.error("[Password Reset] Error:", error);
+    logEvent('error', 'password_reset.unhandled_error', {
+      error_message: error instanceof Error ? error.message : String(error),
+    });
     // Always return success to prevent user enumeration
     return new Response(
       JSON.stringify({ 

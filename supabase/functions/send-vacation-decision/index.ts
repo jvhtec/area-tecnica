@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 import { format as formatDate } from "https://esm.sh/date-fns@3.6.0";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
+import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
 // Deno std@0.224.0 base64 module no longer exports `encode`.
 // Implement a small Uint8Array -> Base64 helper using btoa for reliability in Edge Runtime.
 function u8ToBase64(u8: Uint8Array): string {
@@ -264,6 +265,11 @@ function buildEmailHtml(reqRow: VacationRequestRow, baseUrl: string, logos: { co
   const duration = Math.floor((Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / msPerDay) + 1;
   const approverName = `${reqRow.approver?.first_name || ""} ${reqRow.approver?.last_name || ""}`.trim();
   const approvedAt = reqRow.approved_at ? new Date(reqRow.approved_at).toLocaleDateString() : "";
+  const safeTechName = escapeHtml(techName);
+  const safeDepartment = escapeHtml(dept);
+  const safeApproverName = escapeHtml(approverName || 'Gestión');
+  const safeReason = escapeHtml(reqRow.reason || '(no indicado)');
+  const safeRejectionReason = reqRow.rejection_reason ? escapeHtml(reqRow.rejection_reason) : '';
 
   const statusText = reqRow.status === 'approved'
     ? 'Tu solicitud de vacaciones ha sido aprobada por tu jefe de departamento.'
@@ -306,7 +312,7 @@ function buildEmailHtml(reqRow: VacationRequestRow, baseUrl: string, logos: { co
               </tr>
               <tr>
                 <td style="padding:24px 24px 8px 24px;">
-                  <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${techName}${dept ? ` (${dept})` : ''},</h2>
+                  <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeTechName}${safeDepartment ? ` (${safeDepartment})` : ''},</h2>
                   <p style="margin:0;color:#374151;line-height:1.55;">${statusText}</p>
                 </td>
               </tr>
@@ -316,11 +322,11 @@ function buildEmailHtml(reqRow: VacationRequestRow, baseUrl: string, logos: { co
                     <b>Detalles de la solicitud</b>
                     <ul style="margin:10px 0 0 18px;padding:0;line-height:1.55;">
                       <li><b>Periodo:</b> ${start.toLocaleDateString()} - ${end.toLocaleDateString()} (${duration} día${duration === 1 ? '' : 's'})</li>
-                      <li><b>Motivo:</b> ${reqRow.reason || '(no indicado)'}</li>
-                      <li><b>Estado:</b> ${reqRow.status.toUpperCase()}</li>
-                      ${reqRow.status === 'approved' ? `<li><b>Aprobado por:</b> ${approverName || 'Gestión'} el ${approvedAt}</li>` : ''}
-                      ${reqRow.status === 'rejected' ? `<li><b>Rechazado por:</b> ${approverName || 'Gestión'} el ${approvedAt}</li>` : ''}
-                      ${reqRow.status === 'rejected' && reqRow.rejection_reason ? `<li><b>Motivo del rechazo:</b> ${reqRow.rejection_reason}</li>` : ''}
+                      <li><b>Motivo:</b> ${safeReason}</li>
+                      <li><b>Estado:</b> ${escapeHtml(reqRow.status.toUpperCase())}</li>
+                      ${reqRow.status === 'approved' ? `<li><b>Aprobado por:</b> ${safeApproverName} el ${approvedAt}</li>` : ''}
+                      ${reqRow.status === 'rejected' ? `<li><b>Rechazado por:</b> ${safeApproverName} el ${approvedAt}</li>` : ''}
+                      ${reqRow.status === 'rejected' && safeRejectionReason ? `<li><b>Motivo del rechazo:</b> ${safeRejectionReason}</li>` : ''}
                     </ul>
                   </div>
                   <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">

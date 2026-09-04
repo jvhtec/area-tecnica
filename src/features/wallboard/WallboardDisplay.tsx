@@ -400,7 +400,9 @@ export function WallboardDisplay({
       const techIds = Array.from(new Set(crewDraftJobs.flatMap((j) => j.crew.map((c) => c.technician_id))));
       const profileById = new Map<string, ProfileRow>();
       if (techIds.length) {
-        const { data: profs } = await supabase.from('wallboard_profiles').select('id,first_name,last_name,department').in('id', techIds);
+        const { data: profs } = await supabase.rpc('get_profile_directory', {
+          p_profile_ids: techIds,
+        });
         ((profs || []) as ProfileRow[]).forEach((profile) => profileById.set(profile.id, profile));
       }
 

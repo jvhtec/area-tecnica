@@ -3,6 +3,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { getErrorMessage } from "@/utils/errorMessage";
 
+type SupabaseLikeError = { code?: string | null; message?: string | null };
+
+function isMissingReadRpc(error: SupabaseLikeError): boolean {
+  if (error.code === "42883" || error.code === "PGRST202") return true;
+  const message = error.message?.toLowerCase() ?? "";
+  return message.includes("get_my_calendar_ics_token") &&
+    (message.includes("does not exist") || message.includes("schema cache"));
+}
+
+async function readLegacyTokenBeforeMigration(): Promise<string | null> {
+  const { data: authData, error: authError } = await dataLayerClient.auth.getUser();
+  if (authError) throw authError;
+  if (!authData.user) return null;
+
+  const { data, error } = await dataLayerClient
+    .from("profiles")
+    .select("calendar_ics_token")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.calendar_ics_token ?? null;
+}
+
 /**
  * Owns the technician calendar (ICS) token.
  *
@@ -27,12 +50,22 @@ export function useCalendarIcsToken() {
     const load = async () => {
       const { data, error } = await dataLayerClient.rpc("get_my_calendar_ics_token");
       if (cancelled) return;
-      if (error) {
+      let nextToken = data as string | null;
+      if (error && isMissingReadRpc(error)) {
+        try {
+          nextToken = await readLegacyTokenBeforeMigration();
+        } catch (fallbackError) {
+          console.error("Error fetching legacy calendar token:", getErrorMessage(fallbackError));
+          nextToken = null;
+        }
+      } else if (error) {
         console.error("Error fetching calendar token:", getErrorMessage(error));
-      } else if (!rotatedRef.current) {
-        setToken((data as string | null) ?? "");
+        nextToken = null;
       }
-      setLoading(false);
+      if (!cancelled && !rotatedRef.current) {
+        setToken(nextToken ?? "");
+      }
+      if (!cancelled) setLoading(false);
     };
 
     void load();
