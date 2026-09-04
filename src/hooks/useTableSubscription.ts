@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { getRealtimeConnectionStatus } from '@/integrations/supabase/client';
 import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
+import type { SubscriptionQueryKey } from "@/lib/unified-subscription-support";
 
 /** Per-table realtime status, keyed by table name. */
 export type TableSubscriptionStatus = {
@@ -19,7 +20,7 @@ export type TableSubscriptionStatus = {
  */
 export function useTableSubscription(
   tableName: string,
-  queryKey: string | string[]
+  queryKey: SubscriptionQueryKey
 ) {
   const { 
     connectionStatus: globalConnectionStatus, 
@@ -88,7 +89,7 @@ export function useTableSubscription(
 export function useMultiTableSubscription(
   tables: Array<{ 
     table: string, 
-    queryKey: string | string[]
+    queryKey: SubscriptionQueryKey
   }>
 ) {
   const { 
@@ -158,7 +159,7 @@ export function useMultiTableSubscription(
 export function useRowSubscription(
   tableName: string,
   rowId: string,
-  queryKey: string | string[]
+  queryKey: SubscriptionQueryKey
 ) {
   // Use the base hook but could be enhanced with row-specific logic
   return useTableSubscription(tableName, queryKey);

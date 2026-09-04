@@ -4,6 +4,7 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from '@/utils/seasonalHouseTech';
+import type { TechUnavailabilityStatus } from '@/types/availability';
 
 interface TechnicianAvailability {
   id: number;
@@ -263,7 +264,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthKey]); // Only refetch when month boundary changes
 
-  const updateAvailability = useCallback(async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => {
+  const updateAvailability = useCallback(async (techId: string, status: TechUnavailabilityStatus, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const key = `${techId}-${dateStr}`;
 

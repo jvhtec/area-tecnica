@@ -9,6 +9,7 @@ import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope, Ho
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
+import type { TechUnavailabilityStatus } from "@/types/availability";
 
 interface TechDetailModalProps {
   open: boolean;
@@ -38,8 +39,8 @@ interface TechDetailModalProps {
     };
   };
   date: Date;
-  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable' | null;
-  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => void;
+  availabilityStatus?: TechUnavailabilityStatus | null;
+  onAvailabilityChange?: (techId: string, status: TechUnavailabilityStatus, date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -67,7 +68,12 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
   };
 
   const getDepartmentRole = () => {
-    const dept = technician.department?.charAt(0).toUpperCase() + technician.department?.slice(1) || 'Unknown';
+    const department = technician.department;
+    // Without the local, `a?.charAt(0) + a?.slice(1)` yields "undefinedundefined"
+    // before `|| 'Unknown'` ever gets a chance to apply.
+    const dept = department
+      ? department.charAt(0).toUpperCase() + department.slice(1)
+      : 'Unknown';
     return `${dept} House Tech`;
   };
 
@@ -91,7 +97,7 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
     }
   };
 
-  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable') => {
+  const handleUnavailableClick = (status: TechUnavailabilityStatus) => {
     if (onAvailabilityChange) {
       onAvailabilityChange(technician.id, status, date);
       onOpenChange(false);

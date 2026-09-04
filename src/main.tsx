@@ -75,7 +75,7 @@ const handleChunkLoadError = async () => {
       navigator.serviceWorker.addEventListener('message', messageHandler);
 
       try {
-        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+        navigator.serviceWorker.controller?.postMessage({ type: 'CLEAR_CACHES' });
       } catch (error) {
         cleanup();
         resolve();

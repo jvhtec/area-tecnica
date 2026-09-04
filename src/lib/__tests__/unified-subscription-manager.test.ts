@@ -43,6 +43,7 @@ const createChannel = (name: string) => {
     statusHandlers: [] as ChannelStatusHandler[],
     on: vi.fn(),
     subscribe: vi.fn(),
+    track: vi.fn().mockResolvedValue("ok"),
   };
 
   mockChannel.on.mockImplementation(
@@ -72,6 +73,28 @@ afterEach(() => {
 });
 
 describe("UnifiedSubscriptionManager", () => {
+  it("deduplicates query keys with equivalent object properties in a different order", async () => {
+    const { manager, channels } = await setupManager();
+
+    manager.subscribeToTable(
+      "festival_artists",
+      ["festival-artists", { festivalId: "festival-1", filters: { status: "active", sort: "name" } }],
+      undefined,
+      "medium",
+    );
+    manager.subscribeToTable(
+      "festival_artists",
+      ["festival-artists", { filters: { sort: "name", status: "active" }, festivalId: "festival-1" }],
+      undefined,
+      "medium",
+    );
+
+    const artistChannels = channels.filter((mockChannel) =>
+      mockChannel.name.startsWith("festival_artists-"),
+    );
+    expect(artistChannels).toHaveLength(1);
+  });
+
   it("deduplicates channels while cleaning up owner-scoped payload handlers", async () => {
     const { manager, channels, removeChannel } = await setupManager();
     const firstHandler = vi.fn();

@@ -21,13 +21,14 @@ interface Festival {
   end_time: string;
 }
 
+// Mirrors the nullable `festival_artists` columns selected by this dialog.
 interface Artist {
   id: string;
   name: string;
-  stage: number;
-  date: string;
-  show_start: string;
-  show_end: string;
+  stage: number | null;
+  date: string | null;
+  show_start: string | null;
+  show_end: string | null;
 }
 
 interface SearchResultArtist extends Artist {

@@ -59,7 +59,7 @@ export const useHojaDeRutaState = () => {
                      travelArrangements.length > 0 ||
                      accommodations.length > 0;
     
-    setIsDirty(hasContent && isInitialized);
+    setIsDirty(Boolean(hasContent) && isInitialized);
   }, [eventData, travelArrangements, accommodations, isInitialized]);
 
   return {

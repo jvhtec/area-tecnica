@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { JobPayoutTotals } from '@/types/jobExtras';
+import { normalizeJobPayoutRows } from '@/utils/jobPayoutTotals';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -64,15 +65,7 @@ export function useJobPayoutTotals(
         approvalMap.set(techId, allApproved);
       });
       
-      return (viewData || []).map((item) => ({
-        ...item,
-        extras_total_eur: Number(item.extras_total_eur ?? 0),
-        expenses_total_eur: Number(item.expenses_total_eur ?? 0),
-        total_eur: Number(item.total_eur ?? 0),
-        extras_breakdown: (item.extras_breakdown ?? {}) as JobPayoutTotals['extras_breakdown'],
-        expenses_breakdown: (item.expenses_breakdown ?? []) as unknown as JobPayoutTotals['expenses_breakdown'],
-        payout_approved: approvalMap.get(item.technician_id) ?? false,
-      }));
+      return normalizeJobPayoutRows(viewData, approvalMap);
     },
     enabled: (!!jobId) && (options?.enabled ?? true),
     staleTime: 30 * 1000, // 30 seconds
@@ -89,14 +82,7 @@ export function useMyJobPayoutTotals() {
         .order('job_id');
       
       if (error) throw error;
-      return (data || []).map((item) => ({
-        ...item,
-        extras_total_eur: Number(item.extras_total_eur ?? 0),
-        expenses_total_eur: Number(item.expenses_total_eur ?? 0),
-        total_eur: Number(item.total_eur ?? 0),
-        extras_breakdown: (item.extras_breakdown ?? {}) as JobPayoutTotals['extras_breakdown'],
-        expenses_breakdown: (item.expenses_breakdown ?? []) as unknown as JobPayoutTotals['expenses_breakdown'],
-      }));
+      return normalizeJobPayoutRows(data);
     },
     staleTime: 30 * 1000, // 30 seconds
   });

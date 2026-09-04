@@ -205,7 +205,9 @@ const isSoundCategory = (category: string): category is SoundCategory =>
   (SOUND_CATEGORIES as readonly string[]).includes(category);
 
 export const resolveSubsystemForEquipment = (
-  equipment?: Pick<Equipment, 'category'> | null
+  // Accepts a nullable category: rows joined from presets/lookups may not carry one,
+  // and the function already returns null in that case.
+  equipment?: { category?: Equipment['category'] | null } | null
 ): PresetSubsystem | null => {
   if (!equipment?.category) return null;
   if (!isSoundCategory(equipment.category)) return null;

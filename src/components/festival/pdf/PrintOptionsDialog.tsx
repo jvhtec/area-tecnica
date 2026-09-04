@@ -594,7 +594,7 @@ export const PrintOptionsDialog = ({
             <div className="border rounded-md p-3 space-y-2 bg-muted/40 dark:bg-muted/20">
               <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
                 <span className="font-medium text-foreground">{progress?.label || "Preparando documentacion"}</span>
-                {typeof progressValue === "number" && (
+                {progress && typeof progressValue === "number" && (
                   <span className="shrink-0 text-muted-foreground">
                     {progress.completed}/{progress.total}
                   </span>

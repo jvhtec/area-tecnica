@@ -513,7 +513,7 @@ export const StaffingCampaignView = ({
           </div>
           <div>
             <p className="text-gray-600">Creada</p>
-            <p className="font-medium">{formatInJobTimezone(campaign.created_at, 'PPp')}</p>
+            <p className="font-medium">{campaign.created_at ? formatInJobTimezone(campaign.created_at, 'PPp') : '—'}</p>
           </div>
           {campaign.last_run_at && (
             <div>

@@ -24,7 +24,7 @@ export async function retryWithBackoff<T>(
     backoffMultiplier = 2
   } = options;
 
-  let lastError: Error;
+  let lastError: Error = new Error('Operation failed before any attempt was made');
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

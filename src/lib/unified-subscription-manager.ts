@@ -9,6 +9,7 @@ import {
   createSubscriptionDebugEntries,
   forceRefreshManagedSubscriptions,
   groupSubscriptionsByTable,
+  hashSubscriptionQueryKey,
   normalizeQueryKey,
   type ManagedSubscription,
   type PendingManagedSubscription,
@@ -18,6 +19,7 @@ import {
   type SubscribeToTableOptions,
   type SubscriptionDebugEntry,
   type SubscriptionPriority,
+  type SubscriptionQueryKey,
   type SubscriptionSnapshot,
 } from "@/lib/unified-subscription-support";
 
@@ -26,6 +28,7 @@ export type {
   RealtimePayloadHandler,
   RealtimeSubscriptionFilter,
   SubscriptionDebugEntry,
+  SubscriptionQueryKey,
   SubscriptionSnapshot,
 } from "@/lib/unified-subscription-support";
 
@@ -104,11 +107,11 @@ export class UnifiedSubscriptionManager {
     });
   }
 
-  private normalizeQueryKey(queryKey: string | string[]) {
+  private normalizeQueryKey(queryKey: SubscriptionQueryKey) {
     return normalizeQueryKey(queryKey);
   }
 
-  private getSubscriptionKey(table: string, queryKey: string | string[], filter?: RealtimeSubscriptionFilter) {
+  private getSubscriptionKey(table: string, queryKey: SubscriptionQueryKey, filter?: RealtimeSubscriptionFilter) {
     return buildSubscriptionKey(table, queryKey, filter);
   }
 
@@ -298,9 +301,9 @@ export class UnifiedSubscriptionManager {
     }
   }
 
-  private scheduleInvalidation(queryKey: string | string[], priority: 'high' | 'medium' | 'low') {
+  private scheduleInvalidation(queryKey: SubscriptionQueryKey, priority: 'high' | 'medium' | 'low') {
     const normalizedQueryKey = this.normalizeQueryKey(queryKey);
-    const key = JSON.stringify(normalizedQueryKey);
+    const key = hashSubscriptionQueryKey(normalizedQueryKey);
 
     const existing = this.invalidationTimers.get(key);
     if (existing) {
@@ -321,7 +324,7 @@ export class UnifiedSubscriptionManager {
 
   private invalidateStaleQueries(maxAgeMs: number) {
     const now = Date.now();
-    const queryKeysToInvalidate = new Set<string>();
+    const queryKeysToInvalidate = new Map<string, unknown[]>();
 
     this.subscriptions.forEach((subscription, subscriptionKey) => {
       const lastActivity = this.tableLastActivity.get(subscriptionKey) ?? 0;
@@ -329,20 +332,15 @@ export class UnifiedSubscriptionManager {
       if (now - lastActivity <= maxAgeMs) return;
 
       const normalized = this.normalizeQueryKey(subscription.options.queryKey);
-      queryKeysToInvalidate.add(JSON.stringify(normalized));
+      queryKeysToInvalidate.set(hashSubscriptionQueryKey(normalized), normalized);
     });
 
     if (!queryKeysToInvalidate.size) {
       return;
     }
 
-    queryKeysToInvalidate.forEach((serialized) => {
-      try {
-        const parsed = JSON.parse(serialized) as string[];
-        this.queryClient.invalidateQueries({ queryKey: parsed });
-      } catch (error) {
-        console.warn('[UnifiedSubscriptionManager] Failed to invalidate stale queryKey', error);
-      }
+    queryKeysToInvalidate.forEach((queryKey) => {
+      this.queryClient.invalidateQueries({ queryKey });
     });
 
     this.updateSnapshot({ lastRefreshTime: Date.now() });
@@ -450,7 +448,7 @@ export class UnifiedSubscriptionManager {
    */
   public subscribeToTable(
     table: string, 
-    queryKey: string | string[], 
+    queryKey: SubscriptionQueryKey, 
     filter?: RealtimeSubscriptionFilter,
     priority: SubscriptionPriority = 'medium',
     options: SubscribeToTableOptions = {},
@@ -458,36 +456,34 @@ export class UnifiedSubscriptionManager {
     const subscriptionKey = this.getSubscriptionKey(table, queryKey, filter);
     
     // Check if we already have this subscription (deduplication)
-    if (this.subscriptions.has(subscriptionKey)) {
-      const existingSubscription = this.subscriptions.get(subscriptionKey);
-      if (existingSubscription) {
-        if (options.invalidateOnPayload !== false) {
-          existingSubscription.invalidateOnPayload = true;
-        }
-        if (options.ownerRoute) {
-          this.registerRouteSubscription(options.ownerRoute, subscriptionKey);
-        }
-        const handlerId = options.onPayload
-          ? this.addPayloadHandler(existingSubscription, options.onPayload, options.ownerRoute)
-          : null;
+    const existingSubscription = this.subscriptions.get(subscriptionKey);
+    if (existingSubscription) {
+      if (options.invalidateOnPayload !== false) {
+        existingSubscription.invalidateOnPayload = true;
+      }
+      if (options.ownerRoute) {
+        this.registerRouteSubscription(options.ownerRoute, subscriptionKey);
+      }
+      const handlerId = options.onPayload
+        ? this.addPayloadHandler(existingSubscription, options.onPayload, options.ownerRoute)
+        : null;
 
-        if (handlerId) {
-          return {
-            ...existingSubscription,
-            unsubscribe: () => {
-              const currentSubscription = this.subscriptions.get(subscriptionKey);
-              if (currentSubscription) {
-                this.removePayloadHandler(currentSubscription, handlerId);
-              }
-            },
-          };
-        }
+      if (handlerId) {
+        return {
+          ...existingSubscription,
+          unsubscribe: () => {
+            const currentSubscription = this.subscriptions.get(subscriptionKey);
+            if (currentSubscription) {
+              this.removePayloadHandler(currentSubscription, handlerId);
+            }
+          },
+        };
       }
 
       if (priority === 'high') {
         console.log(`Already subscribed to ${table} with query key ${subscriptionKey}`);
       }
-      return this.subscriptions.get(subscriptionKey);
+      return existingSubscription;
     }
     
     if (priority === 'high') {
@@ -687,7 +683,7 @@ export class UnifiedSubscriptionManager {
   public subscribeToTables(
     tableConfigs: Array<{
       table: string, 
-      queryKey: string | string[],
+      queryKey: SubscriptionQueryKey,
       filter?: RealtimeSubscriptionFilter,
       priority?: SubscriptionPriority
     }>
@@ -767,7 +763,7 @@ export class UnifiedSubscriptionManager {
   /**
    * Get subscription status for a specific table
    */
-  public getSubscriptionStatus(table: string, queryKey: string | string[]): { isConnected: boolean, lastActivity: number } {
+  public getSubscriptionStatus(table: string, queryKey: SubscriptionQueryKey): { isConnected: boolean, lastActivity: number } {
     const subscriptionKey = this.getSubscriptionKey(table, queryKey);
     
     const isConnected = this.subscriptions.has(subscriptionKey) && this.connectionStatus === 'connected';

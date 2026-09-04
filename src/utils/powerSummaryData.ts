@@ -159,7 +159,7 @@ const mapPowerRequirementTable = (
     currentPerPhase: calculation.currentLine,
     totalVa: calculation.totalVa,
     calculation,
-    notes: buildPowerRowNotes(row.includes_hoist, calculation.isEstimate),
+    notes: buildPowerRowNotes(Boolean(row.includes_hoist), calculation.isEstimate),
     source: 'job',
   };
 };

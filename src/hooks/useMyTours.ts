@@ -46,13 +46,14 @@ const firstRow = <T,>(value: T | T[] | null | undefined): T | null =>
 export interface MyTour {
   id: string;
   name: string;
-  description?: string;
+  // Nullable to match the `tours` / `tour_assignments` columns they are read from.
+  description?: string | null;
   color: string;
-  start_date?: string;
-  end_date?: string;
+  start_date?: string | null;
+  end_date?: string | null;
   assignment_role: string;
   assignment_department: string;
-  assignment_notes?: string;
+  assignment_notes?: string | null;
   total_dates: number;
   upcoming_dates: number;
 }

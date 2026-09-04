@@ -52,15 +52,19 @@ export const useUpsertVenue = () => {
 
   return useMutation({
     mutationFn: async (venueData: VenueMetadata) => {
+      // `upsert_venue` declares every argument as nullable, and the optional ones
+      // DEFAULT NULL — so omitting them is equivalent to passing NULL. The generated
+      // `types.ts` does not model argument nullability, hence the two casts below for
+      // the arguments that have no default and must therefore be sent explicitly.
       const { data, error } = await supabase.rpc('upsert_venue', {
         p_name: venueData.name,
-        p_google_place_id: venueData.google_place_id || null,
+        p_google_place_id: (venueData.google_place_id || null) as string,
         p_city: venueData.city,
-        p_state_region: venueData.state_region || null,
+        p_state_region: (venueData.state_region || null) as string,
         p_country: venueData.country,
-        p_full_address: venueData.full_address || null,
-        p_coordinates: venueData.coordinates || null,
-        p_capacity: venueData.capacity || null,
+        p_full_address: venueData.full_address || undefined,
+        p_coordinates: venueData.coordinates || undefined,
+        p_capacity: venueData.capacity || undefined,
       });
 
       if (error) throw error;

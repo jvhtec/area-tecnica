@@ -10,6 +10,7 @@ import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { isAdminRole } from '@/utils/permissions';
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
+import type { SubscriptionQueryKey } from '@/lib/unified-subscription-support';
 import {
   GLOBAL_SUBSCRIPTION_TABLES,
   getSubscriptionConfigForPathname,
@@ -45,7 +46,7 @@ const getRouteQueryKeyForTable = (table: string): string | string[] =>
 
 type RouteSubscriptionRequirement = {
   table: string;
-  queryKey: string | string[];
+  queryKey: SubscriptionQueryKey;
   priority: 'high' | 'medium' | 'low';
 };
 

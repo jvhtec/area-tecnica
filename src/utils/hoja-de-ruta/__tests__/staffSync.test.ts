@@ -76,6 +76,7 @@ describe("remapAccommodationStaffReferences", () => {
     ]);
     const accommodations = [
       {
+        id: "acc-1",
         hotel_name: "Hotel",
         rooms: [
           { room_type: "double" as const, staff_member1_id: "0", staff_member2_id: "1" },
@@ -105,6 +106,7 @@ describe("remapAccommodationStaffReferences", () => {
     ]);
     const accommodations = [
       {
+        id: "acc-1",
         rooms: [
           { room_type: "double" as const, staff_member1_id: "t1", staff_member2_id: "t2" },
         ],
@@ -127,6 +129,7 @@ describe("adjustAccommodationsForStaffRemoval", () => {
   it("clears references to the removed member and shifts higher indexes", () => {
     const accommodations = [
       {
+        id: "acc-1",
         rooms: [
           { room_type: "double" as const, staff_member1_id: "1", staff_member2_id: "2" },
           { room_type: "single" as const, staff_member1_id: "0", staff_member2_id: "" },

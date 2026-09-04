@@ -14,7 +14,7 @@ import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog"
 type Options = {
   jobId: string;
   jobTitle: string;
-  logoUrl: string | null;
+  logoUrl: string | undefined;
   options: PrintOptions;
   pdfConcurrency: number;
   reportProgress: (progress: FestivalPdfProgress) => void;

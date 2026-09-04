@@ -4,9 +4,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { supabase } from '@/lib/supabase';
-import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
+import { getScheduledWorkDateKeys, type TourDateLike } from '@/utils/assignmentWorkDates';
 import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import type { JobDocument } from '@/types/job';
 import {
   canCreateFolders,
   canEditJobs as canEditJobsForRole,
@@ -29,16 +30,11 @@ export type UseOptimizedJobCardOptions = {
   refreshAssignmentsOnMount?: boolean;
 };
 
-export type JobDocumentRow = {
-  id: string;
-  file_name: string;
-  file_path: string;
-  uploaded_at: string;
-  visible_to_tech?: boolean;
-  read_only?: boolean;
-  template_type?: string | null;
-  [key: string]: unknown;
-};
+/**
+ * Job-card view of a `job_documents` row. Aliased to the canonical `JobDocument` so the
+ * card, its document sections and the shared row component all speak the same type.
+ */
+export type JobDocumentRow = JobDocument;
 
 export type JobProfileRef = {
   first_name?: string | null;
@@ -78,7 +74,7 @@ export type OptimizedJobCardJob = {
   start_time?: string | null;
   end_time?: string | null;
   job_type?: string | null;
-  tour_date?: unknown;
+  tour_date?: TourDateLike | TourDateLike[] | null;
   job_assignments?: JobAssignmentForCard[] | null;
   job_documents?: JobDocumentRow[] | null;
   job_date_types?: JobDateTypeForCard[] | null;
@@ -88,11 +84,11 @@ export type OptimizedJobCardJob = {
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-export const useOptimizedJobCard = (
-  job: OptimizedJobCardJob,
+export const useOptimizedJobCard = <TJob extends OptimizedJobCardJob>(
+  job: TJob,
   department: string,
   userRole: string | null,
-  _onEditClick: (job: OptimizedJobCardJob) => void,
+  _onEditClick: (job: TJob) => void,
   _onDeleteClick: (jobId: string) => void,
   _onJobClick: (jobId: string) => void,
   options?: UseOptimizedJobCardOptions

@@ -79,12 +79,12 @@ export class ContentSections {
   }
 
   async addAccommodationSection(
-    accommodations: any[], 
-    eventData: EventData, 
+    accommodations: Accommodation[] | undefined,
+    eventData: EventData,
     yPosition: number,
     suppressRoomTable: boolean = false
   ): Promise<number> {
-    return await this.accommodationSection.addAccommodationSection(accommodations, eventData, yPosition, suppressRoomTable);
+    return await this.accommodationSection.addAccommodationSection(accommodations ?? [], eventData, yPosition, suppressRoomTable);
   }
 
   addStaffSection(eventData: EventData, yPosition: number): number {
@@ -150,7 +150,7 @@ export class ContentSections {
   }
 
   hasWeatherData(eventData: EventData): boolean {
-    return eventData.weather && eventData.weather.length > 0;
+    return !!eventData.weather && eventData.weather.length > 0;
   }
 
   hasContactsData(eventData: EventData): boolean {
@@ -165,18 +165,19 @@ export class ContentSections {
     );
   }
 
-  hasTravelData(travelArrangements: any[]): boolean {
-    return travelArrangements && travelArrangements.length > 0;
+  hasTravelData(travelArrangements: TravelArrangement[] | undefined): boolean {
+    return !!travelArrangements && travelArrangements.length > 0;
   }
 
-  hasAccommodationData(accommodations: any[]): boolean {
+  hasAccommodationData(accommodations: Accommodation[] | undefined): boolean {
     if (!accommodations || accommodations.length === 0) return false;
 
     return accommodations.some(acc => {
       if (!acc) return false;
 
+      // `hotel_address` belongs to the tour-ops accommodation shape, not this one — the
+      // previous `any[]` hid that, so the check was always undefined. `address` is the field.
       const hasHotelInfo = DataValidators.hasData(acc.hotel_name) ||
-        DataValidators.hasData(acc.hotel_address) ||
         DataValidators.hasData(acc.address);
       const hasDates = DataValidators.hasData(acc.check_in) || DataValidators.hasData(acc.check_out);
       const hasRooms = Array.isArray(acc.rooms) && (
@@ -187,8 +188,8 @@ export class ContentSections {
     });
   }
 
-  hasRoomingData(accommodations: any[]): boolean {
-    return accommodations && accommodations.some(acc => 
+  hasRoomingData(accommodations: Accommodation[] | undefined): boolean {
+    return !!accommodations && accommodations.some(acc =>
       acc.rooms && acc.rooms.length > 0
     );
   }
@@ -219,7 +220,7 @@ export class ContentSections {
   }
 
   hasPowerData(eventData: EventData): boolean {
-    return eventData.powerRequirements && eventData.powerRequirements.trim().length > 0;
+    return !!eventData.powerRequirements && eventData.powerRequirements.trim().length > 0;
   }
 
   hasAuxNeedsData(eventData: EventData): boolean {

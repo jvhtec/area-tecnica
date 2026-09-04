@@ -372,3 +372,17 @@ export const drawFooterMetaText = (
     doc.text(rightText, pageWidth - 10, pageHeight - 10, { align: 'right' });
   }
 };
+
+// ---------------------------------------------------------------------------
+// Font helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Change only the font *style*, keeping whatever family is currently active.
+ *
+ * jsPDF accepts `setFont(undefined, style)` for this at runtime, but its type
+ * declaration requires a font name — so resolve the current family explicitly.
+ */
+export const setFontStyle = (doc: jsPDF, style: 'normal' | 'bold' | 'italic' | 'bolditalic'): void => {
+  doc.setFont(doc.getFont().fontName, style);
+};

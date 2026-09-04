@@ -26,9 +26,9 @@ export interface AggregatedTimesheetAssignment {
   status: string;
   source: 'assignment' | 'timesheet';
   roles: {
-    sound_role?: string;
-    lights_role?: string;
-    video_role?: string;
+    sound_role?: string | null;
+    lights_role?: string | null;
+    video_role?: string | null;
   };
   original_assignment?: AssignmentLookupRow;
 }

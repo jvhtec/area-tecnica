@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { isPresent } from '@/utils/typeGuards';
 export interface IncidentReport {
   id: string;
   job_id: string;
@@ -48,7 +49,7 @@ export const useIncidentReports = () => {
       if (error) throw error;
       
       // Get unique user IDs and fetch profile data separately
-      const userIds = [...new Set(data.map(report => report.uploaded_by).filter(Boolean))];
+      const userIds = [...new Set(data.map(report => report.uploaded_by))].filter(isPresent);
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, first_name, last_name")

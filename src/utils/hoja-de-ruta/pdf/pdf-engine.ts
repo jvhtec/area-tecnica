@@ -18,7 +18,8 @@ import type {
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
-  private headerSection: HeaderSection;
+  // Assigned in renderPDF() once job info and logo are resolved, before any section renders.
+  private headerSection!: HeaderSection;
   private contentSections: ContentSections;
   private logoData?: string;
   private hasCoverPage = true;
@@ -79,7 +80,7 @@ export class PDFEngine {
     this.renderedSectionCount = 0;
 
     // Load logo first (used on cover and in page header)
-    this.logoData = await LogoService.loadJobLogo(selectedJobId);
+    this.logoData = (await LogoService.loadJobLogo(selectedJobId)) ?? undefined;
 
     // Compute header logo scaled dimensions to keep aspect ratio
     let headerLogoDims: { width: number; height: number } | undefined = undefined;

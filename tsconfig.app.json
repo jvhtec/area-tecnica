@@ -14,11 +14,15 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
+    /* Strictness ratchet: nullability and indexed access remain staged for the next slice. */
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
     "useUnknownInCatchVariables": true,
     "noFallthroughCasesInSwitch": false,
 

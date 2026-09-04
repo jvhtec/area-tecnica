@@ -103,11 +103,13 @@ export const RoomAssignmentsDialog = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Sin asignar</SelectItem>
-                    {(eventData.staff || []).map((member) => (
-                      <SelectItem key={member.name} value={member.name}>
-                        {`${member.name} ${member.surname1 || ""}`}
-                      </SelectItem>
-                    ))}
+                    {eventData.staff.map((member) =>
+                      member.name ? (
+                        <SelectItem key={member.name} value={member.name}>
+                          {`${member.name} ${member.surname1 || ""}`}
+                        </SelectItem>
+                      ) : null
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -130,11 +132,13 @@ export const RoomAssignmentsDialog = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Sin asignar</SelectItem>
-                      {(eventData.staff || []).map((member) => (
-                        <SelectItem key={member.name} value={member.name}>
-                          {`${member.name} ${member.surname1 || ""}`}
-                        </SelectItem>
-                      ))}
+                      {eventData.staff.map((member) =>
+                        member.name ? (
+                          <SelectItem key={member.name} value={member.name}>
+                            {`${member.name} ${member.surname1 || ""}`}
+                          </SelectItem>
+                        ) : null
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-09-04T15:19:44.712Z",
+  "generatedAt": "2026-09-04T15:21:32.820Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1277,
+  "total": 1267,
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 1056,
+    "@typescript-eslint/no-explicit-any": 1046,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -125,7 +125,7 @@
       "react-refresh/only-export-components": 1
     },
     "src/components/hoja-de-ruta/sections/ModernEventSection.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/hoja-de-ruta/sections/ModernLogisticsSection.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -624,9 +624,6 @@
     "src/hooks/useOptimisticJobManagement.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/hooks/useOptimisticMutation.ts": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
     "src/hooks/useOptimizedAuth.tsx": {
       "react-refresh/only-export-components": 1
     },
@@ -924,7 +921,7 @@
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/utils/hoja-de-ruta/pdf/sections/content-sections.ts": {
-      "@typescript-eslint/no-explicit-any": 7
+      "@typescript-eslint/no-explicit-any": 3
     },
     "src/utils/hoja-de-ruta/pdf/sections/program.ts": {
       "@typescript-eslint/no-explicit-any": 3

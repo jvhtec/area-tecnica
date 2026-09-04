@@ -3,18 +3,21 @@ export interface Timesheet {
   job_id: string;
   technician_id: string;
   date: string;
-  start_time?: string;
-  end_time?: string;
+  // Nullable to match the columns: rejecting with `resetHours` clears both
+  // (chk_valid_times requires start/end to be null together).
+  start_time?: string | null;
+  end_time?: string | null;
   break_minutes: number;
   overtime_hours: number;
-  notes?: string;
+  notes?: string | null;
   ends_next_day?: boolean;
   status: 'draft' | 'submitted' | 'approved' | 'rejected';
-  signature_data?: string;
-  signed_at?: string;
-  created_by?: string;
-  approved_by?: string;
-  approved_at?: string;
+  // Nullable to match the columns: clearing them on reset/unapprove writes `null`.
+  signature_data?: string | null;
+  signed_at?: string | null;
+  created_by?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
   rejected_at?: string | null;
   rejected_by?: string | null;
   rejection_reason?: string | null;

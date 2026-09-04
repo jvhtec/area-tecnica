@@ -31,7 +31,8 @@ interface Assignment {
   id?: string;
   technician_id: string;
   job_id?: string;
-  assignment_date?: string;
+  // Nullable: `job_assignments.assignment_date` is null for multi-day assignments.
+  assignment_date?: string | null;
   single_day?: boolean;
   dates?: string[];
   job?: {

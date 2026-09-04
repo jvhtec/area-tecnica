@@ -91,7 +91,7 @@ export const createQueryKey = {
     /** All pending-task query keys. */
     all: ['pending-tasks'] as const,
     /** Pending tasks for a user, optionally scoped by a normalized department. */
-    byUser: (userId: string, dept: string | null) =>
+    byUser: (userId: string | null, dept: string | null) =>
       [...createQueryKey.pendingTasks.all, userId, dept] as const,
   },
   jobs: {

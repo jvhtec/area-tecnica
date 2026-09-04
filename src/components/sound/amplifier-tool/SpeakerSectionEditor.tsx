@@ -14,7 +14,8 @@ export const SpeakerSectionEditor: React.FC<{
   onMirroredChange: (section: string, checked: boolean) => void;
   onAddSpeaker: (section: string) => void;
   onRemoveSpeaker: (section: string, index: number) => void;
-  onConfigChange: (section: string, index: number, field: keyof SpeakerConfig, value: string | number | boolean) => void;
+  // `SpeakerConfig` has no boolean field — the mirrored flag goes through `onMirroredChange`.
+  onConfigChange: (section: string, index: number, field: keyof SpeakerConfig, value: string | number) => void;
 }> = ({
   section,
   sectionConfig,

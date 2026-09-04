@@ -279,12 +279,12 @@ export function PushToFlexPullsheetDialog({
 
         const processItems = (
           items: EquipmentItemWithModel[],
-          getQuantity: (item: EquipmentItemWithModel) => number,
+          getQuantity: (item: EquipmentItemWithModel) => number | undefined,
           category: string
         ) => {
           items.forEach(item => {
             if (!item.model) return;
-            const qty = getQuantity(item);
+            const qty = getQuantity(item) ?? 0;
             if (qty <= 0) return;
 
             const resourceId = foundMap.get(item.model);

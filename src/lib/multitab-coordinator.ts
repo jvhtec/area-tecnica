@@ -4,12 +4,13 @@ import {
   type RealtimeSubscriptionFilter,
 } from '@/lib/unified-subscription-manager';
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
+import type { SubscriptionQueryKey } from '@/lib/unified-subscription-support';
 
 type SubscriptionPriority = 'high' | 'medium' | 'low';
 
 export interface DelegatedRouteSubscription {
   table: string;
-  queryKey: string | string[];
+  queryKey: SubscriptionQueryKey;
   filter?: RealtimeSubscriptionFilter;
   priority?: SubscriptionPriority;
 }

@@ -38,7 +38,8 @@ interface Equipment {
   name: string;
   category: EquipmentCategory;
   current_quantity: number;
-  base_quantity?: number;
+  /** Always set by the only mapper that builds these rows (defaults to 0). */
+  base_quantity: number;
   rental_boost?: number;
   image_id?: string | null;
   manufacturer?: string | null;

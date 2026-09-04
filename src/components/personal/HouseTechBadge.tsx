@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { TechDetailModal } from './TechDetailModal';
 import { labelForCode } from '@/utils/roles';
 import { useAvailabilityStatus } from './hooks/useTechnicianAvailability';
+import type { TechUnavailabilityStatus } from "@/types/availability";
 
 interface HouseTechBadgeProps {
   technician: {
@@ -33,8 +34,8 @@ interface HouseTechBadgeProps {
   };
   date: Date;
   compact?: boolean;
-  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null;
-  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => void;
+  availabilityStatus?: TechUnavailabilityStatus | null;
+  onAvailabilityChange?: (techId: string, status: TechUnavailabilityStatus, date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -49,7 +50,7 @@ export const HouseTechBadge = memo<HouseTechBadgeProps>(({
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   // Local optimistic state for instant UI feedback
-  const [optimisticStatus, setOptimisticStatus] = useState<'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null>(null);
+  const [optimisticStatus, setOptimisticStatus] = useState<TechUnavailabilityStatus | null>(null);
 
   // Subscribe to this badge's status from global store - only THIS badge rerenders when its status changes
   const storeStatus = useAvailabilityStatus(technician.id, date);
@@ -128,7 +129,7 @@ export const HouseTechBadge = memo<HouseTechBadgeProps>(({
     setModalOpen(true);
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
+  const handleAvailabilityChange = (techId: string, status: TechUnavailabilityStatus, date: Date) => {
     // Optimistic update - only this badge rerenders
     setOptimisticStatus(status);
 
@@ -145,6 +146,8 @@ export const HouseTechBadge = memo<HouseTechBadgeProps>(({
       onAvailabilityRemove(techId, date);
     }
   };
+
+  const role = getRole();
 
   return (
     <>
@@ -177,9 +180,9 @@ export const HouseTechBadge = memo<HouseTechBadgeProps>(({
         ) : (
           <>
             <span className="flex-shrink-0 text-xs">{getInitials()}</span>
-            {assignment && getRole() && !isUnavailable && (
+            {assignment && role && !isUnavailable && (
               <span className="truncate text-[10px] opacity-75 max-w-[24px]">
-                {getRole().slice(0, 3)}
+                {role.slice(0, 3)}
               </span>
             )}
             {getAvailabilityIcon() && (

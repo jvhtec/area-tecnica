@@ -225,7 +225,7 @@ export default function Disponibilidad() {
           <div className="lg:col-span-4 xl:col-span-3 space-y-6">
             {/* Calendar (Green) */}
             <div className="rounded-xl border shadow-sm bg-card">
-              <DisponibilidadCalendar onDateSelect={setSelectedDate} selectedDate={selectedDate} />
+              <DisponibilidadCalendar onDateSelect={(date) => date && setSelectedDate(date)} selectedDate={selectedDate} />
             </div>
 
             {/* Selected Day Details (Blue) */}

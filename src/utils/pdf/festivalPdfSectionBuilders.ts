@@ -295,7 +295,8 @@ export const hasInfrastructureNeeds = (artist: ArtistInfrastructureData): boolea
 
 interface ShiftLike {
   id: string;
-  job_id: string;
+  /** Nullable to match the `festival_shifts.job_id` column. */
+  job_id: string | null;
   name: string;
   date: string;
   start_time: string;
@@ -362,7 +363,8 @@ export const attachShiftAssignmentsAndProfiles = (
 
     return {
       id: String(shift.id),
-      job_id: String(shift.job_id),
+      // Propagate null rather than stringifying it into the literal "null".
+      job_id: shift.job_id === null ? null : String(shift.job_id),
       name: toStringValue(shift.name, 'Turno'),
       date: toStringValue(shift.date),
       start_time: toStringValue(shift.start_time),

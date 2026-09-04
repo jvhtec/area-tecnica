@@ -13,6 +13,8 @@ import {
   type TechnicalStage,
 } from "@/features/technical-tools/stage/stageAllocation";
 import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
+import type { TourDateOverrideTable } from "@/hooks/useTourDateOverrides";
+import type { TableRow } from "@/pages/pesos-tool/pesosToolModel";
 import {
   TOUR_PACKAGE_LABELS,
   TOUR_PACKAGE_SIZES,
@@ -52,7 +54,7 @@ export interface PesosToolViewProps {
   setCablePickWeight: (value: string) => void;
   soundComponentDatabase: Array<{ id: number; name: string; weight: number }>;
   currentTable: any;
-  updateInput: (index: number, field: string, value: string) => void;
+  updateInput: (index: number, field: keyof TableRow, value: string) => void;
   removeRow: (index: number) => void;
   addRow: () => void;
   generateTable: () => void;
@@ -67,7 +69,7 @@ export interface PesosToolViewProps {
   setNewDefaultSetName: (value: string) => void;
   deleteSet: (id: string) => void;
   weightOverrides: any[];
-  deleteOverride: (args: { id: string; table: string }) => void;
+  deleteOverride: (args: { id: string; table: TourDateOverrideTable }) => void;
   saveAsDefaultSet: () => void;
   removeTable: (id: number) => void;
   /** Extra header actions (stage copy / quick presets) rendered next to Export. */

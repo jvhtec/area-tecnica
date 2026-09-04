@@ -191,8 +191,8 @@ export const useJobExpenseMutations = () => {
         p_amount_original: data.amount_original,
         p_currency_code: data.currency_code,
         p_fx_rate: data.fx_rate || 1,
-        p_description: data.description || null,
-        p_receipt_path: data.receipt_path || null,
+        p_description: data.description || undefined,
+        p_receipt_path: data.receipt_path || undefined,
       });
 
       if (error) throw error;
@@ -295,8 +295,12 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
   const isManager = isManagementRole(userRole);
 
   return useQuery({
-    queryKey: queryKeys.scope('job-approved-expenses', jobId),
-    enabled: !!jobId,
+    // The result is scoped by user and role (technicians only see their own rows), so both
+    // must be part of the cache identity — otherwise a technician-scoped result can be served
+    // to a manager, or vice versa, after a login or role change. Gate on auth readiness too,
+    // so an unauthenticated `[]` is not cached for the whole staleTime window.
+    queryKey: queryKeys.scope('job-approved-expenses', jobId, user?.id, { isManager }),
+    enabled: !!jobId && !!user?.id,
     queryFn: async () => {
       if (!jobId) {
         return [];
@@ -324,6 +328,7 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
 
       // Managers see all approved expenses for the job
       if (!isManager) {
+        if (!user) return [];
         query = query.eq('technician_id', user.id);
       }
 
@@ -338,11 +343,12 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
         const techId = expense.technician_id;
         const category = expense.category_slug || 'otros';
 
-        if (!expensesByTechnicianAndCategory.has(techId)) {
-          expensesByTechnicianAndCategory.set(techId, new Map());
+        let categoryMap = expensesByTechnicianAndCategory.get(techId);
+        if (!categoryMap) {
+          categoryMap = new Map();
+          expensesByTechnicianAndCategory.set(techId, categoryMap);
         }
 
-        const categoryMap = expensesByTechnicianAndCategory.get(techId);
         const currentTotal = categoryMap.get(category) || 0;
 
         // Only count approved expenses

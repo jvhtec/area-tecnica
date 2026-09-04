@@ -9,6 +9,7 @@ export function useJobRatesApproval(jobId?: string) {
     queryKey: queryKeys.scope('job-rates-approval', jobId),
     enabled: !!jobId,
     queryFn: async () => {
+      if (!jobId) return null;
       const { data, error } = await supabase
         .from('jobs')
         .select('id, rates_approved, rates_approved_at, rates_approved_by')

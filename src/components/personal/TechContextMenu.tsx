@@ -11,6 +11,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Calendar, Plane, Stethoscope, CalendarOff, Warehouse } from 'lucide-react';
+import type { TechUnavailabilityStatus } from "@/types/availability";
 
 interface TechContextMenuProps {
   children: React.ReactNode;
@@ -21,7 +22,8 @@ interface TechContextMenuProps {
     department: string | null;
   };
   date: Date;
-  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => void;
+  // Omitted in read-only mode, alongside `onAvailabilityRemove`.
+  onAvailabilityChange?: (techId: string, status: TechUnavailabilityStatus, date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -32,13 +34,17 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
   onAvailabilityChange,
   onAvailabilityRemove,
 }) => {
-  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable') => {
-    onAvailabilityChange(technician.id, reason, date);
+  const handleUnavailable = (reason: TechUnavailabilityStatus) => {
+    onAvailabilityChange?.(technician.id, reason, date);
   };
 
   const handleRemoveAvailability = () => {
     onAvailabilityRemove?.(technician.id, date);
   };
+
+  if (!onAvailabilityChange && !onAvailabilityRemove) {
+    return <>{children}</>;
+  }
 
   return (
     <ContextMenu>
@@ -46,6 +52,9 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-56">
+        {/* Read-only callers omit the handlers; rendering the items anyway would show
+            actions that silently do nothing when clicked. */}
+        {onAvailabilityChange && (
         <ContextMenuSub>
           <ContextMenuSubTrigger>
             <Calendar className="mr-2 h-4 w-4" />
@@ -74,11 +83,14 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
-        <ContextMenuSeparator />
+        )}
+        {onAvailabilityChange && onAvailabilityRemove && <ContextMenuSeparator />}
+        {onAvailabilityRemove && (
         <ContextMenuItem onClick={handleRemoveAvailability}>
           <Calendar className="mr-2 h-4 w-4" />
           Remove Override
         </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

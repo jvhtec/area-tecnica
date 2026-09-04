@@ -110,9 +110,9 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Buscar Hotel</Label>
                       <HotelAutocomplete
-                        value={accommodation.hotel_name}
-                        checkIn={accommodation.check_in}
-                        checkOut={accommodation.check_out}
+                        value={accommodation.hotel_name ?? ""}
+                        checkIn={accommodation.check_in ?? ""}
+                        checkOut={accommodation.check_out ?? ""}
                         onChange={(hotelName, address, coordinates) => {
                           const updates: Partial<Accommodation> = { hotel_name: hotelName };
                           if (address) updates.address = address;

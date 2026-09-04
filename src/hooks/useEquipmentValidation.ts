@@ -1,7 +1,7 @@
 
 import { FestivalGearSetup } from "@/types/festival";
 
-export const useEquipmentValidation = (gearSetup: FestivalGearSetup | null) => {
+export const useEquipmentValidation = (gearSetup: FestivalGearSetup | null | undefined) => {
   const validateEquipment = (type: string, value: number): boolean => {
     if (!gearSetup) return true;
     
