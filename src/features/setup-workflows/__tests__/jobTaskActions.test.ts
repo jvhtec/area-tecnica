@@ -18,14 +18,20 @@ describe('getJobSetupTaskAction', () => {
   });
 
   it('routes department calculations to the existing job-aware tools', () => {
-    expect(getJobSetupTaskAction(task('pesos:sound', 'technical', 'sound'), 'job a')).toMatchObject({
-      kind: 'route', href: '/sound/pesos?jobId=job+a',
-    });
-    expect(getJobSetupTaskAction(task('consumos:lights', 'technical', 'lights'), 'job-1')).toMatchObject({
-      kind: 'route', href: '/lights-consumos-tool?jobId=job-1',
-    });
-    expect(getJobSetupTaskAction(task('technical_report:video', 'technical', 'video'), 'job-1')).toMatchObject({
-      kind: 'route', href: '/video-memoria-tecnica?jobId=job-1',
+    const actions = [
+      getJobSetupTaskAction(task('pesos:sound', 'technical', 'sound'), 'job-1'),
+      getJobSetupTaskAction(task('consumos:lights', 'technical', 'lights'), 'job-1'),
+      getJobSetupTaskAction(task('technical_report:video', 'technical', 'video'), 'job-1'),
+    ];
+    expect(actions.map(action => action.kind === 'route' ? new URL(action.href, 'https://app.test').pathname : null))
+      .toEqual(['/sound/pesos', '/lights-consumos-tool', '/video-memoria-tecnica']);
+    actions.forEach(action => {
+      expect(action.kind).toBe('route');
+      if (action.kind === 'route') {
+        const url = new URL(action.href, 'https://app.test');
+        expect(url.searchParams.get('jobId')).toBe('job-1');
+        expect(url.searchParams.get('setupReturnTo')).toBe('/jobs/job-1/setup');
+      }
     });
   });
 
@@ -42,8 +48,12 @@ describe('getJobSetupTaskAction', () => {
   });
 
   it('returns operators to the real project card for Flex provisioning', () => {
-    expect(getJobSetupTaskAction(task('flex_folders', 'resources'), 'job/1')).toMatchObject({
-      kind: 'project', href: '/project-management?setupJobId=job%2F1',
-    });
+    const action = getJobSetupTaskAction(task('flex_folders', 'resources'), 'job-1');
+    expect(action.kind).toBe('project');
+    if (action.kind !== 'project') return;
+    const url = new URL(action.href, 'https://app.test');
+    expect(url.pathname).toBe('/project-management');
+    expect(url.searchParams.get('setupJobId')).toBe('job-1');
+    expect(url.searchParams.get('setupReturnTo')).toBe('/jobs/job-1/setup');
   });
 });

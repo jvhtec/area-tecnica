@@ -100,6 +100,8 @@ creation flow: **Preparación guiada** for a new Job and **Preparar** on editabl
 cards. Starting preparation generates tasks from the Job's canonical departments.
 The page persists the current step before navigation and requires the operator to
 confirm completion after doing the work; opening a tool never completes a task.
+Existing Job cards label this action **Preparación guiada**; the page-level **Nuevo
+trabajo guiado** action creates a Job first.
 
 `jobTaskActions.ts` is the central adapter from generated setup keys to existing
 tools. Basic fields and departments open `EditJobDialog`; personnel opens
@@ -108,6 +110,9 @@ manager; Pesos, Consumos and Memoria tasks use their existing job-aware routes;
 Estructura reuses the motor preparation and certificate actions. Flex returns to
 the exact Job card in Project Management, where the established Flex folder picker
 and provisioning logic remains the only writer.
+Routed tools receive a validated setup return target. The app shell keeps a visible
+**Volver a preparación guiada** action on those screens, and existing tool back
+buttons honor the same target where present.
 
 When departments change, **Actualizar tareas** reconciles generated requirements.
 The service preserves status and audit history for unchanged or retired tasks. A

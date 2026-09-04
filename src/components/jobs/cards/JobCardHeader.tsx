@@ -108,9 +108,9 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
               />
             )}
             {isProjectManagementPage && canEditJobs(userRole) && (
-              <Button asChild variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs">
+              <Button asChild variant="secondary" size="sm" className="h-8 gap-1.5 px-3 text-xs">
                 <Link to={`/jobs/${job.id}/setup`} onClick={(event) => event.stopPropagation()}>
-                  <CheckSquare2 className="h-3.5 w-3.5" />Preparar
+                  <CheckSquare2 className="h-3.5 w-3.5" />Preparación guiada
                 </Link>
               </Button>
             )}

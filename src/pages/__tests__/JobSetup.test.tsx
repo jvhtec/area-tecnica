@@ -92,7 +92,7 @@ describe('JobSetup', () => {
     await userEvent.click(screen.getByRole('button', { name: /abrir herramienta/i }));
 
     expect(mocks.update).toHaveBeenCalledWith({ action: 'step', step: 'technical' });
-    expect(await screen.findByText('/sound/pesos?jobId=job-1')).toBeInTheDocument();
+    expect(await screen.findByText('/sound/pesos?jobId=job-1&setupReturnTo=%2Fjobs%2Fjob-1%2Fsetup')).toBeInTheDocument();
   });
 
   it('persists explicit task completion', async () => {

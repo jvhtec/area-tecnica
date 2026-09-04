@@ -135,6 +135,6 @@ describe('JobCardHeader package badges', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: /preparar/i })).toHaveAttribute('href', '/jobs/job-1/setup');
+    expect(screen.getByRole('link', { name: /preparación guiada/i })).toHaveAttribute('href', '/jobs/job-1/setup');
   });
 });

@@ -32,11 +32,15 @@ import { GeneratedPowerTableCard } from "@/features/technical-tools/power/consum
 import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 import { ConsumosDefaultSetPanel } from "@/features/technical-tools/power/consumos/ConsumosDefaultSetPanel";
 import { ConsumosSavedTables } from "@/features/technical-tools/power/consumos/ConsumosSavedTables";
+import { useSearchParams } from "react-router-dom";
+import { getSetupReturnPath } from "@/features/setup-workflows/returnNavigation";
 
 export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = ({
   config,
 }) => {
   const state = useConsumosTool(config);
+  const [searchParams] = useSearchParams();
+  const setupReturnPath = getSetupReturnPath(searchParams);
   const { labels, features } = config;
   const {
     navigate,
@@ -161,7 +165,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
       <div className="mb-6">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(config.backPath)}>
+            <Button variant="ghost" size="icon" onClick={() => navigate(setupReturnPath ?? config.backPath)}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>

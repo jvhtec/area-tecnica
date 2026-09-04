@@ -568,7 +568,7 @@ const ProjectManagement = () => {
               <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Gestión de proyectos</CardTitle>
               {canCreateItems && (
                 <Button variant="outline" size="sm" onClick={() => navigate('/jobs/setup/new')}>
-                  Preparación guiada
+                  Nuevo trabajo guiado
                 </Button>
               )}
             </div>

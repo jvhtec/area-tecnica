@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Outlet, useLocation, useNavigate, Navigate, useSearchParams } from "react-router-dom"
+import { SetupWorkflowReturnBar } from "@/features/setup-workflows/components/SetupWorkflowReturnBar"
 import { LogOut } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -526,6 +527,7 @@ const Layout = () => {
                   : "pb-10",
             )}
           >
+            <SetupWorkflowReturnBar />
             <ErrorBoundary
               boundaryName="route"
               resetKeys={[location.pathname, location.search]}

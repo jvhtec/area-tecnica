@@ -1,4 +1,5 @@
 import type { SetupWorkflowTask } from './types';
+import { withJobSetupReturn } from './returnNavigation';
 
 export type JobSetupDialog = 'edit' | 'requirements' | 'tasks' | 'details';
 
@@ -54,12 +55,12 @@ export function getJobSetupTaskAction(
   }
   if (requirement === 'pesos' || requirement === 'consumos' || requirement === 'technical_report') {
     const href = department ? routeFor(requirement, department, jobId) : undefined;
-    if (href) return { kind: 'route', href, label: 'Abrir herramienta' };
+    if (href) return { kind: 'route', href: withJobSetupReturn(href, jobId), label: 'Abrir herramienta' };
   }
   if (task.task_key === 'flex_folders') {
     return {
       kind: 'project',
-      href: `/project-management?setupJobId=${encodeURIComponent(jobId)}`,
+      href: withJobSetupReturn(`/project-management?setupJobId=${encodeURIComponent(jobId)}`, jobId),
       label: 'Abrir herramientas Flex',
     };
   }
