@@ -265,7 +265,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       }
     },
     onError: (error: unknown) => {
-      const message = getErrorMessage(error) || 'No se pudo actualizar la aprobación del trabajo.';
+      const message = getErrorMessage(error, 'No se pudo actualizar la aprobación del trabajo.');
       toast.error(message);
     },
   });

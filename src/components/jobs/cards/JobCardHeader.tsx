@@ -12,7 +12,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useJobDistance } from "@/hooks/useJobDistance";
 import { getDateTypeMeta } from "@/constants/dateTypes";
 import { canEditJobs } from "@/utils/permissions";
-import type { JobDateTypeForCard } from "@/hooks/useOptimizedJobCard";
+import type { JobDateTypeForCard } from "@/utils/jobDateTypes";
+import { formatInJobTimezone, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import {
   getDepartmentPackageSize,
   getPackageBadgeLabel,
@@ -50,8 +51,8 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
     ? getDepartmentPackageSize(job.tour_date, packageDepartment)
     : null;
 
-  const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, JobDateTypeForCard>) => {
-    const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
+  const getDateTypeIcon = (jobId: string, dateKey: string, dateTypes: Record<string, JobDateTypeForCard>) => {
+    const key = `${jobId}-${dateKey}`;
     const meta = getDateTypeMeta(dateTypes[key]?.type);
     if (!meta) return null;
     const Icon = meta.icon;
@@ -84,7 +85,11 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
       <div className={cn("flex items-start justify-between", isMobile ? "gap-2" : "gap-4")}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
+            {getDateTypeIcon(
+              job.id,
+              formatInJobTimezone(job.start_time, "yyyy-MM-dd", job.timezone || MADRID_TIMEZONE),
+              dateTypes,
+            )}
             <h3 className={cn("font-medium break-words leading-tight", isMobile ? "text-base" : "text-lg")}>{job.title}</h3>
             {getBadgeForJobType(job.job_type)}
             {packageDepartment && packageSize && (

@@ -37,7 +37,7 @@ export const useVacationRequests = () => {
     onError: (error: unknown) => {
       toast({
         title: "Error submitting request",
-        description: getErrorMessage(error) || "An unexpected error occurred.",
+        description: getErrorMessage(error, "An unexpected error occurred."),
         variant: "destructive",
       });
     },
@@ -55,7 +55,7 @@ export const useVacationRequests = () => {
     onError: (error: unknown) => {
       toast({
         title: "Approval failed",
-        description: getErrorMessage(error) || "Failed to approve selected requests.",
+        description: getErrorMessage(error, "Failed to approve selected requests."),
         variant: "destructive",
       });
     },
@@ -74,7 +74,7 @@ export const useVacationRequests = () => {
     onError: (error: unknown) => {
       toast({
         title: "Rejection failed",
-        description: getErrorMessage(error) || "Failed to reject selected requests.",
+        description: getErrorMessage(error, "Failed to reject selected requests."),
         variant: "destructive",
       });
     },

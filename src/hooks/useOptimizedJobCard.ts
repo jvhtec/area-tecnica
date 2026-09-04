@@ -14,12 +14,14 @@ import {
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
 import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/storageUpload';
+import type { JobDateTypeForCard } from '@/utils/jobDateTypes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 
 import { queryKeys } from "@/lib/react-query";
+export type { JobDateTypeForCard } from '@/utils/jobDateTypes';
 export type UseOptimizedJobCardOptions = {
   enableRoleSummary?: boolean;
   enableSoundTasks?: boolean;
@@ -65,11 +67,6 @@ export type TimesheetForCard = {
   technician_id?: string | null;
   date?: string | null;
   profiles?: JobProfileRef | JobProfileRef[] | null;
-};
-
-export type JobDateTypeForCard = {
-  date?: string | null;
-  type?: string | null;
 };
 
 export type OptimizedJobCardJob = {

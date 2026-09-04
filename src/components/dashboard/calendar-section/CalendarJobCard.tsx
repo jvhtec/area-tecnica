@@ -17,7 +17,7 @@ import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { getDateTypeMeta } from "@/constants/dateTypes";
 
 import { DateTypeContextMenu } from "../DateTypeContextMenu";
-import type { JobDateTypeForCard } from "@/hooks/useOptimizedJobCard";
+import type { JobDateTypeForCard } from "@/utils/jobDateTypes";
 
 export interface CalendarJobCardProps {
   job: any;

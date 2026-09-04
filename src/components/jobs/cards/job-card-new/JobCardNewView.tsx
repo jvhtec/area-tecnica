@@ -52,8 +52,7 @@ import type {
   WhatsappRequestSummary,
 } from "@/features/jobs/job-card-new/jobCardNewTypes";
 import { queryKeys } from "@/lib/react-query";
-import type { JobDateTypeMap } from "@/hooks/useOptimizedDateTypes";
-import type { JobDateTypeForCard } from "@/hooks/useOptimizedJobCard";
+import { buildJobDateTypeMap } from "@/utils/jobDateTypes";
 
 export interface JobCardNewViewProps {
   job: JobCardJob;
@@ -325,12 +324,10 @@ export function JobCardNewView({
   // `JobCardHeader` looks date types up by `${jobId}-${yyyy-MM-dd}`. `job_date_types`
   // is a flat array, so passing it through unchanged meant every lookup missed and
   // the date-type icon never rendered.
-  const dateTypeMap = useMemo<JobDateTypeMap>(() => {
-    const entries = (job.job_date_types ?? [])
-      .filter((dt): dt is JobDateTypeForCard & { date: string } => Boolean(dt?.date))
-      .map((dt) => [`${job.id}-${dt.date}`, dt] as const);
-    return Object.fromEntries(entries);
-  }, [job.id, job.job_date_types]);
+  const dateTypeMap = useMemo(
+    () => buildJobDateTypeMap(job.id, job.job_date_types),
+    [job.id, job.job_date_types],
+  );
 
   return (
     <div>

@@ -172,7 +172,7 @@ export const useSoundVisionAccessRequest = () => {
     onError: (error: unknown) => {
       toast({
         title: 'Error submitting request',
-        description: getErrorMessage(error) || 'An unexpected error occurred.',
+        description: getErrorMessage(error, 'An unexpected error occurred.'),
         variant: 'destructive',
       });
     },

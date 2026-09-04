@@ -47,11 +47,12 @@ import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta } from "@/constants/dateTy
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { JobDateTypeForCard, JobDateTypeMap } from "@/utils/jobDateTypes";
 interface MobileJobCardProps {
   job: any;
   department?: Department;
   currentDate: Date;
-  dateTypes?: Record<string, unknown>;
+  dateTypes?: JobDateTypeMap;
   onDateTypeChange?: () => void;
   onEditClick?: (job: any) => void;
   onDeleteClick?: (jobId: string) => void;
@@ -120,12 +121,14 @@ export function MobileJobCard({
 
   // Get current date type for this job on the selected date using the key format
   const dateTypeKey = `${job.id}-${format(currentDate, 'yyyy-MM-dd')}`;
-  const currentDateType = propDateTypes?.[dateTypeKey] || 
-    (Array.isArray(job?.job_date_types) ? 
-      job.job_date_types.find((dt: any) => {
+  const embeddedDateTypes: JobDateTypeForCard[] = Array.isArray(job?.job_date_types)
+    ? job.job_date_types
+    : [];
+  const currentDateType = propDateTypes?.[dateTypeKey] ||
+    embeddedDateTypes.find((dt) => {
         const dtDate = dt?.date ? new Date(dt.date) : null;
         return !!dtDate && dtDate.toDateString() === currentDate.toDateString();
-      }) : null);
+      });
 
   const currentTypeValue = currentDateType ? (currentDateType.type || currentDateType.date_type) : undefined;
 

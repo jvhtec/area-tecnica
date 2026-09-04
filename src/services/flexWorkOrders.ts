@@ -22,7 +22,7 @@ async function createWorkOrderElement(options: {
   job: { id: string; title: string; start_time: string; end_time: string; location_id: string | null; timezone?: string | null };
   technicianName: string;
   vendorId: string;
-}): Promise<{ documentId: string; raw: any }>
+}): Promise<{ documentId: string; raw: FlexElementResponse }>
 {
   const { parentElementId, job, technicianName, vendorId } = options;
 

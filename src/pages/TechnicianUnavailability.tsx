@@ -101,7 +101,7 @@ export default function TechnicianUnavailability() {
       setAllDay(true);
       setFormErrors({});
     },
-    onError: (e: unknown) => toast.error(getErrorMessage(e) || 'No se pudo crear el bloqueo'),
+    onError: (e: unknown) => toast.error(getErrorMessage(e, 'No se pudo crear el bloqueo')),
   });
 
   const deleteMutation = useMutation({
@@ -116,7 +116,7 @@ export default function TechnicianUnavailability() {
       toast.success('Bloqueo eliminado');
       qc.invalidateQueries({ queryKey: queryKeys.scope('my-unavailability') });
     },
-    onError: (e: unknown) => toast.error(getErrorMessage(e) || 'No se pudo eliminar el bloqueo'),
+    onError: (e: unknown) => toast.error(getErrorMessage(e, 'No se pudo eliminar el bloqueo')),
     onSettled: () => {
       setDeletingId(null);
     },

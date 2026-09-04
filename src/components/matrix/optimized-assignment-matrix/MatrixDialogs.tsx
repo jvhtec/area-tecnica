@@ -216,7 +216,7 @@ export const MatrixDialogs = ({
                   onError: (error: unknown) => {
                     toast({
                       title: "No se pudo enviar la oferta",
-                      description: getErrorMessage(error),
+                      description: getErrorMessage(error, "No se pudo enviar la oferta"),
                       variant: "destructive",
                     });
                   },
@@ -247,7 +247,7 @@ export const MatrixDialogs = ({
                   onError: (error: unknown) => {
                     toast({
                       title: "No se pudo enviar la oferta",
-                      description: getErrorMessage(error),
+                      description: getErrorMessage(error, "No se pudo enviar la oferta"),
                       variant: "destructive",
                     });
                   },
@@ -515,7 +515,7 @@ export const MatrixDialogs = ({
                     setAvailabilitySending(false);
                     toast({
                       title: "Error al enviar",
-                      description: getErrorMessage(error) || "No se pudo enviar la solicitud de staffing",
+                      description: getErrorMessage(error, "No se pudo enviar la solicitud de staffing"),
                       variant: "destructive",
                     });
                   },

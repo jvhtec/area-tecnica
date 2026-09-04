@@ -364,7 +364,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       // Broadcast push notification about update (summarized changes)
       try {
-        const changes: Record<string, unknown> = {};
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
         const toISO = (v: any) => (v instanceof Date ? v.toISOString() : v);
         if (job.title !== title) changes.title = { from: job.title, to: title };
         if ((job.description || '') !== (description || '')) changes.description = { from: job.description, to: description };

@@ -69,6 +69,22 @@ describe('JobCardHeader date type icon', () => {
     });
     expect(container.querySelector('.text-blue-500')).toBeNull();
   });
+
+  it('uses the job timezone when its UTC start falls on the previous local date', () => {
+    const { container } = renderHeader(
+      {
+        ...baseJob,
+        start_time: '2026-06-16T00:30:00.000Z',
+        timezone: 'America/New_York',
+      },
+      'sound',
+      {
+        'job-1-2026-06-15': { date: '2026-06-15', type: 'travel' },
+      },
+    );
+
+    expect(container.querySelector('.text-blue-500')).not.toBeNull();
+  });
 });
 
 describe('JobCardHeader package badges', () => {
