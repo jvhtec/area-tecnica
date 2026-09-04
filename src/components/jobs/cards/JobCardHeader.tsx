@@ -4,7 +4,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Clock, MapPin, Package } from "lucide-react";
+import { CheckSquare2, ChevronDown, ChevronUp, Clock, MapPin, Package } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Department } from "@/types/department";
 import { JobStatusSelector } from "@/components/jobs/JobStatusSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -105,6 +106,13 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
                 currentStatus={job.status}
                 disabled={!canEditJobs(userRole)}
               />
+            )}
+            {isProjectManagementPage && canEditJobs(userRole) && (
+              <Button asChild variant="secondary" size="sm" className="h-8 gap-1.5 px-3 text-xs">
+                <Link to={`/jobs/${job.id}/setup`} onClick={(event) => event.stopPropagation()}>
+                  <CheckSquare2 className="h-3.5 w-3.5" />Preparación guiada
+                </Link>
+              </Button>
             )}
           </div>
         </div>

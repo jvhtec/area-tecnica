@@ -13,6 +13,7 @@ import { useJobSelection } from '@/hooks/useJobSelection';
 import { DocumentationJobPicker } from '@/features/technical-tools/jobs/DocumentationJobPicker';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getSetupReturnPath } from '@/features/setup-workflows/returnNavigation';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
@@ -57,6 +58,7 @@ const VideoPesosTool: React.FC = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
+  const setupReturnPath = getSetupReturnPath(searchParams);
   const jobIdFromUrl = searchParams.get('jobId');
   
   // Tour override mode detection
@@ -380,7 +382,7 @@ const VideoPesosTool: React.FC = () => {
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/video')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(setupReturnPath ?? '/video')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <CardTitle className="text-2xl font-bold">

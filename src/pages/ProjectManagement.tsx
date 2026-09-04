@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
 import { canEditJobs } from "@/utils/permissions";
+import { useSetupJob } from "@/features/setup-workflows/jobContext";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -75,11 +76,14 @@ const ProjectManagement = () => {
   const [isAutoCompleting, setIsAutoCompleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [focusedSetupJobId, setFocusedSetupJobId] = useState<string | null>(() => searchParams.get('setupJobId'));
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const { forceSubscribe } = useSubscriptionContext();
 
   // URL parameter for opening hoja de ruta modal
   const openHojaDeRutaJobId = searchParams.get('openHojaDeRuta');
+  const setupJobId = searchParams.get('setupJobId');
+  const setupJobQuery = useSetupJob(setupJobId ?? undefined);
 
   // Memoized callback to clear URL parameter after modal is opened
   const handleHojaDeRutaOpened = useCallback(() => {
@@ -97,6 +101,20 @@ const ProjectManagement = () => {
       setSelectedDepartment((userDepartment as Department) ?? "sound");
     }
   }, [authLoading, userDepartment]);
+
+  useEffect(() => {
+    const data = setupJobQuery.data;
+    if (!setupJobId || !data) return;
+    setFocusedSetupJobId(setupJobId);
+    setSearchQuery(data.title);
+    setCurrentDate(new Date(data.start_time));
+    const supported = new Set<Department>(['sound', 'lights', 'video', 'production']);
+    const department = data.job_departments?.find(({ department }) => supported.has(department as Department))?.department;
+    if (department) setSelectedDepartment(department as Department);
+    const next = new URLSearchParams(searchParams);
+    next.delete('setupJobId');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, setupJobId, setupJobQuery.data]);
 
   // Use custom hook to keep the "jobs" tab active/visible.
   useTabVisibility(["optimized-jobs"]);
@@ -160,6 +178,7 @@ const ProjectManagement = () => {
   // Filter jobs by selected job type and statuses with database-level optimization
   const tokens = buildSearchTokens(debouncedQuery);
   const jobs = (optimizedJobs || []).filter((job: any) => {
+    if (focusedSetupJobId) return job.id === focusedSetupJobId;
     const matchesType = isSearching
       ? true // search overrides type filter
       : (selectedJobTypes.length === 0 ||
@@ -545,7 +564,14 @@ const ProjectManagement = () => {
         <Card>
           <CardHeader className={cn("flex flex-col space-y-4", isMobile ? "p-4 pb-3" : "p-6 pb-4")}>
           <div className="flex items-center justify-between">
-            <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Gestión de proyectos</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Gestión de proyectos</CardTitle>
+              {canCreateItems && (
+                <Button variant="outline" size="sm" onClick={() => navigate('/jobs/setup/new')}>
+                  Nuevo trabajo guiado
+                </Button>
+              )}
+            </div>
             {isMobile && (
               <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
                 <SheetTrigger asChild>
@@ -582,7 +608,10 @@ const ProjectManagement = () => {
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setFocusedSetupJobId(null);
+                  setSearchQuery(e.target.value);
+                }}
                 placeholder="Buscar proyectos..."
                 className={cn("pl-8 h-9", isMobile && "w-full")}
               />

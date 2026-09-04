@@ -2,6 +2,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 import { JobCardHeader } from '../JobCardHeader';
 
@@ -115,5 +116,25 @@ describe('JobCardHeader package badges', () => {
     });
 
     expect(screen.getByText('SX XL')).toBeInTheDocument();
+  });
+
+  it('links editable project jobs to their persisted preparation', () => {
+    render(
+      <MemoryRouter>
+        <JobCardHeader
+          job={baseJob}
+          collapsed
+          onToggleCollapse={vi.fn()}
+          appliedBorderColor=""
+          appliedBgColor=""
+          dateTypes={{}}
+          department="sound"
+          isProjectManagementPage
+          userRole="management"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: /preparación guiada/i })).toHaveAttribute('href', '/jobs/job-1/setup');
   });
 });

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { dataLayerClient } from '@/services/dataLayerClient';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { PesosToolView } from './pesos-tool/PesosToolView';
@@ -36,9 +36,11 @@ import { assignSuffixes, createEmptyRow, type Table, type TableRow } from "@/pag
 import { usePesosPdfExport } from "@/pages/pesos-tool/usePesosPdfExport";
 import { usePesosLoadedTables } from "@/pages/pesos-tool/usePesosLoadedTables";
 import { usePesosContext } from "@/features/technical-tools/weights/usePesosContext";
+import { getSetupReturnPath } from '@/features/setup-workflows/returnNavigation';
 
 const PesosTool: React.FC = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
@@ -63,12 +65,14 @@ const PesosTool: React.FC = () => {
   const [cablePickWeight, setCablePickWeight] = useState('100');
   const [currentSetName, setCurrentSetName] = useState('');
 
-  const { handleBackNavigation, isJobOverrideMode, jobTourInfo, tourDateInfo, tourName } = usePesosContext({
+  const { handleBackNavigation: handleContextBack, isJobOverrideMode, jobTourInfo, tourDateInfo, tourName } = usePesosContext({
     selectedJob,
     isTourContext,
     tourId,
     tourDateId,
   });
+  const setupReturnPath = getSetupReturnPath(searchParams);
+  const handleBackNavigation = () => setupReturnPath ? navigate(setupReturnPath) : handleContextBack();
   const {
     selectedStage,
     selectedStageNumber,

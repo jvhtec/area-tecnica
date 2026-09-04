@@ -25,6 +25,17 @@ vi.mock("@/hooks/useOptimizedJobs", () => ({
   useOptimizedJobs: (...args: any[]) => mockUseOptimizedJobs(...args),
 }));
 
+const mockUseSetupJob = vi.fn();
+const focusedSetupJob = {
+  id: "job-1",
+  title: "Focused setup job",
+  start_time: "2026-11-12T08:00:00.000Z",
+  job_departments: [{ department: "lights" }],
+};
+vi.mock("@/features/setup-workflows/jobContext", () => ({
+  useSetupJob: (...args: unknown[]) => mockUseSetupJob(...args),
+}));
+
 vi.mock("@/hooks/useTabVisibility", () => ({
   useTabVisibility: () => {},
 }));
@@ -58,8 +69,8 @@ vi.mock("@/components/project-management/StatusFilter", () => ({
 }));
 
 vi.mock("@/components/jobs/cards/JobCardNew", () => ({
-  JobCardNew: ({ job }: { job: { title: string } }) => (
-    <div data-testid={`job-card-${job?.title ?? "unknown"}`}>{job?.title ?? "Unknown"}</div>
+  JobCardNew: ({ job }: { job: { id: string; title: string } }) => (
+    <div data-testid={`job-card-${job?.id ?? "unknown"}`}>{job?.title ?? "Unknown"}</div>
   ),
 }));
 
@@ -86,6 +97,7 @@ describe("ProjectManagement department tabs", () => {
     mockForceSubscribe.mockReset();
     mockUseOptimizedAuth.mockReset();
     mockUseOptimizedJobs.mockReset();
+    mockUseSetupJob.mockReset();
     mockAutoCompleteJobs.mockClear();
     mockIsMobile = false;
     mockGetSession.mockResolvedValue({
@@ -116,6 +128,22 @@ describe("ProjectManagement department tabs", () => {
           }),
         };
       }
+      if (table === "jobs") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: {
+                  title: "Focused setup job",
+                  start_time: "2026-11-12T08:00:00.000Z",
+                  job_departments: [{ department: "lights" }],
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
       return {
         select: () => ({
           eq: () => ({
@@ -126,6 +154,11 @@ describe("ProjectManagement department tabs", () => {
     });
 
     mockUseOptimizedJobs.mockReturnValue({ data: [], isLoading: false, error: null });
+    mockUseSetupJob.mockImplementation((id?: string) => ({
+      data: id ? focusedSetupJob : undefined,
+      isLoading: false,
+      isError: false,
+    }));
   });
 
   it("activates the user's department tab on first render", async () => {
@@ -253,5 +286,34 @@ describe("ProjectManagement department tabs", () => {
       expect(screen.getByRole("button", { name: /confirmado/i })).toHaveAttribute("aria-pressed", "false");
       expect(screen.getByRole("button", { name: /tentativa/i })).toHaveAttribute("aria-pressed", "false");
     });
+  });
+
+  it("focuses the exact job returned from a setup workflow tool", async () => {
+    mockUseOptimizedAuth.mockReturnValue({ userDepartment: "sound", isLoading: false });
+    mockUseOptimizedJobs.mockReturnValue({
+      data: [
+        {
+          id: "job-1", title: "Focused setup job", job_type: "single", status: "Completado",
+          start_time: "2026-11-12T08:00:00.000Z", end_time: "2026-11-12T20:00:00.000Z",
+        },
+        {
+          id: "job-2", title: "Focused setup job", job_type: "single", status: "Confirmado",
+          start_time: "2026-11-12T08:00:00.000Z", end_time: "2026-11-12T20:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/project-management?setupJobId=job-1"]}>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByDisplayValue("Focused setup job")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("tab", { name: /luces/i })).toHaveAttribute("data-state", "active"));
+    expect(screen.getByTestId("job-card-job-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("job-card-job-2")).not.toBeInTheDocument();
   });
 });
