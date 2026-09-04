@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+
+import { useCalendarIcsToken } from "@/hooks/useCalendarIcsToken";
 import { useNavigate, Link } from "react-router-dom";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +42,7 @@ export const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+  const { token: icsToken, rotate: rotateIcsToken } = useCalendarIcsToken();
   const [folderStructure, setFolderStructure] = useState<FolderStructure | null>(null);
   const [tourFolderStructure, setTourFolderStructure] = useState<FolderStructure | null>(null);
   const [activeSection, setActiveSection] = useState<ProfileSection>("profile");
@@ -180,10 +183,7 @@ export const Profile = () => {
 
   const handleRotateIcsToken = async () => {
     try {
-      const { data, error } = await dataLayerClient.rpc('rotate_my_calendar_ics_token');
-      if (error) throw error;
-      const newToken = data as string;
-      setProfile((p: any) => ({ ...p, calendar_ics_token: newToken }));
+      await rotateIcsToken();
       toast({ title: 'Enlace actualizado', description: 'Se generó un nuevo token para tu calendario.' });
     } catch (err) {
       console.error('rotate token error', err);
@@ -191,8 +191,8 @@ export const Profile = () => {
     }
   };
 
-  const icsUrl = profile?.calendar_ics_token
-    ? `webcal://${SUPABASE_URL.replace(/^https?:\/\//, '')}/functions/v1/tech-calendar-ics?tid=${profile.id}&token=${profile.calendar_ics_token}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`
+  const icsUrl = icsToken && profile?.id
+    ? `webcal://${SUPABASE_URL.replace(/^https?:\/\//, '')}/functions/v1/tech-calendar-ics?tid=${profile.id}&token=${icsToken}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`
     : '';
 
   const handlePasswordChange = async () => {

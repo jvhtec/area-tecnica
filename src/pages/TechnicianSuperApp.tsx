@@ -176,7 +176,7 @@ export default function TechnicianSuperApp() {
     queryFn: async () => {
       if (!user?.id) return null;
       const { data, error } = await dataLayerClient.from('profiles')
-        .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department, calendar_ics_token, soundvision_tool_access_enabled')
+        .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department, soundvision_tool_access_enabled')
         .eq('id', user.id)
         .single();
       if (error) throw error;

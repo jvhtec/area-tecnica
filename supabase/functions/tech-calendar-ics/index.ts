@@ -147,14 +147,29 @@ serve(createHttpHandler(async (req) => {
     return new Response('Too Many Requests', { status: 429, headers: rateLimitHeaders(rateLimit) });
   }
 
-  // Validate token against profiles
-  const { data: profile, error: profErr } = await supabase
-    .from('profiles')
-    .select('id, first_name, last_name, calendar_ics_token, role, department')
-    .eq('id', tid)
-    .maybeSingle();
+  // Validate the token. It lives in `profile_calendar_tokens` rather than on
+  // the profile row: `profiles` is readable by every authenticated user, so a
+  // token stored there was a credential any colleague could lift (SEC-13).
+  // This client uses the service role, so RLS on the token table does not
+  // apply here — the owner-only policy protects it from the browser.
+  const [{ data: profile, error: profErr }, { data: tokenRow, error: tokenErr }] =
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role, department')
+        .eq('id', tid)
+        .maybeSingle(),
+      supabase
+        .from('profile_calendar_tokens')
+        .select('token')
+        .eq('profile_id', tid)
+        .maybeSingle(),
+    ]);
 
-  if (profErr || !profile || !profile.calendar_ics_token || !(await tokensMatch(profile.calendar_ics_token, token))) {
+  if (
+    profErr || tokenErr || !profile || !tokenRow?.token ||
+    !(await tokensMatch(tokenRow.token, token))
+  ) {
     return new Response('Forbidden', { status: 403 });
   }
 

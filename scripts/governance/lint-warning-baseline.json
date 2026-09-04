@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-09-04T15:50:06.999Z",
+  "generatedAt": "2026-09-04T17:38:49.298Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1259,
+  "total": 1258,
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 1038,
+    "@typescript-eslint/no-explicit-any": 1037,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -780,7 +780,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/Profile.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/ProjectManagement.tsx": {
       "@typescript-eslint/no-explicit-any": 4

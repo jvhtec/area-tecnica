@@ -101,6 +101,16 @@ against `profiles.calendar_ics_token`. Any authenticated user can read all 313 t
 any colleague's personal calendar from an unauthenticated endpoint — privilege escalation, not
 just an over-broad read.
 
+> **Status (2026-09-04):** the credential half is fixed. Migration
+> `20260904160000_move_calendar_ics_token_out_of_profiles.sql` moves the token to
+> `profile_calendar_tokens` (owner-only RLS, no write policy for `authenticated`), routes reads and
+> rotation through `get_my_calendar_ics_token()` / `rotate_my_calendar_ics_token()`, and drops the
+> column from `profiles`. Verified against a local database built from the full 201-migration
+> chain: all 372 pgTAP assertions pass, including a new `profile_calendar_token_isolation.sql` that
+> proves one technician cannot read another's token. The PII half — `dni`, `residencia`, `phone`
+> still readable org-wide because `profiles_select` remains `USING (true)` — is not addressed and
+> is tracked as the remaining half of this item.
+
 **Remediation.** Narrow `profiles_select` to self + colleagues the caller legitimately needs
 (assignment/department correlated), with admin/management retaining full read. Independently move
 `calendar_ics_token` out of the client-readable row — a side table readable only by `service_role`,
@@ -333,7 +343,7 @@ inherited from the July roadmap.
 
 | # | ID | Move | Why it ranks here | Effort | Exit criteria |
 | --- | --- | --- | --- | --- | --- |
-| 1 | SEC-13 | Get `calendar_ics_token` out of the client-readable row, then narrow `profiles_select`; rotate all 313 tokens afterwards | Only finding that is both confirmed-exploitable and live: 313 bearer credentials and 286 national IDs readable by any account | S (column `REVOKE` is one line; policy is one migration) | As `authenticated`, a non-management user reads only permitted rows; pgTAP deny test for `profiles`; tokens rotated |
+| 1 | SEC-13 | **Step 1 done** (`20260904160000`): token moved to `profile_calendar_tokens`, owner-only RLS, read/rotate via self-scoped definer RPCs, column dropped. **Remaining:** narrow `profiles_select` (still `USING (true)`, so `dni`/`residencia`/`phone` stay org-readable) and decide on rotating the 313 carried-over tokens | Only finding that is both confirmed-exploitable and live: 313 bearer credentials and 286 national IDs readable by any account | S (column `REVOKE` is one line; policy is one migration) | As `authenticated`, a non-management user reads only permitted rows; pgTAP deny test for `profiles`; tokens rotated |
 | 2 | SEC-12 | Drop the `true` term from the three anon-reachable SELECT policies; fix the `ja.job_id = ja.job_id` self-correlation in the same `festival_artists` policy; decide `activity_catalog`'s audience explicitly | 598 rows of unannounced line-ups readable with a key that ships in the bundle | S | Anon sweep returns zero rows from `festival_artists` and `rate_extras_2025`; pgTAP deny test per table |
 | 3 | **DB-06** | Reconcile production RLS with the migration chain, then add a CI drift check | **Highest structural leverage.** Until this closes, three CI jobs test a fiction, a restore-from-migrations silently re-opens SEC-12, and no migration-based RLS reasoning is sound — including this document's | M | One reconciliation migration lands; CI fails on any `pg_policies`/`pg_proc` diff between replay and production dump |
 | 4 | QLT-07 | Delete the 88 unreferenced modules (~13,955 LOC) in one reviewable PR | Cheapest large win: improves QLT-01, QLT-05 and review surface simultaneously; nothing depends on it | S–M (mechanical, but needs one careful review pass) | Modules deleted; `npm run lint`/`typecheck`/tests green; lint baseline regenerated downward |
