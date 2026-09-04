@@ -90,7 +90,16 @@ BEGIN
       UPDATE public.setup_workflows SET state = state || (p_payload->'state')
       WHERE id = p_workflow_id;
     WHEN 'step' THEN
-      UPDATE public.setup_workflows SET current_step = p_payload->>'step' WHERE id = p_workflow_id;
+      IF jsonb_typeof(p_payload->'step') IS DISTINCT FROM 'string' THEN
+        RAISE EXCEPTION 'invalid_input: step must be valid for the workflow type' USING ERRCODE = '22023';
+      END IF;
+      BEGIN
+        -- Reuse the table's workflow-specific step constraint rather than
+        -- maintaining a second set of step arrays inside the RPC.
+        UPDATE public.setup_workflows SET current_step = p_payload->>'step' WHERE id = p_workflow_id;
+      EXCEPTION WHEN check_violation THEN
+        RAISE EXCEPTION 'invalid_input: step must be valid for the workflow type' USING ERRCODE = '22023';
+      END;
     WHEN 'sync' THEN
       PERFORM public.sync_setup_workflow_tasks(p_workflow_id, p_payload->'tasks');
     WHEN 'task_status' THEN

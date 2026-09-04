@@ -67,7 +67,13 @@ SELECT is((SELECT current_step FROM public.setup_workflows WHERE id = current_se
   'technical', 'current step persists independently of wizard state');
 SELECT throws_ok(
   $$SELECT public.mutate_setup_workflow('step', '{"step":"dates"}', current_setting('test.setup_id')::uuid)$$,
-  '23514', NULL, 'database rejects a step belonging to a different workflow type');
+  '22023', 'invalid_input: step must be valid for the workflow type', 'RPC rejects a step belonging to a different workflow type');
+SELECT throws_ok(
+  format('SELECT public.mutate_setup_workflow(''step'', %L::jsonb, %L::uuid)', payload, current_setting('test.setup_id')),
+  '22023', 'invalid_input: step must be valid for the workflow type', 'RPC rejects malformed step: ' || payload
+) FROM (VALUES ('{}'), ('{"step":null}'), ('{"step":7}'), ('{"step":[]}'), ('{"step":true}')) AS invalid(payload);
+SELECT is((SELECT current_step FROM public.setup_workflows WHERE id = current_setting('test.setup_id')::uuid),
+  'technical', 'invalid step requests leave the saved step unchanged');
 
 SELECT public.mutate_setup_workflow('task_status', '{"task_key":"review","status":"skipped"}', current_setting('test.setup_id')::uuid);
 SELECT throws_ok(

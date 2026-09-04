@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { queryKeys } from '@/lib/react-query';
 import * as service from './service';
+import { SetupWorkflowError, workflowErrorMessages } from './errors';
 import type { JsonObject, SetupDepartment, TaskStatus, WorkflowStatus, WorkflowType } from './types';
 
 export const setupWorkflowKeys = {
@@ -41,7 +42,11 @@ function useWorkflowMutationFeedback() {
     // so a retry cannot rely on stale lifecycle or task statuses.
     onError: (error: Error) => {
       void client.invalidateQueries({ queryKey: setupWorkflowKeys.all });
-      toast({ title: 'No se pudo guardar la preparación', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'No se pudo guardar la preparación',
+        description: error instanceof SetupWorkflowError ? error.message : workflowErrorMessages.persistence,
+        variant: 'destructive',
+      });
     },
   };
 }
