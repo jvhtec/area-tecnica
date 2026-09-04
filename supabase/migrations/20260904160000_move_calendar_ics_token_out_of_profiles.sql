@@ -41,9 +41,9 @@ CREATE POLICY "profile_calendar_tokens_service_role_all"
   FOR ALL TO "service_role"
   USING (true) WITH CHECK (true);
 
-GRANT SELECT ON TABLE "public"."profile_calendar_tokens" TO "authenticated";
 GRANT ALL ON TABLE "public"."profile_calendar_tokens" TO "service_role";
-REVOKE ALL ON TABLE "public"."profile_calendar_tokens" FROM "anon", PUBLIC;
+REVOKE ALL ON TABLE "public"."profile_calendar_tokens" FROM "anon", "authenticated", PUBLIC;
+GRANT SELECT ON TABLE "public"."profile_calendar_tokens" TO "authenticated";
 
 -- Generate fresh credentials instead of copying values that were readable by
 -- every authenticated account. rotated_at records the incident-wide rotation.

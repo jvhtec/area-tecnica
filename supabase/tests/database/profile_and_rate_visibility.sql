@@ -65,6 +65,12 @@ SELECT is(
   'all rate catalog reads require management at the policy boundary'
 );
 
+-- auth.users inserts can provision a profile row through a trigger. Seed under
+-- the service-role claim so the test's corrective UPSERT is allowed through
+-- the existing profile privilege-change trigger.
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT set_config('request.jwt.claim.sub', '', false);
+
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at, created_at,
   updated_at, raw_app_meta_data, raw_user_meta_data, aud, role
@@ -129,7 +135,7 @@ SELECT is(
 
 SELECT is(
   (SELECT dni FROM public.profiles WHERE id = 'c8200000-0000-0000-0000-000000000002'),
-  NULL,
+  NULL::text,
   'addressing an unrelated technician by id does not reveal DNI'
 );
 

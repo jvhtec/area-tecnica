@@ -46,11 +46,11 @@ SEC-03 fixed for `sub_rentals` — the fix was applied to one table rather than 
 
 | Signal | 2026-07-09 | 2026-09-04 | Verdict |
 | --- | --- | --- | --- |
-| `npm run lint` warnings | 1,904 | **1,259** (898 app/test + 361 functions) | −34%; unchanged since the roadmap's own milestone |
-| — of which `no-explicit-any` | ~1,343 | **1,038** (754 app + 284 functions) | app half ratcheted; functions half never was |
+| `npm run lint` warnings | 1,904 | **1,216** (897 app/test + 319 functions) | −36%; this PR removes an unused unsafe email template and locks the reduction into the baseline |
+| — of which `no-explicit-any` | ~1,343 | **1,037** | reduced and ratcheted; functions remain the largest untreated area |
 | `npm run typecheck` | passes, `strict: false` | **passes, `strict: true`** | resolved |
 | `npm run typecheck:functions` | did not exist | **passes for all Edge Function modules** | resolved |
-| Vitest full suite | "passed" (selective) | **357 files / 1,983 tests, all pass** | healthy |
+| Vitest full suite | "passed" (selective) | **360 files / 1,995 tests, all pass** | healthy |
 | Coverage thresholds | none | **5 files**, and **CI never runs coverage** | inert |
 | Production build | passes | **passes** | ok |
 | Bundle (js gzip) | 3.01 MB / 3.34 MB ceiling | **3.10 MB / 3.34 MB** | **7.2% headroom** vs PERF-01's 15% target |
@@ -69,7 +69,7 @@ SEC-03 fixed for `sub_rentals` — the fix was applied to one table rather than 
 | `direct-protected-route-allowed-roles` | 0 | 64 | **cleared** |
 | `pages-supabase-client-import` | 0 | 0 | held |
 | File size >800 lines | 0 | 0 | **`src/` only — see QLT-05 below** |
-| Lint warnings | 1,259 | 1,259 | **zero headroom; ratchet is frozen at par** |
+| Lint warnings | 1,216 | 1,216 | **zero headroom; this PR's 42-warning reduction is ratcheted** |
 | Mobile type floor | 244 | 248 | draining |
 | Manual Edge entrypoints | 33 | 37 | 38 functions now use `createHttpHandler` |
 | Edge exposure classes | 14 public-token / 14 authenticated / 36 privileged / 7 service-only | — | all 71 classified |
@@ -280,7 +280,7 @@ a wall of exemptions.
 
 ### QLT-01 — the lint ratchet is frozen at par
 
-Current warnings equal the baseline exactly (1,259 = 1,259). The gate blocks regressions and exerts
+Current warnings equal the baseline exactly (1,216 = 1,216). The gate blocks regressions and exerts
 no downward pressure. The 284 `no-explicit-any` warnings in `supabase/functions/` have never been
 through a reduction pass, and the 78 `react-hooks/exhaustive-deps` warnings remain the highest-risk
 category in the file — each is a potential stale-closure bug, not a style nit.
