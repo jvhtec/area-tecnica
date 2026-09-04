@@ -16,6 +16,11 @@
 > `calendar_ics_token` bearer credentials, 286 national IDs) and **SEC-12** (three tables readable
 > with the public anon key, `festival_artists` at 598 rows materially; its policy also still
 > carries the `ja.job_id = ja.job_id` self-comparison SEC-03 fixed only for `sub_rentals`).
+> A third finding, **DB-06**, outranks the rest of this register structurally: production RLS has
+> been hand-edited away from the migration chain (552 live policies vs 590 replayed, with bodies
+> rewritten in place), so the `migration_apply`, `db_lint` and `rls_rpc_security_tests` jobs test a
+> schema that is not production, and a rebuild from migrations would silently re-open SEC-12.
+> See the prioritized register in the 2026-09-04 report.
 > The counts below are dated 2026-07-09 and should not be quoted as current.
 
 ## Executive assessment

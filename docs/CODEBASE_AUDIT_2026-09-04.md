@@ -57,7 +57,7 @@ SEC-03 fixed for `sub_rentals` — the fix was applied to one table rather than 
 | Governance | passes (grandfathered) | **passes**, all 11 sub-gates | see below |
 | Dependency audit | baseline-aware | **0 advisories, baseline is zero** | resolved |
 | Migrations | 180+ | **200**, timestamps unique/ordered | ok |
-| Live DB vs migration chain | not checked | **drifted** — replay mispredicts production RLS | see Method and limits |
+| Live DB vs migration chain | not checked | **drifted** — 552 live policies vs 590 replayed; bodies rewritten in place | DB-06 |
 | Playwright | failed on Windows | **POSIX env syntax removed** (Node launcher) | config resolved; suite not runnable here |
 
 ### Governance gate detail
@@ -149,6 +149,45 @@ technician can read the entire job book and the full rate card. That is a busine
 confirm, not a defect to assume — but it should be confirmed rather than inherited.
 
 ## P1 — open, and older than they look
+
+### DB-06 — Production RLS has been hand-edited away from the migration chain
+
+**Severity: high (latent). Measured on production.** The schema the migrations build is not the
+schema that is running:
+
+| | Migration replay | Production |
+| --- | ---: | ---: |
+| Policies in `public` | 590 | **552** |
+| Tables carrying policies | 184 | 183 |
+
+The difference is not only missing policies — **policy bodies have been rewritten in place under
+the same name**. The four tables the first pass of this audit wrongly flagged are the proof:
+
+| Policy | Migration chain says | Production actually has |
+| --- | --- | --- |
+| `p_tours_public_select_5a6a0b` | `USING (true OR <role check>)` | `USING (auth.uid() IS NOT NULL)` |
+| `p_tour_dates_public_select_8f4344` | `USING (true OR <role check>)` | `USING (auth.uid() IS NOT NULL)` |
+| `p_tour_power_defaults_public_select_5dba2b` | `USING (true OR <role check>)` | `USING (auth.uid() IS NOT NULL)` |
+| `p_job_date_types_public_select_e0ccdb` | `USING (true OR <role check>)` | `USING (auth.uid() IS NOT NULL)` |
+
+Someone hardened these directly against the database — plausibly through the Supabase advisor UI —
+without writing a migration. Two consequences, and the second is the serious one:
+
+1. **CI validates a schema that is not production.** `migration_apply`, `db_lint` and
+   `rls_rpc_security_tests` all run `supabase db reset` and then test the result. For every drifted
+   policy, those three jobs — the expensive ones, the ones that exist precisely to catch
+   authorization defects — are asserting against a fiction.
+2. **A rebuild from migrations silently reintroduces the vulnerability.** Any disaster-recovery
+   restore, any new staging project, any `supabase db reset` against a real environment replays
+   `USING (true OR …)` and re-opens the SEC-12-class exposure on tables that are currently safe.
+   The hardening exists only in one mutable place, and nothing in CI would notice it being lost.
+
+**Remediation.** Dump the production schema (`supabase db dump --linked -f`), diff it against a
+migration replay, and write one reconciliation migration so the chain reproduces production
+exactly. Then add a CI drift check — replay into an ephemeral database, dump both, and fail on a
+`pg_policies` / `pg_proc` diff — so the two can never separate again silently. Until that check
+exists, no RLS conclusion drawn from reading migrations can be trusted, including the ones in this
+document.
 
 ### SEC-09 (carried) — structured logging shipped as dead code
 
@@ -286,23 +325,25 @@ reachable from a URL.
 
 ---
 
-## Recommended sequence
+## Next moves — prioritized register
 
-1. **Now.** SEC-13 — get `calendar_ics_token` out of client reach first (fastest risk reduction;
-   a column-level `REVOKE` is a one-line migration), then narrow `profiles_select`. Rotate the
-   existing tokens afterwards: they have been readable org-wide for as long as the policy has
-   existed, so treat them as disclosed.
-2. **Within 7 days.** SEC-12 — fix the three policy predicates, fix the `ja.job_id = ja.job_id`
-   self-correlation in the same `festival_artists` policy, decide `activity_catalog`'s audience
-   explicitly, and add the policy-shape governance rule plus pgTAP deny tests. Then confirm
-   whether org-wide read of `jobs`, `job_assignments` and the `rate_cards_*` tables is intended.
-3. **Within 30 days.** SEC-09 and SEC-15 — adopt `structuredLogger` and `escapeHtml` at the mail
-   and auth functions, and add the lint rules that make adoption enforceable rather than optional.
-4. **Within 30 days.** QLT-07 — delete the 88 unreferenced modules in one reviewable PR; it
-   improves QLT-01, QLT-05 and review surface at once.
-5. **Ongoing.** Extend the file-size gate to `supabase/functions/`, split the lint baseline into
-   app/functions halves with a decrement target, and wire `test:coverage` into CI so REL-02's
-   thresholds are real.
+Ranked by risk removed (or future defects prevented) per unit of effort, not by severity alone.
+Each row is meant to become one issue with an owner and a target release, per the review rules
+inherited from the July roadmap.
+
+| # | ID | Move | Why it ranks here | Effort | Exit criteria |
+| --- | --- | --- | --- | --- | --- |
+| 1 | SEC-13 | Get `calendar_ics_token` out of the client-readable row, then narrow `profiles_select`; rotate all 313 tokens afterwards | Only finding that is both confirmed-exploitable and live: 313 bearer credentials and 286 national IDs readable by any account | S (column `REVOKE` is one line; policy is one migration) | As `authenticated`, a non-management user reads only permitted rows; pgTAP deny test for `profiles`; tokens rotated |
+| 2 | SEC-12 | Drop the `true` term from the three anon-reachable SELECT policies; fix the `ja.job_id = ja.job_id` self-correlation in the same `festival_artists` policy; decide `activity_catalog`'s audience explicitly | 598 rows of unannounced line-ups readable with a key that ships in the bundle | S | Anon sweep returns zero rows from `festival_artists` and `rate_extras_2025`; pgTAP deny test per table |
+| 3 | **DB-06** | Reconcile production RLS with the migration chain, then add a CI drift check | **Highest structural leverage.** Until this closes, three CI jobs test a fiction, a restore-from-migrations silently re-opens SEC-12, and no migration-based RLS reasoning is sound — including this document's | M | One reconciliation migration lands; CI fails on any `pg_policies`/`pg_proc` diff between replay and production dump |
+| 4 | QLT-07 | Delete the 88 unreferenced modules (~13,955 LOC) in one reviewable PR | Cheapest large win: improves QLT-01, QLT-05 and review surface simultaneously; nothing depends on it | S–M (mechanical, but needs one careful review pass) | Modules deleted; `npm run lint`/`typecheck`/tests green; lint baseline regenerated downward |
+| 5 | QLT-08 | Close the gate blind spots: extend the file-size budget to `supabase/functions/`, wire `test:coverage` into CI, split the lint baseline into app/functions halves with a decrement target | Small config changes that make three existing gates tell the truth; prevents recurrence rather than fixing instances | S | File-size gate reports the six oversized functions; coverage thresholds actually fail a PR; lint baseline drops below par |
+| 6 | SEC-09 / SEC-15 | Adopt `structuredLogger` and `escapeHtml` at the mail and auth functions, and add the lint rules that make adoption enforceable | The primitives already exist and are tested; only adoption is missing. The lint rule is what stops it regressing again | M | No bare `console.*` in `supabase/functions/**` outside an allowlist; every email template escapes interpolated values |
+| 7 | QLT-03 | Continue draining the 195 legacy data-layer imports | Steady structural work with no acute risk; ranks below everything above | L | Baseline continues to fall each release |
+
+Items 1–3 are the ones worth doing before anything else. Item 3 is the one most likely to be
+skipped because it produces no visible feature change, and the one whose absence most reliably
+turns a fixed vulnerability back into an open one.
 
 ## Method and limits
 
@@ -326,8 +367,8 @@ reachable from a URL.
     writes `SET "search_path"` (quoted) and the scan matched only the unquoted form. Production has
     **140 of 140 definer functions pinned**, and neither `anon` nor `authenticated` holds `CREATE`
     on schema `public`. There is no finding here; the earlier SEC-14 entry has been withdrawn.
-  Treat the migration chain as the intent and `pg_policies` / `pg_proc` as the truth. The gap
-  between them is itself worth closing — see DB-01.
+  Treat the migration chain as the intent and `pg_policies` / `pg_proc` as the truth. That gap is
+  itself the highest-leverage structural finding in this report — see **DB-06**.
 - The dead-code sweep resolves `@/`-aliased and relative module specifiers and was spot-checked
   against dynamic `import()` calls. Modules reachable only through a string built at runtime would
   not be detected.
