@@ -152,24 +152,57 @@ serve(createHttpHandler(async (req) => {
   // token stored there was a credential any colleague could lift (SEC-13).
   // This client uses the service role, so RLS on the token table does not
   // apply here — the owner-only policy protects it from the browser.
-  const [{ data: profile, error: profErr }, { data: tokenRow, error: tokenErr }] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('id, first_name, last_name, role, department')
-        .eq('id', tid)
-        .maybeSingle(),
-      supabase
-        .from('profile_calendar_tokens')
-        .select('token')
-        .eq('profile_id', tid)
-        .maybeSingle(),
-    ]);
+  const [{ data: profile, error: profErr }, tokenLookup] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, first_name, last_name, role, department')
+      .eq('id', tid)
+      .maybeSingle(),
+    supabase
+      .from('profile_calendar_tokens')
+      .select('token')
+      .eq('profile_id', tid)
+      .maybeSingle(),
+  ]);
 
-  if (
-    profErr || tokenErr || !profile || !tokenRow?.token ||
-    !(await tokensMatch(tokenRow.token, token))
-  ) {
+  let tokenErr = tokenLookup.error;
+  let storedToken: string | null = tokenLookup.data?.token ?? null;
+
+  // Transitional fallback, removable once the SEC-13 migration has been applied
+  // everywhere. Database migrations and Function deploys are separate commands,
+  // so one necessarily lands first. Without this branch both orderings break a
+  // publicly reachable endpoint: deploying this Function first would query a
+  // table that does not exist yet, and applying the migration first would leave
+  // the previous Function reading a column that has been dropped. Reading the
+  // legacy column when the new table is unavailable makes Function-first
+  // ordering seamless, which is the order the migration header documents.
+  if (tokenErr) {
+    const legacy = await supabase
+      .from('profiles')
+      .select('calendar_ics_token')
+      .eq('id', tid)
+      .maybeSingle();
+    if (!legacy.error) {
+      storedToken = (legacy.data as { calendar_ics_token?: string | null } | null)
+        ?.calendar_ics_token ?? null;
+      tokenErr = null;
+    }
+  }
+
+  // A failed lookup is an availability problem, not an authentication one.
+  // Answering 403 would tell a correctly-subscribed calendar client that its
+  // credential is bad, and some clients drop the subscription on that. 503 is
+  // retryable and keeps the feed alive across a transient database error.
+  if (profErr || tokenErr) {
+    return new Response('Service Unavailable', {
+      status: 503,
+      headers: { 'Retry-After': '300' },
+    });
+  }
+
+  // Missing rows and wrong tokens stay a uniform 403, so the response does not
+  // reveal whether a given profile exists.
+  if (!profile || !storedToken || !(await tokensMatch(storedToken, token))) {
     return new Response('Forbidden', { status: 403 });
   }
 

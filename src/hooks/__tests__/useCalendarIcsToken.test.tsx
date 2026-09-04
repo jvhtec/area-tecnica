@@ -66,6 +66,31 @@ describe("useCalendarIcsToken", () => {
     expect(result.current.token).toBe("rotated-token");
   });
 
+  // Consumers gate their "generate a link" affordance on `loading`. Until the
+  // read resolves the token is empty, which is indistinguishable from genuinely
+  // having none — acting on that would rotate a token the user already has and
+  // silently break their live calendar subscription.
+  it("reports loading until the initial read resolves, so callers can gate on it", async () => {
+    let resolveRead: (value: { data: string | null; error: null }) => void = () => {};
+    const pending = new Promise<{ data: string | null; error: null }>((resolve) => {
+      resolveRead = resolve;
+    });
+    rpc.mockReturnValueOnce(pending);
+
+    const { result } = renderHook(() => useCalendarIcsToken());
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.token).toBe("");
+
+    await act(async () => {
+      resolveRead({ data: "existing-token", error: null });
+      await pending;
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.token).toBe("existing-token");
+  });
+
   it("propagates a rotation failure instead of clearing the current token", async () => {
     rpc.mockResolvedValueOnce({ data: "existing-token", error: null });
     const { result } = renderHook(() => useCalendarIcsToken());

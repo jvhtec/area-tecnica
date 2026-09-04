@@ -24,14 +24,26 @@
 -- expresses the real rule — this row belongs to exactly one user — as RLS,
 -- which is row-aware in the way column grants are not.
 --
--- Deploy order
--- ------------
--- This migration drops `profiles.calendar_ics_token`. The `tech-calendar-ics`
--- Edge Function and the two client reads are updated in the same change, but
--- migrations and Function deploys are separate steps: deploy the Function
--- first, or accept a short window in which existing calendar subscriptions
--- return 403 until it lands. Subscriptions recover on their own once deployed;
--- no token values change here.
+-- Deploy order — deploy the Edge Function FIRST
+-- --------------------------------------------
+-- This migration drops `profiles.calendar_ics_token`, and migrations and
+-- Function deploys are separate commands, so one necessarily lands first.
+-- `tech-calendar-ics` is publicly reachable, so a gap there is a real outage
+-- for every subscribed calendar, and naively both orderings produce one: the
+-- new Function would query a table that does not exist yet, and the previous
+-- Function would read a column that has been dropped.
+--
+-- The updated Function therefore falls back to `profiles.calendar_ics_token`
+-- when `profile_calendar_tokens` is unavailable, which makes Function-first
+-- ordering seamless:
+--   1. Deploy `tech-calendar-ics`. The new table does not exist yet, so it
+--      falls back to the legacy column and serves feeds exactly as before.
+--   2. Apply this migration. The table now exists and is backfilled, the
+--      primary read succeeds, and the fallback stops being reached.
+-- The fallback is dead code from step 2 onwards and should be deleted in a
+-- follow-up once every environment has run this migration.
+--
+-- No token values change here, so no subscription needs to be re-added.
 --
 -- Existing tokens are carried over as-is rather than regenerated. They have
 -- been readable org-wide for as long as the policy has existed and should be

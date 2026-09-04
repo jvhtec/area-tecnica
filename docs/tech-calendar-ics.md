@@ -33,7 +33,7 @@ Database changes
   - Backfills every existing token before dropping the column, so live subscriptions survive the deploy.
   - Redefines `rotate_my_calendar_ics_token()` to upsert into the new table (signature and return value unchanged) and adds `get_my_calendar_ics_token()`.
   - Drops `profiles.calendar_ics_token`.
-  - **Deploy order:** deploy this Edge Function before applying the migration, or feeds return 403 for the window between the two.
+  - **Deploy order:** deploy this Edge Function **before** applying the migration. Both orderings would otherwise break a public endpoint, so the Function falls back to the legacy `profiles.calendar_ics_token` while `profile_calendar_tokens` does not yet exist; that makes Function-first seamless. The fallback is dead code once the migration has run everywhere and should be removed in a follow-up.
   - Coverage: `supabase/tests/database/profile_calendar_token_isolation.sql` proves one technician cannot read another's token.
 
 Parameters

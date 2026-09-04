@@ -73,7 +73,11 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
 
     // Calendar token: owned by a hook because it is a bearer credential kept
     // off the broadly-readable profiles row (SEC-13).
-    const { token: calendarToken, rotate: rotateCalendarToken } = useCalendarIcsToken();
+    const {
+        token: calendarToken,
+        loading: calendarTokenLoading,
+        rotate: rotateCalendarToken,
+    } = useCalendarIcsToken();
 
     // Form state
     const [firstName, setFirstName] = useState(userProfile?.first_name || '');
@@ -200,6 +204,15 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     // Handle calendar sync - open webcal:// link directly
     const handleCalendarSync = async () => {
         try {
+            // Until the initial read resolves the token reads as empty, which is
+            // indistinguishable from genuinely having none. Rotating here would
+            // mint a new token for a user who already had one and silently break
+            // their existing calendar subscription, so wait for the read first.
+            if (calendarTokenLoading) {
+                toast.loading('Cargando enlace de calendario...', { id: 'calendar-sync' });
+                return;
+            }
+
             let token = calendarToken;
 
             // If no token exists, generate one

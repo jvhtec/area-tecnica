@@ -42,7 +42,7 @@ export const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
-  const { token: icsToken, rotate: rotateIcsToken } = useCalendarIcsToken();
+  const { token: icsToken, loading: icsTokenLoading, rotate: rotateIcsToken } = useCalendarIcsToken();
   const [folderStructure, setFolderStructure] = useState<FolderStructure | null>(null);
   const [tourFolderStructure, setTourFolderStructure] = useState<FolderStructure | null>(null);
   const [activeSection, setActiveSection] = useState<ProfileSection>("profile");
@@ -659,7 +659,17 @@ export const Profile = () => {
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   Suscribirse al calendario
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleRotateIcsToken}>
+                {/* Disabled while the initial read is pending: until it
+                    resolves the token reads as empty, so this would offer to
+                    "generate" a link for someone who already has one and
+                    silently invalidate their existing subscription. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={icsTokenLoading}
+                  onClick={handleRotateIcsToken}
+                >
                   <RefreshCcw className="mr-2 h-4 w-4" />
                   {icsToken ? "Rotar enlace" : "Generar enlace"}
                 </Button>
