@@ -96,8 +96,8 @@ An empty active task list is 0% and cannot complete.
 ## Job preparation integration
 
 Project Management exposes two opt-in entry points without changing the existing
-creation flow: **Preparación guiada** for a new Job and **Preparar** on editable Job
-cards. Starting preparation generates tasks from the Job's canonical departments.
+creation flow: **Nuevo trabajo guiado** for a new Job and **Preparación guiada** on
+editable Job cards. Starting preparation generates tasks from the Job's canonical departments.
 The page persists the current step before navigation and requires the operator to
 confirm completion after doing the work; opening a tool never completes a task.
 Existing Job cards label this action **Preparación guiada**; the page-level **Nuevo
@@ -115,7 +115,7 @@ Routed tools receive a validated setup return target. The app shell keeps a visi
 buttons honor the same target where present.
 
 When departments change, **Actualizar tareas** reconciles generated requirements.
-The service preserves status and audit history for unchanged or retired tasks. A
+The service preserves status and audit history for unchanged or retired tasks.
 Only an `in_progress` workflow can enter review; database completion rejects unresolved
 required tasks or blockers under the same row lock.
 

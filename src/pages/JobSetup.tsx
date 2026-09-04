@@ -68,6 +68,7 @@ export default function JobSetup() {
   const job = jobQuery.data;
   const departments = useMemo(() => getSetupJobDepartments(job), [job]);
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+  const isStartingWorkflow = createWorkflow.isPending || updateCreatedWorkflowStatus.isPending;
   const orderedTasks = useMemo(() => {
     const order = ['basic', 'departments', 'personnel', 'technical', 'resources', 'review'];
     return [...tasks].sort((left, right) => {
@@ -156,14 +157,14 @@ export default function JobSetup() {
       {!workflow ? (
         <Card>
           <CardHeader><CardTitle>Iniciar preparación guiada</CardTitle><CardDescription>Se generarán tareas para {departments.length ? departments.join(', ') : 'los departamentos del trabajo'} usando los datos actuales del trabajo.</CardDescription></CardHeader>
-          <CardContent><Button className="gap-2" disabled={createWorkflow.isPending || departments.length === 0} onClick={() => void startWorkflow()}>{createWorkflow.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}Iniciar preparación</Button>{departments.length === 0 && <p className="mt-2 text-sm text-destructive">Añade al menos un departamento antes de iniciar.</p>}</CardContent>
+          <CardContent><Button className="gap-2" disabled={isStartingWorkflow || departments.length === 0} onClick={() => void startWorkflow()}>{isStartingWorkflow ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}Iniciar preparación</Button>{departments.length === 0 && <p className="mt-2 text-sm text-destructive">Añade al menos un departamento antes de iniciar.</p>}</CardContent>
         </Card>
       ) : (
         <>
           <SetupWorkflowProgress workflow={workflow} tasks={tasks} compact />
 
           {(workflow.status === 'complete' || workflow.status === 'cancelled') && (
-            <Button variant="outline" className="gap-2" disabled={createWorkflow.isPending} onClick={() => void startWorkflow()}><Play className="h-4 w-4" />Iniciar una nueva preparación</Button>
+            <Button variant="outline" className="gap-2" disabled={isStartingWorkflow} onClick={() => void startWorkflow()}>{isStartingWorkflow ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}Iniciar una nueva preparación</Button>
           )}
 
           {workflow.status === 'draft' && (

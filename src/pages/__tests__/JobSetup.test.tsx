@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   refetchWorkflow: vi.fn(),
   update: vi.fn(),
   updateStatus: vi.fn(),
+  updateStatusPending: false,
   refetchTasks: vi.fn(),
   tasksError: null as Error | null,
   workflow: null as SetupWorkflow | null,
@@ -43,7 +44,7 @@ vi.mock('@/features/setup-workflows/hooks', () => ({
     data: mocks.workflow || mocks.latestWorkflow ? [task] : [], isLoading: false,
     isError: Boolean(mocks.tasksError), error: mocks.tasksError, refetch: mocks.refetchTasks,
   }),
-  useSetupWorkflowStatusMutation: () => ({ mutateAsync: mocks.updateStatus, isPending: false }),
+  useSetupWorkflowStatusMutation: () => ({ mutateAsync: mocks.updateStatus, isPending: mocks.updateStatusPending }),
   useUpdateSetupWorkflow: () => ({ mutateAsync: mocks.update, mutate: mocks.update, isPending: false }),
 }));
 
@@ -76,6 +77,7 @@ describe('JobSetup', () => {
     mocks.refetchWorkflow.mockReset().mockResolvedValue(undefined);
     mocks.update.mockReset().mockResolvedValue(undefined);
     mocks.updateStatus.mockReset().mockResolvedValue(undefined);
+    mocks.updateStatusPending = false;
     mocks.refetchTasks.mockReset().mockResolvedValue(undefined);
     mocks.tasksError = null;
     mocks.latestWorkflow = null;
@@ -110,6 +112,14 @@ describe('JobSetup', () => {
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ workflowType: 'job', entityId: 'job-1', departments: ['sound'] }));
     await waitFor(() => expect(mocks.updateStatus).toHaveBeenCalledWith({ workflowId: 'workflow-new', status: 'in_progress' }));
     expect(mocks.refetchWorkflow).toHaveBeenCalled();
+  });
+
+  it('keeps workflow creation disabled while activation is pending', () => {
+    mocks.workflow = null;
+    mocks.updateStatusPending = true;
+    renderPage();
+
+    expect(screen.getByRole('button', { name: /iniciar preparación/i })).toBeDisabled();
   });
 
   it('shows task loading failures with a retry action', async () => {
