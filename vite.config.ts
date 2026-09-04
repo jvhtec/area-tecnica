@@ -19,9 +19,20 @@ export default defineConfig(({ mode }) => ({
 
   ].filter(Boolean),
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+      // jsPDF lists html2canvas as an optional dependency and reaches for it
+      // through a dynamic import inside its `.html()` renderer. Nothing in this
+      // app calls `.html()` — the only html2canvas consumer is the rack builder,
+      // which imports `html2canvas-pro` directly — but Rollup still follows that
+      // dynamic import and emits the whole library as its own ~200 kB chunk.
+      //
+      // Resolving the bare specifier to an empty module drops that chunk. The
+      // regex is anchored so it cannot also catch `html2canvas-pro`. If jsPDF's
+      // `.html()` is ever needed, remove this alias rather than working around
+      // it — the stub deliberately fails loudly instead of half-working.
+      { find: /^html2canvas$/, replacement: path.resolve(__dirname, "./src/stubs/html2canvas-unused.ts") },
+    ],
   },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(new Date().toISOString()),
