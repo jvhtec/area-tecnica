@@ -19,6 +19,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": true,
+    "useUnknownInCatchVariables": true,
     "noFallthroughCasesInSwitch": false,
 
     "baseUrl": ".",

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getErrorMessage, getErrorStatus } from '@/utils/errorMessage';
+import {
+  getErrorMessage,
+  getErrorName,
+  getErrorStack,
+  getErrorStatus,
+} from '@/utils/errorMessage';
 
 describe('getErrorMessage', () => {
   it('returns native Error messages', () => {
@@ -61,12 +66,35 @@ describe('getErrorMessage', () => {
       ),
     ).toBe('Operation failed');
   });
+
+  it('uses the caller fallback for missing and blank thrown values', () => {
+    expect(getErrorMessage(null, 'Operation failed')).toBe('Operation failed');
+    expect(getErrorMessage(undefined, 'Operation failed')).toBe('Operation failed');
+    expect(getErrorMessage('   ', 'Operation failed')).toBe('Operation failed');
+  });
+
+  it('handles self-referential arrays without overflowing the stack', () => {
+    const error: unknown[] = [new Error('inner failure')];
+    error.push(error);
+
+    expect(getErrorMessage(error)).toBe('inner failure');
+  });
+});
+
+describe('error metadata helpers', () => {
+  it('reads error names and stacks without assuming a native Error', () => {
+    expect(getErrorName({ name: 'AbortError' })).toBe('AbortError');
+    expect(getErrorStack({ stack: 'line one' })).toBe('line one');
+    expect(getErrorName('AbortError')).toBeUndefined();
+    expect(getErrorStack(null)).toBeUndefined();
+  });
 });
 
 describe('getErrorStatus', () => {
   it('reads numeric and numeric-string HTTP error statuses', () => {
     expect(getErrorStatus({ status: 404 })).toBe(404);
     expect(getErrorStatus({ statusCode: '503' })).toBe(503);
+    expect(getErrorStatus({ status: 'invalid', statusCode: 429 })).toBe(429);
   });
 
   it('rejects non-error and malformed statuses', () => {

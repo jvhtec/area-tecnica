@@ -63,7 +63,11 @@ function uniqueParts(parts: Array<string | null>): string[] {
  * Convert unknown runtime errors (including Supabase/PostgREST objects)
  * into deterministic, user-readable strings.
  */
-export function getErrorMessage(error: unknown, fallback = 'Unexpected error'): string {
+function getErrorMessageInternal(
+  error: unknown,
+  fallback: string,
+  seen: WeakSet<object>,
+): string {
   if (error instanceof Error) {
     const msg = toText(error.message);
     const specificName = error.name === 'Error' ? null : toText(error.name);
@@ -71,7 +75,10 @@ export function getErrorMessage(error: unknown, fallback = 'Unexpected error'): 
   }
 
   if (Array.isArray(error)) {
-    const nested = uniqueParts(error.map((item) => getErrorMessage(item, fallback)));
+    if (seen.has(error)) return '';
+    seen.add(error);
+    const nested = uniqueParts(error.map((item) => getErrorMessageInternal(item, fallback, seen)));
+    seen.delete(error);
     return nested.length > 0 ? nested.join('; ') : fallback;
   }
 
@@ -95,10 +102,14 @@ export function getErrorMessage(error: unknown, fallback = 'Unexpected error'): 
 
   const direct = toText(error);
   if (direct) return direct;
+  if (error == null || typeof error === 'string') return fallback;
   const serialized = stringifySafe(error);
   return serialized === 'Unexpected error' ? fallback : serialized;
 }
 
+export function getErrorMessage(error: unknown, fallback = 'Unexpected error'): string {
+  return getErrorMessageInternal(error, fallback, new WeakSet<object>());
+}
 
 /**
  * Reads the `name` of an unknown thrown value — used to branch on well-known
@@ -129,15 +140,19 @@ export function getErrorStack(error: unknown): string | undefined {
  */
 export function getErrorStatus(error: unknown): number | undefined {
   if (!isRecord(error)) return undefined;
-  const status = error.status ?? error.statusCode;
-  const numericStatus =
-    typeof status === 'number'
-      ? status
-      : typeof status === 'string' && status.trim().length > 0
-        ? Number(status)
-        : Number.NaN;
 
-  return Number.isInteger(numericStatus) && numericStatus >= 400 && numericStatus <= 599
-    ? numericStatus
-    : undefined;
+  for (const status of [error.status, error.statusCode]) {
+    const numericStatus =
+      typeof status === 'number'
+        ? status
+        : typeof status === 'string' && status.trim().length > 0
+          ? Number(status)
+          : Number.NaN;
+
+    if (Number.isInteger(numericStatus) && numericStatus >= 400 && numericStatus <= 599) {
+      return numericStatus;
+    }
+  }
+
+  return undefined;
 }
