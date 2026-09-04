@@ -4,6 +4,13 @@ import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { getRealtimeConnectionStatus } from '@/integrations/supabase/client';
 import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
 
+/** Per-table realtime status, keyed by table name. */
+export type TableSubscriptionStatus = {
+  isSubscribed: boolean;
+  isStale: boolean;
+  lastActivity: number;
+};
+
 /**
  * Hook to monitor subscription status for specific tables
  * @param tableName Array of table names to monitor
@@ -92,11 +99,11 @@ export function useMultiTableSubscription(
     subscriptionsByTable
   } = useSubscriptionContext();
 
-  const [statuses, setStatuses] = useState<Record<string, any>>({});
+  const [statuses, setStatuses] = useState<Record<string, TableSubscriptionStatus>>({});
   
   useEffect(() => {
     // Update statuses for each table
-    const newStatuses: Record<string, any> = {};
+    const newStatuses: Record<string, TableSubscriptionStatus> = {};
     
     tables.forEach(({ table }) => {
       const tableSubscriptions = subscriptionsByTable[table] || [];

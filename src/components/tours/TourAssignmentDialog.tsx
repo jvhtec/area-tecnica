@@ -18,6 +18,7 @@ import { RequestTourAvailabilityDialog } from '@/components/tours/RequestTourAva
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 interface TourAssignment {
   id: string;
   tour_id: string;
@@ -138,8 +139,8 @@ export const TourAssignmentDialog = ({
       // Invalidate job assignments as they're automatically synced
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to create assignment: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Failed to create assignment: ${getErrorMessage(error)}`);
     }
   });
 
@@ -161,8 +162,8 @@ export const TourAssignmentDialog = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to update role: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Failed to update role: ${getErrorMessage(error)}`);
     }
   });
 
@@ -184,8 +185,8 @@ export const TourAssignmentDialog = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to remove assignment: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Failed to remove assignment: ${getErrorMessage(error)}`);
     }
   });
 

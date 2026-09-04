@@ -22,15 +22,15 @@ const {
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/hooks/usePushNotifications", () => ({
-  usePushNotifications: (...args: any[]) => usePushNotificationsMock(...args),
+  usePushNotifications: (...args: unknown[]) => usePushNotificationsMock(...args),
 }));
 
 vi.mock("@/hooks/usePushDebug", () => ({
-  usePushDebug: (...args: any[]) => usePushDebugMock(...args),
+  usePushDebug: (...args: unknown[]) => usePushDebugMock(...args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -42,7 +42,7 @@ vi.mock("@/services/dataLayerClient", () => ({
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
-  toast: (...args: any[]) => toastMock(...args),
+  toast: (...args: unknown[]) => toastMock(...args),
 }));
 
 vi.mock("react-router-dom", async () => {

@@ -14,7 +14,7 @@ const { useOptimizedAuthMock, toastMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -26,7 +26,7 @@ vi.mock("@/services/dataLayerClient", () => ({
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
-  toast: (...args: any[]) => toastMock(...args),
+  toast: (...args: unknown[]) => toastMock(...args),
 }));
 
 vi.mock("@/components/settings/HouseTechRateEditor", () => ({

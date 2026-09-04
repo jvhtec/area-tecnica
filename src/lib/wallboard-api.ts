@@ -114,14 +114,13 @@ export class WallboardApi {
       const { data, error } = await supabase.functions.invoke('wallboard-feed', {
         body: { path },
         headers,
-        responseType: 'json'
-      } as any);
+      });
       if (error) throw error;
       return data as T;
     } catch (err) {
       const anon =
-        (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY ||
-        (import.meta as any)?.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
+        import.meta.env?.VITE_SUPABASE_ANON_KEY ||
+        import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
       const headers: Record<string, string> = this.token ? { "x-wallboard-jwt": this.token } : {};
       if (anon) {
         headers["Authorization"] = `Bearer ${anon}`;

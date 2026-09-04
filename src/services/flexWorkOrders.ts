@@ -4,6 +4,9 @@ import { FLEX_FOLDER_IDS } from '@/utils/flex-folders/constants';
 import { resourceIdForRole, EXTRA_RESOURCE_IDS } from '@/utils/flex-labor-resources';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 import { formatFlexWorkOrderDate } from '@/services/flexWorkOrderDates';
+import type { FlexElementResponse } from '@/services/flex-work-orders/types';
+
+
 
 import {
   CURRENCY_EUR_ID,
@@ -19,7 +22,7 @@ async function createWorkOrderElement(options: {
   job: { id: string; title: string; start_time: string; end_time: string; location_id: string | null; timezone?: string | null };
   technicianName: string;
   vendorId: string;
-}): Promise<{ documentId: string; raw: any }>
+}): Promise<{ documentId: string; raw: FlexElementResponse }>
 {
   const { parentElementId, job, technicianName, vendorId } = options;
 
@@ -49,9 +52,9 @@ async function createWorkOrderElement(options: {
     throw new Error(message);
   }
 
-  const raw: Record<string, any> = await response
-    .json<Record<string, any>>()
-    .catch((): Record<string, any> => ({}));
+  const raw: FlexElementResponse = await response
+    .json<FlexElementResponse>()
+    .catch((): FlexElementResponse => ({}));
   const documentId =
     raw?.id || raw?.elementId || raw?.data?.id || raw?.data?.elementId || raw?.element?.id || null;
   const documentNumber = raw?.documentNumber || raw?.elementNumber || raw?.number || raw?.data?.documentNumber || null;
@@ -574,7 +577,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
       throw new Error(`Failed to create work orders folder in Flex: ${errorData?.exceptionMessage || flexResponse.statusText}`);
     }
     
-    const flexData = await flexResponse.json<Record<string, any>>();
+    const flexData = await flexResponse.json<FlexElementResponse>();
     const newElementId = flexData?.id || flexData?.elementId || flexData?.data?.id;
     
     if (!newElementId) {

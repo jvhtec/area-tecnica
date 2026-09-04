@@ -3,6 +3,8 @@ import { vi } from "vitest";
 export interface MockSupabaseResult<T = unknown> {
   data: T;
   error: unknown;
+  /** Present when the query used `{ count: 'exact' }` (e.g. UsersList's paging). */
+  count?: number | null;
 }
 
 type MockChainMethod =

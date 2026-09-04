@@ -26,7 +26,7 @@ no finding" section recording what was cleared.
 | Check | Result | Interpretation |
 | --- | --- | --- |
 | `npm run typecheck` | Pass | App still compiles with `strict: false`. |
-| `npm run lint` | Pass with 1,878 warnings (1,517 app + 361 functions) | Effectively flat vs 1,879 on 2026-07-10. App: 1,343 `no-explicit-any`, 87 `react-hooks/exhaustive-deps`, 61 `react-refresh/only-export-components`. |
+| `npm run lint` | Pass with 1,373 warnings | Down from 1,878. App `no-explicit-any` 1,343 → 868 (−35%) after the `catch (e: any)`, `onError`, rest-arg, Supabase-payload and `Record<string, any>` clusters were typed; 78 `react-hooks/exhaustive-deps` and 43 `react-refresh/only-export-components` remain as the next targets. |
 | `npm run governance` | Pass | All sub-gates green; baselines ratchet downward (see below). |
 | Source-boundary gate | `ui-data-layer-client-import` 197 (baseline 213); `scheduling-new-date` 88 (baseline 107); `direct-protected-route-allowed-roles` 0 (baseline 64) | Real progress; the direct-role-guard debt is fully eliminated. |
 | File-size gate | 43 files over 800 lines (baseline 45) | Unchanged since 2026-07-10; largest handwritten modules unchanged (`TourOpsManagementHub.tsx` 2,116; `tourSchedulingService.ts` 1,885; `useConsumosTool.ts` 1,806; `TourDefaultsManager.tsx` 1,706). |

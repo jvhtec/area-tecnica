@@ -18,17 +18,17 @@ const {
 
 vi.mock('@/services/dataLayerClient', () => ({
   dataLayerClient: {
-    from: (...args: any[]) => fromMock(...args),
+    from: (...args: unknown[]) => fromMock(...args),
   },
 }))
 
 vi.mock('@/hooks/useOptimizedAuth', () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }))
 
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: toastMock }),
-  toast: (...args: any[]) => toastMock(...args),
+  toast: (...args: unknown[]) => toastMock(...args),
 }))
 
 import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'

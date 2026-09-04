@@ -19,7 +19,7 @@ const isPWAMode = (): boolean => {
   }
 
   // iOS Safari specific check
-  if ((window.navigator as any).standalone === true) {
+  if (window.navigator.standalone === true) {
     return true;
   }
 
@@ -33,7 +33,7 @@ const isIOS = (): boolean => {
   const ua = window.navigator.userAgent;
   const isIOSDevice = /iPad|iPhone|iPod/.test(ua);
   const isIOSSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
-  return isIOSDevice || isIOSSafari || (window.navigator as any).standalone === true;
+  return isIOSDevice || isIOSSafari || window.navigator.standalone === true;
 };
 
 /**

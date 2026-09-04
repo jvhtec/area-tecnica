@@ -16,7 +16,7 @@ vi.mock("@/integrations/supabase/client", () => {
   class MockQueryBuilder {
     private table: string;
     private action: QueryAction | null = null;
-    private filters: Record<string, any> = {};
+    private filters: Record<string, unknown> = {};
     private insertPayload: any = null;
     private wantsReturning = false;
     private wantsSingle = false;

@@ -35,6 +35,7 @@ import type { Database } from '@/integrations/supabase/types';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 type TourRatesManagerDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -263,8 +264,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
         }
       }
     },
-    onError: (error: any) => {
-      const message = error?.message || 'No se pudo actualizar la aprobación del trabajo.';
+    onError: (error: unknown) => {
+      const message = getErrorMessage(error, 'No se pudo actualizar la aprobación del trabajo.');
       toast.error(message);
     },
   });

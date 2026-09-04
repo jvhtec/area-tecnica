@@ -88,7 +88,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
         description: "Milestone definition deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Delete mutation error:", error);
       toast({
         title: "Error",

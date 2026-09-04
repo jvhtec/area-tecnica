@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { JobDateTypeMap } from "@/utils/jobDateTypes";
 /**
  * Optimized hook for fetching date types with aggressive caching
  */
@@ -25,10 +26,10 @@ export const useOptimizedDateTypes = (jobIds: string[], dates: string[]) => {
         throw error;
       }
 
-      return data.reduce((acc: Record<string, any>, curr) => ({
-        ...acc,
-        [`${curr.job_id}-${curr.date}`]: curr,
-      }), {});
+      return data.reduce((acc: JobDateTypeMap, curr) => {
+        acc[`${curr.job_id}-${curr.date}`] = curr;
+        return acc;
+      }, {});
     },
     staleTime: 1000 * 60 * 10, // 10 minutes - date types don't change often
     gcTime: 1000 * 60 * 30, // 30 minutes cache

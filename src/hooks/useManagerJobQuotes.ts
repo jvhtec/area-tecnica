@@ -57,7 +57,7 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
                 breakdown: { error: errorMsg, error_details: error },
               } as TourJobRateQuote;
             }
-            const q = (data || {}) as Record<string, any>;
+            const q = (data || {}) as Record<string, unknown>;
             return {
               job_id: q.job_id ?? jobId,
               technician_id: q.technician_id ?? techId,

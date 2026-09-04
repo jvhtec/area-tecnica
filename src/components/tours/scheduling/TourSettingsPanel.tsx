@@ -127,7 +127,7 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
       };
 
       const { error } = await dataLayerClient.from("tours")
-        .update({ tour_settings: tourSettings } as any)
+        .update({ tour_settings: tourSettings })
         .eq("id", tourId);
 
       if (error) throw error;

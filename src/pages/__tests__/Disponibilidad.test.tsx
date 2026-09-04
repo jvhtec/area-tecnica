@@ -23,7 +23,7 @@ const {
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -31,15 +31,15 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 vi.mock("@/hooks/useOptimizedJobs", () => ({
-  useOptimizedJobs: (...args: any[]) => useOptimizedJobsMock(...args),
+  useOptimizedJobs: (...args: unknown[]) => useOptimizedJobsMock(...args),
 }));
 
 vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: (...args: any[]) => useIsMobileMock(...args),
+  useIsMobile: (...args: unknown[]) => useIsMobileMock(...args),
 }));
 
 vi.mock("@/utils/pdf/logoUtils", () => ({
-  fetchJobLogo: (...args: any[]) => fetchJobLogoMock(...args),
+  fetchJobLogo: (...args: unknown[]) => fetchJobLogoMock(...args),
 }));
 
 vi.mock("@/lib/supabase", () => ({

@@ -27,7 +27,7 @@ type ExpensePermissionMock = {
 };
 
 vi.mock('@/hooks/useExpensePermissions', () => ({
-  useExpensePermissions: (...args: any[]) => useExpensePermissionsMock(...args),
+  useExpensePermissions: (...args: unknown[]) => useExpensePermissionsMock(...args),
   isPermissionActive: () => true,
   getEffectiveCap: () => 45,
 }));

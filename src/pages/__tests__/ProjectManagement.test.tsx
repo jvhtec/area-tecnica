@@ -22,7 +22,7 @@ vi.mock("@/hooks/useOptimizedAuth", () => ({
 
 const mockUseOptimizedJobs = vi.fn();
 vi.mock("@/hooks/useOptimizedJobs", () => ({
-  useOptimizedJobs: (...args: any[]) => mockUseOptimizedJobs(...args),
+  useOptimizedJobs: (...args: unknown[]) => mockUseOptimizedJobs(...args),
 }));
 
 const mockUseSetupJob = vi.fn();
@@ -76,7 +76,7 @@ vi.mock("@/components/jobs/cards/JobCardNew", () => ({
 
 const mockAutoCompleteJobs = vi.fn().mockResolvedValue({ updatedJobs: [], updatedCount: 0 });
 vi.mock("@/utils/jobStatusUtils", () => ({
-  autoCompleteJobs: (...args: any[]) => mockAutoCompleteJobs(...args),
+  autoCompleteJobs: (...args: unknown[]) => mockAutoCompleteJobs(...args),
 }));
 
 const mockGetSession = vi.fn();
@@ -85,9 +85,9 @@ const mockFrom = vi.fn();
 vi.mock("@/services/dataLayerClient", () => ({
   dataLayerClient: {
     auth: {
-      getSession: (...args: any[]) => mockGetSession(...args),
+      getSession: (...args: unknown[]) => mockGetSession(...args),
     },
-    from: (...args: any[]) => mockFrom(...args),
+    from: (...args: unknown[]) => mockFrom(...args),
   },
 }));
 

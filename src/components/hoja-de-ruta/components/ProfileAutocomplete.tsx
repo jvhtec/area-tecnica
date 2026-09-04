@@ -6,7 +6,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface Profile {
+export interface Profile {
   id: string;
   first_name: string | null;
   last_name: string | null;
@@ -92,8 +92,6 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
   };
 
   const handleProfileSelect = (profile: Profile) => {
-    const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
-    
     onSelect({
       id: profile.id,
       first_name: profile.first_name,
@@ -101,9 +99,7 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
       dni: profile.dni,
       department: profile.department,
       role: profile.role,
-      // Provide full_name so consumers can reliably parse
-      full_name: fullName
-    } as any);
+    });
     
     setIsOpen(false);
     setProfiles([]);

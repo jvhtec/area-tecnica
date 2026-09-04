@@ -158,7 +158,7 @@ export const ManageAssignmentsDialog = ({
         description: "Técnico asignado exitosamente",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error adding assignment:", error);
       toast({
         title: "Error",
@@ -188,7 +188,7 @@ export const ManageAssignmentsDialog = ({
         description: "Técnico desasignado exitosamente",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error removing assignment:", error);
       toast({
         title: "Error",

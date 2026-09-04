@@ -33,19 +33,19 @@ const {
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/hooks/useTourAssignments", () => ({
-  useTourAssignments: (...args: any[]) => useTourAssignmentsMock(...args),
+  useTourAssignments: (...args: unknown[]) => useTourAssignmentsMock(...args),
 }));
 
 vi.mock("@/hooks/useTourRatesApproval", () => ({
-  useTourRatesApproval: (...args: any[]) => useTourRatesApprovalMock(...args),
+  useTourRatesApproval: (...args: unknown[]) => useTourRatesApprovalMock(...args),
 }));
 
 vi.mock("@/hooks/useFlexUuid", () => ({
-  useFlexUuid: (...args: any[]) => useFlexUuidMock(...args),
+  useFlexUuid: (...args: unknown[]) => useFlexUuidMock(...args),
 }));
 
 vi.mock("@tanstack/react-query", async () => {
@@ -53,7 +53,7 @@ vi.mock("@tanstack/react-query", async () => {
 
   return {
     ...actual,
-    useQuery: (...args: any[]) => useQueryMock(...args),
+    useQuery: (...args: unknown[]) => useQueryMock(...args),
   };
 });
 
@@ -79,15 +79,15 @@ vi.mock("react-router-dom", async () => {
 });
 
 vi.mock("@/utils/pdf/logoUtils", () => ({
-  fetchTourLogo: (...args: any[]) => fetchTourLogoMock(...args),
+  fetchTourLogo: (...args: unknown[]) => fetchTourLogoMock(...args),
 }));
 
 vi.mock("@/lib/tourPdfExport", () => ({
-  exportTourPDF: (...args: any[]) => exportTourPDFMock(...args),
+  exportTourPDF: (...args: unknown[]) => exportTourPDFMock(...args),
 }));
 
 vi.mock("@/utils/flex-folders", () => ({
-  openFlexElement: (...args: any[]) => openFlexElementMock(...args),
+  openFlexElement: (...args: unknown[]) => openFlexElementMock(...args),
 }));
 
 vi.mock("@/assets/icons/icon.png", () => ({

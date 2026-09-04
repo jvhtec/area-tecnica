@@ -1035,6 +1035,8 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Don't import lovable-tagger** in vite.config.ts (causes build failures)
 - **Edge functions use Deno runtime** — don't use Node.js APIs or npm imports in `supabase/functions/`; use `https://esm.sh/` or `jsr:` for deps
 - **Lint edge functions separately** — `npm run lint:functions` uses different ESLint config with Deno globals
+- **Errors are `unknown`, not `any`** — never annotate `catch (e: any)`; that annotation also silently overrides `useUnknownInCatchVariables`. Write `catch (error)` and read it through `getErrorMessage` / `getErrorName` / `getErrorStack` from `@/utils/errorMessage`, which unwrap Supabase/PostgREST error objects (message/details/hint/code) rather than assuming `.message` exists.
+- **`no-explicit-any` is ratcheted** — `governance:lint-warnings` holds a per-file, per-rule ceiling in `scripts/governance/lint-warning-baseline.json`. Reductions are always allowed; new warnings fail governance. After removing warnings run `node scripts/governance/check-lint-warning-baseline.mjs --write-baseline` so the gains are locked in.
 - **Type-check edge functions separately too** — `npm run typecheck:functions`; `npm run typecheck` only covers `src/`
 - **Never type a Supabase client as `ReturnType<typeof createClient>`** — that instantiates the generic with its defaults and makes every `.from()` row resolve to `never`, so the module silently stops being type-checked. Import the exported `SupabaseClient` type instead.
 - **`.returns<T>()` takes the array form** even when the query ends in `.maybeSingle()`/`.single()` — `.returns<Row[]>()`, not `.returns<Row>()`, or the row resolves to `never`.

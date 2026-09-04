@@ -3,11 +3,11 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { JobCardJob as JobCardActionsJob } from "@/components/jobs/cards/job-card-actions/types";
 import type {
   JobAssignmentForCard,
-  JobDateTypeForCard,
   JobDocumentRow,
   OptimizedJobCardJob,
   useOptimizedJobCard,
 } from "@/hooks/useOptimizedJobCard";
+import type { JobDateTypeForCard } from "@/utils/jobDateTypes";
 import type { Database } from "@/integrations/supabase/types";
 import type { Department } from "@/types/department";
 import type { TourDateLike } from "@/utils/assignmentWorkDates";

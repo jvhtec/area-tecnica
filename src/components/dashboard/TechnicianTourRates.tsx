@@ -9,6 +9,7 @@ import { useTourRatesApprovalMap } from "@/hooks/useTourRatesApproval";
 import { useJobRatesApprovalMap } from "@/hooks/useJobRatesApproval";
 import { calculateQuoteTotal, formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
 import type { TourJobRateQuote } from "@/types/tourRates";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface TechnicianTourRatesProps {
   theme?: {
@@ -202,7 +203,7 @@ export const TechnicianTourRates: React.FC<TechnicianTourRatesProps> = ({ theme,
           ) : error ? (
             <div className={`p-3 rounded-lg ${t.danger} flex items-start gap-2 text-sm`}>
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>No se pudieron cargar tus tarifas de gira: {(error as any).message}</span>
+              <span>No se pudieron cargar tus tarifas de gira: {getErrorMessage(error)}</span>
             </div>
           ) : (
             <>

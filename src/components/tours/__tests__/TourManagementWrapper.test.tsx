@@ -12,7 +12,7 @@ const { useQueryMock, useOptimizedAuthMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@tanstack/react-query", async () => {
@@ -20,7 +20,7 @@ vi.mock("@tanstack/react-query", async () => {
 
   return {
     ...actual,
-    useQuery: (...args: any[]) => useQueryMock(...args),
+    useQuery: (...args: unknown[]) => useQueryMock(...args),
   };
 });
 

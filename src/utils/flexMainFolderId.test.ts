@@ -180,9 +180,10 @@ describe("flexMainFolderId", () => {
         eq: mockEq,
       });
 
+      // Deliberately partial: the code under test only reaches `.select().eq()`.
       vi.mocked(supabase.from).mockReturnValue({
         select: mockSelect,
-      } as any);
+      } as unknown as ReturnType<typeof supabase.from>);
 
       const result = await resolveMainFlexElementId(job);
 
@@ -227,9 +228,10 @@ describe("flexMainFolderId", () => {
         eq: mockEq,
       });
 
+      // Deliberately partial: the code under test only reaches `.select().eq()`.
       vi.mocked(supabase.from).mockReturnValue({
         select: mockSelect,
-      } as any);
+      } as unknown as ReturnType<typeof supabase.from>);
 
       const result = await resolveMainFlexElementId(job);
 
@@ -264,9 +266,10 @@ describe("flexMainFolderId", () => {
         eq: mockEq,
       });
 
+      // Deliberately partial: the code under test only reaches `.select().eq()`.
       vi.mocked(supabase.from).mockReturnValue({
         select: mockSelect,
-      } as any);
+      } as unknown as ReturnType<typeof supabase.from>);
 
       const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 

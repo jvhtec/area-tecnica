@@ -19,6 +19,7 @@ import {
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface StaffingAutoModePanelProps {
   campaign: any
@@ -68,8 +69,8 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       toast({ title: `${CARLOS_AGENT_NAME} pausado` })
       invalidateAll()
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    onError: (error: unknown) => {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' })
     }
   })
 
@@ -94,8 +95,8 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       })
       invalidateAll()
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    onError: (error: unknown) => {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' })
     }
   })
 
@@ -121,8 +122,8 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       })
       invalidateAll()
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    onError: (error: unknown) => {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' })
     }
   })
 
@@ -145,8 +146,8 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       toast({ title: `${CARLOS_AGENT_NAME} detenido` })
       invalidateAll()
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    onError: (error: unknown) => {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' })
     }
   })
 
@@ -176,10 +177,10 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       setShowEscalationWarning(false)
       invalidateAll()
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive'
       })
     }

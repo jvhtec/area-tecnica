@@ -26,19 +26,19 @@ const {
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("next-themes", () => ({
-  useTheme: (...args: any[]) => useThemeMock(...args),
+  useTheme: (...args: unknown[]) => useThemeMock(...args),
 }));
 
 vi.mock("@/hooks/useMyTours", () => ({
-  useMyTours: (...args: any[]) => useMyToursMock(...args),
+  useMyTours: (...args: unknown[]) => useMyToursMock(...args),
 }));
 
 vi.mock("@/hooks/useTableSubscription", () => ({
-  useTableSubscription: (...args: any[]) => useTableSubscriptionMock(...args),
+  useTableSubscription: (...args: unknown[]) => useTableSubscriptionMock(...args),
 }));
 
 vi.mock("@/hooks/useMobileRealtimeSubscriptions", () => ({

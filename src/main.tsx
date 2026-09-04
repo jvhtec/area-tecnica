@@ -234,7 +234,7 @@ if (shouldRegisterServiceWorker) {
       // iOS PWA: Add visibility change listener for update checking
       // iOS doesn't always check for updates on app launch, but does better with visibility changes
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator as any).standalone === true;
+        navigator.standalone === true;
 
       if (isIOS) {
         let lastCheckTime = Date.now();

@@ -14,11 +14,11 @@ const { useOptimizedAuthMock, useIsMobileMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }));
 
 vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: (...args: any[]) => useIsMobileMock(...args),
+  useIsMobile: (...args: unknown[]) => useIsMobileMock(...args),
 }));
 
 vi.mock("@/lib/supabase", () => ({

@@ -55,6 +55,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { JobDateTypeMap } from "@/utils/jobDateTypes";
 interface MobileDayCalendarProps {
   date: Date | undefined;
   onDateSelect: (date: Date | undefined) => void;
@@ -175,10 +176,10 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         return {};
       }
 
-      return data.reduce((acc: Record<string, any>, curr) => ({
-        ...acc,
-        [`${curr.job_id}-${curr.date}`]: curr,
-      }), {});
+      return data.reduce((acc: JobDateTypeMap, curr) => {
+        acc[`${curr.job_id}-${curr.date}`] = curr;
+        return acc;
+      }, {});
     },
     enabled: getJobsForDate(currentDate).length > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes

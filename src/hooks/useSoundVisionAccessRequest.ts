@@ -5,6 +5,7 @@ import { VacationRequest } from '@/lib/vacation-requests';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { getErrorMessage } from '@/utils/errorMessage';
 const SOUNDVISION_REQUEST_PREFIX = '[SoundVision Access]';
 
 interface SoundVisionAccessRequestParams {
@@ -168,10 +169,10 @@ export const useSoundVisionAccessRequest = () => {
         description: 'Your SoundVision access request has been submitted for approval.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error submitting request',
-        description: error.message || 'An unexpected error occurred.',
+        description: getErrorMessage(error, 'An unexpected error occurred.'),
         variant: 'destructive',
       });
     },

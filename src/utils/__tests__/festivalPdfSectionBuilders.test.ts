@@ -15,7 +15,7 @@ describe('festivalPdfSectionBuilders', () => {
         show_start: '20:00',
         show_end: '21:00',
       },
-    ] as any);
+    ]);
 
     expect(artists).toHaveLength(1);
     expect(artists[0].technical).toBeDefined();
@@ -32,7 +32,7 @@ describe('festivalPdfSectionBuilders', () => {
         infra_cat6: true,
         infra_cat6_quantity: 4,
       },
-    ] as any);
+    ]);
 
     expect(artists).toHaveLength(1);
     expect(artists[0].cat6.enabled).toBe(true);

@@ -41,7 +41,7 @@ export function useSaveTourBaseRate() {
       queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.baseRates });
       toast.success('Tour base rate saved');
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       console.error('Failed to save tour base rate', err);
       toast.error('Failed to save tour base rate');
     }

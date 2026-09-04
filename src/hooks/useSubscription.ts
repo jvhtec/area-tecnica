@@ -1,6 +1,6 @@
 
 // Re-export from the unified table subscription hook
-import { useTableSubscription } from './useTableSubscription';
+import { useTableSubscription, type TableSubscriptionStatus } from './useTableSubscription';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { useEffect, useMemo } from 'react';
 
@@ -42,7 +42,7 @@ export function useRelatedTablesSubscription(
         lastActivity: lastRefreshTime,
       };
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, TableSubscriptionStatus>);
   }, [connectionStatus, lastRefreshTime, subscriptionsByTable, tables]);
 
   const isSubscribed = tables.every((table) => (subscriptionsByTable[table]?.length ?? 0) > 0) && connectionStatus === 'connected';
@@ -96,7 +96,7 @@ export function useMultiTableSubscription(
         lastActivity: lastRefreshTime,
       };
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, TableSubscriptionStatus>);
   }, [connectionStatus, lastRefreshTime, subscriptionsByTable, tables]);
 
   const isSubscribed =

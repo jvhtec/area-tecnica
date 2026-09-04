@@ -31,7 +31,11 @@ const baseJob = {
   location: { name: 'Bilbao Arena' },
 };
 
-const renderHeader = (job: any, department: any = 'sound') =>
+const renderHeader = (
+  job: any,
+  department: any = 'sound',
+  dateTypes: Record<string, { date?: string | null; type?: string | null }> = {},
+) =>
   render(
     <JobCardHeader
       job={job}
@@ -39,10 +43,49 @@ const renderHeader = (job: any, department: any = 'sound') =>
       onToggleCollapse={vi.fn()}
       appliedBorderColor=""
       appliedBgColor=""
-      dateTypes={{}}
+      dateTypes={dateTypes}
       department={department}
     />
   );
+
+describe('JobCardHeader date type icon', () => {
+  beforeEach(() => {
+    isMobileMock.mockReturnValue(false);
+  });
+
+  // Regression: `dateTypes` must be keyed by `${jobId}-${yyyy-MM-dd}`. JobCardNewView
+  // used to pass the raw `job_date_types` array straight through, so every lookup
+  // missed and the icon silently never rendered.
+  it('renders the date type icon when the map is keyed by jobId-date', () => {
+    const { container } = renderHeader(baseJob, 'sound', {
+      'job-1-2026-06-16': { date: '2026-06-16', type: 'travel' },
+    });
+    expect(container.querySelector('.text-blue-500')).not.toBeNull();
+  });
+
+  it('renders no icon when the entry is keyed by anything else', () => {
+    const { container } = renderHeader(baseJob, 'sound', {
+      '2026-06-16': { date: '2026-06-16', type: 'travel' },
+    });
+    expect(container.querySelector('.text-blue-500')).toBeNull();
+  });
+
+  it('uses the job timezone when its UTC start falls on the previous local date', () => {
+    const { container } = renderHeader(
+      {
+        ...baseJob,
+        start_time: '2026-06-16T00:30:00.000Z',
+        timezone: 'America/New_York',
+      },
+      'sound',
+      {
+        'job-1-2026-06-15': { date: '2026-06-15', type: 'travel' },
+      },
+    );
+
+    expect(container.querySelector('.text-blue-500')).not.toBeNull();
+  });
+});
 
 describe('JobCardHeader package badges', () => {
   beforeEach(() => {

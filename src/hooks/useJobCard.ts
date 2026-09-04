@@ -20,6 +20,7 @@ import { getStorageUploadErrorMessage, uploadStorageObject } from '@/utils/stora
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import { buildJobDateTypeMap, type JobDateTypeMap } from '@/utils/jobDateTypes';
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -38,7 +39,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   const [collapsed, setCollapsed] = useState(true);
   const [assignments, setAssignments] = useState(job.job_assignments || []);
   const [documents, setDocuments] = useState<JobDocument[]>(job.job_documents || []);
-  const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
+  const [dateTypes, setDateTypes] = useState<JobDateTypeMap>({});
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
@@ -71,12 +72,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       fetchDateTypes();
     } else if (job.job_date_types) {
       // Use pre-loaded data
-      const processedDateTypes = job.job_date_types.reduce((acc: any, dt: any) => {
-        const key = `${job.id}-${dt.date}`;
-        acc[key] = dt;
-        return acc;
-      }, {});
-      setDateTypes(processedDateTypes);
+      setDateTypes(buildJobDateTypeMap(job.id, job.job_date_types));
     }
   }, [job.id, job.start_time, job.job_date_types, isJobBeingDeleted]);
 

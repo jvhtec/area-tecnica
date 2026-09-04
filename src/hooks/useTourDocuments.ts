@@ -154,7 +154,7 @@ export const useTourDocuments = (tourId: string) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
       toast.success('Visibility updated');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Update visibility error:', error);
       toast.error('Failed to update visibility');
     },
@@ -177,7 +177,7 @@ export const useTourDocuments = (tourId: string) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
       toast.success('Guest visibility updated');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Update guest visibility error:', error);
       toast.error('Failed to update guest visibility');
     },
@@ -223,7 +223,7 @@ export const useTourDocuments = (tourId: string) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
       toast.success('Document deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Delete error:', error);
       toast.error('Failed to delete document');
     }
