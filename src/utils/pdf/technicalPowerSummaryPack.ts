@@ -3,8 +3,21 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 import { buildReadableFilename } from '@/utils/fileName';
 import { getDepartmentLabel } from '@/types/department';
+import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
+import {
+  REPORT_ACCENT,
+  distributeColumnWidths,
+  drawReportMasthead,
+  drawReportRunningHead,
+  drawReportSectionHeading,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportFolios,
+  type ReportChromeOptions,
+  type ReportGeometry,
+} from '@/utils/pdf/report-system';
+import { drawReportHeadlineFigure, drawReportTotals } from '@/utils/pdf/report-system/blocks';
 import { normalizeTechnicalPowerDepartments } from '@/utils/technicalPowerTypes';
 import { aggregatePowerCalculations } from '@/features/technical-tools/power/powerAggregation';
 import type {
@@ -29,10 +42,6 @@ interface GenerateTechnicalPowerSummaryPackInput {
   summary: CombinedTechnicalPowerSummaryData;
 }
 
-const CORPORATE_RED = [125, 1, 1] as const;
-const HEADER_HEIGHT = 40;
-const CONTENT_START_Y = 68;
-const FOOTER_SPACE = 28;
 const MADRID_TIMEZONE = 'Europe/Madrid';
 
 // Distinct color per department for the combined stage plot (legend on the PDF)
@@ -92,143 +101,18 @@ const buildStagePlotGroupKey = (
   return `stage-name-${encodeURIComponent(normalizedName)}`;
 };
 
-const getPageWidth = (doc: any) =>
-  doc.internal.pageSize.getWidth?.() ?? doc.internal.pageSize.width;
-
-const getPageHeight = (doc: any) =>
-  doc.internal.pageSize.getHeight?.() ?? doc.internal.pageSize.height;
-
-const drawCorporateHeader = ({
-  doc,
-  title,
-  subtitleLines = [],
-  headerLogo,
-}: {
-  doc: any;
-  title: string;
-  subtitleLines?: string[];
-  headerLogo?: HTMLImageElement | null;
-}) => {
-  const pageWidth = getPageWidth(doc);
-
-  doc.setFillColor(...CORPORATE_RED);
-  doc.rect(0, 0, pageWidth, HEADER_HEIGHT, 'F');
-
-  if (headerLogo) {
-    const logoHeight = 8;
-    const logoWidth = logoHeight * (headerLogo.width / headerLogo.height);
-    try {
-      doc.addImage(headerLogo, 'PNG', 10, 5, logoWidth, logoHeight);
-    } catch {
-      // Ignore logo rendering failures and keep the export flowing.
-    }
-  }
-
-  doc.setFontSize(24);
-  doc.setTextColor(255, 255, 255);
-  doc.text(title, pageWidth / 2, 18, { align: 'center' });
-
-  if (subtitleLines.length > 0) {
-    doc.setFontSize(11);
-    subtitleLines.slice(0, 2).forEach((line, index) => {
-      doc.text(line, pageWidth / 2, 27 + index * 8, { align: 'center' });
-    });
-  }
-};
-
-const drawFooter = ({
-  doc,
-  pageNumber,
-  companyLogo,
-  createdDate,
-}: {
-  doc: any;
-  pageNumber: number;
-  companyLogo: HTMLImageElement | null;
-  createdDate: string;
-}) => {
-  const pageWidth = getPageWidth(doc);
-  const pageHeight = getPageHeight(doc);
-
-  doc.setPage(pageNumber);
-
-  if (companyLogo) {
-    const logoWidth = 50;
-    const logoHeight = logoWidth * (companyLogo.height / companyLogo.width);
-    const xPosition = (pageWidth - logoWidth) / 2;
-
-    try {
-      doc.addImage(
-        companyLogo,
-        'PNG',
-        xPosition,
-        pageHeight - 20 - logoHeight,
-        logoWidth,
-        logoHeight
-      );
-    } catch {
-      // Ignore footer logo failures.
-    }
-  }
-
-  doc.setFontSize(10);
-  doc.setTextColor(51, 51, 51);
-  doc.text(`Creado: ${createdDate}`, pageWidth - 10, pageHeight - 10, {
-    align: 'right',
-  });
-};
-
 const departmentTableBody = (department: DepartmentPowerSummaryData) =>
   department.rows.length > 0
     ? department.rows.map((row) => [
-        row.stageName || (row.stageNumber != null ? `Stage ${row.stageNumber}` : '-'),
+        row.stageName || (row.stageNumber != null ? `Escenario ${row.stageNumber}` : '—'),
         row.name,
-        row.pduLabel || 'N/A',
-        row.positionLabel || 'N/A',
+        row.pduLabel || '—',
+        row.positionLabel || '—',
         formatWatts(row.totalWatts),
         formatAmps(row.currentPerPhase),
         row.notes || '',
       ])
-    : [['-', 'Sin datos guardados', '-', '-', formatWatts(0), formatAmps(0), '']];
-
-const drawTotalsBox = ({
-  doc,
-  yPosition,
-  title,
-  lines,
-  onPageBreak,
-}: {
-  doc: any;
-  yPosition: number;
-  title: string;
-  lines: string[];
-  onPageBreak?: () => void;
-}) => {
-  const pageWidth = getPageWidth(doc);
-  const pageHeight = getPageHeight(doc);
-  const requiredHeight = 18 + lines.length * 7;
-
-  if (yPosition + requiredHeight > pageHeight - FOOTER_SPACE) {
-    doc.addPage();
-    onPageBreak?.();
-    yPosition = CONTENT_START_Y;
-  }
-
-  doc.setFillColor(245, 245, 250);
-  doc.rect(14, yPosition - 6, pageWidth - 28, requiredHeight, 'F');
-  doc.setFontSize(13);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text(title, 18, yPosition + 2);
-
-  let lineY = yPosition + 10;
-  doc.setFontSize(11);
-  doc.setTextColor(51, 51, 51);
-
-  lines.forEach((line) => {
-    doc.text(line, 18, lineY);
-    lineY += 7;
-  });
-};
+    : [['—', 'Sin datos guardados', '—', '—', formatWatts(0), formatAmps(0), '']];
 
 export const buildTechnicalPowerSummaryPackFilename = (
   jobTitle?: string | null
@@ -248,10 +132,7 @@ export const generateTechnicalPowerSummaryPack = async ({
   summary,
 }: GenerateTechnicalPowerSummaryPackInput): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const [headerLogo, companyLogo] = await Promise.all([
-    loadImage(logoUrl),
-    getCompanyLogo(),
-  ]);
+  const [headerLogo] = await Promise.all([loadImage(logoUrl), loadReportIssuerMark()]);
 
   const doc = new jsPDF();
   const displayDate = formatDisplayDate(jobDate, generatedAt);
@@ -275,63 +156,52 @@ export const generateTechnicalPowerSummaryPack = async ({
   const totalSystemKva =
     systemAggregation.totalVa === null ? null : systemAggregation.totalVa / 1000;
 
-  drawCorporateHeader({
-    doc,
-    title: 'Resumen Tecnico de Potencia',
-    subtitleLines: [
-      jobTitle || 'Trabajo sin titulo',
-      jobLocation || displayDate,
+  const chrome: ReportChromeOptions = {
+    kind: 'power',
+    kindLabel: 'Resumen técnico de potencia',
+    eventTitle: jobTitle || 'Trabajo sin título',
+    contextLabel: displayDate,
+  };
+
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title: jobTitle || 'Trabajo sin título',
+    subtitle: `Resumen técnico de potencia · ${jobLocation || 'Sin ubicación'}`,
+    clientLogo: headerLogo,
+    meta: [
+      { label: 'Fecha del trabajo', value: displayDate },
+      { label: 'Departamentos', value: String(departmentsToInclude.length) },
+      { label: 'Emisión', value: createdDate },
     ],
-    headerLogo,
   });
 
-  const pageWidth = getPageWidth(doc);
-
-  doc.setFontSize(18);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text(jobTitle || 'Trabajo sin titulo', pageWidth / 2, 92, { align: 'center' });
-
-  doc.setFontSize(12);
-  doc.setTextColor(51, 51, 51);
-  doc.text(`Fecha del trabajo: ${displayDate}`, pageWidth / 2, 106, {
-    align: 'center',
+  // The two figures the whole pack exists to state, side by side, above
+  // everything the reader would otherwise have to add up themselves.
+  const halfWidth = (geo.contentWidth - 8 * geo.mm) / 2;
+  drawReportHeadlineFigure(doc, geo, contentTop, {
+    label: 'Corriente de línea resultante',
+    value: formatAmps(totalSystemAmps),
+    width: halfWidth,
   });
-  doc.text(
-    `Ubicacion: ${jobLocation || 'Sin ubicacion'}`,
-    pageWidth / 2,
-    116,
-    { align: 'center', maxWidth: pageWidth - 50 }
-  );
-  doc.text(
-    `Departamentos incluidos: ${
-      includedDepartmentLabels.length > 0 ? includedDepartmentLabels.join(', ') : 'Sin datos'
-    }`,
-    pageWidth / 2,
-    128,
-    { align: 'center', maxWidth: pageWidth - 50 }
-  );
+  let y = drawReportHeadlineFigure(doc, geo, contentTop, {
+    label: 'Potencia total',
+    value: formatWatts(totalSystemWatts),
+    support: systemAggregation.reason || undefined,
+    x: geo.left + halfWidth + 8 * geo.mm,
+    width: halfWidth,
+  });
 
-  drawTotalsBox({
-    doc,
-    yPosition: 154,
-    title: 'Totales globales',
+  y = drawReportSectionHeading(doc, geo, 'Totales del sistema', y + 6, 1);
+  drawReportTotals(doc, geo, y, {
     lines: [
-      `Potencia total: ${formatWatts(totalSystemWatts)}`,
-      `Corriente de línea resultante: ${formatAmps(totalSystemAmps)}`,
-      `Potencia aparente total: ${formatKva(totalSystemKva)}`,
-      ...(systemAggregation.reason ? [systemAggregation.reason] : []),
+      { label: 'Potencia total', value: formatWatts(totalSystemWatts) },
+      { label: 'Potencia aparente total', value: formatKva(totalSystemKva) },
+      {
+        label: 'Departamentos incluidos',
+        value: includedDepartmentLabels.length > 0 ? includedDepartmentLabels.join(', ') : 'Sin datos',
+      },
     ],
-    onPageBreak: () => {
-      drawCorporateHeader({
-        doc,
-        title: 'Resumen Tecnico de Potencia',
-        subtitleLines: [
-          jobTitle || 'Trabajo sin titulo',
-          jobLocation || displayDate,
-        ],
-        headerLogo,
-      });
-    },
+    total: { label: 'Corriente de línea resultante', value: formatAmps(totalSystemAmps) },
   });
 
   // Combined stage plot(s): every department's tables on one drawing,
@@ -349,7 +219,7 @@ export const generateTechnicalPowerSummaryPack = async ({
         stageKey: buildStagePlotGroupKey(row.stageNumber, row.stageName),
         stageLabel:
           row.stageName?.trim() ||
-          (row.stageNumber != null ? `Stage ${row.stageNumber}` : ''),
+          (row.stageNumber != null ? `Escenario ${row.stageNumber}` : ''),
       }))
     );
 
@@ -366,163 +236,119 @@ export const generateTechnicalPowerSummaryPack = async ({
   }));
   const entryColorFor = (entry: { department?: string }) =>
     DEPARTMENT_PLOT_COLORS[entry.department as TechnicalPowerDepartment] ??
-    CORPORATE_RED;
+    (REPORT_ACCENT as StagePlotRgb);
 
   stageGroups.forEach((group) => {
     const plot = buildPowerStagePlot(group.tables);
     if (!plot.hasPositionedEntries) return;
 
+    const title = group.label
+      ? `Distribución en escenario · ${group.label}`
+      : 'Distribución en escenario';
+
     doc.addPage();
-    drawCorporateHeader({
-      doc,
-      title: 'Resumen Tecnico de Potencia',
-      subtitleLines: [
-        jobTitle || 'Trabajo sin titulo',
-        group.label ? `Distribución en Escenario - ${group.label}` : 'Distribución en Escenario',
-      ],
-      headerLogo,
+    const plotGeo: ReportGeometry = drawReportRunningHead(doc, {
+      ...chrome,
+      contextLabel: title,
     });
     drawPowerStagePlot(doc, plot, {
-      startY: CONTENT_START_Y,
-      pageWidth: getPageWidth(doc),
-      pageHeight: getPageHeight(doc),
-      footerSpace: FOOTER_SPACE,
-      title: group.label
-        ? `Distribución en Escenario - ${group.label}`
-        : 'Distribución en Escenario',
+      startY: plotGeo.contentTop,
+      pageWidth: plotGeo.pageWidth,
+      pageHeight: plotGeo.pageHeight,
+      footerSpace: plotGeo.pageHeight - plotGeo.contentBottom,
+      title,
       entryColorFor,
       legend,
     });
   });
 
-  departmentsToInclude.forEach((department) => {
+  departmentsToInclude.forEach((department, index) => {
     const departmentName = getDepartmentLabel(department.department);
+    const context = `${departmentName} · Cuadros y márgenes`;
+
     doc.addPage();
+    const pageGeo: ReportGeometry = drawReportRunningHead(doc, { ...chrome, contextLabel: context });
+    const headingY = drawReportSectionHeading(
+      doc,
+      pageGeo,
+      departmentName,
+      pageGeo.contentTop,
+      index + 2,
+    );
 
     autoTable(doc, {
-      startY: CONTENT_START_Y,
-      head: [['Stage', 'Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente de línea', 'Notas']],
+      startY: headingY,
+      head: [['Escenario', 'Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
       body: departmentTableBody(department),
-      theme: 'grid',
-      styles: {
-        fontSize: 10,
-        cellPadding: 5,
-        lineColor: [220, 220, 230],
-        lineWidth: 0.1,
-        textColor: [51, 51, 51],
-      },
-      headStyles: {
-        fillColor: [...CORPORATE_RED],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [250, 250, 255],
-      },
-      margin: { top: CONTENT_START_Y, bottom: FOOTER_SPACE, left: 14, right: 14 },
-      didDrawPage: () => {
-        const subtitleLines = [
-          jobTitle || 'Trabajo sin titulo',
-          `${departmentName} · Supuestos y márgenes por tabla`,
-        ];
-
-        drawCorporateHeader({
-          doc,
-          title: 'Resumen Tecnico de Potencia',
-          subtitleLines,
-          headerLogo,
-        });
+      ...reportTableDefaults(pageGeo, { fontSize: 7, numericColumns: [4, 5] }),
+      columnStyles: distributeColumnWidths([20, 34, 20, 22, 22, 22, 34], pageGeo.contentWidth),
+      didDrawPage: (hook) => {
+        if (hook.pageNumber > 1) {
+          drawReportRunningHead(doc, { ...chrome, contextLabel: context });
+        }
       },
     });
 
-    const finalY = (doc as any).lastAutoTable?.finalY ?? CONTENT_START_Y;
-    drawTotalsBox({
-      doc,
-      yPosition: finalY + 12,
-      title: `Totales ${departmentName.toLowerCase()}`,
+    const totalsY = getLastAutoTableY(doc, headingY) + 12;
+    drawReportTotals(doc, pageGeo, totalsY, {
+      heading: `Totales · ${departmentName}`,
       lines: [
-        `Potencia total: ${formatWatts(department.totalWatts)}`,
-        `Corriente de línea resultante: ${formatAmps(department.totalAmps)}`,
-        `Potencia aparente total: ${formatKva(department.totalKva)}`,
-        ...(department.aggregationReason ? [department.aggregationReason] : []),
+        { label: 'Potencia total', value: formatWatts(department.totalWatts) },
+        { label: 'Potencia aparente total', value: formatKva(department.totalKva) },
+        ...(department.aggregationReason
+          ? [{ label: 'Nota', value: department.aggregationReason }]
+          : []),
       ],
-      onPageBreak: () => {
-        const subtitleLines = [
-          jobTitle || 'Trabajo sin titulo',
-          `${departmentName} · Supuestos y márgenes por tabla`,
-        ];
-
-        drawCorporateHeader({
-          doc,
-          title: 'Resumen Tecnico de Potencia',
-          subtitleLines,
-          headerLogo,
-        });
+      total: {
+        label: 'Corriente de línea resultante',
+        value: formatAmps(department.totalAmps),
       },
     });
   });
 
   doc.addPage();
+  const comparisonContext = 'Totales comparativos';
+  const comparisonGeo: ReportGeometry = drawReportRunningHead(doc, {
+    ...chrome,
+    contextLabel: comparisonContext,
+  });
+  const comparisonY = drawReportSectionHeading(
+    doc,
+    comparisonGeo,
+    'Totales comparativos',
+    comparisonGeo.contentTop,
+    departmentsToInclude.length + 2,
+  );
+
   autoTable(doc, {
-    startY: CONTENT_START_Y,
-    head: [['Departamento', 'Potencia total', 'Corriente de línea resultante', 'Potencia aparente']],
+    startY: comparisonY,
+    head: [['Departamento', 'Potencia total', 'Corriente de línea', 'Potencia aparente']],
     body: departmentsToInclude.map((department) => [
       getDepartmentLabel(department.department),
       formatWatts(department.totalWatts),
       formatAmps(department.totalAmps),
       formatKva(department.totalKva),
     ]),
-    theme: 'grid',
-    styles: {
-      fontSize: 10,
-      cellPadding: 5,
-      lineColor: [220, 220, 230],
-      lineWidth: 0.1,
-      textColor: [51, 51, 51],
-    },
-    headStyles: {
-      fillColor: [...CORPORATE_RED],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-    },
-    alternateRowStyles: {
-      fillColor: [250, 250, 255],
-    },
-    margin: { top: CONTENT_START_Y, bottom: FOOTER_SPACE, left: 14, right: 14 },
-    didDrawPage: () => {
-      drawCorporateHeader({
-        doc,
-        title: 'Resumen Tecnico de Potencia',
-        subtitleLines: [jobTitle || 'Trabajo sin titulo', 'Totales comparativos'],
-        headerLogo,
-      });
+    ...reportTableDefaults(comparisonGeo, { fontSize: 7.6, numericColumns: [1, 2, 3] }),
+    columnStyles: distributeColumnWidths([40, 26, 26, 26], comparisonGeo.contentWidth),
+    didDrawPage: (hook) => {
+      if (hook.pageNumber > 1) {
+        drawReportRunningHead(doc, { ...chrome, contextLabel: comparisonContext });
+      }
     },
   });
 
-  drawTotalsBox({
-    doc,
-    yPosition: ((doc as any).lastAutoTable?.finalY ?? CONTENT_START_Y) + 12,
-    title: 'Total del sistema',
+  drawReportTotals(doc, comparisonGeo, getLastAutoTableY(doc, comparisonY) + 12, {
+    heading: 'Total del sistema',
     lines: [
-      `Potencia total: ${formatWatts(totalSystemWatts)}`,
-      `Corriente de línea resultante: ${formatAmps(totalSystemAmps)}`,
-      `Potencia aparente total: ${formatKva(totalSystemKva)}`,
-      ...(systemAggregation.reason ? [systemAggregation.reason] : []),
+      { label: 'Potencia total', value: formatWatts(totalSystemWatts) },
+      { label: 'Potencia aparente total', value: formatKva(totalSystemKva) },
+      ...(systemAggregation.reason ? [{ label: 'Nota', value: systemAggregation.reason }] : []),
     ],
-    onPageBreak: () => {
-      drawCorporateHeader({
-        doc,
-        title: 'Resumen Tecnico de Potencia',
-        subtitleLines: [jobTitle || 'Trabajo sin titulo', 'Totales comparativos'],
-        headerLogo,
-      });
-    },
+    total: { label: 'Corriente de línea resultante', value: formatAmps(totalSystemAmps) },
   });
 
-  const totalPages = doc.internal.pages.length - 1;
-  for (let page = 1; page <= totalPages; page += 1) {
-    drawFooter({ doc, pageNumber: page, companyLogo, createdDate });
-  }
+  stampReportFolios(doc);
 
   return doc.output('blob');
 };

@@ -96,6 +96,11 @@ export const loadImageWithTimeout = async (
   src: string,
   description: string,
 ): Promise<HTMLImageElement | null> => {
+  // Every document generator now loads the issuer mark through this helper, so
+  // it has to survive a context with no DOM — a test, or server-side rendering
+  // — by reporting "no image" rather than throwing on `new Image()`.
+  if (!src || typeof Image === 'undefined') return null;
+
   console.log(`Loading ${description} from:`, src);
 
   return new Promise((resolve) => {

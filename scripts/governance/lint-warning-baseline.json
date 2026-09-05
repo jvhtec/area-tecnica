@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-05T12:07:01.036Z",
+  "generatedAt": "2026-09-05T15:53:22.620Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1145,
+  "total": 1127,
   "domains": {
     "app": {
-      "total": 826,
+      "total": 808,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
-        "@typescript-eslint/no-explicit-any": 687,
+        "@typescript-eslint/no-explicit-any": 669,
         "react-hooks/exhaustive-deps": 74,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
@@ -34,7 +34,7 @@
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 971,
+    "@typescript-eslint/no-explicit-any": 953,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -641,9 +641,6 @@
     "src/lib/vacation-requests.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/lib/weeklySummaryPdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 5
-    },
     "src/pages/__tests__/Disponibilidad.test.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
@@ -794,9 +791,6 @@
     "src/utils/__tests__/tourPowerTables.test.ts": {
       "@typescript-eslint/no-explicit-any": 5
     },
-    "src/utils/amplifierCalculationPdf.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/utils/consoleCapture.ts": {
       "@typescript-eslint/no-this-alias": 1
     },
@@ -830,9 +824,6 @@
     "src/utils/folderNameSanitizer.ts": {
       "no-control-regex": 1
     },
-    "src/utils/fullFestivalSchedulePdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/utils/gearSetupPdfExport.ts": {
       "@typescript-eslint/no-explicit-any": 5
     },
@@ -863,13 +854,7 @@
     "src/utils/memoriaTecnicaDocuments.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/utils/pdf/technicalPowerSummaryPack.ts": {
-      "@typescript-eslint/no-explicit-any": 7
-    },
     "src/utils/pdfExport.ts": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/utils/timesheet-pdf.ts": {
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/utils/tourFolders.ts": {
