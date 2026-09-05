@@ -2,6 +2,9 @@ import { capturePrivateDataScope, setPrivateDataIdentity } from "@/lib/private-d
 import { __resetOfflineDbForTests, offlineDb, SNAPSHOT_STORE, FILES_STORE, QUEUE_STORE } from "../offline-db";
 import { __resetOfflineRevocationsForTests } from "../offline-revocation";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
+
+vi.mock("@/lib/private-supabase-client", () => ({ createPrivateSupabaseClient: vi.fn(async () => mockSupabase) }));
 
 import { fetchWithOfflineFallback } from "../with-offline-fallback";
 
@@ -14,6 +17,8 @@ describe("fetchWithOfflineFallback", () => {
   beforeEach(() => {
     __resetOfflineDbForTests();
     __resetOfflineRevocationsForTests();
+    resetMockSupabase();
+    mockSupabase.rpc.mockResolvedValue({ data: "management", error: null });
     setPrivateDataIdentity("account-a", "management:sound");
   });
   afterEach(() => {
@@ -41,6 +46,53 @@ describe("fetchWithOfflineFallback", () => {
     expect(await offlineDb.getAll(QUEUE_STORE)).toHaveLength(1);
   });
 
+  it("revokes a removed technician's snapshot even when RLS returns an empty success", async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: "technician", error: null });
+    const assignment = createMockQueryBuilder({ data: [], error: null });
+    mockSupabase.from.mockReturnValue(assignment);
+    await offlineDb.put(SNAPSHOT_STORE, { jobId: "job", secret: "old artists" });
+    await offlineDb.put(FILES_STORE, { key: "rider", jobId: "job" });
+    await offlineDb.put(QUEUE_STORE, { id: "unsent", jobId: "job" });
+    await expect(fetchWithOfflineFallback({
+      jobId: "job", online: async () => [], offline: async () => ["old artists"],
+    })).rejects.toMatchObject({ code: "42501" });
+    expect(assignment.eq).toHaveBeenCalledWith("job_id", "job");
+    expect(assignment.eq).toHaveBeenCalledWith("technician_id", "account-a");
+    expect(await offlineDb.get(SNAPSHOT_STORE, "job")).toMatchObject({ accessRevoked: true });
+    expect(await offlineDb.get(FILES_STORE, "rider")).toBeNull();
+    expect(await offlineDb.getAll(QUEUE_STORE)).toHaveLength(1);
+    vi.stubGlobal("navigator", { onLine: false });
+    await expect(fetchWithOfflineFallback({
+      jobId: "job", online: async () => [], offline: async () => ["old artists"],
+    })).rejects.toThrow("Sin conexión");
+  });
+
+  it("retains an assigned technician's cache for a legitimately empty festival date", async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: "technician", error: null });
+    mockSupabase.from.mockReturnValue(createMockQueryBuilder({ data: [{ job_id: "job" }], error: null }));
+    await offlineDb.put(SNAPSHOT_STORE, { jobId: "job", secret: "other dates" });
+    expect(await fetchWithOfflineFallback({
+      jobId: "job", online: async () => [], offline: async () => ["other dates"],
+    })).toEqual({ data: [], fromOffline: false });
+    expect(await offlineDb.get(SNAPSHOT_STORE, "job")).toMatchObject({ secret: "other dates" });
+  });
+
+  it("observes a late assignment denial after a transport error already served cache", async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: "technician", error: null });
+    let resolveAssignment!: (value: { data: []; error: null }) => void;
+    const assignment = new Promise((resolve) => { resolveAssignment = resolve; });
+    const builder = createMockQueryBuilder();
+    builder.limit.mockReturnValue(assignment);
+    mockSupabase.from.mockReturnValue(builder);
+    const scope = capturePrivateDataScope();
+    expect(await fetchWithOfflineFallback({
+      jobId: "job", online: async () => { throw new TypeError("Failed to fetch"); }, offline: async () => "cached",
+    })).toEqual({ data: "cached", fromOffline: true });
+    resolveAssignment({ data: [], error: null });
+    await vi.waitFor(() => expect(scope.signal.aborted).toBe(true));
+    expect(await offlineDb.get(SNAPSHOT_STORE, "job")).toMatchObject({ accessRevoked: true });
+  });
+
   it("does not revoke the next account's snapshot when the previous request fails late", async () => {
     let deny!: (error: unknown) => void;
     await fetchWithOfflineFallback({
@@ -60,6 +112,17 @@ describe("fetchWithOfflineFallback", () => {
     const offline = vi.fn(async (): Promise<string> => { throw new TypeError("Failed to fetch"); });
     await expect(fetchWithOfflineFallback({ jobId: "job", online: never, offline, timeoutMs: 1 })).rejects.toThrow("Failed to fetch");
     expect(offline).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not revoke an authorized festival for a missing optional single row", async () => {
+    await offlineDb.put(SNAPSHOT_STORE, { jobId: "job", secret: "valid data" });
+    const scope = capturePrivateDataScope();
+    const error = { code: "PGRST116", message: "Cannot coerce the result to a single JSON object" };
+    await expect(fetchWithOfflineFallback({
+      jobId: "job", online: async () => { throw error; }, offline: async () => "valid data",
+    })).rejects.toBe(error);
+    expect(scope.signal.aborted).toBe(false);
+    expect(await offlineDb.get(SNAPSHOT_STORE, "job")).toMatchObject({ secret: "valid data" });
   });
 
   it("serves the snapshot immediately when the browser is offline", async () => {

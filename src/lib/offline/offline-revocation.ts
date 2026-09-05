@@ -8,7 +8,7 @@ export const isAuthorizationFailure = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { status?: number; code?: string; context?: { status?: number } };
   return [401, 403].includes(Number(candidate.status ?? candidate.context?.status))
-    || ["42501", "PGRST301", "PGRST302", "PGRST116"].includes(candidate.code ?? "");
+    || ["42501", "PGRST301", "PGRST302"].includes(candidate.code ?? "");
 };
 
 export const isFestivalCacheRevoked = (jobId: string, scope: PrivateDataScope) => revokedJobs.has(keyFor(jobId, scope));

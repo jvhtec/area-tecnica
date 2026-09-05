@@ -23,6 +23,7 @@ test.describe("festival management smoke", () => {
       functions: {
         "get-google-maps-key": { apiKey: "test-google-key" },
       },
+      rpc: { get_current_user_role: "management" },
       tables: {
         profiles: [
           {

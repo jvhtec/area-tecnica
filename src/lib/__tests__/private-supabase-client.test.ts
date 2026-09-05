@@ -39,4 +39,31 @@ describe("Supabase requests bound to a private operation", () => {
     await expect(createPrivateSupabaseClient(capturePrivateDataScope())).rejects.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])("aborts a response body after headers arrived (legacy webview: %s)", async (legacy) => {
+    if (legacy) vi.stubGlobal("AbortSignal", { any: undefined });
+    let requestSignal!: AbortSignal;
+    fetchMock.mockImplementation(async (_input, init) => {
+      requestSignal = init.signal;
+      return new Response(new ReadableStream({
+        start(controller) {
+          requestSignal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    const client = await createPrivateSupabaseClient(capturePrivateDataScope());
+    const request = Promise.resolve(client.from("festival_artists").select("id"));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    setPrivateDataIdentity("account-b", "management:sound");
+    expect(requestSignal.aborted).toBe(true);
+    expect((await request).error).not.toBeNull();
+  });
+
+  it("preserves successful response bodies in older webviews", async () => {
+    vi.stubGlobal("AbortSignal", { any: undefined });
+    const client = await createPrivateSupabaseClient(capturePrivateDataScope());
+    const result = await client.from("festival_artists").select("id");
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([]);
+  });
 });

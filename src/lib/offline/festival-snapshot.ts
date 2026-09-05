@@ -1,6 +1,7 @@
 import { capturePrivateDataScope, type PrivateDataScope } from "@/lib/private-data-scope";
 import { createPrivateSupabaseClient, type PrivateSupabaseClient } from "@/lib/private-supabase-client";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { assertFestivalAccess } from "./festival-access";
 
 import {
   deleteOfflineFilesForJob,
@@ -135,6 +136,7 @@ const buildFestivalSnapshot = async (jobId: string, scope: PrivateDataScope): Pr
   const db = offlineDb.forScope(scope);
   const supabase = await createPrivateSupabaseClient(scope);
   scope.assertCurrent();
+  await assertFestivalAccess(jobId, scope, supabase);
   const { data: job, error: jobError } = await supabase.from("jobs").select("*").eq("id", jobId).single();
   scope.assertCurrent();
   if (jobError) throw jobError;
@@ -200,6 +202,8 @@ const buildFestivalSnapshot = async (jobId: string, scope: PrivateDataScope): Pr
     },
   };
 
+  // An assignment can disappear while the multi-page snapshot downloads.
+  await assertFestivalAccess(jobId, scope, supabase);
   await db.put(SNAPSHOT_STORE, snapshot);
   scope.assertCurrent();
   authorizeFestivalCache(jobId, scope);

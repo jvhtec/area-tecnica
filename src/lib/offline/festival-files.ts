@@ -1,9 +1,9 @@
 import { capturePrivateDataScope, PrivateDataScopeError } from "@/lib/private-data-scope";
 import { createPrivateSupabaseClient, type PrivateSupabaseClient } from "@/lib/private-supabase-client";
-import { isTransportFailure } from "./with-offline-fallback";
+import { isTransportFailure } from "@/lib/offline/with-offline-fallback";
 
-import { FILES_STORE, SNAPSHOT_STORE, offlineDb } from "./offline-db";
-import { isFestivalCacheRevoked } from "./offline-revocation";
+import { FILES_STORE, SNAPSHOT_STORE, offlineDb } from "@/lib/offline/offline-db";
+import { isFestivalCacheRevoked } from "@/lib/offline/offline-revocation";
 
 /**
  * Binary files (rider PDFs, stage plots, job documents) cached alongside a
@@ -37,6 +37,10 @@ const fileKey = (bucket: string, path: string) => `${bucket}/${path}`;
 
 const DOWNLOAD_CONCURRENCY = 4;
 const FILE_DOWNLOAD_TIMEOUT_MS = 30_000;
+
+class FileDownloadTimeoutError extends Error {
+  constructor() { super("La descarga del archivo agotó el tiempo de espera."); }
+}
 
 /**
  * Cache lookups never throw: callers use them as a fast path before the
@@ -78,11 +82,23 @@ export const deleteOfflineFilesForJob = async (jobId: string, scope = capturePri
 
 // Storage downloads get their own abort timeout: one request that never
 // settles would otherwise pin a worker and block the whole snapshot download.
-const downloadWithTimeout = (supabase: PrivateSupabaseClient, bucket: string, path: string) => {
+const downloadWithTimeout = async (supabase: PrivateSupabaseClient, bucket: string, path: string) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FILE_DOWNLOAD_TIMEOUT_MS);
-  const request = supabase.storage.from(bucket).download(path, undefined, { signal: controller.signal });
-  return Promise.resolve(request).finally(() => clearTimeout(timer));
+  try {
+    const result = await supabase.storage.from(bucket).download(path, undefined, { signal: controller.signal });
+    if (controller.signal.aborted && result.error?.name === "StorageUnknownError") {
+      throw new FileDownloadTimeoutError();
+    }
+    return result;
+  } catch (error) {
+    if (controller.signal.aborted && error instanceof DOMException && error.name === "AbortError") {
+      throw new FileDownloadTimeoutError();
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 /**
@@ -134,7 +150,7 @@ export const downloadFestivalFiles = async (
         stats.failed += 1;
         // Only a transport failure can justify retaining a cached private file.
         // Authorization errors and deleted objects must remove the stale copy.
-        if (isTransportFailure(error) && await db.get(FILES_STORE, key)) {
+        if ((error instanceof FileDownloadTimeoutError || isTransportFailure(error)) && await db.get(FILES_STORE, key)) {
           keptKeys.add(key);
         } else {
           await db.remove(FILES_STORE, key);

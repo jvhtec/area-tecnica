@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
 import { setPrivateDataIdentity } from "@/lib/private-data-scope";
-import { __resetOfflineDbForTests, offlineDb, QUEUE_STORE, SNAPSHOT_STORE } from "../offline-db";
-import { downloadFestivalSnapshot } from "../festival-snapshot";
-import { downloadFestivalFiles, getOfflineFileBlob } from "../festival-files";
-import { getPendingChanges, queueFestivalChange } from "../festival-offline-queue";
-import { syncFestivalPendingChanges } from "../festival-sync";
+import { __resetOfflineDbForTests, offlineDb, QUEUE_STORE, SNAPSHOT_STORE } from "@/lib/offline/offline-db";
+import { downloadFestivalSnapshot } from "@/lib/offline/festival-snapshot";
+import { downloadFestivalFiles, getOfflineFileBlob } from "@/lib/offline/festival-files";
+import { getPendingChanges, queueFestivalChange } from "@/lib/offline/festival-offline-queue";
+import { syncFestivalPendingChanges } from "@/lib/offline/festival-sync";
+import { __resetOfflineRevocationsForTests } from "@/lib/offline/offline-revocation";
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: mockSupabase }));
 vi.mock("@/lib/private-supabase-client", () => ({ createPrivateSupabaseClient: vi.fn(async () => mockSupabase) }));
@@ -19,7 +20,9 @@ const deferred = <T>() => {
 describe("offline operations during an account change", () => {
   beforeEach(() => {
     __resetOfflineDbForTests();
+    __resetOfflineRevocationsForTests();
     resetMockSupabase();
+    mockSupabase.rpc.mockResolvedValue({ data: "management", error: null });
     setPrivateDataIdentity("account-a", "management:sound");
   });
   afterEach(() => setPrivateDataIdentity(null));
@@ -38,6 +41,18 @@ describe("offline operations during an account change", () => {
     expect(await offlineDb.get(SNAPSHOT_STORE, "job")).toBeNull();
     setPrivateDataIdentity("account-a", "management:sound");
     expect(await offlineDb.get(SNAPSHOT_STORE, "job")).toBeNull();
+  });
+
+  it("refuses to rebuild a revoked snapshot from RLS-filtered empty rows", async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: "technician", error: null });
+    mockSupabase.from.mockReturnValue(createMockQueryBuilder({ data: [], error: null }));
+    await offlineDb.put(SNAPSHOT_STORE, { jobId: "job", secret: "old snapshot" });
+    await offlineDb.put(QUEUE_STORE, { id: "unsent", jobId: "job" });
+    await expect(downloadFestivalSnapshot("job")).rejects.toMatchObject({ code: "42501" });
+    expect(mockSupabase.from).toHaveBeenCalledWith("job_assignments");
+    expect(mockSupabase.from).not.toHaveBeenCalledWith("jobs");
+    expect(await offlineDb.get(SNAPSHOT_STORE, "job")).toMatchObject({ accessRevoked: true });
+    expect(await getPendingChanges("job")).toHaveLength(1);
   });
 
   it("does not write a late file into the next account or start another worker request", async () => {

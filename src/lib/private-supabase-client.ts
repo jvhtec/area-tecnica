@@ -22,19 +22,30 @@ export const createPrivateSupabaseClient = async (scope: PrivateDataScope) => {
     global: {
       fetch: async (input, init) => {
         scope.assertCurrent();
+        // Native dependent signals remain linked while the response body is
+        // consumed, without retaining manual listeners after each request.
+        const signals = [scope.signal, init?.signal, input instanceof Request ? input.signal : null]
+          .filter((signal): signal is AbortSignal => signal != null);
+        if (typeof AbortSignal.any === "function") {
+          const response = await fetch(input, { ...init, signal: AbortSignal.any(signals) });
+          scope.assertCurrent();
+          return response;
+        }
+        // Older webviews lack AbortSignal.any. Keep forwarding cancellation
+        // until the body is consumed, then release the temporary listeners.
         const controller = new AbortController();
-        const signals = [scope.signal, init?.signal, input instanceof Request ? input.signal : null];
         const abort = () => controller.abort();
         for (const signal of signals) {
-          if (signal?.aborted) abort();
-          else signal?.addEventListener("abort", abort, { once: true });
+          if (signal.aborted) abort();
+          else signal.addEventListener("abort", abort, { once: true });
         }
         try {
           const response = await fetch(input, { ...init, signal: controller.signal });
+          const body = response.body ? await response.blob() : null;
           scope.assertCurrent();
-          return response;
+          return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
         } finally {
-          signals.forEach((signal) => signal?.removeEventListener("abort", abort));
+          signals.forEach((signal) => signal.removeEventListener("abort", abort));
         }
       },
     },

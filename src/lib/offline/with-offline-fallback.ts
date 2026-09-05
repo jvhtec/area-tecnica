@@ -1,4 +1,5 @@
 import { isBrowserOnline } from "./offline-events";
+import { assertFestivalAccess } from "./festival-access";
 import { capturePrivateDataScope } from "@/lib/private-data-scope";
 import { isAuthorizationFailure, isFestivalCacheRevoked, revokeFestivalCache } from "./offline-revocation";
 
@@ -71,7 +72,9 @@ export const fetchWithOfflineFallback = async <T>(options: {
   // denial must withdraw that data instead of being silently swallowed.
   const onlinePromise = Promise.resolve().then(() => {
     scope.assertCurrent();
-    return online();
+    // The access probe observes its own late denial even if the data request
+    // fails first or the timeout has already served the offline snapshot.
+    return Promise.all([online(), assertFestivalAccess(jobId, scope)]).then(([data]) => data);
   }).then(
     (data) => ({ kind: "data" as const, data }),
     async (error: unknown) => {

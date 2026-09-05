@@ -1,5 +1,6 @@
 import { capturePrivateDataScope, type PrivateDataScope } from "@/lib/private-data-scope";
 import { createPrivateSupabaseClient, type PrivateSupabaseClient } from "@/lib/private-supabase-client";
+import { isAuthorizationFailure, revokeFestivalCache } from "@/lib/offline/offline-revocation";
 
 import { downloadFestivalSnapshot } from "./festival-snapshot";
 import { getPendingChanges, removePendingChange } from "./festival-offline-queue";
@@ -164,6 +165,10 @@ export const syncFestivalPendingChanges = async (
       }
     } catch (error) {
       scope.assertCurrent();
+      if (isAuthorizationFailure(error)) {
+        await revokeFestivalCache(jobId, scope);
+        throw error;
+      }
       result.failed.push({
         changeId: change.id,
         table: change.table,
