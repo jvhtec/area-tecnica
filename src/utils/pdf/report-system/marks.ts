@@ -20,6 +20,7 @@ export type ReportDocKind =
   | 'tour'
   | 'equipment'
   | 'amplifier'
+  | 'power'
   | 'schedule';
 
 export const REPORT_DOC_LABELS: Record<ReportDocKind, string> = {
@@ -32,6 +33,7 @@ export const REPORT_DOC_LABELS: Record<ReportDocKind, string> = {
   tour: 'Operativa de gira',
   equipment: 'Material',
   amplifier: 'Amplificación',
+  power: 'Potencia',
   schedule: 'Horarios',
 };
 
@@ -118,6 +120,14 @@ export const drawReportTypeMark = (
       doc.line(x + s * 0.2, y + s * 0.12, x + s * 0.86, y + s * 0.5);
       doc.line(x + s * 0.2, y + s * 0.88, x + s * 0.86, y + s * 0.5);
       doc.line(x + s * 0.86, y + s * 0.5, x + s, y + s * 0.5);
+      break;
+    // A distribution box with the supply entering it.
+    case 'power':
+      doc.roundedRect(x + s * 0.1, y + s * 0.18, s * 0.8, s * 0.7, s * 0.07, s * 0.07, 'S');
+      doc.circle(x + s * 0.34, y + s * 0.42, s * 0.06, 'S');
+      doc.circle(x + s * 0.66, y + s * 0.42, s * 0.06, 'S');
+      doc.line(x + s * 0.3, y + s * 0.68, x + s * 0.7, y + s * 0.68);
+      doc.line(x + s * 0.5, y, x + s * 0.5, y + s * 0.18);
       break;
     // Ruled rows against a time axis.
     case 'schedule':

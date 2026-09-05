@@ -284,7 +284,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
     }
 
     try {
-      const pdfBlob = await generateAmplifierPdf(config, results, soundComponentDatabase);
+      const pdfBlob = await generateAmplifierPdf(results);
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
