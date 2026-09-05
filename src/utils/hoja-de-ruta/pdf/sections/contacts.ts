@@ -1,5 +1,6 @@
 import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
+import { hojaGeometry, hojaTable } from '../hoja-report-system';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
 
@@ -30,24 +31,10 @@ export class ContactsSection {
       startY: yPosition,
       head: [["Nombre", "Cargo", "Teléfono"]],
       body: contactsTableData,
-      theme: "grid",
-      styles: {
-        fontSize: 9,
-        cellPadding: 4,
-        valign: 'top',
-        overflow: 'linebreak'
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 10,
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [250, 245, 245]
-      },
-      margin: { left: 20, right: 20 },
-      tableWidth: 'auto',
+      ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+        numericColumns: [2],
+        weights: [42, 38, 30],
+      }),
     });
 
     return this.pdfDoc.getLastAutoTableY() + 10;

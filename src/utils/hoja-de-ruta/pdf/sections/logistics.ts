@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_HEADING, HOJA_LABEL, hojaGeometry, hojaTable } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
@@ -41,19 +42,11 @@ export class LogisticsSection {
         startY: yPosition,
         head: [["Tipo", "Conductor", "Teléfono", "Matrícula", "Empresa", "Salida", "Retorno", "Vuelta", "Hoja", "Categorías"]],
         body: transportData,
-        theme: "grid",
-        styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
-        headStyles: {
-          fillColor: [125, 1, 1],
-          textColor: [255, 255, 255],
-          fontSize: 9,
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [250, 245, 245]
-        },
-        margin: { left: 20, right: 20 },
-        tableWidth: 'auto'
+        ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+          fontSize: 6,
+          numericColumns: [2, 3, 5, 7],
+          weights: [12, 16, 14, 12, 14, 14, 7, 14, 7, 18],
+        }),
       });
 
       yPosition = this.pdfDoc.getLastAutoTableY() + 10;
@@ -63,7 +56,7 @@ export class LogisticsSection {
     if (includeDetails && DataValidators.hasData(logistics.loadingDetails)) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
       
-      this.pdfDoc.setText(12, [125, 1, 1]);
+      this.pdfDoc.setText(12, HOJA_HEADING);
       this.pdfDoc.addText("Detalles de Carga:", 20, yPosition);
       yPosition += 10;
 
@@ -81,7 +74,7 @@ export class LogisticsSection {
     if (includeDetails && DataValidators.hasData(logistics.unloadingDetails)) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
       
-      this.pdfDoc.setText(12, [125, 1, 1]);
+      this.pdfDoc.setText(12, HOJA_HEADING);
       this.pdfDoc.addText("Detalles de Descarga:", 20, yPosition);
       yPosition += 10;
 
@@ -99,7 +92,7 @@ export class LogisticsSection {
     if (includeDetails && DataValidators.hasData(logistics.equipmentLogistics)) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
       
-      this.pdfDoc.setText(12, [125, 1, 1]);
+      this.pdfDoc.setText(12, HOJA_HEADING);
       this.pdfDoc.addText("Logística de Equipos:", 20, yPosition);
       yPosition += 10;
 

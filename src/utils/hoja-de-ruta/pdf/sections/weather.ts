@@ -1,6 +1,8 @@
 import { PDFDocument } from '../core/pdf-document';
 import { EventData, WeatherData } from '../core/pdf-types';
 import { createWeatherTableIconHooks } from '@/utils/pdf/weatherPdfIcons';
+import { REPORT_INK } from '@/utils/pdf/report-system';
+import { hojaGeometry, hojaTable } from '../hoja-report-system';
 
 export class WeatherSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -8,9 +10,8 @@ export class WeatherSection {
   addWeatherSection(eventData: EventData, yPosition: number): number {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
 
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText('Meteorología', 20, yPosition);
-    yPosition += 15;
+    this.pdfDoc.setText(9, REPORT_INK);
+    yPosition += 2;
 
     if (!eventData.weather || eventData.weather.length === 0) {
       return yPosition;
@@ -36,22 +37,10 @@ export class WeatherSection {
       startY: yPosition,
       head: [['Fecha/Hora', 'Condición', 'Temperatura', 'Viento', 'Precipitación']],
       body: weatherData,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 4
-      },
-      headStyles: { 
-        fillColor: [125, 1, 1], 
-        textColor: [255, 255, 255], 
-        fontSize: 10, 
-        fontStyle: 'bold' 
-      },
-      alternateRowStyles: {
-        fillColor: [250, 245, 245]
-      },
-      margin: { left: 20, right: 20 },
-      tableWidth: 'auto',
+      ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+        numericColumns: [2, 3, 4],
+        weights: [26, 34, 22, 18, 24],
+      }),
       ...weatherIconHooks,
     });
 

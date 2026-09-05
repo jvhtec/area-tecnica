@@ -1,4 +1,6 @@
+import { drawReportSectionHeading } from '@/utils/pdf/report-system';
 import { PDFDocument } from '../core/pdf-document';
+import { HojaPageLabels, hojaGeometry } from '../hoja-report-system';
 import { HeaderService } from '../services/header-service';
 
 export class HeaderSection {
@@ -7,13 +9,17 @@ export class HeaderSection {
     private jobName: string,
     private jobDate?: string,
     private headerTitle: string = 'Hoja de Ruta',
-    private smallLogoData?: string,
-    private smallLogoDims?: { width: number; height: number }
+    private pageLabels: HojaPageLabels = new HojaPageLabels(),
   ) {}
+
+  /** The section each page belongs to, for the final chrome pass. */
+  get labels(): HojaPageLabels {
+    return this.pageLabels;
+  }
 
   addSectionHeader(
     title: string,
-    yPosition: number = 55,
+    yPosition?: number,
     options: { startOnNewPage?: boolean } = {}
   ): number {
     // New page per section unless this is the first page of a section-only PDF.
@@ -21,27 +27,14 @@ export class HeaderSection {
       this.pdfDoc.addPage();
     }
 
-    // Draw a consistent header at the very top (matches PesosTool styling)
-    HeaderService.addHeaderToCurrentPage(
-      this.pdfDoc,
-      this.headerTitle,
-      this.jobName,
-      this.jobDate,
-      this.smallLogoData,
-      this.smallLogoDims
+    HeaderService.recordSectionPage(this.pdfDoc, this.pageLabels, title);
+
+    const geo = hojaGeometry(this.pdfDoc.document);
+    return drawReportSectionHeading(
+      this.pdfDoc.document,
+      geo,
+      title,
+      yPosition ?? geo.contentTop,
     );
-
-    // Section title (clean, no icons)
-    const { width: pageWidth } = this.pdfDoc.dimensions;
-
-    this.pdfDoc.setText(18, [125, 1, 1]); // Slightly larger font
-    this.pdfDoc.addText(title, 20, yPosition);
-    
-    // Decorative underline
-    this.pdfDoc.setFillColor(125, 1, 1);
-    this.pdfDoc.addRect(20, yPosition + 5, pageWidth - 40, 1.5, 'F');
-    
-    // Return position with better spacing
-    return yPosition + 20;
   }
 }
