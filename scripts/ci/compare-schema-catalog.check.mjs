@@ -1,9 +1,19 @@
+// Run with node --test; deliberately outside Vitest's *.test.* discovery.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compareCatalogs } from "./compare-schema-catalog.mjs";
 
 const entry = (identity, value = { using: "auth.uid() IS NOT NULL" }) => ({ kind: "policy", identity, value });
 const catalog = (...objects) => ({ format_version: 1, postgres_major: 15, objects });
+
+test("detects default privilege drift even when existing function ACLs match", () => {
+  const existing = { kind: "function_grant", identity: "public.example()", value: [] };
+  const defaults = { kind: "default_grant", identity: "postgres.<global>.f", value: [{ role: "postgres", privilege: "EXECUTE", grantable: false }] };
+  const drift = compareCatalogs(catalog(existing, defaults), catalog(existing));
+  assert.equal(drift.length, 1);
+  assert.equal(drift[0].kind, "default_grant");
+  assert.equal(drift[0].change, "replay_only");
+});
 
 test("compares object identity rather than counts or row order", () => {
   const baseline = catalog(entry("a"), entry("b"));

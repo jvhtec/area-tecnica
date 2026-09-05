@@ -12,6 +12,17 @@ WITH app_relations AS (
   WHERE n.nspname = 'public' AND p.prokind IN ('f', 'p')
     AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
 ), entries AS (
+  SELECT 'default_grant' AS kind,
+    format('%I.%s.%s', pg_get_userbyid(d.defaclrole),
+      CASE WHEN d.defaclnamespace = 0 THEN '<global>' ELSE n.nspname END, d.defaclobjtype) AS identity,
+    coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'role', CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,
+      'privilege', a.privilege_type, 'grantable', a.is_grantable)
+      ORDER BY a.grantee::regrole::text, a.privilege_type, a.is_grantable)
+      FROM aclexplode(d.defaclacl) a), '[]'::jsonb) AS value
+  FROM pg_default_acl d LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+  WHERE d.defaclnamespace = 0 OR n.nspname = 'public'
+  UNION ALL
   SELECT 'policy' AS kind, format('%I.%I.%I', schemaname, tablename, policyname) AS identity,
     jsonb_build_object('command', cmd, 'permissive', permissive,
       'roles', (SELECT jsonb_agg(r ORDER BY r) FROM unnest(roles) r),
@@ -29,6 +40,11 @@ WITH app_relations AS (
     jsonb_build_object('owner', pg_get_userbyid(p.proowner), 'security_definer', p.prosecdef,
       'definition_hash', md5(replace(pg_get_functiondef(p.oid), E'\r\n', E'\n')))
   FROM app_functions p
+  UNION ALL
+  SELECT 'trigger', format('%s.%I', c.oid::regclass::text, t.tgname),
+    jsonb_build_object('enabled', t.tgenabled, 'definition_hash', md5(pg_get_triggerdef(t.oid, false)))
+  FROM pg_trigger t JOIN app_relations c ON c.oid = t.tgrelid
+  WHERE NOT t.tgisinternal
   UNION ALL
   SELECT 'relation_grant', c.oid::regclass::text,
     coalesce((SELECT jsonb_agg(jsonb_build_object('role', CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,
