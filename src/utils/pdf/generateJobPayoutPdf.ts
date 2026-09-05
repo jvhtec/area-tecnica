@@ -4,19 +4,26 @@ import { appendAutonomoLabel } from '@/utils/autonomo';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import {
-  CORPORATE_FOOTER_RESERVED,
-  CORPORATE_RED,
-  SUMMARY_BACKGROUND,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
+  distributeColumnWidths,
+  drawReportMasthead,
+  drawReportRunningHead,
+  drawReportSectionHeading,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportChrome,
+  type ReportChromeOptions,
+  type ReportGeometry,
+} from '@/utils/pdf/report-system';
+import {
+  drawReportEntryHeading,
+  drawReportItemLine,
+  drawReportNotes,
+  drawReportTotals,
+} from '@/utils/pdf/report-system/blocks';
+import {
   buildPdfFilename,
-  corporateTableDefaults,
-  drawCorporateFooter,
-  drawCorporateHeader,
   resolveHeaderLogo,
-  type CorporateHeaderOptions,
 } from '@/utils/pdf/shared/pdfExportShared';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -48,22 +55,13 @@ export async function generateJobPayoutPDF(
 ): Promise<Blob | void> {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
-  const [headerLogo, companyLogo] = await Promise.all([
+  const [headerLogo] = await Promise.all([
     resolveHeaderLogo({
       jobId: jobDetails.id,
       tourId: jobDetails.tour_id,
     }),
-    getCompanyLogo(),
+    loadReportIssuerMark(),
   ]);
-  const headerOptions: CorporateHeaderOptions = {
-    title: 'Informe de Pagos',
-    subtitle: jobDetails.title,
-    metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
-    logo: headerLogo,
-  };
-  const contentTop = drawCorporateHeader(doc, headerOptions);
-
-  let yPos = contentTop;
 
   // Extract unique worked dates from timesheets for all technicians in this PDF
   const allWorkedDates = new Set<string>();
@@ -95,45 +93,54 @@ export async function generateJobPayoutPDF(
   const singleTechInfo = payouts.length === 1 ? getTechName(payouts[0].technician_id) : null;
   const shouldShowInvoicing = singleTechInfo && singleTechInfo.autonomo && !singleTechInfo.is_house_tech;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text('Detalles del Trabajo', 14, yPos);
-  yPos += 6;
+  const issuedOn = new Date();
+  const chrome: ReportChromeOptions = {
+    kind: 'payout',
+    kindLabel: 'Informe de pagos',
+    eventTitle: jobDetails.title,
+    contextLabel: dateText,
+  };
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
-  yPos += 5;
-  doc.text(`Fecha${sortedDates.length > 1 ? 's' : ''}: ${dateText}`, 14, yPos);
-  yPos += 5;
+  const { geo, y: mastheadBottom } = drawReportMasthead(doc, {
+    ...chrome,
+    title: jobDetails.title?.trim() || 'Trabajo sin título',
+    subtitle: `Informe de pagos · Emitido el ${format(issuedOn, 'PPP', { locale: es })}`,
+    clientLogo: headerLogo,
+    meta: [
+      { label: sortedDates.length > 1 ? 'Fechas' : 'Fecha', value: dateText },
+      { label: 'Técnicos', value: String(payouts.length) },
+      { label: 'Emisión', value: format(issuedOn, 'dd/MM/yyyy') },
+    ],
+  });
 
-  // Only show invoicing details for autonomo techs (excluding house techs)
-  if (shouldShowInvoicing && jobDetails.invoicing_company) {
-    const companyDetails = getInvoicingCompanyDetails(jobDetails.invoicing_company);
-    if (companyDetails) {
-      doc.text(`Empresa facturadora: ${companyDetails.legalName}`, 14, yPos);
-      yPos += 5;
-      doc.text(`CIF: ${companyDetails.cif}`, 14, yPos);
-      yPos += 5;
-      doc.text(`Dirección: ${companyDetails.address}`, 14, yPos);
-      yPos += 5;
-    } else {
-      // Fallback to raw name if lookup fails
-      doc.text(`Empresa facturadora: ${jobDetails.invoicing_company}`, 14, yPos);
-      yPos += 5;
+  let yPos = mastheadBottom;
+
+  // Invoicing details are only meaningful for the self-employed technician the
+  // document is addressed to, so they only appear on a single-technician sheet.
+  if (shouldShowInvoicing) {
+    const invoicingRows: Array<[string, string]> = [];
+    if (jobDetails.invoicing_company) {
+      const companyDetails = getInvoicingCompanyDetails(jobDetails.invoicing_company);
+      if (companyDetails) {
+        invoicingRows.push(['Empresa facturadora', companyDetails.legalName]);
+        invoicingRows.push(['CIF', companyDetails.cif]);
+        invoicingRows.push(['Dirección', companyDetails.address]);
+      } else {
+        invoicingRows.push(['Empresa facturadora', jobDetails.invoicing_company]);
+      }
+    }
+    if (lpoNumber) invoicingRows.push(['Nº referencia (LPO)', lpoNumber]);
+
+    if (invoicingRows.length > 0) {
+      yPos = drawReportSectionHeading(doc, geo, 'Facturación', yPos, 1);
+      invoicingRows.forEach(([label, value]) => {
+        yPos = drawReportItemLine(doc, geo, label, value, yPos, { indent: 0 });
+      });
+      yPos += 4;
     }
   }
 
-  if (shouldShowInvoicing && lpoNumber) {
-    doc.text(`Nº Referencia (LPO): ${lpoNumber}`, 14, yPos);
-    yPos += 5;
-  }
-
-  yPos += 5;
-
-  doc.setTextColor(...TEXT_PRIMARY);
+  yPos = drawReportSectionHeading(doc, geo, 'Totales por técnico', yPos, shouldShowInvoicing ? 2 : 1);
 
   const resolveIrpfDeduction = (
     payout: PayoutData,
@@ -224,59 +231,34 @@ export async function generateJobPayoutPDF(
     startY: yPos,
     head: [['Técnico', 'Partes', 'Extras', 'Gastos', 'Total']],
     body: tableData,
-    ...corporateTableDefaults(doc, headerOptions, contentTop),
-    styles: { fontSize: 10, cellPadding: 3 },
-    columnStyles: {
-      1: { halign: 'right' },
-      2: { halign: 'right' },
-      3: { halign: 'right' },
-      4: { halign: 'right', fontStyle: 'bold' },
-    },
+    ...reportTableDefaults(geo, { fontSize: 7.6, numericColumns: [1, 2, 3, 4] }),
+    columnStyles: distributeColumnWidths([40, 14, 14, 14, 16], geo.contentWidth),
   });
 
-  let disclaimerY = getLastAutoTableY(doc, yPos) + 8;
-  if (anyDeductionApplied) {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text(DEDUCTION_DISCLAIMER_TEXT, 14, disclaimerY);
-      disclaimerY += 6;
-  }
+  const notes = [
+    anyDeductionApplied ? DEDUCTION_DISCLAIMER_TEXT : '',
+    anyOverride
+      ? 'Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.'
+      : '',
+    anyEvento ? EVENTO_DISCLAIMER_TEXT : '',
+    anyPrepDay ? PREP_DAY_DISCLAIMER_TEXT : '',
+    anyHouseTechTravelRate ? FIXED_TRAVEL_RATE_DISCLAIMER_TEXT : '',
+  ].filter(Boolean);
 
-  if (anyOverride) {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text('AVISO: Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
-      disclaimerY += 6;
-  }
-
-  if (anyEvento) {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text(EVENTO_DISCLAIMER_TEXT, 14, disclaimerY);
-      disclaimerY += 6;
-  }
-
-  if (anyPrepDay) {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text(PREP_DAY_DISCLAIMER_TEXT, 14, disclaimerY);
-      disclaimerY += 6;
-  }
-
-  if (anyHouseTechTravelRate) {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text(FIXED_TRAVEL_RATE_DISCLAIMER_TEXT, 14, disclaimerY);
-      disclaimerY += 6;
-  }
-
+  const disclaimerY = drawReportNotes(doc, geo, notes, getLastAutoTableY(doc, yPos) + 8);
   let currentY = disclaimerY + 4;
-  const pageHeight = doc.internal.pageSize.getHeight();
+  let sectionNumber = shouldShowInvoicing ? 2 : 1;
+
+  /**
+   * Breaks to a new page when `needed` millimetres do not remain, redrawing the
+   * running head so a continuation page still says which document it belongs to.
+   */
+  const breakIfShort = (y: number, needed: number): number => {
+    if (y <= geo.contentBottom - needed) return y;
+    doc.addPage();
+    const pageGeo: ReportGeometry = drawReportRunningHead(doc, chrome);
+    return pageGeo.contentTop;
+  };
 
   const payoutsWithExtras = payouts.filter(
     (payout) => payout.extras_breakdown?.items && payout.extras_breakdown.items.length > 0
@@ -290,33 +272,19 @@ export async function generateJobPayoutPDF(
     (id) => (timesheetMap?.get(id) || []).length > 0
   );
   if (techIdsWithTimesheets.length > 0) {
-    if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
-      doc.addPage();
-      currentY = drawCorporateHeader(doc, headerOptions) + 2;
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(...CORPORATE_RED);
-    doc.text('Desglose de Partes', 14, currentY);
-    currentY += 7;
+    currentY = breakIfShort(currentY, 60);
+    sectionNumber += 1;
+    currentY = drawReportSectionHeading(doc, geo, 'Desglose de partes', currentY, sectionNumber);
 
     for (const payout of payouts) {
       const lines = timesheetMap?.get(payout.technician_id) || [];
       if (!lines.length) continue;
 
-      if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
-        doc.addPage();
-        currentY = drawCorporateHeader(doc, headerOptions) + 2;
-      }
+      currentY = breakIfShort(currentY, 40);
 
       const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
       const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false, isHouseTech: is_house_tech });
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text(headingName, 14, currentY);
-      currentY += 5;
+      currentY = drawReportEntryHeading(doc, geo, headingName, currentY);
 
       const tableRows = lines.map((ln) => [
         ln.date
@@ -337,17 +305,10 @@ export async function generateJobPayoutPDF(
 
       autoTable(doc, {
         startY: currentY,
-        head: [['Fecha', 'Horas', 'Base día', '+10–12', 'OT', 'Total Parte']],
+        head: [['Fecha', 'Horas', 'Base día', '+10–12', 'OT', 'Total parte']],
         body: tableRows,
-        ...corporateTableDefaults(doc, headerOptions, contentTop),
-        styles: { fontSize: 9, cellPadding: 3 },
-        columnStyles: {
-          1: { halign: 'center' },
-          2: { halign: 'right' },
-          3: { halign: 'right' },
-          4: { halign: 'right' },
-          5: { halign: 'right', fontStyle: 'bold' },
-        },
+        ...reportTableDefaults(geo, { fontSize: 7, numericColumns: [1, 2, 3, 4, 5] }),
+        columnStyles: distributeColumnWidths([20, 9, 18, 16, 22, 14], geo.contentWidth),
       });
 
       currentY = getLastAutoTableY(doc, currentY) + 8;
@@ -355,48 +316,27 @@ export async function generateJobPayoutPDF(
   }
 
   if (payoutsWithExtras.length > 0) {
-    if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
-      doc.addPage();
-      currentY = drawCorporateHeader(doc, headerOptions) + 2;
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(...CORPORATE_RED);
-    doc.text('Desglose de Extras', 14, currentY);
-    currentY += 7;
+    currentY = breakIfShort(currentY, 60);
+    sectionNumber += 1;
+    currentY = drawReportSectionHeading(doc, geo, 'Desglose de extras', currentY, sectionNumber);
 
     payoutsWithExtras.forEach((payout) => {
-      if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
-        doc.addPage();
-        currentY = drawCorporateHeader(doc, headerOptions) + 2;
-      }
+      currentY = breakIfShort(currentY, 40);
 
       const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
       const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false, isHouseTech: is_house_tech });
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text(headingName, 14, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...TEXT_MUTED);
+      currentY = drawReportEntryHeading(doc, geo, headingName, currentY);
 
       payout.extras_breakdown!.items!.forEach((item) => {
+        currentY = breakIfShort(currentY, 20);
         const houseTechLabel = item.is_house_tech_rate ? ' (plantilla)' : '';
-        const itemText = `• ${labelForJobExtraType(item.extra_type)}${houseTechLabel} × ${item.quantity} = ${formatCurrency(item.amount_eur)}`;
-        doc.text(itemText, 18, currentY);
-        currentY += 5;
-
-        if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 20)) {
-          doc.addPage();
-          currentY = drawCorporateHeader(doc, headerOptions) + 2;
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.setTextColor(...TEXT_MUTED);
-        }
+        currentY = drawReportItemLine(
+          doc,
+          geo,
+          `${labelForJobExtraType(item.extra_type)}${houseTechLabel} × ${item.quantity}`,
+          formatCurrency(item.amount_eur),
+          currentY,
+        );
       });
 
       currentY += 4;
@@ -405,34 +345,16 @@ export async function generateJobPayoutPDF(
 
   // Expense breakdown section
   if (payoutsWithExpenses.length > 0) {
-    if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
-      doc.addPage();
-      currentY = drawCorporateHeader(doc, headerOptions) + 2;
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(...CORPORATE_RED);
-    doc.text('Desglose de Gastos', 14, currentY);
-    currentY += 7;
+    currentY = breakIfShort(currentY, 60);
+    sectionNumber += 1;
+    currentY = drawReportSectionHeading(doc, geo, 'Desglose de gastos', currentY, sectionNumber);
 
     payoutsWithExpenses.forEach((payout) => {
-      if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
-        doc.addPage();
-        currentY = drawCorporateHeader(doc, headerOptions) + 2;
-      }
+      currentY = breakIfShort(currentY, 40);
 
       const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
       const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false, isHouseTech: is_house_tech });
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text(headingName, 14, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...TEXT_MUTED);
+      currentY = drawReportEntryHeading(doc, geo, headingName, currentY);
 
       // Get category labels map
       const categoryLabels: Record<string, string> = {
@@ -445,19 +367,10 @@ export async function generateJobPayoutPDF(
 
       if (payout.expenses_breakdown && payout.expenses_breakdown.length > 0) {
         payout.expenses_breakdown.forEach((category) => {
+          currentY = breakIfShort(currentY, 20);
           const label = categoryLabels[category.category_slug] || category.category_slug;
           const amount = category.approved_total_eur || 0;
-          const itemText = `• ${label}: ${formatCurrency(amount)}`;
-          doc.text(itemText, 18, currentY);
-          currentY += 5;
-
-          if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 20)) {
-            doc.addPage();
-            currentY = drawCorporateHeader(doc, headerOptions) + 2;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(...TEXT_MUTED);
-          }
+          currentY = drawReportItemLine(doc, geo, label, formatCurrency(amount), currentY);
         });
       }
 
@@ -465,10 +378,7 @@ export async function generateJobPayoutPDF(
     });
   }
 
-  if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
-    doc.addPage();
-    currentY = drawCorporateHeader(doc, headerOptions) + 4;
-  }
+  currentY = breakIfShort(currentY, 44);
 
   const totalTimesheets = payouts.reduce((sum, payout) => sum + payout.timesheets_total_eur, 0);
   const totalExtras = payouts.reduce((sum, payout) => sum + payout.extras_total_eur, 0);
@@ -479,39 +389,21 @@ export async function generateJobPayoutPDF(
     return sum + (payout.total_eur - deduction);
   }, 0);
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const summaryWidth = pageWidth - 28;
-
-  const summaryHeight = totalExpenses > 0 ? 40 : 32;
-  doc.setFillColor(...SUMMARY_BACKGROUND);
-  doc.roundedRect(14, currentY, summaryWidth, summaryHeight, 3, 3, 'F');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text('Totales del Trabajo', 18, currentY + 10);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text(`Total Partes: ${formatCurrency(totalTimesheets)}`, 18, currentY + 18);
-  doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 18, currentY + 26);
-
-  let totalTextY = currentY + 22;
+  const totalsLines = [
+    { label: 'Total partes', value: formatCurrency(totalTimesheets) },
+    { label: 'Total extras', value: formatCurrency(totalExtras) },
+  ];
   if (totalExpenses > 0) {
-    doc.text(`Total Gastos: ${formatCurrency(totalExpenses)}`, 18, currentY + 34);
-    totalTextY = currentY + 30;
+    totalsLines.push({ label: 'Total gastos', value: formatCurrency(totalExpenses) });
   }
 
-  const totalText = `Total General: ${formatCurrency(grandTotal)}`;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...CORPORATE_RED);
-  const totalWidth = doc.getTextWidth(totalText);
-  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, totalTextY);
+  drawReportTotals(doc, geo, currentY, {
+    heading: 'Totales del trabajo',
+    lines: totalsLines,
+    total: { label: 'Total general', value: formatCurrency(grandTotal) },
+  });
 
-  const footerLogo = companyLogo ?? headerLogo;
-  drawCorporateFooter(doc, footerLogo);
+  stampReportChrome(doc, chrome);
 
   const filename = buildPdfFilename([
     'Pago',

@@ -6,19 +6,26 @@ import { formatCurrency } from '@/lib/utils';
 import { appendAutonomoLabel } from '@/utils/autonomo';
 import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import {
-  CORPORATE_FOOTER_RESERVED,
-  CORPORATE_RED,
-  SUMMARY_BACKGROUND,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
+  distributeColumnWidths,
+  drawReportMasthead,
+  drawReportRunningHead,
+  drawReportSectionHeading,
+  ensureReportSpace,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportChrome,
+  type ReportChromeOptions,
+  type ReportGeometry,
+  REPORT_INK,
+  REPORT_SOFT,
+  REPORT_TOTALS_WEIGHT,
+  setReportMonoText,
+} from '@/utils/pdf/report-system';
+import { drawReportEntryHeading, drawReportTotals } from '@/utils/pdf/report-system/blocks';
+import {
   buildPdfFilename,
-  corporateTableDefaults,
-  drawCorporateFooter,
-  drawCorporateHeader,
   resolveHeaderLogo,
-  type CorporateHeaderOptions,
 } from '@/utils/pdf/shared/pdfExportShared';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -44,38 +51,40 @@ export async function generateTourRatesSummaryPDF(
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const tourId = jobsWithQuotes.find((job) => job.quotes.length)?.quotes[0]?.tour_id;
-  const [headerLogo, companyLogo] = await Promise.all([
+  const [headerLogo] = await Promise.all([
     resolveHeaderLogo({ tourId }),
-    getCompanyLogo(),
+    loadReportIssuerMark(),
   ]);
-  const headerOptions: CorporateHeaderOptions = {
-    title: 'Resumen de Tarifas',
-    subtitle: tourName,
-    metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
-    logo: headerLogo,
-  };
-  const contentTop = drawCorporateHeader(doc, headerOptions);
 
   const getTechName = getTechNameFactory(profiles);
   const sortedJobs = [...jobsWithQuotes].sort(
     (a, b) => new Date(a.job.start_time).getTime() - new Date(b.job.start_time).getTime()
   );
 
-  let yPos = contentTop;
+  const issuedOn = new Date();
+  const dateSpan = sortedJobs.length
+    ? `${formatJobDate(sortedJobs[0].job.start_time)} – ${formatJobDate(sortedJobs[sortedJobs.length - 1].job.start_time)}`
+    : 'Sin fechas';
+  const chrome: ReportChromeOptions = {
+    kind: 'rates',
+    kindLabel: 'Resumen de tarifas',
+    eventTitle: tourName,
+    contextLabel: dateSpan,
+  };
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text(`Total de fechas: ${sortedJobs.length}`, 14, yPos);
-  yPos += 6;
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title: tourName?.trim() || 'Gira sin título',
+    subtitle: `Resumen de tarifas de gira · Emitido el ${format(issuedOn, 'PPP', { locale: es })}`,
+    clientLogo: headerLogo,
+    meta: [
+      { label: 'Fechas', value: String(sortedJobs.length) },
+      { label: 'Periodo', value: dateSpan },
+      { label: 'Emisión', value: format(issuedOn, 'dd/MM/yyyy') },
+    ],
+  });
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text('Resumen general por técnico', 14, yPos);
-  yPos += 6;
-
-  doc.setTextColor(...TEXT_PRIMARY);
+  const yPos = drawReportSectionHeading(doc, geo, 'Resumen por técnico', contentTop, 1);
 
   const techTotals = new Map<
     string,
@@ -125,69 +134,54 @@ export async function generateTourRatesSummaryPDF(
 
   autoTable(doc, {
     startY: yPos,
-    head: [['Técnico', 'Fechas', 'LPOs', 'Total Gira']],
+    head: [['Técnico', 'Fechas', 'LPOs', 'Total gira']],
     body: summaryRows,
-    ...corporateTableDefaults(doc, headerOptions, contentTop),
-    styles: { fontSize: 10, cellPadding: 3 },
-    columnStyles: {
-      1: { halign: 'center' },
-      2: { halign: 'left' },
-      3: { halign: 'right', fontStyle: 'bold' },
-    },
+    ...reportTableDefaults(geo, { fontSize: 7.6, numericColumns: [1, 3] }),
+    columnStyles: distributeColumnWidths([40, 10, 26, 16], geo.contentWidth),
   });
 
   const summaryFinalY = getLastAutoTableY(doc, yPos) + 10;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const boxWidth = pageWidth - 28;
   const tourGrandTotal = Array.from(techTotals.values()).reduce((sum, item) => sum + item.total, 0);
 
-  doc.setFillColor(...SUMMARY_BACKGROUND);
-  doc.roundedRect(14, summaryFinalY, boxWidth, 26, 3, 3, 'F');
+  const totalsY = ensureReportSpace(doc, geo, summaryFinalY, 30);
+  drawReportTotals(doc, geo, totalsY, {
+    lines: [
+      { label: 'Técnicos', value: String(techTotals.size) },
+      { label: 'Fechas', value: String(sortedJobs.length) },
+    ],
+    total: { label: 'Total general de gira', value: formatCurrency(tourGrandTotal) },
+  });
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text(`Total General de Gira: ${formatCurrency(tourGrandTotal)}`, 18, summaryFinalY + 16);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text(`Total de técnicos: ${techTotals.size}`, 18, summaryFinalY + 22);
-
+  // The per-date breakdown is a second act, not a continuation: it starts on
+  // its own page so the tour total is the last thing read on the first one.
   doc.addPage();
-  let headerOffset = drawCorporateHeader(doc, headerOptions);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text('Desglose por Fecha', 14, headerOffset);
-
-  let breakdownY = headerOffset + 8;
-  const pageHeight = doc.internal.pageSize.getHeight();
+  const startBreakdownPage = (continued: boolean): number => {
+    const pageGeo: ReportGeometry = drawReportRunningHead(doc, chrome);
+    return drawReportSectionHeading(
+      doc,
+      pageGeo,
+      continued ? 'Desglose por fecha (cont.)' : 'Desglose por fecha',
+      pageGeo.contentTop,
+      2,
+    );
+  };
+  let breakdownY = startBreakdownPage(false);
 
   sortedJobs.forEach((item) => {
     if (!item.quotes.length) return;
 
-    if (breakdownY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
+    if (breakdownY > geo.contentBottom - 60) {
       doc.addPage();
-      headerOffset = drawCorporateHeader(doc, headerOptions);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.setTextColor(...CORPORATE_RED);
-      doc.text('Desglose por Fecha (cont.)', 14, headerOffset);
-      breakdownY = headerOffset + 8;
+      breakdownY = startBreakdownPage(true);
     }
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(...CORPORATE_RED);
-    doc.text(`${formatJobDate(item.job.start_time)} • ${item.job.title}`, 14, breakdownY);
-    breakdownY += 6;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...TEXT_MUTED);
-    doc.text(`${item.quotes.length} asignaciones`, 14, breakdownY);
-    breakdownY += 4;
+    breakdownY = drawReportEntryHeading(
+      doc,
+      geo,
+      `${formatJobDate(item.job.start_time)}  ·  ${item.job.title}`,
+      breakdownY,
+      `${item.quotes.length} ${item.quotes.length === 1 ? 'asignación' : 'asignaciones'}`,
+    );
 
     const jobTableRows = item.quotes.map((quote) => {
       const { name: baseName, autonomo, is_house_tech } = getTechName(quote.technician_id);
@@ -254,13 +248,8 @@ export async function generateTourRatesSummaryPDF(
       startY: breakdownY,
       head: [['Técnico', 'Categoría', 'Base', 'Extras', 'Total']],
       body: jobTableRows,
-      ...corporateTableDefaults(doc, headerOptions, headerOffset),
-      styles: { fontSize: 9, cellPadding: 3 },
-      columnStyles: {
-        2: { halign: 'right' },
-        3: { halign: 'right' },
-        4: { halign: 'right', fontStyle: 'bold' },
-      },
+      ...reportTableDefaults(geo, { fontSize: 7.2, numericColumns: [2, 3, 4] }),
+      columnStyles: distributeColumnWidths([38, 14, 22, 10, 12], geo.contentWidth),
     });
 
     breakdownY = getLastAutoTableY(doc, breakdownY) + 6;
@@ -277,27 +266,27 @@ export async function generateTourRatesSummaryPDF(
     );
 
     // If there isn't enough room for the totals line, continue on a new page
-    if (breakdownY > pageHeight - (CORPORATE_FOOTER_RESERVED + 16)) {
+    if (breakdownY > geo.contentBottom - 16) {
       doc.addPage();
-      headerOffset = drawCorporateHeader(doc, headerOptions);
-      breakdownY = headerOffset + 8;
+      breakdownY = startBreakdownPage(true);
     }
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...CORPORATE_RED);
+    doc.setDrawColor(...REPORT_INK);
+    doc.setLineWidth(REPORT_TOTALS_WEIGHT * geo.mm);
+    doc.line(geo.left, breakdownY - 3 * geo.mm, geo.right, breakdownY - 3 * geo.mm);
+    setReportMonoText(doc, REPORT_SOFT, 6, 'bold');
     doc.text(
-      `Totales — Base: ${formatCurrency(jobBaseTotal)} · Extras: ${formatCurrency(jobExtrasTotal)} · General: ${formatCurrency(jobGrandTotal)}`,
-      18,
-      breakdownY
+      `BASE ${formatCurrency(jobBaseTotal)}   ·   EXTRAS ${formatCurrency(jobExtrasTotal)}`,
+      geo.left,
+      breakdownY,
     );
+    setReportMonoText(doc, REPORT_INK, 7.6, 'bold');
+    doc.text(formatCurrency(jobGrandTotal), geo.right, breakdownY, { align: 'right' });
 
-    breakdownY += 10;
-    doc.setTextColor(...TEXT_PRIMARY);
+    breakdownY += 12;
   });
 
-  const footerLogo = companyLogo ?? headerLogo;
-  drawCorporateFooter(doc, footerLogo);
+  stampReportChrome(doc, chrome);
 
   const filename = buildPdfFilename([
     'Resumen Gira',
