@@ -182,7 +182,7 @@ export async function generateJobPayoutPDF(
 
     // Show override info if applicable
     if (payout.has_override && payout.override_amount_eur != null && payout.calculated_total_eur != null) {
-      nameCellContent += `\n(!) OVERRIDE: ${formatCurrency(payout.override_amount_eur)} (calc: ${formatCurrency(payout.calculated_total_eur)})`;
+      nameCellContent += `\nExcepción de pago: ${formatCurrency(payout.override_amount_eur)} (calculado: ${formatCurrency(payout.calculated_total_eur)})`;
 
       const actor = payout.override_actor_name;
       const actorEmail = payout.override_actor_email;

@@ -7,6 +7,7 @@ import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import {
   REPORT_ACCENT,
+  REPORT_INK,
   distributeColumnWidths,
   drawReportMasthead,
   drawReportRunningHead,
@@ -256,6 +257,10 @@ export const generateTechnicalPowerSummaryPack = async ({
       pageWidth: plotGeo.pageWidth,
       pageHeight: plotGeo.pageHeight,
       footerSpace: plotGeo.pageHeight - plotGeo.contentBottom,
+      pageBreakY: plotGeo.contentTop,
+      contentLeft: plotGeo.left,
+      contentRight: plotGeo.pageWidth - plotGeo.right,
+      titleColor: REPORT_INK,
       title,
       entryColorFor,
       legend,

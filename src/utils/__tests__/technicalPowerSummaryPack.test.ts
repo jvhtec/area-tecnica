@@ -291,12 +291,12 @@ describe('technicalPowerSummaryPack', () => {
     });
 
     expect(docMock.text).toHaveBeenCalledWith(
-      'Distribución en escenario · Main Stage',
+      'DISTRIBUCIÓN EN ESCENARIO · MAIN STAGE',
       expect.any(Number),
       expect.any(Number)
     );
     expect(docMock.text).toHaveBeenCalledWith(
-      'Distribución en escenario · Main-Stage',
+      'DISTRIBUCIÓN EN ESCENARIO · MAIN-STAGE',
       expect.any(Number),
       expect.any(Number)
     );

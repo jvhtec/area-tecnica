@@ -55,7 +55,6 @@ const createEventSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
     ["Nombre del Evento", data.eventData.eventName || ""],
     ["Código del Evento", data.eventData.eventCode || ""],
     ["Tipo de Evento", data.eventData.eventType || ""],
-    ["Cliente", data.eventData.clientName || ""],
     ["Fechas", data.eventData.eventDates || ""],
     ["Hora de Inicio", data.eventData.eventStartTime || ""],
     ["Hora de Fin", data.eventData.eventEndTime || ""],

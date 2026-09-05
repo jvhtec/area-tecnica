@@ -47,22 +47,29 @@ interface StagePlotData {
   view: 'audience' | 'stage';
 }
 
-// Simple icon representations using Unicode symbols and shapes
+/**
+ * Short marks for the elements on the plan.
+ *
+ * These were emoji, which the PDF standard fonts cannot encode: every box on
+ * every stage plot printed a row of replacement characters. Two or three
+ * letters are legible at the 4 mm the boxes actually get, and they survive
+ * being printed, faxed and photocopied, which emoji would not have anyway.
+ */
 const ELEMENT_ICONS: Record<string, string> = {
-  'Voz': '🎤',
-  'Guitarra': '🎸',
-  'Bajo': '🎸',
-  'Teclados': '🎹',
-  'Batería': '🥁',
-  'Amplificador': '🔊',
-  'Cuña': '📐',
-  'Auricular': '🎧',
-  'DI': '📦',
-  'Pie de micrófono': '⚡',
-  'Toma de corriente': '🔌',
-  'Tarima': '⬜',
-	  'Consola FOH': '🎛️'
-	};
+  'Voz': 'VOZ',
+  'Guitarra': 'GTR',
+  'Bajo': 'BAJO',
+  'Teclados': 'TEC',
+  'Batería': 'BAT',
+  'Amplificador': 'AMP',
+  'Cuña': 'CUÑA',
+  'Auricular': 'IEM',
+  'DI': 'DI',
+  'Pie de micrófono': 'PIE',
+  'Toma de corriente': '230V',
+  'Tarima': 'TAR',
+  'Consola FOH': 'FOH',
+};
 
 const DEFAULT_ITEM_COLOR = '#4aa3ff';
 
@@ -155,11 +162,17 @@ export const generateStagePlotPDF = async (
 
   let yPosition = contentTop;
 
-  // Calculate stage drawing area
+  // The drawing takes the page it is given rather than a fixed 140 mm: with a
+  // title block above it and two tables below, a fixed height pushed both
+  // tables off the sheet and onto a page each.
   const stageMargin = geo.left;
   const stageDrawWidth = geo.contentWidth;
-  const stageDrawHeight = 140; // Fixed height for stage diagram
   const stageStartY = yPosition + 6;
+  const TABLES_RESERVE = 78;
+  const stageDrawHeight = Math.max(
+    90,
+    Math.min(140, geo.contentBottom - stageStartY - TABLES_RESERVE),
+  );
 
   // The stage edge is the only accent rule on the page; everything inside it is
   // the drawing's own colour coding.
@@ -169,7 +182,7 @@ export const generateStagePlotPDF = async (
 
   setReportMonoText(doc, REPORT_SOFT, 5.8, 'bold');
   doc.text(
-    data.view === 'audience' ? '← PÚBLICO' : 'ESCENARIO →',
+    data.view === 'audience' ? 'VISTA DESDE EL PÚBLICO' : 'VISTA DESDE EL ESCENARIO',
     stageMargin,
     stageStartY - 3,
     { charSpace: 0.2 },
@@ -239,10 +252,10 @@ export const generateStagePlotPDF = async (
       pdfDoc.document.rect(itemX, itemY, itemW, itemH, 'FD');
     }
 
-    // Draw icon/emoji
-    const icon = ELEMENT_ICONS[item.type] || '●';
-    pdfDoc.setText(Math.min(itemH * 0.6, 12), [255, 255, 255]);
-    pdfDoc.addText(icon, itemX + itemW / 2, itemY + itemH / 2 - 2, { align: 'center' });
+    // Element mark, set in mono so a grid of them reads as one alphabet.
+    const icon = ELEMENT_ICONS[item.type] ?? item.type.slice(0, 3).toUpperCase();
+    setReportMonoText(doc, [255, 255, 255], Math.min(itemH * 0.42, 7), 'bold');
+    doc.text(icon, itemX + itemW / 2, itemY + itemH / 2 + 1, { align: 'center' });
 
     // Draw label
     if (item.label) {
@@ -258,7 +271,7 @@ export const generateStagePlotPDF = async (
     }
   });
 
-  yPosition = stageStartY + stageDrawHeight + 22;
+  yPosition = stageStartY + stageDrawHeight + 12;
 
   // The input list and the monitor mixes sit side by side: they are read
   // together at the desk, and neither is long enough to earn the full width.
@@ -278,12 +291,20 @@ export const generateStagePlotPDF = async (
   let tablesBottom = tablesTop;
 
   if (inputItems.length > 0) {
+    const defaults = reportTableDefaults(geo, { fontSize: 6.6, numericColumns: [0] });
     pdfDoc.addTable({
       startY: tablesTop,
       head: [['Canal', 'Fuente', 'Mezcla']],
       body: inputItems.map((item) => [item.input || '—', item.label || item.type, item.mix || '—']),
-      ...reportTableDefaults(geo, { fontSize: 6.6, numericColumns: [0] }),
-      margin: { left: geo.left, right: geo.pageWidth - geo.left - columnWidth },
+      ...defaults,
+      // Keep the system's top and bottom margins: overriding the whole object
+      // drops them, and a continuation page then prints its head over the
+      // running head.
+      margin: {
+        ...defaults.margin,
+        left: geo.left,
+        right: geo.pageWidth - geo.left - columnWidth,
+      },
       columnStyles: distributeColumnWidths([16, 40, 20], columnWidth),
       tableWidth: columnWidth,
     });
@@ -291,6 +312,7 @@ export const generateStagePlotPDF = async (
   }
 
   if (mixItems.length > 0) {
+    const defaults = reportTableDefaults(geo, { fontSize: 6.6, numericColumns: [0] });
     pdfDoc.addTable({
       startY: tablesTop,
       head: [['Mezcla', 'Quién']],
@@ -303,8 +325,12 @@ export const generateStagePlotPDF = async (
             .map((item) => item.label || item.type)
             .join(', '),
         ]),
-      ...reportTableDefaults(geo, { fontSize: 6.6, numericColumns: [0] }),
-      margin: { left: rightColumnX, right: geo.pageWidth - geo.right },
+      ...defaults,
+      margin: {
+        ...defaults.margin,
+        left: rightColumnX,
+        right: geo.pageWidth - geo.right,
+      },
       columnStyles: distributeColumnWidths([20, 56], columnWidth),
       tableWidth: columnWidth,
     });

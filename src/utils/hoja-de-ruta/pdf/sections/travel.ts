@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { HOJA_HEADING, HOJA_LABEL } from '../hoja-report-system';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT, HOJA_RIGHT_INSET } from '../hoja-report-system';
 import { TravelArrangement } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
@@ -26,7 +26,7 @@ export class TravelSection {
       
       // Travel arrangement header
       this.pdfDoc.setText(12, HOJA_HEADING);
-      this.pdfDoc.addText(`Transporte: ${Formatters.translateTransportType(arrangement.transportation_type)}`, 30, yPosition);
+      this.pdfDoc.addText(`Transporte: ${Formatters.translateTransportType(arrangement.transportation_type)}`, HOJA_INDENT, yPosition);
       yPosition += 15;
 
       // Travel details table
@@ -53,7 +53,7 @@ export class TravelSection {
             0: { cellWidth: 50, fontStyle: 'bold', textColor: HOJA_LABEL },
             1: { cellWidth: 120 }
           },
-          margin: { left: 20, right: 20 },
+          margin: { left: HOJA_LEFT, right: HOJA_RIGHT_INSET },
           tableWidth: 'auto'
         });
         yPosition = this.pdfDoc.getLastAutoTableY() + 10;
@@ -84,7 +84,7 @@ export class TravelSection {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
 
     this.pdfDoc.setText(11, HOJA_HEADING);
-    this.pdfDoc.addText('Mapa de Recogida:', 20, yPosition);
+    this.pdfDoc.addText('Mapa de Recogida:', HOJA_LEFT, yPosition);
     yPosition += 10;
 
     const desiredMapWidth = 160;

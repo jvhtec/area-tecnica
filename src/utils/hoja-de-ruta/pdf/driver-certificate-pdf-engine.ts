@@ -11,7 +11,7 @@ import {
   loadReportIssuerMark,
 } from '@/utils/pdf/report-system';
 import { PDFDocument } from './core/pdf-document';
-import { hojaGeometry, hojaTable } from './hoja-report-system';
+import { HOJA_CONTENT_WIDTH, HOJA_LEFT, hojaGeometry, hojaTable } from './hoja-report-system';
 import type { DriverCertificatePDFGenerationOptions, GeneratedHojaDeRutaPdf } from './core/pdf-types';
 import { FooterService } from './services/footer-service';
 import { LogoService } from './services/logo-service';
@@ -160,31 +160,31 @@ export class DriverCertificatePDFEngine {
     this.pdfDoc.setText(10, [51, 51, 51]);
 
     if (venueName) {
-      this.pdfDoc.addText(`Recinto: ${venueName}`, 20, yPosition);
+      this.pdfDoc.addText(`Recinto: ${venueName}`, HOJA_LEFT, yPosition);
       yPosition += 6;
     }
 
     if (venueAddress) {
-      const addressLines = this.pdfDoc.splitText(`Dirección: ${venueAddress}`, this.pdfDoc.dimensions.width - 40);
+      const addressLines = this.pdfDoc.splitText(`Dirección: ${venueAddress}`, HOJA_CONTENT_WIDTH);
       addressLines.forEach((line) => {
-        this.pdfDoc.addText(line, 20, yPosition);
+        this.pdfDoc.addText(line, HOJA_LEFT, yPosition);
         yPosition += 5;
       });
       yPosition += 2;
     }
 
-    const mapWidth = this.pdfDoc.dimensions.width - 40;
+    const mapWidth = HOJA_CONTENT_WIDTH;
     const mapHeight = 65;
     const mapDataUrl = await this.resolveVenueMapDataUrl(eventData.venue, venueMapPreview, mapWidth, mapHeight);
 
     if (mapDataUrl) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 75);
-      this.pdfDoc.addImage(mapDataUrl, this.resolveImageFormat(mapDataUrl), 20, yPosition, mapWidth, mapHeight);
+      this.pdfDoc.addImage(mapDataUrl, this.resolveImageFormat(mapDataUrl), HOJA_LEFT, yPosition, mapWidth, mapHeight);
       yPosition += mapHeight + 6;
     } else if (venueAddress) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 20);
       this.pdfDoc.setText(9, [120, 120, 120]);
-      this.pdfDoc.addText('Mapa del recinto no disponible para esta dirección.', 20, yPosition);
+      this.pdfDoc.addText('Mapa del recinto no disponible para esta dirección.', HOJA_LEFT, yPosition);
       yPosition += 6;
     }
 
@@ -222,7 +222,7 @@ export class DriverCertificatePDFEngine {
 
     if (logisticsEvents.length === 0) {
       this.pdfDoc.setText(10, [90, 90, 90]);
-      this.pdfDoc.addText('No hay eventos de carga/descarga relevantes configurados en logística.', 20, yPosition);
+      this.pdfDoc.addText('No hay eventos de carga/descarga relevantes configurados en logística.', HOJA_LEFT, yPosition);
       return yPosition + 8;
     }
 
@@ -257,12 +257,12 @@ export class DriverCertificatePDFEngine {
 
     yPosition = this.addSectionTitle('Horarios en Recinto (Hoja de Ruta)', yPosition);
     this.pdfDoc.setText(9, [90, 90, 90]);
-    this.pdfDoc.addText('Nota: "Fecha y Hora" corresponde al horario en recinto.', 20, yPosition);
+    this.pdfDoc.addText('Nota: "Fecha y Hora" corresponde al horario en recinto.', HOJA_LEFT, yPosition);
     yPosition += 6;
 
     if (relevantTransports.length === 0) {
       this.pdfDoc.setText(10, [90, 90, 90]);
-      this.pdfDoc.addText('No hay horarios en recinto cargados en transporte de Hoja de Ruta.', 20, yPosition);
+      this.pdfDoc.addText('No hay horarios en recinto cargados en transporte de Hoja de Ruta.', HOJA_LEFT, yPosition);
       return yPosition + 8;
     }
 
@@ -305,7 +305,7 @@ export class DriverCertificatePDFEngine {
     const after = this.deliveryCertificateSection.addDeliveryCertificateSection(eventData, yPosition, context);
     if (after === before) {
       this.pdfDoc.setText(10, [90, 90, 90]);
-      this.pdfDoc.addText('No hay transportes relevantes para completar el certificado legal.', 20, yPosition);
+      this.pdfDoc.addText('No hay transportes relevantes para completar el certificado legal.', HOJA_LEFT, yPosition);
       return yPosition + 8;
     }
 

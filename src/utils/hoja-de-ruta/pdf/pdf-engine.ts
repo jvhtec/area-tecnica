@@ -128,10 +128,10 @@ export class PDFEngine {
     if (includeEvent || includeVenue) {
       let currentY = this.addSectionHeader(
         includeEvent && includeVenue
-          ? "Detalles y Venue"
+          ? "Detalles y recinto"
           : includeEvent
             ? "Detalles del Evento"
-            : "Venue"
+            : "Recinto"
       );
 
       if (includeEvent) {
@@ -260,7 +260,7 @@ export class PDFEngine {
     }
 
     if (sectionSelection.has("venue") && this.hasVenueExportData()) {
-      const currentY = this.addSectionHeader("Venue");
+      const currentY = this.addSectionHeader("Recinto");
       await this.contentSections.addVenueSection(
         this.options.eventData,
         this.options.venueMapPreview,

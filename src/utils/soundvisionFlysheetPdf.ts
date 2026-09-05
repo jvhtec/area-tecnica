@@ -497,8 +497,6 @@ function drawHeader(
   flysheet: SoundvisionFlysheet,
   sourceFileName: string,
   createdBy: string,
-  pageNumber: number,
-  pageCount: number,
 ): number {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const contentWidth = pageWidth - MARGIN * 2;
@@ -528,21 +526,19 @@ function drawHeader(
   const leftValueX = MARGIN + 34;
   const rightX = MARGIN + columnWidth + columnGap;
   const rightValueX = rightX + 34;
-  drawCell(pdf, 'Proyecto', MARGIN, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, flysheet.projectName || 'SIN NOMBRE', leftValueX, metaY, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
-  drawCell(pdf, 'Archivo XMLP', rightX, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, sourceFileName, rightValueX, metaY, columnWidth - 34, 7, { fontSize: 7.5 });
-  drawCell(pdf, 'Predicción creada por', MARGIN, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7 });
-  drawCell(pdf, createdBy, leftValueX, metaY + 7, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
-  drawCell(pdf, 'Página', rightX, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, `${pageNumber} / ${pageCount}`, rightValueX, metaY + 7, columnWidth - 34, 7, { fontSize: 7.5 });
-  drawCell(pdf, 'Validación', MARGIN, metaY + 14, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, 'Cargas, seguridad y flying bar: comprobar en Soundvision', leftValueX, metaY + 14, contentWidth - 34, 7, {
+  // The project is the title above and the folio is in the footer, so neither
+  // is repeated here; the row states what the sheet was built from and by whom.
+  drawCell(pdf, 'Archivo XMLP', MARGIN, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, sourceFileName, leftValueX, metaY, columnWidth - 34, 7, { fontSize: 7.5 });
+  drawCell(pdf, 'Predicción creada por', rightX, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7 });
+  drawCell(pdf, createdBy, rightValueX, metaY, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
+  drawCell(pdf, 'Validación', MARGIN, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, 'Cargas, seguridad y flying bar: comprobar en Soundvision', leftValueX, metaY + 7, contentWidth - 34, 7, {
     bold: true,
     fill: YELLOW,
     fontSize: 7.2,
   });
-  return metaY + 25;
+  return metaY + 18;
 }
 
 function drawFooter(
@@ -649,8 +645,6 @@ export async function generateSoundvisionFlysheetPdf(
       flysheet,
       sourceFileName,
       createdBy.trim() || 'No identificado',
-      pageIndex + 1,
-      pages.length,
     );
     const cabinetsStartY = drawSummaryRows(pdf, arrays, MARGIN, tableStartY, arrayWidth) + 2;
     const warningsStartY =

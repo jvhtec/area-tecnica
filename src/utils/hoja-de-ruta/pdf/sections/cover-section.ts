@@ -7,6 +7,7 @@ import {
   loadReportIssuerMark,
   setReportMonoText,
   setReportText,
+  truncateToWidth,
 } from '@/utils/pdf/report-system';
 import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
@@ -71,11 +72,32 @@ export class CoverSection {
     setReportText(doc, REPORT_SOFT, 11);
     doc.text(displayDate, geo.left, afterTitle + 8 * mm);
 
-    if (this.eventData.clientName) {
+    // The venue is what someone holding this cover needs off it — where to
+    // drive to. It also has a column behind it, which the client name never
+    // did: nothing in the platform can set one.
+    const venueName = this.eventData.venue?.name?.trim();
+    const venueAddress = this.eventData.venue?.address?.trim();
+    if (venueName || venueAddress) {
       setReportMonoText(doc, REPORT_SOFT, 5.8, 'bold');
-      doc.text('CLIENTE', geo.left, geo.contentBottom - 12 * mm, { charSpace: 0.25 * mm });
-      setReportText(doc, REPORT_INK, 12, 'bold');
-      doc.text(this.eventData.clientName, geo.left, geo.contentBottom - 5 * mm);
+      doc.text('RECINTO', geo.left, geo.contentBottom - 18 * mm, { charSpace: 0.25 * mm });
+
+      if (venueName) {
+        setReportText(doc, REPORT_INK, 12, 'bold');
+        doc.text(
+          truncateToWidth(doc, venueName, geo.contentWidth),
+          geo.left,
+          geo.contentBottom - 11 * mm,
+        );
+      }
+
+      if (venueAddress) {
+        setReportText(doc, REPORT_SOFT, 9);
+        doc.text(
+          truncateToWidth(doc, venueAddress, geo.contentWidth),
+          geo.left,
+          geo.contentBottom - 5 * mm,
+        );
+      }
     }
 
     setReportMonoText(doc, REPORT_FAINT, 5.8);

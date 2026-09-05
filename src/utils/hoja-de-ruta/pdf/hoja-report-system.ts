@@ -109,3 +109,17 @@ export class HojaPageLabels {
     return undefined;
   }
 }
+
+/**
+ * The content edges of an A4 portrait page in this system.
+ *
+ * The engine's sections were written against a 20 mm margin, which is 5.4 mm
+ * left of where the chrome now rules; these mirror `reportGeometry`'s portrait
+ * spec so body copy lines up with the headings and rules above it.
+ */
+export const HOJA_LEFT = 25.4;
+export const HOJA_RIGHT_INSET = 16.4;
+/** Second level: notes and details that hang under a subheading. */
+export const HOJA_INDENT = HOJA_LEFT + 8;
+/** Usable width between the two content edges. */
+export const HOJA_CONTENT_WIDTH = 210 - HOJA_LEFT - HOJA_RIGHT_INSET;

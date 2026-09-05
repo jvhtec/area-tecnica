@@ -116,10 +116,12 @@ export const exportWeeklySummaryPDF = async (
   const dayWeight = 9;
   const weights = [42, 20, 10, ...Array.from({ length: dayCount }, () => dayWeight), 14];
 
+  const matrixTop = drawReportSectionHeading(doc, geo, 'Disponibilidad por día', contentTop, 1);
+
   autoTable(doc, {
     head: tableHead,
     body: tableBody,
-    startY: contentTop,
+    startY: matrixTop,
     ...reportTableDefaults(geo, {
       fontSize: 6.8,
       numericColumns: [2, ...days.map((_, index) => index + 3), dayCount + 3],
@@ -130,7 +132,7 @@ export const exportWeeklySummaryPDF = async (
     },
   });
 
-  let y = getLastAutoTableY(doc, contentTop) + 12;
+  let y = getLastAutoTableY(doc, matrixTop) + 12;
 
   const ensureSpace = (needed: number): ReportGeometry => {
     if (y + needed <= geo.contentBottom) return geo;
