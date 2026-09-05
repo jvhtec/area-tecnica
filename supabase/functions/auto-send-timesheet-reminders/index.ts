@@ -29,7 +29,7 @@ serve(async (req) => {
   }
 
   const startedAt = new Date().toISOString()
-  console.log('=== auto-send-timesheet-reminders invoked ===', startedAt)
+  logEvent('info', 'auto_reminders.started')
 
   try {
     // verify_jwt=true in config.toml – the Supabase gateway has already
@@ -43,7 +43,7 @@ serve(async (req) => {
     try {
       jwtPayload = JSON.parse(atob(jwt.split('.')[1]))
     } catch {
-      console.error('Failed to decode JWT payload')
+      logEvent('error', 'auto_reminders.jwt_decode_failed')
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -59,7 +59,7 @@ serve(async (req) => {
     let callerAuthorized = false
     if (callerRole === 'service_role') {
       callerAuthorized = true
-      console.log('Caller: pg_cron (service_role)')
+      logEvent('info', 'auto_reminders.service_caller')
     } else {
       const userId = jwtPayload.sub as string | undefined
       if (userId) {
@@ -71,14 +71,14 @@ serve(async (req) => {
             .single()
           if (profile && (profile.role === 'admin' || profile.role === 'management')) {
             callerAuthorized = true
-            console.log('Caller: management user', userId)
+            logEvent('info', 'auto_reminders.management_caller')
           }
         } catch { /* ignore */ }
       }
     }
 
     if (!callerAuthorized) {
-      console.error('Caller not authorized, role:', callerRole)
+      logEvent('error', 'auto_reminders.caller_denied')
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -91,7 +91,7 @@ serve(async (req) => {
       .select('department, auto_reminders_enabled, reminder_frequency_days')
 
     if (settingsError) {
-      console.error('Failed to load reminder settings:', settingsError)
+      logEvent('error', 'auto_reminders.settings_failed')
       return new Response(JSON.stringify({ error: 'Could not load reminder settings' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -114,7 +114,7 @@ serve(async (req) => {
     // Check if ALL departments are disabled (quick-exit optimisation)
     const anyEnabled = settingsRows?.some((r) => r.auto_reminders_enabled) ?? false
     if (!anyEnabled) {
-      console.log('All department reminders disabled – nothing to do.')
+      logEvent('info', 'auto_reminders.disabled')
       return new Response(
         JSON.stringify({ success: true, sent: 0, skipped: 'all_disabled' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -144,7 +144,7 @@ serve(async (req) => {
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
       if (tsError) {
-        console.error('Failed to query timesheets (page %d):', page, tsError)
+        logEvent('error', 'auto_reminders.timesheet_query_failed', { page })
         return new Response(JSON.stringify({ error: 'Failed to query timesheets' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -155,7 +155,7 @@ serve(async (req) => {
       allTimesheets.push(...pageData)
 
       if (pageData.length === PAGE_SIZE) {
-        console.warn(`Timesheets page ${page} returned exactly ${PAGE_SIZE} rows – fetching next page.`)
+        logEvent('warn', 'auto_reminders.next_page', { page })
       } else {
         break // last page
       }
@@ -164,7 +164,7 @@ serve(async (req) => {
     const timesheets = allTimesheets
 
     if (timesheets.length === 0) {
-      console.log('No draft timesheets found.')
+      logEvent('info', 'auto_reminders.no_drafts')
       return new Response(
         JSON.stringify({ success: true, sent: 0 }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -182,14 +182,14 @@ serve(async (req) => {
         .select('id, title, end_time')
         .in('id', chunk)
       if (chunkErr) {
-        console.error('Failed to query jobs chunk:', chunkErr)
+        logEvent('error', 'auto_reminders.jobs_query_failed')
         return new Response(JSON.stringify({ error: 'Failed to query jobs' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
       if (chunkData) allJobs.push(...chunkData)
-      if (chunk.length === CHUNK) console.warn(`Jobs chunk ${i / CHUNK} returned ${chunkData?.length} rows`)
+      if (chunk.length === CHUNK) logEvent('warn', 'auto_reminders.jobs_chunk', { count: chunkData?.length })
     }
 
     const now = new Date()
@@ -230,14 +230,14 @@ serve(async (req) => {
         .select('id, first_name, last_name, nickname, email, department')
         .in('id', chunk)
       if (chunkErr) {
-        console.error('Failed to query technicians chunk:', chunkErr)
+        logEvent('error', 'auto_reminders.technicians_query_failed')
         return new Response(JSON.stringify({ error: 'Failed to query technicians' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
       if (chunkData) allTechs.push(...chunkData)
-      if (chunk.length === CHUNK) console.warn(`Techs chunk ${i / CHUNK} returned ${chunkData?.length} rows`)
+      if (chunk.length === CHUNK) logEvent('warn', 'auto_reminders.technicians_chunk', { count: chunkData?.length })
     }
 
     const techMap = new Map(allTechs.map((t) => [t.id, t]))
@@ -286,7 +286,7 @@ serve(async (req) => {
       const job = jobMap.get(ts.job_id)
 
       if (!technician?.email || !job) {
-        console.warn(`Skipping group tech=${ts.technician_id} job=${ts.job_id}: missing tech email or job.`)
+        logEvent('warn', 'auto_reminders.incomplete_group')
         failCount++
         continue
       }
@@ -360,12 +360,12 @@ serve(async (req) => {
                 <tr>
                   <td align="left" style="vertical-align:middle;">
                     <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
-                      <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                      <img src="${escapeHtml(String(COMPANY_LOGO_URL))}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
                     </a>
                   </td>
                   <td align="right" style="vertical-align:middle;">
                     <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
-                      <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                      <img src="${escapeHtml(String(AT_LOGO_URL))}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
                     </a>
                   </td>
                 </tr>
@@ -427,7 +427,7 @@ serve(async (req) => {
               </div>
 
               <div style="text-align:center;margin:24px 0;">
-                <a href="${timesheetUrl}"
+                <a href="${escapeHtml(String(timesheetUrl))}"
                    style="display:inline-block;background:#6366f1;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 2px 4px rgba(99,102,241,0.3);">
                   Haz clic aquí para rellenar tu parte de horas ahora
                 </a>
@@ -478,7 +478,7 @@ serve(async (req) => {
 
       if (!sendRes.ok) {
         const errText = await sendRes.text()
-        console.error(`Failed to send reminder for timesheet ${ts.id} (${techDept}):`, errText)
+        logEvent('error', 'auto_reminders.delivery_failed', { status: sendRes.status })
         failCount++
         continue
       }
@@ -508,13 +508,13 @@ serve(async (req) => {
         const result = updateResults[i]
         const t = groupTimesheets[i]
         if (result.status === 'rejected') {
-          console.error(`Failed to update timesheet ${t.id} (rejected):`, result.reason)
+          logEvent('error', 'auto_reminders.mark_sent_rejected')
           groupUpdateOk = false
         } else if (result.value.error) {
-          console.error(`Failed to update timesheet ${t.id}:`, result.value.error)
+          logEvent('error', 'auto_reminders.mark_sent_failed')
           groupUpdateOk = false
         } else if (result.value.data !== true) {
-          console.error(`Timesheet ${t.id} was not updated by mark_timesheet_auto_reminder_sent()`)
+          logEvent('error', 'auto_reminders.mark_sent_unchanged')
           groupUpdateOk = false
         }
       }
@@ -526,9 +526,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(
-      `Done. sent=${sentCount} failed=${failCount} skipped_dept=${skippedDept} skipped_expired_job=${skippedExpiredJob} skipped_not_completed_job=${skippedNotCompletedJob} max_job_age_days=${maxJobAgeDays}`
-    )
+    logEvent('info', 'auto_reminders.completed', { sent: sentCount, failed: failCount, skippedDept, skippedExpiredJob, skippedNotCompletedJob, maxJobAgeDays })
 
     return new Response(
       JSON.stringify({
@@ -546,7 +544,7 @@ serve(async (req) => {
     const msg = error instanceof Error ? error.message
       : typeof error === 'string' ? error
       : JSON.stringify(error) || 'Internal server error'
-    console.error('Unhandled error in auto-send-timesheet-reminders:', error)
+    logEvent('error', 'auto_reminders.request_failed')
     return new Response(
       JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

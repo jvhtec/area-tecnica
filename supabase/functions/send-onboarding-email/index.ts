@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2.48.1';
 import { sendBrevoEmail } from '../_shared/brevo.ts';
+import { logEvent } from '../_shared/structuredLogger.ts';
+import { escapeHtml } from '../_shared/corporateEmailTemplate.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,12 +121,12 @@ serve(async (req) => {
         <tr>
           <td align="left" style="padding:0;">
             <a href="https://www.sector-pro.com" target="_blank" style="display:inline-block;text-decoration:none;">
-              <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" width="160" style="display:block;border:0;max-width:160px;height:auto;" />
+              <img src="${escapeHtml(String(COMPANY_LOGO_URL))}" alt="Sector Pro" width="160" style="display:block;border:0;max-width:160px;height:auto;" />
             </a>
           </td>
           <td align="right" style="padding:0;">
             <a href="https://sector-pro.work" target="_blank" style="display:inline-block;text-decoration:none;">
-              <img src="${AT_LOGO_URL}" alt="Área Técnica" width="120" style="display:block;border:0;max-width:120px;height:auto;background:#ffffff;border-radius:4px;padding:2px;" />
+              <img src="${escapeHtml(String(AT_LOGO_URL))}" alt="Área Técnica" width="120" style="display:block;border:0;max-width:120px;height:auto;background:#ffffff;border-radius:4px;padding:2px;" />
             </a>
           </td>
         </tr>
@@ -158,7 +160,7 @@ serve(async (req) => {
           </li>
         </ul>
         <p style="color:#cfe1ff;">Así luce una tarjeta de asignación típica:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/jobcard.png" alt="Tarjeta de asignación" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
+        <img src="${escapeHtml(String(PUBLIC_LOGOS_BASE))}/jobcard.png" alt="Tarjeta de asignación" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -169,7 +171,7 @@ serve(async (req) => {
           restaurantes cercanos.
         </p>
         <p style="color:#cfe1ff;">Ejemplo de la ventana de detalles:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/details.png" alt="Ventana de detalles" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
+        <img src="${escapeHtml(String(PUBLIC_LOGOS_BASE))}/details.png" alt="Ventana de detalles" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -180,7 +182,7 @@ serve(async (req) => {
           lateral izquierda también encontrarás el enlace <strong>My Unavailability</strong> para gestionar tus ausencias.
         </p>
         <p style="color:#cfe1ff;">Vista simplificada de la gestión de disponibilidad:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/availability.png" alt="Mi disponibilidad" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
+        <img src="${escapeHtml(String(PUBLIC_LOGOS_BASE))}/availability.png" alt="Mi disponibilidad" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -191,7 +193,7 @@ serve(async (req) => {
           digitalmente para confirmar tu participación.
         </p>
         <p style="color:#cfe1ff;">Vista simplificada de la gestión de tiempos:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/timesheet.png" alt="Gestión de tiempos" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
+        <img src="${escapeHtml(String(PUBLIC_LOGOS_BASE))}/timesheet.png" alt="Gestión de tiempos" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -209,24 +211,24 @@ serve(async (req) => {
         <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="width:100%;max-width:560px;margin:0 auto 8px auto;">
           <tr>
             <td align="center" style="padding:4px;">
-              <img src="${PUSH_IMG_PROFILE}" alt="Ajuste de push en Perfil" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+              <img src="${escapeHtml(String(PUSH_IMG_PROFILE))}" alt="Ajuste de push en Perfil" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
             </td>
             <td align="center" style="padding:4px;">
-              <img src="${PUSH_IMG_PUSH}" alt="Botones Activar y Probar" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+              <img src="${escapeHtml(String(PUSH_IMG_PUSH))}" alt="Botones Activar y Probar" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
             </td>
             <td align="center" style="padding:4px;">
-              <img src="${PUSH_IMG_ALLOW}" alt="Permitir notificaciones del sistema" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+              <img src="${escapeHtml(String(PUSH_IMG_ALLOW))}" alt="Permitir notificaciones del sistema" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
             </td>
           </tr>
           <tr>
             <td align="center" style="padding:4px;">
-              <img src="${PUSH_IMG_TEST}" alt="Notificación de prueba recibida" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+              <img src="${escapeHtml(String(PUSH_IMG_TEST))}" alt="Notificación de prueba recibida" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
             </td>
             <td align="center" style="padding:4px;">
-              <img src="${PUSH_IMG_FOCUS_1}" alt="Permitir en Enfoque (1)" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+              <img src="${escapeHtml(String(PUSH_IMG_FOCUS_1))}" alt="Permitir en Enfoque (1)" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
             </td>
             <td align="center" style="padding:4px;">
-              <img src="${PUSH_IMG_FOCUS_2}" alt="Permitir en Enfoque (2)" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+              <img src="${escapeHtml(String(PUSH_IMG_FOCUS_2))}" alt="Permitir en Enfoque (2)" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
             </td>
           </tr>
         </table>
@@ -252,9 +254,9 @@ serve(async (req) => {
           <li style="margin-bottom:6px;">Confirma el nombre y pulsa <strong>Añadir</strong>.</li>
         </ol>
         <p style="color:#cfe1ff;">Referencias visuales:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/menu.jpeg" alt="Abrir menú de Safari" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
-        <img src="${PUBLIC_LOGOS_BASE}/add.jpeg" alt="Opción Añadir a pantalla de inicio" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
-        <img src="${PUBLIC_LOGOS_BASE}/result.jpeg" alt="Icono instalado en iOS" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${escapeHtml(String(PUBLIC_LOGOS_BASE))}/menu.jpeg" alt="Abrir menú de Safari" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${escapeHtml(String(PUBLIC_LOGOS_BASE))}/add.jpeg" alt="Opción Añadir a pantalla de inicio" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${escapeHtml(String(PUBLIC_LOGOS_BASE))}/result.jpeg" alt="Icono instalado en iOS" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
       </div>
 
       <p style="color:#dbeafe;">
@@ -289,7 +291,7 @@ serve(async (req) => {
 
     if (!brevoRes.ok) {
       const msg = await brevoRes.text();
-      console.error('[send-onboarding-email] Brevo error:', msg);
+      logEvent('error', 'onboarding.mail_provider_failed');
       return new Response(JSON.stringify({ error: 'Brevo API failed', details: msg }), {
         status: 502,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -301,7 +303,7 @@ serve(async (req) => {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   } catch (err) {
-    console.error('[send-onboarding-email] Error:', err);
+    logEvent('error', 'onboarding.request_failed');
     return new Response(JSON.stringify({ success: false }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },

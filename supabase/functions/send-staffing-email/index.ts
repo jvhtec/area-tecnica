@@ -10,6 +10,7 @@ import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { isServiceRoleRequest, requireAdminOrManagement } from "../_shared/auth.ts";
 import { joinedSingle } from "../_shared/joins.ts";
 import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 import {
   corsHeaders,
   createHttpHandler,
@@ -288,29 +289,12 @@ function emitStaffingPush(params: {
     .then(async (response) => {
       if (!response.ok) {
         const body = await response.text().catch(() => '');
-        console.warn('[send-staffing-email] Push broadcast returned non-OK', {
-          channel: params.channel,
-          status: response.status,
-          body: body.slice(0, 500),
-          staffing_request_id: params.staffingRequestId,
-          phase: params.phase,
-          role_code: params.roleCode,
-          target_date: params.targetDate,
-        });
+        logEvent('warn', 'staffing_email.push_broadcast_returned_non_ok', { status: response.status });
       }
     })
     .catch((pushError) => {
       const timedOut = controller.signal.aborted;
-      console.warn('[send-staffing-email] Failed to emit push', {
-        channel: params.channel,
-        message: timedOut
-          ? 'timeout'
-          : pushError instanceof Error ? pushError.message : String(pushError),
-        staffing_request_id: params.staffingRequestId,
-        phase: params.phase,
-        role_code: params.roleCode,
-        target_date: params.targetDate,
-      });
+      logEvent('warn', 'staffing_email.failed_to_emit_push');
     })
     .finally(() => clearTimeout(timeoutId));
 
@@ -341,11 +325,7 @@ serve(createHttpHandler(async (req) => {
     if (!actorId && serviceRequest && isUuid(STAFFING_SYSTEM_ACTOR_ID)) {
       actorId = STAFFING_SYSTEM_ACTOR_ID;
     }
-    console.log('📥 RECEIVED STAFFING REQUEST:', {
-      serviceRequest,
-      hasActor: Boolean(actorId),
-      fields: Object.keys(body).sort(),
-    });
+    logEvent('info', 'staffing_email.received_staffing_request');
 
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key, request_origin, campaign_id, department } = body;
     const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
@@ -377,18 +357,7 @@ serve(createHttpHandler(async (req) => {
     const isSingleDayRequest = Boolean(single_day) && Boolean(normalizedTargetDate);
     
     // Enhanced validation logging
-    console.log('🔍 VALIDATING FIELDS:', {
-      job_id: { value: job_id, type: typeof job_id, isValid: !!job_id },
-      profile_id: { value: profile_id, type: typeof profile_id, isValid: !!profile_id },
-      phase: { value: phase, type: typeof phase, isValidPhase: ["availability","offer"].includes(phase) },
-      role: { value: role ?? null, normalized: roleCode },
-      message: { present: typeof message === 'string' && message.trim().length > 0, length: typeof message === 'string' ? message.length : 0 },
-      target_date: { value: target_date ?? null, normalized: normalizedTargetDate },
-      single_day: { value: single_day ?? null, effective: isSingleDayRequest },
-      dates: normalizedDates,
-      require_no_conflicts: shouldRequireNoConflicts,
-      idempotency_key: { present: typeof idempotency_key === 'string' && idempotency_key.length > 0 }
-    });
+    logEvent('info', 'staffing_email.validating_fields');
     
     if (!job_id || !profile_id || !["availability","offer"].includes(phase)) {
       const errorDetails = {
@@ -397,18 +366,18 @@ serve(createHttpHandler(async (req) => {
         invalid_phase: !["availability","offer"].includes(phase),
         received: { job_id, profile_id, phase }
       };
-      console.error('❌ VALIDATION FAILED:', errorDetails);
+      logEvent('error', 'staffing_email.validation_failed');
       return new Response(JSON.stringify({ error: "Bad Request", details: errorDetails }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
     
-    console.log('✅ VALIDATION PASSED - Proceeding with email send...');
+    logEvent('info', 'staffing_email.validation_passed_proceeding_with_email_send');
 
     // Idempotency check: prevent duplicate sends within 24h
     if (idempotency_key && typeof idempotency_key === 'string') {
-      console.log('🔑 CHECKING IDEMPOTENCY KEY:', idempotency_key.substring(0, 8) + '...');
+      logEvent('info', 'staffing_email.checking_idempotency_key');
       const since24h = new Date(Date.now() - 24*60*60*1000).toISOString();
       
       const { data: existing, error: idempotencyError } = await supabase
@@ -419,7 +388,7 @@ serve(createHttpHandler(async (req) => {
         .maybeSingle();
 
       if (idempotencyError) {
-        console.warn('⚠️ Idempotency check failed (non-blocking):', idempotencyError);
+        logEvent('warn', 'staffing_email.idempotency_check_failed_non_blocking');
       } else if (existing) {
         if (phase === 'offer' && roleCode && !existing.role_code) {
           const { error: roleUpdateError } = await supabase
@@ -427,14 +396,11 @@ serve(createHttpHandler(async (req) => {
             .update({ role_code: roleCode })
             .eq('id', existing.id);
           if (roleUpdateError) {
-            console.warn('⚠️ Failed to backfill role_code on idempotent request (non-blocking):', roleUpdateError);
+            logEvent('warn', 'staffing_email.failed_to_backfill_role_code_on_idempotent_request_non_blocking');
           }
         }
 
-        console.log('✅ IDEMPOTENT REQUEST DETECTED - returning cached response:', {
-          request_id: existing.id,
-          created_at: existing.created_at
-        });
+        logEvent('info', 'staffing_email.idempotent_request_detected_returning_cached_response');
         return new Response(JSON.stringify({ 
           success: true, 
           cached: true,
@@ -445,18 +411,12 @@ serve(createHttpHandler(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       } else {
-        console.log('✅ New idempotency key - proceeding with send');
+        logEvent('info', 'staffing_email.new_idempotency_key_proceeding_with_send');
       }
     }
 
     // Check required environment variables
-    console.log('🔧 CHECKING ENV VARIABLES:', {
-      DAILY_CAP: { value: DAILY_CAP, exists: !!DAILY_CAP },
-      TOKEN_SECRET: { exists: !!TOKEN_SECRET, length: TOKEN_SECRET?.length },
-      STAFFING_CONFIRM_BASE: { configured: !!__RAW_CONFIRM_BASE, value: STAFFING_CONFIRM_BASE },
-      BREVO_KEY: desiredChannel === 'email' ? { exists: !!BREVO_KEY, length: BREVO_KEY?.length } : { skipped: true },
-      BREVO_FROM: desiredChannel === 'email' ? { exists: !!BREVO_FROM, value: BREVO_FROM } : { skipped: true }
-    });
+    logEvent('info', 'staffing_email.checking_env_variables');
 
     if (!TOKEN_SECRET || (desiredChannel === 'email' && (!BREVO_KEY || !BREVO_FROM))) {
       const missingEnvs = [];
@@ -466,7 +426,7 @@ serve(createHttpHandler(async (req) => {
         if (!BREVO_FROM) missingEnvs.push('BREVO_FROM');
       }
       
-      console.error('❌ MISSING ENV VARIABLES:', missingEnvs);
+      logEvent('error', 'staffing_email.missing_env_variables');
       return new Response(JSON.stringify({ 
         error: "Server configuration error", 
         details: { missing_env_vars: missingEnvs }
@@ -478,7 +438,7 @@ serve(createHttpHandler(async (req) => {
 
     try {
       // Step 1: Check daily cap
-      console.log('📊 CHECKING DAILY CAP...');
+      logEvent('info', 'staffing_email.checking_daily_cap');
       const since = new Date(Date.now() - 24*60*60*1000).toISOString();
       const { count, error: capError } = await supabase.from("staffing_events")
         .select("id", { count: "exact", head: true })
@@ -486,7 +446,7 @@ serve(createHttpHandler(async (req) => {
         .in("event", ["email_sent", "whatsapp_sent"]);
       
       if (capError) {
-        console.error('❌ DAILY CAP CHECK ERROR:', capError);
+        logEvent('error', 'staffing_email.daily_cap_check_error');
         return new Response(JSON.stringify({ 
           error: "Database error checking daily cap", 
           details: capError 
@@ -496,9 +456,9 @@ serve(createHttpHandler(async (req) => {
         });
       }
       
-      console.log('📊 DAILY CAP RESULT:', { count, limit: DAILY_CAP });
+      logEvent('info', 'staffing_email.daily_cap_result', { count, limit: DAILY_CAP });
       if ((count ?? 0) >= DAILY_CAP) {
-        console.log('⚠️ DAILY CAP REACHED');
+        logEvent('info', 'staffing_email.daily_cap_reached');
         return new Response(JSON.stringify({ 
           error: "Daily email limit reached", 
           details: { current: count, limit: DAILY_CAP }
@@ -509,7 +469,7 @@ serve(createHttpHandler(async (req) => {
       }
 
       // Step 2: Fetch job and profile data
-      console.log('🔍 FETCHING JOB AND PROFILE DATA...');
+      logEvent('info', 'staffing_email.fetching_job_and_profile_data');
       const roleDepartmentPromise = !departmentHint
         ? (() => {
           let query = supabase.from("job_required_roles")
@@ -547,22 +507,17 @@ serve(createHttpHandler(async (req) => {
         jobDepartmentsPromise,
       ]);
       
-      console.log('📋 JOB RESULT:', { found: Boolean(jobResult.data), error: jobResult.error });
-      console.log('👤 PROFILE RESULT:', { 
-        found: Boolean(techResult.data),
-        has_email: Boolean(techResult.data?.email),
-        has_phone: Boolean(techResult.data?.phone),
-        error: techResult.error 
-      });
+      logEvent('info', 'staffing_email.job_result');
+      logEvent('info', 'staffing_email.profile_result');
       if (roleDepartmentResult.error) {
-        console.warn('⚠️ ROLE DEPARTMENT LOOKUP FAILED (non-blocking):', roleDepartmentResult.error);
+        logEvent('warn', 'staffing_email.role_department_lookup_failed_non_blocking');
       }
       if (jobDepartmentsResult.error) {
-        console.warn('⚠️ JOB DEPARTMENTS LOOKUP FAILED (non-blocking):', jobDepartmentsResult.error);
+        logEvent('warn', 'staffing_email.job_departments_lookup_failed_non_blocking');
       }
 
       if (jobResult.error) {
-        console.error('❌ JOB FETCH ERROR:', jobResult.error);
+        logEvent('error', 'staffing_email.job_fetch_error');
         return new Response(JSON.stringify({ 
           error: "Error fetching job data", 
           details: jobResult.error 
@@ -573,7 +528,7 @@ serve(createHttpHandler(async (req) => {
       }
 
       if (techResult.error) {
-        console.error('❌ PROFILE FETCH ERROR:', techResult.error);
+        logEvent('error', 'staffing_email.profile_fetch_error');
         return new Response(JSON.stringify({ 
           error: "Error fetching profile data", 
           details: techResult.error 
@@ -589,7 +544,7 @@ serve(createHttpHandler(async (req) => {
       // Both queries use maybeSingle(): a missing row yields `data: null` with no error,
       // so the error checks above are not enough to guarantee either is present.
       if (!job || !tech) {
-        console.error('❌ JOB/PROFILE NOT FOUND:', { job: Boolean(job), tech: Boolean(tech) });
+        logEvent('error', 'staffing_email.job_profile_not_found');
         return new Response(JSON.stringify({
           error: "Job or profile not found",
           details: { job_found: Boolean(job), profile_found: Boolean(tech) }
@@ -625,7 +580,7 @@ serve(createHttpHandler(async (req) => {
       const staffingDepartment = departmentHint || roleDepartment || actorDepartment || jobDepartment || null;
       
       if (!job) {
-        console.error('❌ JOB NOT FOUND:', job_id);
+        logEvent('error', 'staffing_email.job_not_found');
         return new Response(JSON.stringify({ 
           error: "Job not found", 
           details: { job_id }
@@ -638,7 +593,7 @@ serve(createHttpHandler(async (req) => {
       // Channel resolution
       // desiredChannel already computed above
       if (desiredChannel === 'email' && !tech?.email) {
-        console.error('❌ PROFILE NOT FOUND OR NO EMAIL:', { profile_id, has_email: !!tech?.email });
+        logEvent('error', 'staffing_email.profile_not_found_or_no_email');
         return new Response(JSON.stringify({ 
           error: "Profile not found or no email address", 
           details: { profile_id, has_profile: !!tech, has_email: !!tech?.email }
@@ -648,7 +603,7 @@ serve(createHttpHandler(async (req) => {
         });
       }
       if (desiredChannel === 'whatsapp' && !tech?.phone) {
-        console.error('❌ PROFILE HAS NO PHONE FOR WHATSAPP:', { profile_id });
+        logEvent('error', 'staffing_email.profile_has_no_phone_for_whatsapp');
         return new Response(JSON.stringify({ 
           error: "Profile has no phone number for WhatsApp", 
           details: { profile_id, has_phone: !!tech?.phone }
@@ -660,7 +615,7 @@ serve(createHttpHandler(async (req) => {
 
       // Only users with waha_endpoint can send WhatsApp
       if (desiredChannel === 'whatsapp' && !actorResult.data?.waha_endpoint) {
-        console.error('❌ ACTOR NOT AUTHORIZED FOR WHATSAPP:', { actorId });
+        logEvent('error', 'staffing_email.actor_not_authorized_for_whatsapp');
         return new Response(JSON.stringify({ 
           error: "User not authorized for WhatsApp operations", 
           details: { actor_id: actorId }
@@ -671,10 +626,10 @@ serve(createHttpHandler(async (req) => {
       }
 
       const fullName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
-      console.log('👤 TECH INFO:', { fullName, email: '***@***.***' });
+      logEvent('info', 'staffing_email.tech_info');
 
       if (shouldRequireNoConflicts) {
-        console.log('🛡️ RECOMMENDATION GUARD: verifying candidate is still eligible...');
+        logEvent('info', 'staffing_email.recommendation_guard_verifying_candidate_is_still_eligible');
         const targetDates = normalizedDates.length > 0
           ? normalizedDates
           : (normalizedTargetDate ? [normalizedTargetDate] : datesBetween(job.start_time, job.end_time));
@@ -753,7 +708,7 @@ serve(createHttpHandler(async (req) => {
         ].filter(Boolean);
 
         if (guardErrors.length > 0) {
-          console.error('❌ RECOMMENDATION GUARD FAILED:', guardErrors);
+          logEvent('error', 'staffing_email.recommendation_guard_failed');
           return new Response(JSON.stringify({
             error: 'Unable to verify technician availability',
             details: { errors: guardErrors },
@@ -817,7 +772,7 @@ serve(createHttpHandler(async (req) => {
             .order('created_at', { ascending: false });
 
           if (declineEventsError) {
-            console.error('❌ RECOMMENDATION GUARD FAILED: cross-job decline role lookup', declineEventsError);
+            logEvent('error', 'staffing_email.recommendation_guard_failed_cross_job_decline_role_lookup');
             return new Response(JSON.stringify({
               error: 'Unable to verify technician availability',
               details: { errors: [declineEventsError] },
@@ -954,7 +909,7 @@ serve(createHttpHandler(async (req) => {
             technician: { id: tech.id, name: fullName },
           };
 
-          console.log('⛔ BLOCKING SEND: stale candidate is no longer eligible', blockDetails);
+          logEvent('info', 'staffing_email.blocking_send_stale_candidate_is_no_longer_eligible');
           return new Response(JSON.stringify({
             error: 'Technician is no longer available for this recommendation',
             details: blockDetails,
@@ -971,12 +926,10 @@ serve(createHttpHandler(async (req) => {
       // with require_no_conflicts so stale candidate lists do not create collisions.
       const conflictWarnings: any[] = [];
       if (shouldOverrideConflicts && !shouldRequireNoConflicts) {
-        console.log('⚠️ CONFLICT CHECK OVERRIDDEN by user - skipping conflict detection');
+        logEvent('info', 'staffing_email.conflict_check_overridden_by_user_skipping_conflict_detection');
       } else {
         try {
-          console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...', {
-            mode: shouldRequireNoConflicts ? 'blocking hard conflicts' : 'warning'
-          });
+          logEvent('info', 'staffing_email.conflict_check_using_enhanced_rpc_conflict_checker');
 
           // Check conflicts for each date if multi-date, otherwise for single date or whole job
           const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
@@ -994,7 +947,7 @@ serve(createHttpHandler(async (req) => {
             );
 
             if (conflictErr) {
-              console.warn('⚠️ Conflict check failed:', conflictErr);
+              logEvent('warn', 'staffing_email.conflict_check_failed');
               if (shouldRequireNoConflicts) {
                 return new Response(JSON.stringify({
                   error: 'Unable to verify technician availability',
@@ -1028,7 +981,7 @@ serve(createHttpHandler(async (req) => {
                   technician: { id: tech.id, name: fullName },
                 };
 
-                console.log('⛔ BLOCKING SEND: candidate no longer has clean availability', blockDetails);
+                logEvent('info', 'staffing_email.blocking_send_candidate_no_longer_has_clean_availability');
 
                 return new Response(JSON.stringify({
                   error: 'Technician is no longer available for this recommendation',
@@ -1046,11 +999,7 @@ serve(createHttpHandler(async (req) => {
               const conflictType = hasHardConflict ? 'confirmed' : (hasUnavailability ? 'unavailability' : 'pending');
               const conflicts = hasHardConflict ? hardConflicts : softConflicts;
 
-              console.log(`⚠️ ${conflictType} conflict detected (warning only - not blocking):`, {
-                jobConflicts: conflicts,
-                unavailability: unavailabilityConflicts,
-                note: 'Different departments may start at different times, so whole job span conflicts are treated as warnings'
-              });
+              logEvent('info', 'staffing_email.conflict_detected_warning_only_not_blocking');
 
               // Accumulate conflict warnings for metadata logging (don't overwrite)
               conflictWarnings.push({
@@ -1063,12 +1012,12 @@ serve(createHttpHandler(async (req) => {
           }
 
           if (conflictWarnings.length > 0) {
-            console.log('⚠️ Conflicts detected but allowing send to proceed - conflicts logged as warnings');
+            logEvent('info', 'staffing_email.conflicts_detected_but_allowing_send_to_proceed_conflicts_logged_as_warnings');
           } else {
-            console.log('✅ No conflicts detected, proceeding to send email');
+            logEvent('info', 'staffing_email.no_conflicts_detected_proceeding_to_send_email');
           }
         } catch (conflictCheckErr) {
-          console.warn('⚠️ Conflict check encountered an error, continuing to send email:', conflictCheckErr);
+          logEvent('warn', 'staffing_email.conflict_check_encountered_an_error_continuing_to_send_email');
         }
       }
 
@@ -1076,7 +1025,7 @@ serve(createHttpHandler(async (req) => {
       // CRITICAL: This check is NOT overridable - prevents real double-bookings
       // Runs regardless of shouldOverrideConflicts flag
       try {
-        console.log('🕒 TIMESHEET CHECK: verifying no double-booking on exact dates...');
+        logEvent('info', 'staffing_email.timesheet_check_verifying_no_double_booking_on_exact_dates');
 
         // Determine dates to check: use explicit dates if provided, otherwise derive from job
         let datesToCheck = normalizedDates.length > 0 ? normalizedDates : (normalizedTargetDate ? [normalizedTargetDate] : []);
@@ -1090,7 +1039,7 @@ serve(createHttpHandler(async (req) => {
             dates.push(d.toISOString().split('T')[0]);
           }
           datesToCheck = dates;
-          console.log(`📅 Whole-span request detected, checking ${dates.length} dates from job span`);
+          logEvent('info', 'staffing_email.whole_span_request_detected_checking_dates_from_job_span');
         }
 
         if (datesToCheck.length > 0) {
@@ -1105,7 +1054,7 @@ serve(createHttpHandler(async (req) => {
             .eq('is_active', true); // Only check active timesheets
 
           if (timesheetErr) {
-            console.warn('⚠️ Timesheet check failed, continuing:', timesheetErr);
+            logEvent('warn', 'staffing_email.timesheet_check_failed_continuing');
           } else if (existingTimesheets && existingTimesheets.length > 0) {
             // Found actual timesheet conflicts - this is a real double-booking
             const conflictDates = existingTimesheets.map(ts => ({
@@ -1113,7 +1062,7 @@ serve(createHttpHandler(async (req) => {
               job_title: (ts.jobs as any)?.title || 'Unknown Job'
             }));
 
-            console.log('⛔ HARD CONFLICT: Timesheet already exists for exact dates:', conflictDates);
+            logEvent('info', 'staffing_email.hard_conflict_timesheet_already_exists_for_exact_dates');
 
             return new Response(JSON.stringify({
               error: 'Technician already has confirmed work on these dates',
@@ -1132,11 +1081,11 @@ serve(createHttpHandler(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
           } else {
-            console.log('✅ No timesheet conflicts on exact dates');
+            logEvent('info', 'staffing_email.no_timesheet_conflicts_on_exact_dates');
           }
         }
       } catch (timesheetCheckErr) {
-        console.warn('⚠️ Timesheet check encountered an error, continuing:', timesheetCheckErr);
+        logEvent('warn', 'staffing_email.timesheet_check_encountered_an_error_continuing');
       }
 
       // Step 3: Determine request id (rid) and batch shape
@@ -1163,7 +1112,7 @@ serve(createHttpHandler(async (req) => {
             .maybeSingle();
 
           if (existingFirstErr) {
-            console.warn('⚠️ Failed to check existing first batch row, continuing with new rid:', existingFirstErr);
+            logEvent('warn', 'staffing_email.failed_to_check_existing_first_batch_row_continuing_with_new_rid');
           }
 
           if (existingFirst?.id) {
@@ -1175,7 +1124,7 @@ serve(createHttpHandler(async (req) => {
       }
 
       // Step 4: Generate token (must use the final rid)
-      console.log('🔐 GENERATING TOKEN...');
+      logEvent('info', 'staffing_email.generating_token');
       const exp = new Date(Date.now() + 1000*60*60*48).toISOString();
       const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
         { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -1186,10 +1135,10 @@ serve(createHttpHandler(async (req) => {
       // Store only hash of token bytes
       const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", sig));
       let token_hash = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
-      console.log('🔐 TOKEN GENERATED:', { rid, expires: exp });
+      logEvent('info', 'staffing_email.token_generated');
 
       // Step 5: Insert/update staffing request(s)
-      console.log('💾 SAVING STAFFING REQUEST...');
+      logEvent('info', 'staffing_email.saving_staffing_request');
       let insertedId = rid;
 
       // If multiple dates are provided, create a batch of single-day requests and use one of them for the email link
@@ -1218,7 +1167,7 @@ serve(createHttpHandler(async (req) => {
             .maybeSingle();
 
           if (upd.error) {
-            console.error('❌ STAFFING REQUEST BATCH FIRST UPDATE ERROR:', upd.error);
+            logEvent('error', 'staffing_email.staffing_request_batch_first_update_error');
             return new Response(JSON.stringify({ error: 'Database error updating first batch request', details: upd.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         } else {
@@ -1244,7 +1193,7 @@ serve(createHttpHandler(async (req) => {
             const isDuplicate = code === '23505' || /duplicate key/i.test(msg);
 
             if (isDuplicate) {
-              console.warn('🔄 BATCH FIRST INSERT DUPLICATE (race) - reselecting existing row and updating token');
+              logEvent('warn', 'staffing_email.batch_first_insert_duplicate_race_reselecting_existing_row_and_updating_token');
               const { data: existingAfterRace, error: existingAfterRaceErr } = await supabase
                 .from('staffing_requests')
                 .select('id')
@@ -1257,7 +1206,7 @@ serve(createHttpHandler(async (req) => {
                 .maybeSingle();
 
               if (existingAfterRaceErr || !existingAfterRace?.id) {
-                console.error('❌ STAFFING REQUEST BATCH DUPLICATE - FAILED TO FIND EXISTING ROW AFTER RACE:', { existingAfterRaceErr });
+                logEvent('error', 'staffing_email.staffing_request_batch_duplicate_failed_to_find_existing_row_after_race');
                 return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
               }
 
@@ -1292,11 +1241,11 @@ serve(createHttpHandler(async (req) => {
                 .maybeSingle();
 
               if (upd.error) {
-                console.error('❌ STAFFING REQUEST BATCH DUPLICATE - UPDATE ERROR:', upd.error);
+                logEvent('error', 'staffing_email.staffing_request_batch_duplicate_update_error');
                 return new Response(JSON.stringify({ error: 'Database error updating first batch request', details: upd.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
               }
             } else {
-              console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
+              logEvent('error', 'staffing_email.staffing_request_batch_first_insert_error');
               return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
           }
@@ -1318,14 +1267,14 @@ serve(createHttpHandler(async (req) => {
           ...roleCodePatch,
         }));
         if (rest.length) {
-          console.log('📅 Inserting batch dates:', { count: rest.length, dates: rest.map(r => r.target_date) });
+          logEvent('info', 'staffing_email.inserting_batch_dates');
           const up = await supabase
             .from('staffing_requests')
             .insert(rest, { ignoreDuplicates: true } as any);
           if (up.error) {
-            console.warn('⚠️ Batch insert had errors:', up.error);
+            logEvent('warn', 'staffing_email.batch_insert_had_errors');
           } else {
-            console.log('✅ Successfully inserted batch dates');
+            logEvent('info', 'staffing_email.successfully_inserted_batch_dates');
           }
         }
 
@@ -1341,10 +1290,10 @@ serve(createHttpHandler(async (req) => {
             .eq('single_day', true)
             .in('target_date', normalizedDates);
           if (cohesion.error) {
-            console.warn('⚠️ batch_id cohesion update returned error (non-fatal):', cohesion.error);
+            logEvent('warn', 'staffing_email.batch_id_cohesion_update_returned_error_non_fatal');
           }
         } catch (e) {
-          console.warn('⚠️ Failed to enforce batch_id cohesion (non-fatal):', e);
+          logEvent('warn', 'staffing_email.failed_to_enforce_batch_id_cohesion_non_fatal');
         }
       } else {
         // Single request as before
@@ -1363,7 +1312,7 @@ serve(createHttpHandler(async (req) => {
           ...roleCodePatch,
         });
         if (insertRes.error && insertRes.error.code === "23505") {
-          console.log('🔄 DUPLICATE FOUND, UPDATING...');
+          logEvent('info', 'staffing_email.duplicate_found_updating');
           // Target the exact pending row shape to avoid touching unrelated requests
           let updater = supabase
             .from("staffing_requests")
@@ -1386,10 +1335,10 @@ serve(createHttpHandler(async (req) => {
           }
 
           const upd = await updater.select("id").maybeSingle();
-          console.log('🔄 UPDATE RESULT:', { data: upd.data, error: upd.error });
+          logEvent('info', 'staffing_email.update_result');
           if (upd.data?.id) insertedId = upd.data.id;
         } else if (insertRes.error) {
-          console.error('❌ STAFFING REQUEST INSERT ERROR:', insertRes.error);
+          logEvent('error', 'staffing_email.staffing_request_insert_error');
           return new Response(JSON.stringify({ error: "Database error saving request", details: insertRes.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
@@ -1405,11 +1354,11 @@ serve(createHttpHandler(async (req) => {
           if (!sigErr && signed?.signedUrl) tourPdfSignedUrl = signed.signedUrl;
         }
       } catch (e) {
-        console.warn('[send-staffing-email] Failed to sign tour_pdf_path', e);
+        logEvent('warn', 'staffing_email.failed_to_sign_tour_pdf_path');
       }
 
       // Step 5: Build content (email or whatsapp)
-      console.log('📧 BUILDING EMAIL CONTENT...');
+      logEvent('info', 'staffing_email.building_email_content');
       const emailConfirmUrl = buildLegacyStaffingActionUrl({
         base: __DEFAULT_CONFIRM_BASE,
         rid: insertedId,
@@ -1464,16 +1413,16 @@ serve(createHttpHandler(async (req) => {
       const secondaryCta = phase === 'availability' ? 'No estoy disponible' : 'Rechazo la oferta';
       // Build date row depending on single-day vs span
       const datesRowHtml = (isSingleDayRequest && targetDateLabel)
-        ? `<div><b>Fecha:</b> ${targetDateLabel}</div>`
-        : `<div><b>Fechas:</b> ${startDate}${job.end_time ? ` — ${endDate}` : ''}</div>`;
+        ? `<div><b>Fecha:</b> ${escapeHtml(String(targetDateLabel))}</div>`
+        : `<div><b>Fechas:</b> ${escapeHtml(String(startDate))}${job.end_time ? ` — ${escapeHtml(String(endDate))}` : ''}</div>`;
 
       const multiDatesHtml = normalizedDates.length > 1
-        ? `<div><b>Fechas seleccionadas:</b></div><ul style="margin:8px 0 0 16px;padding:0;">${normalizedDates.map(d => `<li>${fmtDate(`${d}T00:00:00Z`)}</li>`).join('')}</ul>`
+        ? `<div><b>Fechas seleccionadas:</b></div><ul style="margin:8px 0 0 16px;padding:0;">${normalizedDates.map(d => `<li>${escapeHtml(String(fmtDate(`${d}T00:00:00Z`)))}</li>`).join('')}</ul>`
         : '';
       const dateDetailsHtml = normalizedDates.length > 1 ? multiDatesHtml : datesRowHtml;
       const offerDetailsHtml = phase === 'offer'
         ? `
-                            <div><b>Horario:</b> ${callTime}</div>
+                            <div><b>Horario:</b> ${escapeHtml(String(callTime))}</div>
                             <div><b>Ubicación:</b> ${safeLocation}</div>
                             ${safeRoleLabel ? `<div><b>Rol:</b> ${safeRoleLabel}</div>` : ''}`
         : '';
@@ -1501,12 +1450,12 @@ serve(createHttpHandler(async (req) => {
                       <tr>
                         <td align="left" style="vertical-align:middle;">
                           <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
-                            <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                            <img src="${escapeHtml(String(COMPANY_LOGO_URL))}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
                           </a>
                         </td>
                         <td align="right" style="vertical-align:middle;">
                           <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
-                            <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                            <img src="${escapeHtml(String(AT_LOGO_URL))}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
                           </a>
                         </td>
                       </tr>
@@ -1548,7 +1497,7 @@ serve(createHttpHandler(async (req) => {
                   <td style="padding:12px 24px 0 24px;">
                     <div style=\"background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;\">
                       <div style=\"font-weight:600;color:#9a3412;margin-bottom:4px;\">Calendario del tour (PDF)</div>
-                      <a href=\"${tourPdfSignedUrl}\" style=\"color:#9a3412;text-decoration:underline;\">Descargar PDF</a>
+                      <a href=\"${escapeHtml(String(tourPdfSignedUrl))}\" style=\"color:#9a3412;text-decoration:underline;\">Descargar PDF</a>
                     </div>
                   </td>
                 </tr>` : ''}
@@ -1557,10 +1506,10 @@ serve(createHttpHandler(async (req) => {
                     <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;">
                       <tr>
                         <td align="left" style="padding:8px 0;">
-                          <a href="${emailConfirmUrl}" style="display:inline-block;background:#10b981;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${primaryCta}</a>
+                          <a href="${escapeHtml(String(emailConfirmUrl))}" style="display:inline-block;background:#10b981;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${primaryCta}</a>
                         </td>
                         <td align="right" style="padding:8px 0;">
-                          <a href="${emailDeclineUrl}" style="display:inline-block;background:#ef4444;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${secondaryCta}</a>
+                          <a href="${escapeHtml(String(emailDeclineUrl))}" style="display:inline-block;background:#ef4444;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${secondaryCta}</a>
                         </td>
                       </tr>
                     </table>
@@ -1585,11 +1534,7 @@ serve(createHttpHandler(async (req) => {
       </html>`;
 
       // Step 6: Deliver via chosen channel
-      console.log('🔗 CONFIRM LINKS GENERATED:', {
-        email: desiredChannel === 'email',
-        whatsapp: desiredChannel === 'whatsapp',
-        expires_at: exp,
-      });
+      logEvent('info', 'staffing_email.confirm_links_generated');
       if (desiredChannel === 'whatsapp') {
         const text = buildWhatsAppStaffingMessage({
           phase,
@@ -1625,7 +1570,7 @@ serve(createHttpHandler(async (req) => {
 
         const requestId = crypto.randomUUID();
         try {
-          console.log('[send-staffing-email] WA request started', { requestId });
+          logEvent('info', 'staffing_email.wa_request_started');
         } catch {}
 
         // Normalize phone → JID
@@ -1726,18 +1671,18 @@ serve(createHttpHandler(async (req) => {
             if (!res.ok) {
               const bodyStr = parsed ? JSON.stringify(parsed) : textBody || '';
               const cf = res.status === 524 && bodyStr ? parseCF524(bodyStr) : null;
-              console.warn('[send-staffing-email] WAHA non-OK', { status: res.status, rayId: cf?.rayId || null });
+              logEvent('warn', 'staffing_email.waha_non_ok', { status: res.status });
               attemptErrors.push({ url: attempt.url, step: 'http', status: res.status, body: truncate(bodyStr), cloudflareRayId: cf?.rayId || null });
               continue;
             }
             const interpretation = interpretResponse(parsed);
             if (interpretation.ok) { waOk = true; break; }
             const serialized = parsed ? JSON.stringify(parsed) : textBody || '';
-            console.warn('[send-staffing-email] WAHA reported failure', { reason: interpretation.reason || null });
+            logEvent('warn', 'staffing_email.waha_reported_failure');
             attemptErrors.push({ url: attempt.url, step: 'api', status: res.status, json: parsed, body: truncate(serialized), message: interpretation.reason });
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
-            console.warn('[send-staffing-email] WAHA fetch error', { message });
+            logEvent('warn', 'staffing_email.waha_fetch_error');
             attemptErrors.push({ url: attempt.url, step: 'fetch', message });
           }
         }
@@ -1786,7 +1731,7 @@ serve(createHttpHandler(async (req) => {
               _visibility: null,
             });
           } catch (activityError) {
-            console.warn('[send-staffing-email] Failed to log activity (whatsapp)', activityError);
+            logEvent('warn', 'staffing_email.failed_to_log_activity_whatsapp');
           }
           return new Response(JSON.stringify({ success: true, channel: 'whatsapp' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -1796,16 +1741,16 @@ serve(createHttpHandler(async (req) => {
         return new Response(JSON.stringify(errorPayload), { status: statusToReturn, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       } else {
         // Email channel via Brevo
-        console.log('📤 SENDING EMAIL VIA BREVO...');
+        logEvent('info', 'staffing_email.sending_email_via_brevo');
         const emailPayload = {
           sender: { email: BREVO_FROM },
           to: [{ email: tech.email }],
           subject,
           htmlContent: html
         };
-        console.log('📤 EMAIL PAYLOAD READY');
+        logEvent('info', 'staffing_email.email_payload_ready');
         const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
-        console.log('📤 BREVO RESPONSE:', { status: sendRes.status, statusText: sendRes.statusText, ok: sendRes.ok });
+        logEvent('info', 'staffing_email.brevo_response', { status: sendRes.status, ok: sendRes.ok });
         await supabase.from("staffing_events").insert({
           staffing_request_id: insertedId,
           event: "email_sent",
@@ -1849,7 +1794,7 @@ serve(createHttpHandler(async (req) => {
               _visibility: null,
             });
           } catch (activityError) {
-            console.warn('[send-staffing-email] Failed to log activity', activityError);
+            logEvent('warn', 'staffing_email.failed_to_log_activity');
           }
           return new Response(JSON.stringify({ success: true, channel: 'email' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } else {
@@ -1859,7 +1804,7 @@ serve(createHttpHandler(async (req) => {
       }
 
     } catch (operationError) {
-      console.error('❌ OPERATION ERROR:', operationError);
+      logEvent('error', 'staffing_email.operation_error');
       return new Response(JSON.stringify({ error: "Internal server error" }), {
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -1868,7 +1813,7 @@ serve(createHttpHandler(async (req) => {
 
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    console.error("Server error:", error);
+    logEvent('error', 'staffing_email.server_error');
     return new Response("Server error", { status: 500, headers: corsHeaders });
   }
 }, { allowedMethods: ["POST"] }));

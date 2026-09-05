@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 import {
   corsHeaders,
   createHttpHandler,
@@ -150,12 +151,12 @@ serve(createHttpHandler(async (req) => {
                     <tr>
                       <td align="left" style="vertical-align:middle;">
                         <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
-                          <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                          <img src="${escapeHtml(String(COMPANY_LOGO_URL))}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
                         </a>
                       </td>
                       <td align="right" style="vertical-align:middle;">
                         <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
-                          <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                          <img src="${escapeHtml(String(AT_LOGO_URL))}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
                         </a>
                       </td>
                     </tr>
@@ -212,7 +213,7 @@ serve(createHttpHandler(async (req) => {
     return new Response(JSON.stringify({ success: true, channel: 'email' }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   } catch (err) {
     if (err instanceof HttpError) throw err;
-    console.error('[send-tour-availability] error:', err);
+    logEvent('error', 'tour_availability.request_failed');
     return new Response('Server error', { status: 500, headers: corsHeaders });
   }
 }, { allowedMethods: ["POST"] }));

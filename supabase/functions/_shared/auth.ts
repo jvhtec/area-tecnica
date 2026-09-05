@@ -1,6 +1,7 @@
 import { type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 
 import { HttpError, requireBearerToken } from "./http.ts";
+import { logEvent } from "./structuredLogger.ts";
 
 export const ADMIN_MANAGEMENT_ROLES = new Set(["admin", "management"]);
 
@@ -84,7 +85,7 @@ export async function requireAuthenticatedRole(
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
   if (authError || !user) {
     if (options.logContext) {
-      console.error(`[${options.logContext}] Token verification failed:`, authError?.message);
+      logEvent("error", "auth.token_verification_failed");
     }
 
     throw new HttpError(401, options.invalidMessage ?? "Invalid or expired token", {
@@ -100,7 +101,7 @@ export async function requireAuthenticatedRole(
 
   if (profileError) {
     if (options.logContext) {
-      console.error(`[${options.logContext}] Profile lookup failed:`, profileError.message);
+      logEvent("error", "auth.profile_lookup_failed");
     }
 
     throw new HttpError(500, "Authorization lookup failed", {
@@ -114,14 +115,14 @@ export async function requireAuthenticatedRole(
 
   if (!allowedRoles.has(role)) {
     if (options.logContext) {
-      console.warn(`[${options.logContext}] Forbidden: user`, user.id, "role:", role || "<missing>");
+      logEvent("warn", "auth.role_forbidden");
     }
 
     try {
       await options.onForbidden?.({ userId: user.id, role, user });
     } catch (hookError) {
       if (options.logContext) {
-        console.error(`[${options.logContext}] Forbidden hook failed:`, hookError);
+        logEvent("error", "auth.forbidden_hook_failed");
       }
     }
 

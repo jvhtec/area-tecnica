@@ -209,7 +209,7 @@ describe("smarter staffing recommendation migration", () => {
 
   it("blocks stale candidate-list sends when the candidate no longer matches displayed availability", () => {
     expect(sendStaffingEmailFunction).toContain("require_no_conflicts");
-    expect(sendStaffingEmailFunction).toContain("RECOMMENDATION GUARD");
+    expect(sendStaffingEmailFunction).toContain("staffing_email.recommendation_guard_verifying_candidate_is_still_eligible");
     expect(sendStaffingEmailFunction).toContain("overlapping_assignments");
     expect(sendStaffingEmailFunction).toContain("same_role_requests");
     expect(sendStaffingEmailFunction).toContain("job_availability_requests");

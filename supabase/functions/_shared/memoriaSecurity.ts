@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 import { requireAuthenticatedRole } from "./auth.ts";
+import { logEvent } from "./structuredLogger.ts";
 import { HttpError, readBoundedJsonObject, requireEnvValues } from "./http.ts";
 import { parseMemoriaRequestInput, type MemoriaRequestInput } from "./memoriaInput.ts";
 
@@ -83,7 +84,7 @@ export async function uploadGeneratedMemoriaPdf(
   }
 
   if (!bucket) {
-    console.error("Memoria PDF upload failed", lastError?.message);
+    logEvent("error", "memoria.upload_failed");
     throw new HttpError(500, "No se pudo guardar el PDF generado", {
       code: "output_upload_failed",
       exposeDetails: false,
@@ -94,7 +95,7 @@ export async function uploadGeneratedMemoriaPdf(
     .from(bucket)
     .createSignedUrl(objectPath, SIGNED_URL_TTL_SECONDS);
   if (error || !data?.signedUrl) {
-    console.error("Memoria PDF signing failed", error?.message);
+    logEvent("error", "memoria.signing_failed");
     throw new HttpError(500, "No se pudo firmar el PDF generado", {
       code: "output_sign_failed",
       exposeDetails: false,

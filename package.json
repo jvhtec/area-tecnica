@@ -25,7 +25,7 @@
     "test:e2e:mobile:smoke": "npm run test:e2e:mobile",
     "perf:baseline": "node scripts/performance/collect-phase4-baseline.mjs",
     "budget:bundle": "node scripts/performance/check-bundle-budget.mjs",
-    "governance": "npm run governance:source && npm run governance:lint-warnings && npm run governance:type-floor && npm run governance:filesize && npm run governance:functions && npm run governance:exposure && npm run governance:sql-grants && npm run governance:csp && npm run governance:actions && npm run ci:db:migrations && npm run audit:deps",
+    "governance": "node scripts/governance/check-edge-logging.mjs && npm run governance:source && npm run governance:lint-warnings && npm run governance:type-floor && npm run governance:filesize && npm run governance:functions && npm run governance:exposure && npm run governance:sql-grants && npm run governance:csp && npm run governance:actions && npm run ci:db:migrations && npm run audit:deps",
     "governance:source": "node scripts/governance/check-source-boundaries.mjs",
     "governance:lint-warnings": "node scripts/governance/check-lint-warning-baseline.mjs",
     "governance:type-floor": "node scripts/governance/check-mobile-type-floor.mjs",
