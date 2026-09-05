@@ -47,11 +47,10 @@ INSERT INTO public.jobs (id, title, start_time, end_time)
 VALUES
   ('e9200000-0000-0000-0000-000000000001', 'Summary requested job', '2026-07-10T08:00:00Z', '2026-07-10T20:00:00Z'),
   ('e9200000-0000-0000-0000-000000000002', 'Summary unrequested job', '2026-07-11T08:00:00Z', '2026-07-11T20:00:00Z');
-INSERT INTO public.rate_cards_2025 (category, base_day_eur, plus_10_12_eur, overtime_hour_eur)
-VALUES ('tecnico', 100, 120, 15) ON CONFLICT (category) DO NOTHING;
-INSERT INTO public.timesheets (job_id, technician_id, date, start_time, end_time, category, is_active)
+-- This test concerns visibility of a stored amount, not rate calculation.
+INSERT INTO public.timesheets (job_id, technician_id, date, start_time, end_time, category, is_active, amount_eur)
 VALUES ('e9200000-0000-0000-0000-000000000001', 'e9100000-0000-0000-0000-000000000001',
-  '2026-07-10', '08:00', '20:00', 'tecnico', true);
+  '2026-07-10', '08:00', '20:00', 'tecnico', true, 125.50);
 REFRESH MATERIALIZED VIEW public.v_job_staffing_summary;
 
 -- Capture the authoritative aggregate before changing caller identities.
@@ -60,7 +59,7 @@ SELECT job_id, assigned_count, worked_count, total_cost_eur, approved_cost_eur
 FROM public.v_job_staffing_summary
 WHERE job_id = 'e9200000-0000-0000-0000-000000000001';
 GRANT SELECT ON expected_staffing_summary TO authenticated, service_role;
-SELECT ok((SELECT total_cost_eur > 0 FROM expected_staffing_summary),
+SELECT is((SELECT total_cost_eur FROM expected_staffing_summary), 125.50::numeric,
   'the fixture contains a nonzero payroll aggregate');
 
 SELECT set_config('request.jwt.claim.role', 'anon', false);
