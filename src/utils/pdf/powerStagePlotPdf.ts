@@ -238,14 +238,18 @@ export const drawPowerStagePlot = (
     y = pageBreakY;
   }
 
-  doc.setFontSize(14);
+  // The font is set explicitly: the caller's chrome may leave mono active, and
+  // a display-size heading in Courier is not this system's voice.
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
   doc.setTextColor(...titleColor);
-  doc.text(title, contentLeft, y);
+  doc.text(title.toUpperCase(), contentLeft, y);
   y += 8;
 
   // Color legend (one swatch + label per department)
   if (legend && legend.length > 0) {
     let legendX = contentLeft;
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     legend.forEach(({ label, color }) => {
       const [red, green, blue] = color;

@@ -3,6 +3,7 @@ import {
   REPORT_INK,
   REPORT_SOFT,
   drawReportRunningHead,
+  reportGeometry,
   loadReportIssuerMark,
   setReportMonoText,
   setReportText,
@@ -182,9 +183,13 @@ export const generatePersonalCalendarPDF = async (
 
   // The month title sits on the same page furniture as every other document;
   // the calendar itself starts right under it.
+  // The grid starts and ends on the same edges as the chrome above it.
+  const calendarGeo = reportGeometry(doc);
   const monthTitleY = 40;
   const calendarStartY = monthTitleY + 8;
-  const footerSpace = 30;
+  // Reserve exactly what the chrome occupies at the foot of this sheet, so the
+  // grid never runs under the footer rule on the taller A3 page.
+  const footerSpace = pageHeight - calendarGeo.contentBottom + 6;
   const legendSpace = 20;
 
   switch (range) {
@@ -207,10 +212,10 @@ export const generatePersonalCalendarPDF = async (
 
   const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
-  const cellWidth = 57;
+  const startX = calendarGeo.left;
+  const cellWidth = calendarGeo.contentWidth / 7;
   const techHeight = 3.5;
   const techSpacing = 0.4;
-  const startX = 15;
   const dayNumberHeight = 8;
   const cellPadding = 2;
 

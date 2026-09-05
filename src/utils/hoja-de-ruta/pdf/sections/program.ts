@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { HOJA_HEADING, HOJA_LABEL, hojaGeometry, hojaTable } from '../hoja-report-system';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT, hojaGeometry, hojaTable } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 
@@ -26,7 +26,7 @@ export class ProgramSection {
       for (const [idx, day] of anyEvent.programScheduleDays.entries()) {
         const title = `${day?.label || `Día ${idx + 1}`}${day?.date ? ` (${day.date})` : ''}`;
         this.pdfDoc.setText(12, HOJA_HEADING);
-        this.pdfDoc.addText(title, 20, yPosition);
+        this.pdfDoc.addText(title, HOJA_LEFT, yPosition);
         yPosition += 10;
 
         if (Array.isArray(day.rows) && day.rows.length > 0) {
@@ -82,7 +82,7 @@ export class ProgramSection {
       if (renderedStructured) {
         yPosition = this.pdfDoc.checkPageBreak(yPosition, 18);
         this.pdfDoc.setText(12, HOJA_HEADING);
-        this.pdfDoc.addText("Programa (Texto Libre)", 20, yPosition);
+        this.pdfDoc.addText("Programa (Texto Libre)", HOJA_LEFT, yPosition);
         yPosition += 10;
         this.pdfDoc.setText(10, [51, 51, 51]);
       }
@@ -94,7 +94,7 @@ export class ProgramSection {
 
       for (const line of scheduleLines) {
         yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
-        this.pdfDoc.addText(line, 30, yPosition);
+        this.pdfDoc.addText(line, HOJA_INDENT, yPosition);
         yPosition += lineHeight;
       }
       return yPosition + 6;

@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { HOJA_HEADING, HOJA_LABEL, hojaGeometry, hojaTable } from '../hoja-report-system';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT, hojaGeometry, hojaTable } from '../hoja-report-system';
 import { EventData, Accommodation } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
@@ -11,7 +11,7 @@ export class RoomingSection {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
     
     this.pdfDoc.setText(14, HOJA_HEADING);
-    this.pdfDoc.addText("Rooming", 20, yPosition);
+    this.pdfDoc.addText("Rooming", HOJA_LEFT, yPosition);
     yPosition += 15;
 
     // Collect all room assignments from accommodations
@@ -43,7 +43,7 @@ export class RoomingSection {
     if (allRooms.length === 0) {
       // Show placeholder
       this.pdfDoc.setText(10, [128, 128, 128]);
-      this.pdfDoc.addText("No hay asignaciones de habitaciones disponibles", 30, yPosition);
+      this.pdfDoc.addText("No hay asignaciones de habitaciones disponibles", HOJA_INDENT, yPosition);
       return yPosition + 20;
     }
 

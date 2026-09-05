@@ -147,7 +147,7 @@ export async function generateRateQuotePDF(
 
     // Show override info if applicable
     if (quote.has_override && quote.override_amount_eur != null && quote.calculated_total_eur != null) {
-      nameCellContent += `\n(!) OVERRIDE: ${formatCurrency(quote.override_amount_eur)} (calc: ${formatCurrency(quote.calculated_total_eur)})`;
+      nameCellContent += `\nExcepción de pago: ${formatCurrency(quote.override_amount_eur)} (calculado: ${formatCurrency(quote.calculated_total_eur)})`;
 
       const actor = quote.override_actor_name;
       const actorEmail = quote.override_actor_email;
@@ -162,7 +162,9 @@ export async function generateRateQuotePDF(
     if (quote.vehicle_disclaimer && quote.vehicle_disclaimer_text) {
       const vehicleNote = normalizeVehicleDisclaimerText(quote.vehicle_disclaimer_text);
       if (vehicleNote) {
-        nameCellContent += `\n(⚠ ${vehicleNote})`;
+        // The warning sign is outside the PDF standard encoding and printed as
+        // a replacement character; the word carries the same weight.
+        nameCellContent += `\nAviso vehículo: ${vehicleNote}`;
       }
     }
 

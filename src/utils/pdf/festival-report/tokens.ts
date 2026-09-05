@@ -29,13 +29,27 @@ export const FESTIVAL_FLAG_LABEL: PdfRgb = [122, 90, 22];
 /** Soundcheck bars on the day programme sit behind the show bars. */
 export const FESTIVAL_TIMELINE_SOUNDCHECK: PdfRgb = [207, 200, 187];
 
+/** Points per millimetre — jsPDF's own scale factor for a document in mm. */
+const POINTS_PER_MM = 2.834645669291339;
+
 /**
- * Millimetres per document unit. jsPDF documents in this codebase are created
- * either in millimetres (most) or points (the microphone matrix), so every
- * geometry constant is declared in millimetres and multiplied by this factor.
+ * Millimetres per document unit. Every geometry constant here is declared in
+ * millimetres and multiplied by this factor, so the same numbers lay out a
+ * document whatever unit it was created in.
+ *
+ * The unit is read from jsPDF's own scale factor — points per user unit, so 1
+ * for a points document and 2.83 for a millimetre one. Inferring it from the
+ * page width instead put every A3 sheet in millimetres (420 mm wide) on the
+ * points branch, and drew its chrome 2.83 times too large.
  */
-export const festivalUnitScale = (doc: jsPDF): number =>
-  doc.internal.pageSize.getWidth() > 400 ? 2.834645669291339 : 1;
+export const festivalUnitScale = (doc: jsPDF): number => {
+  const scaleFactor = doc.internal.scaleFactor;
+  if (typeof scaleFactor !== 'number' || !Number.isFinite(scaleFactor)) {
+    return doc.internal.pageSize.getWidth() > 400 ? POINTS_PER_MM : 1;
+  }
+  // A points document reports 1 point per unit; its geometry needs scaling up.
+  return scaleFactor < 1.5 ? POINTS_PER_MM : 1;
+};
 
 export interface FestivalGeometry {
   /** Millimetres-to-unit scale factor for the document. */
@@ -60,14 +74,19 @@ export interface FestivalGeometry {
   railX: number;
 }
 
+/**
+ * Bottom-edge values are insets from the foot of the sheet, not absolute Ys:
+ * an A3 page is 87 mm taller than A4, and pinning the footer to A4's height
+ * floated it in the middle of the sheet with content running underneath.
+ */
 const PORTRAIT = {
   left: 25.4,
   rightInset: 16.4,
   headerRuleY: 26,
   contentTop: 40,
-  contentBottom: 272,
-  footerRuleY: 278.5,
-  footerTextY: 282,
+  contentBottomInset: 25,
+  footerRuleInset: 18.5,
+  footerTextInset: 15,
   railX: 13.2,
 } as const;
 
@@ -76,9 +95,9 @@ const LANDSCAPE = {
   rightInset: 16,
   headerRuleY: 22,
   contentTop: 33,
-  contentBottom: 186,
-  footerRuleY: 192,
-  footerTextY: 195.5,
+  contentBottomInset: 24,
+  footerRuleInset: 18,
+  footerTextInset: 14.5,
   railX: 12,
 } as const;
 
@@ -104,9 +123,9 @@ export const festivalGeometry = (doc: jsPDF): FestivalGeometry => {
     contentWidth: pageWidth - (spec.left + spec.rightInset) * mm,
     headerRuleY: spec.headerRuleY * mm,
     contentTop: spec.contentTop * mm,
-    contentBottom: Math.min(spec.contentBottom * mm, pageHeight - 25 * mm),
-    footerRuleY: Math.min(spec.footerRuleY * mm, pageHeight - 18.5 * mm),
-    footerTextY: Math.min(spec.footerTextY * mm, pageHeight - 15 * mm),
+    contentBottom: pageHeight - spec.contentBottomInset * mm,
+    footerRuleY: pageHeight - spec.footerRuleInset * mm,
+    footerTextY: pageHeight - spec.footerTextInset * mm,
     railX: spec.railX * mm,
   };
 };

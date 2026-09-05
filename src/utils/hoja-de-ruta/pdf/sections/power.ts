@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_INDENT } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 
@@ -15,7 +16,7 @@ export class PowerSection {
       return yPosition;
     }
 
-    return this.pdfDoc.addWrappedLines(eventData.powerRequirements!, 30, yPosition, {
+    return this.pdfDoc.addWrappedLines(eventData.powerRequirements!, HOJA_INDENT, yPosition, {
       lineHeight: 5,
     }) + 10;
   }

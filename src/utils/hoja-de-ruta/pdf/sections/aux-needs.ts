@@ -2,7 +2,7 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { AUXILIARY_MACHINERY_LABELS } from '@/constants/hojaDeRutaAuxiliaryNeeds';
-import { hojaGeometry, hojaTable } from '../hoja-report-system';
+import { HOJA_INDENT, hojaGeometry, hojaTable } from '../hoja-report-system';
 
 export class AuxNeedsSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -59,10 +59,10 @@ export class AuxNeedsSection {
 
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 14);
     this.pdfDoc.setText(10, [51, 51, 51]);
-    this.pdfDoc.addText("Notas:", 30, yPosition);
+    this.pdfDoc.addText("Notas:", HOJA_INDENT, yPosition);
     yPosition += lineHeight;
 
-    yPosition = this.pdfDoc.addWrappedLines(auxLines, 30, yPosition, { lineHeight });
+    yPosition = this.pdfDoc.addWrappedLines(auxLines, HOJA_INDENT, yPosition, { lineHeight });
 
     return yPosition + 4;
   }

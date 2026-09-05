@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { HOJA_HEADING, HOJA_LABEL } from '../hoja-report-system';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 
@@ -34,14 +34,14 @@ export class ScheduleSection {
     yPosition = this.pdfDoc.checkPageBreak(yPosition);
     
     this.pdfDoc.setText(14, HOJA_HEADING);
-    this.pdfDoc.addText("Programa y Requerimientos", 20, yPosition);
+    this.pdfDoc.addText("Programa y Requerimientos", HOJA_LEFT, yPosition);
     yPosition += 15;
 
     this.pdfDoc.setText(10, [51, 51, 51]);
 
     if (DataValidators.hasData(eventData.schedule)) {
       this.pdfDoc.setText(12, HOJA_HEADING);
-      this.pdfDoc.addText("Programa:", 30, yPosition);
+      this.pdfDoc.addText("Programa:", HOJA_INDENT, yPosition);
       yPosition += 12;
       
       this.pdfDoc.setText(10, [51, 51, 51]);
@@ -51,7 +51,7 @@ export class ScheduleSection {
 
     if (DataValidators.hasData(eventData.powerRequirements)) {
       this.pdfDoc.setText(12, HOJA_HEADING);
-      this.pdfDoc.addText("Requerimientos de Energía:", 30, yPosition);
+      this.pdfDoc.addText("Requerimientos de Energía:", HOJA_INDENT, yPosition);
       yPosition += 12;
       
       this.pdfDoc.setText(10, [51, 51, 51]);
@@ -61,7 +61,7 @@ export class ScheduleSection {
 
     if (DataValidators.hasData(eventData.auxiliaryNeeds)) {
       this.pdfDoc.setText(12, HOJA_HEADING);
-      this.pdfDoc.addText("Necesidades Auxiliares:", 30, yPosition);
+      this.pdfDoc.addText("Necesidades Auxiliares:", HOJA_INDENT, yPosition);
       yPosition += 12;
       
       this.pdfDoc.setText(10, [51, 51, 51]);

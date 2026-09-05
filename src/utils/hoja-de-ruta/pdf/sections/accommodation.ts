@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { HOJA_HEADING, HOJA_LABEL, hojaGeometry, hojaTable } from '../hoja-report-system';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT, hojaGeometry, hojaTable } from '../hoja-report-system';
 import { EventData, Accommodation } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
@@ -24,7 +24,7 @@ export class AccommodationSection {
     yPosition = this.pdfDoc.checkPageBreak(yPosition);
     
     this.pdfDoc.setText(14, HOJA_HEADING);
-    this.pdfDoc.addText("Alojamiento", 20, yPosition);
+    this.pdfDoc.addText("Alojamiento", HOJA_LEFT, yPosition);
     yPosition += 15;
 
   for (const accommodation of validAccommodations) {
@@ -65,7 +65,7 @@ export class AccommodationSection {
       }
       if (DataValidators.hasData(accommodation.hotel_name)) {
         this.pdfDoc.setText(12, HOJA_HEADING);
-        this.pdfDoc.addText(accommodation.hotel_name!, 30, yPosition);
+        this.pdfDoc.addText(accommodation.hotel_name!, HOJA_INDENT, yPosition);
         yPosition += 12;
       }
 
@@ -179,7 +179,7 @@ export class AccommodationSection {
           yPosition = 20;
         }
         this.pdfDoc.setText(12, HOJA_HEADING);
-        this.pdfDoc.addText("Rooming", 20, yPosition);
+        this.pdfDoc.addText("Rooming", HOJA_LEFT, yPosition);
         yPosition += 12;
 
         // Room assignments
