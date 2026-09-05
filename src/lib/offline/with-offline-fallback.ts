@@ -10,6 +10,21 @@ export const ONLINE_FETCH_TIMEOUT_MS = 4000;
 
 const TIMEOUT = Symbol("online-timeout");
 
+/** Only a missing transport response permits cached private data as fallback.
+ * PostgREST serializes fetch TypeErrors into a plain object with an empty code.
+ * HTTP/SQL errors and cancellation must retain their original meaning.
+ */
+const isTransportFailure = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  if ("status" in error && Number(error.status) > 0) return false;
+  if ("context" in error && error.context && typeof error.context === "object"
+    && "status" in error.context && Number(error.context.status) > 0) return false;
+  if ("code" in error && error.code !== "" && error.code != null) return false;
+  if ("name" in error && error.name === "AbortError") return false;
+  return "message" in error && typeof error.message === "string"
+    && /^(?:TypeError: )?(?:Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed|Network request failed)$/i.test(error.message);
+};
+
 export interface OfflineFallbackResult<T> {
   data: T;
   /** true when the data came from the offline snapshot */
@@ -19,7 +34,8 @@ export interface OfflineFallbackResult<T> {
 /**
  * Runs an online fetch with a snapshot fallback:
  *  - browser reports offline  -> snapshot immediately (throw if none)
- *  - online fetch errors      -> snapshot if available, else rethrow
+ *  - transport failure       -> snapshot if available, else rethrow
+ *  - HTTP/SQL/authorization errors or cancellation -> rethrow without cache
  *  - online fetch exceeds the timeout -> snapshot if available, otherwise
  *    keep waiting for the network
  *
@@ -60,6 +76,7 @@ export const fetchWithOfflineFallback = async <T>(options: {
     }
     return { data: await onlinePromise, fromOffline: false };
   } catch (error) {
+    if (!isTransportFailure(error)) throw error;
     const offlineData = await offline();
     if (offlineData !== null) {
       return { data: offlineData, fromOffline: true };

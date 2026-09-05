@@ -62,13 +62,37 @@ describe("fetchWithOfflineFallback", () => {
     expect(result).toEqual({ data: "slow-online", fromOffline: false });
   });
 
-  it("serves the snapshot when the online fetch fails", async () => {
+  it("serves the snapshot after a browser transport failure", async () => {
     const result = await fetchWithOfflineFallback({
       online: async (): Promise<string> => {
-        throw new Error("network down");
+        throw new TypeError("Failed to fetch");
       },
       offline: async () => "offline",
       timeoutMs: 50,
+    });
+    expect(result).toEqual({ data: "offline", fromOffline: true });
+  });
+
+  it.each([
+    { code: "42501", message: "permission denied" },
+    { status: 401, message: "expired token" },
+    { status: 403, message: "Failed to fetch" },
+    { code: "23505", message: "duplicate key" },
+    new Error("invalid response"),
+    new DOMException("Request cancelled", "AbortError"),
+  ])("never substitutes private cached data for a non-transport error: %o", async (error) => {
+    const offline = vi.fn(async () => "private cached data");
+    await expect(fetchWithOfflineFallback({
+      online: async () => { throw error; },
+      offline,
+    })).rejects.toBe(error);
+    expect(offline).not.toHaveBeenCalled();
+  });
+
+  it("supports the network error shape returned by PostgREST", async () => {
+    const result = await fetchWithOfflineFallback({
+      online: async () => { throw { message: "TypeError: Failed to fetch", code: "", details: "" }; },
+      offline: async () => "offline",
     });
     expect(result).toEqual({ data: "offline", fromOffline: true });
   });
