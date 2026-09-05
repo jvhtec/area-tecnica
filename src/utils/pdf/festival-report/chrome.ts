@@ -145,10 +145,25 @@ const drawFestivalIssuerMark = (doc: jsPDF, geo: FestivalGeometry): void => {
   doc.text('SECTOR-PRO', geo.left, baseline, { charSpace: 0.35 * mm });
 };
 
+/**
+ * Draws a document-type mark inside an `sizeMm` square whose top-left corner is
+ * at (`x`, `y`), in the document's own units. Supplied by documents outside the
+ * festival set so they can carry their own line mark through the same chrome.
+ */
+export type FestivalMarkDrawer = (
+  doc: jsPDF,
+  x: number,
+  y: number,
+  mm: number,
+  sizeMm: number,
+) => void;
+
 export interface FestivalChromeOptions {
   kind: FestivalDocKind;
   /** Overrides the default label for the document type. */
   kindLabel?: string;
+  /** Overrides the built-in line mark for `kind`. */
+  mark?: FestivalMarkDrawer;
   /** Event/festival name — carried by the rail so a single printed page still identifies itself. */
   eventTitle?: string;
   /** Second rail segment: stage, date or department. */
@@ -184,15 +199,19 @@ export const drawFestivalChrome = (
   const markSize = 6;
   const markX = geo.right - markSize * mm;
   const labelBaseline = geo.headerRuleY - 6.4 * mm;
-  drawFestivalTypeMark(
-    doc,
-    options.kind,
-    markX,
-    labelBaseline - markSize * mm,
-    mm,
-    FESTIVAL_ACCENT,
-    markSize,
-  );
+  if (options.mark) {
+    options.mark(doc, markX, labelBaseline - markSize * mm, mm, markSize);
+  } else {
+    drawFestivalTypeMark(
+      doc,
+      options.kind,
+      markX,
+      labelBaseline - markSize * mm,
+      mm,
+      FESTIVAL_ACCENT,
+      markSize,
+    );
+  }
 
   setFestivalMonoText(doc, FESTIVAL_SOFT, 5.6, 'bold');
   const labelTracking = 0.18 * mm;

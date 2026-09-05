@@ -155,7 +155,7 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
 
     expect(grandTotals.length).toBeGreaterThan(0);
     expect(baseTotals.length).toBeGreaterThan(0);
-    expect(screen.getByText(/travel half/i)).toBeInTheDocument();
+    expect(screen.getByText(/medio día de viaje/i)).toBeInTheDocument();
     expect(screen.getByText(/vehículo asignado por la gira/i)).toBeInTheDocument();
     expect(screen.queryByText(/no hay información de pagos para este trabajo/i)).not.toBeInTheDocument();
   });

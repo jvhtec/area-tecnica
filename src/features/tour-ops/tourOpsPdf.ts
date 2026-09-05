@@ -1,16 +1,32 @@
 import type { TourOpsDate, TourOpsModel, TourOpsProjection } from "@/features/tour-ops/types";
 import { buildReadableFilename } from "@/utils/fileName";
 import { loadPdfLibs, type AutoTableFn } from "@/utils/pdf/lazyPdf";
-import { fetchTourLogo, getCompanyLogo } from "@/utils/pdf/logoUtils";
+import { fetchTourLogo } from "@/utils/pdf/logoUtils";
+import {
+  REPORT_ACCENT,
+  REPORT_FAINT,
+  REPORT_INK,
+  REPORT_RULE_WEIGHT,
+  REPORT_SOFT,
+  distributeColumnWidths,
+  drawReportRunningHead,
+  drawReportSectionHeading,
+  loadReportIssuerMark,
+  reportGeometry,
+  reportTableDefaults,
+  setReportMonoText,
+  setReportText,
+  stampReportFolios,
+  truncateToWidth,
+  type ReportChromeOptions,
+  type ReportGeometry,
+} from "@/utils/pdf/report-system";
 import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import type jsPDF from "jspdf";
 import type { HookData, UserOptions } from "jspdf-autotable";
-
-const RED: [number, number, number] = [125, 1, 1];
-const INK: [number, number, number] = [32, 36, 42];
-const MUTED: [number, number, number] = [104, 112, 124];
+import { drawReportFactRows } from "@/utils/pdf/report-system/blocks";
 
 interface AutoTableDoc extends jsPDF {
   lastAutoTable?: { finalY?: number };
@@ -18,10 +34,15 @@ interface AutoTableDoc extends jsPDF {
 
 interface PdfBranding {
   tourLogo?: { dataUrl: string; format: "PNG" | "JPEG" };
-  companyLogo?: HTMLImageElement | null;
 }
 
 const lastY = (pdf: jsPDF, fallback: number) => (pdf as AutoTableDoc).lastAutoTable?.finalY ?? fallback;
+
+const PROJECTION_LABELS: Record<TourOpsProjection, string> = {
+  guest: "Itinerario externo",
+  technician: "Itinerario de equipo",
+  management: "Libro de operaciones",
+};
 const dateOnlyAsMadridNoon = (value: string) => (value.includes("T") ? value : `${value}T12:00:00`);
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -45,16 +66,12 @@ const loadDataUrl = async (url: string | undefined): Promise<string | null> => {
 };
 
 const loadBranding = async (tourId: string): Promise<PdfBranding> => {
-  const [tourLogoUrl, companyLogo] = await Promise.all([
-    fetchTourLogo(tourId),
-    getCompanyLogo(),
-  ]);
+  const [tourLogoUrl] = await Promise.all([fetchTourLogo(tourId), loadReportIssuerMark()]);
   const tourLogoData = await loadDataUrl(tourLogoUrl);
   return {
     tourLogo: tourLogoData
       ? { dataUrl: tourLogoData, format: tourLogoData.includes("image/jpeg") || tourLogoData.includes("image/jpg") ? "JPEG" : "PNG" }
       : undefined,
-    companyLogo,
   };
 };
 
@@ -84,94 +101,70 @@ const roomOccupants = (room: TourOpsDate["accommodations"][number]["roomAllocati
     .filter(Boolean)
     .join(" / ");
 
-const header = (pdf: jsPDF, title: string, subtitle: string, branding?: PdfBranding) => {
-  const width = pdf.internal.pageSize.width;
-  pdf.setFillColor(...RED);
-  pdf.rect(0, 0, width, 26, "F");
-  if (branding?.tourLogo) {
-    try {
-      pdf.addImage(branding.tourLogo.dataUrl, branding.tourLogo.format, 10, 5, 18, 16);
-    } catch {
-      // Logo rendering is best-effort; text header remains usable.
-    }
-  }
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(14);
-  pdf.text(title, branding?.tourLogo ? 34 : 12, 12);
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(9);
-  pdf.text(subtitle, branding?.tourLogo ? 34 : 12, 20);
-};
+/**
+ * The running head for a page of the book. Every page names the tour and what
+ * that page is about, so a sheet handed to one driver still identifies itself.
+ */
+const chromeFor = (
+  model: TourOpsModel,
+  projection: TourOpsProjection,
+  contextLabel: string,
+): ReportChromeOptions => ({
+  kind: "tour",
+  kindLabel: PROJECTION_LABELS[projection],
+  eventTitle: model.tour.name,
+  contextLabel,
+});
 
-const footer = (pdf: jsPDF, page: number, branding?: PdfBranding) => {
-  const width = pdf.internal.pageSize.width;
-  const height = pdf.internal.pageSize.height;
-  if (branding?.companyLogo) {
-    try {
-      const logoWidth = 28;
-      const ratio = branding.companyLogo.width > 0 ? branding.companyLogo.height / branding.companyLogo.width : 0.35;
-      const logoHeight = logoWidth * ratio;
-      pdf.addImage(branding.companyLogo, "PNG", (width - logoWidth) / 2, height - logoHeight - 7, logoWidth, logoHeight);
-    } catch {
-      pdf.setTextColor(...MUTED);
-      pdf.setFontSize(8);
-      pdf.text("Sector Pro", width / 2, height - 10, { align: "center" });
-    }
-  } else {
-    pdf.setTextColor(...MUTED);
-    pdf.setFontSize(8);
-    pdf.text("Sector Pro", width / 2, height - 10, { align: "center" });
-  }
-  pdf.setTextColor(...MUTED);
-  pdf.setFontSize(8);
-  pdf.text(`Pagina ${page}`, width - 28, height - 10);
-};
+const drawPageChrome = (
+  pdf: jsPDF,
+  model: TourOpsModel,
+  projection: TourOpsProjection,
+  contextLabel: string,
+): ReportGeometry => drawReportRunningHead(pdf, chromeFor(model, projection, contextLabel));
 
-const ensurePage = (pdf: jsPDF, y: number, pageRef: { value: number }, title: string, subtitle: string, branding?: PdfBranding) => {
-  if (y < 260) return y;
-  footer(pdf, pageRef.value, branding);
+/**
+ * Breaks to a new page when `y` has run past the content area, redrawing the
+ * running head so the continuation still says which date it belongs to.
+ */
+const ensurePage = (
+  pdf: jsPDF,
+  geo: ReportGeometry,
+  y: number,
+  model: TourOpsModel,
+  projection: TourOpsProjection,
+  contextLabel: string,
+) => {
+  if (y < geo.contentBottom - 24) return y;
   pdf.addPage();
-  pageRef.value += 1;
-  header(pdf, title, subtitle, branding);
-  return 38;
+  const pageGeo = drawPageChrome(pdf, model, projection, contextLabel);
+  return pageGeo.contentTop;
 };
 
-const sectionTitle = (pdf: jsPDF, title: string, y: number) => {
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(12);
-  pdf.setTextColor(...RED);
-  pdf.text(title, 12, y);
-  pdf.setTextColor(...INK);
-  return y + 6;
-};
-
+/**
+ * Runs a ledger table, drawing the running head on any page the table spills
+ * onto. Folios are stamped once at the end, when the length is known.
+ */
 const runAutoTable = (
   pdf: jsPDF,
   autoTable: AutoTableFn,
-  pageRef: { value: number },
-  title: string,
-  subtitle: string,
-  branding: PdfBranding | undefined,
+  model: TourOpsModel,
+  projection: TourOpsProjection,
+  contextLabel: string,
   options: UserOptions,
 ) => {
   const userDidDrawPage = options.didDrawPage;
-  const objectMargin =
-    typeof options.margin === "object" && !Array.isArray(options.margin)
-      ? options.margin
-      : {};
+  let firstPage = true;
+
   autoTable(pdf, {
     ...options,
-    margin: { top: 34, left: 12, right: 12, ...objectMargin },
     didDrawPage: (data: HookData) => {
-      const currentPage = pdf.getCurrentPageInfo().pageNumber;
-      pageRef.value = Math.max(pageRef.value, pdf.getNumberOfPages());
-      header(pdf, title, subtitle, branding);
-      footer(pdf, currentPage, branding);
+      // The page the table starts on already carries its chrome.
+      if (firstPage) firstPage = false;
+      else drawPageChrome(pdf, model, projection, contextLabel);
       userDidDrawPage?.(data);
     },
   });
-  pageRef.value = Math.max(pageRef.value, pdf.getNumberOfPages());
 };
 
 const addDatePage = (
@@ -179,51 +172,53 @@ const addDatePage = (
   autoTable: AutoTableFn,
   model: TourOpsModel,
   tourDate: TourOpsDate,
-  pageRef: { value: number },
   projection: TourOpsProjection,
-  branding: PdfBranding | undefined,
   startOnNewPage = true,
 ) => {
-  if (startOnNewPage) {
-    pdf.addPage();
-    pageRef.value += 1;
-  }
-  header(pdf, model.tour.name, `${formatDate(tourDate.date)} - ${tourDate.venueName || "Fecha de gira"}`, branding);
-  let y = 40;
+  if (startOnNewPage) pdf.addPage();
 
-  runAutoTable(pdf, autoTable, pageRef, model.tour.name, `${formatDate(tourDate.date)} - ${tourDate.venueName || "Fecha de gira"}`, branding, {
-    startY: y,
-    theme: "plain",
-    body: [
-      ["Fecha", formatDate(tourDate.date)],
-      ["Tipo", tourDate.type || "show"],
-      ["Venue", tourDate.venueName || tourDate.location?.name || "Por confirmar"],
-      ["Direccion", tourDate.venueAddress || tourDate.location?.formattedAddress || "Por confirmar"],
-      ["Job", tourDate.jobTitle || tourDate.jobId || "Sin job vinculado"],
-    ],
-    styles: { fontSize: 9, cellPadding: 2 },
-    columnStyles: { 0: { fontStyle: "bold", cellWidth: 34 }, 1: { cellWidth: 150 } },
-  });
-  y = lastY(pdf, y) + 10;
+  const dateLabel = formatDate(tourDate.date);
+  const venueLabel = tourDate.venueName || tourDate.location?.name || "Fecha de gira";
+  const context = `${dateLabel}  ·  ${venueLabel}`;
+  const geo = drawPageChrome(pdf, model, projection, context);
 
-  y = sectionTitle(pdf, "Programa", y);
+  // The date leads the page: whoever is holding it needs to know which day it
+  // is before anything else on the sheet means anything.
+  setReportMonoText(pdf, REPORT_ACCENT, 6.2, "bold");
+  pdf.text(dateLabel.toUpperCase(), geo.left, geo.contentTop, { charSpace: 0.3 * geo.mm });
+  setReportText(pdf, REPORT_INK, 17, "bold");
+  pdf.text(
+    truncateToWidth(pdf, venueLabel, geo.contentWidth),
+    geo.left,
+    geo.contentTop + 9 * geo.mm,
+  );
+
+  let y = drawReportFactRows(pdf, geo, [
+    ["Tipo", tourDate.type || "show"],
+    ["Recinto", tourDate.venueName || tourDate.location?.name || "Por confirmar"],
+    ["Dirección", tourDate.venueAddress || tourDate.location?.formattedAddress || "Por confirmar"],
+    ["Trabajo", tourDate.jobTitle || tourDate.jobId || "Sin trabajo vinculado"],
+  ], geo.contentTop + 17 * geo.mm);
+
+  y = drawReportSectionHeading(pdf, geo, "Programa", y + 4, 1);
   const programRows = tourDate.program.flatMap((day) =>
     day.rows.map((row) => [day.label || "", row.time || "", row.item || "", row.dept || "", row.notes || ""]),
   );
-  runAutoTable(pdf, autoTable, pageRef, model.tour.name, `${formatDate(tourDate.date)} - ${tourDate.venueName || "Fecha de gira"}`, branding, {
+  runAutoTable(pdf, autoTable, model, projection, context, {
     startY: y,
-    head: [["Dia", "Hora", "Actividad", "Dpto", "Notas"]],
-    body: programRows.length ? programRows : [["", "", "Programa pendiente", "", ""]],
-    theme: "grid",
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: RED, textColor: [255, 255, 255] },
-    columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 20 }, 2: { cellWidth: 58 }, 3: { cellWidth: 22 }, 4: { cellWidth: 60 } },
+    head: [["Día", "Hora", "Actividad", "Dpto.", "Notas"]],
+    body: programRows.length ? programRows : [["—", "—", "Programa pendiente", "—", ""]],
+    ...reportTableDefaults(geo, { fontSize: 6.8, numericColumns: [1] }),
+    columnStyles: distributeColumnWidths([20, 16, 52, 18, 54], geo.contentWidth),
   });
   y = lastY(pdf, y) + 10;
 
+  let section = 1;
+
   if (model.allowedSections.travel) {
-    y = ensurePage(pdf, y, pageRef, model.tour.name, "Continuacion", branding);
-    y = sectionTitle(pdf, "Viajes", y);
+    y = ensurePage(pdf, geo, y, model, projection, context);
+    section += 1;
+    y = drawReportSectionHeading(pdf, geo, "Viajes", y, section);
     const travelRows = [...tourDate.travelIn, ...tourDate.travelOut].map((segment) => [
       segment.fromLabel,
       segment.toLabel,
@@ -232,76 +227,124 @@ const addDatePage = (
       formatDateTime(segment.arrivalTime),
       segment.routeNotes || "",
     ]);
-    runAutoTable(pdf, autoTable, pageRef, model.tour.name, "Continuacion", branding, {
+    runAutoTable(pdf, autoTable, model, projection, context, {
       startY: y,
       head: [["Origen", "Destino", "Tipo", "Salida", "Llegada", "Notas"]],
-      body: travelRows.length ? travelRows : [["", "", "", "", "", "Sin viajes definidos"]],
-      theme: "grid",
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [70, 82, 96], textColor: [255, 255, 255] },
+      body: travelRows.length ? travelRows : [["—", "—", "—", "—", "—", "Sin viajes definidos"]],
+      ...reportTableDefaults(geo, { fontSize: 6.8, numericColumns: [3, 4] }),
+      columnStyles: distributeColumnWidths([26, 26, 20, 22, 22, 44], geo.contentWidth),
     });
     y = lastY(pdf, y) + 10;
   }
 
   if (projection !== "guest") {
-    y = ensurePage(pdf, y, pageRef, model.tour.name, "Continuacion", branding);
-    y = sectionTitle(pdf, "Equipo", y);
-    runAutoTable(pdf, autoTable, pageRef, model.tour.name, "Continuacion", branding, {
+    y = ensurePage(pdf, geo, y, model, projection, context);
+    section += 1;
+    y = drawReportSectionHeading(pdf, geo, "Equipo", y, section);
+    runAutoTable(pdf, autoTable, model, projection, context, {
       startY: y,
-      head: [["Nombre", "Dpto", "Rol", "Telefono"]],
+      head: [["Nombre", "Dpto.", "Rol", "Teléfono"]],
       body: tourDate.crew.length
-        ? tourDate.crew.map((member) => [member.name, member.department || "", member.role || "", member.phone || ""])
-        : [["", "", "Sin equipo confirmado", ""]],
-      theme: "grid",
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [70, 82, 96], textColor: [255, 255, 255] },
+        ? tourDate.crew.map((member) => [member.name, member.department || "—", member.role || "—", member.phone || "—"])
+        : [["—", "—", "Sin equipo confirmado", "—"]],
+      ...reportTableDefaults(geo, { fontSize: 7, numericColumns: [3] }),
+      columnStyles: distributeColumnWidths([50, 24, 40, 30], geo.contentWidth),
     });
     y = lastY(pdf, y) + 10;
   }
 
   if (model.allowedSections.accommodations) {
-    y = ensurePage(pdf, y, pageRef, model.tour.name, "Continuacion", branding);
-    y = sectionTitle(pdf, "Alojamiento", y);
-    runAutoTable(pdf, autoTable, pageRef, model.tour.name, "Continuacion", branding, {
+    y = ensurePage(pdf, geo, y, model, projection, context);
+    section += 1;
+    y = drawReportSectionHeading(pdf, geo, "Alojamiento", y, section);
+    runAutoTable(pdf, autoTable, model, projection, context, {
       startY: y,
-      head: [["Hotel", "Check-in", "Check-out", "Confirmacion"]],
+      head: [["Hotel", "Entrada", "Salida", "Confirmación"]],
       body: tourDate.accommodations.length
         ? tourDate.accommodations.map((hotel) => [
             hotel.hotelName,
-            hotel.checkInDate || "",
-            hotel.checkOutDate || "",
-            hotel.confirmationNumber || "",
+            hotel.checkInDate || "—",
+            hotel.checkOutDate || "—",
+            hotel.confirmationNumber || "—",
           ])
-        : [["Sin alojamiento definido", "", "", ""]],
-      theme: "grid",
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [70, 82, 96], textColor: [255, 255, 255] },
+        : [["Sin alojamiento definido", "—", "—", "—"]],
+      ...reportTableDefaults(geo, { fontSize: 7, numericColumns: [1, 2, 3] }),
+      columnStyles: distributeColumnWidths([56, 24, 24, 36], geo.contentWidth),
     });
     y = lastY(pdf, y) + 10;
 
     const roomRows = tourDate.accommodations.flatMap((hotel) =>
       hotel.roomAllocation.map((room) => [
         hotel.hotelName,
-        room.roomType || "",
-        room.roomNumber || "",
-        roomOccupants(room) || "",
+        room.roomType || "—",
+        room.roomNumber || "—",
+        roomOccupants(room) || "—",
       ]),
     );
     if (roomRows.length > 0) {
-      y = ensurePage(pdf, y, pageRef, model.tour.name, "Continuacion", branding);
-      y = sectionTitle(pdf, "Rooming", y);
-      runAutoTable(pdf, autoTable, pageRef, model.tour.name, "Continuacion", branding, {
+      y = ensurePage(pdf, geo, y, model, projection, context);
+      section += 1;
+      y = drawReportSectionHeading(pdf, geo, "Rooming", y, section);
+      runAutoTable(pdf, autoTable, model, projection, context, {
         startY: y,
         head: [["Hotel", "Tipo", "Hab.", "Ocupantes"]],
         body: roomRows,
-        theme: "grid",
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [70, 82, 96], textColor: [255, 255, 255] },
+        ...reportTableDefaults(geo, { fontSize: 7, numericColumns: [2] }),
+        columnStyles: distributeColumnWidths([50, 26, 18, 46], geo.contentWidth),
       });
     }
   }
+};
 
-  footer(pdf, pageRef.value, branding);
+/**
+ * The book's cover. No chrome, no folio: the tour's name, what the book is,
+ * and the two figures that say how big it is, over paper rather than a slab of
+ * ink — this document is printed and carried, often on an office printer.
+ */
+const drawCover = (
+  pdf: jsPDF,
+  model: TourOpsModel,
+  projection: TourOpsProjection,
+  branding: PdfBranding,
+) => {
+  const geo = reportGeometry(pdf);
+  const { mm } = geo;
+
+  if (branding.tourLogo) {
+    try {
+      pdf.addImage(branding.tourLogo.dataUrl, branding.tourLogo.format, geo.left, 38 * mm, 30 * mm, 24 * mm);
+    } catch {
+      // Keep the cover readable if logo rendering fails.
+    }
+  }
+
+  setReportMonoText(pdf, REPORT_ACCENT, 6.4, "bold");
+  pdf.text(PROJECTION_LABELS[projection].toUpperCase(), geo.left, 78 * mm, { charSpace: 0.4 * mm });
+
+  setReportText(pdf, REPORT_INK, 30, "bold");
+  const titleLines = (pdf.splitTextToSize(model.tour.name, geo.contentWidth) as string[]).slice(0, 3);
+  pdf.text(titleLines, geo.left, 92 * mm, { lineHeightFactor: 0.94, charSpace: -0.08 * mm });
+
+  const afterTitle = 92 * mm + titleLines.length * 10.5 * mm;
+  pdf.setDrawColor(...REPORT_ACCENT);
+  pdf.setLineWidth(REPORT_RULE_WEIGHT * mm);
+  pdf.line(geo.left, afterTitle, geo.right, afterTitle);
+
+  setReportMonoText(pdf, REPORT_SOFT, 7, "bold");
+  pdf.text(
+    `${model.stats.totalDates} FECHAS   ·   ${model.stats.venueCount} RECINTOS   ·   ${model.stats.travelSegments} VIAJES`,
+    geo.left,
+    afterTitle + 8 * mm,
+    { charSpace: 0.25 * mm },
+  );
+
+  setReportMonoText(pdf, REPORT_FAINT, 5.8);
+  pdf.text(
+    `SECTOR-PRO  ·  ${formatInTimeZone(new Date(), MADRID_TIMEZONE, "dd/MM/yyyy")}`,
+    geo.left,
+    geo.footerTextY,
+    { charSpace: 0.2 * mm },
+  );
 };
 
 export async function generateTourOpsPdf(
@@ -311,13 +354,13 @@ export async function generateTourOpsPdf(
 ) {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
-  const pageRef = { value: 1 };
   const dates = options.dateId ? model.dates.filter((date) => date.id === options.dateId) : model.dates;
   const isDaySheet = Boolean(options.dateId);
   const branding = await loadBranding(model.tour.id);
 
   if (isDaySheet) {
-    dates.forEach((date, index) => addDatePage(pdf, autoTable, model, date, pageRef, projection, branding, index > 0));
+    dates.forEach((date, index) => addDatePage(pdf, autoTable, model, date, projection, index > 0));
+    stampReportFolios(pdf);
     const date = dates[0];
     const filename = buildReadableFilename([
       model.tour.name,
@@ -330,66 +373,38 @@ export async function generateTourOpsPdf(
     return;
   }
 
-  pdf.setFillColor(...RED);
-  pdf.rect(0, 0, pdf.internal.pageSize.width, pdf.internal.pageSize.height, "F");
-  if (branding.tourLogo) {
-    try {
-      pdf.addImage(branding.tourLogo.dataUrl, branding.tourLogo.format, 18, 36, 34, 28);
-    } catch {
-      // Keep cover readable if logo rendering fails.
-    }
-  }
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(28);
-  pdf.text(model.tour.name, 18, 92);
-  pdf.setFontSize(14);
-  pdf.setFont("helvetica", "normal");
-  pdf.text(
-    projection === "guest" ? "Itinerario externo" : projection === "technician" ? "Itinerario de equipo" : "Libro de operaciones",
-    18,
-    108,
-  );
-  pdf.setFontSize(10);
-  pdf.text(`${model.stats.totalDates} fechas - ${model.stats.travelSegments} viajes`, 18, 122);
-  footer(pdf, pageRef.value, branding);
+  drawCover(pdf, model, projection, branding);
 
   pdf.addPage();
-  pageRef.value += 1;
-  header(pdf, model.tour.name, "Resumen", branding);
+  const summaryGeo = drawPageChrome(pdf, model, projection, "Resumen");
 
-  runAutoTable(pdf, autoTable, pageRef, model.tour.name, "Resumen", branding, {
-    startY: 40,
-    body: [
-      ["Fechas", String(model.stats.totalDates)],
-      ["Venues", String(model.stats.venueCount)],
-      ["Viajes", String(model.stats.travelSegments)],
-      ["Documentos", String(model.documents.length)],
-      ["Estado", model.tour.status || ""],
-    ],
-    theme: "plain",
-    styles: { fontSize: 10, cellPadding: 3 },
-    columnStyles: { 0: { cellWidth: 38, fontStyle: "bold" } },
-  });
+  let y = drawReportFactRows(pdf, summaryGeo, [
+    ["Fechas", String(model.stats.totalDates)],
+    ["Recintos", String(model.stats.venueCount)],
+    ["Viajes", String(model.stats.travelSegments)],
+    ["Documentos", String(model.documents.length)],
+    ["Estado", model.tour.status || "Sin estado"],
+  ], summaryGeo.contentTop);
 
-  let y = lastY(pdf, 40) + 12;
-  y = sectionTitle(pdf, "Cronograma", y);
-  runAutoTable(pdf, autoTable, pageRef, model.tour.name, "Resumen", branding, {
+  y = drawReportSectionHeading(pdf, summaryGeo, "Cronograma", y + 4, 1);
+  runAutoTable(pdf, autoTable, model, projection, "Resumen", {
     startY: y,
-    head: [["Fecha", "Tipo", "Venue / Evento", "Estado"]],
+    head: [["Fecha", "Tipo", "Recinto / Evento", "Estado"]],
     body: model.dates.map((date, index) => [
       formatDate(date.date),
       date.type || "show",
-      date.venueName || date.location?.name || `Dia ${index + 1}`,
+      date.venueName || date.location?.name || `Día ${index + 1}`,
       date.health.length ? `${date.health.length} avisos` : "Correcto",
     ]),
-    theme: "grid",
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: RED, textColor: [255, 255, 255] },
+    ...reportTableDefaults(summaryGeo, { fontSize: 7 }),
+    columnStyles: distributeColumnWidths([34, 20, 62, 26], summaryGeo.contentWidth),
   });
-  footer(pdf, pageRef.value, branding);
 
-  dates.forEach((date) => addDatePage(pdf, autoTable, model, date, pageRef, projection, branding));
+  dates.forEach((date) => addDatePage(pdf, autoTable, model, date, projection));
+
+  // The cover is counted but carries no folio, so every printed number still
+  // matches the number anyone counts to.
+  stampReportFolios(pdf, { skipPages: [1] });
 
   const filename = buildReadableFilename([
     model.tour.name,

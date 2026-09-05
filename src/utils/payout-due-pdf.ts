@@ -2,12 +2,20 @@ import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 
 import { buildPayoutDuePdfFilename } from "@/utils/pdfFileNames";
+import { getLastAutoTableY } from "@/utils/pdf/exportHelpers";
 import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
-import { getCompanyLogo } from "@/utils/pdf/logoUtils";
+import {
+  distributeColumnWidths,
+  drawReportMasthead,
+  ensureReportSpace,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportChrome,
+  type ReportChromeOptions,
+} from "@/utils/pdf/report-system";
+import { drawReportTotals } from "@/utils/pdf/report-system/blocks";
 
 const MADRID_TIMEZONE = "Europe/Madrid";
-const CORPORATE_RED: [number, number, number] = [125, 1, 1];
-const TEXT_MUTED: [number, number, number] = [100, 116, 139];
 
 export interface PayoutDuePdfRow {
   jobId: string;
@@ -60,35 +68,26 @@ export async function downloadPayoutDueGroupPdf({
 }: DownloadPayoutDueGroupPdfOptions): Promise<void> {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
+  await loadReportIssuerMark();
 
-  const companyLogo = await getCompanyLogo();
+  const period = `${formatLongDate(paymentFrom)} – ${formatLongDate(paymentTo)}`;
+  const chrome: ReportChromeOptions = {
+    kind: 'payout',
+    kindLabel: 'Pagos previstos',
+    eventTitle: 'Pagos previstos',
+    contextLabel: period,
+  };
 
-  doc.setFillColor(...CORPORATE_RED);
-  doc.rect(0, 0, pageWidth, 40, "F");
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("Pagos previstos", pageWidth / 2, 18, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.text(
-    `A pagar entre ${formatLongDate(paymentFrom)} y ${formatLongDate(paymentTo)}`,
-    pageWidth / 2,
-    28,
-    { align: "center" }
-  );
-  doc.setFontSize(9);
-  doc.text(`Generado: ${formatTimestamp(new Date())}`, pageWidth - 14, 36, { align: "right" });
-
-  doc.setTextColor(31, 41, 55);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text(`Total del bloque: ${formatCurrency(totalEur)}`, 14, 52);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Filas: ${rows.length}`, pageWidth - 14, 52, { align: "right" });
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title: 'Pagos previstos',
+    subtitle: `A pagar entre ${formatLongDate(paymentFrom)} y ${formatLongDate(paymentTo)}`,
+    meta: [
+      { label: 'Líneas', value: String(rows.length) },
+      { label: 'Total del bloque', value: formatCurrency(totalEur) },
+      { label: 'Generado', value: formatTimestamp(new Date()) },
+    ],
+  });
 
   const tableBody = rows.map((row) => [
     row.technicianName,
@@ -106,7 +105,7 @@ export async function downloadPayoutDueGroupPdf({
   ]);
 
   autoTable(doc, {
-    startY: 58,
+    startY: contentTop,
     head: [[
       "Técnico",
       "Departamento",
@@ -118,57 +117,17 @@ export async function downloadPayoutDueGroupPdf({
       "Total",
     ]],
     body: tableBody,
-    theme: "grid",
-    headStyles: {
-      fillColor: CORPORATE_RED,
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      fontSize: 9,
-    },
-    bodyStyles: {
-      fontSize: 8.5,
-      cellPadding: 3,
-      textColor: [51, 51, 51],
-    },
-    alternateRowStyles: {
-      fillColor: [248, 248, 248],
-    },
-    columnStyles: {
-      0: { cellWidth: 24 },
-      1: { cellWidth: 16 },
-      2: { cellWidth: 14 },
-      3: { cellWidth: 20 },
-      4: { cellWidth: 20 },
-      5: { cellWidth: 32 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 16, halign: "right" },
-    },
-    margin: { left: 14, right: 14 },
+    ...reportTableDefaults(geo, { fontSize: 6.6, numericColumns: [7] }),
+    columnStyles: distributeColumnWidths([22, 14, 11, 17, 18, 28, 20, 14], geo.contentWidth),
   });
 
-  const pageCount = doc.getNumberOfPages();
-  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-    doc.setPage(pageNumber);
-    const footerY = pageHeight - 12;
+  const totalsY = ensureReportSpace(doc, geo, getLastAutoTableY(doc, contentTop) + 10, 26);
+  drawReportTotals(doc, geo, totalsY, {
+    lines: [{ label: 'Líneas', value: String(rows.length) }],
+    total: { label: 'Total del bloque', value: formatCurrency(totalEur) },
+  });
 
-    if (companyLogo) {
-      try {
-        const ratio = companyLogo.width && companyLogo.height ? companyLogo.width / companyLogo.height : 1;
-        const logoHeight = 10;
-        const logoWidth = logoHeight * ratio;
-        const logoX = (pageWidth - logoWidth) / 2;
-        doc.addImage(companyLogo, "PNG", logoX, footerY - logoHeight - 2, logoWidth, logoHeight);
-      } catch {
-        // Ignore footer logo errors.
-      }
-    }
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...TEXT_MUTED);
-    doc.text("Sector-Pro", 14, footerY);
-    doc.text(`Página ${pageNumber} de ${pageCount}`, pageWidth - 14, footerY, { align: "right" });
-  }
+  stampReportChrome(doc, chrome);
 
   const fileName = buildPayoutDuePdfFilename(paymentFrom, paymentTo);
   doc.save(fileName);

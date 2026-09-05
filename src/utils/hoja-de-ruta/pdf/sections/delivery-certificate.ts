@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_CONTENT_WIDTH } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { Formatters } from '../utils/formatters';
 import { StampImage, StampService } from '../services/stamp-service';
@@ -66,7 +67,7 @@ export class DeliveryCertificateSection {
 
     const { width: pageWidth } = this.pdfDoc.dimensions;
     const left = 20;
-    const maxWidth = pageWidth - 40;
+    const maxWidth = HOJA_CONTENT_WIDTH;
     // jsPDF default unit is mm; keep line height compact for 11–12pt body text.
     const lineHeight = 5;
 

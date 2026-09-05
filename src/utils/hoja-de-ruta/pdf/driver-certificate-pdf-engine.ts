@@ -4,10 +4,16 @@ import { es } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 
 import { uploadPdfToJob } from '../pdf-upload';
+import {
+  drawReportMetaGrid,
+  drawReportSectionHeading,
+  drawReportTitleBlock,
+  loadReportIssuerMark,
+} from '@/utils/pdf/report-system';
 import { PDFDocument } from './core/pdf-document';
+import { HOJA_CONTENT_WIDTH, HOJA_LEFT, hojaGeometry, hojaTable } from './hoja-report-system';
 import type { DriverCertificatePDFGenerationOptions, GeneratedHojaDeRutaPdf } from './core/pdf-types';
 import { FooterService } from './services/footer-service';
-import { HeaderService } from './services/header-service';
 import { LogoService } from './services/logo-service';
 import { MapService } from './services/map-service';
 import { StampImage, StampService } from './services/stamp-service';
@@ -102,17 +108,24 @@ export class DriverCertificatePDFEngine {
       StampService.loadExactSectorProStamp(),
     ]);
 
-    const headerLogoDims = await this.getHeaderLogoDims(logoData);
-    HeaderService.addHeaderToCurrentPage(
-      this.pdfDoc,
-      'Hoja de Transportes',
-      jobTitle,
-      jobDate,
-      logoData || undefined,
-      headerLogoDims
-    );
+    // The transport sheet is a single flow with no cover: it opens with a title
+    // block and the chrome is stamped over every page once, at the end.
+    await loadReportIssuerMark();
+    const headerLogo = await this.loadHeaderLogoImage(logoData);
+    const geo = hojaGeometry(this.pdfDoc.document);
 
-    let yPosition = 54;
+    let yPosition = drawReportTitleBlock(this.pdfDoc.document, geo, {
+      eyebrow: 'Hoja de transportes',
+      title: jobTitle || 'Trabajo sin título',
+      subtitle: jobDate ? `Fecha del trabajo: ${jobDate}` : undefined,
+      clientLogo: headerLogo,
+    });
+
+    yPosition = drawReportMetaGrid(this.pdfDoc.document, geo, [
+      { label: 'Recinto', value: (eventData.venue?.name || '').trim() || 'Sin recinto' },
+      { label: 'Movimientos', value: String(logisticsEvents.length) },
+      { label: 'Emisión', value: new Date().toLocaleDateString('es-ES') },
+    ], yPosition);
 
     yPosition = await this.addVenueSection(eventData, yPosition, venueMapPreview);
     yPosition = this.addContactsSection(eventData, yPosition);
@@ -128,7 +141,10 @@ export class DriverCertificatePDFEngine {
       stamp: sectorProStamp,
     });
 
-    await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle);
+    await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle, {
+      hasCoverPage: false,
+      headerTitle: 'Hoja de Transportes',
+    });
 
     return this.createGeneratedPDF();
   }
@@ -144,31 +160,31 @@ export class DriverCertificatePDFEngine {
     this.pdfDoc.setText(10, [51, 51, 51]);
 
     if (venueName) {
-      this.pdfDoc.addText(`Recinto: ${venueName}`, 20, yPosition);
+      this.pdfDoc.addText(`Recinto: ${venueName}`, HOJA_LEFT, yPosition);
       yPosition += 6;
     }
 
     if (venueAddress) {
-      const addressLines = this.pdfDoc.splitText(`Dirección: ${venueAddress}`, this.pdfDoc.dimensions.width - 40);
+      const addressLines = this.pdfDoc.splitText(`Dirección: ${venueAddress}`, HOJA_CONTENT_WIDTH);
       addressLines.forEach((line) => {
-        this.pdfDoc.addText(line, 20, yPosition);
+        this.pdfDoc.addText(line, HOJA_LEFT, yPosition);
         yPosition += 5;
       });
       yPosition += 2;
     }
 
-    const mapWidth = this.pdfDoc.dimensions.width - 40;
+    const mapWidth = HOJA_CONTENT_WIDTH;
     const mapHeight = 65;
     const mapDataUrl = await this.resolveVenueMapDataUrl(eventData.venue, venueMapPreview, mapWidth, mapHeight);
 
     if (mapDataUrl) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 75);
-      this.pdfDoc.addImage(mapDataUrl, this.resolveImageFormat(mapDataUrl), 20, yPosition, mapWidth, mapHeight);
+      this.pdfDoc.addImage(mapDataUrl, this.resolveImageFormat(mapDataUrl), HOJA_LEFT, yPosition, mapWidth, mapHeight);
       yPosition += mapHeight + 6;
     } else if (venueAddress) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 20);
       this.pdfDoc.setText(9, [120, 120, 120]);
-      this.pdfDoc.addText('Mapa del recinto no disponible para esta dirección.', 20, yPosition);
+      this.pdfDoc.addText('Mapa del recinto no disponible para esta dirección.', HOJA_LEFT, yPosition);
       yPosition += 6;
     }
 
@@ -192,16 +208,10 @@ export class DriverCertificatePDFEngine {
         contact.phone || '',
         contact.email || '',
       ]),
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 2.5, overflow: 'linebreak' },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: { fillColor: [250, 245, 245] },
-      margin: { left: 20, right: 20 },
+      ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+        numericColumns: [2],
+        weights: [28, 22, 22, 28],
+      }),
     });
 
     return this.pdfDoc.getLastAutoTableY() + 8;
@@ -212,7 +222,7 @@ export class DriverCertificatePDFEngine {
 
     if (logisticsEvents.length === 0) {
       this.pdfDoc.setText(10, [90, 90, 90]);
-      this.pdfDoc.addText('No hay eventos de carga/descarga relevantes configurados en logística.', 20, yPosition);
+      this.pdfDoc.addText('No hay eventos de carga/descarga relevantes configurados en logística.', HOJA_LEFT, yPosition);
       return yPosition + 8;
     }
 
@@ -227,16 +237,11 @@ export class DriverCertificatePDFEngine {
         event.license_plate || '',
         event.loading_bay || event.title || '',
       ]),
-      theme: 'grid',
-      styles: { fontSize: 8.5, cellPadding: 2.5, overflow: 'linebreak' },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: { fillColor: [250, 245, 245] },
-      margin: { left: 20, right: 20 },
+      ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+        fontSize: 6.8,
+        numericColumns: [1, 2, 4],
+        weights: [16, 16, 12, 20, 16, 20],
+      }),
     });
 
     return this.pdfDoc.getLastAutoTableY() + 8;
@@ -252,12 +257,12 @@ export class DriverCertificatePDFEngine {
 
     yPosition = this.addSectionTitle('Horarios en Recinto (Hoja de Ruta)', yPosition);
     this.pdfDoc.setText(9, [90, 90, 90]);
-    this.pdfDoc.addText('Nota: "Fecha y Hora" corresponde al horario en recinto.', 20, yPosition);
+    this.pdfDoc.addText('Nota: "Fecha y Hora" corresponde al horario en recinto.', HOJA_LEFT, yPosition);
     yPosition += 6;
 
     if (relevantTransports.length === 0) {
       this.pdfDoc.setText(10, [90, 90, 90]);
-      this.pdfDoc.addText('No hay horarios en recinto cargados en transporte de Hoja de Ruta.', 20, yPosition);
+      this.pdfDoc.addText('No hay horarios en recinto cargados en transporte de Hoja de Ruta.', HOJA_LEFT, yPosition);
       return yPosition + 8;
     }
 
@@ -277,16 +282,11 @@ export class DriverCertificatePDFEngine {
           transport.driver_name || '',
         ];
       }),
-      theme: 'grid',
-      styles: { fontSize: 8.5, cellPadding: 2.5, overflow: 'linebreak' },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: { fillColor: [250, 245, 245] },
-      margin: { left: 20, right: 20 },
+      ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+        fontSize: 7,
+        numericColumns: [1, 2],
+        weights: [18, 26, 18, 20, 22],
+      }),
     });
 
     return this.pdfDoc.getLastAutoTableY() + 8;
@@ -305,7 +305,7 @@ export class DriverCertificatePDFEngine {
     const after = this.deliveryCertificateSection.addDeliveryCertificateSection(eventData, yPosition, context);
     if (after === before) {
       this.pdfDoc.setText(10, [90, 90, 90]);
-      this.pdfDoc.addText('No hay transportes relevantes para completar el certificado legal.', 20, yPosition);
+      this.pdfDoc.addText('No hay transportes relevantes para completar el certificado legal.', HOJA_LEFT, yPosition);
       return yPosition + 8;
     }
 
@@ -314,13 +314,12 @@ export class DriverCertificatePDFEngine {
 
   private addSectionTitle(title: string, yPosition: number): number {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 20);
-
-    this.pdfDoc.setText(13, [125, 1, 1]);
-    this.pdfDoc.addText(title, 20, yPosition);
-    this.pdfDoc.setFillColor(125, 1, 1);
-    this.pdfDoc.addRect(20, yPosition + 2, this.pdfDoc.dimensions.width - 40, 1, 'F');
-
-    return yPosition + 8;
+    return drawReportSectionHeading(
+      this.pdfDoc.document,
+      hojaGeometry(this.pdfDoc.document),
+      title,
+      yPosition,
+    );
   }
 
   private getRelevantTransportRows(eventData: EventData): Transport[] {
@@ -514,26 +513,17 @@ export class DriverCertificatePDFEngine {
     }
   }
 
-  private async getHeaderLogoDims(logoData?: string | null): Promise<{ width: number; height: number } | undefined> {
-    if (!logoData) return undefined;
-    return await new Promise((resolve) => {
+  /** The job mark as an image element, for the title block. */
+  private loadHeaderLogoImage(logoData?: string | null): Promise<HTMLImageElement | null> {
+    if (!logoData) return Promise.resolve(null);
+    return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => {
-        const maxHeight = 28;
-        const maxWidth = 160;
-        const width = img.naturalWidth || img.width;
-        const height = img.naturalHeight || img.height;
-        if (width > 0 && height > 0) {
-          const scale = Math.min(maxHeight / height, maxWidth / width);
-          resolve({ width: Math.round(width * scale), height: Math.round(height * scale) });
-          return;
-        }
-        resolve({ width: 84, height: 28 });
-      };
-      img.onerror = () => resolve({ width: 84, height: 28 });
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
       img.src = logoData;
     });
   }
+
 
   private formatDate(dateValue: string): string {
     try {

@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_HEADING, HOJA_LABEL, HOJA_LEFT, HOJA_RIGHT_INSET } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { MapService } from '../services/map-service';
@@ -17,8 +18,8 @@ export class VenueSection {
   ): Promise<number> {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
     
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Venue", 20, yPosition);
+    this.pdfDoc.setText(14, HOJA_HEADING);
+    this.pdfDoc.addText("Recinto", HOJA_LEFT, yPosition);
     yPosition += 15;
 
     this.pdfDoc.setText(10, [51, 51, 51]);
@@ -37,10 +38,10 @@ export class VenueSection {
         theme: "plain",
         styles: { fontSize: 10, cellPadding: 4 },
         columnStyles: {
-          0: { cellWidth: 50, fontStyle: 'bold', textColor: [125, 1, 1] },
+          0: { cellWidth: 50, fontStyle: 'bold', textColor: HOJA_LABEL },
           1: { cellWidth: 120 }
         },
-        margin: { left: 20, right: 20 },
+        margin: { left: HOJA_LEFT, right: HOJA_RIGHT_INSET },
         tableWidth: 'auto'
       });
       yPosition = this.pdfDoc.getLastAutoTableY() + 15;
@@ -59,8 +60,8 @@ export class VenueSection {
 
     if (imagesToRender.length > 0) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 90);
-      this.pdfDoc.setText(12, [125, 1, 1]);
-      this.pdfDoc.addText("Imágenes del Venue", 20, yPosition);
+      this.pdfDoc.setText(12, HOJA_HEADING);
+      this.pdfDoc.addText("Imágenes del recinto", HOJA_LEFT, yPosition);
       yPosition += 12;
 
       const leftMargin = 20;

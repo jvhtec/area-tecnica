@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT, hojaGeometry, hojaTable } from '../hoja-report-system';
 import { EventData, Accommodation } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
@@ -22,8 +23,8 @@ export class AccommodationSection {
 
     yPosition = this.pdfDoc.checkPageBreak(yPosition);
     
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Alojamiento", 20, yPosition);
+    this.pdfDoc.setText(14, HOJA_HEADING);
+    this.pdfDoc.addText("Alojamiento", HOJA_LEFT, yPosition);
     yPosition += 15;
 
   for (const accommodation of validAccommodations) {
@@ -63,8 +64,8 @@ export class AccommodationSection {
         console.warn('Failed to fetch accommodation photo:', e);
       }
       if (DataValidators.hasData(accommodation.hotel_name)) {
-        this.pdfDoc.setText(12, [125, 1, 1]);
-        this.pdfDoc.addText(accommodation.hotel_name!, 30, yPosition);
+        this.pdfDoc.setText(12, HOJA_HEADING);
+        this.pdfDoc.addText(accommodation.hotel_name!, HOJA_INDENT, yPosition);
         yPosition += 12;
       }
 
@@ -143,7 +144,7 @@ export class AccommodationSection {
         }
 
         if (!mapAdded) {
-          this.pdfDoc.setText(10, [125, 1, 1]);
+          this.pdfDoc.setText(10, HOJA_HEADING);
           this.pdfDoc.addText("[MAPA NO DISPONIBLE]", mapX + 5, mapY + mapHeight / 2);
         }
 
@@ -156,7 +157,7 @@ export class AccommodationSection {
           this.pdfDoc.addLink(destUrl, qrX, qrY, qrSize, qrSize);
 
           // QR captions
-          this.pdfDoc.setText(9, [125, 1, 1]);
+          this.pdfDoc.setText(9, HOJA_HEADING);
           this.pdfDoc.addText("Ruta al hotel", qrX, qrY + qrSize + 6);
           this.pdfDoc.setText(8, [80, 80, 80]);
           this.pdfDoc.addText("Escanea para direcciones", qrX, qrY + qrSize + 12);
@@ -177,8 +178,8 @@ export class AccommodationSection {
         if (yPosition > 20 && yPosition <= 30) {
           yPosition = 20;
         }
-        this.pdfDoc.setText(12, [125, 1, 1]);
-        this.pdfDoc.addText("Rooming", 20, yPosition);
+        this.pdfDoc.setText(12, HOJA_HEADING);
+        this.pdfDoc.addText("Rooming", HOJA_LEFT, yPosition);
         yPosition += 12;
 
         // Room assignments
@@ -195,18 +196,10 @@ export class AccommodationSection {
             startY: yPosition,
             head: [["Tipo", "Habitación", "Huésped 1", "Huésped 2"]],
             body: roomData,
-            theme: "grid",
-            styles: { fontSize: 9, cellPadding: 4 },
-            headStyles: {
-              fillColor: [125, 1, 1],
-              textColor: [255, 255, 255],
-              fontSize: 10,
-              fontStyle: 'bold'
-            },
-            alternateRowStyles: {
-              fillColor: [250, 245, 245]
-            },
-            margin: { left: 20, right: 20 },
+            ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+              numericColumns: [1],
+              weights: [22, 20, 29, 29],
+            }),
             tableWidth: 'auto'
           });
           yPosition = this.pdfDoc.getLastAutoTableY() + 15;

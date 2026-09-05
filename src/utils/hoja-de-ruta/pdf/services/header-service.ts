@@ -1,77 +1,36 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HojaPageLabels } from '../hoja-report-system';
 
 /**
- * Renders a consistent header on the current page, inspired by PesosTool export
+ * Records which section the current page opens, for the chrome pass that runs
+ * once the document is complete.
+ *
+ * The header used to be a 40 mm red band repeating the document title, the job
+ * name and the job date on every page. The job name and date now ride the rail
+ * and the folio line, so the head only has to say what the document is — which
+ * leaves the band's worth of paper to the content.
  */
 export class HeaderService {
-  static addHeaderToCurrentPage(
+  static recordSectionPage(
     pdfDoc: PDFDocument,
-    mainTitle: string,
-    jobName: string,
-    jobDate?: string,
-    logoData?: string,
-    logoDims?: { width: number; height: number }
-  ) {
-    const { width: pageWidth } = pdfDoc.dimensions;
-
-    // Header background bar
-    pdfDoc.setFillColor(125, 1, 1);
-    pdfDoc.addRect(0, 0, pageWidth, 40, 'F');
-
-    // Optional small logo on left
-    if (logoData) {
-      try {
-        const MAX_H = 28;
-        const MAX_W = 160;
-        let drawW = 24;
-        let drawH = 8;
-        if (logoDims && logoDims.width > 0 && logoDims.height > 0) {
-          const scale = Math.min(MAX_H / logoDims.height, MAX_W / logoDims.width);
-          drawW = Math.max(1, Math.round(logoDims.width * scale));
-          drawH = Math.max(1, Math.round(logoDims.height * scale));
-        } else {
-          drawH = MAX_H;
-          drawW = Math.min(MAX_W, Math.round(MAX_H * 3));
-        }
-        pdfDoc.addImage(logoData, 'PNG', 10, 5, drawW, drawH);
-      } catch (e) {
-        // ignore logo errors
-      }
-    }
-
-    // Header text
-    pdfDoc.setText(24, [255, 255, 255]);
-    pdfDoc.addText(mainTitle, pageWidth / 2, 18, { align: 'center' });
-
-    // Job name and date
-    if (jobName) {
-      pdfDoc.setText(12, [255, 255, 255]);
-      pdfDoc.addText(jobName, pageWidth / 2, 30, { align: 'center' });
-    }
-    if (jobDate) {
-      const displayDate = this.formatJobDate(jobDate);
-      if (displayDate) {
-        pdfDoc.setText(10, [255, 255, 255]);
-        pdfDoc.addText(`Fecha del Trabajo: ${displayDate}`, pageWidth / 2, 38, { align: 'center' });
-      }
-    }
+    pageLabels: HojaPageLabels,
+    sectionLabel: string,
+  ): void {
+    pageLabels.record(pdfDoc.document.getCurrentPageInfo().pageNumber, sectionLabel);
   }
 
-  private static formatJobDate(raw: string): string | null {
+  static formatJobDate(raw: string): string | null {
     try {
-      const d = new Date(raw);
-      if (!isNaN(d.getTime())) {
-        // Format as dd/mm/yyyy
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        return `${dd}/${mm}/${yyyy}`;
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) {
+        const day = String(parsed.getDate()).padStart(2, '0');
+        const month = String(parsed.getMonth() + 1).padStart(2, '0');
+        return `${day}/${month}/${parsed.getFullYear()}`;
       }
-      // Fallback for ISO date only strings (YYYY-MM-DD)
+      // Fallback for ISO date-only strings (YYYY-MM-DD).
       if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-        const [y, m, rest] = raw.split('-');
-        const d2 = rest?.slice(0, 2) || '01';
-        return `${d2}/${m}/${y}`;
+        const [year, month, rest] = raw.split('-');
+        return `${rest?.slice(0, 2) || '01'}/${month}/${year}`;
       }
       return raw;
     } catch {

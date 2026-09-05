@@ -1,12 +1,27 @@
 import { Timesheet } from '@/types/timesheet';
-import { Job } from '@/types/job';
+import { JobWithLocationAndDocs } from '@/types/job';
 import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  distributeColumnWidths,
+  drawReportMasthead,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportChrome,
+  type ReportChromeOptions,
+} from '@/utils/pdf/report-system';
 import { isPrepDayTimesheet } from '@/utils/timesheetPrepDays';
+import type { CellHookData } from 'jspdf-autotable';
 
 interface GenerateTimesheetPDFOptions {
-  job: Job;
+  /**
+   * The job the parte belongs to. `JobWithLocationAndDocs` rather than `Job`
+   * because the sheet states where the work happened, and the location only
+   * exists on the enriched shape the dialogs already hold.
+   */
+  job: JobWithLocationAndDocs;
   timesheets: Timesheet[];
   date: string;
 }
@@ -32,16 +47,10 @@ const formatTime = (time: string | null | undefined): string => {
   return time.substring(0, 5); // "09:00:00" -> "09:00"
 };
 
-// Helper function to format break time
-const formatBreakTime = (breakMinutes: number | null | undefined): string => {
-  if (!breakMinutes) return '--';
-  return `${breakMinutes}min`;
-};
-
 // Helper function to format overtime
 const formatOvertime = (overtimeHours: number | null | undefined): string => {
-  if (!overtimeHours) return '--';
-  return `${overtimeHours}h`;
+  if (!overtimeHours) return '—';
+  return `${overtimeHours} h`;
 };
 
 // Helper function to safely load images with timeout
@@ -74,20 +83,15 @@ const loadImageSafely = (src: string, description: string): Promise<HTMLImageEle
 export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTimesheetPDFOptions) => {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.width;
-  const pageHeight = doc.internal.pageSize.height;
 
   // Load logos and signatures in parallel
   const [jobLogoUrl, loadedSignatures] = await Promise.all([
     fetchJobLogo(job.id),
-    loadSignatures(timesheets)
+    loadSignatures(timesheets),
+    loadReportIssuerMark(),
   ]);
 
-  // Load images
-  const [jobLogo, companyLogo] = await Promise.all([
-    jobLogoUrl ? loadImageSafely(jobLogoUrl, 'job logo') : Promise.resolve(null),
-    loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'company logo')
-  ]);
+  const jobLogo = jobLogoUrl ? await loadImageSafely(jobLogoUrl, 'job logo') : null;
 
   // Create signature map
   const signatureMap = new Map<string, HTMLImageElement>();
@@ -97,70 +101,46 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     }
   });
 
-  // Corporate Header
-  doc.setFillColor(125, 1, 1); // Corporate red
-  doc.rect(0, 0, pageWidth, 40, 'F');
-
-  // Add job logo on left side of header
-  if (jobLogo) {
-    try {
-      doc.addImage(jobLogo, 'PNG', 15, 8, 30, 24);
-    } catch (error) {
-      console.error('Error adding job logo to PDF:', error);
-    }
-  }
-
-  // Header text
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255); // White text
-  doc.text('TIMESHEET', pageWidth / 2, 20, { align: 'center' });
-  
-  doc.setFontSize(12);
-  doc.text(`${job.title}`, pageWidth / 2, 30, { align: 'center' });
-
-  // Reset text color
-  doc.setTextColor(0, 0, 0);
-
-  // Job Information
-  let yPosition = 55;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  
   // Calculate actual date range from timesheets if showing all dates
-  let dateText;
-  if (date === "all-dates" && timesheets.length > 0) {
-    const dates = timesheets.map(t => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
+  let dateText: string;
+  if (date === 'all-dates' && timesheets.length > 0) {
+    const dates = timesheets.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
     const startDate = dates[0];
     const endDate = dates[dates.length - 1];
-    
-    if (startDate.getTime() === endDate.getTime()) {
-      dateText = format(startDate, 'MMM dd, yyyy');
-    } else {
-      dateText = `${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd, yyyy')}`;
-    }
-  } else if (date === "all-dates") {
-    dateText = "All Dates";
+
+    dateText =
+      startDate.getTime() === endDate.getTime()
+        ? format(startDate, "d 'de' MMMM 'de' yyyy", { locale: es })
+        : `${format(startDate, 'd MMM', { locale: es })} – ${format(endDate, "d MMM yyyy", { locale: es })}`;
+  } else if (date === 'all-dates') {
+    dateText = 'Todas las fechas';
   } else {
-    dateText = format(parseISO(date), 'EEEE, MMMM do, yyyy');
+    dateText = format(parseISO(date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
   }
-  
-  doc.text(`Period: ${dateText}`, 20, yPosition);
-  yPosition += 8;
-  
-  // Display location name and address from job.location
-  const locationText = (job as any).location?.name || 'TBD';
-  const addressText = (job as any).location?.formatted_address;
-  doc.text(`Location: ${locationText}`, 20, yPosition);
-  if (addressText) {
-    yPosition += 6;
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${addressText}`, 20, yPosition);
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-  }
-  yPosition += 20;
+
+  const location = job.location ?? job.locations;
+  const locationText = location?.name || 'Por confirmar';
+
+  const chrome: ReportChromeOptions = {
+    kind: 'timesheet',
+    kindLabel: 'Parte de horas',
+    eventTitle: job.title,
+    contextLabel: dateText,
+  };
+
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title: job.title?.trim() || 'Trabajo sin título',
+    subtitle: location?.formatted_address
+      ? `Parte de horas · ${location.formatted_address}`
+      : 'Parte de horas',
+    clientLogo: jobLogo,
+    meta: [
+      { label: 'Periodo', value: dateText },
+      { label: 'Lugar', value: locationText },
+      { label: 'Partes', value: String(timesheets.length) },
+    ],
+  });
 
   // Group timesheets by date and technician for better organization
   const groupedTimesheets = timesheets.reduce((acc, timesheet) => {
@@ -180,11 +160,10 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
     const startTime = formatTime(timesheet.start_time);
     const endTime = formatTime(timesheet.end_time);
-    const breakTime = formatBreakTime(timesheet.break_minutes);
     const overtime = formatOvertime(timesheet.overtime_hours);
-    
+
     // Calculate total hours
-    let totalHours = '--';
+    let totalHours = '—';
     if (timesheet.start_time && timesheet.end_time) {
       const start = new Date(`2000-01-01T${timesheet.start_time}`);
       const end = new Date(`2000-01-01T${timesheet.end_time}`);
@@ -197,116 +176,75 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       const workHours = Math.max(0, diffHours - breakHours);
       totalHours = workHours.toFixed(2);
     }
-    
-    // Handle signature display
-    let signatureStatus = '--';
-    const signatureImg = signatureMap.get(timesheet.id);
-    if (signatureImg) {
-      signatureStatus = 'Signed';
+
+    // The signature column carries the drawn signature where there is one; the
+    // word only stands in for the states where no image exists, so "Firmado"
+    // never appears next to a blank space.
+    let signatureStatus = '—';
+    if (signatureMap.has(timesheet.id)) {
+      signatureStatus = '';
     } else if (timesheet.signature_data) {
-      signatureStatus = 'Failed';
+      signatureStatus = 'Error';
     } else if (timesheet.status === 'approved') {
-      signatureStatus = 'Pending';
+      signatureStatus = 'Pendiente';
     } else if (timesheet.status === 'rejected') {
-      signatureStatus = 'Rejected';
+      signatureStatus = 'Rechazado';
     }
 
-    const row = [
-      format(parseISO(timesheet.date), 'MMM dd'),
-      isPrepDay ? 'Prep Day' : 'Work',
-      technicianName, 
-      startTime, 
-      endTime, 
-      // breakTime, // Removed from PDF
+    return [
+      format(parseISO(timesheet.date), 'd MMM', { locale: es }),
+      isPrepDay ? 'Preparación' : 'Trabajo',
+      technicianName,
+      startTime,
+      endTime,
       totalHours,
-      overtime, 
-      signatureStatus
+      overtime,
+      signatureStatus,
     ];
-    
-    // Add notes if present
-    if (timesheet.notes) {
-      row.push(`Notes: ${timesheet.notes}`);
-    }
-    
-    return row;
   });
 
-  // Create the table using autoTable with updated headers
+  const SIGNATURE_COLUMN = 7;
+  const tableDefaults = reportTableDefaults(geo, {
+    fontSize: 7.2,
+    numericColumns: [3, 4, 5, 6],
+  });
+
   autoTable(doc, {
-    startY: yPosition,
-    head: [['Date', 'Type', 'Technician', 'Start Time', 'End Time', 'Total Hours', 'Overtime', 'Signature']],
+    startY: contentTop,
+    head: [['Fecha', 'Tipo', 'Técnico', 'Entrada', 'Salida', 'Horas', 'Horas extra', 'Firma']],
     body: tableData,
-    theme: 'grid',
-    headStyles: {
-      fillColor: [125, 1, 1], // Corporate red
-      textColor: [255, 255, 255], // White text
-      fontSize: 10,
-      fontStyle: 'bold',
-    },
-    bodyStyles: {
-      fontSize: 9,
-      cellPadding: 3,
-    },
-    alternateRowStyles: {
-      fillColor: [248, 248, 248],
-    },
-    columnStyles: {
-      0: { cellWidth: 18 }, // Date
-      1: { cellWidth: 18 }, // Type
-      2: { cellWidth: 34 }, // Technician
-      3: { cellWidth: 18 }, // Start
-      4: { cellWidth: 18 }, // End
-      // 4: { cellWidth: 15 }, // Break - Removed (15 width redistributed)
-      5: { cellWidth: 18 }, // Total
-      6: { cellWidth: 16 }, // Overtime
-      7: { cellWidth: 22 }, // Signature
-    },
-    didDrawCell: (data: any) => {
-      // Add signature images to the signature column
-      if (data.column.index === 6 && data.section === 'body') {
-        const rowIndex = typeof data?.row?.index === 'number' ? data.row.index : -1;
-        if (rowIndex < 0 || rowIndex >= flattenedTimesheets.length) return;
+    ...tableDefaults,
+    columnStyles: distributeColumnWidths([14, 16, 32, 13, 13, 12, 16, 22], geo.contentWidth),
+    didDrawCell: (data: CellHookData) => {
+      tableDefaults.didDrawCell(data);
 
-        const timesheet = flattenedTimesheets[rowIndex];
-        if (!timesheet?.id) return;
+      if (data.column.index !== SIGNATURE_COLUMN || data.section !== 'body') return;
 
-        const signatureImg = signatureMap.get(timesheet.id);
-        if (signatureImg) {
-          try {
-            doc.addImage(signatureImg, 'PNG', 
-              data.cell.x + 2, 
-              data.cell.y + 2, 
-              18, 
-              data.cell.height - 4
-            );
-          } catch (error) {
-            console.error('Error adding signature to table cell:', error);
-          }
-        }
+      const rowIndex = typeof data.row?.index === 'number' ? data.row.index : -1;
+      if (rowIndex < 0 || rowIndex >= flattenedTimesheets.length) return;
+
+      const timesheet = flattenedTimesheets[rowIndex];
+      if (!timesheet?.id) return;
+
+      const signatureImg = signatureMap.get(timesheet.id);
+      if (!signatureImg) return;
+
+      try {
+        doc.addImage(
+          signatureImg,
+          'PNG',
+          data.cell.x,
+          data.cell.y + 1,
+          Math.min(18, data.cell.width - 2),
+          Math.max(1, data.cell.height - 2),
+        );
+      } catch (error) {
+        console.error('Error adding signature to table cell:', error);
       }
-    }
+    },
   });
 
-  // Footer with company logo
-  const footerY = pageHeight - 25;
-  
-  // Add company logo centered
-  if (companyLogo) {
-    try {
-      const logoWidth = 20;
-      const logoHeight = 10;
-      const logoX = (pageWidth - logoWidth) / 2;
-      doc.addImage(companyLogo, 'PNG', logoX, footerY - 5, logoWidth, logoHeight);
-    } catch (error) {
-      console.error('Error adding company logo to PDF:', error);
-    }
-  }
-
-  // Footer text
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Generated on: ${format(new Date(), 'PPP')}`, pageWidth / 2, footerY + 8, { align: 'center' });
+  stampReportChrome(doc, chrome);
 
   return doc;
 };
@@ -335,9 +273,9 @@ export const downloadTimesheetPDF = async (options: GenerateTimesheetPDFOptions)
   const doc = await generateTimesheetPDF(options);
   
   // Update filename to reflect that it contains all dates
-  const fileName = options.date === "all-dates" 
-    ? `timesheet-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-all-dates.pdf`
-    : `timesheet-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-${options.date}.pdf`;
+  const fileName = options.date === "all-dates"
+    ? `parte-horas-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-todas-las-fechas.pdf`
+    : `parte-horas-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-${options.date}.pdf`;
     
   doc.save(fileName);
 };
