@@ -29,7 +29,7 @@
     "governance:source": "node scripts/governance/check-source-boundaries.mjs",
     "governance:lint-warnings": "node scripts/governance/check-lint-warning-baseline.mjs",
     "governance:type-floor": "node scripts/governance/check-mobile-type-floor.mjs",
-    "governance:filesize": "node scripts/governance/check-file-size-budget.mjs && node scripts/governance/check-file-size-budget.mjs --functions",
+    "governance:filesize": "node scripts/governance/check-file-size-budgets.mjs",
     "governance:functions": "node scripts/governance/check-edge-functions.mjs",
     "governance:exposure": "node scripts/governance/check-edge-function-exposure.mjs",
     "governance:sql-grants": "node scripts/governance/check-security-definer-grants.mjs",

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -21,4 +21,14 @@ it("allows a shrinking legacy function", () => { expect(fixture(850, 900).status
 it("reports approaching-threshold functions without failing", () => {
   const result = fixture(780);
   expect(result.status).toBe(0); expect(result.stdout).toContain("Approaching threshold");
+});
+it("forwards baseline-write arguments to both independent checks", () => {
+  fixture(801);
+  const root = roots.at(-1)!;
+  mkdirSync(join(root, "src"));
+  writeFileSync(join(root, "src/new.ts"), "// fixture\n".repeat(801));
+  const result = spawnSync(process.execPath, [resolve("scripts/governance/check-file-size-budgets.mjs"), "--write-baseline"], { cwd: root, encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: "" } });
+  expect(result.status).toBe(0);
+  expect(JSON.parse(readFileSync(join(root, "scripts/governance/file-size-baseline.json"), "utf8")).files["src/new.ts"]).toBe(801);
+  expect(JSON.parse(readFileSync(join(root, "scripts/governance/function-file-size-baseline.json"), "utf8")).files["supabase/functions/example/index.ts"]).toBe(801);
 });
