@@ -417,6 +417,9 @@ EXCEPTION WHEN others THEN
   RETURN false;
 END;
 $$;
+-- Test helpers must opt in like production functions; PUBLIC EXECUTE is no
+-- longer inherited by newly created postgres-owned functions.
+GRANT EXECUTE ON FUNCTION public.__test_upsert_festival_push_subscription(uuid, boolean, integer[]) TO authenticated;
 
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
