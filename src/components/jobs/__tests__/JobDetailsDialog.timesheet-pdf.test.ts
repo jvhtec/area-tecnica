@@ -13,15 +13,28 @@ vi.mock('jspdf-autotable', () => ({
 }));
 
 class JsPDFMock {
-  internal = { pageSize: { width: 210, height: 297 } };
+  internal = {
+    pageSize: { width: 210, height: 297, getWidth: () => 210, getHeight: () => 297 },
+  };
 
   setFillColor() {}
+  setDrawColor() {}
+  setLineWidth() {}
   rect() {}
+  roundedRect() {}
+  circle() {}
+  line() {}
   addImage() {}
   setFont() {}
+  getFont() { return { fontName: 'helvetica' }; }
   setFontSize() {}
   setTextColor() {}
   text() {}
+  getTextWidth(value: string) { return value.length; }
+  splitTextToSize(value: string) { return [value]; }
+  getNumberOfPages() { return 1; }
+  setPage() {}
+  addPage() {}
   output() { return ''; }
 }
 
@@ -113,7 +126,7 @@ describe('JobDetailsDialog timesheet enrichment', () => {
 
     expect(autoTableCalls.length).toBeGreaterThan(0);
     const firstTable = autoTableCalls[0];
-    expect(firstTable.body[0][1]).toBe('Work');
+    expect(firstTable.body[0][1]).toBe('Trabajo');
     expect(firstTable.body[0][2]).toBe('Alice Doe');
   });
 });

@@ -7,18 +7,19 @@ import { TourJobRateQuote } from '@/types/tourRates';
 import { appendAutonomoLabel } from '@/utils/autonomo';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import {
-  CORPORATE_RED,
-  SUMMARY_BACKGROUND,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
+  distributeColumnWidths,
+  drawReportMasthead,
+  ensureReportSpace,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportChrome,
+  type ReportChromeOptions,
+} from '@/utils/pdf/report-system';
+import { drawReportNotes, drawReportTotals } from '@/utils/pdf/report-system/blocks';
+import {
   buildPdfFilename,
-  corporateTableDefaults,
-  drawCorporateFooter,
-  drawCorporateHeader,
   resolveHeaderLogo,
-  type CorporateHeaderOptions
 } from '@/utils/pdf/shared/pdfExportShared';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -54,38 +55,39 @@ export async function generateRateQuotePDF(
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const tourIdFromQuotes = quotes.find((quote) => quote.tour_id)?.tour_id;
-  const [headerLogo, companyLogo] = await Promise.all([
+  const [headerLogo] = await Promise.all([
     resolveHeaderLogo({
       jobId: jobDetails.id,
       tourId: jobDetails.tour_id ?? tourIdFromQuotes,
     }),
-    getCompanyLogo(),
+    loadReportIssuerMark(),
   ]);
-  const headerOptions: CorporateHeaderOptions = {
-    title: 'Presupuesto de Tarifas',
-    subtitle: jobDetails.title,
-    metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
-    logo: headerLogo,
+
+  const issuedOn = new Date();
+  const jobDateLabel = formatJobDate(jobDetails.start_time);
+  const chrome: ReportChromeOptions = {
+    kind: 'rates',
+    kindLabel: 'Presupuesto de tarifas',
+    eventTitle: jobDetails.title,
+    contextLabel: jobDateLabel,
   };
-  const contentTop = drawCorporateHeader(doc, headerOptions);
 
-  let yPos = contentTop;
+  // The job the quote is for is the subject of the document, so it is the
+  // title; what kind of document it is rides in the eyebrow and the running
+  // head, where it does not compete with the name anyone is looking for.
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title: jobDetails.title?.trim() || 'Trabajo sin título',
+    subtitle: `Presupuesto de tarifas · Emitido el ${format(issuedOn, 'PPP', { locale: es })}`,
+    clientLogo: headerLogo,
+    meta: [
+      { label: 'Fecha del trabajo', value: jobDateLabel },
+      { label: 'Técnicos', value: String(quotes.length) },
+      { label: 'Emisión', value: format(issuedOn, 'dd/MM/yyyy') },
+    ],
+  });
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text('Detalles del Trabajo', 14, yPos);
-  yPos += 6;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
-  yPos += 5;
-  doc.text(`Fecha: ${formatJobDate(jobDetails.start_time)}`, 14, yPos);
-  yPos += 10;
-
-  doc.setTextColor(...TEXT_PRIMARY);
+  const yPos = contentTop;
 
   const getTechName = getTechNameFactory(profiles);
   const getPrepLines = (technicianId: string) => options?.prepTimesheetMap?.get(technicianId) || [];
@@ -204,20 +206,11 @@ export async function generateRateQuotePDF(
     startY: yPos,
     head: [['Técnico', 'Categoría', 'Base (calc.)', 'Mult.', 'Extras', 'Total']],
     body: tableData,
-    ...corporateTableDefaults(doc, headerOptions, contentTop),
-    styles: { fontSize: 9, cellPadding: 3 },
-    columnStyles: {
-      1: { cellWidth: 34 },
-      2: { halign: 'right', cellWidth: 68 },
-      3: { halign: 'center' },
-      4: { halign: 'right' },
-      5: { halign: 'right', fontStyle: 'bold' },
-    },
+    ...reportTableDefaults(geo, { fontSize: 7.2, numericColumns: [2, 3, 4, 5] }),
+    columnStyles: distributeColumnWidths([34, 15, 22, 8, 9, 12], geo.contentWidth),
   });
 
   const finalY = getLastAutoTableY(doc, yPos) + 10;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const summaryWidth = pageWidth - 28;
 
   const totalBase = quotesWithComputed.reduce(
     (sum, { computed }) => sum + computed.effectiveBase,
@@ -273,69 +266,39 @@ export async function generateRateQuotePDF(
     )
   );
 
-  doc.setFillColor(...SUMMARY_BACKGROUND);
-  doc.roundedRect(14, finalY, summaryWidth, anyPrepDay ? 38 : 32, 3, 3, 'F');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...CORPORATE_RED);
-  doc.text('Resumen', 18, finalY + 10);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text(`Total Base: ${formatCurrency(totalBase)}`, 18, finalY + 18);
-  doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 18, finalY + 26);
+  const totalsLines = [
+    { label: 'Total base', value: formatCurrency(totalBase) },
+    { label: 'Total extras', value: formatCurrency(totalExtras) },
+  ];
   if (anyPrepDay) {
-    doc.text(`Total Preparación: ${formatCurrency(totalPrepDays)}`, 18, finalY + 34);
+    totalsLines.push({ label: 'Total preparación', value: formatCurrency(totalPrepDays) });
   }
 
-  const totalText = `Total General: ${formatCurrency(grandTotal)}`;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...CORPORATE_RED);
-  const totalWidth = doc.getTextWidth(totalText);
-  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, finalY + (anyPrepDay ? 25 : 22));
+  const notes = [
+    anyDeductionApplied ? TOUR_DEDUCTION_DISCLAIMER_TEXT : '',
+    anyOverride
+      ? 'Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.'
+      : '',
+    anyPrepDay ? PREP_DAY_DISCLAIMER_TEXT : '',
+    ...vehicleDisclaimerNotes.map((note) => `Aviso vehículo: ${note}`),
+  ].filter(Boolean);
 
-  let disclaimerY = finalY + (anyPrepDay ? 44 : 38);
-  if (anyDeductionApplied) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(...CORPORATE_RED);
-    doc.text(TOUR_DEDUCTION_DISCLAIMER_TEXT, 14, disclaimerY);
-    disclaimerY += 6;
+  // The totals and the conditions that qualify them belong on the same page:
+  // a grand total read without its override warning is the wrong number.
+  const totalsHeight = 26 + totalsLines.length * 5;
+  let summaryY = ensureReportSpace(doc, geo, finalY, totalsHeight);
+  summaryY = drawReportTotals(doc, geo, summaryY, {
+    heading: 'Resumen',
+    lines: totalsLines,
+    total: { label: 'Total general', value: formatCurrency(grandTotal) },
+  });
+
+  if (notes.length > 0) {
+    summaryY = ensureReportSpace(doc, geo, summaryY, 6 + notes.length * 8);
+    drawReportNotes(doc, geo, notes, summaryY);
   }
 
-  if (anyOverride) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(...CORPORATE_RED);
-    doc.text('AVISO: Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
-    disclaimerY += 6;
-  }
-
-  if (anyPrepDay) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(...CORPORATE_RED);
-    doc.text(PREP_DAY_DISCLAIMER_TEXT, 14, disclaimerY);
-    disclaimerY += 6;
-  }
-
-  if (vehicleDisclaimerNotes.length > 0) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(...CORPORATE_RED);
-    const maxWidth = pageWidth - 28;
-    vehicleDisclaimerNotes.forEach((note) => {
-      const lines = doc.splitTextToSize(`AVISO VEHÍCULO: ${note}`, maxWidth) as string[];
-      doc.text(lines, 14, disclaimerY);
-      disclaimerY += lines.length * 4 + 2;
-    });
-  }
-
-  const footerLogo = companyLogo ?? headerLogo;
-  drawCorporateFooter(doc, footerLogo);
+  stampReportChrome(doc, chrome);
 
   const filename = buildPdfFilename([
     'Presupuesto',
