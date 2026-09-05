@@ -96,8 +96,8 @@ Plus point inconsistencies:
 
 **Phase 3 — fixed elements + viewport heights (✅ done on this branch).** Tier 3 floats got `calc(... + env(safe-area-inset-bottom/top))` offsets; Tier 4 pages moved from `h-screen`/`100vh` to `h-dvh`/`100dvh` with inset terms where Layout chrome height varies; Auth page padded for both insets.
 
-**Phase 4 — standardization.**
-- Introduce a shared `--mobile-nav-height: 4.5rem` CSS var and replace all four hard-coded nav-height assumptions.
-- Pick ONE dialect (recommend the existing CSS utilities `.pt-safe-*`/`.pb-safe-*`, extending them as needed) and update `docs/mobile-guidelines.md` to deprecate the others.
-- Remove the redundant double padding in `Sound.tsx`.
-- Optionally add a lint/grep CI check flagging new `h-screen`, `100vh`, `fixed bottom-0`/`top-0` without an `env(safe-area-inset-*)` term.
+**Phase 4 — standardization (✅ done on this branch).**
+- `--mobile-nav-height: 4.5rem` CSS var introduced in `index.css`; all nav-height call sites (Layout, MobileAvailabilityView ×2, PushNotificationMatrix — which had the wrong `4rem` — and SysCalc) now derive from it.
+- Canonical dialect settled on the arbitrary-value `max(base, env(safe-area-inset-*))` pattern (what the primitives and technician modals already use); `docs/mobile-guidelines.md` rewritten accordingly. The unused Tailwind `safe-*` spacing tokens were removed from `tailwind.config.ts`; the `.pt-safe-*` CSS utilities remain as shorthand.
+- `Sound.tsx`'s redundant class + inline-style double padding collapsed into one class.
+- CI grep guard **skipped**: 51 `h-screen`/`100vh` occurrences remain in non-viewport contexts (inner panels, modals capped by parents), so a blanket check would be too noisy. Revisit if those get cleaned up.

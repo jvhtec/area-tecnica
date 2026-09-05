@@ -38,31 +38,38 @@ Examples:
 
 - if (atLeast('lg')) { ... }
 - if (between('sm', 'lg')) { ... }
-- const fullHeight = isMobile ? 'h-[calc(100vh-var(--safe-area-top)-var(--safe-area-bottom))]' : 'h-[calc(100vh-4rem)]'
+- const fullHeight = isMobile ? 'h-[calc(100dvh-var(--safe-area-top)-var(--safe-area-bottom))]' : 'h-[calc(100dvh-4rem)]'
 
 ## Safe-area utilities
 
-iOS and edge-to-edge devices require safe-area padding. We offer two ways to handle it:
+iOS and edge-to-edge devices require safe-area padding (`viewport-fit=cover` is set, so insets are real). **The canonical pattern is an arbitrary-value class with a base minimum:**
 
-1) Tailwind spacing tokens (theme.spacing)
+- `pt-[max(1rem,env(safe-area-inset-top))]` — edge-anchored top (headers, full-screen modal overlays)
+- `pb-[max(1.5rem,env(safe-area-inset-bottom))]` — edge-anchored bottom (bottom sheets, footers)
+- `bottom-[calc(1rem+env(safe-area-inset-bottom))]` — floating elements offset from the bottom edge
 
-- pt-safe-top, pb-safe-bottom, pl-safe-left, pr-safe-right
-- pt-safe-top-2/3/4 and pb-safe-bottom-2/3/4 add 0.5rem/0.75rem/1rem on top of the safe inset
+This is what the UI primitives (`sheet.tsx`, `drawer.tsx`, `toast.tsx`, `sidebar.tsx`) and the technician modals use. The CSS utility classes in `index.css` (`pt-safe`, `pb-safe`, `px-safe`, `pt-safe-2/3/4`, `pb-safe-2/3/4`) remain available as shorthand when no base minimum is needed.
 
-These work anywhere you can use spacing tokens, e.g. `pt-safe-top-3`.
+The old Tailwind spacing tokens (`safe-top`, `safe-bottom`, …) were unused and have been removed — don't reintroduce them.
 
-2) Utility classes in CSS
+Notes:
 
-- pt-safe, pb-safe, px-safe, py-safe
-- pt-safe-2/3/4 and pb-safe-2/3/4 mirror the sizes above
+- `SheetContent` applies its insets as inline styles so consumer classes can't strip them; opt out via the `style` prop if an inner element handles the inset.
+- Use top and bottom independently; avoid a single `py-` value when the two edges need different handling.
 
-Use top and bottom independently on mobile bars and headers. Avoid `py-` with a single token when top and bottom values need to be different.
+## Offsetting above the mobile nav
 
-Examples:
+The fixed mobile nav bar's base height is exposed as `--mobile-nav-height` (4.5rem, defined in `index.css`; keep in sync with `MobileNavBar.tsx`). Anything positioned above the nav, or padding content so it clears the nav, must use:
 
-- Header: `pt-safe` or `pt-safe-3`
-- Bottom bar: `pb-safe` or `pb-safe-3`
-- Edge gutters: `px-safe`
+```
+calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) [+ gap])
+```
+
+Never hard-code 4rem/4.5rem/6rem nav offsets. `Layout.tsx`'s main already pads mobile content with this value — pages inside Layout only need extra offsets for `fixed` elements.
+
+## Viewport heights
+
+Never use `h-screen` or `100vh` for viewport-level containers — on iOS they include the area under browser chrome. Use `h-dvh` / `100dvh` (or `min-h-screen` when only a minimum is needed). When subtracting a safe-area-padded header (like Layout's), subtract `env(safe-area-inset-top)` too: `h-[calc(100dvh-4rem-env(safe-area-inset-top))]`.
 
 ## Spacing scale additions
 
