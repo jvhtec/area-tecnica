@@ -1,6 +1,22 @@
 import { PDFDocument } from '../hoja-de-ruta/pdf/core/pdf-document';
 import { LogoService } from '../hoja-de-ruta/pdf/services/logo-service';
 import { uploadJobPdfWithCleanup } from '../jobDocumentsUpload';
+import {
+  REPORT_ACCENT,
+  REPORT_HAIRLINE,
+  REPORT_INK,
+  REPORT_RULE,
+  REPORT_SOFT,
+  distributeColumnWidths,
+  drawReportMasthead,
+  drawReportSectionHeading,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  setReportMonoText,
+  setReportText,
+  stampReportChrome,
+  type ReportChromeOptions,
+} from '@/utils/pdf/report-system';
 
 interface StagePlotItem {
   id: string;
@@ -91,87 +107,77 @@ export const generateStagePlotPDF = async (
   } = { saveToDatabase: false, downloadLocal: true }
 ): Promise<{ filename: string }> => {
   const pdfDoc = new PDFDocument();
-  const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
+  const doc = pdfDoc.document;
 
-  // Load company logo if job ID provided
-  let logoData: string | null = null;
+  // Load the job mark for the title block and the Sector-Pro mark for the head.
+  let logoImage: HTMLImageElement | null = null;
   if (options.jobId || data.jobId) {
     try {
-      logoData = await LogoService.loadJobLogo(options.jobId || data.jobId!);
+      const logoData = await LogoService.loadJobLogo(options.jobId || data.jobId!);
+      if (logoData) {
+        logoImage = await new Promise<HTMLImageElement | null>((resolve) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = () => resolve(null);
+          image.src = logoData;
+        });
+      }
     } catch (error) {
       console.warn('Could not load logo:', error);
     }
   }
+  await loadReportIssuerMark();
 
-  // Header - Corporate Red Background
-  pdfDoc.setFillColor(125, 1, 1);
-  pdfDoc.addRect(0, 0, pageWidth, 50, 'F');
-
-  // Logo in header
-  if (logoData) {
-    try {
-      const logoImg = new Image();
-      logoImg.src = logoData;
-      await new Promise((resolve, reject) => {
-	      logoImg.onload = resolve;
-	      logoImg.onerror = reject;
-	    });
-	      const logoHeight = 30;
-	      let logoWidth = 60;
-	      if (logoImg.width > 0 && logoImg.height > 0) {
-	        const ratio = logoImg.width / logoImg.height;
-	        const computedWidth = logoHeight * ratio;
-	        if (Number.isFinite(computedWidth) && computedWidth > 0) {
-	          logoWidth = computedWidth;
-	        }
-	      }
-	      pdfDoc.addImage(logoData, 'PNG', 15, 10, logoWidth, logoHeight);
-	    } catch (error) {
-	      console.error("Error adding logo to stage plot:", error);
-	    }
-	  }
-
-  // Header title - White text
-  pdfDoc.setText(18, [255, 255, 255]);
-  pdfDoc.addText('PLANO DE ESCENARIO', pageWidth / 2, 20, { align: 'center' });
-
-  if (data.bandName) {
-    pdfDoc.setText(12, [255, 255, 255]);
-    pdfDoc.addText(data.bandName, pageWidth / 2, 35, { align: 'center' });
-  }
-
-  let yPosition = 65;
-
-  // Stage dimensions
-  pdfDoc.setText(10, [0, 0, 0]);
   const currentDate = new Date();
   const dateStr = currentDate.toLocaleDateString('es-ES');
-  pdfDoc.addText(`Fecha: ${dateStr}`, 20, yPosition);
-  pdfDoc.addText(`Dimensiones: ${data.stage.w}m x ${data.stage.d}m`, pageWidth - 80, yPosition, { align: 'right' });
-  yPosition += 20;
+  const title = data.bandName || data.jobTitle || 'Plano de escenario';
+
+  const chrome: ReportChromeOptions = {
+    kind: 'schedule',
+    kindLabel: 'Plano de escenario',
+    eventTitle: title,
+    contextLabel: dateStr,
+  };
+
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title,
+    subtitle: data.jobTitle && data.jobTitle !== title
+      ? `Plano de escenario · ${data.jobTitle}`
+      : 'Plano de escenario',
+    clientLogo: logoImage,
+    meta: [
+      { label: 'Dimensiones', value: `${data.stage.w} × ${data.stage.d} m` },
+      { label: 'Elementos', value: String(data.items.length) },
+      { label: 'Fecha', value: dateStr },
+    ],
+  });
+
+  let yPosition = contentTop;
 
   // Calculate stage drawing area
-  const stageMargin = 30;
-  const stageDrawWidth = pageWidth - (stageMargin * 2);
+  const stageMargin = geo.left;
+  const stageDrawWidth = geo.contentWidth;
   const stageDrawHeight = 140; // Fixed height for stage diagram
-  const stageStartY = yPosition;
+  const stageStartY = yPosition + 6;
 
-  // Draw stage boundary
-  pdfDoc.document.setDrawColor(125, 1, 1);
-  pdfDoc.document.setLineWidth(2);
-  pdfDoc.document.rect(stageMargin, stageStartY, stageDrawWidth, stageDrawHeight);
+  // The stage edge is the only accent rule on the page; everything inside it is
+  // the drawing's own colour coding.
+  doc.setDrawColor(...REPORT_ACCENT);
+  doc.setLineWidth(0.5);
+  doc.rect(stageMargin, stageStartY, stageDrawWidth, stageDrawHeight);
 
-  // Draw "AUDIENCE" label
-  pdfDoc.setText(10, [100, 100, 100]);
-  if (data.view === 'audience') {
-    pdfDoc.addText('← PÚBLICO', stageMargin + 5, stageStartY - 5);
-  } else {
-    pdfDoc.addText('ESCENARIO →', stageMargin + 5, stageStartY - 5);
-  }
+  setReportMonoText(doc, REPORT_SOFT, 5.8, 'bold');
+  doc.text(
+    data.view === 'audience' ? '← PÚBLICO' : 'ESCENARIO →',
+    stageMargin,
+    stageStartY - 3,
+    { charSpace: 0.2 },
+  );
 
   // Draw grid
-  pdfDoc.document.setDrawColor(220, 220, 220);
-  pdfDoc.document.setLineWidth(0.3);
+  doc.setDrawColor(...REPORT_RULE);
+  doc.setLineWidth(REPORT_HAIRLINE);
   const gridStep = 20;
   for (let i = gridStep; i < stageDrawWidth; i += gridStep) {
     pdfDoc.document.line(
@@ -252,99 +258,69 @@ export const generateStagePlotPDF = async (
     }
   });
 
-  yPosition = stageStartY + stageDrawHeight + 25;
+  yPosition = stageStartY + stageDrawHeight + 22;
 
-  // Input List Table
-  const inputItems = data.items.filter(item => item.input);
+  // The input list and the monitor mixes sit side by side: they are read
+  // together at the desk, and neither is long enough to earn the full width.
+  const columnGap = 8;
+  const columnWidth = (geo.contentWidth - columnGap) / 2;
+  const rightColumnX = geo.left + columnWidth + columnGap;
+
+  const inputItems = data.items.filter((item) => item.input);
+  const mixItems = data.items.filter((item) => item.mix);
+  const tablesTop = drawReportSectionHeading(
+    doc,
+    geo,
+    inputItems.length > 0 ? 'Entradas y mezclas' : 'Mezclas',
+    yPosition,
+    1,
+  );
+  let tablesBottom = tablesTop;
+
   if (inputItems.length > 0) {
-    pdfDoc.setText(12, [125, 1, 1]);
-    pdfDoc.addText('LISTA DE ENTRADAS', 20, yPosition);
-    yPosition += 10;
-
     pdfDoc.addTable({
-      startY: yPosition,
+      startY: tablesTop,
       head: [['Canal', 'Fuente', 'Mezcla']],
-      body: inputItems.map(item => [
-        item.input || '',
-        item.label || item.type,
-        item.mix || ''
-      ]),
-      margin: { left: 20, right: pageWidth / 2 + 10 },
-      styles: {
-        fontSize: 8,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [248, 249, 250]
-      },
-      tableWidth: (pageWidth / 2) - 30
+      body: inputItems.map((item) => [item.input || '—', item.label || item.type, item.mix || '—']),
+      ...reportTableDefaults(geo, { fontSize: 6.6, numericColumns: [0] }),
+      margin: { left: geo.left, right: geo.pageWidth - geo.left - columnWidth },
+      columnStyles: distributeColumnWidths([16, 40, 20], columnWidth),
+      tableWidth: columnWidth,
     });
+    tablesBottom = Math.max(tablesBottom, pdfDoc.getLastAutoTableY());
   }
 
-  // Monitor Mixes Table (on right side)
-  const mixItems = data.items.filter(item => item.mix);
   if (mixItems.length > 0) {
-    const mixYPosition = inputItems.length > 0 ? yPosition : yPosition + 10;
-
     pdfDoc.addTable({
-      startY: mixYPosition,
+      startY: tablesTop,
       head: [['Mezcla', 'Quién']],
-      body: Array.from(new Set(mixItems.map(item => item.mix)))
+      body: Array.from(new Set(mixItems.map((item) => item.mix)))
         .filter(Boolean)
-        .map(mix => [
+        .map((mix) => [
           mix!,
           mixItems
-            .filter(item => item.mix === mix)
-            .map(item => item.label || item.type)
-            .join(', ')
+            .filter((item) => item.mix === mix)
+            .map((item) => item.label || item.type)
+            .join(', '),
         ]),
-      margin: { left: pageWidth / 2 + 10, right: 20 },
-      styles: {
-        fontSize: 8,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [248, 249, 250]
-      },
-      tableWidth: (pageWidth / 2) - 30
+      ...reportTableDefaults(geo, { fontSize: 6.6, numericColumns: [0] }),
+      margin: { left: rightColumnX, right: geo.pageWidth - geo.right },
+      columnStyles: distributeColumnWidths([20, 56], columnWidth),
+      tableWidth: columnWidth,
     });
+    tablesBottom = Math.max(tablesBottom, pdfDoc.getLastAutoTableY());
   }
 
-  yPosition = Math.max(
-    inputItems.length > 0 ? pdfDoc.getLastAutoTableY() + 15 : yPosition + 15,
-    mixItems.length > 0 ? pdfDoc.getLastAutoTableY() + 15 : yPosition + 15
-  );
+  yPosition = tablesBottom + 14;
 
-  // Show Notes if present
   if (data.notes && data.notes.trim()) {
-    pdfDoc.setText(12, [125, 1, 1]);
-    pdfDoc.addText('NOTAS DEL EVENTO', 20, yPosition);
-    yPosition += 10;
-
-    pdfDoc.setFillColor(248, 249, 250);
-    const notesBoxHeight = Math.max(30, Math.ceil(data.notes.length / 100) * 5);
-    pdfDoc.addRect(20, yPosition - 5, pageWidth - 40, notesBoxHeight, 'F');
-
-    pdfDoc.document.setDrawColor(200, 200, 200);
-    pdfDoc.document.setLineWidth(0.5);
-    pdfDoc.document.rect(20, yPosition - 5, pageWidth - 40, notesBoxHeight);
-
-    pdfDoc.setText(9, [0, 0, 0]);
-    const notesLines = pdfDoc.document.splitTextToSize(data.notes, pageWidth - 50);
-    pdfDoc.document.text(notesLines, 25, yPosition + 3);
+    yPosition = drawReportSectionHeading(doc, geo, 'Notas del evento', yPosition, 2);
+    setReportText(doc, REPORT_INK, 8);
+    const notesLines = doc.splitTextToSize(data.notes, geo.contentWidth) as string[];
+    doc.text(notesLines, geo.left, yPosition, { lineHeightFactor: 1.35 });
   }
+
+  stampReportChrome(doc, chrome);
 
   // Generate filename
   const safeName = (data.bandName || data.jobTitle || 'plano-escenario')

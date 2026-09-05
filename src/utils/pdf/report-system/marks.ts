@@ -21,6 +21,7 @@ export type ReportDocKind =
   | 'equipment'
   | 'amplifier'
   | 'power'
+  | 'rigging'
   | 'schedule';
 
 export const REPORT_DOC_LABELS: Record<ReportDocKind, string> = {
@@ -34,6 +35,7 @@ export const REPORT_DOC_LABELS: Record<ReportDocKind, string> = {
   equipment: 'Material',
   amplifier: 'Amplificación',
   power: 'Potencia',
+  rigging: 'Rigging',
   schedule: 'Horarios',
 };
 
@@ -128,6 +130,13 @@ export const drawReportTypeMark = (
       doc.circle(x + s * 0.66, y + s * 0.42, s * 0.06, 'S');
       doc.line(x + s * 0.3, y + s * 0.68, x + s * 0.7, y + s * 0.68);
       doc.line(x + s * 0.5, y, x + s * 0.5, y + s * 0.18);
+      break;
+    // A hoist hanging from a beam: the load path the report checks.
+    case 'rigging':
+      doc.line(x, y + s * 0.08, x + s, y + s * 0.08);
+      doc.line(x + s * 0.5, y + s * 0.08, x + s * 0.5, y + s * 0.5);
+      doc.rect(x + s * 0.28, y + s * 0.5, s * 0.44, s * 0.3, 'S');
+      doc.line(x + s * 0.5, y + s * 0.8, x + s * 0.5, y + s);
       break;
     // Ruled rows against a time axis.
     case 'schedule':
