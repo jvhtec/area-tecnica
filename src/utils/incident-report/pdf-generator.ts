@@ -2,10 +2,24 @@ import { PDFDocument } from '@/utils/hoja-de-ruta/pdf/core/pdf-document';
 import { LogoService } from '@/utils/hoja-de-ruta/pdf/services/logo-service';
 import { uploadJobPdfWithCleanup } from '@/utils/jobDocumentsUpload';
 import { buildIncidentReportPdfFilename } from '@/utils/pdfFileNames';
-import { getCompanyLogo } from '@/utils/pdf/logoUtils';
+import {
+  REPORT_HAIRLINE,
+  REPORT_RULE,
+  REPORT_SOFT,
+  drawReportMasthead,
+  drawReportRunningHead,
+  drawReportSectionHeading,
+  loadReportIssuerMark,
+  setReportMonoText,
+  stampReportChrome,
+  type ReportChromeOptions,
+  type ReportGeometry,
+} from '@/utils/pdf/report-system';
+import { drawReportFactRows, drawReportProse } from '@/utils/pdf/report-system/blocks';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
+import type jsPDF from 'jspdf';
 
 interface IncidentReportPDFData {
   jobId: string;
@@ -33,367 +47,171 @@ function parseImageDataUrl(dataUrl: string): { data: string; format: 'JPEG' | 'P
   return { data: dataUrl, format: 'JPEG' };
 }
 
-/**
- * Draws a section header with the red accent bar and title text.
- */
-function addSectionHeader(pdfDoc: PDFDocument, title: string, yPosition: number, pageWidth: number): number {
-  // Red accent bar
-  pdfDoc.setFillColor(125, 1, 1);
-  pdfDoc.addRect(20, yPosition - 2, 4, 16, 'F');
-
-  pdfDoc.setText(12, [125, 1, 1]);
-  pdfDoc.addText(title, 30, yPosition + 10);
-
-  return yPosition + 22;
-}
-
-// Content box styling constants
-const BOX_PADDING = 10;
-const LINE_HEIGHT = 5.5;
-
-/**
- * Computes box metrics (lines and height) for text content.
- */
-function computeBoxMetrics(
-  pdfDoc: PDFDocument,
-  text: string,
-  pageWidth: number
-): { lines: string[]; boxHeight: number } {
-  const contentWidth = pageWidth - 40;
-  const lines = pdfDoc.document.splitTextToSize(text, contentWidth - 16);
-  const boxHeight = Math.max(30, lines.length * LINE_HEIGHT + BOX_PADDING * 2);
-  return { lines, boxHeight };
-}
-
-/**
- * Calculates the height needed for a content box without drawing it.
- */
-function calculateContentBoxHeight(
-  pdfDoc: PDFDocument,
-  text: string,
-  pageWidth: number
-): number {
-  const { boxHeight } = computeBoxMetrics(pdfDoc, text, pageWidth);
-  return boxHeight + 12; // +12 for spacing after
-}
-
-/**
- * Draws a text content box with background and border.
- */
-function addContentBox(
-  pdfDoc: PDFDocument,
-  text: string,
-  yPosition: number,
-  pageWidth: number
-): number {
-  const contentWidth = pageWidth - 40;
-  const { lines, boxHeight } = computeBoxMetrics(pdfDoc, text, pageWidth);
-
-  // Background
-  pdfDoc.setFillColor(250, 250, 252);
-  pdfDoc.addRect(20, yPosition, contentWidth, boxHeight, 'F');
-
-  // Border
-  pdfDoc.document.setDrawColor(220, 220, 230);
-  pdfDoc.document.setLineWidth(0.3);
-  pdfDoc.document.rect(20, yPosition, contentWidth, boxHeight);
-
-  // Text
-  pdfDoc.setText(10, [30, 30, 40]);
-  pdfDoc.document.text(lines, 28, yPosition + BOX_PADDING + 3);
-
-  return yPosition + boxHeight + 12;
-}
-
 export const generateIncidentReportPDF = async (
   data: IncidentReportPDFData,
   options: { saveToDatabase?: boolean; downloadLocal?: boolean } = { saveToDatabase: false, downloadLocal: true }
 ): Promise<{ documentId?: string; filename: string }> => {
   const pdfDoc = new PDFDocument();
-  const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
+  const doc: jsPDF = pdfDoc.document;
 
-  // Load company logo
-  let logoData: string | null = null;
+  // Load the job mark for the title block and the Sector-Pro mark for the head.
+  let logoImage: HTMLImageElement | null = null;
   try {
-    logoData = await LogoService.loadJobLogo(data.jobId);
+    const logoData = await LogoService.loadJobLogo(data.jobId);
+    if (logoData) {
+      logoImage = await new Promise<HTMLImageElement | null>((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => resolve(null);
+        image.src = logoData;
+      });
+    }
   } catch (error) {
     console.warn('Could not load logo:', error);
   }
-
-  // ── HEADER ──────────────────────────────────────────────────────
-  // Dark gradient-style header
-  pdfDoc.setFillColor(125, 1, 1);
-  pdfDoc.addRect(0, 0, pageWidth, 48, 'F');
-
-  // Subtle darker strip at bottom of header
-  pdfDoc.setFillColor(100, 0, 0);
-  pdfDoc.addRect(0, 44, pageWidth, 4, 'F');
-
-  // Logo in header (left side)
-  if (logoData) {
-    try {
-      const logoImg = new Image();
-      logoImg.src = logoData;
-      const logoHeight = 26;
-      const logoWidth = logoHeight * (logoImg.width / logoImg.height) || 52;
-      pdfDoc.addImage(logoData, 'PNG', 15, 11, logoWidth, logoHeight);
-    } catch (error) {
-      console.error("Error adding logo to incident report:", error);
-    }
-  }
-
-  // Header title
-  pdfDoc.setText(16, [255, 255, 255]);
-  pdfDoc.addText('REPORTE DE INCIDENCIA', pageWidth / 2, 22, { align: 'center' });
-
-  pdfDoc.setText(9, [255, 200, 200]);
-  pdfDoc.addText('DEPARTAMENTO DE SONIDO', pageWidth / 2, 34, { align: 'center' });
-
-  // ── METADATA BAR ────────────────────────────────────────────────
-  pdfDoc.setFillColor(245, 245, 248);
-  pdfDoc.addRect(0, 48, pageWidth, 18, 'F');
+  await loadReportIssuerMark();
 
   const currentDate = toZonedTime(new Date(), 'Europe/Madrid');
   const dateStr = format(currentDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
   const timeStr = format(currentDate, 'HH:mm');
 
-  pdfDoc.setText(8, [100, 100, 110]);
-  pdfDoc.addText(`Fecha: ${dateStr}  •  Hora: ${timeStr}  •  Técnico: ${data.techName}`, pageWidth / 2, 59, { align: 'center' });
+  const chrome: ReportChromeOptions = {
+    kind: 'incident',
+    kindLabel: 'Reporte de incidencia',
+    eventTitle: data.jobTitle,
+    contextLabel: data.techName,
+  };
 
-  let yPosition = 78;
-
-  // ── JOB INFORMATION ─────────────────────────────────────────────
-  yPosition = addSectionHeader(pdfDoc, 'INFORMACIÓN DEL TRABAJO', yPosition, pageWidth);
-
-  pdfDoc.addTable({
-    startY: yPosition,
-    head: [['Campo', 'Detalle']],
-    body: [
-      ['Trabajo', data.jobTitle],
-      ['Fecha de inicio', format(toZonedTime(new Date(data.jobStartDate), 'Europe/Madrid'), "EEE, d 'de' MMMM 'de' yyyy", { locale: es })],
-      ['Fecha de fin', format(toZonedTime(new Date(data.jobEndDate), 'Europe/Madrid'), "EEE, d 'de' MMMM 'de' yyyy", { locale: es })]
+  const { geo, y: mastheadBottom } = drawReportMasthead(doc, {
+    ...chrome,
+    title: data.jobTitle?.trim() || 'Trabajo sin título',
+    subtitle: `Reporte de incidencia · Departamento de sonido`,
+    clientLogo: logoImage,
+    meta: [
+      { label: 'Técnico', value: data.techName },
+      { label: 'Fecha', value: format(currentDate, "d 'de' MMMM 'de' yyyy", { locale: es }) },
+      { label: 'Hora', value: timeStr },
     ],
-    margin: { left: 20, right: 20 },
-    styles: {
-      fontSize: 9,
-      cellPadding: 5,
-      lineColor: [220, 220, 230],
-      lineWidth: 0.3,
-    },
-    headStyles: {
-      fillColor: [125, 1, 1],
-      textColor: [255, 255, 255],
-      fontSize: 9,
-      fontStyle: 'bold'
-    },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 45, textColor: [60, 60, 70] },
-      1: { textColor: [30, 30, 40] }
-    },
-    alternateRowStyles: {
-      fillColor: [250, 250, 252]
-    }
   });
 
-  yPosition = pdfDoc.getLastAutoTableY() + 16;
+  /**
+   * Breaks to a new page when `needed` millimetres do not remain, redrawing the
+   * running head so the continuation still names the incident it belongs to.
+   */
+  const breakIfShort = (y: number, needed: number): number => {
+    if (y <= geo.contentBottom - needed) return y;
+    doc.addPage();
+    const pageGeo: ReportGeometry = drawReportRunningHead(doc, chrome);
+    return pageGeo.contentTop;
+  };
 
-  // ── EQUIPMENT INFORMATION ───────────────────────────────────────
-  yPosition = pdfDoc.checkPageBreak(yPosition, 60);
-  yPosition = addSectionHeader(pdfDoc, 'INFORMACIÓN DEL EQUIPO', yPosition, pageWidth);
-
-  pdfDoc.addTable({
-    startY: yPosition,
-    head: [['Campo', 'Detalle']],
-    body: [
-      ['Marca', data.brand],
-      ['Modelo', data.equipmentModel]
+  let yPosition = drawReportSectionHeading(doc, geo, 'Información del trabajo', mastheadBottom, 1);
+  yPosition = drawReportFactRows(doc, geo, [
+    ['Trabajo', data.jobTitle],
+    [
+      'Fecha de inicio',
+      format(toZonedTime(new Date(data.jobStartDate), 'Europe/Madrid'), "EEE, d 'de' MMMM 'de' yyyy", { locale: es }),
     ],
-    margin: { left: 20, right: 20 },
-    styles: {
-      fontSize: 9,
-      cellPadding: 5,
-      lineColor: [220, 220, 230],
-      lineWidth: 0.3,
-    },
-    headStyles: {
-      fillColor: [125, 1, 1],
-      textColor: [255, 255, 255],
-      fontSize: 9,
-      fontStyle: 'bold'
-    },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 45, textColor: [60, 60, 70] },
-      1: { textColor: [30, 30, 40] }
-    },
-    alternateRowStyles: {
-      fillColor: [250, 250, 252]
-    }
-  });
+    [
+      'Fecha de fin',
+      format(toZonedTime(new Date(data.jobEndDate), 'Europe/Madrid'), "EEE, d 'de' MMMM 'de' yyyy", { locale: es }),
+    ],
+  ], yPosition);
 
-  yPosition = pdfDoc.getLastAutoTableY() + 16;
+  yPosition = breakIfShort(yPosition + 4, 40);
+  yPosition = drawReportSectionHeading(doc, geo, 'Información del equipo', yPosition, 2);
+  yPosition = drawReportFactRows(doc, geo, [
+    ['Marca', data.brand],
+    ['Modelo', data.equipmentModel],
+  ], yPosition);
+  yPosition += 4;
 
   // ── INCIDENT DESCRIPTION ────────────────────────────────────────
-  const issueBoxHeight = calculateContentBoxHeight(pdfDoc, data.issue, pageWidth);
-  yPosition = pdfDoc.checkPageBreak(yPosition, 22 + issueBoxHeight); // 22 for section header
-  yPosition = addSectionHeader(pdfDoc, 'DESCRIPCIÓN DE LA INCIDENCIA', yPosition, pageWidth);
-
-  pdfDoc.setText(10, [30, 30, 40]);
-  yPosition = addContentBox(pdfDoc, data.issue, yPosition, pageWidth);
+  yPosition = breakIfShort(yPosition, 46);
+  yPosition = drawReportSectionHeading(doc, geo, 'Descripción de la incidencia', yPosition, 3);
+  yPosition = drawReportProse(doc, geo, data.issue, yPosition) + 4;
 
   // ── ACTIONS TAKEN ───────────────────────────────────────────────
-  const actionsBoxHeight = calculateContentBoxHeight(pdfDoc, data.actionsTaken, pageWidth);
-  yPosition = pdfDoc.checkPageBreak(yPosition, 22 + actionsBoxHeight); // 22 for section header
-  yPosition = addSectionHeader(pdfDoc, 'ACCIONES REALIZADAS', yPosition, pageWidth);
-
-  pdfDoc.setText(10, [30, 30, 40]);
-  yPosition = addContentBox(pdfDoc, data.actionsTaken, yPosition, pageWidth);
+  yPosition = breakIfShort(yPosition, 46);
+  yPosition = drawReportSectionHeading(doc, geo, 'Acciones realizadas', yPosition, 4);
+  yPosition = drawReportProse(doc, geo, data.actionsTaken, yPosition) + 4;
 
   // ── PHOTO EVIDENCE ──────────────────────────────────────────────
   if (data.photos && data.photos.length > 0) {
-    const contentWidth = pageWidth - 40;
     const maxPhotosPerRow = 2;
     const photoGap = 8;
-    const photoWidth = (contentWidth - photoGap * (maxPhotosPerRow - 1)) / maxPhotosPerRow;
+    const photoWidth = (geo.contentWidth - photoGap * (maxPhotosPerRow - 1)) / maxPhotosPerRow;
     const photoHeight = photoWidth * 0.75; // 4:3 aspect ratio
+    const rowHeight = photoHeight + 10;
 
-    // Check page break for header + first photo row together so they don't split
-    const sectionHeaderHeight = 22;
-    const firstRowHeight = photoHeight + 10; // photo + label space
-    yPosition = pdfDoc.checkPageBreak(yPosition, sectionHeaderHeight + firstRowHeight);
-    yPosition = addSectionHeader(pdfDoc, 'EVIDENCIA FOTOGRÁFICA', yPosition, pageWidth);
+    // The heading travels with the first row so a section never opens on the
+    // last line of a page.
+    yPosition = breakIfShort(yPosition, 14 + rowHeight);
+    yPosition = drawReportSectionHeading(doc, geo, 'Evidencia fotográfica', yPosition, 5);
 
     for (let i = 0; i < data.photos.length; i++) {
       const col = i % maxPhotosPerRow;
-      const isNewRow = col === 0;
 
-      if (isNewRow && i > 0) {
-        yPosition += photoHeight + photoGap;
-        // Check page break before subsequent rows
-        yPosition = pdfDoc.checkPageBreak(yPosition, photoHeight + 10);
+      if (col === 0 && i > 0) {
+        yPosition += rowHeight;
+        yPosition = breakIfShort(yPosition, rowHeight);
       }
 
-      const xOffset = 20 + col * (photoWidth + photoGap);
+      const xOffset = geo.left + col * (photoWidth + photoGap);
 
-      // Photo border/frame
-      pdfDoc.document.setDrawColor(220, 220, 230);
-      pdfDoc.document.setLineWidth(0.3);
-      pdfDoc.setFillColor(250, 250, 252);
-      pdfDoc.addRect(xOffset, yPosition, photoWidth, photoHeight, 'FD');
-
-      // Add photo
       try {
         const { data: imgData, format } = parseImageDataUrl(data.photos[i]);
-        pdfDoc.addImage(imgData, format, xOffset + 1, yPosition + 1, photoWidth - 2, photoHeight - 2);
+        pdfDoc.addImage(imgData, format, xOffset, yPosition, photoWidth, photoHeight);
       } catch (error) {
-        // Fallback: show placeholder text
         console.error('Error adding photo to PDF:', error);
-        pdfDoc.setText(8, [150, 150, 160]);
-        pdfDoc.addText('Error al cargar imagen', xOffset + photoWidth / 2, yPosition + photoHeight / 2, { align: 'center' });
+        setReportMonoText(doc, REPORT_SOFT, 6);
+        doc.text('Error al cargar imagen', xOffset + photoWidth / 2, yPosition + photoHeight / 2, {
+          align: 'center',
+        });
       }
 
-      // Photo label
-      pdfDoc.setText(7, [120, 120, 130]);
-      pdfDoc.addText(`Foto ${i + 1}`, xOffset + photoWidth / 2, yPosition + photoHeight + 5, { align: 'center' });
+      // A hairline frame, drawn over the photo, keeps a light image from
+      // bleeding into the page without putting a slab of grey behind it.
+      doc.setDrawColor(...REPORT_RULE);
+      doc.setLineWidth(REPORT_HAIRLINE * geo.mm);
+      doc.rect(xOffset, yPosition, photoWidth, photoHeight, 'S');
+
+      setReportMonoText(doc, REPORT_SOFT, 5.4, 'bold');
+      doc.text(`FOTO ${i + 1}`, xOffset, yPosition + photoHeight + 4, { charSpace: 0.2 * geo.mm });
     }
 
-    // Advance past the last row of photos
     yPosition += photoHeight + 14;
   }
 
   // ── SIGNATURE ───────────────────────────────────────────────────
-  yPosition = pdfDoc.checkPageBreak(yPosition, 90);
-  yPosition = addSectionHeader(pdfDoc, 'FIRMA DEL TÉCNICO', yPosition, pageWidth);
+  yPosition = breakIfShort(yPosition, 70);
+  yPosition = drawReportSectionHeading(doc, geo, 'Firma del técnico', yPosition, 6);
+  yPosition = drawReportFactRows(doc, geo, [['Técnico', data.techName]], yPosition);
 
-  // Technician name
-  pdfDoc.setText(10, [60, 60, 70]);
-  pdfDoc.addText(`Técnico: ${data.techName}`, 20, yPosition + 4);
-  yPosition += 12;
-
-  // Signature image
   if (data.signature) {
+    const boxWidth = Math.min(150, geo.contentWidth);
     try {
-      // Signature box
-      pdfDoc.setFillColor(255, 255, 255);
-      pdfDoc.addRect(20, yPosition, 150, 45, 'F');
-      pdfDoc.document.setDrawColor(200, 200, 210);
-      pdfDoc.document.setLineWidth(0.3);
-      pdfDoc.document.rect(20, yPosition, 150, 45);
-
-      // Signature image
-      pdfDoc.addImage(data.signature, 'PNG', 25, yPosition + 2, 140, 40);
-
-      yPosition += 50;
+      doc.addImage(data.signature, 'PNG', geo.left + 5, yPosition + 2, boxWidth - 10, 40);
     } catch (error) {
-      console.error("Error adding signature image:", error);
-      pdfDoc.setText(10, [100, 100, 110]);
-      pdfDoc.addText('Firmado digitalmente', 25, yPosition + 20);
-      yPosition += 30;
-    }
-  }
-
-  // Signature timestamp
-  pdfDoc.setText(8, [140, 140, 150]);
-  pdfDoc.addText(`Fecha y hora de firma: ${dateStr} ${timeStr}`, 20, yPosition + 5);
-
-  // ── FOOTER ──────────────────────────────────────────────────────
-  // Load Sector Pro logo for footer
-  let footerLogoData: string | null = null;
-  let footerLogoDims = { width: 0, height: 0 };
-  try {
-    const companyLogoImg = await getCompanyLogo();
-    if (companyLogoImg) {
-      // Convert HTMLImageElement to data URL via canvas
-      const canvas = document.createElement('canvas');
-      canvas.width = companyLogoImg.naturalWidth || companyLogoImg.width;
-      canvas.height = companyLogoImg.naturalHeight || companyLogoImg.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(companyLogoImg, 0, 0);
-        footerLogoData = canvas.toDataURL('image/png');
-        // Scale to fit footer: max 8px high, max 50px wide
-        const maxH = 8, maxW = 50;
-        const scale = Math.min(maxH / canvas.height, maxW / canvas.width);
-        footerLogoDims = {
-          width: Math.round(canvas.width * scale),
-          height: Math.round(canvas.height * scale)
-        };
-      }
-    }
-  } catch (error) {
-    console.warn('Could not load Sector Pro logo for footer:', error);
-  }
-
-  // Apply footer to every page
-  const totalPages = pdfDoc.document.getNumberOfPages();
-  for (let page = 1; page <= totalPages; page++) {
-    pdfDoc.document.setPage(page);
-    const footerY = pageHeight - 20;
-    const bottomTextY = pageHeight - 10;
-
-    // Footer separator line
-    pdfDoc.document.setDrawColor(125, 1, 1);
-    pdfDoc.document.setLineWidth(0.5);
-    pdfDoc.document.line(20, footerY, pageWidth - 20, footerY);
-
-    // Sector Pro logo centered
-    if (footerLogoData && footerLogoDims.width > 0) {
-      const logoX = (pageWidth - footerLogoDims.width) / 2;
-      const logoY = footerY + 2;
-      pdfDoc.addImage(footerLogoData, 'PNG', logoX, logoY, footerLogoDims.width, footerLogoDims.height);
-    } else {
-      // Fallback text if logo not available
-      pdfDoc.setText(8, [125, 1, 1]);
-      pdfDoc.addText('Sector Pro', pageWidth / 2, bottomTextY, { align: 'center' });
+      console.error('Error adding signature image:', error);
+      setReportMonoText(doc, REPORT_SOFT, 7);
+      doc.text('Firmado digitalmente', geo.left + 5, yPosition + 22);
     }
 
-    // Page number on left
-    pdfDoc.setText(7, [140, 140, 150]);
-    pdfDoc.addText(`Pág. ${page} de ${totalPages}`, 20, bottomTextY);
-
-    // Job name on right
-    const truncatedTitle = data.jobTitle.length > 40 ? data.jobTitle.substring(0, 40) + '...' : data.jobTitle;
-    pdfDoc.addText(truncatedTitle, pageWidth - 20, bottomTextY, { align: 'right' });
+    // The signature sits on a rule rather than inside a box: a signature line
+    // is what people are used to signing, and it needs no border to read as one.
+    doc.setDrawColor(...REPORT_RULE);
+    doc.setLineWidth(REPORT_HAIRLINE * geo.mm);
+    doc.line(geo.left, yPosition + 44, geo.left + boxWidth, yPosition + 44);
+    yPosition += 50;
   }
+
+  setReportMonoText(doc, REPORT_SOFT, 5.8);
+  doc.text(`FIRMADO EL ${dateStr.toUpperCase()} A LAS ${timeStr}`, geo.left, yPosition + 4, {
+    charSpace: 0.2 * geo.mm,
+  });
+
+  stampReportChrome(doc, chrome);
 
   // ── OUTPUT ──────────────────────────────────────────────────────
   const filename = buildIncidentReportPdfFilename(data.jobTitle, currentDate);
