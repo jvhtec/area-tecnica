@@ -1,5 +1,6 @@
 -- SEC-01: materialized payroll aggregates are private even when the source
 -- tables have RLS. Clients must use the role-checked staffing RPC.
+\set ON_ERROR_STOP on
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 SELECT plan(19);
@@ -61,6 +62,14 @@ WHERE job_id = 'e9200000-0000-0000-0000-000000000001';
 GRANT SELECT ON expected_staffing_summary TO authenticated, service_role;
 SELECT is((SELECT total_cost_eur FROM expected_staffing_summary), 125.50::numeric,
   'the fixture contains a nonzero payroll aggregate');
+
+-- Exercise the actual migration over populated profiles/jobs/payroll, including
+-- the permissive grants found on production. This also verifies that replaying
+-- the grant repair preserves existing cached values and authorized consumers.
+-- The separate assertions above still verify the fresh migration chain.
+GRANT SELECT ON TABLE public.v_job_staffing_summary TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_job_staffing_summary(uuid[]) TO PUBLIC;
+\ir ../../migrations/20260905094349_restrict_staffing_summary_access.sql
 
 SELECT set_config('request.jwt.claim.role', 'anon', false);
 SET ROLE anon;
