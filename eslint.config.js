@@ -3,6 +3,10 @@ import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
+import emailTemplateRule from "./scripts/governance/email-template-rule.mjs";
+import { readFileSync } from "node:fs";
+
+const legacyConsole = JSON.parse(readFileSync(new URL("./scripts/governance/legacy-console-allowlist.json", import.meta.url), "utf8"));
 
 const baseExtends = [js.configs.recommended, ...tseslint.configs.recommended];
 const browserGlobals = {
@@ -189,5 +193,17 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
     },
+  },
+  {
+    files: [
+      "supabase/functions/{send-password-reset,send-staffing-email,send-tour-availability,send-vacation-decision,notify-staffing-cancellation,auto-send-timesheet-reminders,send-onboarding-email}/index.ts",
+    ],
+    plugins: { "audit-security": { rules: { "escaped-email-template": emailTemplateRule } } },
+    rules: { "audit-security/escaped-email-template": "error" },
+  },
+  {
+    files: ["supabase/functions/**/*.ts"],
+    ignores: [...Object.keys(legacyConsole.files), "supabase/functions/**/*.test.ts", "supabase/functions/**/__tests__/**", "supabase/functions/_shared/structuredLogger.ts"],
+    rules: { "no-console": "error" },
   },
 );

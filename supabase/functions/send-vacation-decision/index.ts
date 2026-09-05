@@ -5,6 +5,7 @@ import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 import { format as formatDate } from "https://esm.sh/date-fns@3.6.0";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 // Deno std@0.224.0 base64 module no longer exports `encode`.
 // Implement a small Uint8Array -> Base64 helper using btoa for reliability in Edge Runtime.
 function u8ToBase64(u8: Uint8Array): string {
@@ -298,12 +299,12 @@ function buildEmailHtml(reqRow: VacationRequestRow, baseUrl: string, logos: { co
                     <tr>
                       <td align="left" style="vertical-align:middle;">
                         <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
-                          <img src="${logos.companyLogo}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                          <img src="${escapeHtml(String(logos.companyLogo))}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
                         </a>
                       </td>
                       <td align="right" style="vertical-align:middle;">
                         <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
-                          <img src="${logos.atLogo}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                          <img src="${escapeHtml(String(logos.atLogo))}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
                         </a>
                       </td>
                     </tr>
@@ -313,7 +314,7 @@ function buildEmailHtml(reqRow: VacationRequestRow, baseUrl: string, logos: { co
               <tr>
                 <td style="padding:24px 24px 8px 24px;">
                   <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeTechName}${safeDepartment ? ` (${safeDepartment})` : ''},</h2>
-                  <p style="margin:0;color:#374151;line-height:1.55;">${statusText}</p>
+                  <p style="margin:0;color:#374151;line-height:1.55;">${escapeHtml(String(statusText))}</p>
                 </td>
               </tr>
               <tr>
@@ -321,16 +322,16 @@ function buildEmailHtml(reqRow: VacationRequestRow, baseUrl: string, logos: { co
                   <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;color:#374151;font-size:14px;">
                     <b>Detalles de la solicitud</b>
                     <ul style="margin:10px 0 0 18px;padding:0;line-height:1.55;">
-                      <li><b>Periodo:</b> ${start.toLocaleDateString()} - ${end.toLocaleDateString()} (${duration} día${duration === 1 ? '' : 's'})</li>
+                      <li><b>Periodo:</b> ${escapeHtml(String(start.toLocaleDateString()))} - ${escapeHtml(String(end.toLocaleDateString()))} (${escapeHtml(String(duration))} día${duration === 1 ? '' : 's'})</li>
                       <li><b>Motivo:</b> ${safeReason}</li>
                       <li><b>Estado:</b> ${escapeHtml(reqRow.status.toUpperCase())}</li>
-                      ${reqRow.status === 'approved' ? `<li><b>Aprobado por:</b> ${safeApproverName} el ${approvedAt}</li>` : ''}
-                      ${reqRow.status === 'rejected' ? `<li><b>Rechazado por:</b> ${safeApproverName} el ${approvedAt}</li>` : ''}
+                      ${reqRow.status === 'approved' ? `<li><b>Aprobado por:</b> ${safeApproverName} el ${escapeHtml(String(approvedAt))}</li>` : ''}
+                      ${reqRow.status === 'rejected' ? `<li><b>Rechazado por:</b> ${safeApproverName} el ${escapeHtml(String(approvedAt))}</li>` : ''}
                       ${reqRow.status === 'rejected' && safeRejectionReason ? `<li><b>Motivo del rechazo:</b> ${safeRejectionReason}</li>` : ''}
                     </ul>
                   </div>
                   <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
-                    <a href="${availabilityUrl}" style="display:inline-block;background:#3b82f6;color:#ffffff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:600;">Ver mi disponibilidad</a>
+                    <a href="${escapeHtml(String(availabilityUrl))}" style="display:inline-block;background:#3b82f6;color:#ffffff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:600;">Ver mi disponibilidad</a>
                   </div>
                 </td>
               </tr>
@@ -494,7 +495,7 @@ serve(async (req) => {
 
         results.push({ id: reqRow.id, sent: true });
       } catch (e: any) {
-        console.error('[send-vacation-decision] Failed for id', reqRow.id, e);
+        logEvent('error', 'vacation_decision.item_failed');
         results.push({ id: reqRow.id, sent: false, error: e?.message || String(e) });
       }
     }
@@ -505,7 +506,7 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (err: any) {
-    console.error('[send-vacation-decision] Error:', err);
+    logEvent('error', 'vacation_decision.request_failed');
     return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },

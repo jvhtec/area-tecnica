@@ -8,6 +8,23 @@ import {
   requireServiceRoleRequest,
 } from "./auth.ts";
 
+it("logs fixed auth events without caller identifiers or error bodies", async () => {
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const denied = createSupabaseStub({ role: "technician", user: { id: "private-user-identifier" } as User });
+    await expect(requireAuthenticatedRole(denied.supabase, requestWithToken("private-token"), {
+      logContext: "private-context@example.com", onForbidden: () => { throw new Error("private-error-body"); },
+    })).rejects.toMatchObject({ status: 403 });
+    const invalid = createSupabaseStub({ authError: { message: "private-auth-error@example.com" } });
+    await expect(requireAuthenticatedRole(invalid.supabase, requestWithToken(), { logContext: "auth" })).rejects.toMatchObject({ status: 401 });
+    const output = JSON.stringify([...error.mock.calls, ...warn.mock.calls]);
+    expect(output).toContain("auth.role_forbidden");
+    expect(output).toContain("auth.token_verification_failed");
+    expect(output).not.toMatch(/private-|example\.com/);
+  } finally { error.mockRestore(); warn.mockRestore(); }
+});
+
 type ProfileError = {
   message: string;
 };

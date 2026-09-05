@@ -1,0 +1,9 @@
+# SEC-09 / SEC-15 regression boundaries
+
+The September audit's seven mail functions now enforce `audit-security/escaped-email-template`. The rule follows immutable local aliases, nested templates, conditionals and mapped HTML. It requires the imported `escapeHtml` implementation at data leaves, not a naming convention; shadowed helpers, reassigned aliases and arbitrary unreviewed sanitizers fail. Generated dates, numeric values and configured URL attributes are escaped too. This is a conservative local-flow guard, not a claim of complete cross-module taint analysis or URL-scheme validation.
+
+`no-console` is an error for every new Edge Function and for migrated files. The exact legacy-file allowlist freezes remaining sites; `check-edge-logging.mjs` additionally prevents growth inside allowlisted files. Tests and the structured logger transport are excluded. Allowlisting legacy files is migration debt, not approval to log personal data. Subsequent maintenance changes should remove sites and shrink this list, not expand it.
+
+Shared auth and Memoria handling, staffing email, onboarding, vacation decisions, tour availability, staffing cancellation and automatic timesheet reminders now log fixed event names without caller IDs, names, token metadata, environment values, request fields or raw provider/database errors. Staffing retains only selected HTTP statuses and aggregate counts. The earlier password-reset boundary already used the logger.
+
+Regression tests reject raw HTML, misleading safe names, mutable aliases, helper shadowing and unescaped nested composition; accept actual escaped HTML; reject console calls in new/migrated files; and verify auth failures emit no fixture identifiers or error bodies. Function typecheck, full tests, governance and coverage are release gates. Production deployment must include changed entrypoints and importers of the shared auth/Memoria helpers; a main merge alone does not deploy Edge Functions.
