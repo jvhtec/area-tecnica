@@ -16,8 +16,6 @@ vi.mock('@/utils/pdf/lazyPdf', () => ({
 import {
   blobToDataUrl,
   createPdfExportDocument,
-  drawCorporatePdfHeader,
-  drawGeneratedPdfFooter,
   getLastAutoTableY,
   loadFirstImageAsDataUrl,
   pdfToBlob,
@@ -78,40 +76,6 @@ describe('PDF export helpers', () => {
 
     expect(pdf.output).toHaveBeenCalledWith('blob');
     expect(blob.type).toBe('application/pdf');
-  });
-
-  it('draws the shared corporate header and safely adds the logo', () => {
-    const pdf = makePdf();
-
-    drawCorporatePdfHeader(pdf as unknown as jsPDF, {
-      title: 'Tour Name',
-      subtitle: 'Tour Schedule',
-      logo: 'data:image/png;base64,logo',
-    });
-
-    expect(pdf.setFillColor).toHaveBeenCalledWith(125, 1, 1);
-    expect(pdf.rect).toHaveBeenCalledWith(0, 0, 210, 30, 'F');
-    expect(pdf.addImage).toHaveBeenCalledWith('data:image/png;base64,logo', 'PNG', 5, 5, 25, 20);
-    expect(pdf.text).toHaveBeenCalledWith('Tour Name', 105, 15, { align: 'center' });
-    expect(pdf.text).toHaveBeenCalledWith('Tour Schedule', 105, 25, { align: 'center' });
-  });
-
-  it('draws the generated footer with logo and page number', () => {
-    const pdf = makePdf();
-
-    drawGeneratedPdfFooter(pdf as unknown as jsPDF, {
-      generatedAt: new Date(Date.UTC(2026, 0, 2, 2, 4)),
-      logo: 'data:image/png;base64,logo',
-      pageNumber: 7,
-    });
-
-    expect(pdf.addImage).toHaveBeenCalledWith('data:image/png;base64,logo', 'PNG', 85, 272, 40, 15);
-    expect(pdf.text).toHaveBeenCalledWith(
-      'Generado el 2 de enero de 2026 a las 03:04',
-      10,
-      287,
-    );
-    expect(pdf.text).toHaveBeenCalledWith('Página 7', 180, 287);
   });
 
   it('keeps image failures local to the failed image', () => {

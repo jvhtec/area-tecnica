@@ -1,31 +1,9 @@
 import type jsPDF from 'jspdf';
-import { SECTOR_PRO_RED, type PdfRgb } from '@/utils/pdf/exportHelpers';
+import type { PdfRgb } from '@/utils/pdf/exportHelpers';
 import { fetchJobLogo, fetchTourLogo } from '@/utils/pdf/logoUtils';
 
 export type { PdfRgb };
 export type PdfImageFormat = 'PNG' | 'JPEG';
-
-// ---------------------------------------------------------------------------
-// Shared corporate palette
-// ---------------------------------------------------------------------------
-
-export const CORPORATE_RED: PdfRgb = SECTOR_PRO_RED;
-export const TEXT_PRIMARY: PdfRgb = [31, 41, 55];
-export const TEXT_MUTED: PdfRgb = [100, 116, 139];
-export const TEXT_DARK: PdfRgb = [51, 51, 51];
-export const TABLE_STRIPE_COLOR: PdfRgb = [248, 248, 248];
-export const SUMMARY_BACKGROUND: PdfRgb = [250, 250, 250];
-
-// ---------------------------------------------------------------------------
-// Layout constants
-// ---------------------------------------------------------------------------
-
-/** Height of the corporate (rates-style) header band. */
-export const CORPORATE_HEADER_HEIGHT = 44;
-/** Y offset at which content starts below the corporate header. */
-export const CORPORATE_HEADER_CONTENT_OFFSET = CORPORATE_HEADER_HEIGHT + 18;
-/** Reserved space at the bottom for the corporate footer so tables/text never collide with it. */
-export const CORPORATE_FOOTER_RESERVED = 38; // px, keep enough room for logo + page text
 
 // ---------------------------------------------------------------------------
 // Logo asset paths
@@ -67,7 +45,7 @@ export const buildPdfFilename = (
  * Quiet image loader: resolves to null when the source is missing, the Image
  * API is unavailable, or loading fails (logging a single warning).
  */
-export const loadImageSilently = (
+const loadImageSilently = (
   src: string,
   description: string,
 ): Promise<HTMLImageElement | null> => {
@@ -128,11 +106,6 @@ export const loadImageWithTimeout = async (
   });
 };
 
-/** Loads the Sector Pro footer logo, falling back to the alternative asset. */
-export const loadSectorProFooterLogo = async (): Promise<HTMLImageElement | null> =>
-  (await loadImageWithTimeout(SECTOR_PRO_LOGO_PATH, 'Sector Pro logo')) ||
-  (await loadImageWithTimeout(FALLBACK_BRAND_LOGO_PATH, 'alternative Sector Pro logo'));
-
 export const inferPdfImageFormat = (
   source: string | HTMLImageElement | null | undefined,
   fallback: PdfImageFormat = 'PNG',
@@ -151,8 +124,8 @@ export const inferPdfImageFormat = (
 };
 
 /**
- * Resolves the branding logo (tour logo first, then job/festival logo) for the
- * corporate header and loads it as an image element.
+ * Resolves the client mark for a document's title block — the tour logo where
+ * there is one, otherwise the job or festival logo — and loads it as an image.
  */
 export const resolveHeaderLogo = async ({
   jobId,
@@ -172,210 +145,6 @@ export const resolveHeaderLogo = async ({
   }
 
   return loadImageSilently(brandingUrl, 'tour or job logo');
-};
-
-// ---------------------------------------------------------------------------
-// Logo placement
-// ---------------------------------------------------------------------------
-
-/**
- * Adds a logo constrained to a maximum height while preserving aspect ratio.
- * Errors from jsPDF propagate to the caller.
- */
-export const addLogoConstrainedToHeight = (
-  doc: jsPDF,
-  image: HTMLImageElement,
-  format: 'PNG' | 'JPEG',
-  x: number,
-  y: number,
-  maxHeight: number,
-): void => {
-  const ratio = image.width / image.height;
-  const logoHeight = Math.min(maxHeight, image.height);
-  const logoWidth = logoHeight * ratio;
-  doc.addImage(image, format, x, y, logoWidth, logoHeight);
-};
-
-// ---------------------------------------------------------------------------
-// Corporate (rates-style) header & footer
-// ---------------------------------------------------------------------------
-
-export interface CorporateHeaderOptions {
-  title: string;
-  subtitle?: string;
-  metadata?: string;
-  logo?: HTMLImageElement | null;
-}
-
-/**
- * Draws the 44px corporate header band with optional logo, subtitle and
- * right-aligned metadata. Returns the Y offset where content should start.
- */
-export const drawCorporateHeader = (
-  doc: jsPDF,
-  { title, subtitle, metadata, logo }: CorporateHeaderOptions,
-): number => {
-  const pageWidth = doc.internal.pageSize.getWidth();
-
-  doc.setFillColor(...CORPORATE_RED);
-  doc.rect(0, 0, pageWidth, CORPORATE_HEADER_HEIGHT, 'F');
-
-  if (logo) {
-    try {
-      const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
-      const logoHeight = 26;
-      const logoWidth = logoHeight * ratio;
-      doc.addImage(logo, inferPdfImageFormat(logo), 16, 9, logoWidth, logoHeight);
-    } catch (error) {
-      console.error('Error adding logo to PDF header:', error);
-    }
-  }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  doc.text(title, pageWidth / 2, 20, { align: 'center' });
-
-  if (subtitle) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(12);
-    doc.text(subtitle, pageWidth / 2, 31, { align: 'center' });
-  }
-
-  if (metadata) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(metadata, pageWidth - 18, CORPORATE_HEADER_HEIGHT - 10, { align: 'right' });
-  }
-
-  doc.setTextColor(...TEXT_PRIMARY);
-
-  return CORPORATE_HEADER_CONTENT_OFFSET;
-};
-
-/**
- * Draws the corporate footer (centered logo, "Sector-Pro" label and
- * "Página X de Y" page numbers) on every page of the document.
- */
-export const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null): void => {
-  const pageCount = doc.getNumberOfPages();
-
-  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
-    doc.setPage(pageNumber);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    const footerY = pageHeight - 12;
-
-    if (logo) {
-      try {
-        const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
-        const logoHeight = 12;
-        const logoWidth = logoHeight * ratio;
-        const logoX = (pageWidth - logoWidth) / 2;
-        doc.addImage(
-          logo,
-          inferPdfImageFormat(logo),
-          logoX,
-          footerY - logoHeight - 3,
-          logoWidth,
-          logoHeight,
-        );
-      } catch (error) {
-        console.error('Error adding logo to PDF footer:', error);
-      }
-    }
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(...TEXT_MUTED);
-
-    doc.text('Sector-Pro', 18, footerY);
-
-    const pageText = `Página ${pageNumber} de ${pageCount}`;
-    doc.text(pageText, pageWidth - 18, footerY, { align: 'right' });
-  }
-
-  doc.setTextColor(...TEXT_PRIMARY);
-};
-
-/**
- * Shared autotable defaults for corporate (rates-style) documents: grid theme,
- * corporate head styles, striped rows, standard margins and header redraw on
- * page breaks.
- */
-export const corporateTableDefaults = (
-  doc: jsPDF,
-  headerOptions: CorporateHeaderOptions,
-  topMargin: number,
-) => ({
-  theme: 'grid' as const,
-  headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' as const },
-  alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR },
-  margin: { left: 14, right: 14, top: topMargin, bottom: CORPORATE_FOOTER_RESERVED },
-  didDrawPage: (data: { pageNumber: number }) => {
-    if (data.pageNumber > 1) {
-      drawCorporateHeader(doc, headerOptions);
-    }
-  },
-});
-
-// ---------------------------------------------------------------------------
-// Festival documents
-// ---------------------------------------------------------------------------
-//
-// The festival set no longer draws a filled header band or a red-filled table
-// head. Its chrome, ledger tables and components live in
-// `@/utils/pdf/festival-report`; the helpers below remain for the corporate
-// (rates-style) documents that still use the banded layout.
-
-/**
- * Draws a horizontally centered footer logo (20px wide, aspect preserved) at
- * `bottomOffset` above the page bottom edge.
- */
-export const drawCenteredFooterLogo = (
-  doc: jsPDF,
-  logo: HTMLImageElement | null,
-  pageWidth: number,
-  pageHeight: number,
-  bottomOffset: number,
-  errorMessage = 'Error adding footer logo to PDF:',
-): void => {
-  if (!logo || !(logo.width > 0) || !(logo.height > 0)) return;
-
-  try {
-    const logoWidth = 20;
-    const logoHeight = logoWidth * (logo.height / logo.width);
-    doc.addImage(
-      logo,
-      'PNG',
-      pageWidth / 2 - logoWidth / 2,
-      pageHeight - logoHeight - bottomOffset,
-      logoWidth,
-      logoHeight,
-    );
-  } catch (error) {
-    console.error(errorMessage, error);
-  }
-};
-
-/**
- * Draws the small footer meta text (left-aligned text plus optional
- * right-aligned text) in dark gray, 8pt.
- */
-export const drawFooterMetaText = (
-  doc: jsPDF,
-  pageWidth: number,
-  pageHeight: number,
-  leftText: string,
-  rightText?: string,
-): void => {
-  doc.setFontSize(8);
-  doc.setTextColor(...TEXT_DARK);
-  doc.text(leftText, 10, pageHeight - 10);
-  if (rightText) {
-    doc.text(rightText, pageWidth - 10, pageHeight - 10, { align: 'right' });
-  }
 };
 
 // ---------------------------------------------------------------------------
