@@ -1,7 +1,36 @@
 {
-  "generatedAt": "2026-09-05T11:48:47.080Z",
+  "generatedAt": "2026-09-05T12:07:01.036Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
   "total": 1145,
+  "domains": {
+    "app": {
+      "total": 826,
+      "rules": {
+        "@typescript-eslint/ban-ts-comment": 3,
+        "@typescript-eslint/no-explicit-any": 687,
+        "react-hooks/exhaustive-deps": 74,
+        "react-refresh/only-export-components": 43,
+        "@typescript-eslint/no-require-imports": 1,
+        "@typescript-eslint/no-empty-object-type": 4,
+        "no-control-regex": 5,
+        "no-useless-escape": 4,
+        "no-case-declarations": 1,
+        "@typescript-eslint/no-unsafe-function-type": 3,
+        "@typescript-eslint/no-this-alias": 1
+      }
+    },
+    "functions": {
+      "total": 319,
+      "rules": {
+        "@typescript-eslint/no-explicit-any": 284,
+        "no-empty": 13,
+        "no-control-regex": 2,
+        "no-useless-escape": 18,
+        "@typescript-eslint/ban-ts-comment": 1,
+        "prefer-const": 1
+      }
+    }
+  },
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,

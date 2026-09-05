@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "threshold": 800,
+  "generatedAt": "2026-09-05T11:59:39.120Z",
+  "note": "Line-count ceilings for files over the threshold. CI fails when a file exceeds its ceiling or a new file crosses the threshold. Regenerate with: npm run governance:filesize -- --write-baseline",
+  "files": {
+    "supabase/functions/send-staffing-email/index.ts": 1874,
+    "supabase/functions/staffing-orchestrator/index.ts": 1288,
+    "supabase/functions/create-whatsapp-group/index.ts": 1002,
+    "supabase/functions/staffing-click/index.ts": 964,
+    "supabase/functions/upload-public-artist-rider/index.ts": 905,
+    "supabase/functions/send-corporate-email/index.ts": 878
+  }
+}
