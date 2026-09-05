@@ -1,7 +1,21 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { joinedSingle } from "../_shared/joins.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
+import {
+  drawReportChrome,
+  drawReportFactRow,
+  drawReportFlag,
+  drawReportFooter,
+  drawReportMetaGrid,
+  drawReportProse,
+  drawReportSectionHeading,
+  drawReportTitleBlock,
+  embedIssuerMark,
+  embedReportFonts,
+  REPORT_PAGE,
+  type StorageClient,
+} from "../_shared/reportPdfKit.ts";
 import { format as formatDate } from "https://esm.sh/date-fns@3.6.0";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
@@ -89,164 +103,104 @@ function toOrigin(input?: string): string | undefined {
   }
 }
 
-async function generateVacationPDF(reqRow: VacationRequestRow, logos: { sectorProLogoUrl?: string } = {}) {
-  // Match jsPDF A4 size (595x842 points)
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pendiente",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+};
+
+const longDate = (value: Date): string =>
+  new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Madrid",
+  }).format(value);
+
+/**
+ * The emailed copy of the vacation request.
+ *
+ * It is the same document the app produces from `vacationRequestPdfExport`, so
+ * it is built on the same design: the technician should not receive a sheet
+ * that looks nothing like the one they can download.
+ */
+async function generateVacationPDF(
+  reqRow: VacationRequestRow,
+  supabase: StorageClient,
+) {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([595, 842]);
-  const pageWidth = page.getWidth();
-  const pageHeight = page.getHeight();
+  const page = doc.addPage([REPORT_PAGE.width, REPORT_PAGE.height]);
+  const fonts = await embedReportFonts(doc);
+  const issuerMark = await embedIssuerMark(doc, supabase);
 
-  // Corporate colors from client export
-  const primaryColor = rgb(125 / 255, 1 / 255, 1 / 255);
-  const accentColor = rgb(125 / 255, 1 / 255, 25 / 255);
-
-  const helv = await doc.embedFont(StandardFonts.Helvetica);
-  const helvBold = await doc.embedFont(StandardFonts.HelveticaBold);
-
-  // Header (height 25 at top) and centered title at y=15 from top (convert to bottom-origin)
-  page.drawRectangle({ x: 0, y: pageHeight - 25, width: pageWidth, height: 25, color: primaryColor });
-  const headerTitle = 'SOLICITUD DE VACACIONES';
-  const headerTitleSize = 18;
-  const headerTitleWidth = helvBold.widthOfTextAtSize(headerTitle, headerTitleSize);
-  page.drawText(headerTitle, {
-    x: (pageWidth - headerTitleWidth) / 2,
-    y: (pageHeight - 15) - (headerTitleSize * 0.35), // jsPDF y=15 from top
-    size: headerTitleSize,
-    font: helvBold,
-    color: rgb(1, 1, 1)
-  });
-
-  // Section title 'Detalles' at (15,45) from top
-  page.drawText('Detalles', { x: 15, y: (pageHeight - 45) - 16 * 0.3, size: 16, font: helvBold, color: rgb(0, 0, 0) });
-
-  // Prepare values
-  const techName = `${reqRow.tech?.first_name || ''} ${reqRow.tech?.last_name || ''}`.trim() || 'Not Available';
-  const department = reqRow.tech?.department || 'Not Available';
+  const techName = `${reqRow.tech?.first_name || ""} ${reqRow.tech?.last_name || ""}`.trim() || "No disponible";
+  const department = reqRow.tech?.department || "No disponible";
+  const approverName = `${reqRow.approver?.first_name || ""} ${reqRow.approver?.last_name || ""}`.trim() || "No disponible";
   const createdAt = reqRow.created_at ? new Date(reqRow.created_at) : null;
   const startDate = new Date(reqRow.start_date);
   const endDate = new Date(reqRow.end_date);
   const durationDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const approverName = `${reqRow.approver?.first_name || ''} ${reqRow.approver?.last_name || ''}`.trim() || 'Not Available';
+  const durationLabel = `${durationDays} ${durationDays === 1 ? "día" : "días"}`;
+  const period = `${longDate(startDate)} – ${longDate(endDate)}`;
+  const statusLabel = STATUS_LABELS[reqRow.status] ?? reqRow.status;
 
-  // Helpers to draw rows similar to jsPDF placement
-  let y = 60; // jsPDF Y from top
-  const label = (text: string, ypos: number) => page.drawText(text + ':', { x: 15, y: (pageHeight - ypos) - 12 * 0.3, size: 12, font: helvBold });
-  const value = (text: string, ypos: number) => page.drawText(text, { x: 80, y: (pageHeight - ypos) - 12 * 0.3, size: 12, font: helv });
-  const addInfoRow = (l: string, v: string) => { label(l, y); value(v, y); y += 10; };
+  drawReportChrome(page, fonts, "Solicitud de vacaciones", issuerMark);
 
-  addInfoRow('Nombre del Empleado', techName);
-  addInfoRow('Departmento', department);
-  addInfoRow('Fecha de la Solicitud', createdAt ? formatDate(createdAt, 'PPP') : '');
-  y += 5;
-  addInfoRow('Periodo', `${formatDate(startDate, 'PPP')} - ${formatDate(endDate, 'PPP')}`);
-  addInfoRow('Duracion', `${durationDays} day${durationDays > 1 ? 's' : ''}`);
-  y += 5;
+  let y = drawReportTitleBlock(page, fonts, {
+    eyebrow: "Solicitud de vacaciones",
+    title: techName,
+    subtitle: period,
+    y: REPORT_PAGE.height - 150,
+  });
 
-  // Reason section
-  page.drawText('Motivo:', { x: 15, y: (pageHeight - y) - 12 * 0.3, size: 12, font: helvBold });
-  y += 10;
+  y = drawReportMetaGrid(page, fonts, [
+    { label: "Estado", value: statusLabel },
+    { label: "Duración", value: durationLabel },
+    { label: "Departamento", value: department },
+  ], y);
 
-  const reasonText = reqRow.reason || 'No reason provided';
-  const wrapWidth = pageWidth - 30; // like splitTextToSize(pageWidth - 30)
-  const wrapText = (text: string, maxWidth: number, font: any, size: number) => {
-    const words = text.split(/\s+/);
-    const lines: string[] = [];
-    let current = '';
-    for (const w of words) {
-      const test = current ? current + ' ' + w : w;
-      const testWidth = font.widthOfTextAtSize(test, size);
-      if (testWidth <= maxWidth) {
-        current = test;
-      } else {
-        if (current) lines.push(current);
-        current = w;
-      }
+  y = drawReportSectionHeading(page, fonts, "Solicitud", y, 1);
+  y = drawReportFactRow(page, fonts, "Empleado", techName, y);
+  y = drawReportFactRow(page, fonts, "Departamento", department, y);
+  if (createdAt) {
+    y = drawReportFactRow(page, fonts, "Fecha de la solicitud", longDate(createdAt), y);
+  }
+  y = drawReportFactRow(page, fonts, "Periodo solicitado", period, y);
+  y = drawReportFactRow(page, fonts, "Duración", durationLabel, y);
+
+  y = drawReportSectionHeading(page, fonts, "Motivo", y - 8, 2);
+  y = drawReportProse(page, fonts, reqRow.reason || "", y);
+
+  y = drawReportSectionHeading(page, fonts, "Resolución", y - 8, 3);
+  y = drawReportFactRow(page, fonts, "Estado", statusLabel, y);
+
+  if (reqRow.status === "approved" && reqRow.approved_at) {
+    y = drawReportFactRow(page, fonts, "Aprobada por", approverName, y);
+    y = drawReportFactRow(page, fonts, "Fecha de aprobación", longDate(new Date(reqRow.approved_at)), y);
+  } else if (reqRow.status === "rejected" && reqRow.approved_at) {
+    y = drawReportFactRow(page, fonts, "Rechazada por", approverName, y);
+    y = drawReportFactRow(page, fonts, "Fecha de rechazo", longDate(new Date(reqRow.approved_at)), y);
+    if (reqRow.rejection_reason) {
+      y = drawReportFlag(page, fonts, {
+        label: "Motivo del rechazo",
+        text: reqRow.rejection_reason,
+        y: y - 6,
+      });
     }
-    if (current) lines.push(current);
-    return lines;
-  };
-  const reasonLines = wrapText(reasonText, wrapWidth, helv, 12);
-  for (const line of reasonLines) {
-    page.drawText(line, { x: 15, y: (pageHeight - y) - 12 * 0.3, size: 12, font: helv, color: rgb(0, 0, 0) });
-    y += 7;
-  }
-  y += 10;
-
-  // Status row
-  addInfoRow('Estado', (reqRow.status || '').toUpperCase());
-  // Status dot (colored) at (70, y-5)
-  const statusColors: Record<string, [number, number, number]> = {
-    pending: [255, 193, 7],
-    approved: [40, 167, 69],
-    rejected: [220, 53, 69],
-  };
-  const [sr, sg, sb] = statusColors[reqRow.status] || [108, 117, 125];
-  page.drawCircle({ x: 70, y: (pageHeight - (y - 5)), size: 3, color: rgb(sr / 255, sg / 255, sb / 255) });
-  y += 5;
-
-  // Approval/rejection details
-  if ((reqRow.status === 'approved' || reqRow.status === 'rejected') && reqRow.approved_at) {
-    if (reqRow.status === 'approved') {
-      addInfoRow('Aprobado por', approverName);
-      addInfoRow('Fecha de aprobacion', formatDate(new Date(reqRow.approved_at), 'PPP'));
-    } else {
-      addInfoRow('Rechazado por', approverName);
-      addInfoRow('Fecha de rechazo', formatDate(new Date(reqRow.approved_at), 'PPP'));
-      if (reqRow.rejection_reason) {
-        y += 5;
-        page.drawText('Motivo del Rechazo', { x: 15, y: (pageHeight - y) - 12 * 0.3, size: 12, font: helvBold });
-        y += 10;
-        const rejLines = wrapText(reqRow.rejection_reason, wrapWidth, helv, 12);
-        for (const line of rejLines) {
-          page.drawText(line, { x: 15, y: (pageHeight - y) - 12 * 0.3, size: 12, font: helv });
-          y += 7;
-        }
-      }
-    }
+  } else {
+    y = drawReportFactRow(page, fonts, "Resolución", "Pendiente de aprobación", y);
   }
 
-  // Footer bar and content
-  const footerY = 0; // bottom bar of height 30
-  page.drawRectangle({ x: 0, y: footerY, width: pageWidth, height: 30, color: accentColor });
-
-  // Footer logo centered
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-  const logoCandidates: string[] = [];
-  if (logos.sectorProLogoUrl) logoCandidates.push(logos.sectorProLogoUrl);
-  if (SUPABASE_URL) {
-    logoCandidates.push(
-      `${SUPABASE_URL}/storage/v1/object/public/public%20logos/sectorpro.png`,
-      `${SUPABASE_URL}/storage/v1/object/public/company-assets/sector-pro-logo.png`,
-    );
-  }
-  for (const url of logoCandidates) {
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) continue;
-      const imgBytes = new Uint8Array(await resp.arrayBuffer());
-      const isPng = imgBytes.length > 8 && imgBytes[0] === 0x89 && imgBytes[1] === 0x50 && imgBytes[2] === 0x4E && imgBytes[3] === 0x47;
-      const img = isPng ? await doc.embedPng(imgBytes) : await doc.embedJpg(imgBytes);
-      const footerLogoHeight = 10;
-      const footerLogoWidth = footerLogoHeight * (img.width / img.height);
-      const logoX = (pageWidth - footerLogoWidth) / 2;
-      page.drawImage(img, { x: logoX, y: footerY + 5, width: footerLogoWidth, height: footerLogoHeight });
-      break;
-    } catch (_) { /* try next */ }
-  }
-
-  // Footer text (white)
-  const footerTextColor = rgb(1, 1, 1);
-  const nowText = formatDate(new Date(), 'PPP p');
-  const nowWidth = helv.widthOfTextAtSize(nowText, 10);
-  page.drawText(nowText, { x: pageWidth - 15 - nowWidth, y: footerY + 10 - 10 * 0.3, size: 10, font: helv, color: footerTextColor });
-  const pageNumText = 'Page 1 of 1';
-  const pageNumWidth = helv.widthOfTextAtSize(pageNumText, 10);
-  page.drawText(pageNumText, { x: (pageWidth - pageNumWidth) / 2, y: footerY + 20 - 10 * 0.3, size: 10, font: helv, color: footerTextColor });
+  drawReportFooter(page, fonts, {
+    issuer: "Sector-Pro · Solicitud de vacaciones",
+    pageNumber: 1,
+    totalPages: doc.getPageCount(),
+  });
 
   const bytes = await doc.save();
 
   // Match client filename pattern: vacation_request_<cleanTechName>_<MMM_dd_yyyy>.pdf
-  const cleanName = (techName || 'Not Available')
+  const cleanName = techName
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -416,7 +370,6 @@ serve(async (req) => {
     const originBase = rawOrigin ? toOrigin(rawOrigin.split('?')[0]) : undefined;
     const baseUrl = envBase || originBase || 'http://localhost:3000';
 
-    const PUBLIC_LOGOS_BASE = `${SUPABASE_URL}/storage/v1/object/public/public%20logos`;
 
     // Fetch all rows
     const { data: rows, error: fetchErr } = await supabase
@@ -448,7 +401,7 @@ serve(async (req) => {
     for (const reqRow of vacationRows) {
       try {
         // Generate PDF attachment
-        const { bytes, filename } = await generateVacationPDF(reqRow, { sectorProLogoUrl: `${PUBLIC_LOGOS_BASE}/sectorpro.png` });
+        const { bytes, filename } = await generateVacationPDF(reqRow, supabase);
         const pdfB64 = u8ToBase64(bytes);
 
         // Build HTML content
