@@ -372,6 +372,7 @@ jobs:
           docker exec -i supabase_db_syldobdcdsgfgjtbuwxm psql -U postgres -d postgres -XqAt -v ON_ERROR_STOP=1 < scripts/ci/schema-catalog.sql > schema-catalog.json
           node --test scripts/ci/compare-schema-catalog.check.mjs
           node scripts/ci/compare-schema-catalog.mjs schema-catalog.json schema-catalog.json
+          node scripts/ci/check-policy-predicates.mjs schema-catalog.json
 
       - name: Retain replayed schema evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
