@@ -67,7 +67,7 @@ Detailed deep-dive docs for the full festival subsystem:
   - `DEPLOY_TIMESHEET_REMINDER.md`
 
 ## Engineering / audits / deep dives
-- **[Codebase re-audit (2026-09-04)](CODEBASE_AUDIT_2026-09-04.md)** — current source of truth. Every gate re-run on `main@3ff4d13`; measured scorecard vs. the 2026-07 baseline, verified closures, and two new authorization findings verified against the production database (`profiles` readable in full by any authenticated user, exposing ICS bearer tokens; three tables readable with the public anon key). Supersedes the registers below for current state.
+- **[Codebase re-audit (opened 2026-09-04, last verified 2026-09-05)](CODEBASE_AUDIT_2026-09-04.md)** — current source of truth and living register. Scorecard across both verification passes, each finding's status re-measured against the production database, and the remaining open items (SEC-16 colleague profile PII, DB-06 drift detection not gated, SEC-09 console migration). Supersedes the registers below for current state.
 - **[Current actionable findings (2026-07-15)](CODEBASE_AUDIT_CURRENT_FINDINGS_2026-07-15.md)** — consolidated register of findings still reproducible on current `main`, externally unverified operational actions, closure criteria, and historical findings intentionally retired. Supersedes the [2026-07-10 register](CODEBASE_AUDIT_CURRENT_FINDINGS_2026-07-10.md).
 - **Job Assignment Matrix audit**
   - `AUDIT_REPORT_JOB_ASSIGNMENT_MATRIX.md`
