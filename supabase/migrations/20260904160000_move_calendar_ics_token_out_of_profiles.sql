@@ -57,8 +57,17 @@ ALTER TABLE "public"."profiles"
   ALTER COLUMN "calendar_ics_token" DROP DEFAULT,
   ALTER COLUMN "calendar_ics_token" DROP NOT NULL;
 
+-- The profile privilege trigger requires JWT claims before any UPDATE, even
+-- when only a non-privileged field changes. Linked migrations run without JWT
+-- claims, so suspend the trigger for this controlled credential purge.
+ALTER TABLE "public"."profiles"
+  DISABLE TRIGGER "enforce_profile_privilege_changes";
+
 UPDATE "public"."profiles" SET "calendar_ics_token" = NULL
  WHERE "calendar_ics_token" IS NOT NULL;
+
+ALTER TABLE "public"."profiles"
+  ENABLE TRIGGER "enforce_profile_privilege_changes";
 
 COMMENT ON COLUMN "public"."profiles"."calendar_ics_token" IS
   'Deprecated compatibility column. Always NULL; remove after pre-SEC-13 PWA bundles have aged out.';
