@@ -1,6 +1,11 @@
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import {
+  REPORT_ACCENT,
+  REPORT_FAINT,
+  REPORT_HAIRLINE,
   REPORT_INK,
+  REPORT_PAPER_TINT,
+  REPORT_RULE,
   REPORT_SOFT,
   drawReportRunningHead,
   reportGeometry,
@@ -178,7 +183,6 @@ export const generatePersonalCalendarPDF = async (
 
   await loadReportIssuerMark();
 
-  const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
   // The month title sits on the same page furniture as every other document;
@@ -271,13 +275,15 @@ export const generatePersonalCalendarPDF = async (
     const totalMinHeight = minHeights.reduce((sum, height) => sum + height, 0);
 
     if (totalMinHeight <= availableHeight) {
+      // Shares are normalised so the slack is fully spent: a per-week average
+      // scaled by a factor that is almost always below 1 left the bottom of an
+      // A3 sheet blank.
       const extraSpace = availableHeight - totalMinHeight;
-      const extraPerWeek = extraSpace / weeks.length;
-      return minHeights.map((minHeight, index) => {
-        const techFactor = Math.max(weekTechCounts[index] / 12, 0.2);
-        const additionalSpace = extraPerWeek * techFactor;
-        return minHeight + additionalSpace;
-      });
+      const weightFor = (index: number) => Math.max(weekTechCounts[index] / 12, 0.2);
+      const weightSum = minHeights.reduce((sum, _height, index) => sum + weightFor(index), 0);
+      return minHeights.map(
+        (minHeight, index) => minHeight + (extraSpace * weightFor(index)) / weightSum,
+      );
     }
 
     const totalWeight = weekTechCounts.reduce((sum, count) => sum + Math.max(count, 1), 0);
@@ -351,26 +357,29 @@ export const generatePersonalCalendarPDF = async (
       for (const [dayIndex, day] of week.entries()) {
         const x = startX + dayIndex * cellWidth;
 
-        doc.setDrawColor(200);
-        doc.setLineWidth(0.5);
+        doc.setDrawColor(...REPORT_RULE);
+        doc.setLineWidth(REPORT_HAIRLINE);
         doc.rect(x, currentY, cellWidth, weekHeight);
 
         if (!day) {
           continue;
         }
 
-        doc.setTextColor(isSameMonth(day, monthStart) ? 0 : 150);
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text(format(day, "d"), x + 2, currentY + 6);
+        setReportMonoText(
+          doc,
+          isSameMonth(day, monthStart) ? REPORT_INK : REPORT_FAINT,
+          9,
+          "bold",
+        );
+        doc.text(format(day, "d"), x + 2, currentY + 5.6);
 
         // Show holiday indicator if it's a Madrid holiday
         const holidayName = getMadridHolidayName(day, madridHolidays);
         if (holidayName) {
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(180, 100, 0); // Amber color
-          doc.text("H", x + cellWidth - 8, currentY + 6);
+          // Holidays are marked with the accent the rest of the system reserves
+          // for marks, not with an amber that belongs to no palette.
+          setReportMonoText(doc, REPORT_ACCENT, 6.4, "bold");
+          doc.text("F", x + cellWidth - 6, currentY + 5.6);
         }
 
         const dayTechsData = getTechsForDay(day);
@@ -423,11 +432,9 @@ export const generatePersonalCalendarPDF = async (
         if (dayTechsData.length > maxTechsToShow) {
           const moreY = techY + maxTechsToShow * (techHeight + techSpacing);
           if (moreY + techHeight < currentY + weekHeight - cellPadding) {
-            doc.setFillColor(240, 240, 240);
+            doc.setFillColor(...REPORT_PAPER_TINT);
             doc.rect(x + 1, moreY, cellWidth - 2, techHeight, "F");
-            doc.setFont("helvetica", "italic");
-            doc.setFontSize(6);
-            doc.setTextColor(100);
+            setReportMonoText(doc, REPORT_SOFT, 5.4, "normal");
             const moreText = `+${dayTechsData.length - maxTechsToShow} más`;
             doc.text(moreText, x + 2, moreY + 2.5);
           }
@@ -439,30 +446,32 @@ export const generatePersonalCalendarPDF = async (
     // Legend
     if (pageIndex === 0) {
       let legendY = currentY + 8;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(0);
-      doc.text("Indicadores de Estado:", startX, legendY);
+      setReportMonoText(doc, REPORT_SOFT, 6.4, "bold");
+      doc.text("INDICADORES DE ESTADO", startX, legendY, { charSpace: 0.25 });
 
-      let legendX = startX + 50;
       const statusLabels = [
         { label: "A", description: "Almacén" },
         { label: "VC", description: "Vacaciones" },
         { label: "VJ", description: "Viaje" },
         { label: "E", description: "Enfermo" },
         { label: "L", description: "Libre" },
+        { label: "F", description: "Festivo" },
       ];
 
-      statusLabels.forEach((status, index) => {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.text(`${status.label} = ${status.description}`, legendX, legendY);
-        legendX += 60;
-
-        if (legendX > pageWidth - 60 && index < statusLabels.length - 1) {
-          legendX = startX + 50;
-          legendY += 10;
+      // Entries are placed against their measured width rather than on a fixed
+      // 60 mm step, which wrapped the legend onto ragged extra lines.
+      const legendLeft = startX + 44;
+      let legendX = legendLeft;
+      setReportText(doc, REPORT_SOFT, 7.4, "normal");
+      statusLabels.forEach((status) => {
+        const entry = `${status.label} = ${status.description}`;
+        const entryWidth = doc.getTextWidth(entry);
+        if (legendX > legendLeft && legendX + entryWidth > calendarGeo.right) {
+          legendX = legendLeft;
+          legendY += 5;
         }
+        doc.text(entry, legendX, legendY);
+        legendX += entryWidth + 10;
       });
     }
   }

@@ -1,6 +1,7 @@
 import { PDFDocument, PDFImage } from "https://esm.sh/pdf-lib@1.17.1";
 import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { fetchOptionalMemoriaLogo, SourceByteBudget } from "./memoriaInput.ts";
+import { embedIssuerMark } from "./reportPdfKit.ts";
 import { logEvent } from "./structuredLogger.ts";
 import {
   drawMemoriaCover,
@@ -13,28 +14,6 @@ import {
 
 export { MEMORIA_PAGE } from "./memoriaCover.ts";
 export type { MemoriaSection } from "./memoriaCover.ts";
-
-/** Fixed application assets, read through the service client. */
-const ISSUER_MARK_CANDIDATES = [
-  { bucket: "public logos", path: "sectorpro.png" },
-  { bucket: "company-assets", path: "sector-pro-logo.png" },
-] as const;
-
-const embedIssuerMark = async (
-  pdf: PDFDocument,
-  supabase: SupabaseClient,
-): Promise<PDFImage | null> => {
-  for (const candidate of ISSUER_MARK_CANDIDATES) {
-    const { data, error } = await supabase.storage.from(candidate.bucket).download(candidate.path);
-    if (error || !data) continue;
-    try {
-      return await pdf.embedPng(new Uint8Array(await data.arrayBuffer()));
-    } catch {
-      logEvent("warn", "memoria.issuer_mark_embed_failed", { bucket: candidate.bucket });
-    }
-  }
-  return null;
-};
 
 /**
  * Loads the two marks the front matter can carry. Neither is required: the
