@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_HEADING, HOJA_LABEL } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 
@@ -8,7 +9,7 @@ export class EventSection {
   addEventDetailsSection(eventData: EventData, yPosition: number): number {
     yPosition = this.pdfDoc.checkPageBreak(yPosition);
     
-    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.setText(14, HOJA_HEADING);
     this.pdfDoc.addText("Detalles del Evento", 20, yPosition);
     yPosition += 15;
     
@@ -31,7 +32,7 @@ export class EventSection {
         theme: "plain",
         styles: { fontSize: 10, cellPadding: 4 },
         columnStyles: {
-          0: { cellWidth: 50, fontStyle: 'bold', textColor: [125, 1, 1] },
+          0: { cellWidth: 50, fontStyle: 'bold', textColor: HOJA_LABEL },
           1: { cellWidth: 120 }
         },
         margin: { left: 20, right: 20 },

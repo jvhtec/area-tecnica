@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
+import { reportGeometry } from '@/utils/pdf/report-system';
 
 export interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
@@ -47,8 +48,9 @@ export class PDFDocument {
   checkPageBreak(currentY: number, requiredHeight: number = 25): number {
     if (currentY + requiredHeight > this.pageHeight - this.footerSpace) {
       this.addPage();
-      // Minimal top margin on continued pages within a section
-      return 30;
+      // A continued page starts where the system's chrome ends, so content
+      // never sits under the running head it will be stamped with.
+      return reportGeometry(this.doc).contentTop;
     }
     return currentY;
   }

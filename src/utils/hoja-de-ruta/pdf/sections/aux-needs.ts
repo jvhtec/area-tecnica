@@ -2,6 +2,7 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { AUXILIARY_MACHINERY_LABELS } from '@/constants/hojaDeRutaAuxiliaryNeeds';
+import { hojaGeometry, hojaTable } from '../hoja-report-system';
 
 export class AuxNeedsSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -35,21 +36,10 @@ export class AuxNeedsSection {
         startY: yPosition,
         head: [["Concepto", "Cantidad"]],
         body: tableRows,
-        theme: "grid",
-        margin: { left: 30, right: 20 },
-        styles: {
-          fontSize: 9,
-          cellPadding: 2,
-          textColor: [51, 51, 51],
-        },
-        headStyles: {
-          fillColor: [125, 1, 1],
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-        },
-        columnStyles: {
-          1: { halign: "right", cellWidth: 25 },
-        },
+        ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+          numericColumns: [1],
+          weights: [76, 24],
+        }),
       });
 
       yPosition = this.pdfDoc.getLastAutoTableY() + 6;

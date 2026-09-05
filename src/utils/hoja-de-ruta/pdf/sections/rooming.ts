@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_HEADING, HOJA_LABEL, hojaGeometry, hojaTable } from '../hoja-report-system';
 import { EventData, Accommodation } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
@@ -9,7 +10,7 @@ export class RoomingSection {
   addRoomingSection(accommodations: Accommodation[], eventData: EventData, yPosition: number): number {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
     
-    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.setText(14, HOJA_HEADING);
     this.pdfDoc.addText("Rooming", 20, yPosition);
     yPosition += 15;
 
@@ -59,28 +60,10 @@ export class RoomingSection {
       startY: yPosition,
       head: [["Hotel", "Habitación", "Tipo", "Ocupantes", "Notas"]],
       body: roomingData,
-      theme: "grid",
-      styles: { 
-        fontSize: 9, 
-        cellPadding: 3,
-        overflow: 'linebreak',
-        columnWidth: 'wrap'
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 10,
-        fontStyle: 'bold'
-      },
-      columnStyles: {
-        0: { cellWidth: 35 }, // Hotel
-        1: { cellWidth: 25 }, // Habitación  
-        2: { cellWidth: 25 }, // Tipo
-        3: { cellWidth: 50 }, // Ocupantes
-        4: { cellWidth: 35 }  // Notas
-      },
-      margin: { left: 20, right: 20 },
-      tableWidth: 'auto'
+      ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+        numericColumns: [1],
+        weights: [24, 16, 16, 32, 22],
+      }),
     });
 
     return this.pdfDoc.getLastAutoTableY() + 15;

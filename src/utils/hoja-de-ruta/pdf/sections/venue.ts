@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_HEADING, HOJA_LABEL } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { MapService } from '../services/map-service';
@@ -17,7 +18,7 @@ export class VenueSection {
   ): Promise<number> {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
     
-    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.setText(14, HOJA_HEADING);
     this.pdfDoc.addText("Venue", 20, yPosition);
     yPosition += 15;
 
@@ -37,7 +38,7 @@ export class VenueSection {
         theme: "plain",
         styles: { fontSize: 10, cellPadding: 4 },
         columnStyles: {
-          0: { cellWidth: 50, fontStyle: 'bold', textColor: [125, 1, 1] },
+          0: { cellWidth: 50, fontStyle: 'bold', textColor: HOJA_LABEL },
           1: { cellWidth: 120 }
         },
         margin: { left: 20, right: 20 },
@@ -59,7 +60,7 @@ export class VenueSection {
 
     if (imagesToRender.length > 0) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 90);
-      this.pdfDoc.setText(12, [125, 1, 1]);
+      this.pdfDoc.setText(12, HOJA_HEADING);
       this.pdfDoc.addText("Imágenes del Venue", 20, yPosition);
       yPosition += 12;
 
