@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
-SELECT plan(12);
+SELECT plan(17);
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 INSERT INTO auth.users (id, email, raw_app_meta_data, raw_user_meta_data, aud, role)
 VALUES
@@ -29,8 +29,8 @@ INSERT INTO public.job_technician_payout_overrides (job_id,technician_id,overrid
 SELECT id,'eb100000-0000-0000-0000-000000000001',123,'eb100000-0000-0000-0000-000000000002'
 FROM public.jobs WHERE id IN ('eb200000-0000-0000-0000-000000000001','eb200000-0000-0000-0000-000000000002');
 INSERT INTO public.expense_categories (slug,label_es) VALUES ('audit-allowed','Permitida'),('audit-denied','No permitida');
-INSERT INTO public.expense_permissions (job_id,technician_id,category_slug) VALUES
- ('eb200000-0000-0000-0000-000000000001','eb100000-0000-0000-0000-000000000001','audit-allowed');
+INSERT INTO public.expense_permissions (job_id,technician_id,category_slug,valid_from,valid_to) VALUES
+ ('eb200000-0000-0000-0000-000000000001','eb100000-0000-0000-0000-000000000001','audit-allowed','2026-10-01','2026-10-01');
 
 SELECT set_config('request.jwt.claim.role','authenticated',true);
 SELECT set_config('request.jwt.claim.sub','eb100000-0000-0000-0000-000000000001',true);
@@ -44,10 +44,15 @@ SELECT is((SELECT count(*) FROM public.job_technician_payout_overrides WHERE job
 SELECT lives_ok($$INSERT INTO public.job_expenses (job_id,technician_id,category_slug,expense_date,amount_original,currency_code,amount_eur) VALUES ('eb200000-0000-0000-0000-000000000001','eb100000-0000-0000-0000-000000000001','audit-allowed','2026-10-01',1,'EUR',1)$$,'matching expense permission permits insertion');
 SELECT throws_ok($$INSERT INTO public.job_expenses (job_id,technician_id,category_slug,expense_date,amount_original,currency_code,amount_eur) VALUES ('eb200000-0000-0000-0000-000000000002','eb100000-0000-0000-0000-000000000001','audit-allowed','2026-10-01',1,'EUR',1)$$,'42501',NULL,'permission for another job is insufficient');
 SELECT throws_ok($$INSERT INTO public.job_expenses (job_id,technician_id,category_slug,expense_date,amount_original,currency_code,amount_eur) VALUES ('eb200000-0000-0000-0000-000000000001','eb100000-0000-0000-0000-000000000001','audit-denied','2026-10-01',1,'EUR',1)$$,'42501',NULL,'permission for another category is insufficient');
+SELECT lives_ok($$UPDATE public.job_expenses SET amount_original=2 WHERE category_slug='audit-allowed'$$,'permitted draft amount remains editable');
+SELECT throws_ok($$UPDATE public.job_expenses SET job_id='eb200000-0000-0000-0000-000000000002' WHERE category_slug='audit-allowed'$$,'42501',NULL,'editing cannot move an expense to an unauthorized job');
+SELECT throws_ok($$UPDATE public.job_expenses SET category_slug='audit-denied' WHERE category_slug='audit-allowed'$$,'42501',NULL,'editing cannot move an expense to an unauthorized category');
+SELECT throws_ok($$UPDATE public.job_expenses SET expense_date='2026-10-02' WHERE category_slug='audit-allowed'$$,'42501',NULL,'editing cannot move an expense outside the permission window');
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub','eb100000-0000-0000-0000-000000000002',true);
 SET LOCAL ROLE authenticated;
 SELECT lives_ok($$UPDATE public.job_technician_payout_overrides SET override_amount_eur=124 WHERE job_id='eb200000-0000-0000-0000-000000000001'$$,'department manager retains assigned-payout editing');
+SELECT is((SELECT override_amount_eur FROM public.job_technician_payout_overrides WHERE job_id='eb200000-0000-0000-0000-000000000001'),124::numeric,'department manager edit actually changes the assigned payout');
 SELECT is((SELECT count(*) FROM public.job_technician_payout_overrides WHERE job_id='eb200000-0000-0000-0000-000000000002'),0::bigint,'department match alone does not reveal an unassigned payout');
 SELECT throws_ok($$INSERT INTO public.job_technician_payout_overrides (job_id,technician_id,override_amount_eur,set_by) VALUES ('eb200000-0000-0000-0000-000000000002','eb100000-0000-0000-0000-000000000002',10,'eb100000-0000-0000-0000-000000000002')$$,'42501',NULL,'manager cannot insert payout for a technician unassigned to that job');
 RESET ROLE;

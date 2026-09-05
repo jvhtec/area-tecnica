@@ -1,5 +1,5 @@
 -- SEC-03 / SEC-12 follow-up: correct remaining outer-row correlations.
--- Preserve existing roles and privileged branches; change only tautological joins.
+-- Preserve existing roles and privileged branches; correct joins and prevent edit bypasses.
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
 
@@ -12,6 +12,22 @@ ALTER POLICY "p_job_expenses_public_insert_0737d2" ON public.job_expenses
 WITH CHECK (((( SELECT auth.role() AS role) = 'service_role'::text) OR public.is_admin_or_management() OR ((technician_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
    FROM public.expense_permissions ep
   WHERE ((ep.job_id = job_expenses.job_id) AND (ep.technician_id = ( SELECT auth.uid() AS uid)) AND (ep.category_slug = job_expenses.category_slug) AND ((ep.valid_from IS NULL) OR (job_expenses.expense_date >= ep.valid_from)) AND ((ep.valid_to IS NULL) OR (job_expenses.expense_date <= ep.valid_to))))))));
+
+-- Draft edits must satisfy the same permission as insertion; otherwise a permitted
+-- expense could be moved to an unauthorized job/category/date after creation.
+ALTER POLICY "p_job_expenses_public_update_52422b" ON public.job_expenses
+WITH CHECK (
+  (SELECT auth.role()) = 'service_role'::text OR public.is_admin_or_management() OR (
+    technician_id = (SELECT auth.uid()) AND EXISTS (
+      SELECT 1 FROM public.expense_permissions ep
+      WHERE ep.job_id = job_expenses.job_id
+        AND ep.technician_id = (SELECT auth.uid())
+        AND ep.category_slug = job_expenses.category_slug
+        AND (ep.valid_from IS NULL OR job_expenses.expense_date >= ep.valid_from)
+        AND (ep.valid_to IS NULL OR job_expenses.expense_date <= ep.valid_to)
+    )
+  )
+);
 
 ALTER POLICY "p_job_required_roles_authenticated_select_65f477" ON public.job_required_roles
 USING (((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text])) OR ((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'coordinator'::text, 'logistics'::text])) OR (EXISTS ( SELECT 1
