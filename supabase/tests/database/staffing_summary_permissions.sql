@@ -3,7 +3,7 @@
 \set ON_ERROR_STOP on
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
-SELECT plan(19);
+SELECT plan(20);
 
 SELECT ok(NOT has_table_privilege('anon', 'public.v_job_staffing_summary', 'SELECT'),
   'anonymous clients cannot select the materialized payroll summary');
@@ -69,7 +69,16 @@ SELECT is((SELECT total_cost_eur FROM expected_staffing_summary), 125.50::numeri
 -- The separate assertions above still verify the fresh migration chain.
 GRANT SELECT ON TABLE public.v_job_staffing_summary TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_job_staffing_summary(uuid[]) TO PUBLIC;
-\ir ../../migrations/20260905094349_restrict_staffing_summary_access.sql
+-- Supabase's test runner mounts test files, not the migrations directory.
+-- Replay the exact SQL recorded by its migrator rather than duplicating SQL.
+SELECT ok(EXISTS (
+  SELECT 1 FROM supabase_migrations.schema_migrations
+  WHERE version = '20260905094349' AND cardinality(statements) > 0
+), 'the populated upgrade replays the actual recorded migration');
+SELECT unnest(statements)
+FROM supabase_migrations.schema_migrations
+WHERE version = '20260905094349'
+\gexec
 
 SELECT set_config('request.jwt.claim.role', 'anon', false);
 SET ROLE anon;
