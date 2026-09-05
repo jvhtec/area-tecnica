@@ -30,9 +30,9 @@
 - **What it does:** Notifies technician when their timesheet is approved
 - **Recipients:** Submitting technician only
 - **Handler:** `supabase/functions/push/index.ts:915`
-- **Trigger:** `src/hooks/useTimesheetApproval.ts:32-48`
+- **Current path (verified 2026-09-05):** `approveTimesheet` in `src/hooks/useTimesheets.ts`, called by the timesheet view/view-model. It updates approval and recalculates amounts but does not emit this push event. The former standalone approval hook was unreachable and has been removed; the server handler remains available.
 - **Message:** `"Parte aprobado - Tu parte para [Job] ha sido aprobado"`
-- **Tested:** Ready for production
+- **Status:** Handler exists; no active approval-push emitter was found. The historical implementation claims below are not evidence of current integration.
 
 #### 3. **timesheet.rejected** ❌
 **Status:** ✅ **FULLY INTEGRATED & WORKING**
@@ -203,7 +203,7 @@ try {
 
 #### 1. Timesheet Approval/Rejection ✅
 **Files modified:**
-- `src/hooks/useTimesheetApproval.ts` - Approval trigger
+- Historical standalone approval hook (removed as unreachable on 2026-09-05). Current approval uses `src/hooks/useTimesheets.ts`; it does not emit approval push.
 - `src/hooks/useTimesheets.ts` - Rejection trigger
 
 **Integration:** Fire-and-forget pattern after successful timesheet update
@@ -523,7 +523,7 @@ VALUES ('new.event', 'Event Label', 'management', 'info', TRUE);
 ✅ Fire-and-forget pattern ensures zero failures
 
 ### **✅ All Triggers Added:**
-✅ timesheet.approved - `src/hooks/useTimesheetApproval.ts`
+⚠️ timesheet.approved - handler exists, but the current `src/hooks/useTimesheets.ts` approval action does not emit this event (verified 2026-09-05).
 ✅ timesheet.rejected - `src/hooks/useTimesheets.ts`
 ✅ job.deleted - `src/services/jobDeletionService.ts`
 ✅ assignment.removed - `src/components/matrix/OptimizedMatrixCell.tsx`
