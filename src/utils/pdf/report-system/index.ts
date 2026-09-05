@@ -162,11 +162,47 @@ export const drawReportChrome = (
 export const stampReportChrome = (
   doc: jsPDF,
   options: Omit<ReportChromeOptions, 'pageNumber' | 'totalPages'>,
+  /** 1-based pages to leave untouched — a cover carries no running head. */
+  skipPages: number[] = [],
 ): void => {
   const totalPages = doc.getNumberOfPages();
+  const skip = new Set(skipPages);
   for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+    if (skip.has(pageNumber)) continue;
     doc.setPage(pageNumber);
     drawReportChrome(doc, { ...options, pageNumber, totalPages });
+  }
+};
+
+/**
+ * Stamps only the `NN / NN` folio into the footer slot of every page.
+ *
+ * Documents whose running head changes from page to page — a tour book, where
+ * each page names its own date — draw their chrome as they go and use this to
+ * fill the one slot that cannot be written until the last page exists. Skipped
+ * pages still consume a number, so the folio on the page keeps matching the
+ * folio anyone counts to.
+ */
+export const stampReportFolios = (
+  doc: jsPDF,
+  { skipPages = [] }: { skipPages?: number[] } = {},
+): void => {
+  const totalPages = doc.getNumberOfPages();
+  const skip = new Set(skipPages);
+
+  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+    if (skip.has(pageNumber)) continue;
+    doc.setPage(pageNumber);
+    const geo = reportGeometry(doc);
+
+    setReportMonoText(doc, REPORT_INK, 7.5, 'bold');
+    const total = ` / ${String(totalPages).padStart(2, '0')}`;
+    const totalWidth = doc.getTextWidth(total);
+    doc.text(String(pageNumber).padStart(2, '0'), geo.right - totalWidth, geo.footerTextY, {
+      align: 'right',
+    });
+    setReportMonoText(doc, REPORT_FAINT, 7.5, 'bold');
+    doc.text(total, geo.right, geo.footerTextY, { align: 'right' });
   }
 };
 

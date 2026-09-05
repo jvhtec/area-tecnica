@@ -178,3 +178,51 @@ export const drawReportHeadlineFigure = (
   }
   return cursor;
 };
+
+/**
+ * A definition block: a mono label in the left column, the value beside it,
+ * wrapping as needed. Used where a handful of named facts open a page and a
+ * table would be three lines of chrome around two lines of content.
+ */
+export const drawReportFactRows = (
+  doc: jsPDF,
+  geo: ReportGeometry,
+  rows: Array<[string, string]>,
+  y: number,
+  options: { labelWidthMm?: number } = {},
+): number => {
+  const { mm } = geo;
+  const labelWidth = (options.labelWidthMm ?? 34) * mm;
+  let cursor = y;
+
+  rows.forEach(([label, value]) => {
+    setReportMonoText(doc, REPORT_SOFT, 5.8, 'bold');
+    doc.text(label.toUpperCase(), geo.left, cursor, { charSpace: 0.2 * mm });
+
+    setReportText(doc, REPORT_INK, 8);
+    const lines = doc.splitTextToSize(value, geo.contentWidth - labelWidth) as string[];
+    doc.text(lines, geo.left + labelWidth, cursor, { lineHeightFactor: 1.25 });
+    cursor += Math.max(1, lines.length) * 4.2 * mm;
+  });
+
+  return cursor + 3 * mm;
+};
+
+/**
+ * Body copy: what the writer actually wrote, set in ink at reading size rather
+ * than inside a tinted panel. The section heading above it already says what
+ * the text is, so the panel only adds an edge to look past.
+ */
+export const drawReportProse = (
+  doc: jsPDF,
+  geo: ReportGeometry,
+  text: string,
+  y: number,
+): number => {
+  const { mm } = geo;
+  const content = text?.trim();
+  setReportText(doc, content ? REPORT_INK : REPORT_SOFT, 8);
+  const lines = doc.splitTextToSize(content || 'Sin información.', geo.contentWidth) as string[];
+  doc.text(lines, geo.left, y, { lineHeightFactor: 1.35 });
+  return y + lines.length * 4 * mm + 3 * mm;
+};
