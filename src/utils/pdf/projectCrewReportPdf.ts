@@ -10,16 +10,20 @@ import {
   uniqueSortedDateKeys,
   type JobScheduleLike,
 } from "@/utils/assignmentWorkDates";
+import { createPdfExportDocument } from "@/utils/pdf/exportHelpers";
 import {
-  createPdfExportDocument,
-  drawCorporatePdfHeader,
-  drawGeneratedPdfFooter,
-  loadImageAsDataUrl,
-} from "@/utils/pdf/exportHelpers";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+  REPORT_SOFT,
+  distributeColumnWidths,
+  drawReportMasthead,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  setReportText,
+  stampReportChrome,
+  type ReportChromeOptions,
+} from "@/utils/pdf/report-system";
+import { resolveHeaderLogo } from "@/utils/pdf/shared/pdfExportShared";
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
-const SECTOR_PRO_RED: [number, number, number] = [125, 1, 1];
 
 type CrewReportJob = JobScheduleLike & {
   id: string;
@@ -142,16 +146,9 @@ const buildCrewReportFilename = (job: CrewReportJob): string =>
     formatDateForFilename(job.start_time instanceof Date ? job.start_time : cleanText(job.start_time)),
   ]);
 
-const inferPdfImageFormat = (dataUrl: string | null): "PNG" | "JPEG" => {
-  if (!dataUrl) return "PNG";
-  return /^data:image\/jpe?g/i.test(dataUrl) ? "JPEG" : "PNG";
-};
-
-const loadReportHeaderLogo = async (jobId: string): Promise<string | null> => {
+const loadReportHeaderLogo = async (jobId: string): Promise<HTMLImageElement | null> => {
   try {
-    const logoUrl = await fetchJobLogo(jobId);
-    if (!logoUrl) return null;
-    return await loadImageAsDataUrl(logoUrl);
+    return await resolveHeaderLogo({ jobId });
   } catch (error) {
     console.warn("Unable to load job logo for crew report:", error);
     return null;
@@ -311,73 +308,64 @@ export const downloadProjectCrewReportPdf = async (job: CrewReportJob): Promise<
   ]);
   const { crewRows, jobScheduledDateKeys } = reportData;
   const { pdf, autoTable } = await createPdfExportDocument({ orientation: "landscape" });
-  const pageWidth = pdf.internal.pageSize.width;
+  await loadReportIssuerMark();
 
   const eventDates = formatDateList(jobScheduledDateKeys);
-  const locationName = cleanText(job.location?.name) || cleanText(job.location?.formatted_address) || "Sin ubicación";
+  const locationName =
+    cleanText(job.location?.name) || cleanText(job.location?.formatted_address) || "Sin ubicación";
+  const jobTitle = cleanText(job.title) || "Trabajo sin título";
 
-  drawCorporatePdfHeader(pdf, {
-    title: "Informe de Personal",
-    subtitle: cleanText(job.title) || "Trabajo sin título",
-    logo: headerLogo,
-    logoFormat: inferPdfImageFormat(headerLogo),
+  const chrome: ReportChromeOptions = {
+    kind: "crew",
+    kindLabel: "Informe de personal",
+    eventTitle: jobTitle,
+    contextLabel: locationName,
+  };
+
+  const { geo, y: contentTop } = drawReportMasthead(pdf, {
+    ...chrome,
+    title: jobTitle,
+    subtitle: `Informe de personal · ${locationName}`,
+    clientLogo: headerLogo,
+    meta: [
+      { label: "Personal", value: String(crewRows.length) },
+      { label: "Jornadas", value: String(jobScheduledDateKeys.length) },
+      {
+        label: "Emisión",
+        value: formatInTimeZone(generatedAt, MADRID_TIME_ZONE, "dd/MM/yyyy HH:mm"),
+      },
+    ],
   });
 
-  pdf.setTextColor(35, 35, 35);
-  pdf.setFontSize(10);
-  pdf.text(`Ubicación: ${locationName}`, 14, 42);
-  const dateLines = pdf.splitTextToSize(`Fechas del trabajo: ${eventDates}`, pageWidth - 28);
-  pdf.text(dateLines, 14, 49);
-  pdf.text(`Total personal: ${crewRows.length}`, pageWidth - 14, 42, { align: "right" });
-  const tableStartY = Math.max(59, 49 + dateLines.length * 5 + 6);
+  // The full list of scheduled dates is too long for a meta cell and too
+  // important to truncate, so it is stated once in full beneath the grid.
+  setReportText(pdf, REPORT_SOFT, 7);
+  const dateLines = pdf.splitTextToSize(
+    `Fechas del trabajo: ${eventDates}`,
+    geo.contentWidth,
+  ) as string[];
+  pdf.text(dateLines, geo.left, contentTop, { lineHeightFactor: 1.3 });
+  const tableStartY = contentTop + dateLines.length * 3.4 + 5;
 
   const body = crewRows.length > 0
     ? crewRows.map((row) => [
       formatDateList(row.dateKeys),
-      row.firstName || "-",
-      row.lastName || "-",
-      row.dni || "-",
+      row.firstName || "—",
+      row.lastName || "—",
+      row.dni || "—",
       Array.from(row.departments).join(", ") || "Sin departamento",
     ])
-    : [["Sin personal asignado", "-", "-", "-", "-"]];
+    : [["Sin personal asignado", "—", "—", "—", "—"]];
 
   autoTable(pdf, {
     head: [["Fechas programadas", "Nombre", "Apellidos", "DNI", "Departamento"]],
     body,
     startY: tableStartY,
-    theme: "grid",
-    styles: {
-      fontSize: 9,
-      cellPadding: 2.5,
-      valign: "middle",
-      overflow: "linebreak",
-    },
-    headStyles: {
-      fillColor: SECTOR_PRO_RED,
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-    },
-    alternateRowStyles: {
-      fillColor: [248, 248, 248],
-    },
-    columnStyles: {
-      0: { cellWidth: 92 },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 54 },
-      3: { cellWidth: 36 },
-      4: { cellWidth: 42 },
-    },
-    margin: { left: 14, right: 14, bottom: 28 },
+    ...reportTableDefaults(geo, { fontSize: 7.4, numericColumns: [3] }),
+    columnStyles: distributeColumnWidths([88, 40, 52, 32, 40], geo.contentWidth),
   });
 
-  const pageCount = pdf.getNumberOfPages();
-  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-    pdf.setPage(pageNumber);
-    drawGeneratedPdfFooter(pdf, {
-      pageNumber,
-      generatedAt,
-    });
-  }
+  stampReportChrome(pdf, chrome);
 
   const filename = buildCrewReportFilename(job);
   pdf.save(filename);
