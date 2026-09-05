@@ -74,8 +74,8 @@ function datesBetween(start?: string | null, end?: string | null): string[] {
   if (!startDate || !endDate) return [];
 
   const dates: string[] = [];
-  const cursor = new Date(`${escapeHtml(String(startDate))}T00:00:00.000Z`);
-  const last = new Date(`${escapeHtml(String(endDate))}T00:00:00.000Z`);
+  const cursor = new Date(`${startDate}T00:00:00.000Z`);
+  const last = new Date(`${endDate}T00:00:00.000Z`);
   while (cursor <= last) {
     dates.push(cursor.toISOString().split('T')[0]);
     cursor.setUTCDate(cursor.getUTCDate() + 1);

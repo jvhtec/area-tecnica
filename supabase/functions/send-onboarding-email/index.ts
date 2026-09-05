@@ -83,12 +83,12 @@ serve(async (req) => {
     const PUBLIC_LOGOS_BASE = `${SUPABASE_URL}/storage/v1/object/public/public%20logos`;
 
     // Push notifications walkthrough images (exact filenames from the bucket)
-    const PUSH_IMG_PROFILE = `${escapeHtml(String(PUBLIC_LOGOS_BASE))}/profile.jpeg`;
-    const PUSH_IMG_PUSH = `${escapeHtml(String(PUBLIC_LOGOS_BASE))}/push.jpeg`;
-    const PUSH_IMG_ALLOW = `${escapeHtml(String(PUBLIC_LOGOS_BASE))}/allow.jpeg`;
-    const PUSH_IMG_TEST = `${escapeHtml(String(PUBLIC_LOGOS_BASE))}/test.jpeg`;
-    const PUSH_IMG_FOCUS_1 = `${escapeHtml(String(PUBLIC_LOGOS_BASE))}/focus.jpeg`;
-    const PUSH_IMG_FOCUS_2 = `${escapeHtml(String(PUBLIC_LOGOS_BASE))}/${encodeURIComponent('focus 2.jpeg')}`;
+    const PUSH_IMG_PROFILE = `${PUBLIC_LOGOS_BASE}/profile.jpeg`;
+    const PUSH_IMG_PUSH = `${PUBLIC_LOGOS_BASE}/push.jpeg`;
+    const PUSH_IMG_ALLOW = `${PUBLIC_LOGOS_BASE}/allow.jpeg`;
+    const PUSH_IMG_TEST = `${PUBLIC_LOGOS_BASE}/test.jpeg`;
+    const PUSH_IMG_FOCUS_1 = `${PUBLIC_LOGOS_BASE}/focus.jpeg`;
+    const PUSH_IMG_FOCUS_2 = `${PUBLIC_LOGOS_BASE}/${encodeURIComponent('focus 2.jpeg')}`;
 
     // New dark-themed HTML content with header logos and remote images
     const htmlContent = `<!DOCTYPE html>
