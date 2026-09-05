@@ -1,412 +1,264 @@
-# Codebase Re-Audit — 2026-09-04
+# Codebase Re-Audit — opened 2026-09-04
 
-**Audit date:** 2026-09-04
-**Baseline reviewed:** `main` at `3ff4d13` (after the strict-mode / `no-explicit-any` / edge-type-gate PR series, #886–#891)
+**Opened:** 2026-09-04 on `main` at `3ff4d13`
+**Last re-verified:** 2026-09-05 on `main` at `f87b836`, after PR #920 and the #921–#929 remediation series
 **Previous audit:** [`docs/plans/2026-07-codebase-audit-roadmap.md`](plans/2026-07-codebase-audit-roadmap.md) (2026-07-09)
-**Scope:** React/Vite app, Supabase migrations/RLS/RPC/grants, all 74 Edge Functions, governance gates, tests/CI, PWA delivery, dependencies, bundle output.
-**Method:** every gate re-run locally on this commit; static data-flow tracing; **all SQL findings verified against the live production database** (`syldobdcdsgfgjtbuwxm`) via read-only catalog queries and role-impersonated (`SET LOCAL ROLE anon` / `authenticated`) row counts. Numbers below are measured, not carried forward.
+**Scope:** React/Vite app, Supabase migrations/RLS/RPC/grants, all Edge Functions, governance gates, tests/CI, PWA delivery, dependencies, bundle output.
+**Method:** every gate re-run locally at each verification; static data-flow tracing; **all SQL findings verified against the live production database** (`syldobdcdsgfgjtbuwxm`) via read-only catalog queries and role-impersonated (`SET LOCAL ROLE anon` / `authenticated`) row counts. Numbers below are measured at the stated date, not carried forward.
+
+This is a living register. Each finding carries its own status; the scorecard shows both
+verification passes so the deltas are visible rather than overwritten.
 
 ---
 
 ## Executive assessment
 
-The remediation programme worked where it was measured. Every governance gate passes, the full
-Vitest suite is green, `strict: true` type-checks clean, and several P0/P1 security items are
-genuinely closed rather than papered over — `image-proxy` was retired instead of patched, CSP is
-enforced with hashes and no `unsafe-eval`, the `anon`-realtime read policies are gone, and
-transport-request duplication is now prevented by a database constraint instead of a read-then-write
-check.
+**As of 2026-09-05 the register is substantially closed, and closed on production rather than only
+in the repository.** Nine PRs (#920–#929) landed since this document opened. Every P0 is verified
+shut against the live database, the two structural quality findings are enforced by new gates
+rather than by intent, and the schema-drift finding has gone from "counts disagree" to a normalized
+catalog exporter, a measured production comparison, and an applied reconciliation migration.
 
-The dominant baseline pattern was different from July's. It was no longer "no safety primitives";
-it was **good primitives with partial adoption**, plus **a schema baseline that the gates never
-look at**. Three examples carried most of the risk:
+What the 2026-09-04 pass found, and where each landed:
 
-1. `structuredLogger.ts` was written and tested but unused; 665 raw `console.*` calls remained,
-   including confirmed email/token boundary cases. This PR converts those confirmed cases.
-2. `escapeHtml` existed in `_shared/corporateEmailTemplate.ts`; seven email functions interpolated
-   database-sourced values into HTML without it. This PR fixes every active instance found.
-3. Every governance gate that reads source stops at `src/`. The 10,500-line schema baseline and
-   the 74 Edge Functions are largely outside the ratchets, and that is where this audit's
-   highest-severity findings are.
+- **`profiles` readable in full by every authenticated account** — 313 rows, 313 ICS bearer tokens,
+  286 national IDs. Both halves are now fixed. Tokens live in an owner-scoped vault with client
+  write privileges revoked; `profiles_select` is correlated to owner / operational admin /
+  shared-job technician. Measured on production: a claimless authenticated session now reads **0**
+  profile rows, and a real technician reads exactly their shared-job set.
+- **Three tables readable with the public anon key** — an anon sweep of every table `anon` can
+  `SELECT` now returns rows from **one**: `activity_catalog` (54 rows of static reference data,
+  deliberately public). `festival_artists` (598) and `rate_extras_2025` are closed, along with the
+  `ja.job_id = ja.job_id` self-comparison that SEC-03 had fixed on one table without sweeping.
+- **Good primitives, partial adoption** — the pattern that dominated the September baseline is
+  now enforced rather than encouraged. `escapeHtml` covers every email function; a new
+  `check-edge-logging` gate freezes console sites so the `structuredLogger` migration can only move
+  forward; the lint gate enforces its own global and per-domain budgets; the file-size budget
+  covers `supabase/functions/` as a second domain.
 
-**The single most important finding is new and unrelated to the recent work:** `profiles` is
-readable in full by every authenticated user — 313 rows, including 313 `calendar_ics_token`
-bearer credentials and 286 national-ID numbers. The February hardening migration narrowed insert,
-update and delete on that table and left select at `USING (true)`.
+**The single most useful thing this pass adds is a residual, not a new defect.** Narrowing
+`profiles_select` reduced exposure sharply but did not eliminate it: a technician still reads the
+**full** profile row — `dni`, `residencia`, `phone`, `email` — for every colleague they have ever
+shared a job with. Measured on production: 175 accounts have such reach, averaging 55 colleagues
+and peaking at **134 of 313 profiles (43%)**. `get_profile_directory()` exists and returns exactly
+the safe projection, but it is an *alternative* the caller may choose, not a *constraint* the
+policy imposes. Closing this means moving colleague-facing reads onto the directory and dropping
+the shared-job branch from `profiles_select` — see SEC-16.
 
-A second, smaller instance of the same class: three tables are readable with the public anon key,
-`festival_artists` (598 rows) materially. Both were predicted as a *class* by SEC-05 in July
-("historical generated policy fragments"); the instances were never enumerated. The policy that
-exposes `festival_artists` also still carries the `ja.job_id = ja.job_id` self-comparison that
-SEC-03 fixed for `sub_rentals` — the fix was applied to one table rather than swept for.
+The second residual is that **schema-drift detection is instrumented but not gated**: CI exports a
+catalog artifact and then compares it against itself, which proves the exporter and comparator run
+but cannot detect drift. The production comparison is a documented manual release step.
 
 ---
 
-## Scorecard — measured on this commit
+## Scorecard
 
-| Signal | 2026-07-09 | 2026-09-04 | Verdict |
-| --- | --- | --- | --- |
-| `npm run lint` warnings | 1,904 | **1,216** (897 app/test + 319 functions) | −36%; this PR removes an unused unsafe email template and locks the reduction into the baseline |
-| — of which `no-explicit-any` | ~1,343 | **1,037** | reduced and ratcheted; functions remain the largest untreated area |
-| `npm run typecheck` | passes, `strict: false` | **passes, `strict: true`** | resolved |
-| `npm run typecheck:functions` | did not exist | **passes for all Edge Function modules** | resolved |
-| Vitest full suite | "passed" (selective) | **360 files / 1,995 tests, all pass** | healthy |
-| Coverage thresholds | none | **5 files**, and **CI never runs coverage** | inert |
-| Production build | passes | **passes** | ok |
-| Bundle (js gzip) | 3.01 MB / 3.34 MB ceiling | **3.10 MB / 3.34 MB** | **7.2% headroom** vs PERF-01's 15% target |
-| Governance | passes (grandfathered) | **passes**, all 11 sub-gates | see below |
-| Dependency audit | baseline-aware | **0 advisories, baseline is zero** | resolved |
-| Migrations | 180+ | **203**, timestamps unique/ordered | ok |
-| Live DB vs migration chain | not checked | **count mismatch requires normalized diff** — 552 live policies vs 590 replayed; the four initially cited body differences are reconciled by a later migration | DB-06 |
-| Playwright | failed on Windows | **POSIX env syntax removed** (Node launcher) | config resolved; suite not runnable here |
+| Signal | 2026-07-09 | 2026-09-04 | 2026-09-05 | Verdict |
+| --- | --- | --- | --- | --- |
+| `npm run lint` warnings | 1,904 | 1,216 | **1,145** (826 app + 319 functions) | −40% from July; now budgeted per domain |
+| — of which `no-explicit-any` | ~1,343 | 1,037 | **966** | ratcheted; functions remain the untreated half |
+| `npm run typecheck` | passes, `strict: false` | passes, `strict: true` | **passes** | resolved |
+| `npm run typecheck:functions` | did not exist | passes | **passes** | resolved |
+| Vitest full suite | "passed" (selective) | 360 files / 1,995 tests | **373 files / 2,075 tests, all pass** | healthy |
+| Coverage thresholds | none | 5 files, **never run in CI** | **10 files incl. every shared trust boundary, run in CI** via `test:critical` | resolved |
+| Production build | passes | passes | **passes** | ok |
+| Bundle (js gzip) | 3.01 MB | 3.10 MB | **3.10 MB / 3.32 MB** | **6.6% headroom** vs PERF-01's 15% target |
+| Governance | passes (grandfathered) | passes, 11 sub-gates | **passes, 12 sub-gates** (adds `check-edge-logging`) | strengthened |
+| Dependency audit | baseline-aware | 0 advisories | **0 advisories** | resolved |
+| Migrations | 180+ | 203 | **206, and all 206 applied to production** | ok |
+| Live DB vs migration chain | not checked | count mismatch, undiagnosed | **normalized catalog compared; 199 object differences found, zero policy differences; reconciliation applied** | DB-06 residual: not gated |
+| Anon-readable tables (measured) | not checked | **3** (598 + 54 + 4 rows) | **1** (`activity_catalog`, 54, deliberate) | resolved |
+| Profiles visible to a claimless authenticated session | not checked | **313** | **0** | resolved |
+| Unreferenced app modules | not checked | **88 files / ~13,955 LOC** | **0** (1 intentional Rollup stub) | resolved |
 
-### Governance gate detail
+### Governance gate detail — 2026-09-05
 
 | Gate | Current | Baseline | Note |
 | --- | ---: | ---: | --- |
-| `ui-data-layer-client-import` | 195 | 213 | slow drain; QLT-03 still open |
-| `scheduling-new-date` | 67 | 107 | good progress |
-| `direct-protected-route-allowed-roles` | 0 | 64 | **cleared** |
+| `ui-data-layer-client-import` | 176 | 176 | draining (213 → 195 → 176); QLT-03 still open |
+| `scheduling-new-date` | 43 | 43 | draining (107 → 67 → 43) |
+| `direct-protected-route-allowed-roles` | 0 | 0 | cleared |
 | `pages-supabase-client-import` | 0 | 0 | held |
-| File size >800 lines | 0 | 0 | **`src/` only — see QLT-05 below** |
-| Lint warnings | 1,216 | 1,216 | **zero headroom; this PR's 42-warning reduction is ratcheted** |
-| Mobile type floor | 244 | 248 | draining |
-| Manual Edge entrypoints | 33 | 37 | 38 functions now use `createHttpHandler` |
+| File size >800 lines — `src/` | 0 | 0 | held |
+| File size >800 lines — `supabase/functions/` | 6 | 6 | **new domain**; the six oversized functions are now budgeted rather than invisible |
+| Lint warnings | 1,145 | 1,145 | now enforced at total, per-rule, per-domain and per-file |
+| Legacy edge console sites | 560 in 80 files | frozen | **new gate**; new/unlisted sites fail |
+| Mobile type floor | 241 | 241 | draining |
 | Edge exposure classes | 14 public-token / 14 authenticated / 36 privileged / 7 service-only | — | all 71 classified |
-| SECURITY DEFINER anon grants | 82 | 82 reviewed | no new exposures |
+| SECURITY DEFINER anon grants | 81 | 81 reviewed | one fewer than September |
 | GitHub Actions pinning | all pinned | — | held |
 
 ---
 
-## P0 — new findings, ship immediately
+## Open findings
 
-### SEC-13 — `profiles` is fully readable by every authenticated user, exposing ICS bearer tokens
+### SEC-16 — a technician still reads full profile rows for every shared-job colleague
 
-**Severity: high. Confirmed on production.** `profiles_select` is `USING (true)` for
-`authenticated` and was never narrowed — the 2026-02 phase-2 hardening migration altered only
-`profiles_insert`, `profiles_update` and `profiles_delete`. Measured directly as the
-`authenticated` role:
+**Severity: medium. New on 2026-09-05, and it is the residual of SEC-13's fix rather than a
+regression.** `profiles_select` is now correlated:
 
-| Visible rows | `calendar_ics_token` readable | `dni` readable |
-| ---: | ---: | ---: |
-| 313 | 313 | 286 |
+```
+id = auth.uid()
+OR current_user_role() = ANY (ARRAY['admin','management','logistics'])
+OR EXISTS (caller and target share a job_assignment)
+```
 
-Every logged-in user — including a freelance `technician` and the `wallboard` display role — can
-read every row of `profiles`: `dni` (Spanish national ID), `residencia` (home address), `phone`,
-`email`.
+That third branch returns the **whole row**, so `dni`, `residencia`, `phone` and `email` remain
+readable for every colleague the caller has ever shared a job with. Measured on production:
 
-`calendar_ics_token` is not merely PII, it is a **bearer credential**. `tech-calendar-ics`
-(`index.ts:153-157`) authenticates a request purely by matching `?tid=<uuid>&token=<value>`
-against `profiles.calendar_ics_token`. Any authenticated user can read all 313 tokens and fetch
-any colleague's personal calendar from an unauthenticated endpoint — privilege escalation, not
-just an over-broad read.
+| Metric | Value |
+| --- | ---: |
+| Accounts with shared-job reach | 175 |
+| Average colleagues visible | 55 |
+| **Maximum colleagues visible to one technician** | **134 of 313 (43%)** |
+| Non-null `dni` among one sampled technician's 103 visible rows | 102 |
 
-> **Status (2026-09-04):** remediated with a staged rollout. Migration
-> `20260904160000_move_calendar_ics_token_out_of_profiles.sql` creates
-> `profile_calendar_tokens` with owner-only RLS, rotates all credentials, removes the legacy
-> column's values/default, and leaves that column nullable for one cached-client compatibility
-> release. The Edge Function reads the vault but falls back only while the vault relation is absent;
-> after migration it fails closed. The read RPC is `SECURITY INVOKER`, rotation remains a self-scoped
-> definer operation, and private calendar responses are no longer publicly cacheable. Regression
-> tests cover both rollout states, rotation, owner isolation, direct writes and anonymous RPC calls.
-> Migration `20260904162000_narrow_profile_and_rate_visibility.sql` also replaces the organisation-wide
-> profile policy with owner, operational-management, and shared-job scopes. A new safe directory RPC
-> preserves name lookups for direct messages, personal calendars and wallboards without returning
-> email, phone, DNI, residence or credentials. The pre-existing `get_profiles_with_skills()` definer
-> bypass was found during remediation and is now restricted to management/logistics and service-role
-> callers. pgTAP exercises direct reads, directory reads, the definer boundary and manager access.
+This is a large improvement on 313-of-313 and the credential is entirely gone from the row, so it
+is not a P0. But `get_profile_directory()` — which returns exactly the safe projection and
+deliberately excludes email, phone, DNI and residence — is an *alternative* a caller may choose,
+not a *constraint* the policy imposes. Any colleague-facing query that goes to `profiles` directly
+still gets the sensitive columns.
 
-**Remediation.** Narrow `profiles_select` to self + colleagues the caller legitimately needs
-(assignment/department correlated), with admin/management retaining full read. Independently move
-`calendar_ics_token` out of the client-readable row — a side table readable only by `service_role`,
-or a column-level `REVOKE` on the `authenticated` grant — so the policy is not the only thing
-between a technician and everyone's calendar. `dni` and `residencia` deserve the same treatment.
-No pgTAP file currently asserts anything about `profiles` row visibility.
+**Remediation.** Inventory the colleague-facing reads (the assignment matrix, staffing, messaging,
+wallboard) and move them onto `get_profile_directory()`; then drop the shared-job branch from
+`profiles_select` so the sensitive columns are reachable only by the owner and by
+admin/management/logistics. Add a pgTAP case asserting a technician reads zero rows for a
+colleague they share a job with, once the directory is the only path. Doing it in that order keeps
+the UI working at every step.
 
-The compatibility column contains no secrets and will be dropped after old PWA bundles have aged out.
+### DB-06 (residual) — drift detection is instrumented but not gated
 
-### SEC-12 — Three tables are readable with the public anon key
+The substance landed: `scripts/ci/schema-catalog.sql` exports policies, RLS flags, view and
+function fingerprints, trigger definitions and table/function/column ACLs under stable object
+identities; `compare-schema-catalog.mjs` diffs two catalogs and refuses empty, duplicate or
+cross-major inputs; `docs/security/schema-drift-verification.md` records the procedure and the
+first real production comparison — **199 object differences, zero policy differences** — and the
+reconciliation migration has been applied (verified: `set_job_created_by` and the jobs attribution
+trigger now exist on production, client `TRUNCATE`/`REFERENCES`/`TRIGGER` grants are gone, and all
+206 repository migrations are applied).
 
-**Severity: medium. Confirmed and bounded on production.** A sweep of every table on which `anon`
-holds `SELECT`, executed as the `anon` role, returns rows from exactly three:
+What is not closed: the CI step runs
 
-| Table | Rows readable by anon | Assessment |
-| --- | ---: | --- |
-| `festival_artists` | **598** | Unannounced festival line-ups, stage assignments, free-text `notes`, rider status flags. Commercially confidential; no contact or fee columns. |
-| `activity_catalog` | 54 | Static event-type reference data. Benign, likely intentional. |
-| `rate_extras_2025` | 4 | Rate-extra pricing rows. |
+```
+node scripts/ci/compare-schema-catalog.mjs schema-catalog.json schema-catalog.json
+```
 
-The cause in each case is a SELECT policy whose predicate short-circuits to true and which carries
-no `TO` clause, so it applies to `PUBLIC` including `anon`:
+— the artifact against itself. That proves the exporter and comparator execute, and it publishes
+the artifact for manual comparison, but it cannot detect drift, because PR CI deliberately never
+contacts production. So drift is caught only when a human downloads the artifact and runs the
+comparison as a release step.
 
-- `festival_artists` → `p_festival_artists_public_select_598f77`, which ORs a `true` term into the
-  middle of an otherwise correct role check. **The same policy also still contains the
-  `ja.job_id = ja.job_id` self-comparison** that SEC-03 fixed for `sub_rentals` in July — the
-  anti-pattern was fixed on one table, not swept for across the schema, exactly as SEC-05 warned.
-- `rate_extras_2025` → `p_rate_extras_2025_public_select_0e3de6` = `(is_admin_or_management() OR true)`.
-- `activity_catalog` → `activity_catalog_read` = `true`.
+**Remediation.** Either accept this explicitly (record the manual comparison as a required item on
+the production release checklist, so it is a gate operated by a person rather than an intention),
+or add a scheduled workflow that holds a read-only production connection and runs the real
+comparison on a cadence, failing loudly on any policy or ACL difference. The first is cheap and
+honest; the second is what actually prevents silent drift between releases.
 
-The `anon` key ships in the client bundle by design, so these need no account to read.
+### SEC-09 (partial) — structured logging is adopted at the boundaries, not throughout
 
-**Remediation.** Drop the `true` term from all three predicates and restore the role check the
-`OR true` was masking; scope each `TO authenticated` unless a public audience is deliberate
-(`activity_catalog` plausibly is — decide explicitly rather than by accident). Fix the
-`ja.job_id = ja.job_id` self-correlation in the same policy. Then add a governance rule that fails
-any policy body matching `true OR`, `OR true`, `USING (true)`, or a self-comparison, unless
-allowlisted with a rationale — the same shape as the existing SQL-grant gate — and a pgTAP deny
-test per table.
+The confirmed PII cases are fixed — `send-password-reset` no longer logs anything, and
+`structuredLogger` now has 8 importers where it had none. A new `check-edge-logging` governance
+gate lints `supabase/functions/**` for `no-console`, freezes the legacy sites in
+`legacy-console-allowlist.json`, and fails on any new or unlisted site, so the remaining debt can
+only shrink.
 
-> **Status (2026-09-04):** fixed by
-> `20260904161000_close_anonymous_catalog_reads.sql`. Anonymous table privileges are revoked from
-> `festival_artists` and `rate_extras_2025`; festival reads are limited to operational roles or the
-> technician assigned to the same job, with the correlation corrected to
-> `ja.job_id = festival_artists.job_id`. `activity_catalog` remains intentionally public and names
-> `anon, authenticated` explicitly. A follow-up in the same PR restricts all three rate catalogs to
-> management. pgTAP coverage pins grants, policy roles, predicates and technician/manager behaviour.
+**560 console sites across 80 files remain.** That is now a ratcheted migration rather than an open
+wound, and the gate's own rationale is explicit that freezing is "not approval to log PII". The
+residual work is to keep draining it, prioritising functions that handle identifiers.
 
-Twelve further tables carry a `USING (true)` SELECT policy scoped to `authenticated`
-(`achievements`, `app_changelog`, `jobs`, `job_assignments`, `job_rehearsal_dates`,
-`venues`, `madrid_holidays`, `role_skill_mapping`,
-`soundvision_file_reviews`, `technical_tool_quick_presets`, plus `tours` via
-"Allow wallboard to read tour status"). These are not anon-reachable and several are plausibly
-intended to be org-wide, but `jobs`, `job_assignments` and the two `rate_cards_*` tables mean any
-technician can read the entire job book. This supports the current technician calendar and assignment
-flows; it remains an explicit data-contract decision to review rather than an inherited accident.
+### QLT-03 — the legacy data-layer boundary is still draining
 
-## P1 — open, and older than they look
+176 `dataLayerClient` imports in pages and components, down from 213 → 195 → 176. No acute risk;
+steady structural work.
 
-### DB-06 — Policy-count mismatch needs an exact normalized schema comparison
+### PERF-01 — bundle headroom is still short of target
 
-**Severity: medium until the object-level diff is established.** Catalog counts differ between the
-audit's reconstructed migration state and production:
+3.10 MB gzip against a 3.32 MB ceiling: **6.6% headroom** where PERF-01 asks for 15%. `maps-lib`
+(~510 kB), `pdf-libs` (~342 kB) and `spreadsheet-libs` (~265 kB) still dominate. Unchanged in
+substance since July.
 
-| | Migration replay | Production |
-| --- | ---: | ---: |
-| Policies in `public` | 590 | **552** |
-| Tables carrying policies | 184 | 183 |
+### DB-02 — pgTAP breadth still trails the policied schema
 
-The initial audit incorrectly presented four policies as proof of production-only edits:
-
-| Policy | Baseline definition | Later migration and production |
-| --- | --- | --- |
-| `p_tours_public_select_5a6a0b` | `USING (true OR <role check>)` | `20260609120000_security_hardening_anon_access.sql` changes it to `auth.uid() IS NOT NULL` |
-| `p_tour_dates_public_select_8f4344` | same | same migration changes it |
-| `p_tour_power_defaults_public_select_5dba2b` | same | same migration changes it |
-| `p_job_date_types_public_select_e0ccdb` | same | same migration changes it |
-
-Those policies therefore match because of committed migration history, not proven hand edits. The
-590-versus-552 count remains a useful signal, but raw counts alone cannot distinguish overwritten
-policies, conditional migrations, dump normalization, or a faulty static replay.
-
-**Remediation.** Build a fresh local database from the full migration chain, dump normalized
-`pg_policies`, function definitions and grants from both that database and production, and compare
-objects by stable identity. Write a reconciliation migration only for differences that remain.
-Automating the same comparison in a privileged, scheduled workflow would prevent future drift;
-pull-request CI cannot securely read production credentials from untrusted forks.
-
-### SEC-09 (carried) — structured logging shipped as dead code
-
-`supabase/functions/_shared/structuredLogger.ts` exports `redactLogFields` and `logEvent` and has a
-test file. At the audited baseline it had **zero importers outside its own test**, while 81 function
-files made 665 raw `console.*` calls. Confirmed PII at the boundary:
-
-- `send-password-reset/index.ts:37, 98, 208` — logs the normalized email address three times per
-  request, including on the success path.
-- `send-password-reset/index.ts:76` — logs resolved `baseUrl` and raw env value.
-- `staffing-click/index.ts:338-351` — logs token-validation internals and a token-expiry prefix.
-
-> **Status (2026-09-04):** the two confirmed credential/PII boundary cases are fixed in this PR.
-> `send-password-reset` now emits structured events without email addresses, recovery URLs or raw
-> environment values. `staffing-click` no longer logs expiry values or token-hash prefixes. The
-> broader raw-console adoption programme remains quality debt and should be drained with a baseline
-> rather than converted in one high-risk sweep.
-
-**Remediation.** Adopt `logEvent` at the mail/auth/token functions first (the ones handling
-identifiers), then make adoption enforceable: an ESLint rule for `supabase/functions/**` banning
-bare `console.*` outside an allowlist would convert this from a convention into a gate.
-
-### SEC-15 — Seven email functions interpolate user data into HTML with no escaping
-
-`send-corporate-email` is correctly hardened (SEC-08 is closed — it runs `sanitizeCorporateEmailHtml`
-server-side at `index.ts:669`). But the shared `escapeHtml` from `_shared/corporateEmailTemplate.ts`
-is not used at all by:
-
-`send-onboarding-email`, `send-password-reset`, `send-staffing-email`, `send-tour-availability`,
-`send-vacation-decision`, `notify-staffing-cancellation`, `auto-send-timesheet-reminders`.
-
-Concrete instance — `send-vacation-decision/index.ts:309-318` interpolates `techName`, `dept` and
-period text straight into markup. `techName` is built from `profiles.first_name`/`last_name`
-(L259), which the user controls. `reqRow.reason` and `rejection_reason` are free-text fields on
-the same path. The result is HTML injection into outbound mail read by managers — a credible
-internal phishing vector, not a self-XSS.
-
-**Remediation.** Route every template through `escapeHtml`; the two functions that already do
-(`send-bug-resolution-email`, `send-expense-notification`) are the pattern to copy.
-
-> **Status (2026-09-04):** fixed for every active vulnerable interpolation found by the audit.
-> Password-reset, staffing, tour-availability, staffing-cancellation, vacation-decision and
-> automatic timesheet-reminder templates escape database/request text before insertion. The
-> onboarding function's unused legacy template was removed; its active template contains no
-> user-controlled HTML interpolation. URL fields remain application-generated and are escaped when
-> inserted into attributes.
+The suite has grown (new files for anonymous catalog access, profile/rate visibility, staffing
+summary, calendar-token isolation, schema attribution) and now covers the tables this audit
+touched. It still does not approach 100% of the 184 policied tables, and the catalog comparison
+explicitly "does not test application row visibility or replace pgTAP".
 
 ---
 
-## P2 — quality signals that are true but narrow
+## Closed and verified on production — 2026-09-05
 
-### QLT-05 — the file-size gate does not look at Edge Functions
+Each row was re-measured against the live database or a re-run gate, not inferred from the diff.
 
-`scripts/governance/check-file-size-budget.mjs:29` sets `sourceRoot = join(repoRoot, "src")`. The
-gate reports "0 files over threshold" — accurate for `src/`, and silent about the privileged server
-code, where six functions exceed the 800-line threshold:
+| ID | What was wrong | What closed it | Measured proof |
+| --- | --- | --- | --- |
+| **SEC-13** | `profiles_select` was `USING (true)`: 313 rows readable by any account, including 313 ICS bearer tokens and 286 national IDs | #920 moved tokens to an owner-scoped vault with client writes revoked and rotated every one; #920 narrowed `profiles_select` and added `get_profile_directory()` | Claimless authenticated session reads **0** profile rows and **0** vault rows; legacy column holds **0** non-null tokens; a real technician reads exactly their shared-job set (103 = 103) and exactly **1** vault row |
+| **SEC-12** | Ten SELECT policies short-circuited via `true OR …`; three tables readable with the public anon key, `festival_artists` at 598 rows; `ja.job_id = ja.job_id` self-comparison | #920 and #929 rewrote the predicates, corrected the correlation and revoked `anon` grants | Anon sweep over every `anon`-SELECTable table returns rows from **one** table (`activity_catalog`, 54, deliberate); **0** policies contain `true OR`/`OR true`; `rate_cards_2025` SELECT is now `is_admin_or_management()` |
+| **SEC-15** | Seven email functions interpolated user-controlled values into HTML with no escaping | #928 | **0** email functions build HTML without `escapeHtml`/sanitiser |
+| **QLT-05** | The file-size gate scanned only `src/`, so six Edge Functions over 800 lines were invisible | #927 split the budget into two domains | Gate reports both domains; `supabase/functions/` baselined at 6 |
+| **QLT-07** | 88 unreferenced app modules, ~13,955 LOC, including five components July had already flagged | #925 | Sweep finds **0** app-owned dead modules; only `src/stubs/html2canvas-unused.ts` remains, which is an intentional Rollup alias target |
+| **QLT-01 (gate)** | `check-lint-warning-baseline.mjs` enforced only per-file ceilings; `baseline.total` was printed, `baseline.rules` never read | #927 added `lint-warning-policy.mjs` | Budgets enforced at total, per-rule, per-domain, per-domain-rule and per-file |
+| **REL-02** | Coverage thresholds existed for 5 files and no workflow ran coverage | #927 | 10 thresholds including every shared trust boundary (`auth`, `rateLimit`, `hojaLinkToken`, `emailHtmlPolicy`, `memoriaSecurity`), executed in CI because `test:critical` chains `test:critical:coverage` |
+| **DB-06 (substance)** | 552 live policies vs 590 replayed, undiagnosed, with four cited body differences | #924 built the normalized exporter/comparator and applied a reconciliation migration | Production comparison found 199 object differences and **zero** policy differences; reconciliation verified applied; **206/206** repository migrations applied |
+| — | Staffing summary view was directly reachable | #922 | `v_job_staffing_summary` has no grants to `anon` or `authenticated` |
+| — | Offline cache retained private state across accounts and accepted cached fallback for authorization errors | #923 | Not independently re-verified here — see Method and limits |
+| — | Expense edit permission bypass | #929 | Not independently re-verified here — see Method and limits |
 
-| Lines | File |
-| ---: | --- |
-| 1,868 | `supabase/functions/send-staffing-email/index.ts` |
-| 1,288 | `supabase/functions/staffing-orchestrator/index.ts` |
-| 1,002 | `supabase/functions/create-whatsapp-group/index.ts` |
-| 969 | `supabase/functions/staffing-click/index.ts` |
-| 905 | `supabase/functions/upload-public-artist-rider/index.ts` |
-| 878 | `supabase/functions/send-corporate-email/index.ts` |
+Also verified still holding from the July → September closures: `strict: true` type-checks clean;
+enforced CSP with no `unsafe-eval` and no `unsafe-inline` in `script-src`; `image-proxy` retired;
+dependency audit at zero; **141 SECURITY DEFINER functions, 0 with an unpinned `search_path`**;
+only two `anon`-targeted policies remain (`activity_catalog_read` and `system_errors_insert`, a
+write-only error sink).
 
-Separately, **20 `src/` files now sit between 780 and 800 lines**, ten of them at 792–799
-(`AmpRackDesigner.tsx` 799; `flexWorkOrders.ts`, `Expenses.tsx`, `TimesheetView.tsx`,
-`AdminPanel.tsx` all at 798). A cluster that tight against the ceiling is a threshold being
-managed, not complexity being reduced.
+### One class worth an explicit decision
 
-**Remediation.** Extend `sourceRoot` to cover `supabase/functions/` with its own baseline, and
-report a "files within 5% of threshold" warning line so the cluster is visible before it becomes
-a wall of exemptions.
-
-### QLT-01 — the lint ratchet is frozen at par
-
-Current warnings equal the baseline exactly (1,216 = 1,216). The gate blocks regressions and exerts
-no downward pressure. The 284 `no-explicit-any` warnings in `supabase/functions/` have never been
-through a reduction pass, and the 78 `react-hooks/exhaustive-deps` warnings remain the highest-risk
-category in the file — each is a potential stale-closure bug, not a style nit.
-
-Suggest splitting the baseline into `app` and `functions` halves so progress on one is not masked
-by the other, and setting a per-PR decrement target rather than a freeze.
-
-**The gate is also narrower than its own baseline file implies.**
-`scripts/governance/check-lint-warning-baseline.mjs` walks `snapshot.files` and compares each
-file/rule pair against `baseline.files`. It never reads `baseline.rules`, and it only *prints*
-`baseline.total` rather than asserting against it. So the `total` and `rules` fields are
-descriptive, not enforced: a change that moved warnings between files while holding every per-file
-ceiling would pass even if the global count rose. Enforcing both alongside the per-file ceilings is
-a few lines and belongs with the QLT-08 gate work below.
-
-### QLT-07 — ~14,000 lines of unreferenced application code
-
-A module-graph sweep (99 unreferenced modules of 1,465 scanned; 11 are vendored shadcn/ui
-primitives worth keeping) leaves **88 app-owned modules, ~13,955 LOC**, with no import anywhere in
-`src/` or `tests/`, static or dynamic. The largest cluster is an abandoned tour-scheduling feature:
-
-| Lines | Module |
-| ---: | --- |
-| 757 | `src/utils/tour-scheduling-pdf-enhanced.ts` |
-| 725 | `src/components/tours/scheduling/TourAccommodationsManager.tsx` |
-| 646 | `src/utils/tour-scheduling-pdf.ts` |
-| 610 | `src/components/equipment/EquipmentCreationManager.tsx` |
-| 594 | `src/components/tours/scheduling/EnhancedTourTravelPlanner.tsx` |
-| 539 | `src/components/equipment/JobPresetManager.tsx` |
-| 405 | `src/components/tours/scheduling/TourItineraryBuilder.tsx` |
-| 391 | `src/hooks/useJobCard.ts` |
-| 352 | `src/components/tours/scheduling/TourTimelineView.tsx` |
-| 350 | `src/types/tourScheduling.ts` |
-
-Two notes on this list. First, the five dashboard components the July roadmap explicitly said to
-"delete rather than type" — `DashboardContent`, `DepartmentSchedule`, `DepartmentTabContent`,
-`MyJobTotalsSection`, `RealTimeJobsList` — are **all still present and still unreferenced**.
-Second, `useOptimisticJobManagement` is documented in `CLAUDE.md` as an active performance pattern
-("Optimistic Updates") and has no callers; the documentation describes code that is not running.
-
-This is dead weight in review surface and in every `any`/lint/type count above, not in the bundle
-(tree-shaking excludes it). Deleting it is the cheapest available reduction in all three.
-
-### REL-02 — coverage thresholds exist but CI never runs coverage
-
-`vitest.config.ts:41-70` defines thresholds for exactly five files. No workflow in
-`.github/workflows/` invokes `test:coverage`, so none of them is enforced anywhere. The
-trust-boundary modules that most need a floor — `_shared/auth.ts`, `memoriaSecurity.ts`,
-`rateLimit.ts`, `hojaLinkToken.ts`, `emailHtmlPolicy.ts` — have tests but no threshold.
-
-### DB-02 — pgTAP covers roughly 40% of the policied schema
-
-19 pgTAP files reference ~76 tables; the replayed migration chain yields **590 live policies across
-184 tables**. Recent table families are well covered. The gap is precisely the old baseline
-tables — including every table named in SEC-12 and SEC-13.
-
----
-
-## Closed since 2026-07-09 — verified, not assumed
-
-| ID | Evidence on this commit |
-| --- | --- |
-| QLT-02 | `tsconfig.app.json:21` `"strict": true`; `npm run typecheck` exits 0 |
-| DATA-02 | `functions_typecheck` job present; `deno.lock` committed; gate fails closed without Deno |
-| DATA-01 | `20260709210000_enforce_subrental_transport_request_uniqueness.sql` adds `uq_transport_requests_active_subrental` |
-| SEC-03 | No self-comparison survives in the effective replayed policy state. Historical baseline SQL still contains examples; `20260904161000_close_anonymous_catalog_reads.sql` replaces the live festival policy with a correctly correlated predicate. |
-| SEC-07 | `image-proxy` retired to a fail-closed stub with the rationale in-file |
-| SEC-08 | `send-corporate-email/index.ts:669` sanitizes server-side via `_shared/emailHtmlPolicy.ts` |
-| SEC-10 | `public/_headers` ships an **enforced** CSP — no `unsafe-eval`, no `unsafe-inline` in `script-src` (7 hashes), `object-src 'none'`, `frame-ancestors 'none'`; `governance:csp` gates it |
-| REL-01 | `playwright.config.ts:21` uses `node scripts/e2e/start-test-server.mjs`; no POSIX inline env |
-| OPS-01 | `audit:deps` reports 0 advisories against a zero baseline |
-| — | `anon_*_select_for_realtime` policies on `jobs`, `profiles`, `job_assignments`, `locations`, `logistics_*` dropped by `20260609120000_security_hardening_anon_access.sql` |
-| — | `direct-protected-route-allowed-roles` fully drained, 64 → 0 |
-
-`style-src 'unsafe-inline'` and `img-src https:` remain in the CSP. Both are common residuals;
-the `img-src` wildcard is worth revisiting since it permits pixel-based exfiltration of anything
-reachable from a URL.
+Fifteen `USING (true)` SELECT policies remain, all scoped to `authenticated` except
+`activity_catalog` (anon + authenticated, deliberate). Most are reference data. Two are not:
+`jobs_select` and `job_assignments_select` make the entire job book and assignment history readable
+by every authenticated account. That is plausibly intended for this product — and
+`job_assignments` being broadly readable is what makes the new correlated `profiles_select` work —
+but it is currently intent-by-inheritance rather than a recorded decision. Worth confirming, then
+either documenting or narrowing.
 
 ---
 
 ## Next moves — prioritized register
 
-Ranked by risk removed (or future defects prevented) per unit of effort, not by severity alone.
-Each row is meant to become one issue with an owner and a target release, per the review rules
-inherited from the July roadmap.
+Ranked by risk removed (or future defects prevented) per unit of effort. Re-ranked 2026-09-05:
+everything above the line in the previous register has shipped.
 
 | # | ID | Move | Why it ranks here | Effort | Exit criteria |
 | --- | --- | --- | --- | --- | --- |
-| 1 | SEC-13 | **Done:** staged token rollout, vault RLS, full rotation, private ICS caching, row-scoped private profiles, safe directory RPC, and a role check on the legacy skills definer | Closes both the bearer-token exploit and organisation-wide profile PII enumeration while preserving operational lookups | Done | pgTAP pins token isolation, private-row visibility, directory projection and definer access |
-| 2 | SEC-12 | **Done:** anonymous grants removed from confidential catalogs; festival assignment correlation fixed; all rate catalogs management-only; `activity_catalog` explicitly public | Closes the measured anonymous and authenticated commercial-data exposure | Done | pgTAP pins grants, roles, predicates and role behaviour |
-| 3 | **DB-06** | Produce a normalized object-level replay/production diff and reconcile only confirmed differences | Raw policy counts differ, but the four originally cited examples were false evidence because a later migration already reconciles them | M | Stable-identity diff for policies/functions/grants is reviewed; confirmed differences have migrations |
-| 4 | QLT-07 | Delete the 88 unreferenced modules (~13,955 LOC) in one reviewable PR | Cheapest large win: improves QLT-01, QLT-05 and review surface simultaneously; nothing depends on it | S–M (mechanical, but needs one careful review pass) | Modules deleted; `npm run lint`/`typecheck`/tests green; lint baseline regenerated downward |
-| 5 | QLT-08 | Close the gate blind spots: extend the file-size budget to `supabase/functions/`, wire `test:coverage` into CI, enforce `baseline.total`/`baseline.rules` in the lint gate (today only per-file ceilings are checked), split the lint baseline into app/functions halves with a decrement target | Small config changes that make three existing gates tell the truth; prevents recurrence rather than fixing instances | S | File-size gate reports the six oversized functions; coverage thresholds actually fail a PR; lint baseline drops below par |
-| 6 | SEC-09 / SEC-15 | Adopt `structuredLogger` and `escapeHtml` at the mail and auth functions, and add the lint rules that make adoption enforceable | The primitives already exist and are tested; only adoption is missing. The lint rule is what stops it regressing again | M | No bare `console.*` in `supabase/functions/**` outside an allowlist; every email template escapes interpolated values |
-| 7 | QLT-03 | Continue draining the 195 legacy data-layer imports | Steady structural work with no acute risk; ranks below everything above | L | Baseline continues to fall each release |
+| 1 | **SEC-16** | Move colleague-facing reads onto `get_profile_directory()`, then drop the shared-job branch from `profiles_select` | The only remaining measured exposure of personal data: one technician can read up to 134 colleagues' `dni`, `residencia`, `phone` and `email`. The safe projection already exists — it just is not the only path | M (touches several read sites; do the migration to the RPC first, the policy narrowing second, so the UI never breaks) | A technician reads 0 rows from `profiles` for a shared-job colleague; pgTAP asserts it; colleague-facing UI unchanged |
+| 2 | **DB-06 (residual)** | Make drift detection a real gate: either record the manual catalog comparison as a required release-checklist item, or add a scheduled read-only production comparison | The tooling and the first reconciliation are done; without a gate, drift resumes silently and the next audit re-derives it from scratch — which is how this finding arose | S (checklist) / M (scheduled workflow) | A diff between replayed and production catalogs fails something a human will see, on a defined cadence |
+| 3 | **SEC-09** | Keep draining the 560 frozen console sites, identifier-handling functions first | Ratcheted and safe, but 80 files still log through an unstructured path | L, incremental | `legacy-console-allowlist.json` shrinks each release; no function handling identifiers remains on the list |
+| 4 | — | Confirm or narrow org-wide `jobs_select` / `job_assignments_select` | Currently intent-by-inheritance; the correlated `profiles_select` depends on it, so decide deliberately rather than discover later | S (decision) | Either a recorded rationale or a narrowed policy with pgTAP |
+| 5 | **PERF-01** | Route-level budgets for the map, PDF and spreadsheet chunks | 6.6% headroom against a 15% target; no acute risk, but the ceiling is approached rather than defended | M | Headroom ≥15%, or per-route budgets replacing the single global ceiling |
+| 6 | **QLT-03** | Continue draining the 176 legacy data-layer imports | Steady structural work, no acute risk | L, incremental | Baseline falls each release |
+| 7 | **DB-02** | Extend pgTAP toward the untested half of the 184 policied tables | The catalog comparison explicitly does not test row visibility, so pgTAP remains the only behavioural check | L | Deny coverage for every table holding personal or financial data |
 
-Items 1–3 are the ones worth doing before anything else. Item 3 is the one most likely to be
-skipped because it produces no visible feature change, and the one whose absence most reliably
-turns a fixed vulnerability back into an open one.
+Items 1 and 2 are the ones worth doing next. Item 1 is the last measured data exposure; item 2 is
+what stops the register from silently regressing between audits.
+
+---
 
 ## Method and limits
 
-- Every number above was produced by running the command on this commit. Commands run: `npm ci`,
-  `lint`, `typecheck`, `test:run`, `build`, `budget:bundle`, all 11 `governance:*` sub-gates,
-  `audit:deps`, `ci:db:migrations`.
-- **Not run:** the Playwright suite (this sandbox ships Chromium r1194; the pinned Playwright wants r1234, so all 29 specs
-  fail at `browserType.launch` before any assertion — an environment mismatch, not a code signal;
-  the `e2e_smoke` and mobile jobs cover it in CI), and every
-  container-backed database job (`migration_apply`, `db_lint`, `rls_rpc_security_tests`), so all
-  SQL findings are derived from replaying the migration chain statically.
-- **SQL findings were verified against production, and that verification overturned two of them.**
-  An initial pass reconstructed RLS by replaying the migration chain. Checking it against the live
-  database showed the replay is not a reliable model of production:
-  - It reported eight tour/job tables as anon-readable. Measured as `anon`, all eight return
-    **zero** rows. The committed `20260609120000_security_hardening_anon_access.sql` migration
-    explains the effective policy bodies; the first audit pass had inspected the baseline without
-    applying that later migration. The measured anon exposure was three tables, and this PR closes
-    the two confidential ones while documenting `activity_catalog` as intentionally public.
-  - It reported 55 `SECURITY DEFINER` functions with a mutable `search_path`, including the
-    authorization primitives. **This was a false positive in the audit tooling**: the schema dump
-    writes `SET "search_path"` (quoted) and the scan matched only the unquoted form. Production has
-    **140 of 140 definer functions pinned**, and neither `anon` nor `authenticated` holds `CREATE`
-    on schema `public`. There is no finding here; the earlier SEC-14 entry has been withdrawn.
-  Treat a fully replayed migration database as the intended state and normalized production
-  `pg_policies` / `pg_proc` output as the deployed state. Compare the two by object identity before
-  drawing a drift conclusion — see **DB-06**.
-- The dead-code sweep resolves `@/`-aliased and relative module specifiers and was spot-checked
-  against dynamic `import()` calls. Modules reachable only through a string built at runtime would
-  not be detected.
+- Numbers are produced by running the command or query at the stated date. Commands re-run for the
+  2026-09-05 pass: `npm ci`, `lint`, `typecheck`, `test:run`, `build`, `budget:bundle`, the full
+  `governance` chain (12 sub-gates), plus a module-graph sweep for unreferenced code.
+- **SQL findings are verified against the live production database**, not inferred from the
+  migration chain. The 2026-09-05 pass used read-only catalog queries plus role-impersonated
+  (`SET LOCAL ROLE anon` / `authenticated`, with `request.jwt.claim.sub` set to a real technician)
+  row counts. This matters: in the 2026-09-04 pass the same check overturned two findings that a
+  migration replay had produced.
+- **Not independently re-verified in this pass:** the offline account-scoping and cancellation
+  fixes (#923) and the expense edit permission fix (#929). Both are application-behaviour changes
+  rather than catalog state, so confirming them needs an authenticated end-to-end exercise rather
+  than a database query. They ship with their own tests and are recorded as closed by their PRs,
+  not by measurement here.
+- `npm run typecheck:functions` and the Playwright suite were not run in this pass. CI covers both;
+  the sandbox's Chromium revision does not match the pinned Playwright.
+- The replay-versus-production distinction remains the central methodological caution. Treat the
+  migration chain as intent and `pg_policies` / `pg_proc` / `information_schema` as truth, and note
+  that CI's catalog comparison currently compares an artifact against itself — see DB-06.
