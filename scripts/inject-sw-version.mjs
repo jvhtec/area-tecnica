@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { minify } from "terser";
 
 const buildTimestamp = `${Math.floor(Date.now() / 1000)}`;
 const swFile = "dist/sw.js";
@@ -46,7 +47,13 @@ if (!currentContents.includes(placeholder)) {
 
 const nextContents = currentContents.replaceAll(placeholder, buildTimestamp);
 
-await writeFile(swFile, nextContents, "utf8");
+if (process.argv.includes('--minify-service-worker')) {
+  const result = await minify(nextContents, { ecma: 2020, compress: { passes: 2 }, mangle: true });
+  if (!result.code) throw new Error('Service worker minification produced no output');
+  await writeFile(swFile, result.code, 'utf8');
+} else {
+  await writeFile(swFile, nextContents, "utf8");
+}
 
 console.log(`Injected build timestamp into service worker: ${buildTimestamp}`);
 

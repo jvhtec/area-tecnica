@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, extname, join, relative } from "node:path";
+import { checkRouteBudgets } from './route-budgets.mjs';
 
 const repoRoot = process.cwd();
 const distDir = join(repoRoot, "dist");
@@ -337,6 +338,20 @@ if (!existsSync(baselinePath)) {
 const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
 const current = collectBundleMetrics();
 const { rows, failures } = compareBundles(current, baseline.bundle);
+
+// Preserve 15% below the existing absolute ceiling; do not raise the ceiling
+// to make headroom look better. Keep total and initial-route limits distinct.
+const reserve = { label: 'js gzip with 15% reserve', baselineBytes: baseline.bundle.totalsByKind.js.gzipBytes,
+  currentBytes: current.totalsByKind.js.gzipBytes, maxBytes: Math.floor(absoluteKindBudgets.js * 0.85) };
+rows.push(reserve);
+if (reserve.currentBytes > reserve.maxBytes) failures.push(reserve);
+const manifest = JSON.parse(readFileSync(join(distDir, '.vite', 'manifest.json'), 'utf8'));
+const assetSizes = new Map(current.files.map(file => [file.path.replace(/^dist\//, ''), file.gzipBytes]));
+for (const route of checkRouteBudgets(manifest, assetSizes)) {
+  const row = { label: `${route.name} static JS gzip`, baselineBytes: 0, currentBytes: route.currentBytes, maxBytes: route.maxBytes };
+  rows.push(row);
+  if (!route.pass) failures.push({ ...row, label: `${row.label}${route.eagerHeavy.length ? `: eager heavy assets ${route.eagerHeavy.join(', ')}` : ''}` });
+}
 
 writeSummary(rows, failures, current);
 

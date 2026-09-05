@@ -32,6 +32,12 @@ export default defineConfig(({ mode }) => ({
       // `.html()` is ever needed, remove this alias rather than working around
       // it — the stub deliberately fails loudly instead of half-working.
       { find: /^html2canvas$/, replacement: path.resolve(__dirname, "./src/stubs/html2canvas-unused.ts") },
+      // No app caller uses jsPDF.addSvgAsImage; keep the optional renderer out
+      // of the bundle and fail loudly if that contract changes.
+      { find: /^canvg$/, replacement: path.resolve(__dirname, "./src/stubs/canvg-unused.ts") },
+      // Modern PWA browsers provide the ES built-ins; use ExcelJS's published
+      // browser bundle without its redundant global core-js polyfills.
+      { find: /^exceljs$/, replacement: path.resolve(__dirname, "./node_modules/exceljs/dist/exceljs.bare.min.js") },
     ],
   },
   define: {
@@ -39,10 +45,12 @@ export default defineConfig(({ mode }) => ({
     'import.meta.env.VITE_BUILD_TIMESTAMP': JSON.stringify(Date.now()),
   },
   build: {
+    manifest: true,
     // Only disable sourcemaps and drop console/debugger in production
     sourcemap: mode !== 'production',
     ...(mode === 'production' && {
-      minify: 'esbuild',
+      minify: 'terser',
+      terserOptions: { ecma: 2020, compress: { passes: 3 } },
       rollupOptions: {
         output: {
           manualChunks: (id) => {
@@ -66,7 +74,23 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('node_modules/@radix-ui/')) {
               return 'vendor-radix';
             }
-            if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
+            // Keep app-aware subscription/status widgets out of the shared
+            // primitives chunk so they cannot pull auth providers into it.
+            if (id.includes('/src/components/ui/') && !/\/(connection-|subscription-|header-status)/.test(id)) {
+              return 'shared-ui';
+            }
+            if (id.includes('node_modules/lucide-react/')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('node_modules/date-fns/') || id.includes('node_modules/date-fns-tz/')) {
+              return 'vendor-dates';
+            }
+            if (id.includes('node_modules/@babel/runtime/')) {
+              // These helpers are shared with signature/UI code: assigning
+              // them to a PDF chunk would eagerly load the PDF engines.
+              return 'runtime-helpers';
+            }
+            if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib') || id.includes('node_modules/@pdf-lib/')) {
               return 'pdf-libs';
             }
             if (id.includes('node_modules/mapbox-gl')) {

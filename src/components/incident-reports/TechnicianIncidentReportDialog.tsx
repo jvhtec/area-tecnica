@@ -5,7 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Save, Camera, Trash2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { toast } from "sonner";
-import { generateIncidentReportPDF } from "@/utils/incident-report/pdf-generator";
 import { Job } from "@/types/job";
 import { Theme } from "@/components/technician/types";
 import {
@@ -193,6 +192,7 @@ export const TechnicianIncidentReportDialog = ({
 
     setIsGenerating(true);
     try {
+      const { generateIncidentReportPDF } = await import("@/utils/incident-report/pdf-generator");
       await generateIncidentReportPDF(
         {
           jobId: job.id,
