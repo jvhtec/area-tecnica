@@ -6156,6 +6156,42 @@ export type Database = {
           },
         ]
       }
+      profile_calendar_tokens: {
+        Row: {
+          created_at: string
+          profile_id: string
+          rotated_at: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+          rotated_at?: string | null
+          token: string
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+          rotated_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_calendar_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_calendar_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_skills: {
         Row: {
           created_at: string
@@ -7203,6 +7239,187 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      setup_workflow_tasks: {
+        Row: {
+          applicable: boolean
+          category: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          label: string
+          metadata: Json
+          required: boolean
+          responsible_role: string
+          status: string
+          task_key: string
+          updated_at: string
+          workflow_id: string
+        }
+        Insert: {
+          applicable?: boolean
+          category: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          label: string
+          metadata?: Json
+          required?: boolean
+          responsible_role: string
+          status?: string
+          task_key: string
+          updated_at?: string
+          workflow_id: string
+        }
+        Update: {
+          applicable?: boolean
+          category?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          label?: string
+          metadata?: Json
+          required?: boolean
+          responsible_role?: string
+          status?: string
+          task_key?: string
+          updated_at?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setup_workflow_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflow_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflow_tasks_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "setup_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setup_workflows: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          current_step: string
+          entity_id: string
+          id: string
+          job_id: string | null
+          state: Json
+          status: string
+          tour_date_id: string | null
+          tour_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_step: string
+          entity_id: string
+          id?: string
+          job_id?: string | null
+          state?: Json
+          status?: string
+          tour_date_id?: string | null
+          tour_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_step?: string
+          entity_id?: string
+          id?: string
+          job_id?: string | null
+          state?: Json
+          status?: string
+          tour_date_id?: string | null
+          tour_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setup_workflows_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflows_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "setup_workflows_tour_date_id_fkey"
+            columns: ["tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setup_workflows_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       skills: {
         Row: {
@@ -11637,6 +11854,21 @@ export type Database = {
           year: number
         }[]
       }
+      get_my_calendar_ics_token: { Args: never; Returns: string }
+      get_profile_directory: {
+        Args: { p_profile_ids?: string[] | null }
+        Returns: {
+          assignable_as_tech: boolean
+          department: string
+          first_name: string
+          id: string
+          last_name: string
+          nickname: string
+          profile_picture_url: string
+          role: Database["public"]["Enums"]["user_role"]
+          warehouse_duty_exempt: boolean
+        }[]
+      }
       get_profiles_with_skills: {
         Args: never
         Returns: {
@@ -11883,6 +12115,31 @@ export type Database = {
         Returns: boolean
       }
       minutes_to_hours_round_30: { Args: { mins: number }; Returns: number }
+      mutate_setup_workflow: {
+        Args: { p_action: string; p_payload: Json; p_workflow_id?: string }
+        Returns: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          current_step: string
+          entity_id: string
+          id: string
+          job_id: string | null
+          state: Json
+          status: string
+          tour_date_id: string | null
+          tour_id: string | null
+          type: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "setup_workflows"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       needs_vehicle_disclaimer: {
         Args: { _profile_id: string }
         Returns: boolean
@@ -12208,6 +12465,10 @@ export type Database = {
       }
       sync_preset_assignments_for_tour: {
         Args: { _preset_id: string; _tour_id: string }
+        Returns: undefined
+      }
+      sync_setup_workflow_tasks: {
+        Args: { p_tasks: Json; p_workflow_id: string }
         Returns: undefined
       }
       toggle_timesheet_day: {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useCalendarIcsToken } from "@/hooks/useCalendarIcsToken";
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
@@ -31,7 +32,6 @@ interface UserProfile {
     profile_picture_url?: string | null;
     role?: string | null;
     department?: string | null;
-    calendar_ics_token?: string | null;
 }
 
 interface ProfileViewProps {
@@ -71,8 +71,13 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     });
     const [passwordLoading, setPasswordLoading] = useState(false);
 
-    // Calendar token state
-    const [calendarToken, setCalendarToken] = useState(userProfile?.calendar_ics_token || '');
+    // Calendar token: owned by a hook because it is a bearer credential kept
+    // off the broadly-readable profiles row (SEC-13).
+    const {
+        token: calendarToken,
+        loading: calendarTokenLoading,
+        rotate: rotateCalendarToken,
+    } = useCalendarIcsToken();
 
     // Form state
     const [firstName, setFirstName] = useState(userProfile?.first_name || '');
@@ -90,7 +95,6 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             setResidencia(userProfile.residencia || '');
             setDni(userProfile.dni || '');
             setSelectedColor(userProfile.bg_color || '#3b82f6');
-            setCalendarToken(userProfile.calendar_ics_token || '');
         }
     }, [userProfile]);
 
@@ -195,26 +199,20 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         : '';
 
     // Handle calendar token generation/rotation
-    const generateCalendarToken = async (): Promise<string> => {
-        const { data, error } = await dataLayerClient.rpc('rotate_my_calendar_ics_token');
-        if (error) throw error;
-        const newToken = data as string;
-
-        // Update local state
-        setCalendarToken(newToken);
-
-        // Update cache
-        queryClient.setQueryData(['user-profile', user?.id], (old: UserProfile | undefined) => ({
-            ...(old ?? {}),
-            calendar_ics_token: newToken
-        }));
-
-        return newToken;
-    };
+    const generateCalendarToken = async (): Promise<string> => rotateCalendarToken();
 
     // Handle calendar sync - open webcal:// link directly
     const handleCalendarSync = async () => {
         try {
+            // Until the initial read resolves the token reads as empty, which is
+            // indistinguishable from genuinely having none. Rotating here would
+            // mint a new token for a user who already had one and silently break
+            // their existing calendar subscription, so wait for the read first.
+            if (calendarTokenLoading) {
+                toast.loading('Cargando enlace de calendario...', { id: 'calendar-sync' });
+                return;
+            }
+
             let token = calendarToken;
 
             // If no token exists, generate one

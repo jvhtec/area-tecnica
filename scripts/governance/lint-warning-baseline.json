@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-09-04T15:50:06.999Z",
+  "generatedAt": "2026-09-04T20:25:29.699Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1259,
+  "total": 1216,
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 1038,
+    "@typescript-eslint/no-explicit-any": 1037,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
     "no-case-declarations": 1,
     "no-control-regex": 8,
     "no-empty": 13,
-    "no-useless-escape": 64,
+    "no-useless-escape": 22,
     "prefer-const": 1,
     "react-hooks/exhaustive-deps": 78,
     "react-refresh/only-export-components": 43
@@ -780,7 +780,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/Profile.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
+      "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/ProjectManagement.tsx": {
       "@typescript-eslint/no-explicit-any": 4
@@ -1001,8 +1001,7 @@
       "no-control-regex": 1
     },
     "supabase/functions/send-onboarding-email/index.ts": {
-      "@typescript-eslint/no-explicit-any": 1,
-      "no-useless-escape": 42
+      "@typescript-eslint/no-explicit-any": 1
     },
     "supabase/functions/send-password-reset/index.ts": {
       "@typescript-eslint/no-explicit-any": 1

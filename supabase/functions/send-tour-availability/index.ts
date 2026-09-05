@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
+import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
 import {
   corsHeaders,
   createHttpHandler,
@@ -77,7 +78,11 @@ serve(createHttpHandler(async (req) => {
     const rangeStr = `${fmtDate(tour.start_date)}${tour.end_date ? ` — ${fmtDate(tour.end_date)}` : ''}`;
     const fullName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
     const subject = `Disponibilidad para gira: ${tour.name}`;
-    const safeMsg = (message ?? '').toString().replace(/</g, '&lt;').replace(/\n/g, '<br/>');
+    const safeMsg = escapeHtml((message ?? '').toString()).replace(/\n/g, '<br/>');
+    const safeSubject = escapeHtml(subject);
+    const safeFullName = escapeHtml(fullName || '');
+    const safeTourName = escapeHtml(String(tour.name ?? ''));
+    const safeRange = escapeHtml(rangeStr);
 
     if (desiredChannel === 'whatsapp') {
       // Require sender WA config
@@ -132,7 +137,7 @@ serve(createHttpHandler(async (req) => {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>${subject}</title>
+      <title>${safeSubject}</title>
     </head>
     <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
@@ -159,9 +164,9 @@ serve(createHttpHandler(async (req) => {
               </tr>
               <tr>
                 <td style="padding:24px 24px 8px 24px;">
-                  <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${fullName || ''},</h2>
+                  <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeFullName},</h2>
                   <p style="margin:0;color:#374151;line-height:1.55;">
-                    ¿Puedes revisar tu disponibilidad para la gira <b>${tour.name}</b> (${rangeStr})?
+                    ¿Puedes revisar tu disponibilidad para la gira <b>${safeTourName}</b> (${safeRange})?
                   </p>
                   ${safeMsg ? `<p style=\"margin:12px 0 0 0;color:#374151;\">${safeMsg}</p>` : ''}
                 </td>
@@ -171,7 +176,7 @@ serve(createHttpHandler(async (req) => {
                 <td style="padding:12px 24px 0 24px;">
                   <div style=\"background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;\">
                     <div style=\"font-weight:600;color:#9a3412;margin-bottom:4px;\">Calendario del tour (PDF)</div>
-                    <a href=\"${tourPdfUrl}\" style=\"color:#9a3412;text-decoration:underline;\">Descargar PDF</a>
+                    <a href=\"${escapeHtml(tourPdfUrl)}\" style=\"color:#9a3412;text-decoration:underline;\">Descargar PDF</a>
                   </div>
                 </td>
               </tr>` : ''}

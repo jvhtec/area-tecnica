@@ -7,6 +7,7 @@ import {
   shouldSendStaffingClickWhatsappFollowup,
 } from "./followupUtils.ts";
 import { parseStaffingClickRequest } from "./requestUtils.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -312,7 +313,7 @@ serve(async (req) => {
 
     const effectiveExp = exp || row.token_expires_at || null;
     if (!effectiveExp) {
-      console.log('❌ STEP 4 FAILED: Missing effective expiry', { rid, urlStyle, token_expires_at: row.token_expires_at });
+      logEvent('warn', 'staffing_click.expiry_missing', { url_style: urlStyle });
       return await redirectResponse({
         title: 'Enlace inválido',
         status: 'error',
@@ -324,7 +325,7 @@ serve(async (req) => {
     const expTime = new Date(effectiveExp).getTime();
     const nowTime = Date.now();
     if (Number.isNaN(expTime) || expTime < nowTime) {
-      console.log('❌ STEP 4 FAILED: Link expired', { expTime, nowTime, diff: nowTime - expTime, urlStyle });
+      logEvent('info', 'staffing_click.link_expired', { url_style: urlStyle });
       return await redirectResponse({
         title: 'Enlace caducado',
         status: 'warning',
@@ -332,10 +333,10 @@ serve(async (req) => {
         message: 'Este enlace ha caducado. Contacta con tu responsable para solicitar uno nuevo.'
       });
     }
-    console.log('✅ STEP 4: Link not expired', { expTime, nowTime, urlStyle });
+    logEvent('info', 'staffing_click.expiry_validated', { url_style: urlStyle });
 
     // Recompute expected token hash (HMAC over rid:phase:exp)
-    console.log('🔐 STEP 5: Starting token validation', { effectiveExp: effectiveExp.substring(0, 20), urlStyle });
+    logEvent('info', 'staffing_click.token_validation_started', { url_style: urlStyle });
     try {
       const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
         { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -348,14 +349,8 @@ serve(async (req) => {
       const providedHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b64uToU8(t))))
         .map(x=>x.toString(16).padStart(2,'0')).join('');
 
-      console.log('🔐 Token hashes computed', { 
-        expected: token_hash_expected.substring(0, 16), 
-        provided: providedHash.substring(0, 16),
-        stored: row.token_hash?.substring(0, 16)
-      });
-
       if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash) {
-        console.log('❌ STEP 5 FAILED: Token validation failed');
+        logEvent('warn', 'staffing_click.token_validation_failed', { url_style: urlStyle });
       return await redirectResponse({
         title: 'Token inválido',
         status: 'error',
@@ -363,7 +358,7 @@ serve(async (req) => {
         message: 'Este enlace no es válido. Utiliza el enlace original que recibiste.'
       });
       }
-      console.log('✅ STEP 5: Token validated successfully');
+      logEvent('info', 'staffing_click.token_validated', { url_style: urlStyle });
     } catch (cryptoError) {
       console.error('❌ STEP 5 FAILED: Crypto error', cryptoError);
       return await redirectResponse({

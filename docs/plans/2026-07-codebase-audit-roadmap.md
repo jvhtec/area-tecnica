@@ -5,6 +5,24 @@
 **Scope:** React/Vite application, Supabase migrations/RLS/RPCs, all Edge Functions, storage access, tests/CI, PWA delivery, dependencies, bundle output, and operational configuration.
 **Method:** repository-wide static scans, authorization tracing, migration-policy review, dependency/governance checks, test/build execution, and manual data-flow inspection. This is an implementation backlog, not a claim that every item is already fixed.
 
+> **Superseded for current state — 2026-09-04.** A full re-audit on `main@3ff4d13` re-ran every
+> gate and re-derived the RLS state. Read
+> [`docs/CODEBASE_AUDIT_2026-09-04.md`](../CODEBASE_AUDIT_2026-09-04.md) for current metrics and
+> the open risk register. Verified closed since this document: QLT-02, DATA-01, DATA-02, SEC-03,
+> SEC-07, SEC-08, SEC-10, REL-01, OPS-01. Still open: QLT-01 (ratchet frozen at par), QLT-03,
+> QLT-04, QLT-05, SEC-05, SEC-06, SEC-09, SEC-11, DB-01 through DB-05, PERF-01, REL-02, REL-03.
+> Two new findings, both verified against the production database, supersede this register's
+> priorities: **SEC-13** (`profiles` readable in full by any authenticated user — 313 rows, 313
+> `calendar_ics_token` bearer credentials, 286 national IDs) and **SEC-12** (three tables readable
+> with the public anon key, `festival_artists` at 598 rows materially; its policy also still
+> carries the `ja.job_id = ja.job_id` self-comparison SEC-03 fixed only for `sub_rentals`).
+> A third finding, **DB-06**, outranks the rest of this register structurally: production RLS has
+> been hand-edited away from the migration chain (552 live policies vs 590 replayed, with bodies
+> rewritten in place), so the `migration_apply`, `db_lint` and `rls_rpc_security_tests` jobs test a
+> schema that is not production, and a rebuild from migrations would silently re-open SEC-12.
+> See the prioritized register in the 2026-09-04 report.
+> The counts below are dated 2026-07-09 and should not be quoted as current.
+
 ## Executive assessment
 
 The application has a solid recent governance layer and a clean app typecheck, but it still carries the signature of rapid AI-assisted growth: duplicated privileged code, old permissive policies, many warning-only quality failures, inconsistent trust boundaries, and broad unmeasured test risk. The biggest risk is not a single vulnerable component; it is that adjacent copies of a pattern drift and bypass later safety improvements.

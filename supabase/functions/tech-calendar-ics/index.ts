@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createHttpHandler, requireEnvValues } from "../_shared/http.ts";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
+import { resolveCalendarToken } from "./tokenLookup.ts";
 
 type AssignmentRow = {
   job_id: string;
@@ -18,7 +19,7 @@ type JobRow = {
   timezone?: string | null;
 };
 
-function isUuid(v?: string | null) {
+function isUuid(v?: string | null): v is string {
   return !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
@@ -98,7 +99,7 @@ serve(createHttpHandler(async (req) => {
   const url = new URL(req.url);
 
   if (req.method === 'HEAD') {
-    return new Response(null, { status: 204, headers: { 'Content-Type': 'text/calendar; charset=UTF-8', 'Cache-Control': 'public, max-age=900' } });
+    return new Response(null, { status: 204, headers: { 'Content-Type': 'text/calendar; charset=UTF-8', 'Cache-Control': 'private, max-age=900' } });
   }
 
   const {
@@ -147,14 +148,47 @@ serve(createHttpHandler(async (req) => {
     return new Response('Too Many Requests', { status: 429, headers: rateLimitHeaders(rateLimit) });
   }
 
-  // Validate token against profiles
-  const { data: profile, error: profErr } = await supabase
-    .from('profiles')
-    .select('id, first_name, last_name, calendar_ics_token, role, department')
-    .eq('id', tid)
-    .maybeSingle();
+  // Validate the token. It lives in `profile_calendar_tokens` rather than on
+  // the profile row: `profiles` is readable by every authenticated user, so a
+  // token stored there was a credential any colleague could lift (SEC-13).
+  // This client uses the service role, so RLS on the token table does not
+  // apply here — the owner-only policy protects it from the browser.
+  const [{ data: profile, error: profErr }, tokenResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, first_name, last_name, role, department')
+      .eq('id', tid)
+      .maybeSingle(),
+    resolveCalendarToken({
+      readVaultToken: async (profileId) => {
+        const { data, error } = await supabase
+          .from('profile_calendar_tokens')
+          .select('token')
+          .eq('profile_id', profileId)
+          .maybeSingle();
+        return { token: data?.token ?? null, error };
+      },
+      readLegacyToken: async (profileId) => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('calendar_ics_token')
+          .eq('id', profileId)
+          .maybeSingle();
+        return { token: data?.calendar_ics_token ?? null, error };
+      },
+    }, tid),
+  ]);
 
-  if (profErr || !profile || !profile.calendar_ics_token || !(await tokensMatch(profile.calendar_ics_token, token))) {
+  if (profErr || tokenResult.error) {
+    return new Response('Service Unavailable', {
+      status: 503,
+      headers: { 'Retry-After': '300' },
+    });
+  }
+
+  // Missing rows and bad credentials deliberately share a response so the
+  // public endpoint does not disclose whether a profile exists.
+  if (!profile || !tokenResult.token || !(await tokensMatch(tokenResult.token, token))) {
     return new Response('Forbidden', { status: 403 });
   }
 
@@ -238,7 +272,7 @@ serve(createHttpHandler(async (req) => {
     if (!timesheets || timesheets.length === 0) {
       const ics = buildCalendar(profile, []);
       const etag = await sha1(ics);
-      return new Response(ics, { status: 200, headers: { 'Content-Type': 'text/calendar; charset=UTF-8', 'Cache-Control': 'public, max-age=900', 'ETag': `W/"${etag}"` } });
+      return new Response(ics, { status: 200, headers: { 'Content-Type': 'text/calendar; charset=UTF-8', 'Cache-Control': 'private, max-age=900', 'ETag': `W/"${etag}"` } });
     }
 
     // Get unique job IDs from timesheets
@@ -323,7 +357,7 @@ serve(createHttpHandler(async (req) => {
     status: 200,
     headers: {
       'Content-Type': 'text/calendar; charset=UTF-8',
-      'Cache-Control': 'public, max-age=900',
+      'Cache-Control': 'private, max-age=900',
       'ETag': `W/"${etag}"`,
     },
   });

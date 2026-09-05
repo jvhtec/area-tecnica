@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { sendBrevoEmail } from '../_shared/brevo.ts'
+import { escapeHtml } from '../_shared/corporateEmailTemplate.ts'
+import { logEvent } from '../_shared/structuredLogger.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -331,13 +333,18 @@ serve(async (req) => {
       const pendingDatesDisplay = pendingDates.length === 1
         ? pendingDates[0]
         : `${pendingDates[0]} – ${pendingDates[pendingDates.length - 1]} (${pendingDates.length} días)`
+      const safeSubject = escapeHtml(subject)
+      const safeTechName = escapeHtml(techName)
+      const safeJobTitle = escapeHtml(jobTitle)
+      const safePendingDatesDisplay = escapeHtml(pendingDatesDisplay)
+      const safeTechnicianEmail = escapeHtml(technician.email)
 
       const htmlContent = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${subject}</title>
+  <title>${safeSubject}</title>
 </head>
 <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
@@ -369,7 +376,7 @@ serve(async (req) => {
           <!-- Greeting -->
           <tr>
             <td style="padding:24px 24px 0 24px;color:#111827;font-size:15px;line-height:1.6;">
-              Hola ${techName},
+              Hola ${safeTechName},
             </td>
           </tr>
 
@@ -378,7 +385,7 @@ serve(async (req) => {
             <td style="padding:16px 24px 24px 24px;">
               <div style="background:#eef2ff;border-left:4px solid #6366f1;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
                 <div style="color:#374151;font-size:15px;line-height:1.6;">
-                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${jobTitle}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
+                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${safeJobTitle}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
                 </div>
               </div>
 
@@ -403,12 +410,12 @@ serve(async (req) => {
                   </tr>
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Trabajo:</strong> ${jobTitle}
+                      <strong>Trabajo:</strong> ${safeJobTitle}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Fecha(s):</strong> ${pendingDatesDisplay}
+                      <strong>Fecha(s):</strong> ${safePendingDatesDisplay}
                     </td>
                   </tr>
                   <tr>
@@ -429,7 +436,7 @@ serve(async (req) => {
               <div style="background:#f9fafb;border:1px solid #e5e7eb;padding:16px;border-radius:6px;margin:20px 0;">
                 <div style="color:#6b7280;font-size:13px;line-height:1.5;">
                   <strong style="color:#374151;">Instrucciones de acceso:</strong><br/>
-                  Accede con tu email: <strong>${technician.email}</strong>.<br/>
+                  Accede con tu email: <strong>${safeTechnicianEmail}</strong>.<br/>
                   Si no recuerdas tu contraseña, utiliza el enlace <em>"¿Olvidaste tu contraseña?"</em>
                   en la pantalla de inicio de sesión para restablecerla.
                 </div>
@@ -478,9 +485,11 @@ serve(async (req) => {
 
       const brevoRes = await sendRes.json()
       const groupIds = groupTimesheets.map((t) => t.id)
-      console.log(
-        `Reminder sent: ${groupIds.length} timesheet(s) dept=${techDept} to=${technician.email} msgId=${brevoRes.messageId}`
-      )
+      logEvent('info', 'timesheet_reminder.delivery_succeeded', {
+        timesheet_count: groupIds.length,
+        department: techDept,
+        provider_message_id: brevoRes.messageId ?? null,
+      })
 
       // Stamp reminder_sent_at and increment auto_reminder_count atomically
       // server-side on each row to avoid lost updates under concurrency.

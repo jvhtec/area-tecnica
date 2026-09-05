@@ -9,6 +9,7 @@ import {
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { isServiceRoleRequest, requireAdminOrManagement } from "../_shared/auth.ts";
 import { joinedSingle } from "../_shared/joins.ts";
+import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
 import {
   corsHeaders,
   createHttpHandler,
@@ -1452,7 +1453,12 @@ serve(createHttpHandler(async (req) => {
       const targetDateLabel = normalizedTargetDate ? fmtDate(`${normalizedTargetDate}T00:00:00Z`) : null;
       const loc = joinedSingle(job.locations)?.formatted_address ?? 'Por confirmar';
 
-      const safeMessage = (message ?? '').replace(/</g, '&lt;').replace(/\n/g, '<br/>');
+      const safeMessage = escapeHtml(message ?? '').replace(/\n/g, '<br/>');
+      const safeSubject = escapeHtml(subject);
+      const safeFullName = escapeHtml(fullName || '');
+      const safeJobTitle = escapeHtml(String(job.title ?? ''));
+      const safeRoleLabel = roleLabel ? escapeHtml(roleLabel) : null;
+      const safeLocation = escapeHtml(loc);
 
       const primaryCta = phase === 'availability' ? 'Estoy disponible' : 'Acepto la oferta';
       const secondaryCta = phase === 'availability' ? 'No estoy disponible' : 'Rechazo la oferta';
@@ -1468,8 +1474,8 @@ serve(createHttpHandler(async (req) => {
       const offerDetailsHtml = phase === 'offer'
         ? `
                             <div><b>Horario:</b> ${callTime}</div>
-                            <div><b>Ubicación:</b> ${loc}</div>
-                            ${roleLabel ? `<div><b>Rol:</b> ${roleLabel}</div>` : ''}`
+                            <div><b>Ubicación:</b> ${safeLocation}</div>
+                            ${safeRoleLabel ? `<div><b>Rol:</b> ${safeRoleLabel}</div>` : ''}`
         : '';
       const detailsTitle = phase === 'availability' ? 'Fechas consultadas' : 'Detalles del trabajo';
 
@@ -1482,7 +1488,7 @@ serve(createHttpHandler(async (req) => {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${subject}</title>
+        <title>${safeSubject}</title>
       </head>
       <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
@@ -1509,16 +1515,16 @@ serve(createHttpHandler(async (req) => {
                 </tr>
                 <tr>
                   <td style="padding:24px 24px 8px 24px;">
-                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${fullName || ''},</h2>
+                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeFullName},</h2>
                     <p style="margin:0;color:#374151;line-height:1.55;">
                       ${phase === 'availability'
                         ? `¿Tendrías disponibilidad para ${datePhrasing}?`
-                        : `Tienes una oferta para <b>${job.title}</b>. Por favor, confirma:`}
+                        : `Tienes una oferta para <b>${safeJobTitle}</b>. Por favor, confirma:`}
                     </p>
                     ${phase === 'availability'
                       ? `<p style="margin:12px 0 0 0;color:#374151;line-height:1.55;"><b>ATENCIÓN:</b> Este email SOLO confirma disponibilidad, no te cierra el evento.<br/>Si confirmas, recibirás un segundo email con la oferta de trabajo detallada.</p>`
                       : ''}
-                    ${phase === 'offer' && roleLabel ? `<p style="margin:8px 0 0 0;color:#111827;"><b>Puesto:</b> ${roleLabel}</p>` : ''}
+                    ${phase === 'offer' && safeRoleLabel ? `<p style="margin:8px 0 0 0;color:#111827;"><b>Puesto:</b> ${safeRoleLabel}</p>` : ''}
                     ${phase === 'offer' && message ? `<p style="margin:12px 0 0 0;color:#374151;">${safeMessage}</p>` : ''}
                   </td>
                 </tr>

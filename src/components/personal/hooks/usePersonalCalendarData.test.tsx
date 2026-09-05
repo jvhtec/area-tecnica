@@ -18,15 +18,7 @@ describe("usePersonalCalendarData", () => {
   });
 
   it("loads only warehouse-eligible house techs for the Personal agenda", async () => {
-    const profilesBuilder = createMockQueryBuilder<
-      Array<{
-        id: string;
-        first_name: string | null;
-        last_name: string | null;
-        department: string | null;
-        phone: string | null;
-      }>
-    >({
+    mockSupabase.rpc.mockResolvedValueOnce({
       data: [
         createUserProfile({
           id: "house-1",
@@ -36,6 +28,14 @@ describe("usePersonalCalendarData", () => {
           department: "sound",
           warehouse_duty_exempt: false,
         }),
+        createUserProfile({
+          id: "house-exempt",
+          first_name: "Excluded",
+          last_name: "House",
+          role: "house_tech",
+          department: "lights",
+          warehouse_duty_exempt: true,
+        }),
       ],
       error: null,
     });
@@ -43,9 +43,6 @@ describe("usePersonalCalendarData", () => {
     const availabilityBuilder = createMockQueryBuilder({ data: [], error: null });
 
     mockSupabase.from.mockImplementation((table: string) => {
-      if (table === "profiles") {
-        return profilesBuilder;
-      }
       if (table === "timesheets") {
         return timesheetsBuilder;
       }
@@ -69,7 +66,8 @@ describe("usePersonalCalendarData", () => {
         department: "sound",
       }),
     ]);
-    expect(profilesBuilder.eq).toHaveBeenCalledWith("role", "house_tech");
-    expect(profilesBuilder.eq).toHaveBeenCalledWith("warehouse_duty_exempt", false);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("get_profile_directory", {
+      p_profile_ids: null,
+    });
   });
 });
