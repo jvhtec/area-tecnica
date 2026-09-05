@@ -7,7 +7,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FlexElementSelectorDialog } from "./FlexElementSelectorDialog";
+import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { FolderTree } from "lucide-react";
 
 interface ExampleComponentProps {
