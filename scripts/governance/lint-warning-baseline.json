@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-05T17:00:53.198Z",
+  "generatedAt": "2026-09-05T17:19:51.751Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1124,
+  "total": 1123,
   "domains": {
     "app": {
-      "total": 805,
+      "total": 804,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
-        "@typescript-eslint/no-explicit-any": 666,
+        "@typescript-eslint/no-explicit-any": 665,
         "react-hooks/exhaustive-deps": 74,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
@@ -34,7 +34,7 @@
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 950,
+    "@typescript-eslint/no-explicit-any": 949,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -847,9 +847,6 @@
     },
     "src/utils/hoja-de-ruta/services/places-restaurant-service.ts": {
       "@typescript-eslint/no-explicit-any": 5
-    },
-    "src/utils/logisticsCalendarExport.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/utils/memoriaTecnicaDocuments.ts": {
       "@typescript-eslint/no-explicit-any": 1

@@ -1,4 +1,14 @@
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
+import {
+  REPORT_INK,
+  REPORT_SOFT,
+  drawReportRunningHead,
+  loadReportIssuerMark,
+  setReportMonoText,
+  setReportText,
+  stampReportFolios,
+  type ReportChromeOptions,
+} from "@/utils/pdf/report-system";
 import { loadExceljs } from "@/utils/lazyExceljs";
 import { applyStyle, saveWorkbook, toArgb, tintColor, thinBorder, hexToRgb, getContrastHexColor } from "@/utils/excelExport";
 import {
@@ -165,25 +175,16 @@ export const generatePersonalCalendarPDF = async (
 
   let startDate: Date, endDate: Date;
 
-  // Load logo
-  const logo = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
-    img.onload = () => resolve(img);
-    img.onerror = (err) => reject(err);
-  }).catch((): null => null);
+  await loadReportIssuerMark();
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  const logoWidth = 60;
-  const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
-
-  const logoTopY = 15;
-  const monthTitleY = logo ? logoTopY + logoHeight + 8 : 25;
-  const calendarStartY = monthTitleY + 15;
-  const footerSpace = 40;
+  // The month title sits on the same page furniture as every other document;
+  // the calendar itself starts right under it.
+  const monthTitleY = 40;
+  const calendarStartY = monthTitleY + 8;
+  const footerSpace = 30;
   const legendSpace = 20;
 
   switch (range) {
@@ -287,31 +288,37 @@ export const generatePersonalCalendarPDF = async (
   for (const [pageIndex, monthStart] of months.entries()) {
     if (pageIndex > 0) doc.addPage([420, 297], "landscape");
 
-    // Add logo
-    const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
-    if (logo) {
-      doc.addImage(logo, "PNG", logoX, logoTopY, logoWidth, logoHeight);
-    }
+    const monthLabel = format(monthStart, "MMMM yyyy", { locale: es });
+    const chrome: ReportChromeOptions = {
+      kind: "crew",
+      kindLabel: "Calendario de personal",
+      eventTitle: "Calendario de personal",
+      contextLabel: monthLabel,
+    };
+    const geo = drawReportRunningHead(doc, chrome);
 
-    // Month title
-    doc.setFontSize(20);
-    doc.setTextColor(51, 51, 51);
+    setReportText(doc, REPORT_INK, 18, "bold");
     doc.text(
-      `CALENDARIO DE PERSONAL - ${format(monthStart, "MMMM yyyy", { locale: es }).toUpperCase()}`,
-      pageWidth / 2,
+      monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+      geo.left,
       monthTitleY,
-      { align: "center" }
+      { charSpace: -0.08 },
     );
 
-    // Days of week header
+    // Weekday heads are set in mono caps over a hairline rather than in a
+    // filled blue band: the grid below already carries all the structure the
+    // eye needs, and a solid band across an A3 sheet only adds weight.
     daysOfWeek.forEach((day, index) => {
-      doc.setFillColor(41, 128, 185);
-      doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 8, "F");
-      doc.setTextColor(255);
-      doc.setFontSize(12);
-      const textX = startX + index * cellWidth + cellWidth / 2;
-      doc.text(day, textX, calendarStartY + 6, { align: "center" });
+      const cellX = startX + index * cellWidth;
+      setReportMonoText(doc, REPORT_SOFT, 6.4, "bold");
+      doc.text(day.toUpperCase(), cellX + cellWidth / 2, calendarStartY + 5, {
+        align: "center",
+        charSpace: 0.25,
+      });
     });
+    doc.setDrawColor(...REPORT_INK);
+    doc.setLineWidth(0.25);
+    doc.line(startX, calendarStartY + 8, startX + cellWidth * 7, calendarStartY + 8);
 
     const monthEnd = endOfMonth(monthStart);
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -455,7 +462,9 @@ export const generatePersonalCalendarPDF = async (
     }
   }
 
-  doc.save(`personal-calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+  stampReportFolios(doc);
+
+  doc.save(`calendario-personal-${range}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
 };
 
 // Department colors matching the UI

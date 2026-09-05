@@ -1,5 +1,14 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  REPORT_INK,
+  drawReportRunningHead,
+  loadReportIssuerMark,
+  reportGeometry,
+  setReportText,
+  stampReportFolios,
+  type ReportChromeOptions,
+} from '@/utils/pdf/report-system';
 import type { RackDesignerLayout } from '@/components/sound/amplifier-tool/rack-designer/types';
 import {
   AMP_CELL_HEIGHT,
@@ -34,24 +43,25 @@ export const generateAmpRackLayoutPdf = async (
   const includeRackLabels = options.includeRackLabels ?? false;
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  await loadReportIssuerMark();
+
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 10;
 
-  // Title box, centered at the top.
-  const title = layout.title.trim() || 'DISTRIBUCIÓN DE AMPLIFICADORES';
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(0, 0, 0);
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.5);
-  const titleBoxHeight = 11;
-  const titleBoxWidth = Math.min(
-    Math.max(doc.getTextWidth(title) + 16, 70),
-    pageWidth - 2 * margin,
-  );
-  doc.rect((pageWidth - titleBoxWidth) / 2, margin, titleBoxWidth, titleBoxHeight);
-  doc.text(title, pageWidth / 2, margin + titleBoxHeight / 2 + 2, { align: 'center' });
+  const title = layout.title.trim() || 'Distribución de amplificadores';
+  const chrome: ReportChromeOptions = {
+    kind: 'amplifier',
+    kindLabel: 'Distribución de amplificadores',
+    eventTitle: title,
+    contextLabel: formatInTimeZone(new Date(), 'Europe/Madrid', 'dd/MM/yyyy'),
+  };
+
+  // The running head names the drawing; the title sits over it in ink rather
+  // than inside a keyline box, which was the only rectangle on the page that
+  // did not represent a rack.
+  const geo = drawReportRunningHead(doc, chrome);
+  setReportText(doc, REPORT_INK, 15, 'bold');
+  doc.text(title, geo.left, geo.contentTop - 2, { charSpace: -0.08 });
 
   const blocks = layout.blocks.filter((block) => block.amps.length > 0);
   if (blocks.length > 0) {
@@ -63,8 +73,8 @@ export const generateAmpRackLayoutPdf = async (
     const maxX = Math.max(...blocks.map((block) => block.x + BLOCK_WIDTH));
     const maxY = Math.max(...blocks.map((block) => block.y + blockHeight(block.amps.length)));
 
-    const contentTop = margin + titleBoxHeight + 8;
-    const contentBottom = pageHeight - 16;
+    const contentTop = geo.contentTop + 4;
+    const contentBottom = geo.contentBottom;
     const contentWidth = pageWidth - 2 * margin;
     const contentHeight = contentBottom - contentTop;
     const scale = Math.min(
@@ -120,32 +130,7 @@ export const generateAmpRackLayoutPdf = async (
     }
   }
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(80, 80, 80);
-  doc.text(
-    `Generado: ${formatInTimeZone(new Date(), 'Europe/Madrid', 'dd/MM/yyyy')}`,
-    margin,
-    pageHeight - 6,
-  );
+  stampReportFolios(doc);
 
-  return new Promise((resolve) => {
-    const logo = new Image();
-    logo.crossOrigin = 'anonymous';
-    logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-    logo.onload = () => {
-      try {
-        const logoWidth = 30;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-        doc.addImage(logo, 'PNG', pageWidth - margin - logoWidth, pageHeight - logoHeight - 4, logoWidth, logoHeight);
-      } catch (error) {
-        console.error('Error adding logo to rack layout PDF:', error);
-      }
-      resolve(doc.output('blob'));
-    };
-    logo.onerror = () => {
-      console.error('Failed to load logo for rack layout PDF');
-      resolve(doc.output('blob'));
-    };
-  });
+  return doc.output('blob');
 };

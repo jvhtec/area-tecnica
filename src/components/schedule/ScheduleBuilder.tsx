@@ -161,22 +161,36 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
   const exportPdf = async () => {
     const { jsPDF } = await import('jspdf');
     const { autoTable } = await import('jspdf-autotable');
+    const {
+      distributeColumnWidths,
+      drawReportMasthead,
+      loadReportIssuerMark,
+      reportTableDefaults,
+      stampReportFolios,
+    } = await import('@/utils/pdf/report-system');
+
     const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.text(title, 20, 20);
-    if (subtitle) {
-      doc.setFontSize(10);
-      doc.text(subtitle, 20, 28);
-    }
+    await loadReportIssuerMark();
+
+    const { geo, y } = drawReportMasthead(doc, {
+      kind: 'schedule',
+      kindLabel: 'Programa',
+      eventTitle: title,
+      contextLabel: subtitle,
+      title,
+      subtitle,
+      meta: [{ label: 'Entradas', value: String(rows.length) }],
+    });
+
     autoTable(doc, {
-      startY: subtitle ? 34 : 28,
+      startY: y,
       head: [['Hora', 'Ítem', 'Depto/Líder', 'Notas']],
       body: rows.map((r) => [r.time, r.item, r.dept || '', r.notes || '']),
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [240, 240, 240], textColor: [51, 51, 51] },
-      theme: 'grid',
-      margin: { left: 15, right: 15 },
+      ...reportTableDefaults(geo, { fontSize: 7.2, numericColumns: [0] }),
+      columnStyles: distributeColumnWidths([14, 24, 26, 36], geo.contentWidth),
     });
+
+    stampReportFolios(doc);
     doc.save('programa.pdf');
   };
 

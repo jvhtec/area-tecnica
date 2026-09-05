@@ -1,4 +1,15 @@
 import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
+import {
+  REPORT_ACCENT,
+  REPORT_SOFT,
+  distributeColumnWidths,
+  drawReportMasthead,
+  drawReportRunningHead,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportFolios,
+  type ReportChromeOptions,
+} from "@/utils/pdf/report-system";
 import { loadExceljs } from "@/utils/lazyExceljs";
 import { applyStyle, populateSheet, saveWorkbook, toArgb } from "@/utils/excelExport";
 import {
@@ -247,32 +258,25 @@ export const generateLogisticsCalendarPDF = async (
   // Create PDF
   const doc = new jsPDF("landscape", "mm", "a4");
 
-  // Add logo
-  const logo = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
-    img.onload = () => resolve(img);
-    img.onerror = (err) => reject(err);
-  }).catch((): null => null);
+  await loadReportIssuerMark();
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const logoWidth = 50;
-  const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
-  const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
+  const chrome: ReportChromeOptions = {
+    kind: "tour",
+    kindLabel: "Calendario de logística",
+    eventTitle: "Calendario de logística",
+    contextLabel: rangeLabel,
+  };
 
-  if (logo) {
-    doc.addImage(logo, "PNG", logoX, 10, logoWidth, logoHeight);
-  }
-
-  // Add title
-  doc.setFontSize(16);
-  doc.setTextColor(41, 128, 185);
-  doc.text(`CALENDARIO DE LOGÍSTICA`, pageWidth / 2, logo ? 10 + logoHeight + 10 : 20, { align: "center" });
-
-  doc.setFontSize(12);
-  doc.setTextColor(52, 73, 94);
-  doc.text(rangeLabel, pageWidth / 2, logo ? 10 + logoHeight + 18 : 28, { align: "center" });
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title: "Calendario de logística",
+    subtitle: rangeLabel,
+    meta: [
+      { label: "Periodo", value: rangeLabel },
+      { label: "Movimientos", value: String(sortedEvents.length) },
+      { label: "Emisión", value: format(new Date(), "dd/MM/yyyy") },
+    ],
+  });
 
   // Prepare table data
   const tableData = sortedEvents.map((event) => {
@@ -297,62 +301,47 @@ export const generateLogisticsCalendarPDF = async (
   });
 
   // Add table using autoTable
+  const tableDefaults = reportTableDefaults(geo, { fontSize: 7, numericColumns: [3] });
+
   autoTable(doc, {
-    startY: logo ? 10 + logoHeight + 25 : 35,
+    startY: contentTop,
     head: [
       [
         "Fecha",
         "Trabajo/Título",
-        "Tipo de Transporte",
+        "Tipo de transporte",
         "Hora",
-        "Tipo de Operación",
-        "Proveedor de Transporte",
+        "Operación",
+        "Proveedor",
         "Departamento",
       ],
     ],
-    body: tableData.length > 0 ? tableData : [["No hay eventos de logística en este período", "", "", "", "", "", ""]],
-    theme: "striped",
-    tableWidth: "auto",
-    margin: { left: 10, right: 10 },
-    headStyles: {
-      fillColor: [52, 73, 94],
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      fontSize: 10,
-      halign: "center",
-    },
-    bodyStyles: {
-      fontSize: 9,
-      cellPadding: 3,
-    },
-    alternateRowStyles: {
-      fillColor: [248, 249, 250],
-    },
-    columnStyles: {
-      0: { halign: "left" },      // Fecha
-      1: { halign: "left" },      // Trabajo/Título
-      2: { halign: "left" },      // Tipo de Transporte
-      3: { halign: "center" },    // Hora
-      4: { halign: "center" },    // Tipo de Operación
-      5: { halign: "left" },      // Proveedor de Transporte
-      6: { halign: "left" },      // Departamento
-    },
-    didParseCell: (data: any) => {
-      // Color code operation type cells
+    body: tableData.length > 0
+      ? tableData
+      : [["No hay eventos de logística en este período", "—", "—", "—", "—", "—", "—"]],
+    ...tableDefaults,
+    columnStyles: distributeColumnWidths([28, 44, 30, 14, 22, 30, 30], geo.contentWidth),
+    didParseCell: (data) => {
+      tableDefaults.didParseCell(data);
+
+      // Load and unload are the two states of the column, and the reader scans
+      // for one of them: they are marked in type rather than by tinting the
+      // cell, which would put two more colours on the page.
       if (data.column.index === 4 && data.section === "body") {
-        const cellValue = data.cell.raw;
-        if (cellValue === "Carga") {
-          data.cell.styles.fillColor = [213, 232, 212]; // Light green
-          data.cell.styles.textColor = [13, 124, 49];   // Dark green
-          data.cell.styles.fontStyle = "bold";
-        } else if (cellValue === "Descarga") {
-          data.cell.styles.fillColor = [255, 230, 204]; // Light orange
-          data.cell.styles.textColor = [217, 119, 0];   // Dark orange
-          data.cell.styles.fontStyle = "bold";
-        }
+        data.cell.styles.font = "courier";
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.textColor =
+          data.cell.raw === "Carga"
+            ? (REPORT_ACCENT as [number, number, number])
+            : (REPORT_SOFT as [number, number, number]);
       }
     },
+    didDrawPage: (hook) => {
+      if (hook.pageNumber > 1) drawReportRunningHead(doc, chrome);
+    },
   });
+
+  stampReportFolios(doc);
 
   // Save PDF
   const filename = `logistica-${range}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
