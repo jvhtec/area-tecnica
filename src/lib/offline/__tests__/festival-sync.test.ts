@@ -1,3 +1,4 @@
+import { setPrivateDataIdentity } from "@/lib/private-data-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
@@ -6,8 +7,11 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/lib/private-supabase-client", () => ({ createPrivateSupabaseClient: vi.fn(async () => mockSupabase) }));
+
 import { offlineDb, QUEUE_STORE, SNAPSHOT_STORE, __resetOfflineDbForTests } from "../offline-db";
 import { getPendingChanges } from "../festival-offline-queue";
+import { __resetOfflineRevocationsForTests } from "../offline-revocation";
 import { syncFestivalPendingChanges } from "../festival-sync";
 import {
   OFFLINE_SNAPSHOT_SCHEMA_VERSION,
@@ -61,6 +65,8 @@ const seedChange = async (change: Partial<OfflinePendingChange>): Promise<Offlin
 describe("syncFestivalPendingChanges", () => {
   beforeEach(async () => {
     __resetOfflineDbForTests();
+    __resetOfflineRevocationsForTests();
+    setPrivateDataIdentity("account-a", "management:sound");
     resetMockSupabase();
     await offlineDb.put(SNAPSHOT_STORE, buildSnapshot());
   });
@@ -202,5 +208,17 @@ describe("syncFestivalPendingChanges", () => {
     expect(result.applied).toBe(0);
     expect(result.failed).toHaveLength(1);
     expect(await getPendingChanges(JOB_ID)).toHaveLength(1);
+  });
+
+  it("revokes the snapshot and stops replay after an authorization denial", async () => {
+    await seedChange({ id: "first", operation: "insert" });
+    await seedChange({ id: "second", operation: "insert" });
+    const denial = { status: 403, message: "Forbidden" };
+    const builder = createMockQueryBuilder({ data: null, error: denial });
+    mockSupabase.from.mockReturnValue(builder);
+    await expect(syncFestivalPendingChanges(JOB_ID, { skipSnapshotRefresh: true })).rejects.toBe(denial);
+    expect(builder.insert).toHaveBeenCalledTimes(1);
+    expect(await offlineDb.get(SNAPSHOT_STORE, JOB_ID)).toMatchObject({ accessRevoked: true });
+    expect(await getPendingChanges(JOB_ID)).toHaveLength(2);
   });
 });

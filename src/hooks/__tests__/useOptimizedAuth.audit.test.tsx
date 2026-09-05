@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { setPrivateDataIdentity } from "@/lib/private-data-scope";
 import { MemoryRouter } from "react-router-dom";
 
 import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
@@ -59,10 +61,11 @@ vi.mock("@/lib/security-audit", () => ({
 import { OptimizedAuthProvider, useOptimizedAuth } from "../useOptimizedAuth";
 
 function TestHarness() {
-  const { login, logout, requestPasswordReset } = useOptimizedAuth();
+  const { login, logout, requestPasswordReset, user, userRole } = useOptimizedAuth();
 
   return (
     <div>
+      <output data-testid="identity">{user?.id ?? "none"}:{userRole ?? "none"}</output>
       <button onClick={() => void login("User@Example.com", "password-1")}>login</button>
       <button onClick={() => void logout()}>logout</button>
       <button onClick={() => { void requestPasswordReset("User@Example.com").catch((): void => {}); }}>password-reset</button>
@@ -72,20 +75,22 @@ function TestHarness() {
 
 function renderAuthProvider(children: ReactNode) {
   return render(
-    <MemoryRouter>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter>
       <OptimizedAuthProvider>{children}</OptimizedAuthProvider>
-    </MemoryRouter>,
+    </MemoryRouter></QueryClientProvider>,
   );
 }
 
 describe("useOptimizedAuth audit logging", () => {
+  afterEach(() => act(() => setPrivateDataIdentity(null)));
   beforeEach(() => {
     vi.clearAllMocks();
     resetMockSupabase();
+    localStorage.clear();
 
     tokenManagerMock.getCachedSession.mockResolvedValue(null);
     tokenManagerMock.refreshToken.mockResolvedValue({ session: null, error: null });
-    tokenManagerMock.signOut.mockResolvedValue(undefined);
+    tokenManagerMock.signOut.mockResolvedValue({ error: null });
 
     const profileBuilder = createMockQueryBuilder({
       data: [
@@ -236,5 +241,42 @@ describe("useOptimizedAuth audit logging", () => {
     await waitFor(() => {
       expect(logAuthEventMock).toHaveBeenCalledWith("user-1", "logout", true);
     });
+  });
+
+  it("reports a returned sign-out error as failure instead of announcing success", async () => {
+    tokenManagerMock.signOut.mockResolvedValue({ error: new Error("Sign-out unavailable") });
+    renderAuthProvider(<TestHarness />);
+    fireEvent.click(screen.getByText("logout"));
+    await waitFor(() => expect(logAuthEventMock).toHaveBeenCalledWith(null, "logout", false, { error: "Sign-out unavailable" }));
+    expect(logAuthEventMock).not.toHaveBeenCalledWith(null, "logout", true);
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+  });
+
+  it("does not let an old profile response give the next account the previous role", async () => {
+    let finishOldProfile!: (value: unknown) => void;
+    const oldProfile = new Promise((resolve) => { finishOldProfile = resolve; });
+    const oldBuilder = createMockQueryBuilder();
+    oldBuilder.limit.mockReturnValue(oldProfile);
+    const newBuilder = createMockQueryBuilder({ data: [{ role: "technician", department: "sound" }], error: null });
+    mockSupabase.from.mockReturnValueOnce(oldBuilder).mockReturnValue(newBuilder);
+    tokenManagerMock.getCachedSession.mockResolvedValue({ user: { id: "account-a" } });
+    renderAuthProvider(<TestHarness />);
+    await waitFor(() => expect(oldBuilder.limit).toHaveBeenCalled());
+    const authChanged = mockSupabase.auth.onAuthStateChange.mock.calls[0][0];
+    await act(async () => { authChanged("SIGNED_IN", { user: { id: "account-b" } }); });
+    await waitFor(() => expect(screen.getByTestId("identity").textContent).toBe("account-b:technician"));
+    await act(async () => { finishOldProfile({ data: [{ role: "admin", department: "sound" }], error: null }); });
+    expect(screen.getByTestId("identity").textContent).toBe("account-b:technician");
+  });
+
+  it("ignores a session bootstrap that resolves after a newer auth event", async () => {
+    let finishBootstrap!: (value: unknown) => void;
+    tokenManagerMock.getCachedSession.mockReturnValue(new Promise((resolve) => { finishBootstrap = resolve; }));
+    renderAuthProvider(<TestHarness />);
+    const authChanged = mockSupabase.auth.onAuthStateChange.mock.calls[0][0];
+    await act(async () => { authChanged("SIGNED_IN", { user: { id: "account-b" } }); });
+    await waitFor(() => expect(screen.getByTestId("identity").textContent).toBe("account-b:management"));
+    await act(async () => { finishBootstrap({ user: { id: "account-a" } }); });
+    expect(screen.getByTestId("identity").textContent).toBe("account-b:management");
   });
 });

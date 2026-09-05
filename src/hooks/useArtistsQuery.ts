@@ -107,6 +107,7 @@ export const useArtistsQuery = (
       // Serves the snapshot when the browser is offline, the fetch fails, or
       // the network is too slow to answer (weak festival-site connectivity).
       const result = await fetchWithOfflineFallback({
+        jobId,
         online: fetchArtistsOnline,
         offline: () => searchAllDates
           ? getOfflineArtistsForJob(jobId, dayStartTime)

@@ -1,4 +1,6 @@
-import { supabase } from "@/integrations/supabase/client";
+import { capturePrivateDataScope, type PrivateDataScope } from "@/lib/private-data-scope";
+import { createPrivateSupabaseClient, type PrivateSupabaseClient } from "@/lib/private-supabase-client";
+import { isAuthorizationFailure, revokeFestivalCache } from "@/lib/offline/offline-revocation";
 
 import { downloadFestivalSnapshot } from "./festival-snapshot";
 import { getPendingChanges, removePendingChange } from "./festival-offline-queue";
@@ -35,24 +37,29 @@ type ApplyOutcome =
   | { status: "conflict"; reason: OfflineSyncConflictReason };
 
 const fetchServerUpdatedAt = async (
+  supabase: PrivateSupabaseClient,
+  scope: PrivateDataScope,
   change: OfflinePendingChange,
 ): Promise<{ exists: boolean; updatedAt: string | null }> => {
+  scope.assertCurrent();
   const { data, error } = await supabase
     .from(change.table)
     .select("id, updated_at")
     .eq("id", change.recordId)
     .maybeSingle();
-
+  scope.assertCurrent();
   if (error) throw error;
   if (!data) return { exists: false, updatedAt: null };
   return { exists: true, updatedAt: (data as Row).updated_at as string | null };
 };
 
-const applyChange = async (change: OfflinePendingChange, force: boolean): Promise<ApplyOutcome> => {
+const applyChange = async (supabase: PrivateSupabaseClient, scope: PrivateDataScope, change: OfflinePendingChange, force: boolean): Promise<ApplyOutcome> => {
+  scope.assertCurrent();
   if (change.operation === "insert") {
     const payload = sanitizePayload(change.table, change.payload);
     payload.id = change.recordId;
     const { error } = await supabase.from(change.table).insert([payload as never]);
+    scope.assertCurrent();
     if (error) {
       if (error.code === "23505") {
         return { status: "conflict", reason: "duplicate_on_server" };
@@ -77,12 +84,13 @@ const applyChange = async (change: OfflinePendingChange, force: boolean): Promis
       query = query.eq("updated_at", change.baseUpdatedAt as string);
     }
     const { data, error } = await query.select("id");
+    scope.assertCurrent();
     if (error) throw error;
     if ((data ?? []).length > 0) {
       return { status: "applied" };
     }
 
-    const server = await fetchServerUpdatedAt(change);
+    const server = await fetchServerUpdatedAt(supabase, scope, change);
     if (!server.exists) {
       return { status: "conflict", reason: "deleted_on_server" };
     }
@@ -95,12 +103,13 @@ const applyChange = async (change: OfflinePendingChange, force: boolean): Promis
     query = query.eq("updated_at", change.baseUpdatedAt as string);
   }
   const { data, error } = await query.select("id");
+  scope.assertCurrent();
   if (error) throw error;
   if ((data ?? []).length > 0) {
     return { status: "applied" };
   }
 
-  const server = await fetchServerUpdatedAt(change);
+  const server = await fetchServerUpdatedAt(supabase, scope, change);
   if (!server.exists) {
     // Already gone on the server: nothing to do.
     return { status: "applied" };
@@ -130,14 +139,19 @@ export const syncFestivalPendingChanges = async (
     throw new Error("Sin conexión: no se pueden sincronizar los cambios");
   }
 
-  const changes = await getPendingChanges(jobId);
+  const scope = capturePrivateDataScope();
+  const changes = await getPendingChanges(jobId, scope);
+  const supabase = await createPrivateSupabaseClient(scope);
+  scope.assertCurrent();
   const result: OfflineSyncResult = { applied: 0, conflicts: [], failed: [] };
 
   for (const change of changes) {
     try {
-      const outcome = await applyChange(change, options.force ?? false);
+      const outcome = await applyChange(supabase, scope, change, options.force ?? false);
+      scope.assertCurrent();
       if (outcome.status === "applied") {
-        await removePendingChange(change.id);
+        await removePendingChange(change.id, scope);
+        scope.assertCurrent();
         result.applied += 1;
       } else {
         result.conflicts.push({
@@ -150,6 +164,11 @@ export const syncFestivalPendingChanges = async (
         });
       }
     } catch (error) {
+      scope.assertCurrent();
+      if (isAuthorizationFailure(error)) {
+        await revokeFestivalCache(jobId, scope);
+        throw error;
+      }
       result.failed.push({
         changeId: change.id,
         table: change.table,
@@ -163,14 +182,16 @@ export const syncFestivalPendingChanges = async (
 
   if (!options.skipSnapshotRefresh && result.conflicts.length === 0 && result.failed.length === 0) {
     try {
-      await downloadFestivalSnapshot(jobId);
+      await downloadFestivalSnapshot(jobId, scope);
     } catch (error) {
+      scope.assertCurrent();
       // The sync itself succeeded; a failed refresh only leaves the local
       // copy slightly stale, so report it without failing the operation.
       console.warn("No se pudo actualizar la copia offline tras la sincronización:", error);
     }
   }
 
+  scope.assertCurrent();
   notifyOfflineFestivalChanged(jobId);
   return result;
 };

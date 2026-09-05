@@ -21,6 +21,7 @@ import { labelForCode } from '@/utils/roles';
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorName } from '@/utils/errorMessage';
+import { getPrivateDataScope } from '@/lib/private-data-scope';
 interface AssignmentStatusDialogProps {
   open: boolean;
   onClose: () => void;
@@ -111,10 +112,12 @@ export const AssignmentStatusDialog = ({
 
     // Save previous cache state BEFORE mutation
     onMutate: async (variables) => {
+      const scope = getPrivateDataScope();
       // Cancel any outgoing refetches to prevent race conditions
       await queryClient.cancelQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
       await queryClient.cancelQueries({ queryKey: queryKeys.scope('matrix-assignments') });
       await queryClient.cancelQueries({ queryKey: queryKeys.scope('job-assignments', variables.jobId) });
+      scope?.assertCurrent();
 
       // Snapshot the previous values for rollback
       const previousData: Record<string, unknown> = {};

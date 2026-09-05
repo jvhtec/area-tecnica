@@ -1,3 +1,4 @@
+import { setPrivateDataIdentity } from "@/lib/private-data-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
@@ -5,6 +6,8 @@ import { mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
+
+vi.mock("@/lib/private-supabase-client", () => ({ createPrivateSupabaseClient: vi.fn(async () => mockSupabase) }));
 
 import { offlineDb, SNAPSHOT_STORE, __resetOfflineDbForTests } from "../offline-db";
 import { getFestivalSnapshot } from "../festival-snapshot";
@@ -47,6 +50,7 @@ const buildSnapshot = (): OfflineFestivalSnapshot => ({
 describe("festival offline queue", () => {
   beforeEach(async () => {
     __resetOfflineDbForTests();
+    setPrivateDataIdentity("account-a", "management:sound");
     resetMockSupabase();
     await offlineDb.put(SNAPSHOT_STORE, buildSnapshot());
   });

@@ -1,5 +1,7 @@
-import { supabase } from "@/integrations/supabase/client";
+import { capturePrivateDataScope, type PrivateDataScope } from "@/lib/private-data-scope";
+import { createPrivateSupabaseClient, type PrivateSupabaseClient } from "@/lib/private-supabase-client";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { assertFestivalAccess } from "./festival-access";
 
 import {
   deleteOfflineFilesForJob,
@@ -9,6 +11,7 @@ import {
 } from "./festival-files";
 import { offlineDb, QUEUE_STORE, SNAPSHOT_STORE } from "./offline-db";
 import { notifyOfflineFestivalChanged } from "./offline-events";
+import { authorizeFestivalCache, isAuthorizationFailure, isFestivalCacheRevoked, revokeFestivalCache } from "./offline-revocation";
 import {
   OFFLINE_SNAPSHOT_SCHEMA_VERSION,
   type OfflineFestivalSnapshot,
@@ -27,6 +30,8 @@ const PAGE_SIZE = 1000;
  * (no skipped or duplicated rows between pages).
  */
 const fetchAllRows = async (
+  supabase: PrivateSupabaseClient,
+  scope: PrivateDataScope,
   table: string,
   filterColumn: string,
   filterValue: string | string[],
@@ -35,6 +40,7 @@ const fetchAllRows = async (
   let from = 0;
 
   for (;;) {
+    scope.assertCurrent();
     let query = supabase
       .from(table as never)
       .select("*")
@@ -45,6 +51,7 @@ const fetchAllRows = async (
       : query.eq(filterColumn as never, filterValue as never);
 
     const { data, error } = await query;
+    scope.assertCurrent();
     if (error) throw error;
 
     const page = (data ?? []) as Row[];
@@ -56,12 +63,14 @@ const fetchAllRows = async (
   return rows;
 };
 
-const fetchMaybeSingle = async (table: string, filterColumn: string, filterValue: string): Promise<Row | null> => {
+const fetchMaybeSingle = async (supabase: PrivateSupabaseClient, scope: PrivateDataScope, table: string, filterColumn: string, filterValue: string): Promise<Row | null> => {
+  scope.assertCurrent();
   const { data, error } = await supabase
     .from(table as never)
     .select("*")
     .eq(filterColumn as never, filterValue as never)
     .maybeSingle();
+  scope.assertCurrent();
   if (error) throw error;
   return (data as Row | null) ?? null;
 };
@@ -114,14 +123,22 @@ const collectSnapshotFileRefs = (data: OfflineFestivalSnapshotData): OfflineFile
 export const downloadFestivalSnapshotWithFiles = async (
   jobId: string,
 ): Promise<FestivalSnapshotDownloadResult> => {
-  const snapshot = await downloadFestivalSnapshot(jobId);
-  const files = await downloadFestivalFiles(jobId, collectSnapshotFileRefs(snapshot.data));
+  const scope = capturePrivateDataScope();
+  const snapshot = await downloadFestivalSnapshot(jobId, scope);
+  scope.assertCurrent();
+  const files = await downloadFestivalFiles(jobId, collectSnapshotFileRefs(snapshot.data), scope);
+  scope.assertCurrent();
   notifyOfflineFestivalChanged(jobId);
   return { snapshot, files };
 };
 
-export const downloadFestivalSnapshot = async (jobId: string): Promise<OfflineFestivalSnapshot> => {
+const buildFestivalSnapshot = async (jobId: string, scope: PrivateDataScope): Promise<OfflineFestivalSnapshot> => {
+  const db = offlineDb.forScope(scope);
+  const supabase = await createPrivateSupabaseClient(scope);
+  scope.assertCurrent();
+  await assertFestivalAccess(jobId, scope, supabase);
   const { data: job, error: jobError } = await supabase.from("jobs").select("*").eq("id", jobId).single();
+  scope.assertCurrent();
   if (jobError) throw jobError;
 
   const [
@@ -135,15 +152,15 @@ export const downloadFestivalSnapshot = async (jobId: string): Promise<OfflineFe
     jobDocuments,
     hojaVenue,
   ] = await Promise.all([
-    fetchMaybeSingle("festival_settings", "job_id", jobId),
-    fetchAllRows("job_date_types", "job_id", jobId),
-    fetchAllRows("festival_stages", "job_id", jobId),
-    fetchAllRows("festival_gear_setups", "job_id", jobId),
-    fetchAllRows("festival_artists", "job_id", jobId),
-    fetchAllRows("festival_shifts", "job_id", jobId),
-    fetchAllRows("festival_logos", "job_id", jobId),
-    fetchAllRows("job_documents", "job_id", jobId),
-    fetchMaybeSingle("hoja_de_ruta", "job_id", jobId),
+    fetchMaybeSingle(supabase, scope, "festival_settings", "job_id", jobId),
+    fetchAllRows(supabase, scope, "job_date_types", "job_id", jobId),
+    fetchAllRows(supabase, scope, "festival_stages", "job_id", jobId),
+    fetchAllRows(supabase, scope, "festival_gear_setups", "job_id", jobId),
+    fetchAllRows(supabase, scope, "festival_artists", "job_id", jobId),
+    fetchAllRows(supabase, scope, "festival_shifts", "job_id", jobId),
+    fetchAllRows(supabase, scope, "festival_logos", "job_id", jobId),
+    fetchAllRows(supabase, scope, "job_documents", "job_id", jobId),
+    fetchMaybeSingle(supabase, scope, "hoja_de_ruta", "job_id", jobId),
   ]);
 
   const gearSetupIds = gearSetups.map((setup) => setup.id as string).filter(Boolean);
@@ -152,21 +169,20 @@ export const downloadFestivalSnapshot = async (jobId: string): Promise<OfflineFe
   const locationId = (job as Row).location_id as string | null;
 
   const [stageGearSetups, artistFormSubmissions, artistFiles, shiftAssignments, location] = await Promise.all([
-    gearSetupIds.length ? fetchAllRows("festival_stage_gear_setups", "gear_setup_id", gearSetupIds) : Promise.resolve([]),
-    artistIds.length ? fetchAllRows("festival_artist_form_submissions", "artist_id", artistIds) : Promise.resolve([]),
-    artistIds.length ? fetchAllRows("festival_artist_files", "artist_id", artistIds) : Promise.resolve([]),
-    shiftIds.length ? fetchAllRows("festival_shift_assignments", "shift_id", shiftIds) : Promise.resolve([]),
-    locationId ? fetchMaybeSingle("locations", "id", locationId) : Promise.resolve(null),
+    gearSetupIds.length ? fetchAllRows(supabase, scope, "festival_stage_gear_setups", "gear_setup_id", gearSetupIds) : Promise.resolve([]),
+    artistIds.length ? fetchAllRows(supabase, scope, "festival_artist_form_submissions", "artist_id", artistIds) : Promise.resolve([]),
+    artistIds.length ? fetchAllRows(supabase, scope, "festival_artist_files", "artist_id", artistIds) : Promise.resolve([]),
+    shiftIds.length ? fetchAllRows(supabase, scope, "festival_shift_assignments", "shift_id", shiftIds) : Promise.resolve([]),
+    locationId ? fetchMaybeSingle(supabase, scope, "locations", "id", locationId) : Promise.resolve(null),
   ]);
-
-  const { data: sessionData } = await supabase.auth.getSession();
+  scope.assertCurrent();
 
   const snapshot: OfflineFestivalSnapshot = {
     jobId,
     jobTitle: ((job as Row).title as string) || "Festival",
     schemaVersion: OFFLINE_SNAPSHOT_SCHEMA_VERSION,
     downloadedAt: new Date().toISOString(),
-    downloadedBy: sessionData?.session?.user?.id ?? null,
+    downloadedBy: scope.userId,
     data: {
       job: job as Row,
       festivalSettings,
@@ -186,30 +202,49 @@ export const downloadFestivalSnapshot = async (jobId: string): Promise<OfflineFe
     },
   };
 
-  await offlineDb.put(SNAPSHOT_STORE, snapshot);
+  // An assignment can disappear while the multi-page snapshot downloads.
+  await assertFestivalAccess(jobId, scope, supabase);
+  await db.put(SNAPSHOT_STORE, snapshot);
+  scope.assertCurrent();
+  authorizeFestivalCache(jobId, scope);
   notifyOfflineFestivalChanged(jobId);
   return snapshot;
 };
 
-export const getFestivalSnapshot = async (jobId: string): Promise<OfflineFestivalSnapshot | null> => {
-  const snapshot = await offlineDb.get<OfflineFestivalSnapshot>(SNAPSHOT_STORE, jobId);
-  if (!snapshot || snapshot.schemaVersion !== OFFLINE_SNAPSHOT_SCHEMA_VERSION) {
+export const downloadFestivalSnapshot = async (jobId: string, scope = capturePrivateDataScope()): Promise<OfflineFestivalSnapshot> => {
+  try { return await buildFestivalSnapshot(jobId, scope); }
+  catch (error) {
+    if (isAuthorizationFailure(error)) await revokeFestivalCache(jobId, scope);
+    throw error;
+  }
+};
+
+export const getFestivalSnapshot = async (jobId: string, scope = capturePrivateDataScope()): Promise<OfflineFestivalSnapshot | null> => {
+  scope.assertCurrent();
+  if (isFestivalCacheRevoked(jobId, scope)) return null;
+  const snapshot = await offlineDb.forScope(scope).get<OfflineFestivalSnapshot>(SNAPSHOT_STORE, jobId);
+  scope.assertCurrent();
+  if (isFestivalCacheRevoked(jobId, scope) || !snapshot || snapshot.schemaVersion !== OFFLINE_SNAPSHOT_SCHEMA_VERSION) {
     return null;
   }
   return snapshot;
 };
 
-export const saveFestivalSnapshot = async (snapshot: OfflineFestivalSnapshot): Promise<void> => {
-  await offlineDb.put(SNAPSHOT_STORE, snapshot);
+export const saveFestivalSnapshot = async (snapshot: OfflineFestivalSnapshot, scope = capturePrivateDataScope()): Promise<void> => {
+  await offlineDb.forScope(scope).put(SNAPSHOT_STORE, snapshot);
+  scope.assertCurrent();
   notifyOfflineFestivalChanged(snapshot.jobId);
 };
 
 /** Removes the offline copy, its cached files and any pending changes. */
 export const deleteFestivalSnapshot = async (jobId: string): Promise<void> => {
-  await offlineDb.remove(SNAPSHOT_STORE, jobId);
-  const pending = await offlineDb.getAll<OfflinePendingChange>(QUEUE_STORE);
-  await Promise.all(pending.filter((change) => change.jobId === jobId).map((change) => offlineDb.remove(QUEUE_STORE, change.id)));
-  await deleteOfflineFilesForJob(jobId);
+  const scope = capturePrivateDataScope();
+  const db = offlineDb.forScope(scope);
+  await db.remove(SNAPSHOT_STORE, jobId);
+  const pending = await db.getAll<OfflinePendingChange>(QUEUE_STORE);
+  await Promise.all(pending.filter((change) => change.jobId === jobId).map((change) => db.remove(QUEUE_STORE, change.id)));
+  await deleteOfflineFilesForJob(jobId, scope);
+  scope.assertCurrent();
   notifyOfflineFestivalChanged(jobId);
 };
 

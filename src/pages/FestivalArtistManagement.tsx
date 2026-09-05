@@ -90,6 +90,7 @@ const FestivalArtistManagement = () => {
 
       try {
         const result = await fetchWithOfflineFallback({
+          jobId,
           online: fetchSettingsOnline,
           offline: async () => {
             const offlineContext = await getOfflineFestivalContext(jobId);
@@ -153,6 +154,7 @@ const FestivalArtistManagement = () => {
 
       try {
         const result = await fetchWithOfflineFallback({
+          jobId,
           online: fetchDateTypesOnline,
           offline: async () => (await getOfflineFestivalContext(jobId))?.dateTypes ?? null,
         });
@@ -197,6 +199,7 @@ const FestivalArtistManagement = () => {
 
       try {
         const result = await fetchWithOfflineFallback({
+          jobId,
           online: fetchStageNamesOnline,
           offline: async () => (await getOfflineFestivalContext(jobId))?.stageNames ?? null,
         });
