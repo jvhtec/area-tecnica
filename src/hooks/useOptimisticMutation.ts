@@ -1,5 +1,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { getPrivateDataScope } from '@/lib/private-data-scope';
 
 /**
  * The value returned by `onMutate` and handed back to the later callbacks. React Query v5
@@ -38,8 +39,10 @@ export function useOptimisticMutation<
     mutationFn,
 
     onMutate: async (variables) => {
+      const scope = getPrivateDataScope();
       // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: normalizedQueryKey });
+      scope?.assertCurrent();
 
       // Snapshot the previous value
       const previousData = queryClient.getQueryData(normalizedQueryKey);

@@ -1,4 +1,5 @@
 import { offlineDb, QUEUE_STORE } from "./offline-db";
+import { capturePrivateDataScope, type PrivateDataScope } from "@/lib/private-data-scope";
 import { notifyOfflineFestivalChanged } from "./offline-events";
 import { getFestivalSnapshot, saveFestivalSnapshot } from "./festival-snapshot";
 import type {
@@ -50,8 +51,9 @@ const withJobWriteLock = <T>(jobId: string, fn: () => Promise<T>): Promise<T> =>
   return result;
 };
 
-export const getPendingChanges = async (jobId?: string): Promise<OfflinePendingChange[]> => {
-  const changes = await offlineDb.getAll<OfflinePendingChange>(QUEUE_STORE);
+export const getPendingChanges = async (jobId?: string, scope = capturePrivateDataScope()): Promise<OfflinePendingChange[]> => {
+  const changes = await offlineDb.forScope(scope).getAll<OfflinePendingChange>(QUEUE_STORE);
+  scope.assertCurrent();
   return changes
     .filter((change) => !jobId || change.jobId === jobId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -60,8 +62,8 @@ export const getPendingChanges = async (jobId?: string): Promise<OfflinePendingC
 export const countPendingChanges = async (jobId: string): Promise<number> =>
   (await getPendingChanges(jobId)).length;
 
-export const removePendingChange = async (changeId: string): Promise<void> => {
-  await offlineDb.remove(QUEUE_STORE, changeId);
+export const removePendingChange = async (changeId: string, scope = capturePrivateDataScope()): Promise<void> => {
+  await offlineDb.forScope(scope).remove(QUEUE_STORE, changeId);
 };
 
 /**
@@ -70,8 +72,11 @@ export const removePendingChange = async (changeId: string): Promise<void> => {
  * when a connection is available.
  */
 export const discardPendingChanges = async (jobId: string): Promise<number> => {
-  const changes = await getPendingChanges(jobId);
-  await Promise.all(changes.map((change) => offlineDb.remove(QUEUE_STORE, change.id)));
+  const scope = capturePrivateDataScope();
+  const db = offlineDb.forScope(scope);
+  const changes = await getPendingChanges(jobId, scope);
+  await Promise.all(changes.map((change) => db.remove(QUEUE_STORE, change.id)));
+  scope.assertCurrent();
   notifyOfflineFestivalChanged(jobId);
   return changes.length;
 };
@@ -91,15 +96,16 @@ const applyChangeToSnapshotArtists = (artists: Row[], change: OfflinePendingChan
   }
 };
 
-const mutateSnapshot = async (change: OfflinePendingChange): Promise<void> => {
-  const snapshot = await getFestivalSnapshot(change.jobId);
+const mutateSnapshot = async (change: OfflinePendingChange, scope: PrivateDataScope): Promise<void> => {
+  const snapshot = await getFestivalSnapshot(change.jobId, scope);
+  scope.assertCurrent();
   if (!snapshot) return;
 
   if (change.table === "festival_artists") {
     snapshot.data.artists = applyChangeToSnapshotArtists(snapshot.data.artists, change);
   }
 
-  await saveFestivalSnapshot(snapshot);
+  await saveFestivalSnapshot(snapshot, scope);
 };
 
 /**
@@ -155,8 +161,11 @@ export interface QueueFestivalChangeInput {
  * snapshot so offline reads show the edited data. Writes for the same
  * festival are serialized to avoid stale read-modify-write races.
  */
-export const queueFestivalChange = (input: QueueFestivalChangeInput): Promise<void> =>
-  withJobWriteLock(input.jobId, async () => {
+export const queueFestivalChange = async (input: QueueFestivalChangeInput): Promise<void> => {
+  const scope = capturePrivateDataScope();
+  const db = offlineDb.forScope(scope);
+  return withJobWriteLock(JSON.stringify([scope.userId, input.jobId]), async () => {
+    scope.assertCurrent();
     const incoming: OfflinePendingChange = {
       id: generateOfflineId(),
       jobId: input.jobId,
@@ -169,7 +178,8 @@ export const queueFestivalChange = (input: QueueFestivalChangeInput): Promise<vo
       label: input.label,
     };
 
-    const pending = await getPendingChanges(input.jobId);
+    const pending = await getPendingChanges(input.jobId, scope);
+    scope.assertCurrent();
     const existing = pending.find(
       (change) => change.table === input.table && change.recordId === input.recordId,
     );
@@ -177,12 +187,14 @@ export const queueFestivalChange = (input: QueueFestivalChangeInput): Promise<vo
     const merged = coalesce(existing, incoming);
 
     if (existing && (!merged || merged.id !== existing.id)) {
-      await offlineDb.remove(QUEUE_STORE, existing.id);
+      await db.remove(QUEUE_STORE, existing.id);
     }
     if (merged) {
-      await offlineDb.put(QUEUE_STORE, merged);
+      await db.put(QUEUE_STORE, merged);
     }
 
-    await mutateSnapshot(incoming);
+    await mutateSnapshot(incoming, scope);
+    scope.assertCurrent();
     notifyOfflineFestivalChanged(input.jobId);
   });
+};

@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vacationRequestsApi, VacationRequestSubmission } from '@/lib/vacation-requests';
 import { useToast } from '@/hooks/use-toast';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -9,20 +10,25 @@ import { getErrorMessage } from '@/utils/errorMessage';
 export const useVacationRequests = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, userRole, userDepartment } = useOptimizedAuth();
+  const account = [user?.id ?? null, userRole, userDepartment];
 
   const userRequestsQuery = useQuery({
-    queryKey: queryKeys.scope('vacation-requests', 'user'),
+    queryKey: queryKeys.scope('vacation-requests', 'user', ...account),
     queryFn: vacationRequestsApi.getUserRequests,
+    enabled: Boolean(user),
   });
 
   const departmentRequestsQuery = useQuery({
-    queryKey: queryKeys.scope('vacation-requests', 'department'),
+    queryKey: queryKeys.scope('vacation-requests', 'department', ...account),
     queryFn: vacationRequestsApi.getDepartmentRequests,
+    enabled: Boolean(user),
   });
 
   const pendingRequestsQuery = useQuery({
-    queryKey: queryKeys.scope('vacation-requests', 'pending'),
+    queryKey: queryKeys.scope('vacation-requests', 'pending', ...account),
     queryFn: vacationRequestsApi.getPendingRequests,
+    enabled: Boolean(user),
   });
 
   const submitRequestMutation = useMutation({

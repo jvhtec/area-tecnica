@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { capturePrivateDataScope } from "@/lib/private-data-scope";
+import { getLegacyQueueStatus, type LegacyQueueStatus } from "@/lib/offline/legacy-quarantine";
 
 import {
   countPendingChanges,
@@ -30,6 +32,12 @@ export const useOfflineFestival = (jobId?: string) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<OfflineSyncResult | null>(null);
+  const [legacyQueue, setLegacyQueue] = useState<LegacyQueueStatus>({ status: "none" });
+  useEffect(() => {
+    let active = true;
+    void getLegacyQueueStatus().then((status) => { if (active) setLegacyQueue(status); });
+    return () => { active = false; };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!jobId) {
@@ -37,7 +45,9 @@ export const useOfflineFestival = (jobId?: string) => {
       setPendingCount(0);
       return;
     }
+    const scope = capturePrivateDataScope();
     const [snapshot, count] = await Promise.all([getFestivalSnapshot(jobId), countPendingChanges(jobId)]);
+    scope.assertCurrent();
     setSnapshotMeta(
       snapshot
         ? {
@@ -73,13 +83,16 @@ export const useOfflineFestival = (jobId?: string) => {
 
   const download = useCallback(async () => {
     if (!jobId) return;
+    const scope = capturePrivateDataScope();
     if (!isBrowserOnline()) {
       toast.error("Sin conexión", { description: "Conéctate a internet para descargar los datos del festival." });
       return;
     }
     // A refresh overwrites the local snapshot with server data, which would
     // hide queued edits while they remain pending sync.
-    if ((await countPendingChanges(jobId)) > 0) {
+    const pending = await countPendingChanges(jobId);
+    if (scope.signal.aborted) return;
+    if (pending > 0) {
       toast.error("Cambios pendientes", {
         description: "Sincroniza o descarta los cambios pendientes antes de actualizar la copia offline.",
       });
@@ -88,6 +101,7 @@ export const useOfflineFestival = (jobId?: string) => {
     setIsDownloading(true);
     try {
       const { snapshot, files } = await downloadFestivalSnapshotWithFiles(jobId);
+      scope.assertCurrent();
       const fileSummary =
         files.total > 0
           ? ` y ${files.downloaded} de ${files.total} archivos (riders, planos, documentos)`
@@ -103,6 +117,7 @@ export const useOfflineFestival = (jobId?: string) => {
         });
       }
     } catch (error) {
+      if (scope.signal.aborted) return;
       console.error("Error descargando datos offline:", error);
       toast.error("Error", { description: "No se pudieron descargar los datos para uso offline." });
     } finally {
@@ -113,6 +128,7 @@ export const useOfflineFestival = (jobId?: string) => {
   const sync = useCallback(
     async (options?: { force?: boolean }) => {
       if (!jobId) return null;
+      const scope = capturePrivateDataScope();
       if (!isBrowserOnline()) {
         toast.error("Sin conexión", { description: "Conéctate a internet para sincronizar los cambios." });
         return null;
@@ -120,6 +136,7 @@ export const useOfflineFestival = (jobId?: string) => {
       setIsSyncing(true);
       try {
         const result = await syncFestivalPendingChanges(jobId, { force: options?.force });
+        scope.assertCurrent();
         setLastSyncResult(result);
 
         if (result.conflicts.length === 0 && result.failed.length === 0) {
@@ -157,6 +174,7 @@ export const useOfflineFestival = (jobId?: string) => {
         }
         return result;
       } catch (error) {
+        if (scope.signal.aborted) return null;
         console.error("Error sincronizando cambios offline:", error);
         toast.error("Error", { description: "No se pudieron sincronizar los cambios offline." });
         return null;
@@ -169,13 +187,16 @@ export const useOfflineFestival = (jobId?: string) => {
 
   const removeOfflineCopy = useCallback(async () => {
     if (!jobId) return;
+    const scope = capturePrivateDataScope();
     await deleteFestivalSnapshot(jobId);
+    scope.assertCurrent();
     setLastSyncResult(null);
     toast.success("Copia offline eliminada");
   }, [jobId]);
 
   const discardChanges = useCallback(async () => {
     if (!jobId) return;
+    const scope = capturePrivateDataScope();
     if (!isBrowserOnline()) {
       toast.error("Sin conexión", {
         description: "Conéctate a internet para descartar los cambios y restaurar la copia offline.",
@@ -187,6 +208,7 @@ export const useOfflineFestival = (jobId?: string) => {
     // edits that can no longer be synchronized or discarded cleanly.
     try {
       const { files } = await downloadFestivalSnapshotWithFiles(jobId);
+      scope.assertCurrent();
       if (files.failed > 0) {
         toast.warning("Copia restaurada con avisos", {
           description: `${files.failed} archivo${files.failed === 1 ? "" : "s"} no se pudieron restaurar.`,
@@ -194,6 +216,7 @@ export const useOfflineFestival = (jobId?: string) => {
         });
       }
     } catch (error) {
+      if (scope.signal.aborted) return;
       console.error("No se pudo restaurar la copia offline antes de descartar cambios:", error);
       toast.error("Error", {
         description: "No se pudo restaurar la copia offline. Los cambios pendientes se mantienen.",
@@ -201,6 +224,7 @@ export const useOfflineFestival = (jobId?: string) => {
       return;
     }
     const discarded = await discardPendingChanges(jobId);
+    scope.assertCurrent();
     setLastSyncResult(null);
     toast.success("Cambios descartados", {
       description: `${discarded} cambio${discarded === 1 ? "" : "s"} pendiente${discarded === 1 ? "" : "s"} eliminado${discarded === 1 ? "" : "s"}.`,
@@ -208,6 +232,7 @@ export const useOfflineFestival = (jobId?: string) => {
   }, [jobId]);
 
   return {
+    legacyQueue,
     isOnline,
     hasSnapshot: snapshotMeta !== null,
     snapshotMeta,

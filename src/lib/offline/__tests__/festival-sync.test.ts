@@ -1,3 +1,4 @@
+import { setPrivateDataIdentity } from "@/lib/private-data-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
@@ -5,6 +6,8 @@ import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
+
+vi.mock("@/lib/private-supabase-client", () => ({ createPrivateSupabaseClient: vi.fn(async () => mockSupabase) }));
 
 import { offlineDb, QUEUE_STORE, SNAPSHOT_STORE, __resetOfflineDbForTests } from "../offline-db";
 import { getPendingChanges } from "../festival-offline-queue";
@@ -61,6 +64,7 @@ const seedChange = async (change: Partial<OfflinePendingChange>): Promise<Offlin
 describe("syncFestivalPendingChanges", () => {
   beforeEach(async () => {
     __resetOfflineDbForTests();
+    setPrivateDataIdentity("account-a", "management:sound");
     resetMockSupabase();
     await offlineDb.put(SNAPSHOT_STORE, buildSnapshot());
   });

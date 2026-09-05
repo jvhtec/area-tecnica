@@ -232,6 +232,7 @@ export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJo
   // Snapshot fallback covers browser-offline, online failures and
   // slow/unresponsive networks (timeout-raced).
   const result = await fetchWithOfflineFallback({
+    jobId,
     online: () => fetchFestivalJobDetailsOnline(jobId),
     offline: () => buildOfflineJobDetails(jobId),
   });
@@ -322,6 +323,7 @@ const fetchFestivalDocumentsOnline = async (jobId: string): Promise<FestivalDocu
 
 export const fetchFestivalDocuments = async (jobId: string): Promise<FestivalDocumentsData> => {
   const result = await fetchWithOfflineFallback({
+    jobId,
     online: () => fetchFestivalDocumentsOnline(jobId),
     offline: () => buildOfflineDocuments(jobId),
   });

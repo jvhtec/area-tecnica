@@ -1,6 +1,7 @@
 
 import { QueryClient, DefaultOptions, QueryKey } from "@tanstack/react-query";
 import { getErrorStatus } from '@/utils/errorMessage';
+import { PrivateMutationCache } from '@/lib/private-mutation-cache';
 
 // Optimized React Query configuration for real-time data with multi-tab support
 const createOptimizedQueryOptions = (isLeader: boolean = true): DefaultOptions => ({
@@ -41,33 +42,13 @@ const optimizedQueryOptions = createOptimizedQueryOptions(true);
 export const createOptimizedQueryClient = (isLeader: boolean = true) => {
   const queryClientOptions = createOptimizedQueryOptions(isLeader);
   const queryClient = new QueryClient({
+    mutationCache: new PrivateMutationCache(),
     defaultOptions: queryClientOptions,
   });
 
-  // Add query deduplication
-  const originalFetchQuery = queryClient.fetchQuery.bind(queryClient);
-  const pendingQueries = new Map<string, Promise<any>>();
-
-  queryClient.fetchQuery = function(options: any) {
-    const queryKey = JSON.stringify(options.queryKey);
-    
-    // Check if this query is already pending
-    if (pendingQueries.has(queryKey)) {
-      if (import.meta.env.DEV) {
-        console.log(`Deduplicating query: ${queryKey}`);
-      }
-      return pendingQueries.get(queryKey)!;
-    }
-
-    // Start new query and cache the promise
-    const queryPromise = originalFetchQuery(options).finally(() => {
-      pendingQueries.delete(queryKey);
-    });
-
-    pendingQueries.set(queryKey, queryPromise);
-    return queryPromise;
-  };
-
+  // TanStack Query already shares in-flight requests by query key. Keeping a
+  // second promise map here outlived clear()/cancelQueries() on account change
+  // and handed the next account a promise from the previous session.
   return queryClient;
 };
 

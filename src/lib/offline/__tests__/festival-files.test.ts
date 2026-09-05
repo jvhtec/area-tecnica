@@ -1,3 +1,4 @@
+import { setPrivateDataIdentity } from "@/lib/private-data-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
@@ -5,6 +6,8 @@ import { mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
+
+vi.mock("@/lib/private-supabase-client", () => ({ createPrivateSupabaseClient: vi.fn(async () => mockSupabase) }));
 
 import { __resetOfflineDbForTests } from "../offline-db";
 import {
@@ -19,7 +22,7 @@ const mockStorageDownload = (failPaths: string[] = []) => {
   mockSupabase.storage.from.mockImplementation(() => ({
     download: vi.fn(async (path: string) =>
       failPaths.includes(path)
-        ? { data: null, error: new Error("storage error") }
+        ? { data: null, error: new TypeError("Failed to fetch") }
         : { data: new Blob([`contenido de ${path}`]), error: null },
     ),
     upload: vi.fn(),
@@ -32,6 +35,7 @@ const mockStorageDownload = (failPaths: string[] = []) => {
 describe("festival offline files", () => {
   beforeEach(() => {
     __resetOfflineDbForTests();
+    setPrivateDataIdentity("account-a", "management:sound");
     resetMockSupabase();
   });
 

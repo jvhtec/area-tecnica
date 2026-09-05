@@ -2,6 +2,7 @@
 import { useQuery, useMutation, UseQueryOptions, UseMutationOptions } from "@tanstack/react-query";
 import { queryKeys, queryClient } from "@/lib/react-query";
 import { ApiService } from "@/lib/api-service";
+import { getPrivateDataScope } from "@/lib/private-data-scope";
 
 type EntityMutationVariables = {
   id?: string | number;
@@ -78,9 +79,12 @@ export const useEntityMutation = <T, TVariables extends EntityMutationVariables>
       }
     },
     onMutate: async (variables, mutationContext): Promise<MutationContext<T>> => {
+      const scope = getPrivateDataScope();
       const optionContext = (await mutationOptions.onMutate?.(variables, mutationContext)) ?? {};
+      scope?.assertCurrent();
       if (optimisticUpdate) {
         await queryClient.cancelQueries({ queryKey: queryKeys.custom(entityType) });
+        scope?.assertCurrent();
         
         // Get the current data and type cast it
         const previousData = queryClient.getQueryData<T>([entityType]);

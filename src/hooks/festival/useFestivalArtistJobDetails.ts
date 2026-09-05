@@ -84,6 +84,7 @@ export const useFestivalArtistJobDetails = (jobId: string | undefined, routeDate
       if (!jobId) return;
       try {
         const result = await fetchWithOfflineFallback({
+          jobId,
           online: fetchJobDetailsOnline,
           offline: readOfflineJobDetails,
         });

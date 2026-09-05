@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback, useContext, createContext, ReactNode } from "react";
+import { useState, useEffect, useCallback, useContext, createContext, useMemo, useSyncExternalStore, Fragment, ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { PrivateAuthBoundary } from "@/hooks/optimizedAuthBoundary";
+import { getPrivateDataScope, subscribePrivateDataScope } from "@/lib/private-data-scope";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -52,6 +55,25 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tokenManager = TokenManager.getInstance();
+  const queryClient = useQueryClient();
+  const privateScope = useSyncExternalStore(subscribePrivateDataScope, getPrivateDataScope, getPrivateDataScope);
+  useEffect(() => subscribePrivateDataScope(() => {
+    void queryClient.cancelQueries();
+    queryClient.clear();
+  }), [queryClient]);
+  const boundary = useMemo(() => new PrivateAuthBoundary(queryClient), [queryClient]);
+  const applySession = useCallback((next: Session | null) => {
+    if (boundary.acceptSession(next?.user.id ?? null)) {
+      setUserRole(null);
+      setUserDepartment(null);
+      setSoundVisionAccessFlag(false);
+      setAssignableAsTechFlag(false);
+      setIsProfileLoading(false);
+    }
+    setSession(next);
+    setUser(next?.user ?? null);
+    setIsInitialized(true);
+  }, [boundary]);
 
   // Cache profile data in localStorage
   const getCachedProfile = useCallback((userId: string): CachedProfile | null => {
@@ -100,11 +122,14 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   }, []);
 
   const fetchUserProfile = useCallback(async (userId: string, useCache = true): Promise<ProfileData | null> => {
+    const request = boundary.beginProfile(userId);
+    if (!request) return null;
     try {
       // Try cache first if enabled
       if (useCache) {
         const cached = getCachedProfile(userId);
         if (cached) {
+          if (!request.apply(cached.role, cached.department, Boolean(cached.soundVisionAccess), Boolean(cached.assignableAsTech))) return null;
           setUserRole(cached.role);
           setUserDepartment(cached.department);
           setSoundVisionAccessFlag(Boolean(cached.soundVisionAccess));
@@ -122,12 +147,13 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       setIsProfileLoading(true);
 
       const selectProfile = async (columns: string): Promise<{ data: ProfileQueryResult | null; error: SupabaseErrorLike | null }> => {
+        if (!request.isCurrent()) throw new Error("La sesión ha cambiado");
         const { data, error } = await supabase
           .from('profiles')
           .select(columns)
           .eq('id', userId)
           .limit(1);
-
+        if (!request.isCurrent()) throw new Error("La sesión ha cambiado");
         return { data: (data?.[0] ?? null) as unknown as ProfileQueryResult | null, error };
       };
 
@@ -157,6 +183,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
       if (!data && !error) {
         const { data: authUserData, error: authUserError } = await supabase.auth.getUser();
+        if (!request.isCurrent()) return null;
         const authUser = authUserData?.user ?? null;
 
         if (!authUserError && authUser && authUser.id === userId) {
@@ -212,6 +239,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         const typedData = data as unknown as ProfileQueryResult;
         const soundVisionAccess = Boolean(typedData.soundvision_access);
         const assignableAsTech = Boolean(typedData.assignable_as_tech);
+        if (!request.apply(typedData.role, typedData.department, soundVisionAccess, assignableAsTech)) return null;
         setUserRole(typedData.role);
         setUserDepartment(typedData.department);
         setSoundVisionAccessFlag(soundVisionAccess);
@@ -219,6 +247,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         setCachedProfile(userId, typedData.role, typedData.department, soundVisionAccess, assignableAsTech);
         return { ...typedData, soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as ProfileData;
       } else {
+        if (!request.apply(null, null, false, false)) return null;
         setUserRole(null);
         setUserDepartment(null);
         setSoundVisionAccessFlag(false);
@@ -226,20 +255,20 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
       return data ?? null;
     } catch (error) {
-      console.error("Exception in fetchUserProfile:", error);
+      if (request.isCurrent()) console.error("Exception in fetchUserProfile:", error);
       return null;
     } finally {
-      setIsProfileLoading(false);
+      if (request.isCurrent()) setIsProfileLoading(false);
     }
-  }, [getCachedProfile, setCachedProfile]);
+  }, [getCachedProfile, setCachedProfile, boundary]);
 
   const getSessionOnce = useCallback(async () => {
     if (isInitialized) return session;
-
+    const revision = boundary.sessionRevision;
     try {
       const currentSession = await tokenManager.getCachedSession();
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
+      if (boundary.sessionRevision !== revision) { setIsInitialized(true); return null; }
+      applySession(currentSession);
 
       // Parallelize profile fetch with session setup
       if (currentSession?.user?.id) {
@@ -258,20 +287,21 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     } finally {
       setIsLoading(false);
     }
-  }, [session, isInitialized, tokenManager, fetchUserProfile]);
+  }, [session, isInitialized, tokenManager, fetchUserProfile, applySession, boundary]);
 
   const refreshSession = useCallback(async (): Promise<Session | null> => {
+    const revision = boundary.sessionRevision;
     try {
       console.log("Starting session refresh");
 
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
+      if (boundary.sessionRevision !== revision) return null;
 
       if (error) {
         console.error("Session refresh error:", error);
 
         if (error.message && error.message.includes('expired')) {
-          setSession(null);
-          setUser(null);
+          applySession(null);
           setUserRole(null);
           setUserDepartment(null);
           clearProfileCache();
@@ -287,8 +317,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
       if (refreshedSession) {
         console.log("Session refreshed successfully");
-        setSession(refreshedSession);
-        setUser(refreshedSession.user);
+        applySession(refreshedSession);
 
         if (!user || user.id !== refreshedSession.user.id) {
           // Parallelize profile fetch and other operations
@@ -309,7 +338,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.error("Exception in refreshSession:", error);
       return null;
     }
-  }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries, clearProfileCache]);
+  }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries, clearProfileCache, applySession, boundary]);
 
   const resolveCurrentAuditUserId = useCallback(async (): Promise<string | null> => {
     if (user?.id) {
@@ -340,12 +369,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         console.log("Auth state changed:", event);
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
+        applySession(newSession);
 
         if (newSession?.user?.id) {
           // Background profile fetch without blocking UI
-          fetchUserProfile(newSession.user.id, true).catch(error => {
+          fetchUserProfile(newSession.user.id, event === 'INITIAL_SESSION').catch(error => {
             console.error('Auth state profile fetch failed:', error);
           });
         } else {
@@ -359,7 +387,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     );
 
     return () => subscription.unsubscribe();
-  }, [fetchUserProfile, clearProfileCache]);
+  }, [fetchUserProfile, clearProfileCache, applySession]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -385,6 +413,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       if (data.user) {
+        applySession(data.session);
         void logAuthEvent(
           data.user.id,
           "login",
@@ -550,22 +579,23 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
   const logout = async () => {
     const currentUserId = await resolveCurrentAuditUserId();
-
+    applySession(null);
+    clearProfileCache();
     try {
       setIsLoading(true);
 
-      await tokenManager.signOut();
+      const { error: signOutError } = await tokenManager.signOut();
+      if (signOutError) throw signOutError;
       void logAuthEvent(currentUserId, "logout", true);
       clearProfileCache();
 
-      setSession(null);
-      setUser(null);
+      applySession(null);
       setUserRole(null);
       setUserDepartment(null);
 
       toast({
-        title: "Success",
-        description: "You have been logged out successfully",
+        title: "Sesión cerrada",
+        description: "Has cerrado la sesión correctamente",
       });
 
       navigate('/auth');
@@ -576,7 +606,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       });
       setError(errorMessage);
       toast({
-        title: "Logout failed",
+        title: "No se ha podido cerrar la sesión",
         description: errorMessage,
         variant: "destructive",
       });
@@ -754,5 +784,5 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     getCacheStatus: tokenManager.getCacheStatus.bind(tokenManager)
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}><Fragment key={privateScope?.generation ?? "signed-out"}>{children}</Fragment></AuthContext.Provider>;
 };

@@ -271,6 +271,7 @@ export function TechnicianArtistReadOnlyModal({
       // Snapshot fallback covers browser-offline, fetch failures and
       // slow/unresponsive networks (timeout-raced).
       const result = await fetchWithOfflineFallback({
+        jobId: job.id,
         online: fetchArtistsOnline,
         offline: () => fetchOfflineReadOnlyArtists(job.id),
       });
@@ -304,6 +305,7 @@ export function TechnicianArtistReadOnlyModal({
 
       try {
         const result = await fetchWithOfflineFallback({
+          jobId: job.id,
           online: fetchStagesOnline,
           offline: readOfflineStages,
         });

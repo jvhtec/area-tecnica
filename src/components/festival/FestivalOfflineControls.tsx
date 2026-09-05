@@ -38,6 +38,7 @@ interface FestivalOfflineControlsProps {
 export const FestivalOfflineControls = ({ jobId, canEdit, className }: FestivalOfflineControlsProps) => {
   const {
     isOnline,
+    legacyQueue,
     hasSnapshot,
     snapshotMeta,
     pendingCount,
@@ -105,6 +106,18 @@ export const FestivalOfflineControls = ({ jobId, canEdit, className }: FestivalO
             </div>
           )}
         </DropdownMenuLabel>
+        {legacyQueue.status === "retained" && (
+          <div role="status" className="px-2 py-2 text-xs text-amber-700 dark:text-amber-400">
+            Este navegador conserva {legacyQueue.count} cambio{legacyQueue.count === 1 ? "" : "s"} de una versión anterior
+            sin autor identificado. No se sincronizarán con tu cuenta. Contacta con administración para revisarlos
+            antes de borrar los datos del navegador.
+          </div>
+        )}
+        {legacyQueue.status === "unavailable" && (
+          <div role="status" className="px-2 py-2 text-xs text-amber-700 dark:text-amber-400">
+            No se han podido comprobar los cambios offline antiguos. Conserva los datos de este navegador hasta poder revisarlos.
+          </div>
+        )}
         <DropdownMenuSeparator />
 
         <DropdownMenuItem disabled={!isOnline || busy || pendingCount > 0} onSelect={() => download()}>

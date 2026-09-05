@@ -5,6 +5,12 @@ import {
 } from '@/lib/unified-subscription-manager';
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
 import type { SubscriptionQueryKey } from '@/lib/unified-subscription-support';
+import { getPrivateDataScope, subscribePrivateDataScope } from '@/lib/private-data-scope';
+
+const currentScopeKey = (): string | null => {
+  const scope = getPrivateDataScope();
+  return scope ? JSON.stringify([scope.userId, scope.authorizationKey]) : null;
+};
 
 type SubscriptionPriority = 'high' | 'medium' | 'low';
 
@@ -21,6 +27,7 @@ export interface RouteSubscriptionRequest {
 }
 
 interface TabMessage {
+  scopeKey?: string;
   type: 'cache-update' | 'invalidate' | 'leader-election' | 'heartbeat' | 'subscription-request' | 'subscription-release';
   queryKey?: QueryKey;
   data?: unknown;
@@ -59,11 +66,21 @@ export class MultiTabCoordinator {
   private broadcastFlushTimeout: number | null = null;
   private lockAcquired: boolean = false;
   private lastLeaderSeen: number = Date.now();
+  private scopeKey = currentScopeKey();
+  private scopeUnsubscribe: (() => void) | null = null;
+  private releaseLeaderLock: (() => void) | null = null;
+  private destroyed = false;
+  private scopeRevision = 0;
+  private delegatedOwners = new Set<string>();
+
+  private get leaderKey() { return `sector-pro-leader:${this.scopeKey ?? 'signed-out'}`; }
+  private get channelName() { return `sector-pro-tabs:${this.scopeKey ?? 'signed-out'}`; }
   
   private constructor(queryClient: QueryClient) {
     this.tabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     this.queryClient = queryClient;
-    this.broadcastChannel = new BroadcastChannel('sector-pro-tabs');
+    this.broadcastChannel = new BroadcastChannel(this.channelName);
+    this.scopeUnsubscribe = subscribePrivateDataScope(() => this.resetForIdentity());
     
     this.setupBroadcastChannel();
     this.setupVisibilityHandling();
@@ -89,7 +106,9 @@ export class MultiTabCoordinator {
   }
 
   private setupBroadcastChannel() {
-    this.broadcastChannel.addEventListener('message', (event: MessageEvent<TabMessage>) => {
+    const channel = this.broadcastChannel;
+    channel.addEventListener('message', (event: MessageEvent<TabMessage>) => {
+      if (this.destroyed || channel !== this.broadcastChannel || !this.scopeKey || event.data.scopeKey !== this.scopeKey) return;
       const { type, queryKey, data, tabId, timestamp, tables, routeKey, subscriptions } = event.data;
       
       // Ignore messages from ourselves
@@ -150,17 +169,20 @@ export class MultiTabCoordinator {
   }
 
   private async startLeaderElection() {
+    if (this.destroyed || !this.scopeKey) return;
+    const revision = this.scopeRevision;
     try {
       // Try to acquire the leader lock
       if ('locks' in navigator) {
-        await navigator.locks.request('sector-pro-leader', { mode: 'exclusive', ifAvailable: true }, (lock) => {
+        await navigator.locks.request(this.leaderKey, { mode: 'exclusive', ifAvailable: true }, (lock) => {
+          if (this.destroyed || this.scopeRevision !== revision) return;
           if (lock) {
             this.lockAcquired = true;
             this.becomeLeader();
             
-            // Keep the lock until the tab closes
-            return new Promise(() => {
-              // This promise never resolves, keeping the lock
+            // Release on account change and teardown, including React remounts.
+            return new Promise<void>((resolve) => {
+              this.releaseLeaderLock = resolve;
             });
           } else {
             this.becomeFollower();
@@ -172,19 +194,20 @@ export class MultiTabCoordinator {
         this.fallbackLeaderElection();
       }
     } catch (error) {
+      if (this.destroyed || this.scopeRevision !== revision) return;
       console.error('Error in leader election:', error);
       this.fallbackLeaderElection();
     }
   }
 
   private fallbackLeaderElection() {
-    if (document.hidden) {
+    if (this.destroyed || !this.scopeKey || document.hidden || this.leaderElectionInterval) {
       return;
     }
 
     // Fallback leader election using localStorage and timestamps
     const checkLeader = () => {
-      const leaderInfo = localStorage.getItem('sector-pro-leader');
+      const leaderInfo = localStorage.getItem(this.leaderKey);
       const now = Date.now();
       
       if (!leaderInfo) {
@@ -273,7 +296,7 @@ export class MultiTabCoordinator {
           tabId: this.tabId,
           timestamp: Date.now()
         };
-        localStorage.setItem('sector-pro-leader', JSON.stringify(leaderInfo));
+        localStorage.setItem(this.leaderKey, JSON.stringify(leaderInfo));
       }
     }, FALLBACK_HEARTBEAT_INTERVAL_MS);
   }
@@ -283,12 +306,12 @@ export class MultiTabCoordinator {
       tabId: this.tabId,
       timestamp: Date.now()
     };
-    localStorage.setItem('sector-pro-leader', JSON.stringify(leaderInfo));
+    localStorage.setItem(this.leaderKey, JSON.stringify(leaderInfo));
     this.becomeLeader();
   }
 
   private becomeLeader() {
-    if (this.isLeader) return;
+    if (this.destroyed || !this.scopeKey || this.isLeader) return;
     
     this.isLeader = true;
     console.log(`Tab ${this.tabId} became leader`);
@@ -402,6 +425,7 @@ export class MultiTabCoordinator {
     }
 
     const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
+    this.delegatedOwners.add(ownerRoute);
     const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
 
     requestedSubscriptions.forEach(({ table, queryKey, filter, priority }) => {
@@ -434,6 +458,7 @@ export class MultiTabCoordinator {
 
   private handleSubscriptionRelease(routeKey: string, requesterTabId?: string) {
     const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
+    this.delegatedOwners.delete(ownerRoute);
     const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
 
     manager.cleanupRouteDependentSubscriptions(ownerRoute);
@@ -447,9 +472,11 @@ export class MultiTabCoordinator {
   }
 
   public broadcast(message: TabMessage) {
+    if (this.destroyed || !this.scopeKey) return;
     try {
       this.broadcastChannel.postMessage({
         ...message,
+        scopeKey: this.scopeKey,
         tabId: this.tabId,
         timestamp: Date.now()
       });
@@ -521,7 +548,48 @@ export class MultiTabCoordinator {
     });
   }
 
+  private clearIdentityState() {
+    this.scopeRevision += 1;
+    this.becomeFollower();
+    this.pauseIntervals();
+    this.releaseLeaderLock?.();
+    this.releaseLeaderLock = null;
+    this.lockAcquired = false;
+    if (this.broadcastFlushTimeout) clearTimeout(this.broadcastFlushTimeout);
+    this.broadcastFlushTimeout = null;
+    this.pendingBroadcasts.clear();
+    this.lastBroadcastedUpdatedAt.clear();
+    if (this.delegatedOwners.size > 0) {
+      const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
+      this.delegatedOwners.forEach((owner) => manager.cleanupRouteDependentSubscriptions(owner));
+      this.delegatedOwners.clear();
+    }
+    try {
+      const leaderInfo = localStorage.getItem(this.leaderKey);
+      if (leaderInfo) {
+        if (JSON.parse(leaderInfo).tabId === this.tabId) localStorage.removeItem(this.leaderKey);
+      }
+    } catch { /* Storage may be unavailable; Web Locks do not depend on it. */ }
+  }
+
+  private resetForIdentity() {
+    if (this.destroyed) return;
+    // This also clears a buffered message when A logs out and back into A.
+    this.clearIdentityState();
+    this.broadcastChannel.close();
+    this.scopeKey = currentScopeKey();
+    this.lastLeaderSeen = Date.now();
+    this.broadcastChannel = new BroadcastChannel(this.channelName);
+    this.setupBroadcastChannel();
+    void this.startLeaderElection();
+  }
+
   public destroy() {
+    if (this.destroyed) return;
+    this.clearIdentityState();
+    this.destroyed = true;
+    this.scopeUnsubscribe?.();
+    this.scopeUnsubscribe = null;
     if (this.leaderElectionInterval) {
       clearInterval(this.leaderElectionInterval);
     }
@@ -549,12 +617,12 @@ export class MultiTabCoordinator {
     
     // Clean up localStorage if we were the leader
     if (this.isLeader && !('locks' in navigator)) {
-      const leaderInfo = localStorage.getItem('sector-pro-leader');
+      const leaderInfo = localStorage.getItem(this.leaderKey);
       if (leaderInfo) {
         try {
           const { tabId } = JSON.parse(leaderInfo);
           if (tabId === this.tabId) {
-            localStorage.removeItem('sector-pro-leader');
+            localStorage.removeItem(this.leaderKey);
           }
         } catch (error) {
           console.error('Error cleaning up leader info:', error);
