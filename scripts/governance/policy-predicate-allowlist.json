@@ -1,0 +1,342 @@
+{
+  "version": 1,
+  "policies": {
+    "public.achievements.achievements_select_all": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.activity_catalog.activity_catalog_read": {
+      "rationale": "Explicitly public static event catalog; SEC-12 reviewed exception.",
+      "value": {
+        "check": null,
+        "roles": [
+          "anon",
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.app_changelog.app_changelog_select_auth": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.consumos_components.consumos_components_insert_authenticated": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": "true",
+        "roles": [
+          "authenticated"
+        ],
+        "using": null,
+        "command": "INSERT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.consumos_components.consumos_components_select_authenticated": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.corporate_email_logs.corporate_email_logs_service_role": {
+      "rationale": "Server-only maintenance policy; client roles do not match.",
+      "value": {
+        "check": "true",
+        "roles": [
+          "service_role"
+        ],
+        "using": "true",
+        "command": "ALL",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.dryhire_parent_folders.\"Allow authenticated read\"": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.edge_rate_limit_counters.edge_rate_limit_counters_service_role_all": {
+      "rationale": "Server-only maintenance policy; client roles do not match.",
+      "value": {
+        "check": "true",
+        "roles": [
+          "service_role"
+        ],
+        "using": "true",
+        "command": "ALL",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.equipment.p_equipment_public_select_5598cc": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "using": "((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text])) OR (department = public.current_user_department()) OR ((( SELECT auth.uid() AS uid) IS NOT NULL) AND true))",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.equipment_models_deprecated_20251204.\"Authenticated users can view equipment models\"": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.external_api_usage.external_api_usage_service_role_all": {
+      "rationale": "Server-only maintenance policy; client roles do not match.",
+      "value": {
+        "check": "true",
+        "roles": [
+          "service_role"
+        ],
+        "using": "true",
+        "command": "ALL",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.flex_folders.p_flex_folders_public_select_d8b2cd": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "using": "((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text])) OR ((( SELECT auth.uid() AS uid) IS NOT NULL) AND true))",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.global_availability_presets.p_global_availability_presets_public_select_954946": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "using": "((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text])) OR ((( SELECT auth.uid() AS uid) IS NOT NULL) AND true))",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.hoja_de_ruta_templates.p_hoja_de_ruta_templates_public_select_451545": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "using": "((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text])) OR ((( SELECT auth.uid() AS uid) IS NOT NULL) AND (is_active = true)))",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.job_assignments.job_assignments_select": {
+      "rationale": "Existing authenticated calendar/assignment data contract, deliberately preserved; changing organizational visibility requires a separate product decision.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.job_documents.p_job_documents_public_select_04844b": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "using": "((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text])) OR ((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text])) OR ((visible_to_tech = true) AND (job_id IN ( SELECT ja.job_id\n   FROM public.job_assignments ja\n  WHERE (ja.technician_id = ( SELECT auth.uid() AS uid))))) OR (public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'wallboard'::text, 'house_tech'::text])))))",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.job_rehearsal_dates.job_rehearsal_dates_select": {
+      "rationale": "Existing authenticated calendar/assignment data contract, deliberately preserved; changing organizational visibility requires a separate product decision.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.jobs.jobs_select": {
+      "rationale": "Existing authenticated calendar/assignment data contract, deliberately preserved; changing organizational visibility requires a separate product decision.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.madrid_holidays.\"Anyone can view Madrid holidays\"": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.profile_calendar_tokens.profile_calendar_tokens_service_role_all": {
+      "rationale": "Server-only maintenance policy; client roles do not match.",
+      "value": {
+        "check": "true",
+        "roles": [
+          "service_role"
+        ],
+        "using": "true",
+        "command": "ALL",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.role_skill_mapping.role_skill_mapping_select_for_authenticated": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.security_audit_log.security_audit_log_service_role_all": {
+      "rationale": "Server-only maintenance policy; client roles do not match.",
+      "value": {
+        "check": "true",
+        "roles": [
+          "service_role"
+        ],
+        "using": "true",
+        "command": "ALL",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.soundvision_file_reviews.soundvision_file_reviews_select_authenticated": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.technical_tool_quick_presets.technical_tool_quick_presets_select_authenticated": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.tour_documents.p_tour_documents_insert": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": "((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text])) OR ((auth.uid() IS NOT NULL) AND (uploaded_by = auth.uid()) AND (visible_to_tech = true) AND ((EXISTS ( SELECT 1\n   FROM public.tour_assignments ta\n  WHERE ((ta.tour_id = tour_documents.tour_id) AND (ta.technician_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM ((public.timesheets ts\n     JOIN public.jobs j ON ((j.id = ts.job_id)))\n     LEFT JOIN public.tour_dates td ON ((td.id = j.tour_date_id)))\n  WHERE ((ts.technician_id = auth.uid()) AND (ts.is_active = true) AND ((j.tour_id = tour_documents.tour_id) OR (td.tour_id = tour_documents.tour_id))))))))",
+        "roles": [
+          "public"
+        ],
+        "using": null,
+        "command": "INSERT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.tour_documents.p_tour_documents_select": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "using": "((public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text])) OR ((auth.uid() IS NOT NULL) AND (visible_to_tech = true) AND ((EXISTS ( SELECT 1\n   FROM public.tour_assignments ta\n  WHERE ((ta.tour_id = tour_documents.tour_id) AND (ta.technician_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM ((public.timesheets ts\n     JOIN public.jobs j ON ((j.id = ts.job_id)))\n     LEFT JOIN public.tour_dates td ON ((td.id = j.tour_date_id)))\n  WHERE ((ts.technician_id = auth.uid()) AND (ts.is_active = true) AND ((j.tour_id = tour_documents.tour_id) OR (td.tour_id = tour_documents.tour_id))))))))",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.tours.\"Allow wallboard to read tour status\"": {
+      "rationale": "Existing authenticated calendar/assignment data contract, deliberately preserved; changing organizational visibility requires a separate product decision.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    },
+    "public.venues.venues_select_authenticated": {
+      "rationale": "Existing authenticated shared operational/reference data contract; freeze exact roles and predicate, no new broadening.",
+      "value": {
+        "check": null,
+        "roles": [
+          "authenticated"
+        ],
+        "using": "true",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE"
+      }
+    }
+  }
+}
