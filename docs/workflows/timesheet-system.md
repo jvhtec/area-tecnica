@@ -17,7 +17,7 @@ The timesheet system tracks technician hours per job per date. Timesheets are au
 | **Reject dialog** | `src/components/timesheet/TimesheetRejectDialog.tsx` |
 | **Job totals** | `src/components/timesheet/MyJobTotal.tsx`, `JobTotalAmounts.tsx` |
 | **Core hook** | `src/hooks/useTimesheets.ts` (17.8KB) |
-| **Approval hook** | `src/hooks/useTimesheetApproval.ts` |
+| **Approval action** | `approveTimesheet` in `src/hooks/useTimesheets.ts`, called by `src/components/timesheet/useTimesheetViewModel.ts` and `TimesheetView.tsx` |
 | **Calculator** | `src/hooks/useShiftTimeCalculator.ts` (9.1KB) |
 | **Recalc hook** | `src/hooks/useRecalcTimesheet.ts` |
 | **PDF export** | `src/utils/timesheet-pdf.ts` |
@@ -68,12 +68,12 @@ When assignments are made (via matrix or tour), `autoCreateTimesheets()` creates
 
 ### 4. Approval (Manager Action)
 - Manager reviews in TimesheetView (filter by technician, department, date)
-- `useTimesheetApproval.mutate()`:
+- `useTimesheets().approveTimesheet(timesheetId)`:
   1. Sets `approved_by_manager = true`, `approved_by`, `approved_at`
   2. Calls `compute_timesheet_amount_2025` RPC with `_persist = true`
   3. RPC calculates: category-based rates, overtime, holiday multipliers, autonomo deductions
   4. Stores `amount_eur` and `amount_breakdown` on the timesheet
-  5. Sends push notification to technician
+  5. Refreshes timesheets and invalidates approval context. This active path does not emit `timesheet.approved` push; the unused standalone hook that did so was removed on 2026-09-05. Approval behavior was not changed by that cleanup.
 
 ### 5. Rejection (Manager Action)
 - `rejectTimesheet(reason)` → status to 'rejected' with reason

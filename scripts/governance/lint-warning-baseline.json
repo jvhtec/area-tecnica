@@ -1,20 +1,20 @@
 {
-  "generatedAt": "2026-09-04T20:25:29.699Z",
+  "generatedAt": "2026-09-05T11:48:47.080Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1216,
+  "total": 1145,
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 1037,
+    "@typescript-eslint/no-explicit-any": 971,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
     "no-case-declarations": 1,
-    "no-control-regex": 8,
+    "no-control-regex": 7,
     "no-empty": 13,
     "no-useless-escape": 22,
     "prefer-const": 1,
-    "react-hooks/exhaustive-deps": 78,
+    "react-hooks/exhaustive-deps": 74,
     "react-refresh/only-export-components": 43
   },
   "files": {
@@ -30,32 +30,17 @@
     "src/components/dashboard/CalendarSection.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/components/dashboard/DashboardContent.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
     "src/components/dashboard/DashboardMobileHub.tsx": {
       "@typescript-eslint/no-explicit-any": 4
     },
     "src/components/dashboard/DateTypeContextMenu.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/dashboard/DepartmentSchedule.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/components/dashboard/DepartmentTabContent.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/dashboard/LightsSchedule.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/components/dashboard/MobileDayCalendar.tsx": {
       "@typescript-eslint/no-explicit-any": 6
     },
     "src/components/dashboard/MobileJobCard.tsx": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/components/dashboard/RealTimeJobsList.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/dashboard/TourChips.tsx": {
       "@typescript-eslint/no-explicit-any": 7
@@ -72,19 +57,10 @@
     "src/components/disponibilidad/MobileAvailabilityView.tsx": {
       "@typescript-eslint/no-explicit-any": 4
     },
-    "src/components/disponibilidad/PresetManagement.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/disponibilidad/WeeklySummary.tsx": {
       "@typescript-eslint/no-explicit-any": 5
     },
-    "src/components/equipment/EquipmentCreationManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/equipment/InventoryManagementDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/equipment/JobPresetManager.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/equipment/SubRentalManager.tsx": {
@@ -98,9 +74,6 @@
     },
     "src/components/festival/ArtistFileDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 5
-    },
-    "src/components/festival/ArtistFormSubmissionDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/festival/ArtistManagementDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 2
@@ -218,9 +191,6 @@
     "src/components/layout/SidebarNavigation.tsx": {
       "react-refresh/only-export-components": 1
     },
-    "src/components/lights/LightsCalendar.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/logistics/LogisticsEventCard.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
@@ -300,15 +270,6 @@
     "src/components/messages/hooks/useMessagesQuery.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/messages/MessageReplyDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/milestones/JobMilestonesDialog.tsx": {
-      "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/milestones/ManageMilestonesDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
     "src/components/personal/hooks/usePersonalCalendarData.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
@@ -350,9 +311,6 @@
     "src/components/settings/SkillRoleMappingManager.tsx": {
       "react-refresh/only-export-components": 6
     },
-    "src/components/shortcuts/ShortcutableButton.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/sound/SoundTaskDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
@@ -373,12 +331,6 @@
       "@typescript-eslint/no-explicit-any": 7
     },
     "src/components/technician/AboutModal.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/technician/AssignmentCard.tsx": {
-      "@typescript-eslint/no-explicit-any": 4
-    },
-    "src/components/technician/AssignmentsGrid.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/technician/DashboardScreen.tsx": {
@@ -402,9 +354,6 @@
     "src/components/timesheet/TimesheetEditForm.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/timesheet/TimesheetSidebar.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/components/timesheet/TimesheetSignature.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
@@ -418,19 +367,8 @@
       "@typescript-eslint/no-explicit-any": 7,
       "react-hooks/exhaustive-deps": 1
     },
-    "src/components/tours/scheduling/EnhancedTourTravelPlanner.tsx": {
-      "@typescript-eslint/no-explicit-any": 3,
-      "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/tours/scheduling/TourAccommodationsManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 10,
-      "react-hooks/exhaustive-deps": 1
-    },
     "src/components/tours/scheduling/TourContactsManager.tsx": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/tours/scheduling/TourItineraryBuilder.tsx": {
-      "react-hooks/exhaustive-deps": 1
     },
     "src/components/tours/scheduling/TourMapViewMapbox.tsx": {
       "@typescript-eslint/no-explicit-any": 6,
@@ -439,20 +377,11 @@
     "src/components/tours/scheduling/TourSettingsPanel.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/tours/scheduling/TourTimelineView.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
     "src/components/tours/TourAssignmentDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/TourCard.tsx": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/components/tours/TourDateForm.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/tours/TourDateListItem.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/TourDateManagementDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 2
@@ -461,9 +390,6 @@
       "@typescript-eslint/no-explicit-any": 3
     },
     "src/components/tours/TourManagementDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/tours/TourPowerWeightDefaultsDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/TourRatesManagerDialog.tsx": {
@@ -486,9 +412,6 @@
     },
     "src/components/users/EditUserDialog.tsx": {
       "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/video/VideoCalendar.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/contexts/DepartmentContext.tsx": {
       "react-refresh/only-export-components": 2
@@ -554,9 +477,6 @@
     "src/hooks/__tests__/useOptimizedMatrixData.test.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/hooks/hoja-de-ruta/useHojaDeRutaData.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/hooks/hoja-de-ruta/useHojaDeRutaInitialization.ts": {
       "@typescript-eslint/no-explicit-any": 8,
       "react-hooks/exhaustive-deps": 2
@@ -588,17 +508,8 @@
     "src/hooks/useJobActions.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/hooks/useJobCard.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/hooks/useJobDistance.ts": {
       "react-hooks/exhaustive-deps": 4
-    },
-    "src/hooks/useJobIntegration.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/hooks/useJobManagement.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useJobRatesApproval.ts": {
       "@typescript-eslint/no-explicit-any": 1
@@ -616,9 +527,6 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useMorningSummarySubscription.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/hooks/useOptimisticJobManagement.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/hooks/useOptimizedAuth.tsx": {
@@ -691,9 +599,6 @@
     },
     "src/lib/mapbox/mapboxClient.ts": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/lib/optimized-react-query.ts": {
-      "@typescript-eslint/no-explicit-any": 2
     },
     "src/lib/streamdeck/websocket-server.ts": {
       "@typescript-eslint/no-explicit-any": 4
@@ -776,9 +681,6 @@
     "src/pages/pesos-tool/PesosToolView.tsx": {
       "@typescript-eslint/no-explicit-any": 14
     },
-    "src/pages/pesos-tool/TableCard.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
     "src/pages/Profile.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
@@ -827,9 +729,6 @@
     },
     "src/services/tourPayoutOverrides.ts": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/services/tours/createFoldersForDate.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/stores/useShortcutStore.ts": {
       "@typescript-eslint/no-explicit-any": 2
@@ -934,10 +833,6 @@
     },
     "src/utils/memoriaTecnicaDocuments.ts": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/utils/pdf-generator.ts": {
-      "@typescript-eslint/no-explicit-any": 8,
-      "no-control-regex": 1
     },
     "src/utils/pdf/technicalPowerSummaryPack.ts": {
       "@typescript-eslint/no-explicit-any": 7

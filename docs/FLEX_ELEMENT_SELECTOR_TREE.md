@@ -175,7 +175,7 @@ All tests passing ✅
 1. `src/utils/flex-folders/getElementTree.ts` - Element tree utilities
 2. `src/utils/flex-folders/getElementTree.test.ts` - Unit tests for utilities
 3. `src/components/flex/FlexElementSelectorDialog.test.tsx` - Component tests
-4. `src/components/flex/FlexElementSelectorDialog.example.tsx` - Usage examples
+4. `docs/examples/FlexElementSelectorDialog.example.tsx` - Usage examples
 5. `FLEX_ELEMENT_SELECTOR_TREE.md` - This documentation
 
 ### Modified Files

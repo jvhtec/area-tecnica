@@ -412,7 +412,7 @@ Client-side security config in `src/lib/enhanced-security-config.ts`:
 3. **Realtime Throttling**: Connection pooling, subscription deduplication, route-aware subscriptions
 4. **Multi-Tab Dedup**: Leader election prevents duplicate subscriptions across tabs
 5. **Virtual Scrolling**: assignment matrix inline row/column windowing plus `useVirtualizedDateRange` for large datasets
-6. **Optimistic Updates**: `useOptimisticJobManagement` for immediate UI feedback with rollback
+6. **Optimistic Updates**: `deleteJobOptimistically` in `src/services/optimisticJobDeletionService.ts` provides immediate job-removal feedback with rollback and is called by the job-card folder actions.
 7. **Image Optimization**: `src/utils/imageOptimization.ts`
 8. **Bundle Optimization**: Separate chunks for pdf-libs, maps-lib, spreadsheet-libs, editor-lib
 9. **Production Mode**: Console/debugger statements dropped via esbuild
