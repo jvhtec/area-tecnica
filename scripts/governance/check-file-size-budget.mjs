@@ -24,9 +24,10 @@ import {
 import { dirname, extname, join, relative } from "node:path";
 
 const repoRoot = process.cwd();
-const baselinePath = join(repoRoot, "scripts", "governance", "file-size-baseline.json");
+const functionsDomain = process.argv.includes("--functions");
+const baselinePath = join(repoRoot, "scripts", "governance", functionsDomain ? "function-file-size-baseline.json" : "file-size-baseline.json");
 const shouldWriteBaseline = process.argv.includes("--write-baseline");
-const sourceRoot = join(repoRoot, "src");
+const sourceRoot = join(repoRoot, functionsDomain ? "supabase/functions" : "src");
 
 const THRESHOLD = 800;
 
@@ -67,12 +68,11 @@ function countLines(absolute) {
   return withoutTrailingNewline.split("\n").length;
 }
 
-function collectOversized() {
+function collectSourceSizes() {
   return walk(sourceRoot)
     .map((file) => ({ absolute: file, path: toPosix(relative(repoRoot, file)) }))
     .filter((file) => isSourceFile(file.path) && !isTestFile(file.path) && !isExcluded(file.path))
     .map((file) => ({ path: file.path, lines: countLines(file.absolute) }))
-    .filter((file) => file.lines > THRESHOLD)
     // lines desc, then path asc so equal-sized entries stay stable across runs
     .sort((a, b) => b.lines - a.lines || a.path.localeCompare(b.path));
 }
@@ -128,10 +128,15 @@ function writeSummary(files, failures = []) {
   const baselineCount = baseline ? Object.keys(baseline.files ?? {}).length : 0;
 
   const lines = [
-    "## File Size Budget",
+    `## File Size Budget (${functionsDomain ? "functions" : "app"})`,
     "",
     `Threshold: ${THRESHOLD} lines. Files over threshold: ${files.length} (baseline: ${baselineCount}).`,
   ];
+  const near = sourceSizes.filter((file) => file.lines >= THRESHOLD * 0.95 && file.lines <= THRESHOLD);
+  if (near.length) {
+    lines.push("", "### Approaching threshold (95–100%)", "");
+    for (const file of near) lines.push(`- \`${file.path}\`: ${file.lines} lines`);
+  }
 
   if (failures.length > 0) {
     lines.push("", "### Budget Violations", "");
@@ -147,7 +152,8 @@ function writeSummary(files, failures = []) {
   console.log(lines.join("\n"));
 }
 
-const files = collectOversized();
+const sourceSizes = collectSourceSizes();
+const files = sourceSizes.filter((file) => file.lines > THRESHOLD);
 
 if (shouldWriteBaseline) {
   mkdirSync(dirname(baselinePath), { recursive: true });

@@ -39,6 +39,21 @@ export default defineConfig({
         "tests/**",
       ],
       thresholds: {
+        "supabase/functions/_shared/auth.ts": {
+          branches: 75, functions: 100, lines: 90, statements: 90,
+        },
+        "supabase/functions/_shared/rateLimit.ts": {
+          branches: 75, functions: 100, lines: 90, statements: 90,
+        },
+        "supabase/functions/_shared/hojaLinkToken.ts": {
+          branches: 75, functions: 100, lines: 95, statements: 95,
+        },
+        "supabase/functions/_shared/emailHtmlPolicy.ts": {
+          branches: 100, functions: 100, lines: 100, statements: 100,
+        },
+        "supabase/functions/_shared/memoriaSecurity.ts": {
+          branches: 90, functions: 100, lines: 95, statements: 95,
+        },
         "src/services/deleteJobAssignments.ts": {
           branches: 80,
           functions: 100,
