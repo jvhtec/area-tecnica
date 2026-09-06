@@ -13,11 +13,24 @@ verification pass so the deltas are visible rather than overwritten.
 **What the 2026-09-06 pass changed.** The two previous passes worked the same ground — table RLS,
 RPC bodies, Edge Functions, source ratchets — and that ground is now in good shape: every gate is
 green, 2,101 tests pass, and exactly one table (`activity_catalog`, 54 deliberate rows) is readable
-with the anon key. So this pass went where the earlier ones never looked: **Supabase Storage**, and
-**the privilege catalog rather than the policy catalog**. Both turned out to hold the audit's
-highest-severity findings, and both were invisible to every gate the repository runs. The headline
-is that `profiles` was hardened while 1,273 files in seven *private* buckets remained downloadable
-by anyone holding the public anon key — the access-control effort went to rows and skipped objects.
+with the anon key. So this pass went where the earlier ones never looked, on **both** axes.
+
+*Security:* Supabase Storage, and the privilege catalog rather than the policy catalog. Both held
+findings more severe than anything the register previously carried, and both were invisible to
+every gate the repository runs — SEC-17, SEC-18.
+
+*Quality, reliability and maintainability:* duplication analysis, file-length distribution, the
+dead-code sweep's blind spot, production observability, dependency currency, internationalisation
+and — for the first time in any pass — accessibility. Findings QLT-09 through QLT-12, REL-03,
+A11Y-01 and DEP-01.
+
+The two halves converge on one observation, which is the most useful thing this pass produces. The
+codebase's controls are strong and its discipline is real; what neither covers is **anything that
+exists in more than one place**. `storage.objects` is a second policy surface beside `public`.
+Production privileges are a second privilege surface beside the migration chain. And in the
+application, the same feature is written once per department across five layers — which is exactly
+why three separate findings in this register have the shape "the correct fix was applied to one
+member of a set". Individually each file is under budget, linted and typed. Collectively they drift.
 
 ---
 
@@ -104,6 +117,17 @@ but cannot detect drift. The production comparison is a documented manual releas
 | Storage buckets accepting an unauthenticated upload | not checked | not checked | not checked | **1** (`lights-memoria-tecnica`) | **SEC-17** |
 | `SECURITY DEFINER` functions `anon` may call (non-trigger, live) | not checked | not checked | not checked | **47**, of which **≥5 carry no authorization at all** | **SEC-18 — high** |
 | Secret comparisons using the shared timing-safe helper | not checked | not checked | not checked | **helper exists; 5 call sites still use `===`** | **SEC-19 — low** |
+| Copy-paste duplication across `src/` | not checked | not checked | not checked | **0.8%** (3,099 / 388,937 lines) | low overall; concentrated in QLT-09 |
+| `console.*` in `src/`, and what replaces it in production | not checked | not checked | not checked | **2,410**, all stripped by esbuild; `structuredLogger` used in **0** app files | **REL-03** |
+| Files within 10 lines of the 800-line ceiling | not checked | not checked | not checked | **11** (median file: 124 lines) | **QLT-10** |
+| Unreferenced modules — re-checked | not checked | 88 files | 0 | **1 directory / 5 files / 461 lines** missed by the sweep | **QLT-11** |
+| English toast titles in a Spanish-only UI | not checked | not checked | not checked | **226** `"Error"` vs 39 `"Éxito"` vs 38 `"Success"` | **QLT-12** |
+| Icon-only controls with no accessible name below `sm` | not checked | not checked | not checked | **65 sites**, 15+ files with no `aria-label` | **A11Y-01 — new class** |
+| Dependencies a major version behind / vulnerabilities | not checked | not checked | not checked | **24 major behind / 0 advisories** | **DEP-01** |
+| `catch` blocks that swallow the error | not checked | not checked | not checked | **3 of 1,250** | healthy |
+| `@ts-ignore` + `@ts-expect-error` across 337,985 lines | not checked | not checked | not checked | **4** | healthy — `strict` was reached at the type level |
+| pgTAP files vs policied tables | not checked | not checked | ~40% | **25 files / 184 policied tables** | DB-02 |
+| Test files per area | not checked | not checked | not checked | `utils` 100/236, `components` 96/549, `hooks` 24/145, **`stores` 0/4** | DB-02 / REL-02 |
 
 ### Governance gate detail — re-run 2026-09-06 on `7e4040b`
 
@@ -122,6 +146,31 @@ but cannot detect drift. The production comparison is a documented manual releas
 | SECURITY DEFINER anon grants | 82 | 82 reviewed | **the gate replays migrations only. Production carries 75, and the two sets differ by 81 entries — see SEC-18** |
 | GitHub Actions pinning | all pinned | — | held |
 | **Storage buckets / `storage.objects` policies** | — | — | **no gate exists**; 21 buckets and 60+ object policies are outside every ratchet — see SEC-17 |
+
+---
+
+## What is healthy — measured, not assumed
+
+An audit that lists only problems misrepresents the codebase, so these were measured on the same
+commit and are worth stating plainly:
+
+- **Duplication is genuinely low.** 0.8% (3,099 of 388,937 lines) by copy-paste detection, and
+  almost all of it is the one department cluster in QLT-09. Outside that axis the codebase does not
+  repeat itself.
+- **Error handling is disciplined.** 1,250 `catch` blocks in `src/`, of which **3** are empty or
+  comment-only. Errors are read through `getErrorMessage` rather than assumed to have `.message`.
+- **`strict: true` was reached honestly.** Across 337,985 lines of `src/`: **3** `@ts-ignore` and
+  **1** `@ts-expect-error`. The register's claim that strict was achieved at the type level rather
+  than with casts holds up under measurement.
+- **React Query is configured centrally**, not per-call-site — `createOptimizedQueryClient` sets
+  `defaultOptions` including `gcTime`, and adjusts them on multi-tab leadership change. The 269
+  `useQuery` sites that set no `staleTime` are inheriting a deliberate default, not drifting.
+- **The service worker is correctly scoped.** Same-origin `GET` only, network-first for HTML and
+  cache-first for content-hashed assets. No Supabase API or auth response is ever cached.
+- **Client XSS surfaces are nearly clean.** Four `dangerouslySetInnerHTML` sites, three of them
+  sanitised or static; no `eval`, no `new Function`; no hardcoded credentials in `src/`. QLT-08 is
+  the single exception found.
+- **The dependency audit is honestly zero** — not a baseline absorbing known advisories.
 
 ---
 
@@ -314,6 +363,208 @@ powers. It is worth fixing because it is a one-line inconsistency inside a funct
 demonstrates the correct pattern twice, which is how such gaps survive: the file looks safe.
 
 
+### QLT-09 — the same feature is written once per department, across every layer of the stack
+
+**Severity: medium as a defect, high as a cause. This is the mechanism behind the "partial
+adoption" pattern this register keeps rediscovering.**
+
+`department` is an enum with six values, and the codebase treats it as a copy-paste axis rather
+than as data. The same feature exists three to five times, in parallel, at every layer:
+
+| Layer | Parallel implementations | Lines |
+| --- | --- | ---: |
+| Components — Memoria Técnica | `sound/MemoriaTecnica.tsx` (704), `lights/LightMemoriaTecnica.tsx` (679), `video/VideoMemoriaTecnica.tsx` (671) | 2,054 |
+| Components — task dialogs | `sound/SoundTaskDialog.tsx` (686), `video/VideoTaskDialog.tsx` (632), `lights/LightsTaskDialog.tsx` (629) | 1,947 |
+| Edge Functions | `generate-memoria-tecnica`, `generate-lights-memoria-tecnica`, `generate-video-memoria-tecnica` | 285 |
+| Tables — tasks | `sound_job_tasks`, `lights_job_tasks`, `video_job_tasks`, `production_job_tasks`, `administrative_job_tasks` | — |
+| Tables — personnel | `sound_job_personnel`, `lights_job_personnel`, `video_job_personnel` | — |
+| Tables — documents | `memoria_tecnica_documents`, `lights_memoria_tecnica_documents`, `video_memoria_tecnica_documents` | — |
+
+Copy-paste detection over `src/` puts overall duplication at **0.8% (3,099 of 388,937 lines)**,
+which is genuinely low — but nearly every large clone is in this cluster: 279 + 250 + 165 + 109 +
+81 + 79 + 65 + 65 lines between the three Memoria Técnica components, and 267 + 119 between the
+lights and video task dialogs. Outside the department axis, the codebase does not repeat itself.
+
+**Why this matters more than its line count.** Three of this register's findings are the same
+shape — a correct fix applied to one member of a parallel set:
+
+- SEC-03 fixed the `ja.job_id = ja.job_id` self-comparison on `sub_rentals`; the identical bug
+  survived on `festival_artists` until the 2026-09-04 pass found it.
+- SEC-15 found seven email functions interpolating unescaped values while `escapeHtml` sat in
+  `_shared`.
+- QLT-08 (below) has two of three Mapbox popups escaping correctly and the third not.
+
+Parallel implementations do not just cost lines; they convert every fix into a sweep, and every
+missed sweep into a latent defect. Governance ratchets cannot see this class at all — each file is
+individually under budget, individually linted, individually typed.
+
+**Remediation.** Do not attempt this as one refactor. Take the Memoria Técnica triple first, since
+it is the largest and its three copies are the most similar: extract the shared component with
+department passed as a prop and the department-specific pieces as a config record, then collapse
+the three edge functions onto one entry point with a `department` parameter. The parallel *tables*
+are the deeper problem and a much larger change — record the intent, but the components and
+functions deliver most of the benefit for a fraction of the risk.
+
+### REL-03 — the app has no production observability at all
+
+**Severity: medium. New in this pass, and it is a gap rather than a defect, which is why no gate
+reports it.**
+
+`src/` contains **2,410 `console.*` calls**. `vite.config.ts` sets `drop: ['console', 'debugger']`
+for production builds. Both of those are individually reasonable; together they mean **every
+diagnostic in the client is removed at build time and nothing replaces it**. When a user hits a bug
+in production, there is no log, no breadcrumb and no error report — only the user's description.
+
+The repository already built the answer and pointed it at the smaller half of the problem:
+`structuredLogger` is adopted in **13 Edge Function files** and **0 application files**, and the
+`check-edge-logging` governance gate freezes 560 console sites in `supabase/functions/` so that
+migration can only move forward. There is no equivalent gate, and no equivalent migration, for the
+2,410 sites in `src/` — four times the volume, on the tier where users actually experience failures.
+
+Worth being precise about what is and is not wrong here: stripping `console` from production is
+correct, and the absence of logs is not a data-exposure problem. The problem is that the decision to
+strip was never paired with a decision about what production failures should look like instead.
+
+**Remediation.** Decide the destination first — a client error reporter, or `structuredLogger`
+writing to an existing endpoint. Then wire the top offenders (`useHojaDeRutaPersistence.ts` at 56
+sites, `flexUuidService.ts` at 45, `useTimesheets.ts` at 45, `unified-subscription-manager.ts` at
+32) and extend `check-edge-logging` to cover `src/` so the count can only fall. Error boundaries and
+mutation `onError` handlers are the highest-value sites; ordinary debug logging can stay dropped.
+
+### QLT-10 — the file-size ratchet holds a wall of files against the ceiling instead of causing decomposition
+
+**Severity: low. Recorded because the gate is reported as green and the shape underneath is not.**
+
+File length across `src/` (excluding the 12,994-line generated `types.ts`) is strongly bimodal.
+Median file: **124 lines**. And then:
+
+| Range | Files |
+| --- | ---: |
+| 790–800 lines | **11** |
+| 750–800 lines | **40** |
+| 700–800 lines | 60 |
+| over 800 | 3 (all generated or test fixtures) |
+
+Eleven files sit within ten lines of the 800-line limit — `Profile.tsx` at exactly 800,
+`AmpRackDesigner.tsx` at 799, then four files at 798. That distribution is not what natural code
+length looks like; it is what a ceiling looks like. The gate is doing the job it was given (nothing
+grows past 800) but the job it was assumed to be doing (files get decomposed) is not happening —
+work is being trimmed to fit instead.
+
+This was visible during the SEC-13 work in this very register: `Profile.tsx` crossed 800, and the
+resolution was to extract one hook and land at exactly 800 rather than to reconsider the file.
+
+**Remediation.** Not more gate. Either add a second, lower advisory threshold that reports without
+failing (so the trend is visible), or accept the ceiling as a growth brake and stop reading it as a
+decomposition signal. Recording which of the 40 near-ceiling files are genuinely cohesive and which
+are accretions would be more useful than another number.
+
+### QLT-11 — a completed component decomposition sits unreferenced beside the file it was meant to replace
+
+**Severity: low, but it is a miss by an existing control.**
+
+`src/components/ui/sidebar.tsx` is 774 lines and is the only version anything imports
+(`src/components/layout/Layout.tsx:17`). Beside it, `src/components/ui/sidebar/` holds a finished
+five-file decomposition of the same component — `sidebar-components.tsx` (221),
+`sidebar-context.tsx` (120), `sidebar-layout.tsx` (69), `sidebar-menu.tsx` (34), `index.tsx` (17),
+**461 lines** — that nothing in the repository reaches. Copy-paste detection flags 93 duplicated
+lines between the two.
+
+The 2026-09-05 dead-code sweep reported **0 unreferenced modules**. It missed this because
+`@/components/ui/sidebar` is ambiguous: TypeScript and Vite both resolve `sidebar.tsx` in
+preference to `sidebar/index.tsx`, so the directory looks like a live barrel export to a
+module-graph walk while resolving to nothing in practice.
+
+**Remediation.** Finish or delete. If the decomposition is the intended end state, point `Layout`
+at it and remove `sidebar.tsx`; otherwise delete the directory. Either way, teach the dead-code
+sweep about file-beats-directory resolution, or this class stays invisible.
+
+### QLT-12 — the Spanish-only UI has an English toast convention
+
+**Severity: low, but it is the most-seen text in the product.**
+
+The project rule is explicit: Spanish is the only supported UI language. Toast titles do not follow
+it, and they do not follow anything else either:
+
+| Toast title | Occurrences |
+| --- | ---: |
+| `title: "Error"` | **226** |
+| `title: "Éxito"` | 39 |
+| `title: "Success"` | 38 |
+
+So the dominant pattern is an English title over a Spanish body — `title: "Error"`,
+`description: "No se pudo actualizar el turno"` — with a Spanish minority and an English minority
+underneath it. Alongside these, roughly 70 hardcoded English strings remain in components
+(`Save`, `Cancel`, `Delete`, `Close`, `Loading...`), and 47 toasts are English end to end
+(`"Failed to export PDF."`).
+
+Credit where due: Zod validation messages, which the project rule calls out as a common miss, are
+consistently in Spanish.
+
+**Remediation.** This is a find-and-replace with a decision attached, not a refactor: pick
+`"Error"` / `"Éxito"` and apply it in one pass, then add a `/i18n-check`-backed gate so the count
+cannot climb again. The 226-instance majority means the cheapest correct answer may be to keep
+`"Error"` as a deliberate loanword and normalise `"Success"` → `"Éxito"`; what matters is that it
+stops being three conventions.
+
+### A11Y-01 — icon-only controls lose their accessible name at mobile width
+
+**Severity: medium. An entirely new class — no previous pass examined accessibility.**
+
+The pattern `<Icon /><span className="hidden sm:inline">Label</span>` appears at **65 sites**. Below
+the `sm` breakpoint the span is not rendered, so the button has no text content — and at least 15
+of those files contain no `aria-label` anywhere, meaning the control has **no accessible name at
+all** on a phone. That is WCAG 4.1.2 (Name, Role, Value), and `getByRole("button", { name })`
+cannot find these controls either.
+
+Affected files include `JobCard.tsx`, `TourManagement.tsx`, `FestivalManagementView.tsx`,
+`FestivalArtistManagement.tsx`, `FestivalGearManagement.tsx` and six job-card actions — primary
+navigation and primary actions, not edge cases.
+
+Two things make this worse than a typical a11y nit here. The product is a mobile-first PWA, so the
+broken width is the main one. And CI runs the whole e2e suite at 390 px (`test:e2e:mobile`), so the
+viewport where these controls are nameless is already exercised — the suite simply does not assert
+accessible names.
+
+**Remediation.** Add `aria-label` containing the visible text at each of the 65 sites; it is
+mechanical. Then make it stick: an ESLint rule, or an axe assertion in the mobile e2e run, so the
+count is enforced rather than fixed once. Given no accessibility review has ever been done here, a
+broader audit (focus order, contrast, form labelling, dialog focus traps) is worth scheduling
+separately — this finding is what one narrow grep surfaced, not a considered assessment of the
+whole product.
+
+### DEP-01 — 24 dependencies are a major version behind, with zero vulnerabilities
+
+**Severity: low now, and it compounds.**
+
+`npm audit` is clean and the baseline is genuinely zero — that half is in good shape. The other half
+is that 43 packages are behind, **24 of them by a major version**:
+
+| Package | Current | Latest |
+| --- | --- | --- |
+| `react` / `react-dom` | 18.3.1 | 19.2.8 |
+| `@types/react` / `@types/react-dom` | 18.3.31 | 19.2.18 |
+| `react-day-picker` | 8.10.2 | 10.0.1 |
+| `@hookform/resolvers` | 3.10.0 | 5.9.1 |
+| `@vitest/coverage-v8` | 3.2.7 | 5.0.0 |
+| `jsdom` | 29.1.1 | 30.0.1 |
+| `@vitejs/plugin-react-swc` | 3.11.0 | 4.3.3 |
+| `lucide-react` | 0.462.0 | 1.41.0 |
+
+`date-fns` (3.6.0 → 4.4.0) is a deliberate, documented pin for `react-day-picker` compatibility and
+should stay put. The rest are not decisions, they are drift — and they interlock: React 19 pulls the
+type packages, the SWC plugin and probably `react-day-picker`, so the longer it waits the more it
+becomes one large simultaneous upgrade instead of several small ones.
+
+The `--legacy-peer-deps` requirement is the symptom worth watching. It exists because the graph
+cannot resolve cleanly today, and it also hides the peer conflicts that would tell you which
+upgrades are now coupled.
+
+**Remediation.** Do not treat this as one task. Take the leaves first — `jsdom`, `@vitest/*`,
+`@testing-library/jest-dom`, `lucide-react` — where the blast radius is the test suite and CI tells
+you immediately. Then plan React 19 as its own piece of work with its own branch and full e2e run;
+`react-day-picker` and the `date-fns` pin should be re-evaluated as part of it, not before.
+
 ### SEC-16 — a technician still reads full profile rows for every shared-job colleague
 
 **Severity: medium. New on 2026-09-05, and it is the residual of SEC-13's fix rather than a
@@ -466,19 +717,24 @@ everything above the line in the previous register has shipped.
 | 2 | **SEC-18** | Revoke `anon` EXECUTE from the five unguarded functions, then re-derive the grant baseline from production rather than from the replay | Unauthenticated writes to `timesheets` and `tours`, and an unauthenticated read of pay extras. The gate reports this as reviewed and green because it reads the migration chain | S (the revokes) / M (re-derive + add the body check to the gate) | The five functions return 401/403 to `anon`; the baseline is generated from the live catalog; a function on the anon list without an authorization predicate fails CI |
 | 3 | **DB-06 (residual)** | Add the scheduled read-only production comparison, and extend the catalog export to `storage.*` | Both findings above are the same root cause: production state that no gate reads. Fixing the two instances without closing the mechanism just resets the clock to the next audit | M | A policy or ACL difference between replay and production fails something a human sees, on a cadence; `storage.objects` is in the catalog |
 | 4 | **SEC-16** | Move colleague-facing reads onto `get_profile_directory()`, then drop the shared-job branch from `profiles_select` | Still the largest exposure of personal data *to authenticated users*: one technician can read up to 134 colleagues' `dni`, `residencia`, `phone` and `email`. It ranks below the three above only because it needs a valid login | M (do the migration to the RPC first, the policy narrowing second, so the UI never breaks) | A technician reads 0 rows from `profiles` for a shared-job colleague; pgTAP asserts it; colleague-facing UI unchanged |
-| 5 | **SEC-09** | Keep draining the 560 frozen console sites, identifier-handling functions first | Ratcheted and safe, but 80 files still log through an unstructured path | L, incremental | `legacy-console-allowlist.json` shrinks each release; no function handling identifiers remains on the list |
-| 6 | — | Confirm or narrow org-wide `jobs_select` / `job_assignments_select` | Currently intent-by-inheritance; the correlated `profiles_select` depends on it, so decide deliberately rather than discover later | S (decision) | Either a recorded rationale or a narrowed policy with pgTAP |
-| 7 | **PERF-01** | Route-level budgets for the map, PDF and spreadsheet chunks | 6.6% headroom against a 15% target; no acute risk, but the ceiling is approached rather than defended | M | Headroom ≥15%, or per-route budgets replacing the single global ceiling |
-| 8 | **QLT-03** | Continue draining the 176 legacy data-layer imports | Steady structural work, no acute risk | L, incremental | Baseline falls each release |
-| 9 | **DB-02** | Extend pgTAP toward the untested half of the 184 policied tables | The catalog comparison explicitly does not test row visibility, so pgTAP remains the only behavioural check | L | Deny coverage for every table holding personal or financial data |
+| 5 | **A11Y-01** | Add `aria-label` at the 65 icon-only sites, then assert accessible names in the mobile e2e run | Mechanical, and it fixes primary navigation on the viewport this product is built for. CI already runs at 390 px — it just does not assert | S (the labels) / S (the assertion) | Every icon-only control has an accessible name at 390 px; an axe or role-name assertion fails if one regresses |
+| 6 | **QLT-09** | Collapse the Memoria Técnica triple (components, then the three edge functions) onto one department-parameterised implementation | ~4,000 lines of parallel code is the mechanism behind three of this register's own findings — every fix here is a sweep, and a missed sweep is a latent defect | L; do the components first, leave the parallel tables recorded but untouched | Three components and three functions become one each; the `*_job_tasks` split is documented as a deliberate remaining decision |
+| 7 | **REL-03** | Choose a production error destination, wire the top offenders, extend `check-edge-logging` to `src/` | Client failures in production are currently invisible: 2,410 diagnostics, all dropped at build, nothing behind them | M | Error boundaries and mutation `onError` reach a real sink; the `src/` console count is gated and falling |
+| 8 | **SEC-09** | Keep draining the 560 frozen console sites, identifier-handling functions first | Ratcheted and safe, but 80 files still log through an unstructured path | L, incremental | `legacy-console-allowlist.json` shrinks each release; no function handling identifiers remains on the list |
+| 9 | — | Confirm or narrow org-wide `jobs_select` / `job_assignments_select` | Currently intent-by-inheritance; the correlated `profiles_select` depends on it, so decide deliberately rather than discover later | S (decision) | Either a recorded rationale or a narrowed policy with pgTAP |
+| 10 | **PERF-01** | Route-level budgets for the map, PDF and spreadsheet chunks | 6.6% headroom against a 15% target; no acute risk, but the ceiling is approached rather than defended | M | Headroom ≥15%, or per-route budgets replacing the single global ceiling |
+| 11 | **QLT-03** | Continue draining the 176 legacy data-layer imports | Steady structural work, no acute risk | L, incremental | Baseline falls each release |
+| 12 | **DB-02** | Extend pgTAP toward the untested half of the 184 policied tables | The catalog comparison explicitly does not test row visibility, so pgTAP remains the only behavioural check | L | Deny coverage for every table holding personal or financial data |
 
 Items 1–3 are the ones worth doing next, and they are one piece of work in three parts. Items 1
 and 2 are the only findings in this register reachable **without any credentials**; item 3 is the
 mechanism that let both of them exist unnoticed while every gate stayed green. Fixing 1 and 2
 without 3 buys until the next audit.
 
-SEC-19 and QLT-08 are small enough to ride along with unrelated work rather than earn their own
-change.
+SEC-19, QLT-08, QLT-11 and QLT-12 are small enough to ride along with unrelated work rather than
+earn their own change. DEP-01 is not urgent but should be started as leaves-first maintenance now
+rather than deferred into a single React 19 cliff; QLT-10 is an observation about how to read an
+existing gate, not work.
 
 ---
 
@@ -489,12 +745,24 @@ change.
   (380 files / 2,101 tests) and the full `governance` chain — all green. `build`, `budget:bundle`,
   `typecheck:functions` and Playwright were not re-run; CI covers them and neither had changed in
   a way this pass examined.
-- The 2026-09-06 pass deliberately went to ground the earlier passes never covered: Storage buckets
-  and `storage.objects`, the privilege catalog (`pg_default_acl`, `has_function_privilege`) as
-  distinct from the policy catalog, the service worker's caching strategy, client XSS sinks
-  (`dangerouslySetInnerHTML`, `innerHTML`, `setHTML`), and the tokenized public surfaces. The
-  service worker came back clean — same-origin `GET` only, so no Supabase API or auth response is
-  ever cached. Client XSS came back nearly clean; QLT-08 is the single exception.
+- The 2026-09-06 pass deliberately went to ground the earlier passes never covered, on two axes.
+  *Security:* Storage buckets and `storage.objects`, the privilege catalog (`pg_default_acl`,
+  `has_function_privilege`) as distinct from the policy catalog, the service worker's caching
+  strategy, client XSS sinks (`dangerouslySetInnerHTML`, `innerHTML`, `setHTML`), and the tokenized
+  public surfaces. *Quality and reliability:* copy-paste detection over `src/` (jscpd, 40-line /
+  150-token minimum), file-length distribution against the 800-line gate, module reachability
+  re-checked by hand, `console.*` volume against the production `drop` config and `structuredLogger`
+  adoption, `npm outdated` against the manifest, hardcoded-English and toast-title counts, and a
+  grep-level accessibility check of icon-only controls.
+- Some things came back clean and are recorded as such rather than omitted: the service worker
+  (same-origin `GET` only, no API or auth response cached), client XSS (QLT-08 the single
+  exception), silent catch blocks (3 of 1,250), strict-mode escape hatches (4 in 337,985 lines),
+  and React Query configuration (central defaults, so the 269 call sites without `staleTime` are
+  inheriting a deliberate value — an early reading of that as drift was checked and dropped).
+- **Accessibility has never been audited in this repository**, and A11Y-01 is what a single narrow
+  grep surfaced, not a considered assessment. Focus order, contrast, form labelling and dialog
+  focus traps are unexamined. Treat the finding as evidence that a real accessibility review is
+  owed, not as its result.
 - **SQL findings are verified against the live production database**, not inferred from the
   migration chain, using read-only catalog queries plus role-impersonated (`SET LOCAL ROLE anon` /
   `authenticated`) row counts. This matters: in the 2026-09-04 pass the same check overturned two
