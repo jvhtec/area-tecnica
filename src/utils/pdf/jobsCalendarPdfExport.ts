@@ -29,7 +29,6 @@ import {
   DATE_TYPE_META,
   DATE_TYPE_ORDER,
   getDateTypeMeta,
-  type DateType,
 } from "@/constants/dateTypes";
 import { getCalendarExportInterval } from "@/components/dashboard/calendar-section/calendarViewModel";
 import type { CalendarArtist } from "@/utils/calendarArtists";
@@ -115,10 +114,6 @@ export const generateJobsCalendarPDF = async ({
     short: DATE_TYPE_META[type].shortLabel,
     label: DATE_TYPE_META[type].labelEs,
   }));
-  const dateTypeLabels: Record<DateType, string> = DATE_TYPE_ORDER.reduce((acc, type) => {
-    acc[type] = DATE_TYPE_META[type].shortLabel;
-    return acc;
-  }, {} as Record<DateType, string>);
 
   // Helper function to calculate events for a day
   const getEventsForDayPdf = (day: Date) => { // Renamed to avoid conflict with memoized one

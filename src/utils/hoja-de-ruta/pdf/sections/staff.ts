@@ -2,7 +2,6 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { hojaGeometry, hojaTable } from '../hoja-report-system';
 import { DataValidators } from '../utils/validators';
-import { Formatters } from '../utils/formatters';
 
 export class StaffSection {
   constructor(private pdfDoc: PDFDocument) {}

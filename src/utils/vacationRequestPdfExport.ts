@@ -142,18 +142,18 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
 
   if (request.status === 'approved' && request.approved_at) {
     y = drawReportItemLine(pdf, geo, 'Aprobada por', finalApproverName || UNKNOWN, y, { indent: 0 });
-    y = drawReportItemLine(pdf, geo, 'Fecha de aprobación', longDate(request.approved_at), y, { indent: 0 });
+    drawReportItemLine(pdf, geo, 'Fecha de aprobación', longDate(request.approved_at), y, { indent: 0 });
   } else if (request.status === 'rejected' && request.approved_at) {
     y = drawReportItemLine(pdf, geo, 'Rechazada por', finalApproverName || UNKNOWN, y, { indent: 0 });
     y = drawReportItemLine(pdf, geo, 'Fecha de rechazo', longDate(request.approved_at), y, { indent: 0 });
     if (request.rejection_reason) {
-      y = drawReportFlag(pdf, geo, y + 3, {
+      drawReportFlag(pdf, geo, y + 3, {
         label: 'Revisar',
-        text: `Motivo del rechazo: ${request.rejection_reason}`,
+        text: request.rejection_reason,
       });
     }
   } else {
-    y = drawReportItemLine(pdf, geo, 'Resolución', 'Pendiente de aprobación', y, { indent: 0 });
+    drawReportItemLine(pdf, geo, 'Resolución', 'Pendiente de aprobación', y, { indent: 0 });
   }
 
   stampReportChrome(pdf, chrome);

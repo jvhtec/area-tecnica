@@ -16,7 +16,7 @@ import {
   type ReportChromeOptions,
 } from "@/utils/pdf/report-system";
 import { loadExceljs } from "@/utils/lazyExceljs";
-import { applyStyle, saveWorkbook, toArgb, tintColor, thinBorder, hexToRgb, getContrastHexColor } from "@/utils/excelExport";
+import { saveWorkbook, toArgb, tintColor, thinBorder, hexToRgb, getContrastHexColor } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,

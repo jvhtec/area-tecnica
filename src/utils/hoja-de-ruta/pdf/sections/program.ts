@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT, hojaGeometry, hojaTable } from '../hoja-report-system';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LEFT, hojaGeometry, hojaTable } from '../hoja-report-system';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 

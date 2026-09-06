@@ -4,7 +4,6 @@ import {
   REPORT_INK,
   drawReportRunningHead,
   loadReportIssuerMark,
-  reportGeometry,
   setReportText,
   stampReportFolios,
   type ReportChromeOptions,

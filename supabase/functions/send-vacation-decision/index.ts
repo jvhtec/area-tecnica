@@ -176,19 +176,19 @@ async function generateVacationPDF(
 
   if (reqRow.status === "approved" && reqRow.approved_at) {
     y = drawReportFactRow(page, fonts, "Aprobada por", approverName, y);
-    y = drawReportFactRow(page, fonts, "Fecha de aprobación", longDate(new Date(reqRow.approved_at)), y);
+    drawReportFactRow(page, fonts, "Fecha de aprobación", longDate(new Date(reqRow.approved_at)), y);
   } else if (reqRow.status === "rejected" && reqRow.approved_at) {
     y = drawReportFactRow(page, fonts, "Rechazada por", approverName, y);
     y = drawReportFactRow(page, fonts, "Fecha de rechazo", longDate(new Date(reqRow.approved_at)), y);
     if (reqRow.rejection_reason) {
-      y = drawReportFlag(page, fonts, {
-        label: "Motivo del rechazo",
+      drawReportFlag(page, fonts, {
+        label: "Revisar",
         text: reqRow.rejection_reason,
         y: y - 6,
       });
     }
   } else {
-    y = drawReportFactRow(page, fonts, "Resolución", "Pendiente de aprobación", y);
+    drawReportFactRow(page, fonts, "Resolución", "Pendiente de aprobación", y);
   }
 
   drawReportFooter(page, fonts, {

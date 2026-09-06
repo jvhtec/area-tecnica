@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { EventData, WeatherData } from '../core/pdf-types';
+import { EventData } from '../core/pdf-types';
 import { createWeatherTableIconHooks } from '@/utils/pdf/weatherPdfIcons';
 import { REPORT_INK } from '@/utils/pdf/report-system';
 import { hojaGeometry, hojaTable } from '../hoja-report-system';

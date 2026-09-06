@@ -12,7 +12,6 @@ import {
 import {
   buildMemoriaFrontMatter,
   loadMemoriaBranding,
-  MEMORIA_PAGE,
 } from "../_shared/memoriaAssembly.ts";
 import { createHttpHandler, HttpError, jsonResponse } from "../_shared/http.ts";
 
