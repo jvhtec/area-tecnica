@@ -14,7 +14,9 @@ it('draws each signature in Firma, leaving overtime and overnight hours intact',
     onload?: () => void;
     set src(_value: string) { queueMicrotask(() => this.onload?.()); }
   });
-  const images = vi.spyOn(jsPDF.API, 'addImage').mockImplementation(function (this: jsPDF) { return this; });
+  // jsPDF declares API as a plugin registry, not as its runtime image methods.
+  const imageApi = jsPDF.API as unknown as Pick<jsPDF, 'addImage'>;
+  const images = vi.spyOn(imageApi, 'addImage').mockImplementation(function (this: jsPDF) { return this; });
   const doc = await generateTimesheetPDF({
     job: { id: 'job', title: 'Prueba' } as never,
     date: '2026-09-06',
