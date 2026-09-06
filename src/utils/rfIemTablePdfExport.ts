@@ -1,18 +1,16 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
+import { distributeColumnWidths } from '@/utils/pdf/festival-report/tables';
 import {
-  distributeColumnWidths,
   drawFestivalChrome,
-  drawFestivalConstantsLine,
   drawFestivalMetaGrid,
   drawFestivalSectionHeading,
   drawFestivalTitleBlock,
-  FESTIVAL_ACCENT,
-  FESTIVAL_RULE,
-  festivalTableTheme,
-  loadFestivalIssuerMark,
-} from '@/utils/pdf/festival-report';
+} from '@/utils/pdf/festival-report/chrome';
+import { drawFestivalConstantsLine, festivalTableTheme } from '@/utils/pdf/festival-report/components';
+import { FESTIVAL_ACCENT, FESTIVAL_RULE } from '@/utils/pdf/festival-report/tokens';
+import { loadFestivalIssuerMark } from '@/utils/pdf/festival-report/issuerMark';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 import { extractRfIemScheduleFields, formatRfIemScheduleCell } from '@/utils/rfIemScheduleFields';
 import { groupArtistsByFestivalDay } from '@/utils/pdf/rfIemFestivalDays';

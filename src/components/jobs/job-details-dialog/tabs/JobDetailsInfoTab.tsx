@@ -15,7 +15,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { syncFlexWorkOrdersForJob } from "@/services/flexWorkOrders";
-import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { generateTimesheetPDF } from "@/utils/timesheet-pdf";
 import { generateJobPayoutPDF, generateRateQuotePDF } from "@/utils/rates-pdf-export";
 import { sendJobPayoutEmails } from "@/lib/job-payout-email";
@@ -646,7 +645,8 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     }
 
                     // 4) Build final file (tourdate: payouts only, no timesheet section)
-                    const finalBlob = isTourDateJob || !tsBlob ? payoutBlob : await mergePDFs([tsBlob, payoutBlob]);
+                    const finalBlob = isTourDateJob || !tsBlob ? payoutBlob
+                      : await (await import("@/utils/pdf/pdfMerge")).mergePDFs([tsBlob, payoutBlob]);
                     const url = URL.createObjectURL(finalBlob);
                     const a = document.createElement("a");
                     a.href = url;

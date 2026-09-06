@@ -284,17 +284,26 @@ test("carries a long-press multi-select into the offer, clamped to the job", asy
   await page.goto("/job-assignment-matrix");
   await expect(page.getByRole("heading", { name: /matriz de asignación de trabajos/i })).toBeVisible();
 
-  const cells = page.locator('[data-matrix-cell="true"]');
-  const todayIndex = await page.locator('[data-matrix-cell-state="today"]').first().evaluate((el) => {
-    return Array.from(document.querySelectorAll('[data-matrix-cell="true"]')).indexOf(el);
+  const todayPosition = await page.locator('[data-matrix-cell-state="today"]').first().evaluate((el) => {
+    const scroller = el.closest('.matrix-main-scroll')!;
+    const rect = el.getBoundingClientRect();
+    return { left: rect.left - scroller.getBoundingClientRect().left + scroller.scrollLeft, width: rect.width };
   });
 
-  // Two days the job runs on, plus one it does not.
+  // Seek the virtualized column before locating its accessible date. DOM
+  // indices change as columns mount/unmount, and scrolling a missing nth()
+  // element cannot mount it. Two days are in the job, the third is outside.
   for (const step of [0, 1, 4]) {
-    const cell = cells.nth(todayIndex + step);
-    await cell.scrollIntoViewIfNeeded();
+    await page.locator('.matrix-main-scroll').evaluate((el, left) => {
+      el.scrollTo({ left, behavior: 'instant' });
+    }, todayPosition.left + step * todayPosition.width);
+    const dateLabel = new Intl.DateTimeFormat('es-ES', {
+      day: 'numeric', month: 'long', timeZone: 'Europe/Madrid',
+    }).format(new Date(`${dayKey(step)}T12:00:00Z`));
+    const cell = page.getByRole('button', { name: new RegExp(`, ${dateLabel}:`) });
+    await expect(cell).toBeVisible();
     await cell.dispatchEvent("touchstart");
-    await page.waitForTimeout(600);
+    await expect(cell).toHaveAttribute('aria-pressed', 'true');
     await cell.dispatchEvent("touchend");
   }
   await expect(page.getByText("3 días")).toBeVisible();
