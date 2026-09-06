@@ -1,6 +1,6 @@
 import type jsPDF from 'jspdf';
 import type { PdfRgb } from '@/utils/pdf/exportHelpers';
-import { FESTIVAL_ACCENT } from '@/utils/pdf/festival-report';
+import { FESTIVAL_ACCENT } from '@/utils/pdf/festival-report/tokens';
 
 /**
  * Document families outside the festival set.

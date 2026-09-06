@@ -6,17 +6,14 @@ import { getDepartmentLabel } from '@/types/department';
 import { buildVacationRequestPdfFilename } from '@/utils/pdfFileNames';
 import { loadJsPDF } from '@/utils/pdf/lazyPdf';
 import {
-  REPORT_INK,
-  REPORT_SOFT,
   drawReportMasthead,
   drawReportSectionHeading,
   loadReportIssuerMark,
-  setReportText,
   stampReportChrome,
-  drawReportFlag,
+  ensureReportSpace,
   type ReportChromeOptions,
 } from '@/utils/pdf/report-system';
-import { drawReportItemLine } from '@/utils/pdf/report-system/blocks';
+import { drawReportFactRows, drawReportItemLine, drawReportProse } from '@/utils/pdf/report-system/blocks';
 
 const UNKNOWN = 'No disponible';
 
@@ -124,19 +121,14 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   y = drawReportItemLine(pdf, geo, 'Empleado', techName, y, { indent: 0 });
   y = drawReportItemLine(pdf, geo, 'Departamento', department, y, { indent: 0 });
   y = drawReportItemLine(pdf, geo, 'Fecha de la solicitud', longDate(request.created_at), y, { indent: 0 });
-  y = drawReportItemLine(pdf, geo, 'Periodo solicitado', period, y, { indent: 0 });
+  y = drawReportFactRows(pdf, geo, [['Periodo solicitado', period]], y, { labelWidthMm: 45 });
   y = drawReportItemLine(pdf, geo, 'Duración', durationLabel, y, { indent: 0 });
   y += 4;
 
   y = drawReportSectionHeading(pdf, geo, 'Motivo', y, 2);
-  setReportText(pdf, request.reason ? REPORT_INK : REPORT_SOFT, 8);
-  const reasonLines = pdf.splitTextToSize(
-    request.reason || 'No se indicó ningún motivo.',
-    geo.contentWidth,
-  ) as string[];
-  pdf.text(reasonLines, geo.left, y, { lineHeightFactor: 1.3 });
-  y += reasonLines.length * 4.4 + 6;
+  y = drawReportProse(pdf, geo, request.reason || 'No se indicó ningún motivo.', y);
 
+  y = ensureReportSpace(pdf, geo, y, 40);
   y = drawReportSectionHeading(pdf, geo, 'Resolución', y, 3);
   y = drawReportItemLine(pdf, geo, 'Estado', statusLabel, y, { indent: 0 });
 
@@ -147,10 +139,9 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
     y = drawReportItemLine(pdf, geo, 'Rechazada por', finalApproverName || UNKNOWN, y, { indent: 0 });
     y = drawReportItemLine(pdf, geo, 'Fecha de rechazo', longDate(request.approved_at), y, { indent: 0 });
     if (request.rejection_reason) {
-      drawReportFlag(pdf, geo, y + 3, {
-        label: 'Revisar',
-        text: request.rejection_reason,
-      });
+      y = ensureReportSpace(pdf, geo, y + 3, 20);
+      y = drawReportSectionHeading(pdf, geo, 'Motivo del rechazo', y, 4);
+      drawReportProse(pdf, geo, request.rejection_reason, y);
     }
   } else {
     drawReportItemLine(pdf, geo, 'Resolución', 'Pendiente de aprobación', y, { indent: 0 });

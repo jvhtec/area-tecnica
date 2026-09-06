@@ -305,11 +305,16 @@ export const drawReportProse = (
   fonts: ReportFonts,
   text: string,
   y: number,
+  nextPage?: () => PDFPage,
 ): number => {
   const content = text?.trim();
   const lines = wrapText(content || "Sin información.", fonts.body, 10, REPORT_CONTENT_WIDTH);
   let cursor = y;
   for (const line of lines) {
+    if (cursor < 70 && nextPage) {
+      page = nextPage();
+      cursor = REPORT_PAGE.height - 120;
+    }
     page.drawText(line, {
       x: REPORT_MARGIN,
       y: cursor,
@@ -431,9 +436,9 @@ export const embedIssuerMark = async (
   supabase: StorageClient,
 ): Promise<PDFImage | null> => {
   for (const candidate of ISSUER_MARK_CANDIDATES) {
-    const { data, error } = await supabase.storage.from(candidate.bucket).download(candidate.path);
-    if (error || !data) continue;
     try {
+      const { data, error } = await supabase.storage.from(candidate.bucket).download(candidate.path);
+      if (error || !data || data.size > 2 * 1024 * 1024) continue;
       return await pdf.embedPng(new Uint8Array(await data.arrayBuffer()));
     } catch {
       logEvent("warn", "report.issuer_mark_embed_failed", { bucket: candidate.bucket });

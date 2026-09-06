@@ -17,6 +17,7 @@ import {
 } from '@/utils/pdf/report-system';
 import {
   drawReportEntryHeading,
+  drawReportFactRows,
   drawReportItemLine,
   drawReportNotes,
   drawReportTotals,
@@ -133,9 +134,7 @@ export async function generateJobPayoutPDF(
 
     if (invoicingRows.length > 0) {
       yPos = drawReportSectionHeading(doc, geo, 'Facturación', yPos, 1);
-      invoicingRows.forEach(([label, value]) => {
-        yPos = drawReportItemLine(doc, geo, label, value, yPos, { indent: 0 });
-      });
+      yPos = drawReportFactRows(doc, geo, invoicingRows, yPos, { labelWidthMm: 45 });
       yPos += 4;
     }
   }

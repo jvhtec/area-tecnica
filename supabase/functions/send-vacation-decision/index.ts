@@ -5,7 +5,6 @@ import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 import {
   drawReportChrome,
   drawReportFactRow,
-  drawReportFlag,
   drawReportFooter,
   drawReportMetaGrid,
   drawReportProse,
@@ -124,12 +123,12 @@ const longDate = (value: Date): string =>
  * it is built on the same design: the technician should not receive a sheet
  * that looks nothing like the one they can download.
  */
-async function generateVacationPDF(
+export async function generateVacationPDF(
   reqRow: VacationRequestRow,
   supabase: StorageClient,
 ) {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([REPORT_PAGE.width, REPORT_PAGE.height]);
+  let page = doc.addPage([REPORT_PAGE.width, REPORT_PAGE.height]);
   const fonts = await embedReportFonts(doc);
   const issuerMark = await embedIssuerMark(doc, supabase);
 
@@ -145,6 +144,16 @@ async function generateVacationPDF(
   const statusLabel = STATUS_LABELS[reqRow.status] ?? reqRow.status;
 
   drawReportChrome(page, fonts, "Solicitud de vacaciones", issuerMark);
+  const nextPage = () => {
+    page = doc.addPage([REPORT_PAGE.width, REPORT_PAGE.height]);
+    drawReportChrome(page, fonts, "Solicitud de vacaciones", issuerMark);
+    return page;
+  };
+  const ensureSpace = (cursor: number, height: number) => {
+    if (cursor - height >= 70) return cursor;
+    nextPage();
+    return REPORT_PAGE.height - 120;
+  };
 
   let y = drawReportTitleBlock(page, fonts, {
     eyebrow: "Solicitud de vacaciones",
@@ -169,8 +178,9 @@ async function generateVacationPDF(
   y = drawReportFactRow(page, fonts, "Duración", durationLabel, y);
 
   y = drawReportSectionHeading(page, fonts, "Motivo", y - 8, 2);
-  y = drawReportProse(page, fonts, reqRow.reason || "", y);
+  y = drawReportProse(page, fonts, reqRow.reason || "", y, nextPage);
 
+  y = ensureSpace(y, 145);
   y = drawReportSectionHeading(page, fonts, "Resolución", y - 8, 3);
   y = drawReportFactRow(page, fonts, "Estado", statusLabel, y);
 
@@ -181,21 +191,19 @@ async function generateVacationPDF(
     y = drawReportFactRow(page, fonts, "Rechazada por", approverName, y);
     y = drawReportFactRow(page, fonts, "Fecha de rechazo", longDate(new Date(reqRow.approved_at)), y);
     if (reqRow.rejection_reason) {
-      drawReportFlag(page, fonts, {
-        label: "Revisar",
-        text: reqRow.rejection_reason,
-        y: y - 6,
-      });
+      y = ensureSpace(y, 50);
+      y = drawReportSectionHeading(page, fonts, "Motivo del rechazo", y - 6, 4);
+      drawReportProse(page, fonts, reqRow.rejection_reason, y, nextPage);
     }
   } else {
     drawReportFactRow(page, fonts, "Resolución", "Pendiente de aprobación", y);
   }
 
-  drawReportFooter(page, fonts, {
+  doc.getPages().forEach((target, index) => drawReportFooter(target, fonts, {
     issuer: "Sector-Pro · Solicitud de vacaciones",
-    pageNumber: 1,
+    pageNumber: index + 1,
     totalPages: doc.getPageCount(),
-  });
+  }));
 
   const bytes = await doc.save();
 
