@@ -20,7 +20,14 @@ const {
     setLineWidth: vi.fn(),
     setLineDashPattern: vi.fn(),
     setFont: vi.fn(),
+    getFont: vi.fn(() => ({ fontName: 'helvetica' })),
     getTextWidth: vi.fn(() => 20),
+    // The document chrome draws its marks and rules with these.
+    roundedRect: vi.fn(),
+    circle: vi.fn(),
+    line: vi.fn(),
+    splitTextToSize: vi.fn((value: string) => [value]),
+    getNumberOfPages: vi.fn(() => doc.internal.pages.length - 1),
     addPage: vi.fn(function (this: any) {
       doc.internal.pages.push({});
       return this;
@@ -43,7 +50,7 @@ const {
     getCompanyLogoMock: vi.fn(),
     jsPdfConstructorMock: vi.fn(() => doc),
     autoTableMock: vi.fn((instance: any, options: any) => {
-      options.didDrawPage?.();
+      options.didDrawPage?.({ pageNumber: 1 });
       instance.lastAutoTable = { finalY: 120 };
     }),
     docMock: doc,
@@ -134,8 +141,9 @@ describe('technicalPowerSummaryPack', () => {
     expect(blob).toBeInstanceOf(Blob);
     expect(jsPdfConstructorMock).toHaveBeenCalled();
     expect(autoTableMock).toHaveBeenCalled();
+    // The running head names the document type, in caps, on every page.
     expect(docMock.text).toHaveBeenCalledWith(
-      'Resumen Tecnico de Potencia',
+      'RESUMEN TÉCNICO DE POTENCIA',
       expect.any(Number),
       expect.any(Number),
       expect.any(Object)
@@ -144,12 +152,12 @@ describe('technicalPowerSummaryPack', () => {
       expect.anything(),
       expect.objectContaining({
         head: [[
-          'Stage',
-          'Nombre Cuadro',
+          'Escenario',
+          'Cuadro',
           'PDU',
           'Posición',
           'Potencia',
-          'Corriente de línea',
+          'Corriente',
           'Notas',
         ]],
       })
@@ -157,7 +165,7 @@ describe('technicalPowerSummaryPack', () => {
     expect(autoTableMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        body: expect.arrayContaining([expect.arrayContaining(['Stage 0'])]),
+        body: expect.arrayContaining([expect.arrayContaining(['Escenario 0'])]),
       })
     );
   });
@@ -200,17 +208,24 @@ describe('technicalPowerSummaryPack', () => {
       },
     });
 
+    // The job date and the issue date travel in the conditions grid, as values
+    // under their own labels rather than as sentences.
     expect(docMock.text).toHaveBeenCalledWith(
-      'Fecha del trabajo: 07/04/2026',
+      'FECHA DEL TRABAJO',
       expect.any(Number),
       expect.any(Number),
       expect.any(Object)
     );
     expect(docMock.text).toHaveBeenCalledWith(
-      'Creado: 07/04/2026',
+      'EMISIÓN',
       expect.any(Number),
       expect.any(Number),
       expect.any(Object)
+    );
+    expect(docMock.text).toHaveBeenCalledWith(
+      '07/04/2026',
+      expect.any(Number),
+      expect.any(Number)
     );
   });
 
@@ -276,12 +291,12 @@ describe('technicalPowerSummaryPack', () => {
     });
 
     expect(docMock.text).toHaveBeenCalledWith(
-      'Distribución en Escenario - Main Stage',
+      'DISTRIBUCIÓN EN ESCENARIO · MAIN STAGE',
       expect.any(Number),
       expect.any(Number)
     );
     expect(docMock.text).toHaveBeenCalledWith(
-      'Distribución en Escenario - Main-Stage',
+      'DISTRIBUCIÓN EN ESCENARIO · MAIN-STAGE',
       expect.any(Number),
       expect.any(Number)
     );

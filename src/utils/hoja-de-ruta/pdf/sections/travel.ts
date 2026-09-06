@@ -1,4 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
+import { HOJA_HEADING, HOJA_INDENT, HOJA_LABEL, HOJA_LEFT, HOJA_RIGHT_INSET } from '../hoja-report-system';
 import { TravelArrangement } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
@@ -24,8 +25,8 @@ export class TravelSection {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 120);
       
       // Travel arrangement header
-      this.pdfDoc.setText(12, [125, 1, 1]);
-      this.pdfDoc.addText(`Transporte: ${Formatters.translateTransportType(arrangement.transportation_type)}`, 30, yPosition);
+      this.pdfDoc.setText(12, HOJA_HEADING);
+      this.pdfDoc.addText(`Transporte: ${Formatters.translateTransportType(arrangement.transportation_type)}`, HOJA_INDENT, yPosition);
       yPosition += 15;
 
       // Travel details table
@@ -49,10 +50,10 @@ export class TravelSection {
           theme: "plain",
           styles: { fontSize: 10, cellPadding: 4 },
           columnStyles: {
-            0: { cellWidth: 50, fontStyle: 'bold', textColor: [125, 1, 1] },
+            0: { cellWidth: 50, fontStyle: 'bold', textColor: HOJA_LABEL },
             1: { cellWidth: 120 }
           },
-          margin: { left: 20, right: 20 },
+          margin: { left: HOJA_LEFT, right: HOJA_RIGHT_INSET },
           tableWidth: 'auto'
         });
         yPosition = this.pdfDoc.getLastAutoTableY() + 10;
@@ -82,8 +83,8 @@ export class TravelSection {
   private async addPickupMapAndQR(pickupAddress: string, yPosition: number): Promise<void> {
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
 
-    this.pdfDoc.setText(11, [125, 1, 1]);
-    this.pdfDoc.addText('Mapa de Recogida:', 20, yPosition);
+    this.pdfDoc.setText(11, HOJA_HEADING);
+    this.pdfDoc.addText('Mapa de Recogida:', HOJA_LEFT, yPosition);
     yPosition += 10;
 
     const desiredMapWidth = 160;
@@ -143,7 +144,7 @@ export class TravelSection {
 
     if (!mapAdded) {
       // Fallback placeholder within margins
-      this.pdfDoc.setText(10, [125, 1, 1]);
+      this.pdfDoc.setText(10, HOJA_HEADING);
       this.pdfDoc.addText('[MAPA NO DISPONIBLE]', mapX + 5, mapY + mapHeight / 2);
     }
 
@@ -158,7 +159,7 @@ export class TravelSection {
         this.pdfDoc.addLink(pickupUrl, qrX, qrY, qrSize, qrSize);
 
         // Caption below QR (kept simple to avoid overflow)
-        this.pdfDoc.setText(9, [125, 1, 1]);
+        this.pdfDoc.setText(9, HOJA_HEADING);
         this.pdfDoc.addText('Ruta a Recogida', qrX, qrY + qrSize + 6);
         this.pdfDoc.setText(8, [51, 51, 51]);
         this.pdfDoc.addText('Escanea para direcciones', qrX, qrY + qrSize + 12);

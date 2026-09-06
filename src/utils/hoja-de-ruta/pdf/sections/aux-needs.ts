@@ -2,6 +2,7 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { AUXILIARY_MACHINERY_LABELS } from '@/constants/hojaDeRutaAuxiliaryNeeds';
+import { HOJA_INDENT, hojaGeometry, hojaTable } from '../hoja-report-system';
 
 export class AuxNeedsSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -35,21 +36,10 @@ export class AuxNeedsSection {
         startY: yPosition,
         head: [["Concepto", "Cantidad"]],
         body: tableRows,
-        theme: "grid",
-        margin: { left: 30, right: 20 },
-        styles: {
-          fontSize: 9,
-          cellPadding: 2,
-          textColor: [51, 51, 51],
-        },
-        headStyles: {
-          fillColor: [125, 1, 1],
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-        },
-        columnStyles: {
-          1: { halign: "right", cellWidth: 25 },
-        },
+        ...hojaTable(hojaGeometry(this.pdfDoc.document), {
+          numericColumns: [1],
+          weights: [76, 24],
+        }),
       });
 
       yPosition = this.pdfDoc.getLastAutoTableY() + 6;
@@ -69,10 +59,10 @@ export class AuxNeedsSection {
 
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 14);
     this.pdfDoc.setText(10, [51, 51, 51]);
-    this.pdfDoc.addText("Notas:", 30, yPosition);
+    this.pdfDoc.addText("Notas:", HOJA_INDENT, yPosition);
     yPosition += lineHeight;
 
-    yPosition = this.pdfDoc.addWrappedLines(auxLines, 30, yPosition, { lineHeight });
+    yPosition = this.pdfDoc.addWrappedLines(auxLines, HOJA_INDENT, yPosition, { lineHeight });
 
     return yPosition + 4;
   }

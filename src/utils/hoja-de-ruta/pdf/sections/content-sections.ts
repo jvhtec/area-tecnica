@@ -142,7 +142,7 @@ export class ContentSections {
 
   // Data validation methods
   hasEventDetailsData(eventData: EventData): boolean {
-    return !!(eventData.eventName || eventData.clientName || eventData.eventDates || eventData.eventStartTime);
+    return !!(eventData.eventName || eventData.eventDates || eventData.eventStartTime);
   }
 
   hasVenueData(eventData: EventData): boolean {

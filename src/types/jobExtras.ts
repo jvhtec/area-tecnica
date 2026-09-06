@@ -64,9 +64,9 @@ export interface JobPayoutTotals {
 }
 
 export const EXTRA_TYPE_LABELS: Record<JobExtraType, string> = {
-  travel_half: 'Half Travel Day',
-  travel_full: 'Full Travel Day',
-  day_off: 'Day Off',
+  travel_half: 'Medio día de viaje',
+  travel_full: 'Día completo de viaje',
+  day_off: 'Día libre',
   conduccion: 'Conducción'
 };
 
@@ -76,9 +76,11 @@ export const JOB_EXTRA_BREAKDOWN_LABELS: Record<JobExtraBreakdownType, string> =
 };
 
 export function labelForJobExtraType(extraType: string): string {
-  if (extraType === PREVENTIVE_RESOURCE_EXTRA_TYPE) {
-    return JOB_EXTRA_BREAKDOWN_LABELS[PREVENTIVE_RESOURCE_EXTRA_TYPE];
-  }
+  // The map was only ever consulted for the preventive-resource type, so every
+  // other extra printed its raw key — "travel half" — on payout cards, the tour
+  // rates panel and the payout PDF.
+  const label = JOB_EXTRA_BREAKDOWN_LABELS[extraType as JobExtraBreakdownType];
+  if (label) return label;
 
   return extraType.replace(/_/g, ' ');
 }

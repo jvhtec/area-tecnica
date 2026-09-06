@@ -94,7 +94,6 @@ export interface EventData {
   eventName?: string;
   eventCode?: string;
   eventType?: string;
-  clientName?: string;
   eventDates?: string;
   eventStartTime?: string;
   eventEndTime?: string;

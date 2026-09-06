@@ -79,30 +79,9 @@ export class PDFEngine {
     this.hasCoverPage = !requestedSections;
     this.renderedSectionCount = 0;
 
-    // Load logo first (used on cover and in page header)
+    // The job mark is placed once, on the cover; the running head carries the
+    // Sector-Pro mark instead of repeating the client's on every page.
     this.logoData = (await LogoService.loadJobLogo(selectedJobId)) ?? undefined;
-
-    // Compute header logo scaled dimensions to keep aspect ratio
-    let headerLogoDims: { width: number; height: number } | undefined = undefined;
-    if (this.logoData) {
-      headerLogoDims = await new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          const MAX_H = 28;
-          const MAX_W = 160;
-          const w = img.naturalWidth || img.width;
-          const h = img.naturalHeight || img.height;
-          if (w > 0 && h > 0) {
-            const scale = Math.min(MAX_H / h, MAX_W / w);
-            resolve({ width: Math.round(w * scale), height: Math.round(h * scale) });
-          } else {
-            resolve({ width: 84, height: 28 });
-          }
-        };
-        img.onerror = () => resolve({ width: 84, height: 28 });
-        img.src = this.logoData!;
-      });
-    }
 
     // Initialize header section now that we have job info and logo
     this.headerSection = new HeaderSection(
@@ -112,8 +91,6 @@ export class PDFEngine {
       selectedSections
         ? `Hoja de Ruta - ${selectedSectionLabel}`
         : 'Hoja de Ruta',
-      this.logoData || undefined,
-      headerLogoDims
     );
     
     if (this.hasCoverPage) {
@@ -131,7 +108,11 @@ export class PDFEngine {
     }
 
     // Add Sector-Pro footer to all pages with page numbers and job name
-    await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle, { hasCoverPage: this.hasCoverPage });
+    await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle, {
+      hasCoverPage: this.hasCoverPage,
+      headerTitle: selectedSections ? `Hoja de Ruta - ${selectedSectionLabel}` : 'Hoja de Ruta',
+      pageLabels: this.headerSection.labels,
+    });
 
     return {
       ...this.createGeneratedPDF(),
@@ -147,10 +128,10 @@ export class PDFEngine {
     if (includeEvent || includeVenue) {
       let currentY = this.addSectionHeader(
         includeEvent && includeVenue
-          ? "Detalles y Venue"
+          ? "Detalles y recinto"
           : includeEvent
             ? "Detalles del Evento"
-            : "Venue"
+            : "Recinto"
       );
 
       if (includeEvent) {
@@ -279,7 +260,7 @@ export class PDFEngine {
     }
 
     if (sectionSelection.has("venue") && this.hasVenueExportData()) {
-      const currentY = this.addSectionHeader("Venue");
+      const currentY = this.addSectionHeader("Recinto");
       await this.contentSections.addVenueSection(
         this.options.eventData,
         this.options.venueMapPreview,
@@ -376,7 +357,9 @@ export class PDFEngine {
   }
 
   private addSectionHeader(title: string): number {
-    const currentY = this.headerSection.addSectionHeader(title, 55, {
+    // The section heading sits at the system's content top; the engine no
+    // longer has to clear a 40 mm band before it.
+    const currentY = this.headerSection.addSectionHeader(title, undefined, {
       startOnNewPage: this.hasCoverPage || this.renderedSectionCount > 0,
     });
     this.renderedSectionCount += 1;

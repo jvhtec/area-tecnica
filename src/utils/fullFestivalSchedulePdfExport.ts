@@ -1,10 +1,18 @@
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import {
-  loadImageWithTimeout as loadImageSafely,
-  SECTOR_PRO_LOGO_PATH,
-  FALLBACK_BRAND_LOGO_PATH,
-} from '@/utils/pdf/shared/pdfExportShared';
+  distributeColumnWidths,
+  drawFestivalChrome,
+  drawFestivalConstantsLine,
+  drawFestivalMetaGrid,
+  drawFestivalNilState,
+  drawFestivalTitleBlock,
+  festivalTableTheme,
+  loadFestivalIssuerMark,
+} from '@/utils/pdf/festival-report';
+import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
 
 // Artist data interface for full schedule export
 export interface FullScheduleArtist {
@@ -27,230 +35,129 @@ export interface FullFestivalSchedulePdfData {
   artists: FullScheduleArtist[];
   stageNames?: Record<number, string>;
   logoUrl?: string;
+  /** False when the document is bound into a set that stamps its own folios. */
+  paginate?: boolean;
 }
 
-export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePdfData): Promise<Blob> => {
-  console.log('exportFullFestivalSchedulePDF called with data:', data);
-  
+const TABLE_HEAD = ['Fecha', 'Día', 'Artista', 'Escenario', 'Carga', 'Show', 'Prueba', 'Line check'];
+const TABLE_WEIGHTS = [18, 20, 54, 24, 16, 26, 24, 24];
+
+/** A window that was not scheduled reads as an em dash, never as a blank cell. */
+const timeWindow = (start?: string, end?: string, enabled = true): string =>
+  enabled && start && end ? `${start} – ${end}` : '—';
+
+export const exportFullFestivalSchedulePDF = async (
+  data: FullFestivalSchedulePdfData,
+): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const doc = new jsPDF('landscape');
-  const pageWidth = doc.internal.pageSize.width;
-  const pageHeight = doc.internal.pageSize.height;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  // === HEADER SECTION ===
-  doc.setFillColor(125, 1, 1);
-  doc.rect(0, 0, pageWidth, 35, 'F');
+  await loadFestivalIssuerMark();
+  const clientLogo = data.logoUrl
+    ? await loadImageWithTimeout(data.logoUrl, 'logotipo del festival')
+    : null;
 
-  // Load festival logo if provided
-  let festivalLogoLoaded = false;
-  if (data.logoUrl) {
-    console.log("Attempting to load festival logo:", data.logoUrl);
-    
-    const festivalImg = await loadImageSafely(data.logoUrl, 'festival logo');
-    if (festivalImg) {
-      try {
-        console.log("Festival logo loaded, dimensions:", festivalImg.width, "x", festivalImg.height);
-        const maxHeight = 20;
-        const ratio = festivalImg.width / festivalImg.height;
-        const logoHeight = Math.min(maxHeight, festivalImg.height);
-        const logoWidth = logoHeight * ratio;
-        
-        doc.addImage(festivalImg, 'JPEG', 10, 7, logoWidth, logoHeight);
-        festivalLogoLoaded = true;
-        console.log("Festival logo added successfully to PDF");
-      } catch (error) {
-        console.error('Error adding festival logo to PDF:', error);
-      }
-    }
-  }
-
-  // If festival logo failed, try fallback logo
-  if (!festivalLogoLoaded) {
-    console.log("Trying fallback logo");
-    const fallbackImg = await loadImageSafely(FALLBACK_BRAND_LOGO_PATH, 'fallback logo');
-    if (fallbackImg) {
-      try {
-        const maxHeight = 20;
-        const ratio = fallbackImg.width / fallbackImg.height;
-        const logoHeight = Math.min(maxHeight, fallbackImg.height);
-        const logoWidth = logoHeight * ratio;
-        
-        doc.addImage(fallbackImg, 'PNG', 10, 7, logoWidth, logoHeight);
-        console.log("Fallback logo added successfully");
-      } catch (error) {
-        console.error('Error adding fallback logo to PDF:', error);
-      }
-    }
-  }
-
-  // Add title
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  const titleText = `${data.jobTitle} - Festival Schedule`;
-  doc.text(titleText, pageWidth / 2, 20, { align: 'center' });
-  
-  doc.setFontSize(12);
-  doc.text('Complete Show Schedule', pageWidth / 2, 30, { align: 'center' });
-
-  // Sort artists by date, then by show time
   const sortedArtists = data.artists
-    .filter(artist => artist.show_start) // Only include artists with show times
+    .filter((artist) => artist.show_start)
     .sort((a, b) => {
-      // First sort by date
       const dateCompare = a.date.localeCompare(b.date);
-      if (dateCompare !== 0) return dateCompare;
-      
-      // Then by show start time
-      return a.show_start.localeCompare(b.show_start);
+      return dateCompare !== 0 ? dateCompare : a.show_start.localeCompare(b.show_start);
     });
 
-  console.log('Sorted artists for schedule:', sortedArtists.length);
+  const uniqueDates = [...new Set(sortedArtists.map((artist) => artist.date))];
+  const uniqueStages = [...new Set(sortedArtists.map((artist) => artist.stage))];
+  const stageName = (stage: number): string => data.stageNames?.[stage] || `Escenario ${stage}`;
 
-  // === FESTIVAL SCHEDULE TABLE ===
-  const tableData = sortedArtists.map(artist => {
-    const stageName = data.stageNames?.[artist.stage] || `Stage ${artist.stage}`;
-    const loadInTime = artist.load_in_time || '-';
-    const showTime = `${artist.show_start} - ${artist.show_end}`;
-    const soundcheckTime = artist.soundcheck && artist.soundcheck_start && artist.soundcheck_end 
-      ? `${artist.soundcheck_start} - ${artist.soundcheck_end}`
-      : '-';
-    const lineCheckTime = artist.line_check && artist.line_check_start && artist.line_check_end
-      ? `${artist.line_check_start} - ${artist.line_check_end}`
-      : '-';
-    
-    return [
-      format(new Date(artist.date), 'dd/MM/yyyy'),
-      format(new Date(artist.date), 'EEEE'),
-      artist.name,
-      stageName,
-      loadInTime,
-      showTime,
-      soundcheckTime,
-      lineCheckTime
-    ];
+  const period = uniqueDates.length
+    ? `${format(new Date(uniqueDates[0]), 'dd/MM/yyyy')} – ${format(
+        new Date(uniqueDates[uniqueDates.length - 1]),
+        'dd/MM/yyyy',
+      )}`
+    : 'Sin fechas';
+
+  const chrome = (pageNumber?: number, totalPages?: number) =>
+    drawFestivalChrome(doc, {
+      kind: 'programme',
+      kindLabel: 'Programa completo',
+      eventTitle: data.jobTitle,
+      contextLabel: period,
+      issuer: `Sector-Pro  ·  ${data.jobTitle}`,
+      pageNumber,
+      totalPages,
+      paginate: data.paginate !== false,
+    });
+
+  const geo = chrome();
+
+  let y = drawFestivalTitleBlock(doc, geo, {
+    eyebrow: 'Programa completo del festival  ·  Rev. A',
+    title: data.jobTitle,
+    subtitle: period,
+    clientLogo,
   });
 
-  console.log('Schedule table data prepared:', tableData.length, 'rows');
+  y = drawFestivalMetaGrid(doc, geo, [
+    { label: 'Jornadas', value: String(uniqueDates.length) },
+    { label: 'Actuaciones', value: String(sortedArtists.length) },
+    { label: 'Escenarios', value: String(uniqueStages.length) },
+    { label: 'Periodo', value: period },
+  ], y);
 
-  autoTable(doc, {
-    head: [['FECHA', 'DÍA', 'ARTISTA', 'ESCENARIO', 'LOAD IN', 'SHOW', 'SOUNDCHECK', 'LINE CHECK']],
-    body: tableData,
-    startY: 45,
-    theme: 'grid',
-    styles: {
-      fontSize: 8,
-      cellPadding: 2,
-      valign: 'middle',
-      lineColor: [200, 200, 200],
-      lineWidth: 0.1,
-    },
-    headStyles: {
-      fillColor: [125, 1, 1],
-      textColor: [255, 255, 255],
-      fontSize: 8.5,
-      fontStyle: 'bold',
-      cellPadding: 3,
-    },
-    columnStyles: {
-      0: { cellWidth: 20, halign: 'center' }, // Date
-      1: { cellWidth: 22, halign: 'center' }, // Day
-      2: { cellWidth: 60, halign: 'left' }, // Artist
-      3: { cellWidth: 25, halign: 'center' }, // Stage
-      4: { cellWidth: 20, halign: 'center' }, // Load In
-      5: { cellWidth: 30, halign: 'center' }, // Show Time
-      6: { cellWidth: 25, halign: 'center' }, // Soundcheck
-      7: { cellWidth: 25, halign: 'center' }, // Line Check
-    },
-    alternateRowStyles: {
-      fillColor: [248, 249, 250],
-    },
-    margin: { left: 10, right: 10 },
-  });
-
-  // Add summary information
-  const uniqueDates = [...new Set(sortedArtists.map(a => a.date))];
-  const totalArtists = sortedArtists.length;
-  const uniqueStages = [...new Set(sortedArtists.map(a => a.stage))];
-
-  let currentY = (doc as any).lastAutoTable.finalY + 20;
-
-  // Check if we need a new page for the summary
-  if (currentY > pageHeight - 80) {
-    doc.addPage();
-    currentY = 20;
-  }
-
-  // Add summary section
-  doc.setFontSize(14);
-  doc.setTextColor(125, 1, 1);
-  doc.text('Resumen del Festival', 15, currentY);
-  currentY += 15;
-
-  doc.setFontSize(11);
-  doc.setTextColor(0, 0, 0);
-  doc.text(`Total de fechas: ${uniqueDates.length}`, 15, currentY);
-  currentY += 8;
-  doc.text(`Total de artistas: ${totalArtists}`, 15, currentY);
-  currentY += 8;
-  doc.text(`Escenarios utilizados: ${uniqueStages.length} (${uniqueStages.map(s => data.stageNames?.[s] || `Stage ${s}`).join(', ')})`, 15, currentY);
-  currentY += 8;
-
-  if (uniqueDates.length > 0) {
-    const firstDate = format(new Date(uniqueDates[0]), 'dd/MM/yyyy');
-    const lastDate = format(new Date(uniqueDates[uniqueDates.length - 1]), 'dd/MM/yyyy');
-    doc.text(`Período: ${firstDate} - ${lastDate}`, 15, currentY);
-  }
-
-  // === COMPANY LOGO (CENTERED AT BOTTOM) ===
-  console.log("Attempting to load Sector Pro logo");
-  const sectorImg = await loadImageSafely(SECTOR_PRO_LOGO_PATH, 'Sector Pro logo');
-  if (sectorImg) {
-    try {
-      const logoWidth = 30;
-      const ratio = sectorImg.width / sectorImg.height;
-      const logoHeight = logoWidth / ratio;
-      
-      doc.addImage(
-        sectorImg, 
-        'PNG', 
-        pageWidth / 2 - logoWidth / 2,
-        pageHeight - logoHeight - 10,
-        logoWidth,
-        logoHeight
-      );
-      console.log("Sector Pro logo added successfully at bottom center");
-    } catch (error) {
-      console.error('Error adding Sector Pro logo to PDF:', error);
-    }
+  if (sortedArtists.length === 0) {
+    drawFestivalNilState(
+      doc,
+      geo,
+      y,
+      'No hay actuaciones con horario de show confirmado. El programa está confirmado como vacío, no pendiente de planificación.',
+    );
   } else {
-    const altSectorImg = await loadImageSafely(FALLBACK_BRAND_LOGO_PATH, 'alternative Sector Pro logo');
-    if (altSectorImg) {
-      try {
-        const logoWidth = 30;
-        const ratio = altSectorImg.width / altSectorImg.height;
-        const logoHeight = logoWidth / ratio;
-        
-        doc.addImage(
-          altSectorImg, 
-          'PNG', 
-          pageWidth / 2 - logoWidth / 2,
-          pageHeight - logoHeight - 10,
-          logoWidth,
-          logoHeight
-        );
-        console.log("Alternative Sector Pro logo added successfully");
-      } catch (error) {
-        console.error('Error adding alternative Sector Pro logo to PDF:', error);
-      }
-    }
+    const body = sortedArtists.map((artist) => [
+      format(new Date(artist.date), 'dd/MM/yy'),
+      format(new Date(artist.date), 'EEEE', { locale: es }),
+      artist.name,
+      stageName(artist.stage),
+      artist.load_in_time || '—',
+      timeWindow(artist.show_start, artist.show_end),
+      timeWindow(artist.soundcheck_start, artist.soundcheck_end, artist.soundcheck),
+      timeWindow(artist.line_check_start, artist.line_check_end, artist.line_check),
+    ]);
+
+    autoTable(doc, {
+      head: [TABLE_HEAD],
+      body,
+      startY: y,
+      ...festivalTableTheme(geo, { fontSize: 6.8, numericColumns: [0, 4, 5, 6, 7] }),
+      columnStyles: distributeColumnWidths(TABLE_WEIGHTS, geo.contentWidth),
+      margin: {
+        left: geo.left,
+        right: geo.pageWidth - geo.right,
+        top: geo.contentTop,
+        bottom: geo.pageHeight - geo.contentBottom,
+      },
+      didDrawPage: (hook) => {
+        if (hook.pageNumber > 1) chrome();
+      },
+    });
+
+    // The stages are the same on every row of a given day; naming them once
+    // under the table keeps them out of the reader's way but still on the page.
+    drawFestivalConstantsLine(
+      doc,
+      geo,
+      [
+        { label: 'Escenarios', value: uniqueStages.map(stageName).join('  ·  ') },
+        { label: 'Actuaciones', value: String(sortedArtists.length) },
+        { label: 'Generado', value: new Date().toLocaleDateString('es-ES') },
+      ],
+      getLastAutoTableY(doc, y) + 2,
+    );
   }
 
-  // Add creation date
-  doc.setFontSize(8);
-  doc.setTextColor(100, 100, 100);
-  const creationDate = new Date().toLocaleDateString('es-ES');
-  doc.text(`Generado: ${creationDate}`, pageWidth - 15, pageHeight - 5, { align: 'right' });
+  const totalPages = doc.getNumberOfPages();
+  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+    doc.setPage(pageNumber);
+    chrome(pageNumber, totalPages);
+  }
 
-  console.log('Full festival schedule PDF generation complete');
   return doc.output('blob');
 };

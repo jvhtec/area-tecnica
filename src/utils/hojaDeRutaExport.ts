@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { EventData, TravelArrangement, Accommodation, Transport } from "@/types/hoja-de-ruta";
 import { loadExceljs } from "@/utils/lazyExceljs";
-import { applyStyle, populateSheet, saveWorkbook, toArgb } from "@/utils/excelExport";
+import { applyStyle, populateSheet, saveWorkbook } from "@/utils/excelExport";
 import type ExcelJS from "exceljs";
 import { formatLogisticsHojaCategories } from "@/constants/logisticsHojaCategories";
 
@@ -55,7 +55,6 @@ const createEventSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
     ["Nombre del Evento", data.eventData.eventName || ""],
     ["Código del Evento", data.eventData.eventCode || ""],
     ["Tipo de Evento", data.eventData.eventType || ""],
-    ["Cliente", data.eventData.clientName || ""],
     ["Fechas", data.eventData.eventDates || ""],
     ["Hora de Inicio", data.eventData.eventStartTime || ""],
     ["Hora de Fin", data.eventData.eventEndTime || ""],

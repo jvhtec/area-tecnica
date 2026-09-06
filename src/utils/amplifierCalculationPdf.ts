@@ -1,137 +1,116 @@
 import { format } from 'date-fns';
-import type { SpeakerSection, AmplifierResults } from '@/components/sound/amplifier-tool/types';
+import { es } from 'date-fns/locale';
+import type { AmplifierResults } from '@/components/sound/amplifier-tool/types';
+import { getLastAutoTableY } from '@/utils/pdf/exportHelpers';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  drawReportMasthead,
+  drawReportRunningHead,
+  drawReportSectionHeading,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportFolios,
+  type ReportChromeOptions,
+  type ReportGeometry,
+} from '@/utils/pdf/report-system';
+import {
+  drawReportEntryHeading,
+  drawReportHeadlineFigure,
+  drawReportTotals,
+} from '@/utils/pdf/report-system/blocks';
 
-export const generateAmplifierPdf = async (
-  config: Record<string, SpeakerSection>,
-  results: AmplifierResults,
-  soundComponentDatabase: Array<{ id: number; name: string; weight: number }>,
-): Promise<Blob> => {
+/** The subsystem keys the amplifier tool works in, named for the reader. */
+const SECTION_LABELS: Record<string, string> = {
+  mains: 'Mains',
+  outs: 'Outs',
+  subs: 'Subs',
+  fronts: 'Front fills',
+  delays: 'Delays',
+  other: 'Otros',
+};
+
+const sectionLabel = (section: string): string =>
+  SECTION_LABELS[section] ?? section.charAt(0).toUpperCase() + section.slice(1);
+
+export const generateAmplifierPdf = async (results: AmplifierResults): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const createdDate = format(new Date(), 'PPP');
+  const doc = new jsPDF();
+  await loadReportIssuerMark();
 
-      // Header
-      doc.setFillColor(125, 1, 1);
-      doc.rect(0, 0, pageWidth, 30, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
-      doc.text("Amplifier Requirements Report", pageWidth / 2, 20, { align: 'center' });
+  const issuedOn = new Date();
+  const activeSections = Object.entries(results.perSection).filter(
+    ([, data]) => data.totalAmps > 0,
+  );
 
-      // Date
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(12);
-      doc.text(`Generated: ${createdDate}`, 14, 40);
+  const chrome: ReportChromeOptions = {
+    kind: 'amplifier',
+    kindLabel: 'Necesidades de amplificación',
+    eventTitle: 'Necesidades de amplificación',
+    contextLabel: format(issuedOn, 'dd/MM/yyyy'),
+  };
 
-      let yPosition = 60;
-
-      // Section Details
-      Object.entries(results.perSection).forEach(([section, data]) => {
-        if (data.totalAmps > 0) {
-          // Section Header
-          doc.setFontSize(14);
-          doc.setTextColor(125, 1, 1);
-          const sectionTitle = `${section.charAt(0).toUpperCase() + section.slice(1)}${data.mirrored ? ' (Mirrored)' : ''}`;
-          doc.text(sectionTitle, 14, yPosition);
-          yPosition += 10;
-
-          // Speaker Details
-          const speakerData = data.details.map(detail => [detail]);
-          autoTable(doc, {
-            startY: yPosition,
-            head: [['Speaker Configuration']],
-            body: speakerData,
-            theme: 'grid',
-            headStyles: {
-              fillColor: [200, 200, 200],
-              textColor: [0, 0, 0],
-              fontStyle: 'bold'
-            },
-            margin: { left: 14, right: 14 },
-          });
-
-          yPosition = (doc as any).lastAutoTable.finalY + 10;
-
-          // Total for section
-          doc.setFontSize(12);
-          doc.setTextColor(0, 0, 0);
-          doc.text(`Total amplifiers for section: ${data.totalAmps}`, 14, yPosition);
-          yPosition += 20;
-
-          // Check if we need a new page
-          if (yPosition > pageHeight - 40) {
-            doc.addPage();
-            yPosition = 20;
-          }
-        }
-      });
-
-      // Summary Section
-      doc.setFontSize(16);
-      doc.setTextColor(125, 1, 1);
-      doc.text("Summary", 14, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      const summaryData = [
-        [`Total LA-RAKs required: ${results.completeRaks}`],
-        [`Additional loose amplifiers: ${results.looseAmplifiers}`],
-        [`Total amplifiers needed: ${results.totalAmplifiersNeeded}`]
-      ];
-
-      autoTable(doc, {
-        startY: yPosition,
-        body: summaryData,
-        theme: 'plain',
-        styles: {
-          fontSize: 12,
-          cellPadding: 2
-        },
-        margin: { left: 14, right: 14 }
-      });
-
-      // Add logo
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-
-      logo.onload = () => {
-        try {
-          const logoWidth = 40;
-          const logoHeight = logoWidth * (logo.height / logo.width);
-          const totalPages = (doc.internal as any).pages.length;
-
-          // Add logo and page numbers to each page
-          for (let i = 1; i <= totalPages; i++) {
-            doc.setPage(i);
-            doc.addImage(logo, 'PNG', pageWidth - 50, pageHeight - 25, logoWidth, logoHeight);
-            doc.setFontSize(10);
-            doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-          }
-
-          const blob = doc.output('blob');
-          resolve(blob);
-        } catch (error) {
-          console.error('Error adding logo:', error);
-          const blob = doc.output('blob');
-          resolve(blob);
-        }
-      };
-
-      logo.onerror = () => {
-        console.error('Failed to load logo');
-        const blob = doc.output('blob');
-        resolve(blob);
-      };
-
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      reject(error);
-    }
+  const { geo, y: contentTop } = drawReportMasthead(doc, {
+    ...chrome,
+    title: 'Necesidades de amplificación',
+    subtitle: `Cálculo emitido el ${format(issuedOn, 'PPP', { locale: es })}`,
+    meta: [
+      { label: 'Subsistemas', value: String(activeSections.length) },
+      { label: 'Racks LA-RAK', value: String(results.completeRaks) },
+      { label: 'Amplificadores', value: String(results.totalAmplifiersNeeded) },
+    ],
   });
+
+  // The figure the whole calculation exists to produce leads the page.
+  let y = drawReportHeadlineFigure(doc, geo, contentTop, {
+    label: 'Amplificadores necesarios',
+    value: String(results.totalAmplifiersNeeded),
+    support: `${results.completeRaks} ${results.completeRaks === 1 ? 'rack completo' : 'racks completos'} más ${results.looseAmplifiers} ${results.looseAmplifiers === 1 ? 'unidad suelta' : 'unidades sueltas'}.`,
+  });
+
+  const breakIfShort = (cursor: number, needed: number): number => {
+    if (cursor <= geo.contentBottom - needed) return cursor;
+    doc.addPage();
+    const pageGeo: ReportGeometry = drawReportRunningHead(doc, chrome);
+    return pageGeo.contentTop;
+  };
+
+  y = drawReportSectionHeading(doc, geo, 'Detalle por subsistema', y + 4, 1);
+
+  activeSections.forEach(([section, data]) => {
+    y = breakIfShort(y, 34);
+    y = drawReportEntryHeading(
+      doc,
+      geo,
+      `${sectionLabel(section)}${data.mirrored ? ' · Simétrico' : ''}`,
+      y,
+      `${data.totalAmps} ${data.totalAmps === 1 ? 'amplificador' : 'amplificadores'}`,
+    );
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Configuración de cajas']],
+      body: data.details.map((detail) => [detail]),
+      ...reportTableDefaults(geo, { fontSize: 7.2 }),
+      didDrawPage: (hook) => {
+        if (hook.pageNumber > 1) drawReportRunningHead(doc, chrome);
+      },
+    });
+
+    y = getLastAutoTableY(doc, y) + 8;
+  });
+
+  y = breakIfShort(y, 40);
+  drawReportTotals(doc, geo, y, {
+    heading: 'Resumen',
+    lines: [
+      { label: 'Racks LA-RAK completos', value: String(results.completeRaks) },
+      { label: 'Amplificadores sueltos', value: String(results.looseAmplifiers) },
+      { label: 'Racks PLM', value: String(results.plmRacks) },
+    ],
+    total: { label: 'Amplificadores necesarios', value: String(results.totalAmplifiersNeeded) },
+  });
+
+  stampReportFolios(doc);
+
+  return doc.output('blob');
 };

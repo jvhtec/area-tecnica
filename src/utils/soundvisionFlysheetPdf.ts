@@ -7,8 +7,18 @@ import type {
 import {
   loadCompanyLogoDataUrl,
   safeAddPdfImage,
-  SECTOR_PRO_RED,
 } from '@/utils/pdf/exportHelpers';
+import {
+  REPORT_ACCENT,
+  REPORT_FAINT,
+  REPORT_HAIRLINE,
+  REPORT_INK,
+  REPORT_RULE,
+  REPORT_RULE_WEIGHT,
+  REPORT_SOFT,
+  setReportMonoText,
+  setReportText,
+} from '@/utils/pdf/report-system';
 import { loadJsPDF } from '@/utils/pdf/lazyPdf';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 
@@ -487,39 +497,48 @@ function drawHeader(
   flysheet: SoundvisionFlysheet,
   sourceFileName: string,
   createdBy: string,
-  pageNumber: number,
-  pageCount: number,
 ): number {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const contentWidth = pageWidth - MARGIN * 2;
-  pdf.setFillColor(...SECTOR_PRO_RED);
-  pdf.rect(0, 0, pageWidth, 30, 'F');
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(20);
-  pdf.setTextColor(255, 255, 255);
-  pdf.text('FLYSHEET SOUNDVISION', pageWidth / 2, 20, { align: 'center' });
 
-  const metaY = 36;
+  // The flysheet keeps its own tight cell grid, so the running head is set at
+  // the sheet's own margin rather than the system's — same marks, same rule,
+  // aligned to the content it sits over.
+  setReportText(pdf, REPORT_INK, 9, 'bold');
+  pdf.text('SECTOR-PRO', MARGIN, 14, { charSpace: 0.35 });
+
+  setReportMonoText(pdf, REPORT_SOFT, 6.4, 'bold');
+  pdf.text('FLYSHEET SOUNDVISION', pageWidth - MARGIN, 14, {
+    align: 'right',
+    charSpace: 0.25,
+  });
+
+  pdf.setDrawColor(...REPORT_ACCENT);
+  pdf.setLineWidth(REPORT_RULE_WEIGHT);
+  pdf.line(MARGIN, 18, pageWidth - MARGIN, 18);
+
+  setReportText(pdf, REPORT_INK, 16, 'bold');
+  pdf.text(flysheet.projectName || 'Proyecto sin nombre', MARGIN, 27, { charSpace: -0.1 });
+
+  const metaY = 33;
   const columnGap = 6;
   const columnWidth = (contentWidth - columnGap) / 2;
   const leftValueX = MARGIN + 34;
   const rightX = MARGIN + columnWidth + columnGap;
   const rightValueX = rightX + 34;
-  drawCell(pdf, 'Proyecto', MARGIN, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, flysheet.projectName || 'SIN NOMBRE', leftValueX, metaY, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
-  drawCell(pdf, 'Archivo XMLP', rightX, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, sourceFileName, rightValueX, metaY, columnWidth - 34, 7, { fontSize: 7.5 });
-  drawCell(pdf, 'Predicción creada por', MARGIN, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7 });
-  drawCell(pdf, createdBy, leftValueX, metaY + 7, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
-  drawCell(pdf, 'Página', rightX, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, `${pageNumber} / ${pageCount}`, rightValueX, metaY + 7, columnWidth - 34, 7, { fontSize: 7.5 });
-  drawCell(pdf, 'Validación', MARGIN, metaY + 14, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
-  drawCell(pdf, 'Cargas, seguridad y flying bar: comprobar en Soundvision', leftValueX, metaY + 14, contentWidth - 34, 7, {
+  // The project is the title above and the folio is in the footer, so neither
+  // is repeated here; the row states what the sheet was built from and by whom.
+  drawCell(pdf, 'Archivo XMLP', MARGIN, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, sourceFileName, leftValueX, metaY, columnWidth - 34, 7, { fontSize: 7.5 });
+  drawCell(pdf, 'Predicción creada por', rightX, metaY, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7 });
+  drawCell(pdf, createdBy, rightValueX, metaY, columnWidth - 34, 7, { bold: true, fontSize: 7.5 });
+  drawCell(pdf, 'Validación', MARGIN, metaY + 7, 34, 7, { bold: true, fill: LIGHT_GRAY, fontSize: 7.5 });
+  drawCell(pdf, 'Cargas, seguridad y flying bar: comprobar en Soundvision', leftValueX, metaY + 7, contentWidth - 34, 7, {
     bold: true,
     fill: YELLOW,
     fontSize: 7.2,
   });
-  return metaY + 25;
+  return metaY + 18;
 }
 
 function drawFooter(
@@ -531,29 +550,38 @@ function drawFooter(
 ): void {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(7);
-  pdf.setTextColor(80, 80, 80);
+
+  pdf.setDrawColor(...REPORT_RULE);
+  pdf.setLineWidth(REPORT_HAIRLINE);
+  pdf.line(MARGIN, pageHeight - 14, pageWidth - MARGIN, pageHeight - 14);
+
+  setReportMonoText(pdf, REPORT_SOFT, 5.8);
   pdf.text(
-    `Generado: ${formatInTimeZone(generatedAt, MADRID_TIMEZONE, 'dd/MM/yyyy HH:mm')}`,
+    `SECTOR-PRO  ·  GENERADO ${formatInTimeZone(generatedAt, MADRID_TIMEZONE, 'dd/MM/yyyy HH:mm')}`,
     MARGIN,
-    pageHeight - 10,
+    pageHeight - 9,
+    { charSpace: 0.18 },
   );
 
-  pdf.setTextColor(...BLACK);
-  pdf.setFontSize(8);
-  pdf.text(`Página ${pageNumber} de ${pageCount}`, pageWidth / 2, pageHeight - 10, {
-    align: 'center',
+  const total = ` / ${String(pageCount).padStart(2, '0')}`;
+  setReportMonoText(pdf, REPORT_INK, 7.5, 'bold');
+  const totalWidth = pdf.getTextWidth(total);
+  pdf.text(String(pageNumber).padStart(2, '0'), pageWidth - MARGIN - totalWidth, pageHeight - 9, {
+    align: 'right',
   });
+  setReportMonoText(pdf, REPORT_FAINT, 7.5, 'bold');
+  pdf.text(total, pageWidth - MARGIN, pageHeight - 9, { align: 'right' });
 
-  const logoWidth = 40;
+  // The brand mark is set in type in the running head; the artwork is only
+  // placed here when it loaded, and never as a substitute for the folio.
+  const logoWidth = 30;
   const logoHeight = logoWidth / 7.94;
   safeAddPdfImage(
     pdf,
     brandLogoDataUrl,
     'PNG',
-    pageWidth - 50,
-    pageHeight - 25,
+    pageWidth / 2 - logoWidth / 2,
+    pageHeight - 11 - logoHeight,
     logoWidth,
     logoHeight,
     'No se pudo añadir el logotipo de Sector Pro al flysheet:',
@@ -617,8 +645,6 @@ export async function generateSoundvisionFlysheetPdf(
       flysheet,
       sourceFileName,
       createdBy.trim() || 'No identificado',
-      pageIndex + 1,
-      pages.length,
     );
     const cabinetsStartY = drawSummaryRows(pdf, arrays, MARGIN, tableStartY, arrayWidth) + 2;
     const warningsStartY =

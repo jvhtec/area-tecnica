@@ -1,14 +1,10 @@
 import type jsPDF from 'jspdf';
-import { formatInTimeZone } from 'date-fns-tz';
-import { es } from 'date-fns/locale';
 import { loadPdfLibs, type AutoTableFn } from '@/utils/pdf/lazyPdf';
-import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 
 export type { AutoTableFn };
 export type PdfRgb = [number, number, number];
 
 export const SECTOR_PRO_RED: PdfRgb = [125, 1, 1];
-export const DEFAULT_PDF_HEADER_HEIGHT = 30;
 export const COMPANY_LOGO_FALLBACK_PATHS = [
   '/sector pro logo.png',
   './sector pro logo.png',
@@ -137,84 +133,3 @@ export const safeAddPdfImage = (
   }
 };
 
-export interface CorporateHeaderOptions {
-  title: string;
-  subtitle?: string;
-  logo?: string | null;
-  logoFormat?: string;
-  backgroundColor?: PdfRgb;
-  height?: number;
-}
-
-export const drawCorporatePdfHeader = (
-  pdf: jsPDF,
-  {
-    title,
-    subtitle,
-    logo,
-    logoFormat = 'PNG',
-    backgroundColor = SECTOR_PRO_RED,
-    height = DEFAULT_PDF_HEADER_HEIGHT,
-  }: CorporateHeaderOptions,
-): void => {
-  const pageWidth = pdf.internal.pageSize.width;
-
-  pdf.setFillColor(...backgroundColor);
-  pdf.rect(0, 0, pageWidth, height, 'F');
-
-  safeAddPdfImage(pdf, logo, logoFormat, 5, 5, 25, 20, 'Error adding PDF header logo:');
-
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(18);
-  pdf.text(title, pageWidth / 2, 15, { align: 'center' });
-
-  if (subtitle) {
-    pdf.setFontSize(12);
-    pdf.text(subtitle, pageWidth / 2, 25, { align: 'center' });
-  }
-};
-
-export interface GeneratedFooterOptions {
-  pageNumber?: number;
-  logo?: string | null;
-  logoFormat?: string;
-  generatedAt?: Date;
-}
-
-export const drawGeneratedPdfFooter = (
-  pdf: jsPDF,
-  {
-    pageNumber,
-    logo,
-    logoFormat = 'PNG',
-    generatedAt = new Date(),
-  }: GeneratedFooterOptions = {},
-): void => {
-  const pageWidth = pdf.internal.pageSize.width;
-  const pageHeight = pdf.internal.pageSize.height;
-
-  if (logo) {
-    const logoWidth = 40;
-    const logoHeight = 15;
-    const x = (pageWidth - logoWidth) / 2;
-    const y = pageHeight - 25;
-    safeAddPdfImage(pdf, logo, logoFormat, x, y, logoWidth, logoHeight, 'Error adding PDF footer logo:');
-  }
-
-  pdf.setFontSize(8);
-  pdf.setTextColor(100, 100, 100);
-  pdf.text(
-    `Generado el ${formatInTimeZone(
-      generatedAt,
-      MADRID_TIMEZONE,
-      "d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-      { locale: es },
-    )}`,
-    10,
-    pageHeight - 10,
-  );
-
-  if (pageNumber !== undefined) {
-    pdf.text(`Página ${pageNumber}`, pageWidth - 30, pageHeight - 10);
-  }
-};

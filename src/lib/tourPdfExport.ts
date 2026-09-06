@@ -1,6 +1,6 @@
 import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
-import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { buildReadableFilename } from '@/utils/fileName';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 import {
@@ -11,15 +11,21 @@ import {
 } from '@/utils/tourPackages';
 import {
   createPdfExportDocument,
-  drawCorporatePdfHeader,
-  getLastAutoTableY,
-  loadCompanyLogoDataUrl,
   pdfToBlob,
-  safeAddPdfImage,
-  SECTOR_PRO_RED,
   type AutoTableFn,
   type AutoTablePdfDocument,
 } from '@/utils/pdf/exportHelpers';
+import {
+  distributeColumnWidths,
+  drawReportMasthead,
+  drawReportRunningHead,
+  loadReportIssuerMark,
+  reportTableDefaults,
+  stampReportFolios,
+  type ReportChromeOptions,
+  type ReportGeometry,
+} from '@/utils/pdf/report-system';
+import { resolveHeaderLogo } from '@/utils/pdf/shared/pdfExportShared';
 
 interface TourScheduleDate {
   date: string;
@@ -46,110 +52,81 @@ const sortedTourDates = (tour: TourScheduleExport): TourScheduleDate[] =>
 const tableRowsForTour = (tour: TourScheduleExport) =>
   sortedTourDates(tour).map((date) => [
     format(parseISO(date.date), 'dd/MM/yyyy'),
-    format(parseISO(date.date), 'EEEE'),
-    date.location?.name || 'TBC',
+    format(parseISO(date.date), 'EEEE', { locale: es }),
+    date.location?.name || 'Por confirmar',
     PACKAGE_DEPARTMENTS
       .map((department) => {
         const packageSize = getDepartmentPackageSize(date, department);
         return packageSize ? getPackageBadgeLabel({ department, packageSize }) : null;
       })
       .filter(Boolean)
-      .join(' · ') || 'Unassigned',
+      .join(' · ') || 'Sin asignar',
   ]);
-
-const drawTourScheduleHeader = async (
-  pdf: AutoTablePdfDocument,
-  tour: TourScheduleExport,
-) => {
-  let logoUrl: string | undefined;
-  try {
-    logoUrl = await fetchTourLogo(tour.id);
-  } catch (error) {
-    console.warn('Could not load tour logo:', error);
-  }
-
-  drawCorporatePdfHeader(pdf, {
-    title: tour.name,
-    subtitle: 'Tour Schedule',
-    logo: logoUrl,
-  });
-};
 
 const drawTourScheduleTable = (
   pdf: AutoTablePdfDocument,
   autoTable: AutoTableFn,
   tour: TourScheduleExport,
+  geo: ReportGeometry,
+  chrome: ReportChromeOptions,
+  startY: number,
 ) => {
   autoTable(pdf, {
-    head: [['Date', 'Day', 'Venue', 'Setup Type']],
+    head: [['Fecha', 'Día', 'Recinto', 'Montaje']],
     body: tableRowsForTour(tour),
-    startY: 40,
-    theme: 'grid',
-    styles: {
-      fontSize: 10,
-      cellPadding: 3,
-      valign: 'top',
+    startY,
+    ...reportTableDefaults(geo, { fontSize: 7.6, numericColumns: [0] }),
+    columnStyles: distributeColumnWidths([22, 22, 62, 34], geo.contentWidth),
+    didDrawPage: (hook) => {
+      if (hook.pageNumber > 1) drawReportRunningHead(pdf, chrome);
     },
-    headStyles: {
-      fillColor: SECTOR_PRO_RED,
-      textColor: [255, 255, 255],
-      fontSize: 11,
-      fontStyle: 'bold',
-    },
-    columnStyles: {
-      0: { cellWidth: 30, halign: 'center' },
-      1: { cellWidth: 30, halign: 'center' },
-      2: { cellWidth: 'auto', halign: 'left' },
-      3: { cellWidth: 40, halign: 'center' },
-    },
-    margin: { left: 10, right: 10 },
   });
-};
-
-const drawTourScheduleFooter = async (pdf: AutoTablePdfDocument) => {
-  const pageWidth = pdf.internal.pageSize.width;
-  const pageHeight = pdf.internal.pageSize.height;
-  const finalY = getLastAutoTableY(pdf, 100);
-
-  pdf.setFontSize(10);
-  pdf.setTextColor(...SECTOR_PRO_RED);
-  pdf.text(
-    `Generated on ${formatInTimeZone(new Date(), MADRID_TIMEZONE, 'dd/MM/yyyy HH:mm')}`,
-    10,
-    finalY + 20,
-  );
-
-  const logo = await loadCompanyLogoDataUrl();
-  if (!logo) {
-    console.warn('Could not load Sector Pro logo from any fallback path');
-    return;
-  }
-
-  const logoWidth = 40;
-  const logoHeight = 15;
-  safeAddPdfImage(
-    pdf,
-    logo,
-    'PNG',
-    (pageWidth - logoWidth) / 2,
-    pageHeight - 30,
-    logoWidth,
-    logoHeight,
-    'Error adding logo to PDF:',
-  );
 };
 
 const buildTourSchedulePdf = async (tour: TourScheduleExport): Promise<AutoTablePdfDocument> => {
   const { pdf, autoTable } = await createPdfExportDocument();
-  await drawTourScheduleHeader(pdf, tour);
-  drawTourScheduleTable(pdf, autoTable, tour);
-  await drawTourScheduleFooter(pdf);
+  const [clientLogo] = await Promise.all([
+    resolveHeaderLogo({ tourId: tour.id }),
+    loadReportIssuerMark(),
+  ]);
+
+  const dates = sortedTourDates(tour);
+  const period = dates.length
+    ? `${format(parseISO(dates[0].date), 'dd/MM/yyyy')} – ${format(
+        parseISO(dates[dates.length - 1].date),
+        'dd/MM/yyyy',
+      )}`
+    : 'Sin fechas';
+  const chrome: ReportChromeOptions = {
+    kind: 'tour',
+    kindLabel: 'Calendario de gira',
+    eventTitle: tour.name,
+    contextLabel: period,
+  };
+
+  const { geo, y: contentTop } = drawReportMasthead(pdf, {
+    ...chrome,
+    title: tour.name,
+    subtitle: `Calendario de gira · ${period}`,
+    clientLogo,
+    meta: [
+      { label: 'Fechas', value: String(dates.length) },
+      { label: 'Periodo', value: period },
+      {
+        label: 'Emisión',
+        value: formatInTimeZone(new Date(), MADRID_TIMEZONE, 'dd/MM/yyyy HH:mm'),
+      },
+    ],
+  });
+
+  drawTourScheduleTable(pdf, autoTable, tour, geo, chrome, contentTop);
+  stampReportFolios(pdf);
   return pdf;
 };
 
 export const exportTourPDF = async (tour: TourScheduleExport) => {
   const pdf = await buildTourSchedulePdf(tour);
-  pdf.save(buildReadableFilename([tour.name, 'schedule']));
+  pdf.save(buildReadableFilename([tour.name, 'calendario']));
 };
 
 export const buildTourSchedulePdfBlob = async (tour: TourScheduleExport): Promise<Blob> => {
