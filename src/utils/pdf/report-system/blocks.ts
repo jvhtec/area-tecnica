@@ -6,6 +6,7 @@ import {
   REPORT_RULE,
   REPORT_SOFT,
   drawReportTotalsRule,
+  ensureReportSpace,
   setReportMonoText,
   setReportText,
   truncateToWidth,
@@ -86,14 +87,15 @@ export const drawReportNotes = (
   present.forEach((note) => {
     setReportText(doc, REPORT_INK, 6.8);
     const lines = doc.splitTextToSize(note, geo.contentWidth - 5 * mm) as string[];
-    const height = lines.length * 3.1 * mm;
-
-    doc.setDrawColor(...REPORT_ACCENT);
-    doc.setLineWidth(0.5 * mm);
-    doc.line(geo.left, cursor - 2.4 * mm, geo.left, cursor + height - 3 * mm);
-
-    doc.text(lines, geo.left + 3 * mm, cursor, { lineHeightFactor: 1.24 });
-    cursor += height + 2.2 * mm;
+    for (const line of lines) {
+      cursor = ensureReportSpace(doc, geo, cursor, 3.1 * mm);
+      doc.setDrawColor(...REPORT_ACCENT);
+      doc.setLineWidth(0.5 * mm);
+      doc.line(geo.left, cursor - 2.4 * mm, geo.left, cursor + 0.7 * mm);
+      doc.text(line, geo.left + 3 * mm, cursor);
+      cursor += 3.1 * mm;
+    }
+    cursor += 2.2 * mm;
   });
 
   return cursor + 1 * mm;
@@ -196,13 +198,17 @@ export const drawReportFactRows = (
   let cursor = y;
 
   rows.forEach(([label, value]) => {
+    cursor = ensureReportSpace(doc, geo, cursor, 4.2 * mm);
     setReportMonoText(doc, REPORT_SOFT, 5.8, 'bold');
     doc.text(label.toUpperCase(), geo.left, cursor, { charSpace: 0.2 * mm });
 
     setReportText(doc, REPORT_INK, 8);
     const lines = doc.splitTextToSize(value, geo.contentWidth - labelWidth) as string[];
-    doc.text(lines, geo.left + labelWidth, cursor, { lineHeightFactor: 1.25 });
-    cursor += Math.max(1, lines.length) * 4.2 * mm;
+    for (const line of lines) {
+      cursor = ensureReportSpace(doc, geo, cursor, 4.2 * mm);
+      doc.text(line, geo.left + labelWidth, cursor);
+      cursor += 4.2 * mm;
+    }
   });
 
   return cursor + 3 * mm;
@@ -223,6 +229,11 @@ export const drawReportProse = (
   const content = text?.trim();
   setReportText(doc, content ? REPORT_INK : REPORT_SOFT, 8);
   const lines = doc.splitTextToSize(content || 'Sin información.', geo.contentWidth) as string[];
-  doc.text(lines, geo.left, y, { lineHeightFactor: 1.35 });
-  return y + lines.length * 4 * mm + 3 * mm;
+  let cursor = y;
+  for (const line of lines) {
+    cursor = ensureReportSpace(doc, geo, cursor, 4 * mm);
+    doc.text(line, geo.left, cursor);
+    cursor += 4 * mm;
+  }
+  return cursor + 3 * mm;
 };

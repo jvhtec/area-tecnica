@@ -30,30 +30,24 @@ import {
   FESTIVAL_SOFT,
   FESTIVAL_TOTALS_WEIGHT,
   FESTIVAL_TRACK,
-  drawFestivalChrome,
-  drawFestivalConstantsLine,
-  drawFestivalFlag,
-  drawFestivalGauge,
-  drawFestivalHatch,
-  drawFestivalMetaGrid,
-  drawFestivalNilState,
-  drawFestivalSectionHeading,
-  drawFestivalTitleBlock,
-  drawFestivalTotalsRule,
   festivalGeometry,
-  festivalTableTheme,
   festivalUnitScale,
-  formatFestivalNumber,
-  loadFestivalIssuerMark,
   setFestivalMono,
   setFestivalMonoText,
   setFestivalSans,
   setFestivalText,
-  truncateToWidth,
-  type FestivalFlagLabel,
   type FestivalGeometry,
-  type FestivalMetaItem,
-} from '@/utils/pdf/festival-report';
+} from '@/utils/pdf/festival-report/tokens';
+import {
+  drawFestivalChrome, drawFestivalMetaGrid, drawFestivalSectionHeading,
+  drawFestivalTitleBlock, truncateToWidth, type FestivalMetaItem,
+} from '@/utils/pdf/festival-report/chrome';
+import {
+  drawFestivalConstantsLine, drawFestivalFlag, drawFestivalGauge,
+  drawFestivalHatch, drawFestivalNilState, drawFestivalTotalsRule,
+  festivalTableTheme, formatFestivalNumber, type FestivalFlagLabel,
+} from '@/utils/pdf/festival-report/components';
+import { loadFestivalIssuerMark } from '@/utils/pdf/festival-report/issuerMark';
 import { REPORT_DOC_LABELS, reportMark, type ReportDocKind } from './marks';
 
 export { REPORT_DOC_LABELS, drawReportTypeMark, reportMark, type ReportDocKind } from './marks';
@@ -117,7 +111,7 @@ export const drawReportNilState = drawFestivalNilState;
 export const drawReportTotalsRule = drawFestivalTotalsRule;
 export const formatReportNumber = formatFestivalNumber;
 export const loadReportIssuerMark = loadFestivalIssuerMark;
-export { dropConstantColumns, distributeColumnWidths } from '@/utils/pdf/festival-report';
+export { dropConstantColumns, distributeColumnWidths } from '@/utils/pdf/festival-report/tables';
 
 export interface ReportChromeOptions {
   kind: ReportDocKind;
@@ -291,6 +285,7 @@ export const reportTableDefaults = (
   } = {},
 ) => ({
   ...reportTableTheme(geo, options),
+  rowPageBreak: 'avoid' as const,
   margin: {
     left: geo.left,
     right: geo.pageWidth - geo.right,
