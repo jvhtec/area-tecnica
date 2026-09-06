@@ -43,7 +43,11 @@ describe('optimized browser dependencies', () => {
         if (entry.isDirectory()) {
           if (!['__tests__', 'stubs', 'legacy'].includes(entry.name)) visitDirectory(file);
         } else if (/\.[jt]sx?$/.test(file) && !/\.(test|spec)\./.test(file)) {
-          const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+          const text = readFileSync(file, 'utf8');
+          // Most modules cannot contain either call. Avoid parsing the entire
+          // app during concurrent full-suite/build runs; include escaped names.
+          if (!text.includes('html') && !text.includes('addSvgAsImage') && !text.includes('\\u')) continue;
+          const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
           function visit(node: ts.Node) {
             if (ts.isCallExpression(node)) {
               const callee = node.expression;
@@ -60,5 +64,5 @@ describe('optimized browser dependencies', () => {
     }
     visitDirectory(join(process.cwd(), 'src'));
     expect(violations).toEqual([]);
-  });
+  }, 15_000);
 });
