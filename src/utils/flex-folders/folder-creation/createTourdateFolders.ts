@@ -283,59 +283,6 @@ export const createTourdateFolders = async ({
       continue;
     }
 
-    if (
-      ["sound", "lights", "video"].includes(dept) &&
-      shouldCreateItem(dept, "hojaInfo", options)
-    ) {
-      const hojaInfoType = dept === "sound"
-        ? FLEX_FOLDER_IDS.hojaInfoSx
-        : dept === "lights"
-          ? FLEX_FOLDER_IDS.hojaInfoLx
-          : FLEX_FOLDER_IDS.hojaInfoVx;
-      const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
-      const hojaInfoPayload = {
-        definitionId: hojaInfoType,
-        parentElementId: deptFolderId,
-        open: true,
-        locked: false,
-        name: `Hoja de Información - ${locationName} - ${formattedDate}`,
-        plannedStartDate: formattedStartDate,
-        plannedEndDate: formattedEndDate,
-        locationId: FLEX_FOLDER_IDS.location,
-        departmentId: DEPARTMENT_IDS[dept],
-        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${hojaInfoSuffix}`,
-        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
-      };
-
-      console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-      const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
-      const hojaInfoFolderType = dept === "sound"
-        ? "hoja_info_sx"
-        : dept === "lights"
-          ? "hoja_info_lx"
-          : "hoja_info_vx";
-
-      try {
-        const { error: insertError } = await supabase.from("flex_folders").insert({
-          job_id: job.id,
-          tour_date_id: job.tour_date_id ?? null,
-          parent_id: deptFolderRowId ?? null,
-          element_id: hojaInfoResponse.elementId,
-          department: dept,
-          folder_type: hojaInfoFolderType,
-        });
-        if (insertError) throw insertError;
-        console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
-      } catch (err) {
-        console.error(`Failed to persist hojaInfo for ${dept}:`, err);
-        console.error(`Orphaned Flex folder created with element_id: ${hojaInfoResponse.elementId}`);
-        throw new Error(
-          `Failed to persist hojaInfo for ${dept} (element_id: ${hojaInfoResponse.elementId}). ` +
-          `Flex folder was created but could not be recorded in database. Original error: ${err}`
-        );
-      }
-    }
-
     if (dept !== "personnel" && dept !== "comercial") {
       const subfolders = [
         {

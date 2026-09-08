@@ -98,9 +98,8 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
     try {
       setIsCreatingFolders(true);
 
-      // Check if folders already exist - createAllFoldersForJob is NOT fully idempotent
-      // and will create duplicates if run again (e.g., hojaInfo elements are created
-      // unconditionally without checking for existing flex_folders rows)
+      // This primary-create action remains separate from the picker-based add action.
+      // Recovery and repair paths call the reconciler directly.
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")

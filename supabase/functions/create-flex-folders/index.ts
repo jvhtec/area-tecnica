@@ -1,14 +1,15 @@
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
-import { getErrorStatus, HttpError } from "../_shared/http.ts";
+import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import {
-  ESTRUCTURA_DEPARTMENT,
-  ESTRUCTURA_PULL_SHEETS,
-  ESTRUCTURA_SOURCE_DEPARTMENTS,
-} from "../../../src/domain/estructura.ts";
+  executeProvisioningPlan,
+  type ProvisioningNode,
+  type ProvisioningStore,
+} from "../_shared/flex-folders/engine.ts";
+import { buildJobPlan, makeJobStore } from "../_shared/flex-folders/jobPlan.ts";
+import { getErrorStatus, HttpError } from "../_shared/http.ts";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
@@ -17,640 +18,772 @@ import {
 } from "../../../src/utils/flex-folders/constants.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
+};
 
-const FLEX_API_BASE_URL = 'https://api.intranet.sectorpro.es';
-const FLEX_DIRECT_API_BASE_URL = Deno.env.get('FLEX_API_BASE_URL') ||
-  'https://sectorpro.flexrentalsolutions.com/f5/api';
+const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") ||
+  "https://sectorpro.flexrentalsolutions.com/f5/api";
+const TECHNICAL_DEPARTMENTS = ["sound", "lights", "video"] as const;
+const ROOT_DEPARTMENTS = ["sound", "lights", "video", "production", "personnel", "comercial"] as const;
+type RootDepartment = typeof ROOT_DEPARTMENTS[number];
 
-interface FlexFolderPayload {
-  parent_id?: string;
-  name: string;
-  description?: string;
-}
-
-interface FlexFolderResponse {
+interface TourRecord {
   id: string;
   name: string;
-  parent_id?: string;
-}
-
-interface TypedFlexElementResponse {
-  elementId: string;
-}
-
-type AppSupabaseClient = SupabaseClient;
-
-interface TourFlexRecord {
-  id: string;
-  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  flex_folders_created: boolean | null;
   flex_main_folder_id: string | null;
+  flex_sound_folder_id: string | null;
+  flex_lights_folder_id: string | null;
+  flex_video_folder_id: string | null;
+  flex_production_folder_id: string | null;
+  flex_personnel_folder_id: string | null;
+  flex_comercial_folder_id: string | null;
   flex_estructura_folder_id: string | null;
 }
 
-interface TourDateRecord {
-  id: string;
-  date: string;
-}
-
-interface LinkedTourDateJob {
-  id: string;
-  tour_date_id: string | null;
-  title: string | null;
-  start_time: string | null;
-  end_time: string | null;
-}
-
-interface EstructuraTrackedRow {
-  id: string;
-  element_id: string;
-  folder_type: string;
-  source_department: string | null;
-  job_id: string | null;
-}
-
-async function createTypedFlexElement(
-  payload: Record<string, unknown>,
-  authToken: string,
-): Promise<TypedFlexElementResponse> {
-  const response = await fetchWithRetry(`${FLEX_DIRECT_API_BASE_URL}/element`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Auth-Token': authToken,
-      apikey: authToken,
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-API-Client': 'flex5-desktop',
-    },
-    body: JSON.stringify(payload),
-  }, { retryOnTimeout: false });
-  if (!response.ok) {
-    throw new Error(`Flex returned ${response.status} while creating an Estructura element`);
-  }
-  const result = await response.json() as TypedFlexElementResponse;
-  if (!result.elementId) throw new Error('Flex returned no elementId for an Estructura element');
-  return result;
+interface LeaseRow {
+  operation_id: string;
+  lease_token: string | null;
+  status: string;
+  acquired: boolean;
 }
 
 const flexDate = (value: string): string => {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new Error(`Invalid Flex date: ${value}`);
-  return `${date.toISOString().split('.')[0]}.000Z`;
+  if (Number.isNaN(date.getTime())) throw new HttpError(400, "Invalid tour date");
+  return `${date.toISOString().split(".")[0]}.000Z`;
 };
 
-const tourDateDocumentNumber = (value: string): string =>
-  new Date(value).toISOString().slice(2, 10).replaceAll('-', '');
+const documentNumberFor = (value: string): string => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid",
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map((part) => [part.type, part.value]));
+  return `${parts.year}${parts.month}${parts.day}`;
+};
 
-async function resolveActorName(supabase: SupabaseClient, actorId: string | null): Promise<string | null> {
-  if (!actorId) return null;
-  try {
-    const { data } = await supabase
-      .from('profiles')
-      .select('first_name,last_name,nickname,email')
-      .eq('id', actorId)
-      .maybeSingle();
-    if (!data) return null;
-    const full = `${data.first_name || ''} ${data.last_name || ''}`.trim();
-    if (full) return full;
-    if ((data as any).nickname) return (data as any).nickname as string;
-    return data.email || null;
-  } catch (_err) {
-    return null;
-  }
-}
+const createFlexElement = async (payload: Record<string, unknown>, authToken: string) => {
+  const response = await fetchWithRetry(`${FLEX_API_BASE_URL}/element`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": authToken,
+      apikey: authToken,
+      "X-Requested-With": "XMLHttpRequest",
+      "X-API-Client": "flex5-desktop",
+    },
+    body: JSON.stringify(payload),
+  }, { retryOnTimeout: false });
+  if (!response.ok) throw new Error(`Flex returned HTTP ${response.status}`);
+  return await response.json() as { elementId?: string };
+};
 
-async function createFlexFolder(payload: FlexFolderPayload, authToken: string): Promise<FlexFolderResponse> {
-  console.log("Creating Flex folder", { hasParent: Boolean(payload.parent_id) });
-  
-  try {
-    // Folder creation is not idempotent on the Flex side, so a timed-out
-    // attempt is never replayed (it may have landed); 5xx/429 are retried.
-    const response = await fetchWithRetry(`${FLEX_API_BASE_URL}/element`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
-      },
-      body: JSON.stringify(payload)
-    }, { retryOnTimeout: false });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log("Created Flex folder:", result);
-    return result;
-  } catch (error) {
-    console.error("Flex folder creation error:", error);
-    throw error;
-  }
-}
-
-/**
- * Gets the selected departments for a tour by checking its jobs
- */
-async function getTourDepartments(supabase: any, tourId: string): Promise<string[]> {
+const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
   const { data, error } = await supabase
-    .from('jobs')
-    .select(`
-      job_departments (department)
-    `)
-    .eq('tour_id', tourId)
-    .limit(1);
-
-  if (error || !data || data.length === 0) {
-    console.log("No departments found for tour, defaulting to all departments");
-    return ['sound', 'lights', 'video', 'production', 'personnel', 'comercial'];
+    .from("jobs")
+    .select("job_departments(department)")
+    .eq("tour_id", tourId);
+  if (error) throw error;
+  const selected = new Set<string>();
+  for (const job of data || []) {
+    for (const row of job.job_departments || []) {
+      if (typeof row.department === "string") selected.add(row.department);
+    }
   }
+  return selected;
+};
 
-  const departments = data[0].job_departments?.map((jd: any) => jd.department) || [];
-  console.log("Found departments for tour:", departments);
-  return departments;
-}
+const loadTourRange = async (supabase: SupabaseClient, tour: TourRecord) => {
+  if (tour.start_date && tour.end_date) return { start: tour.start_date, end: tour.end_date };
+  const { data, error } = await supabase
+    .from("tour_dates")
+    .select("date")
+    .eq("tour_id", tour.id)
+    .order("date", { ascending: true });
+  if (error) throw error;
+  if (!data?.length) throw new HttpError(400, "Tour has no dates");
+  return { start: data[0].date, end: data[data.length - 1].date };
+};
 
-/**
- * Determines which departments should have folders created
- */
-function shouldCreateDepartmentFolder(department: string, selectedDepartments: string[]): boolean {
-  // Always create these administrative departments
-  const alwaysCreateDepartments = ['production', 'personnel', 'comercial'];
-  
-  if (alwaysCreateDepartments.includes(department)) {
-    return true;
-  }
+const buildRootPlan = (
+  tour: TourRecord,
+  selected: Set<string>,
+  range: { start: string; end: string },
+  includeChildren: boolean,
+): ProvisioningNode[] => {
+  const plannedStartDate = flexDate(range.start);
+  const plannedEndDate = flexDate(range.end);
+  const documentNumber = documentNumberFor(range.start);
+  const base = { open: true, locked: false, plannedStartDate, plannedEndDate, locationId: FLEX_FOLDER_IDS.location };
+  const nodes: ProvisioningNode[] = [{
+    key: "root",
+    payload: {
+      ...base,
+      definitionId: FLEX_FOLDER_IDS.mainFolder,
+      name: tour.name,
+      documentNumber,
+      personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
+      notes: "Provisioned by Sector Pro",
+    },
+    tracking: { folderType: "tour_root", tourColumn: "flex_main_folder_id" },
+  }];
 
-  // For technical departments (sound, lights, video), only create if selected
-  const technicalDepartments = ['sound', 'lights', 'video'];
-  if (technicalDepartments.includes(department)) {
-    return selectedDepartments.includes(department);
-  }
-
-  return false;
-}
-
-async function ensureTrackedTourEstructuraRoot(
-  supabase: AppSupabaseClient,
-  tour: TourFlexRecord,
-  authToken: string,
-): Promise<string> {
-  if (!tour.flex_main_folder_id) {
-    throw new Error('Tour root folder must exist before Estructura');
-  }
-
-  let elementId = tour.flex_estructura_folder_id as string | null;
-  if (!elementId) {
-    const created = await createFlexFolder({
-      parent_id: tour.flex_main_folder_id,
-      name: 'Estructura',
-      description: `Estructura folder for ${tour.name}`,
-    }, authToken);
-    elementId = created.id;
-    const { error: updateError } = await supabase
-      .from('tours')
-      .update({ flex_estructura_folder_id: elementId })
-      .eq('id', tour.id);
-    if (updateError) throw updateError;
-    tour.flex_estructura_folder_id = elementId;
-  }
-
-  const { data: tracked, error: trackedError } = await supabase
-    .from('flex_folders')
-    .select('id')
-    .eq('element_id', elementId)
-    .limit(1);
-  if (trackedError) throw trackedError;
-  if (!tracked?.length) {
-    const { error: insertError } = await supabase.from('flex_folders').insert({
-      job_id: null,
-      parent_id: tour.flex_main_folder_id,
-      element_id: elementId,
-      department: ESTRUCTURA_DEPARTMENT,
-      folder_type: 'tour_department',
+  for (const department of ROOT_DEPARTMENTS) {
+    if (TECHNICAL_DEPARTMENTS.includes(department as typeof TECHNICAL_DEPARTMENTS[number]) && !selected.has(department)) continue;
+    const label = department.charAt(0).toUpperCase() + department.slice(1);
+    nodes.push({
+      key: `department:${department}`,
+      parentKey: "root",
+      payload: {
+        ...base,
+        definitionId: FLEX_FOLDER_IDS.subFolder,
+        name: `${tour.name} - ${label}`,
+        departmentId: DEPARTMENT_IDS[department],
+        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[department]}`,
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[department],
+      },
+      tracking: { folderType: "tour_department", department, tourColumn: `flex_${department}_folder_id` },
     });
-    if (insertError) throw insertError;
+
+    if (!includeChildren || ![...TECHNICAL_DEPARTMENTS, "production"].includes(department)) continue;
+    for (const child of [
+      { key: "technical-documentation", definitionId: FLEX_FOLDER_IDS.documentacionTecnica, name: "Documentación Técnica", suffix: "DT", folderType: "doc_tecnica" },
+      { key: "received-budgets", definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos, name: "Presupuestos Recibidos", suffix: "PR", folderType: "presupuestos_recibidos" },
+      { key: "expenses", definitionId: FLEX_FOLDER_IDS.hojaGastos, name: "Hoja de Gastos", suffix: "HG", folderType: "hoja_gastos" },
+    ]) {
+      nodes.push({
+        key: `department:${department}:${child.key}`,
+        parentKey: `department:${department}`,
+        payload: {
+          ...base,
+          definitionId: child.definitionId,
+          name: `${tour.name} - ${child.name} - ${label}`,
+          departmentId: DEPARTMENT_IDS[department],
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[department]}${child.suffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[department],
+        },
+        tracking: { folderType: child.folderType, department },
+      });
+    }
   }
 
-  return elementId;
-}
-
-async function ensureTourDateEstructura(
-  supabase: AppSupabaseClient,
-  tour: TourFlexRecord,
-  tourDate: TourDateRecord,
-  linkedJob: LinkedTourDateJob | undefined,
-  authToken: string,
-): Promise<void> {
-  const parentElementId = await ensureTrackedTourEstructuraRoot(supabase, tour, authToken);
-  const { data: existingRows, error: existingError } = await supabase
-    .from('flex_folders')
-    .select('id, element_id, folder_type, source_department, job_id')
-    .eq('tour_date_id', tourDate.id)
-    .eq('department', ESTRUCTURA_DEPARTMENT);
-  if (existingError) throw existingError;
-
-  const jobId = linkedJob?.id ?? null;
-  const dateValue = String(linkedJob?.start_time || tourDate.date);
-  const endValue = String(linkedJob?.end_time || `${String(tourDate.date).slice(0, 10)}T23:59:59Z`);
-  const dateLabel = new Date(tourDate.date).toISOString().split('T')[0];
-  const documentNumber = tourDateDocumentNumber(dateValue);
-  const trackedRows = (existingRows || []) as EstructuraTrackedRow[];
-  let dateFolder = trackedRows.find((row) => row.folder_type === 'tourdate');
-
-  if (!dateFolder) {
-    const created = await createTypedFlexElement({
+  nodes.push({
+    key: "department:estructura",
+    parentKey: "root",
+    payload: {
+      ...base,
       definitionId: FLEX_FOLDER_IDS.subFolder,
-      parentElementId,
-      open: true,
-      locked: false,
-      name: `${dateLabel} - ${tour.name} - Estructura`,
-      plannedStartDate: flexDate(dateValue),
-      plannedEndDate: flexDate(endValue),
-      locationId: FLEX_FOLDER_IDS.location,
+      name: `${tour.name} - Estructura`,
       departmentId: DEPARTMENT_IDS.estructura,
       documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES.estructura}`,
       personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
-    }, authToken);
-    const { data, error } = await supabase
-      .from('flex_folders')
-      .insert({
-        tour_date_id: tourDate.id,
-        job_id: jobId,
-        parent_id: parentElementId,
-        element_id: created.elementId,
-        folder_type: 'tourdate',
-        department: ESTRUCTURA_DEPARTMENT,
-      })
-      .select('id, element_id, folder_type, source_department, job_id')
-      .single();
-    if (error || !data) throw error || new Error('Unable to track Estructura tour-date folder');
-    dateFolder = data;
-  } else if (!dateFolder.job_id && jobId) {
-    const { error } = await supabase.from('flex_folders').update({ job_id: jobId }).eq('id', dateFolder.id);
+    },
+    tracking: { folderType: "tour_department", department: "estructura", tourColumn: "flex_estructura_folder_id" },
+  });
+  return nodes;
+};
+
+const seedKnownTourElements = async (
+  supabase: SupabaseClient,
+  operationId: string,
+  tour: TourRecord,
+) => {
+  const known: Array<[string, string | null]> = [
+    ["root", tour.flex_main_folder_id],
+    ...ROOT_DEPARTMENTS.map((department) => [`department:${department}`, tour[`flex_${department}_folder_id`]] as [string, string | null]),
+    ["department:estructura", tour.flex_estructura_folder_id],
+  ];
+  for (const [semanticKey, elementId] of known) {
+    if (!elementId) continue;
+    const { error } = await supabase.from("flex_provisioning_nodes").upsert({
+      operation_id: operationId,
+      semantic_key: semanticKey,
+      state: "needs_reconciliation",
+      element_id: elementId,
+    }, { onConflict: "operation_id,semantic_key", ignoreDuplicates: true });
     if (error) throw error;
   }
+};
 
-  for (const sourceDepartment of ESTRUCTURA_SOURCE_DEPARTMENTS) {
-    const existing = trackedRows.find(
-      (row) => row.folder_type === 'pull_sheet' && row.source_department === sourceDepartment,
-    );
-    if (existing) {
-      if (!existing.job_id && jobId) {
-        const { error } = await supabase.from('flex_folders').update({ job_id: jobId }).eq('id', existing.id);
-        if (error) throw error;
-      }
-      continue;
+const makeStore = (supabase: SupabaseClient, operationId: string, tourId: string): ProvisioningStore => ({
+  load: async () => {
+    const { data, error } = await supabase.from("flex_provisioning_nodes")
+      .select("semantic_key,state,element_id").eq("operation_id", operationId);
+    if (error) throw error;
+    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined }));
+  },
+  markCreating: async (node) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").upsert({
+      operation_id: operationId, semantic_key: node.key, parent_key: node.parentKey,
+      state: "creating", payload: node.payload,
+    }, { onConflict: "operation_id,semantic_key" });
+    if (error) throw error;
+  },
+  markRemoteElement: async (node, elementId) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").update({
+      state: "needs_reconciliation", element_id: elementId, updated_at: new Date().toISOString(),
+    }).eq("operation_id", operationId).eq("semantic_key", node.key);
+    if (error) throw error;
+  },
+  persistTracking: async (node, elementId, parentTrackingId) => {
+    const tracking = node.tracking as { folderType: string; department?: string; tourColumn?: string };
+    const { data: existing, error: readError } = await supabase.from("flex_folders")
+      .select("id").eq("element_id", elementId).maybeSingle();
+    if (readError) throw readError;
+    let trackingId = existing?.id as string | undefined;
+    if (!trackingId) {
+      const { data, error } = await supabase.from("flex_folders").insert({
+        job_id: null,
+        parent_id: parentTrackingId || null,
+        element_id: elementId,
+        department: tracking.department || null,
+        folder_type: tracking.folderType,
+      }).select("id").single();
+      if (error) throw error;
+      trackingId = data.id;
     }
+    if (tracking.tourColumn) {
+      const { error } = await supabase.from("tours").update({ [tracking.tourColumn]: elementId }).eq("id", tourId);
+      if (error) throw error;
+    }
+    return trackingId;
+  },
+  markPersisted: async (node, elementId, trackingRowId) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").update({
+      state: "persisted", element_id: elementId, tracking_row_id: trackingRowId || null,
+      safe_error: null, updated_at: new Date().toISOString(),
+    }).eq("operation_id", operationId).eq("semantic_key", node.key);
+    if (error) throw error;
+  },
+  markNeedsReconciliation: async (node, safeError) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").update({
+      state: "needs_reconciliation", safe_error: safeError, updated_at: new Date().toISOString(),
+    }).eq("operation_id", operationId).eq("semantic_key", node.key);
+    if (error) throw error;
+  },
+});
 
-    const config = ESTRUCTURA_PULL_SHEETS[sourceDepartment];
-    const created = await createTypedFlexElement({
-      definitionId: FLEX_FOLDER_IDS.pullSheet,
-      parentElementId: dateFolder.element_id,
-      open: true,
-      locked: false,
-      name: `${linkedJob?.title || `${dateLabel} - ${tour.name}`} - ${config.nameSuffix}`,
-      plannedStartDate: flexDate(dateValue),
-      plannedEndDate: flexDate(endValue),
-      locationId: FLEX_FOLDER_IDS.location,
-      departmentId: DEPARTMENT_IDS.estructura,
-      documentNumber: `${documentNumber}${config.documentSuffix}`,
-      personResponsibleId: RESPONSIBLE_PERSON_IDS[sourceDepartment],
-    }, authToken);
-    const { error } = await supabase.from('flex_folders').insert({
-      tour_date_id: tourDate.id,
-      job_id: jobId,
-      parent_id: dateFolder.id,
-      element_id: created.elementId,
-      folder_type: 'pull_sheet',
-      department: ESTRUCTURA_DEPARTMENT,
-      source_department: sourceDepartment,
+const DRYHIRE_MONTHS = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+const buildDryhirePlan = (year: number): ProvisioningNode[] => {
+  const nodes: ProvisioningNode[] = [];
+  const yearSuffix = String(year).slice(-2);
+  for (const department of ["sound", "lights"] as const) {
+    const prefix = department === "sound" ? "666" : "555";
+    const label = department === "sound" ? "Sonido" : "Luces";
+    const rootDocument = `${prefix}.${yearSuffix}`;
+    nodes.push({
+      key: `department:${department}`,
+      payload: {
+        definitionId: FLEX_FOLDER_IDS.mainFolder,
+        open: true,
+        locked: false,
+        name: `Dry Hire ${year} - ${label}`,
+        plannedStartDate: `${year}-01-01T00:00:00.000Z`,
+        plannedEndDate: `${year}-12-31T23:59:59.000Z`,
+        locationId: FLEX_FOLDER_IDS.location,
+        departmentId: DEPARTMENT_IDS[department],
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[department],
+        documentNumber: rootDocument,
+      },
+      tracking: { kind: "root", year, department },
+    });
+    DRYHIRE_MONTHS.forEach((name, index) => {
+      const month = String(index + 1).padStart(2, "0");
+      const finalDay = new Date(Date.UTC(year, index + 1, 0)).getUTCDate();
+      nodes.push({
+        key: `department:${department}:month:${month}`,
+        parentKey: `department:${department}`,
+        payload: {
+          definitionId: FLEX_FOLDER_IDS.subFolder,
+          open: true,
+          locked: false,
+          name,
+          plannedStartDate: `${year}-${month}-01T00:00:00.000Z`,
+          plannedEndDate: `${year}-${month}-${String(finalDay).padStart(2, "0")}T23:59:59.000Z`,
+          locationId: FLEX_FOLDER_IDS.location,
+          departmentId: DEPARTMENT_IDS[department],
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[department],
+          documentNumber: `${rootDocument}.${month}`,
+        },
+        tracking: { kind: "month", year, department, month },
+      });
+    });
+  }
+  return nodes;
+};
+
+const makeDryhireStore = (
+  supabase: SupabaseClient,
+  operationId: string,
+): ProvisioningStore => ({
+  load: async () => {
+    const { data, error } = await supabase.from("flex_provisioning_nodes")
+      .select("semantic_key,state,element_id").eq("operation_id", operationId);
+    if (error) throw error;
+    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined }));
+  },
+  markCreating: async (node) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").upsert({
+      operation_id: operationId, semantic_key: node.key, parent_key: node.parentKey,
+      state: "creating", payload: node.payload,
+    }, { onConflict: "operation_id,semantic_key" });
+    if (error) throw error;
+  },
+  markRemoteElement: async (node, elementId) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").update({
+      state: "needs_reconciliation", element_id: elementId, updated_at: new Date().toISOString(),
+    }).eq("operation_id", operationId).eq("semantic_key", node.key);
+    if (error) throw error;
+  },
+  persistTracking: async (node, elementId) => {
+    const tracking = node.tracking as { kind: string; year: number; department: string; month?: string };
+    if (tracking.kind === "root") return undefined;
+    const { data: existing, error: readError } = await supabase.from("dryhire_parent_folders")
+      .select("id,element_id").eq("year", tracking.year).eq("department", tracking.department)
+      .eq("month", tracking.month).maybeSingle();
+    if (readError) throw readError;
+    if (existing?.id) {
+      if (existing.element_id !== elementId) throw new Error(`Dry-hire month ${node.key} has a conflicting remote ID`);
+      return existing.id;
+    }
+    const { data, error } = await supabase.from("dryhire_parent_folders").insert({
+      year: tracking.year, department: tracking.department, month: tracking.month, element_id: elementId,
+    }).select("id").single();
+    if (error) throw error;
+    return data.id;
+  },
+  markPersisted: async (node, elementId, trackingRowId) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").update({
+      state: "persisted", element_id: elementId, tracking_row_id: trackingRowId || null,
+      safe_error: null, updated_at: new Date().toISOString(),
+    }).eq("operation_id", operationId).eq("semantic_key", node.key);
+    if (error) throw error;
+  },
+  markNeedsReconciliation: async (node, safeError) => {
+    const { error } = await supabase.from("flex_provisioning_nodes").update({
+      state: "needs_reconciliation", safe_error: safeError, updated_at: new Date().toISOString(),
+    }).eq("operation_id", operationId).eq("semantic_key", node.key);
+    if (error) throw error;
+  },
+});
+
+const provisionDryhireYear = async (
+  supabase: SupabaseClient,
+  year: number,
+  flexToken: string,
+  reconcile: boolean,
+) => {
+  const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
+    p_scope_key: `dryhire-year:${year}`,
+    p_operation_type: "dryhire-year",
+    p_scope_id: String(year),
+    p_lease_seconds: 600,
+    p_reconcile: reconcile,
+  });
+  if (leaseError) throw leaseError;
+  const lease = (leaseData?.[0] || null) as LeaseRow | null;
+  if (!lease?.acquired || !lease.lease_token) {
+    return { success: lease?.status === "complete", status: lease?.status || "in_progress" };
+  }
+  try {
+    const [{ data: legacyRows, error: legacyError }, { data: stateRows, error: stateError }] = await Promise.all([
+      supabase.from("dryhire_parent_folders").select("id").eq("year", year).limit(1),
+      supabase.from("flex_provisioning_nodes").select("id").eq("operation_id", lease.operation_id).limit(1),
+    ]);
+    if (legacyError || stateError) throw legacyError || stateError;
+    if (legacyRows?.length && !stateRows?.length) {
+      throw new Error("Legacy partial dry-hire year requires manual parent reconciliation");
+    }
+    const outcome = await executeProvisioningPlan(
+      buildDryhirePlan(year),
+      makeDryhireStore(supabase, lease.operation_id),
+      (payload) => createFlexElement(payload, flexToken),
+    );
+    const { error } = await supabase.rpc("finish_flex_provisioning_lease", {
+      p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
+      p_status: "complete", p_last_error: null,
     });
     if (error) throw error;
+    return { success: true, status: "complete", data: outcome };
+  } catch (error) {
+    await supabase.rpc("finish_flex_provisioning_lease", {
+      p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
+      p_status: "needs_reconciliation", p_last_error: { code: "dryhire_year_interrupted" },
+    }).then(() => undefined, () => undefined);
+    throw error;
   }
-}
+};
+
+const artistWallClock = (date: string, time: string): string => {
+  if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) throw new HttpError(400, "Invalid artist time");
+  return `${date}T${time.length === 5 ? `${time}:00` : time}.000Z`;
+};
+
+const nextDate = (date: string): string => {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+};
+
+const provisionArtistExtras = async (
+  supabase: SupabaseClient,
+  artistId: string,
+  expectedJobId: string,
+  dayStartTime: string,
+  flexToken: string,
+  reconcile: boolean,
+) => {
+  const { data: artist, error: artistError } = await supabase.from("festival_artists")
+    .select("id,job_id,name,date,show_start,show_end,isaftermidnight").eq("id", artistId).single();
+  if (artistError || !artist) throw new HttpError(404, "Artist not found");
+  if (!artist.job_id || artist.job_id !== expectedJobId) throw new HttpError(403, "Artist does not belong to this job");
+  if (!artist.date) throw new HttpError(400, "Artist has no festival date");
+  const { data: job, error: jobError } = await supabase.from("jobs").select("id,title").eq("id", artist.job_id).single();
+  if (jobError || !job) throw new HttpError(404, "Job not found");
+  const { data: commercial, error: commercialError } = await supabase.from("flex_folders")
+    .select("id,element_id").eq("job_id", artist.job_id).eq("folder_type", "department")
+    .eq("department", "comercial").maybeSingle();
+  if (commercialError) throw commercialError;
+  if (!commercial) throw new HttpError(409, "Create the job Commercial folder first");
+  const { data: existingExtras, error: extrasError } = await supabase.from("flex_folders")
+    .select("id,element_id").eq("job_id", artist.job_id).eq("folder_type", "comercial_extras")
+    .eq("department", "sound").maybeSingle();
+  if (extrasError) throw extrasError;
+
+  const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
+    p_scope_key: `festival-artist-extras:${artistId}`,
+    p_operation_type: "festival-artist-extras",
+    p_scope_id: artistId,
+    p_lease_seconds: 180,
+    p_reconcile: reconcile,
+  });
+  if (leaseError) throw leaseError;
+  const lease = (leaseData?.[0] || null) as LeaseRow | null;
+  if (!lease?.acquired || !lease.lease_token) return { success: lease?.status === "complete", status: lease?.status };
+
+  const date = String(artist.date);
+  const startTime = String(artist.show_start || dayStartTime);
+  const endTime = String(artist.show_end || dayStartTime);
+  const endDate = artist.isaftermidnight || !artist.show_end ? nextDate(date) : date;
+  const dateParts = date.split("-");
+  const shortDate = `${dateParts[2]}${dateParts[1]}${dateParts[0].slice(-2)}`;
+  const { count, error: countError } = await supabase.from("flex_folders")
+    .select("id", { count: "exact", head: true }).eq("job_id", artist.job_id)
+    .eq("folder_type", "comercial_presupuesto");
+  if (countError) throw countError;
+  const { data: ordinal, error: ordinalError } = await supabase.rpc("allocate_flex_provisioning_sequence", {
+    p_operation_id: lease.operation_id,
+    p_sequence_group: `festival-artist-extras:${artist.job_id}`,
+    p_minimum: (count || 0) + 1,
+  });
+  if (ordinalError) throw ordinalError;
+  if (!Number.isInteger(ordinal) || ordinal < 1) throw new Error("Failed to allocate artist budget ordinal");
+  const documentNumber = `${shortDate}.${ordinal}SQT`;
+  const schedule = {
+    plannedStartDate: artistWallClock(date, startTime),
+    plannedEndDate: artistWallClock(endDate, endTime),
+  };
+  if (existingExtras) {
+    const { error } = await supabase.from("flex_provisioning_nodes").upsert({
+      operation_id: lease.operation_id, semantic_key: "extras:sound", state: "persisted",
+      element_id: existingExtras.element_id, tracking_row_id: existingExtras.id,
+    }, { onConflict: "operation_id,semantic_key", ignoreDuplicates: true });
+    if (error) throw error;
+  }
+  const plan: ProvisioningNode[] = [
+    {
+      key: "extras:sound",
+      externalParentElementId: commercial.element_id,
+      payload: {
+        definitionId: FLEX_FOLDER_IDS.subFolder, open: true, locked: false,
+        name: `Extras ${job.title?.trim() || "Sin título"} - Sonido`, ...schedule,
+        locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS.sound,
+        documentNumber: `${shortDate}ESQT`, personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
+      },
+      tracking: { folderType: "comercial_extras" },
+    },
+    {
+      key: `artist:${artistId}:budget`,
+      parentKey: "extras:sound",
+      payload: {
+        definitionId: FLEX_FOLDER_IDS.presupuesto, open: true, locked: false,
+        name: `${artist.name} - Extras`, ...schedule,
+        locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS.sound,
+        documentNumber, personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
+      },
+      tracking: { folderType: "comercial_presupuesto" },
+    },
+  ];
+
+  const store: ProvisioningStore = {
+    load: async () => {
+      const { data, error } = await supabase.from("flex_provisioning_nodes")
+        .select("semantic_key,state,element_id").eq("operation_id", lease.operation_id);
+      if (error) throw error;
+      return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined }));
+    },
+    markCreating: async (node) => {
+      const { error } = await supabase.from("flex_provisioning_nodes").upsert({
+        operation_id: lease.operation_id, semantic_key: node.key, parent_key: node.parentKey,
+        state: "creating", payload: node.payload,
+      }, { onConflict: "operation_id,semantic_key" });
+      if (error) throw error;
+    },
+    markRemoteElement: async (node, elementId) => {
+      const { error } = await supabase.from("flex_provisioning_nodes").update({ state: "needs_reconciliation", element_id: elementId })
+        .eq("operation_id", lease.operation_id).eq("semantic_key", node.key);
+      if (error) throw error;
+    },
+    persistTracking: async (node, elementId, parentTrackingId) => {
+      if (node.key === "extras:sound" && existingExtras) return existingExtras.id;
+      const { data: tracked, error: trackedError } = await supabase.from("flex_folders")
+        .select("id").eq("element_id", elementId).maybeSingle();
+      if (trackedError) throw trackedError;
+      if (tracked?.id) return tracked.id;
+      const { data, error } = await supabase.from("flex_folders").insert({
+        job_id: artist.job_id,
+        parent_id: node.key === "extras:sound" ? commercial.id : (parentTrackingId || existingExtras?.id || null),
+        element_id: elementId, department: "sound", folder_type: node.tracking.folderType,
+      }).select("id").single();
+      if (error) throw error;
+      return data.id;
+    },
+    markPersisted: async (node, elementId, trackingRowId) => {
+      const { error } = await supabase.from("flex_provisioning_nodes").update({
+        state: "persisted", element_id: elementId, tracking_row_id: trackingRowId || null, safe_error: null,
+      }).eq("operation_id", lease.operation_id).eq("semantic_key", node.key);
+      if (error) throw error;
+    },
+    markNeedsReconciliation: async (node, safeError) => {
+      const { error } = await supabase.from("flex_provisioning_nodes").update({ state: "needs_reconciliation", safe_error: safeError })
+        .eq("operation_id", lease.operation_id).eq("semantic_key", node.key);
+      if (error) throw error;
+    },
+  };
+  try {
+    const outcome = await executeProvisioningPlan(plan, store, (payload) => createFlexElement(payload, flexToken));
+    const { error } = await supabase.rpc("finish_flex_provisioning_lease", {
+      p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: "complete", p_last_error: null,
+    });
+    if (error) throw error;
+    return { success: true, status: "complete", documentNumber, data: outcome };
+  } catch (error) {
+    await supabase.rpc("finish_flex_provisioning_lease", {
+      p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
+      p_status: "needs_reconciliation", p_last_error: { code: "artist_extras_interrupted" },
+    }).then(() => undefined, () => undefined);
+    throw error;
+  }
+};
+
+const provisionJob = async (
+  supabase: SupabaseClient,
+  jobId: string,
+  options: Record<string, unknown> | undefined,
+  flexToken: string,
+  reconcile: boolean,
+) => {
+  const { data: job, error: jobError } = await supabase.from("jobs")
+    .select("*,locations(name)").eq("id", jobId).single();
+  if (jobError || !job) throw new HttpError(404, "Job not found");
+  const { data: departmentRows, error: departmentError } = await supabase.from("job_departments")
+    .select("department").eq("job_id", jobId);
+  if (departmentError) throw departmentError;
+  const selected = new Set<string>((departmentRows || []).map((row) => row.department).filter(Boolean));
+  let tour: Record<string, unknown> | undefined;
+  if (job.job_type === "tourdate") {
+    if (!job.tour_id) throw new HttpError(409, "Tour date has no tour");
+    const { data, error } = await supabase.from("tours").select("*").eq("id", job.tour_id).single();
+    if (error || !data) throw new HttpError(404, "Tour not found");
+    tour = data;
+  }
+  const start = flexDate(job.start_time);
+  const end = flexDate(job.end_time);
+  const documentNumber = documentNumberFor(job.start_time);
+  const operationType = job.job_type === "tourdate" ? "tour-date" : "job";
+  const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
+    p_scope_key: `${operationType}:${jobId}`, p_operation_type: operationType, p_scope_id: jobId,
+    p_lease_seconds: 600, p_reconcile: reconcile,
+  });
+  if (leaseError) throw leaseError;
+  const lease = (leaseData?.[0] || null) as LeaseRow | null;
+  if (!lease?.acquired || !lease.lease_token) return { success: lease?.status === "complete", status: lease?.status || "in_progress" };
+  try {
+    let plan: ProvisioningNode[];
+    if (job.job_type === "dryhire") {
+      const timezone = typeof job.timezone === "string" && job.timezone ? job.timezone : "Europe/Madrid";
+      const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+      const wallClock = (value: string) => { const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map((part) => [part.type, part.value])); return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.000Z`; };
+      const dateParts = Object.fromEntries(formatter.formatToParts(new Date(job.start_time)).map((part) => [part.type, part.value]));
+      const year = Number(dateParts.year);
+      const month = String(dateParts.month);
+      const department = selected.has("lights") && !selected.has("sound") ? "lights" : "sound";
+      const { data: parent, error: parentError } = await supabase.from("dryhire_parent_folders").select("id,element_id").eq("year", year).eq("month", month).eq("department", department).single();
+      if (parentError || !parent) throw new HttpError(409, "Create the dry-hire year/month folders first");
+      const deptSuffix = DEPARTMENT_SUFFIXES[department];
+      const common = { open: true, locked: false, plannedStartDate: wallClock(job.start_time), plannedEndDate: wallClock(job.end_time), locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS[department], personResponsibleId: RESPONSIBLE_PERSON_IDS[department] };
+      plan = [
+        { key: "dryhire", externalParentElementId: parent.element_id, payload: { ...common, definitionId: FLEX_FOLDER_IDS.subFolder, name: `Dry Hire - ${job.title}`, documentNumber: `${String(dateParts.year).slice(-2)}${month}${dateParts.day}${deptSuffix}` }, tracking: { folderType: "dryhire", department, externalParentTrackingId: parent.id } },
+        { key: "dryhire:budget", parentKey: "dryhire", payload: { ...common, definitionId: FLEX_FOLDER_IDS.presupuestoDryHire, name: `Presupuesto - ${job.title}`, documentNumber: `${String(dateParts.year).slice(-2)}${month}${dateParts.day}${deptSuffix}DH` }, tracking: { folderType: "dryhire_presupuesto", department } },
+      ];
+    } else {
+      plan = buildJobPlan({ job, selected, options: options as never, start, end, documentNumber, tour });
+    }
+    if (job.job_type === "tourdate" && plan.some((node) => node.externalParentElementId === "")) {
+      throw new HttpError(409, "Create or reconcile the tour roots first");
+    }
+    const outcome = await executeProvisioningPlan(plan, makeJobStore(supabase, lease.operation_id, job), (payload) => createFlexElement(payload, flexToken));
+    const { error: flagError } = await supabase.from("jobs").update({ flex_folders_created: true }).eq("id", jobId);
+    if (flagError) throw flagError;
+    const { error: finishError } = await supabase.rpc("finish_flex_provisioning_lease", { p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: "complete", p_last_error: null });
+    if (finishError) throw finishError;
+    return { success: true, status: "complete", data: outcome };
+  } catch (error) {
+    await supabase.rpc("finish_flex_provisioning_lease", { p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: "needs_reconciliation", p_last_error: { code: "job_provisioning_interrupted" } }).then(() => undefined, () => undefined);
+    throw error;
+  }
+};
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  let lease: LeaseRow | null = null;
+  let supabase: SupabaseClient | null = null;
   try {
-    const { tourId, createRootFolders, createDateFolders } = await req.json()
-    
-    if (!tourId) {
-      throw new HttpError(400, 'Tour ID is required')
+    const body = await req.json() as Record<string, unknown>;
+    const tourId = typeof body.tourId === "string" ? body.tourId : "";
+    const legacyRoot = body.createRootFolders === true && body.createDateFolders !== true;
+    const operation = typeof body.operation === "string" ? body.operation : legacyRoot ? "tour-root" : "";
+    if (operation !== "job" && operation !== "tour-date" && operation !== "tour-root" && operation !== "dryhire-year" && operation !== "festival-artist-extras") {
+      throw new HttpError(409, "Update the app to create tour dates through the canonical job/date workflow");
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const authToken = Deno.env.get('X_AUTH_TOKEN')
-    
-    if (!supabaseUrl || !supabaseKey || !authToken) {
-      throw new Error('Missing environment variables')
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const flexToken = Deno.env.get("X_AUTH_TOKEN");
+    if (!supabaseUrl || !serviceRoleKey || !flexToken) throw new Error("Missing environment variables");
+    supabase = createClient(supabaseUrl, serviceRoleKey);
+    const caller = await requireAdminOrManagement(supabase, req, { logContext: "create-flex-folders" });
+
+    if (operation === "job" || operation === "tour-date") {
+      const jobId = typeof body.jobId === "string" ? body.jobId : "";
+      if (!jobId) throw new HttpError(400, "Job ID is required");
+      const options = body.options && typeof body.options === "object" && !Array.isArray(body.options)
+        ? body.options as Record<string, unknown>
+        : body.options === undefined ? undefined : {};
+      const result = await provisionJob(supabase, jobId, options, flexToken, body.reconcile === true);
+      return new Response(JSON.stringify(result), { status: result.success ? 200 : 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
-    const caller = await requireAdminOrManagement(supabase, req, {
-      logContext: 'create-flex-folders',
-    })
-    const actorId = caller.userId
-    const actorName = await resolveActorName(supabase, actorId)
-    const activityEvents: Array<{ payload: Record<string, unknown>; visibility?: 'management' | 'job_participants' | 'house_plus_job' | 'actor_only' }> = []
-
-    // Get tour information
-    const { data: tour, error: tourError } = await supabase
-      .from('tours')
-      .select('*')
-      .eq('id', tourId)
-      .single()
-
-    if (tourError) throw tourError
-
-    const result = { success: true, data: tour }
-
-    // Create root folders if requested
-    if (createRootFolders && tour.flex_folders_created && tour.flex_main_folder_id) {
-      // Idempotency guard: a re-run (double click, client retry) must not
-      // create a duplicate folder tree in Flex.
-      console.log("Root folders already exist for tour, skipping creation:", tour.name)
-      await ensureTrackedTourEstructuraRoot(supabase, tour, authToken)
-    } else if (createRootFolders) {
-      console.log("Creating root folders for tour:", tour.name)
-
-      // Get selected departments for this tour
-      const selectedDepartments = await getTourDepartments(supabase, tourId);
-      console.log("Selected departments for root folder creation:", selectedDepartments);
-      
-      // Create main tour folder
-      const mainFolder = await createFlexFolder({
-        name: tour.name,
-        description: `Tour folder for ${tour.name}`
-      }, authToken)
-
-      // Create department folders (conditional for technical departments)
-      const allDepartments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial']
-      const folderIds: Record<string, string> = { main: mainFolder.id }
-
-      for (const dept of allDepartments) {
-        // Check if this department should have a folder created
-        if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
-          console.log(`Skipping ${dept} folder - department not selected`);
-          continue;
-        }
-
-        const deptFolder = await createFlexFolder({
-          parent_id: mainFolder.id,
-          name: dept.charAt(0).toUpperCase() + dept.slice(1),
-          description: `${dept} folder for ${tour.name}`
-        }, authToken)
-        folderIds[dept] = deptFolder.id
-      }
-
-      const estructuraFolder = await createFlexFolder({
-        parent_id: mainFolder.id,
-        name: 'Estructura',
-        description: `Estructura folder for ${tour.name}`,
-      }, authToken)
-      folderIds.estructura = estructuraFolder.id
-
-      // Update tour with folder IDs (only for created folders)
-      const updateData: any = {
-        flex_folders_created: true,
-        flex_main_folder_id: folderIds.main,
-      }
-
-      // Only set folder IDs for departments that were actually created
-      if (folderIds.sound) updateData.flex_sound_folder_id = folderIds.sound
-      if (folderIds.lights) updateData.flex_lights_folder_id = folderIds.lights
-      if (folderIds.video) updateData.flex_video_folder_id = folderIds.video
-      if (folderIds.production) updateData.flex_production_folder_id = folderIds.production
-      if (folderIds.personnel) updateData.flex_personnel_folder_id = folderIds.personnel
-      if (folderIds.comercial) updateData.flex_comercial_folder_id = folderIds.comercial
-      updateData.flex_estructura_folder_id = folderIds.estructura
-
-      const { error: updateError } = await supabase
-        .from('tours')
-        .update(updateData)
-        .eq('id', tourId)
-
-      if (updateError) throw updateError
-
-      const { error: estructuraTrackingError } = await supabase.from('flex_folders').insert({
-        job_id: null,
-        parent_id: folderIds.main,
-        element_id: folderIds.estructura,
-        department: ESTRUCTURA_DEPARTMENT,
-        folder_type: 'tour_department',
-      })
-      if (estructuraTrackingError) throw estructuraTrackingError
-
-      Object.assign(tour, updateData)
-
-      result.data = { ...tour, ...folderIds, flex_folders_created: true }
-
-      activityEvents.push({
-        payload: {
-          folder: tour.name,
-          scope: 'root',
-          tour_id: tourId,
-          departments: Object.keys(folderIds).filter((key) => key !== 'main'),
-        },
-        visibility: 'management',
-      })
+    if (operation === "dryhire-year") {
+      const year = Number(body.year);
+      if (!Number.isInteger(year) || year < 2000 || year > 2200) throw new HttpError(400, "Invalid dry-hire year");
+      const dryhireResult = await provisionDryhireYear(supabase, year, flexToken, body.reconcile === true);
+      return new Response(JSON.stringify(dryhireResult), {
+        status: dryhireResult.success ? 200 : 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Create date folders if requested
-    if (createDateFolders) {
-      console.log("Creating date folders for tour:", tour.name)
-      
-      // Get tour dates
-      const { data: tourDates, error: tourDatesError } = await supabase
-        .from("tour_dates")
-        .select("*")
-        .eq("tour_id", tourId)
-        .order("date", { ascending: true })
-
-      if (tourDatesError) throw tourDatesError
-
-      if (!tourDates || tourDates.length === 0) {
-        throw new Error('No tour dates found for this tour')
-      }
-
-      // Ensure tour has root folders
-      if (!tour.flex_main_folder_id) {
-        throw new Error('Tour root folders must be created before date folders')
-      }
-
-      // Get selected departments for date folder creation
-      const selectedDepartments = await getTourDepartments(supabase, tourId);
-      console.log("Selected departments for date folder creation:", selectedDepartments);
-
-      const { data: linkedJobs, error: linkedJobsError } = await supabase
-        .from('jobs')
-        .select('id, tour_date_id, title, start_time, end_time')
-        .eq('tour_id', tourId);
-      if (linkedJobsError) throw linkedJobsError;
-      const typedLinkedJobs = (linkedJobs || []) as LinkedTourDateJob[];
-      const jobsByTourDate = new Map<string, LinkedTourDateJob>(
-        typedLinkedJobs
-          .filter((job): job is LinkedTourDateJob & { tour_date_id: string } => Boolean(job.tour_date_id))
-          .map((job) => [job.tour_date_id, job]),
+    if (operation === "festival-artist-extras") {
+      const artistId = typeof body.artistId === "string" ? body.artistId : "";
+      const jobId = typeof body.jobId === "string" ? body.jobId : "";
+      const dayStartTime = typeof body.dayStartTime === "string" ? body.dayStartTime : "07:00";
+      if (!artistId || !jobId) throw new HttpError(400, "Artist ID and job ID are required");
+      const artistResult = await provisionArtistExtras(
+        supabase, artistId, jobId, dayStartTime, flexToken, body.reconcile === true,
       );
-
-      // Idempotency guard: skip dates that already have a Flex folder so a
-      // re-run only fills in the missing ones. A failed read must abort —
-      // treating it as "no folders" would recreate the whole tree in Flex.
-      const { data: existingDateFolders, error: existingDateFoldersError } = await supabase
-        .from('flex_folders')
-        .select('tour_date_id')
-        .eq('folder_type', 'tour_date')
-        .in('tour_date_id', tourDates.map((td: any) => td.id))
-      if (existingDateFoldersError) throw existingDateFoldersError
-      const datesWithFolders = new Set(
-        (existingDateFolders || []).map((row: any) => row.tour_date_id).filter(Boolean)
-      )
-
-      // Create folders for each tour date
-      let createdDateCount = 0
-      for (const tourDate of tourDates) {
-        await ensureTourDateEstructura(
-          supabase,
-          tour,
-          tourDate,
-          jobsByTourDate.get(tourDate.id),
-          authToken,
-        )
-        if (datesWithFolders.has(tourDate.id)) {
-          console.log("Date folder already exists, skipping:", tourDate.date)
-          continue
-        }
-        const dateStr = new Date(tourDate.date).toISOString().split('T')[0]
-        const dateFolderName = `${dateStr} - ${tour.name}`
-        
-        // Create date folder under main tour folder
-        const dateFolder = await createFlexFolder({
-          parent_id: tour.flex_main_folder_id,
-          name: dateFolderName,
-          description: `Date folder for ${tour.name} on ${dateStr}`
-        }, authToken)
-
-        // Create department subfolders for this date (only for selected departments)
-        const allDepartments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial']
-        for (const dept of allDepartments) {
-          // Check if this department should have a folder created
-          if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
-            console.log(`Skipping ${dept} date folder - department not selected`);
-            continue;
-          }
-
-          await createFlexFolder({
-            parent_id: dateFolder.id,
-            name: dept.charAt(0).toUpperCase() + dept.slice(1),
-            description: `${dept} folder for ${tour.name} on ${dateStr}`
-          }, authToken)
-        }
-
-        // Store the flex folder reference
-        await supabase
-          .from("flex_folders")
-          .insert({
-            tour_date_id: tourDate.id,
-            job_id: null, // This is a tour date folder, not a job folder
-            element_id: dateFolder.id,
-            folder_type: 'tour_date',
-            department: null
-          })
-
-        createdDateCount += 1
-      }
-
-      activityEvents.push({
-        payload: {
-          folder: tour.name,
-          scope: 'dates',
-          tour_id: tourId,
-          dates_created: createdDateCount,
-        },
-        visibility: 'management',
-      })
-
-      // Fire push broadcast explicitly for tourdate folder creation
-      try {
-        const pushUrl = `${supabaseUrl}/functions/v1/push`;
-        await fetch(pushUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-          body: JSON.stringify({
-            action: 'broadcast',
-            type: 'flex.tourdate_folder.created',
-            url: `/tours/${tourId}`,
-            tour_id: tourId,
-            tour_name: tour.name,
-            dates_count: createdDateCount,
-            actor_name: actorName || undefined,
-          })
-        }).catch(() => undefined);
-      } catch (_err) {
-        // non-blocking
-      }
+      return new Response(JSON.stringify(artistResult), {
+        status: artistResult.success ? 200 : 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    if (activityEvents.length) {
-      try {
-        await Promise.all(
-          activityEvents.map((event) => {
-            const code = (event.payload as any)?.scope === 'dates'
-              ? 'flex.tourdate_folder.created'
-              : 'flex.folders.created';
-            return supabase.rpc('log_activity_as', {
-              _actor_id: actorId,
-              _code: code,
-              _job_id: null,
-              _entity_type: 'flex',
-              _entity_id: tourId,
-              _payload: event.payload,
-              _visibility: event.visibility ?? 'management',
-            })
-          })
-        )
-      } catch (activityError) {
-        console.warn('[create-flex-folders] Failed to log activity event', activityError)
-      }
+    if (!tourId) throw new HttpError(400, "Tour ID is required");
+
+    const { data: tourData, error: tourError } = await supabase.from("tours").select("*").eq("id", tourId).single();
+    if (tourError || !tourData) throw new HttpError(404, "Tour not found");
+    const tour = tourData as TourRecord;
+    const [selected, range] = await Promise.all([
+      loadTourDepartments(supabase, tourId),
+      loadTourRange(supabase, tour),
+    ]);
+
+    const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
+      p_scope_key: `tour-root:${tourId}`,
+      p_operation_type: "tour-root",
+      p_scope_id: tourId,
+      p_lease_seconds: 300,
+      p_reconcile: body.reconcile === true,
+    });
+    if (leaseError) throw leaseError;
+    lease = (leaseData?.[0] || null) as LeaseRow | null;
+    if (!lease?.acquired || !lease.lease_token) {
+      return new Response(JSON.stringify({ success: lease?.status === "complete", status: lease?.status || "in_progress" }), {
+        status: lease?.status === "complete" ? 200 : 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    return new Response(
-      JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
+    const legacyExistingRoot = Boolean(tour.flex_main_folder_id);
+    await seedKnownTourElements(supabase, lease.operation_id, tour);
+    const plan = buildRootPlan(tour, selected, range, !legacyExistingRoot);
+    const outcome = await executeProvisioningPlan(
+      plan,
+      makeStore(supabase, lease.operation_id, tourId),
+      (payload) => createFlexElement(payload, flexToken),
+    );
+
+    const { error: tourUpdateError } = await supabase.from("tours").update({ flex_folders_created: true }).eq("id", tourId);
+    if (tourUpdateError) throw tourUpdateError;
+    const { error: finishError } = await supabase.rpc("finish_flex_provisioning_lease", {
+      p_operation_id: lease.operation_id,
+      p_lease_token: lease.lease_token,
+      p_status: "complete",
+      p_last_error: null,
+    });
+    if (finishError) throw finishError;
+
+    if (outcome.created > 0) {
+      await supabase.rpc("log_activity_as", {
+        _actor_id: caller.userId,
+        _code: "flex.folders.created",
+        _job_id: null,
+        _entity_type: "flex",
+        _entity_id: tourId,
+        _payload: { scope: "root", tour_id: tourId, nodes_created: outcome.created },
+        _visibility: "management",
+      }).then(() => undefined, () => undefined);
+    }
+
+    return new Response(JSON.stringify({ success: true, status: "complete", data: outcome }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error("Error in create-flex-folders:", error)
-    // Default to 500: nothing else in this function throws with a status, so a 400
-    // fallback reported env/database failures as client errors and echoed their raw
-    // messages back. Only explicit HttpErrors with exposeDetails surface their text.
+    if (supabase && lease?.lease_token) {
+      await supabase.rpc("finish_flex_provisioning_lease", {
+        p_operation_id: lease.operation_id,
+        p_lease_token: lease.lease_token,
+        p_status: "needs_reconciliation",
+        p_last_error: { code: "provisioning_interrupted" },
+      }).then(() => undefined, () => undefined);
+    }
     const status = getErrorStatus(error, 500);
-    // Only errors we constructed deliberately may surface their text. A Supabase or
-    // env failure that happens to carry a 4xx status still gets the generic message.
-    const message = error instanceof HttpError && error.exposeDetails
-      ? error.message
-      : 'Internal server error';
-    return new Response(
-      JSON.stringify({ error: message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status,
-      },
-    )
+    const message = error instanceof HttpError && error.exposeDetails ? error.message : "Internal server error";
+    return new Response(JSON.stringify({ success: false, error: message }), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
-})
+});

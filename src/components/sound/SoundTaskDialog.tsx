@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Upload, Download, Trash2, Table, X } from "lucide-react";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -37,6 +37,7 @@ import {
 import { queryKeys } from "@/lib/react-query";
 import type { Database } from "@/integrations/supabase/types";
 import { getErrorMessage } from '@/utils/errorMessage';
+import { createAllFoldersForJob } from "@/utils/flex-folders";
 import {
   DOCUMENT_UPLOAD_ACCEPT,
   getDocumentUploadValidationError,
@@ -170,38 +171,41 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
     enabled: !!jobId
   });
 
-  const updateFolderStatusMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await dataLayerClient.from('jobs')
-        .update({ flex_folders_created: true })
-        .eq('id', jobId);
-      if (error) throw error;
-    }
-  });
-
   const createFlexFolders = async () => {
     if (!jobDetails || jobDetails.flex_folders_created) {
       toast({
-        title: "Folders already created",
-        description: "Flex folders have already been created for this job.",
+        title: "Carpetas ya creadas",
+        description: "Las carpetas Flex de este trabajo ya están creadas.",
         variant: "destructive"
       });
       return;
     }
     try {
       toast({
-        title: "Creating folders",
-        description: "Please wait while the folders are being created...",
+        title: "Creando carpetas",
+        description: "Espera mientras se crean las carpetas Flex...",
       });
 
-      const startDate = new Date(jobDetails.start_date);
+      const startDate = new Date(jobDetails.start_time);
       const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, '');
+      const formattedStartDate = startDate.toISOString().split(".")[0] + ".000Z";
+      const formattedEndDate = new Date(jobDetails.end_time).toISOString().split(".")[0] + ".000Z";
 
-      await updateFolderStatusMutation.mutateAsync();
+      await createAllFoldersForJob(
+        jobDetails,
+        formattedStartDate,
+        formattedEndDate,
+        documentNumber,
+      );
+
+      const { error: statusError } = await dataLayerClient.from('jobs')
+        .update({ flex_folders_created: true })
+        .eq('id', jobId);
+      if (statusError) throw statusError;
 
       toast({
-        title: "Success",
-        description: "Flex folders have been created successfully.",
+        title: "Carpetas creadas",
+        description: "Las carpetas Flex se han creado correctamente.",
       });
 
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details', jobId) });

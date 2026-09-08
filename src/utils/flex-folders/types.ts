@@ -14,7 +14,6 @@ export type FlexDepartmentKey = DepartmentKey | OperationalFlexDepartment;
 
 // Toggleable items per department
 export type SubfolderKey =
-  | "hojaInfo" // SIP/LIP/VIP (only for sound/lights/video)
   | "documentacionTecnica" // DT
   | "presupuestosRecibidos" // PR
   | "hojaGastos" // HG (dept; also used for personnel “Gastos de Personal”)
@@ -58,6 +57,68 @@ export interface DepartmentSelectionOptions {
 export type CreateFoldersOptions = Partial<
   Record<DepartmentKey, DepartmentSelectionOptions>
 >;
+
+const DEPARTMENT_KEYS: readonly DepartmentKey[] = [
+  "sound",
+  "lights",
+  "video",
+  "production",
+  "personnel",
+  "comercial",
+];
+
+const SUBFOLDER_KEYS: ReadonlySet<string> = new Set<SubfolderKey>([
+  "documentacionTecnica",
+  "presupuestosRecibidos",
+  "hojaGastos",
+  "pullSheetTP",
+  "pullSheetPA",
+  "gastosDePersonal",
+  "workOrder",
+  "crewCallSound",
+  "crewCallLights",
+  "extrasSound",
+  "extrasLights",
+  "presupuestoSound",
+  "presupuestoLights",
+]);
+
+/**
+ * Normalizes persisted or stale-client picker input without widening it.
+ * Deprecated/unknown keys are discarded, while an explicit empty selection
+ * remains an explicit empty selection instead of becoming default-all.
+ */
+export const normalizeCreateFoldersOptions = (value: unknown): CreateFoldersOptions | undefined => {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const input = value as Record<string, unknown>;
+  const normalized: CreateFoldersOptions = {};
+
+  for (const department of DEPARTMENT_KEYS) {
+    const rawSelection = input[department];
+    if (!rawSelection || typeof rawSelection !== "object" || Array.isArray(rawSelection)) continue;
+
+    const selection = rawSelection as Record<string, unknown>;
+    const next: DepartmentSelectionOptions = {};
+    if (Array.isArray(selection.subfolders)) {
+      next.subfolders = selection.subfolders.filter(
+        (key): key is SubfolderKey => typeof key === "string" && SUBFOLDER_KEYS.has(key)
+      );
+    }
+    const customPullsheet = sanitizeCustomPullsheetSettings(
+      selection.customPullsheet as CustomPullsheetSettings | undefined
+    );
+    const extrasPresupuesto = sanitizeExtrasPresupuestoSettings(
+      selection.extrasPresupuesto as ExtrasPresupuestoSettings | undefined
+    );
+    if (customPullsheet) next.customPullsheet = customPullsheet;
+    if (extrasPresupuesto) next.extrasPresupuesto = extrasPresupuesto;
+    normalized[department] = next;
+  }
+
+  return normalized;
+};
 
 const cloneMetadataEntries = (
   entries?: FlexFolderMetadataEntry[]

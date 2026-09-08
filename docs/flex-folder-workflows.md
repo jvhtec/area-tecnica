@@ -1,177 +1,41 @@
-# Flex Folder Creation Workflows Audit
+# Flex folder provisioning
 
-## Overview
-This document summarizes how Flex folders are provisioned for jobs, tours, and tour dates in the application. It captures entry points, supporting utilities, Supabase functions, and database side effects so future updates can maintain parity across workflows.
+Flex provisioning creates remote elements and records their identities locally. These writes are not transactional, so every workflow must persist each returned Flex UUID before creating children and must stop when the outcome of a remote request is ambiguous.
 
-## Estructura operational invariant
+## Supported hierarchies
 
-`Estructura` is an always-created Flex/warehouse department, not a selectable job department. It owns motors, motor controllers, and their associated control/power cabling. Bumpers, frames, truss, steels, and other general rigging remain with Sound or Lights according to their technical origin.
+- Standard jobs and festivals use the `job` server operation through `createAllFoldersForJob`: event root, selected technical departments, administrative departments, and Estructura. Picker options control typed children and custom entries.
+- Tour roots use the authenticated `create-flex-folders` operation `tour-root`. Manual, card, bulk, repair, and automatic-tour aliases all call this operation. Technical roots use the union of the tour jobs' persisted department selections; Production, Personnel, and Commercial remain administrative roots.
+- Tour dates use the `tour-date` server operation for single and bulk runs: `Tour → department → date → typed children`. The former Edge hierarchy `Tour → date → department` is rejected for new requests so stale clients cannot create a competing tree.
+- Dry-hire jobs use the `job` server operation and keep their monthly parent → dry hire → Presupuesto structure. Year setup uses the `dryhire-year` server operation, Spanish month names, and the `666.YY.MM`/`555.YY.MM` numbering contracts.
+- Artist extras use the `festival-artist-extras` server operation. It loads the artist and job authoritatively and keeps its artist-specific identity, atomically allocated per-job ordinal, wall-clock schedule, and overnight rules because those differ from job commercial defaults.
 
-For every standard job with normal Flex folders, the tracked hierarchy is:
+Estructura is independent of picker selection. Standard jobs have Sound and Lights source Pull Sheets below Estructura. Tour dates use the tracked tour Estructura root and adopt pre-job rows by `tour_date_id` when a job later becomes available. `source_department` is the stable identity for source sheets.
 
-```text
-<Job>
-└── Estructura                         260828E
-    ├── <Job> - Estructura Sonido      260828ES
-    └── <Job> - Estructura Luces       260828EL
-```
+## Deprecated Hoja de Información
 
-Both children are `folder_type = 'pull_sheet'` and `department = 'estructura'`. Their source is persisted explicitly as `source_department = 'sound'` or `'lights'`; names are display text, never the primary discriminator. The Sound sheet uses the Sound responsible person and the Lights sheet uses the Lights responsible person. The parent uses the existing main/general responsible.
+Provisioning never creates SIP, LIP, or VIP Hoja de Información elements. Their definition IDs are absent from the active catalog. Stale options containing `hojaInfo` are normalized by dropping that key. An explicit empty selection remains empty, and malformed or unknown input never becomes default-all.
 
-Creation and reconciliation do not depend on `job_departments` or folder-picker options. The selectable technical department union remains unchanged, so Estructura does not appear in job creation, job editing, or the Flex folder picker. Partial unique indexes permit at most one tracked Estructura Pull Sheet per source for either a linked job or a tour date whose job has not been linked yet, while legacy rows with a null discriminator continue to work.
+Historical `flex_folders` rows and remote elements are retained. Date-change readers may still recognize historical Hoja rows; that compatibility code is read-only. Hoja de Gastos, Gastos de Personal, Hoja de Ruta, and accommodation fields with similar names are unrelated and remain supported.
 
-## Job Flex Folder Creation
+## Durable execution and recovery
 
-### Entry Points in the UI
-* **Job cards (dashboard & jobs list).** Both `Dashboard JobCardNew` and the job card used in the jobs list expose "Create Flex folders" actions. Each checks for an existing `flex_folders` row for the job, builds the Flex timestamps/document number, and then calls the shared creation helper before marking `jobs.flex_folders_created` and refreshing queries.【F:src/components/dashboard/JobCardNew.tsx†L516-L583】【F:src/components/jobs/cards/JobCardNew.tsx†L523-L583】
-* **Shared job action hook.** `useJobActions` provides the same creation routine for components that rely on the hook (including legacy card implementations). It prevents duplicate requests, invokes the helper, updates the job record, and fires a push notification broadcast.【F:src/hooks/useJobActions.ts†L100-L141】
-* **Tour-date automation hook.** `useTourDateFlexFolders` bulk-creates folders for every tour date by locating its associated job and reusing the job helper. It maintains mutation state, updates `jobs.flex_folders_created`, and invalidates both job and tour-date queries.【F:src/hooks/useTourDateFlexFolders.ts†L8-L158】
+`flex_provisioning_operations` owns one scope through an atomic database lease. `flex_provisioning_nodes` records stable semantic keys, parent keys, state, payload metadata, returned Flex UUIDs, and safe error details. The executor follows this sequence:
 
-### Core Helper: `createAllFoldersForJob`
-The heavy lifting lives in `src/utils/flex-folders/folders.ts`. The helper orchestrates Flex API calls and local persistence with nuanced handling per job type.【F:src/utils/flex-folders/folders.ts†L245-L740】 Key behaviors:
+1. Acquire the scope lease after authoritative context and authorization checks.
+2. Record a node as `creating`, then issue one typed `POST /element` request. Timeouts and ambiguous gateway failures are not replayed.
+3. Retry recording a returned `elementId` before writing consumer rows. Children use the parent's remote `element_id`; new `flex_folders.parent_id` values use the local parent row ID.
+4. Mark the node `persisted` only after its consumer record is durable.
+5. Mark the operation complete only after every node in the requested plan is persisted. Activity is emitted only when the run created remote nodes.
 
-* **Dry hire jobs.** Resolve the department-specific monthly parent folder, create the dry hire subfolder plus a linked "Presupuesto" child, and register the Flex element in `flex_folders` as a `dryhire` row.【F:src/utils/flex-folders/folders.ts†L200-L242】
-* **Tour date jobs.** Require existing tour root folders, look up selected departments, and create department subfolders beneath the tour’s saved Flex IDs. Each folder is stored locally (`folder_type: "tourdate"`) and optional structures (hoja info, documentación técnica, pull sheets, crew calls, etc.) are gated by department selections and UI options.【F:src/utils/flex-folders/folders.ts†L252-L533】 Crew call elements update `flex_crew_calls` so the job retains pointers back to Flex.【F:src/utils/flex-folders/folders.ts†L506-L533】
-* **Standard jobs.** Create the main event folder, persist it (`folder_type: "main_event"`), and then iterate per department. The helper respects department enablement, provisions specialty elements (hoja info, documentación técnica, presupuestos, gastos, comercial extras, crew calls), and writes the relationships into `flex_folders` with `folder_type: "department"` for traceability.【F:src/utils/flex-folders/folders.ts†L538-L737】
+An interrupted node with no returned UUID becomes `needs_reconciliation`; automatic replay is refused. A node with a known UUID is adopted and its local persistence can resume without another Flex POST. An explicit repair sends `reconcile: true`. Expired leases first transition to `needs_reconciliation` rather than silently assuming that an in-flight request failed.
 
-The Estructura hierarchy is created immediately below the standard-job root before selectable departments are processed. Re-running creation reuses the locally tracked Estructura folder and source-discriminated sheets instead of blindly creating remote duplicates.
+Legacy tour roots with known UUID columns are adopted. Because their historical child elements were not consistently tracked, recovery does not recreate technical-documentation children under an existing root. Missing known roots, including Estructura, can still be added safely. A partially populated legacy dry-hire year whose root UUID is unknown requires manual parent reconciliation; new year operations are resumable node by node.
 
-Dry hire deliberately retains its existing department-specific folder plus Presupuesto model. Applying the standard Estructura hierarchy there would conflict with that special commercial structure, so `Preparar motores` is also hidden for dry-hire jobs.
+## Authorization and rollout
 
-All branches call the shared `createFlexFolder` fetch wrapper (Flex API `POST /element`) and rely on `supabase` inserts to mirror the Flex hierarchy locally.【F:src/utils/flex-folders/api.ts†L1-L28】【F:src/utils/flex-folders/folders.ts†L556-L609】
+The server validates the caller with `requireAdminOrManagement`, loads tours, jobs, dates, and department selections using the service client, and accepts entity IDs plus the few allowed operation options. Callers cannot supply arbitrary Flex parents, definition IDs, department IDs, or responsible-person IDs.
 
-## Tour and Tour-Date Flex Folder Workflows
+Deploy `20260908113000_add_flex_provisioning_state.sql` before the Edge function, then deploy clients that use the typed operation names. A production `supabase db push --linked --dry-run` and migration apply are human release steps. If provisioning must be paused, keep the Hoja removal and durable state records, disable new operations, and forward-fix adoption; do not delete remote elements or return to the deprecated date builder.
 
-### Supabase Edge Function (`create-flex-folders`)
-Tours can trigger folder creation via the edge function at `supabase/functions/create-flex-folders/index.ts`:
-
-* **Root folders.** The function determines enabled departments from tour jobs, creates the main folder plus department subfolders in Flex, persists created IDs back onto the `tours` row, and logs management-visible activity events.【F:supabase/functions/create-flex-folders/index.ts†L138-L235】
-* **Date folders.** When asked to build tour-date folders, it enumerates dates, creates a date folder under the tour’s main element, conditionally creates department folders beneath each date, and inserts a `flex_folders` record tied to the `tour_date_id`. It also broadcasts a `flex.tourdate_folder.created` push notification and logs activity.【F:supabase/functions/create-flex-folders/index.ts†L237-L378】
-
-Tour roots always reconcile `Tour / Estructura` and persist its UUID in `tours.flex_estructura_folder_id`, including legacy tours already marked `flex_folders_created`. Each tour date then reconciles an Estructura date folder and its two source-discriminated Pull Sheets independently of selected tour departments. Rows created by bulk date creation before a linked job exists use `tour_date_id`; the job workflow adopts those rows by adding `job_id` instead of creating duplicates.
-
-Legacy tours whose main Flex root predates Estructura show `Falta Estructura` on the tour card. The card menu exposes `Crear carpeta Estructura`; after the authenticated root request returns, the client verifies `tours.flex_estructura_folder_id` and the corresponding `flex_folders` row and repairs either missing record through the shared Flex API path. An already tracked Estructura child is adopted instead of duplicated. Tours that already track `flex_estructura_folder_id` do not show the recovery action.
-
-Every tour-date folder workflow performs the same verified reconciliation before creating Estructura, Sound, Lights, Video, Production, Personnel, or Commercial date folders. A legacy tour therefore repairs itself during normal folder creation instead of blocking all selected folder types on the missing Estructura root.
-
-The UI wires into this function through `createTourRootFolders` and `createTourDateFolders` utilities, which invoke the function with the appropriate payload and bubble errors to the calling components.【F:src/utils/tourFolders.ts†L14-L63】 `TourCard` exposes these flows to users, blocking date-folder creation until root folders exist.【F:src/components/tours/TourCard.tsx†L110-L160】
-
-### Manual Root Folder Creation
-For cases where Flex access must be proxied differently, `createTourRootFoldersManual` calls the `secure-flex-api` function to create the main tour folder plus department subfolders, mirrors auxiliary elements (hoja info, documentación técnica, etc.), persists IDs into both `tours` and `flex_folders`, and returns the collected metadata.【F:src/utils/tourFolders.ts†L66-L286】 This path mirrors the job folder structure to keep numbering and subfolders consistent.
-
-### Tour-Date Jobs via UI Hook
-When a user opts to generate folders for individual tour dates from the management dialog, the `useTourDateFlexFolders` hook described above executes the job helper for each date, ensuring tour-level jobs gain the same folder structure as stand-alone jobs.【F:src/hooks/useTourDateFlexFolders.ts†L13-L158】
-
-## Flex Element Selector Integration
-
-### Overview
-The Flex Element Selector provides an interactive tree-based dialog for selecting which Flex element to open, with hierarchical navigation, search functionality, and visual indentation.
-
-### Components
-
-#### FlexElementSelectorDialog (`src/components/flex/FlexElementSelectorDialog.tsx`)
-A reusable modal dialog component that:
-* Fetches the complete element tree from Flex API via `getElementTree` helper
-* Uses TanStack Query for efficient data fetching and caching
-* Renders elements in a searchable, scrollable command menu
-* Displays nested hierarchy with visual indentation (16px per level)
-* Shows element display names and document numbers
-* Highlights the default element when specified
-* Supports real-time filtering by name or document number
-* Provides loading spinner and error states with retry functionality
-* Calls `onSelect` callback with selected element ID and closes on selection
-
-**Props**:
-* `open: boolean` - Controls dialog visibility
-* `onOpenChange: (open: boolean) => void` - Callback for dialog state changes
-* `mainElementId: string` - Root element ID to fetch tree from
-* `defaultElementId?: string` - Optional element ID to highlight as default
-* `onSelect: (elementId: string) => void` - Callback invoked when element is selected
-
-#### Element Tree Helper (`src/utils/flex-folders/getElementTree.ts`)
-Provides utilities for fetching and processing Flex element trees:
-
-* **`getElementTree(mainElementId)`**: Fetches the element tree from Flex API
-  - Returns array of FlexElementNode objects with hierarchical structure
-  - Handles API errors and transforms response to normalized format
-  - Supports nested children with recursive structure
-
-* **`flattenTree(nodes, depth?)`**: Flattens hierarchical tree to list with depth
-  - Preserves parent-child relationships
-  - Adds depth property for indentation rendering
-  - Returns FlatElementNode array for easy list rendering
-
-* **`searchTree(nodes, query)`**: Searches tree by display name or document number
-  - Case-insensitive search
-  - Returns flattened results with depth preserved
-  - Empty query returns all nodes flattened
-
-#### Helper Functions (`src/utils/flexMainFolderId.ts`)
-Two utility functions for resolving the main Flex element ID:
-
-* **`getMainFlexElementIdSync`**: Synchronously extracts the main element ID from `job.flex_folders` array
-  - Prefers `folder_type === 'main_event'`
-  - Falls back to `folder_type === 'main'` for legacy data
-  - Returns `{ elementId, department }` or `null`
-
-* **`resolveMainFlexElementId`**: Async version that queries Supabase when job data lacks flex_folders
-  - First checks job's in-memory flex_folders array
-  - Falls back to Supabase query for `main_event` or `main` folder types
-  - Handles errors gracefully with console logging
-
-### Integration in JobCardActions
-
-The "Open Flex" button behavior varies by context:
-
-**Project Management Page (with main element)**:
-* Computes the main Flex element ID using `getMainFlexElementIdSync`
-* Opens the FlexElementSelectorDialog when clicked
-* User selects from available department folders
-* Selected folder opens in new tab
-
-**Other Contexts (or no main element)**:
-* Retains legacy behavior using `useFlexUuid` hook
-* Directly navigates to the job's primary Flex folder
-* Shows appropriate error/info toasts when folders unavailable
-
-### Loading States
-The button remains disabled while:
-* Folder state is loading (`folderStateLoading`)
-* Folders are being created (`isCreatingFolders`)
-* Flex UUID is being resolved (`isFlexLoading`)
-
-Toast feedback is shown for:
-* Main folder resolution failures
-* Selector loading errors
-* Missing folder availability
-
-### Testing
-
-#### Element Tree Tests (`src/utils/flex-folders/getElementTree.test.ts`)
-Comprehensive unit tests covering:
-* Tree flattening with correct depth calculation
-* Multi-level nesting and sibling handling
-* Search filtering by display name and document number
-* Case-insensitive search
-* Edge cases (empty trees, missing children, deep nesting)
-
-#### Dialog Component Tests (`src/components/flex/FlexElementSelectorDialog.test.tsx`)
-Unit tests for component behavior:
-* Tree flattening for rendering with indentation
-* Search/filter functionality
-* Node selection callback invocation
-* Default element highlighting logic
-* Document number display handling
-
-#### Main Folder ID Tests (`src/utils/flexMainFolderId.test.ts`)
-Tests covering:
-* Synchronous extraction from job.flex_folders
-* Preference for main_event over main folder type
-* Fallback to Supabase queries
-* Error handling for missing/invalid data
-* Graceful handling of exceptions
-
-## Observations
-* All job-facing entry points now share the API-driven `createAllFoldersForJob` helper, ensuring consistent Flex element creation and Supabase persistence across cards, dialogs, and hooks.【F:src/components/dashboard/JobCardNew.tsx†L512-L587】【F:src/pages/FestivalManagement.tsx†L498-L600】【F:src/hooks/useJobActions.ts†L1-L122】
-* Each workflow writes to the `flex_folders` table to mirror remote structure, so any schema changes should remain backward compatible with these inserts (job, dryhire, tourdate, and tour department folder types).【F:src/utils/flex-folders/folders.ts†L232-L239】【F:supabase/functions/create-flex-folders/index.ts†L292-L301】
-* The Flex Element Selector enhances user experience by allowing department-specific navigation while maintaining backward compatibility with direct Flex UUID navigation for non-project-management contexts.
+The live Flex typed payload contract and representative staging fixtures must be checked before production rollout because local tests do not issue remote Flex writes.
