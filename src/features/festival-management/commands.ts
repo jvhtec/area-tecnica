@@ -192,19 +192,13 @@ export const ensureNoExistingFlexFolders = async (jobId: string) => {
   return !data || data.length === 0;
 };
 
-export const createFestivalFlexFolders = async ({
-  documentNumber,
-  endDate,
-  job,
-  options,
-  startDate,
-}: {
+export const createFestivalFlexFolders = async (args: {
   documentNumber: string;
   endDate: string;
   job: FestivalJob;
   options?: CreateFoldersOptions;
   startDate: string;
-}) => createAllFoldersForJob(job, startDate, endDate, documentNumber, options);
+}) => createAllFoldersForJob(args.job, args.options);
 
 export const broadcastFlexFoldersCreated = async (jobId: string) => {
   try {

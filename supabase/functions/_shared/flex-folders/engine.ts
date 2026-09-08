@@ -32,7 +32,15 @@ export interface ProvisioningStore {
   markRemoteElement(node: ProvisioningNode, elementId: string): Promise<void>;
   persistTracking(node: ProvisioningNode, elementId: string, parentTrackingId?: string): Promise<string | undefined>;
   markPersisted(node: ProvisioningNode, elementId: string, trackingRowId?: string): Promise<void>;
+  markFailed(node: ProvisioningNode, safeError: Record<string, unknown>): Promise<void>;
   markNeedsReconciliation(node: ProvisioningNode, safeError: Record<string, unknown>): Promise<void>;
+}
+
+export class FlexProvisioningDeterministicError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FlexProvisioningDeterministicError";
+  }
 }
 
 export class FlexProvisioningReconciliationError extends Error {
@@ -109,10 +117,17 @@ export async function executeProvisioningPlan(
       try {
         response = await createRemote(payload);
       } catch (error) {
-        await store.markNeedsReconciliation(node, {
-          code: "ambiguous_remote_outcome",
+        const safeError = {
+          code: error instanceof FlexProvisioningDeterministicError
+            ? "remote_request_rejected"
+            : "ambiguous_remote_outcome",
           message: error instanceof Error ? error.message : "Flex request failed",
-        });
+        };
+        if (error instanceof FlexProvisioningDeterministicError) {
+          await store.markFailed(node, safeError);
+        } else {
+          await store.markNeedsReconciliation(node, safeError);
+        }
         throw error;
       }
       if (!response.elementId) {

@@ -151,9 +151,6 @@ describe("createAllFoldersForJob folder picker options", () => {
 
     await createAllFoldersForJob(
       job,
-      "2025-01-01T10:00:00.000Z",
-      "2025-01-02T10:00:00.000Z",
-      "250101",
       { sound: { subfolders: ["documentacionTecnica"] } }
     );
 
@@ -177,9 +174,6 @@ describe("createAllFoldersForJob folder picker options", () => {
         start_time: "2026-09-08T10:00:00.000Z",
         end_time: "2026-09-08T20:00:00.000Z",
       },
-      "2026-09-08T10:00:00.000Z",
-      "2026-09-08T20:00:00.000Z",
-      "260908",
       options as never,
     );
 

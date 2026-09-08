@@ -92,11 +92,6 @@ begin
     return;
   end if;
 
-  if v_operation.status = 'complete' then
-    return query select v_operation.id, null::uuid, v_operation.status, false;
-    return;
-  end if;
-
   if v_operation.status = 'running' then
     if v_operation.lease_expires_at > now() then
       return query select v_operation.id, null::uuid, v_operation.status, false;
@@ -106,8 +101,10 @@ begin
       set status = 'needs_reconciliation', lease_token = null, lease_expires_at = null,
           last_error = jsonb_build_object('code', 'lease_expired_after_remote_write'), updated_at = now()
       where id = v_operation.id;
-    return query select v_operation.id, null::uuid, 'needs_reconciliation'::text, false;
-    return;
+    if not p_reconcile then
+      return query select v_operation.id, null::uuid, 'needs_reconciliation'::text, false;
+      return;
+    end if;
   end if;
 
   if v_operation.status = 'needs_reconciliation' and not p_reconcile then
@@ -118,7 +115,8 @@ begin
   update public.flex_provisioning_operations
     set status = 'running', lease_token = v_token,
         lease_expires_at = now() + make_interval(secs => p_lease_seconds),
-        requested_by = coalesce(requested_by, p_requested_by), updated_at = now()
+        requested_by = coalesce(requested_by, p_requested_by),
+        completed_at = null, last_error = null, updated_at = now()
     where id = v_operation.id;
   return query select v_operation.id, v_token, 'running'::text, true;
 end

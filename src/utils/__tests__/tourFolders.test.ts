@@ -61,10 +61,14 @@ describe("canonical tour folder orchestration", () => {
     expect(mocks.invoke).not.toHaveBeenCalled();
     expect(mocks.createAllFoldersForJob).toHaveBeenCalledWith(
       expect.objectContaining({ id: "job-1", tour_date_id: "date-1" }),
-      "2026-08-01T10:00:00.000Z",
-      "2026-08-01T22:00:00.000Z",
-      "260801",
     );
+  });
+
+  it("passes explicit reconciliation intent to the server", async () => {
+    await createTourRootFolders("tour-1", { reconcile: true });
+    expect(mocks.invoke).toHaveBeenCalledWith("create-flex-folders", {
+      body: { operation: "tour-root", tourId: "tour-1", reconcile: true },
+    });
   });
 
   it("does not mark a failed server result as success", async () => {

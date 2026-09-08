@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   executeProvisioningPlan,
+  FlexProvisioningDeterministicError,
   FlexProvisioningReconciliationError,
   type ProvisioningStore,
   type StoredProvisioningNode,
@@ -14,6 +15,7 @@ const makeStore = (initial: StoredProvisioningNode[] = []) => {
     markRemoteElement: async (node, elementId) => { nodes.set(node.key, { key: node.key, state: "needs_reconciliation", elementId }); },
     persistTracking: async (node) => `row:${node.key}`,
     markPersisted: async (node, elementId) => { nodes.set(node.key, { key: node.key, state: "persisted", elementId }); },
+    markFailed: async (node) => { nodes.set(node.key, { key: node.key, state: "failed" }); },
     markNeedsReconciliation: async (node) => { nodes.set(node.key, { key: node.key, state: "needs_reconciliation" }); },
   };
   return { nodes, store };
@@ -54,6 +56,22 @@ it("executor refuses blind replay after an interrupted remote call", async () =>
         async () => ({ elementId: "duplicate" }),
       )).rejects.toBeInstanceOf(FlexProvisioningReconciliationError);
   }
+});
+
+it("keeps deterministic remote rejections replayable", async () => {
+  const { nodes, store } = makeStore();
+  await expect(executeProvisioningPlan(
+    [{ key: "root", payload: { definitionId: "allowed" }, tracking: {} }],
+    store,
+    async () => { throw new FlexProvisioningDeterministicError("Flex returned HTTP 400"); },
+  )).rejects.toBeInstanceOf(FlexProvisioningDeterministicError);
+  expect(nodes.get("root")?.state).toBe("failed");
+
+  await expect(executeProvisioningPlan(
+    [{ key: "root", payload: { definitionId: "allowed" }, tracking: {} }],
+    store,
+    async () => ({ elementId: "remote-root" }),
+  )).resolves.toEqual({ created: 1, adopted: 0, skipped: 0 });
 });
 
 it("executor rejects every deprecated Hoja definition", async () => {

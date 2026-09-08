@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 
-SELECT plan(15);
+SELECT plan(17);
 
 SELECT has_table('public', 'flex_provisioning_operations', 'Provisioning operations are durable');
 SELECT has_table('public', 'flex_provisioning_nodes', 'Provisioning nodes are durable');
@@ -50,5 +50,33 @@ SELECT ok(
   NOT has_function_privilege('authenticated', 'public.finish_flex_provisioning_lease(uuid,uuid,text,jsonb)', 'EXECUTE'),
   'Authenticated callers cannot forge provisioning completion'
 );
+
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+
+INSERT INTO public.flex_provisioning_operations (scope_key, operation_type, scope_id, status, completed_at)
+VALUES ('pgtap:flex:complete-expansion', 'job', 'complete-expansion', 'complete', now());
+SELECT is(
+  (SELECT acquired FROM public.acquire_flex_provisioning_lease(
+    'pgtap:flex:complete-expansion', 'job', 'complete-expansion', 30, false, null
+  )),
+  true,
+  'A completed scope can reopen to process newly added semantic nodes'
+);
+
+INSERT INTO public.flex_provisioning_operations (
+  scope_key, operation_type, scope_id, status, lease_token, lease_expires_at
+) VALUES (
+  'pgtap:flex:expired-reconcile', 'job', 'expired-reconcile', 'running', gen_random_uuid(), now() - interval '1 minute'
+);
+SELECT is(
+  (SELECT acquired FROM public.acquire_flex_provisioning_lease(
+    'pgtap:flex:expired-reconcile', 'job', 'expired-reconcile', 30, true, null
+  )),
+  true,
+  'An expired lease is reacquired immediately when reconciliation is requested'
+);
+
+DELETE FROM public.flex_provisioning_operations
+WHERE scope_key IN ('pgtap:flex:complete-expansion', 'pgtap:flex:expired-reconcile');
 
 SELECT * FROM finish();

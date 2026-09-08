@@ -186,17 +186,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         description: "Espera mientras se crean las carpetas Flex...",
       });
 
-      const startDate = new Date(jobDetails.start_time);
-      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, '');
-      const formattedStartDate = startDate.toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(jobDetails.end_time).toISOString().split(".")[0] + ".000Z";
-
-      await createAllFoldersForJob(
-        jobDetails,
-        formattedStartDate,
-        formattedEndDate,
-        documentNumber,
-      );
+      await createAllFoldersForJob(jobDetails);
 
       const { error: statusError } = await dataLayerClient.from('jobs')
         .update({ flex_folders_created: true })

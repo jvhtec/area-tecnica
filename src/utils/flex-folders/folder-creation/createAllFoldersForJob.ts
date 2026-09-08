@@ -8,20 +8,16 @@ import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
  */
 export async function createAllFoldersForJob(
   job: FlexFolderJob,
-  formattedStartDate: string,
-  formattedEndDate: string,
-  documentNumber: string,
-  options?: CreateFoldersOptions
+  options?: CreateFoldersOptions,
+  settings?: { reconcile?: boolean },
 ) {
-  void formattedStartDate;
-  void formattedEndDate;
-  void documentNumber;
   const normalizedOptions = normalizeCreateFoldersOptions(options);
   const { data, error } = await supabase.functions.invoke("create-flex-folders", {
     body: {
       operation: job.job_type === "tourdate" ? "tour-date" : "job",
       jobId: job.id,
       options: normalizedOptions,
+      ...(settings?.reconcile === true ? { reconcile: true } : {}),
     },
   });
   if (error) throw error;

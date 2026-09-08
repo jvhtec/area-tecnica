@@ -1,8 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
-import { formatInTimeZone } from "date-fns-tz";
-import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 
 export interface TourFolderCreationResult {
@@ -15,11 +13,12 @@ type TourProvisioningOperation = "tour-root";
 
 const provisionTourFolders = async (
   tourId: string,
-  operation: TourProvisioningOperation
+  operation: TourProvisioningOperation,
+  reconcile = false,
 ): Promise<TourFolderCreationResult> => {
   try {
     const { data, error } = await supabase.functions.invoke("create-flex-folders", {
-      body: { operation, tourId },
+      body: { operation, tourId, ...(reconcile ? { reconcile: true } : {}) },
     });
 
     if (error) {
@@ -37,8 +36,8 @@ const provisionTourFolders = async (
   }
 };
 
-export const createTourRootFolders = (tourId: string) =>
-  provisionTourFolders(tourId, "tour-root");
+export const createTourRootFolders = (tourId: string, settings?: { reconcile?: boolean }) =>
+  provisionTourFolders(tourId, "tour-root", settings?.reconcile);
 
 export const createTourDateFolders = async (tourId: string): Promise<TourFolderCreationResult> => {
   try {
@@ -55,15 +54,7 @@ export const createTourDateFolders = async (tourId: string): Promise<TourFolderC
       if (!job.start_time || !job.end_time) {
         throw new Error(`El trabajo ${job.id} no tiene fechas válidas`);
       }
-      const start = new Date(job.start_time);
-      const end = new Date(job.end_time);
-      const documentNumber = formatInTimeZone(start, MADRID_TIMEZONE, "yyMMdd");
-      await createAllFoldersForJob(
-        job,
-        `${start.toISOString().split(".")[0]}.000Z`,
-        `${end.toISOString().split(".")[0]}.000Z`,
-        documentNumber,
-      );
+      await createAllFoldersForJob(job);
     }
 
     return { success: true, data: { jobsProcessed: jobs.length } };

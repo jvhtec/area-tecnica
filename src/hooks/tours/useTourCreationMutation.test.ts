@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   events: [] as string[],
   createTourRootFolders: vi.fn(),
+  failingInsert: "" as string,
 }));
 
 vi.mock("@/hooks/useLocationManagement", () => ({
@@ -19,11 +20,16 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (table: string) => ({
       insert: (payload: unknown) => {
         state.events.push(`insert:${table}`);
-        if (table === "tours") return { select: () => ({ single: async () => ({ data: { id: "tour-1", name: "Tour" }, error: null }) }) };
-        if (table === "tour_dates") return { select: () => ({ single: async () => ({ data: { id: "date-1" }, error: null }) }) };
-        if (table === "jobs") return { select: () => ({ single: async () => ({ data: { id: "job-1" }, error: null }) }) };
-        return Promise.resolve({ data: payload, error: null });
+        const error = state.failingInsert === table ? new Error(`${table} failed`) : null;
+        if (table === "tours") return { select: () => ({ single: async () => ({ data: { id: "tour-1", name: "Tour" }, error }) }) };
+        if (table === "tour_dates") return { select: () => ({ single: async () => ({ data: { id: "date-1" }, error }) }) };
+        if (table === "jobs") return { select: () => ({ single: async () => ({ data: { id: "job-1" }, error }) }) };
+        return Promise.resolve({ data: payload, error });
       },
+      delete: () => ({ eq: async () => {
+        state.events.push(`delete:${table}`);
+        return { error: null };
+      } }),
     }),
   },
 }));
@@ -33,6 +39,7 @@ import { useTourCreationMutation } from "./useTourCreationMutation";
 describe("useTourCreationMutation provisioning order", () => {
   beforeEach(() => {
     state.events.length = 0;
+    state.failingInsert = "";
     state.createTourRootFolders.mockReset().mockImplementation(async () => {
       state.events.push("provision:tour-root");
       return { success: true };
@@ -65,8 +72,21 @@ describe("useTourCreationMutation provisioning order", () => {
       description: "",
       dates: [{ date: "2026-08-30", location: "" }],
       color: "#000000",
-      departments: [],
+      departments: ["sound"],
     })).rejects.toThrow("needs reconciliation");
     expect(state.events).not.toContain("delete:tours");
+  });
+
+  it("removes the incomplete tour when local persistence fails", async () => {
+    state.failingInsert = "job_departments";
+    await expect(useTourCreationMutation().createTourWithDates({
+      title: "Test Tour",
+      description: "",
+      dates: [{ date: "2026-08-30", location: "Madrid" }],
+      color: "#000000",
+      departments: ["sound"],
+    })).rejects.toThrow("job_departments failed");
+    expect(state.events).toContain("delete:tours");
+    expect(state.events).not.toContain("provision:tour-root");
   });
 });

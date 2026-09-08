@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildJobPlan, makeJobStore } from "./jobPlan.ts";
+import { buildJobPlan, makeJobStore, matchLegacyJobElements } from "./jobPlan.ts";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { FORBIDDEN_HOJA_DEFINITION_IDS } from "./engine.ts";
 
@@ -67,6 +67,31 @@ describe("server-owned job plans", () => {
     const store = makeJobStore({ from } as unknown as SupabaseClient, "operation", { id: "job", tour_date_id: "date" });
     await store.persistTracking({ key: "department:sound", externalParentElementId: "remote-tour-parent", payload: {}, tracking: { folderType: "tourdate", department: "sound" } }, "remote-child");
     expect(inserted?.parent_id).toBe("local-tour-parent");
+  });
+
+  it("adopts legacy job rows by semantic role before creating remote elements", () => {
+    const plan = [
+      { key: "root", payload: {}, tracking: { folderType: "main_event" } },
+      { key: "department:sound", parentKey: "root", payload: {}, tracking: { folderType: "department", department: "sound" } },
+      { key: "department:sound:pullsheet:TP", parentKey: "department:sound", payload: {}, tracking: { folderType: "pull_sheet", department: "sound" } },
+      { key: "department:sound:pullsheet:PA", parentKey: "department:sound", payload: {}, tracking: { folderType: "pull_sheet", department: "sound" } },
+      { key: "estructura:source:sound", parentKey: "department:estructura", payload: {}, tracking: { folderType: "pull_sheet", department: "estructura", sourceDepartment: "sound" } },
+    ];
+    const rows = [
+      { id: "local-root", element_id: "remote-root", parent_id: null, folder_type: "main_event", department: null, source_department: null, job_id: "job" },
+      { id: "local-sound", element_id: "remote-sound", parent_id: "remote-root", folder_type: "department", department: "sound", source_department: null, job_id: "job" },
+      { id: "local-tp", element_id: "remote-tp", parent_id: "local-sound", folder_type: "pull_sheet", department: "sound", source_department: null, job_id: "job" },
+      { id: "local-pa", element_id: "remote-pa", parent_id: "local-sound", folder_type: "pull_sheet", department: "sound", source_department: null, job_id: "job" },
+      { id: "local-es", element_id: "remote-es", parent_id: "estructura", folder_type: "pull_sheet", department: "estructura", source_department: "sound", job_id: null },
+    ];
+    const matches = matchLegacyJobElements(rows, new Map(), plan);
+    expect([...matches.entries()].map(([key, row]) => [key, row.element_id])).toEqual([
+      ["root", "remote-root"],
+      ["department:sound", "remote-sound"],
+      ["department:sound:pullsheet:TP", "remote-tp"],
+      ["department:sound:pullsheet:PA", "remote-pa"],
+      ["estructura:source:sound", "remote-es"],
+    ]);
   });
 
   it("places tour dates below authoritative tour department roots", () => {

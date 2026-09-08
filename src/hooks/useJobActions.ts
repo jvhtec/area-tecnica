@@ -115,18 +115,12 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         return;
       }
 
-      const startDate = new Date(job.start_time);
-      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
-
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
-
       toast({
         title: "Creating folders...",
         description: "Setting up Flex folder structure for this job."
       });
 
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
+      await createAllFoldersForJob(job);
 
       const { error: updateError } = await supabase
         .from('jobs')

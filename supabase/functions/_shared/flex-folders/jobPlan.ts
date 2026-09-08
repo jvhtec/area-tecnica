@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { DEPARTMENT_IDS, DEPARTMENT_SUFFIXES, FLEX_FOLDER_IDS, RESPONSIBLE_PERSON_IDS } from "../../../../src/utils/flex-folders/constants.ts";
-import type { ProvisioningNode, ProvisioningStore } from "./engine.ts";
+import type { ProvisioningNode } from "./engine.ts";
+import { makeProvisioningStore } from "./store.ts";
 
 const DEPARTMENTS = ["sound", "lights", "video", "production", "personnel", "comercial"] as const;
 type Department = typeof DEPARTMENTS[number];
@@ -148,11 +149,94 @@ export const buildJobPlan = (context: {
   return nodes;
 };
 
-export const makeJobStore = (supabase: SupabaseClient, operationId: string, job: Record<string, unknown>): ProvisioningStore => ({
-  load: async () => { const { data, error } = await supabase.from("flex_provisioning_nodes").select("semantic_key,state,element_id,tracking_row_id").eq("operation_id", operationId); if (error) throw error; return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined, trackingRowId: row.tracking_row_id || undefined })); },
-  markCreating: async (node) => { const { error } = await supabase.from("flex_provisioning_nodes").upsert({ operation_id: operationId, semantic_key: node.key, parent_key: node.parentKey, state: "creating", payload: node.payload }, { onConflict: "operation_id,semantic_key" }); if (error) throw error; },
-  markRemoteElement: async (node, elementId) => { const { error } = await supabase.from("flex_provisioning_nodes").update({ state: "needs_reconciliation", element_id: elementId }).eq("operation_id", operationId).eq("semantic_key", node.key); if (error) throw error; },
-  persistTracking: async (node, elementId, parentTrackingId) => {
+export type LegacyFlexFolder = {
+  id: string;
+  element_id: string;
+  parent_id: string | null;
+  folder_type: string;
+  department: string | null;
+  source_department: string | null;
+  job_id: string | null;
+};
+
+export const matchLegacyJobElements = (
+  legacyRows: LegacyFlexFolder[],
+  crewElements: Map<string, string>,
+  plan: ProvisioningNode[],
+) => {
+  const used = new Set<string>();
+  const matched = new Map<string, LegacyFlexFolder>();
+  for (const node of plan) {
+    const tracking = node.tracking as {
+      folderType?: string; department?: string; sourceDepartment?: string | null; crewDepartment?: string;
+    };
+    const candidates = legacyRows.filter((row) => {
+      if (used.has(row.id) || row.folder_type !== tracking.folderType) return false;
+      if (tracking.department !== undefined && row.department !== tracking.department) return false;
+      if (tracking.sourceDepartment !== undefined && row.source_department !== tracking.sourceDepartment) return false;
+      if (tracking.sourceDepartment === undefined && row.source_department !== null) return false;
+      const crewElementId = tracking.crewDepartment ? crewElements.get(tracking.crewDepartment) : undefined;
+      return !crewElementId || row.element_id === crewElementId;
+    });
+    const parent = node.parentKey ? matched.get(node.parentKey) : undefined;
+    const legacy = candidates.find((row) => parent && (row.parent_id === parent.id || row.parent_id === parent.element_id))
+      || candidates[0];
+    if (!legacy) continue;
+    used.add(legacy.id);
+    matched.set(node.key, legacy);
+  }
+  return matched;
+};
+
+/** Maps pre-provisioning tracking rows onto stable semantic keys before execution. */
+export const seedKnownJobElements = async (
+  supabase: SupabaseClient,
+  operationId: string,
+  job: Record<string, unknown>,
+  plan: ProvisioningNode[],
+) => {
+  const { data: existingNodes, error: existingNodeError } = await supabase.from("flex_provisioning_nodes")
+    .select("semantic_key").eq("operation_id", operationId).limit(1);
+  if (existingNodeError) throw existingNodeError;
+  if (existingNodes?.length) return;
+
+  const jobId = String(job.id);
+  const filters = [`job_id.eq.${jobId}`];
+  if (job.tour_date_id) filters.push(`tour_date_id.eq.${String(job.tour_date_id)}`);
+  const { data, error } = await supabase.from("flex_folders")
+    .select("id,element_id,parent_id,folder_type,department,source_department,job_id,created_at")
+    .or(filters.join(","))
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  const { data: crewRows, error: crewError } = await supabase.from("flex_crew_calls")
+    .select("department,flex_element_id").eq("job_id", jobId);
+  if (crewError) throw crewError;
+  const crewElements = new Map<string, string>((crewRows || []).map((row) => [row.department, row.flex_element_id]));
+  const legacyRows = (data || []) as LegacyFlexFolder[];
+  const matched = matchLegacyJobElements(legacyRows, crewElements, plan);
+  for (const node of plan) {
+    const legacy = matched.get(node.key);
+    if (!legacy) continue;
+    if (!legacy.job_id) {
+      const { error: updateError } = await supabase.from("flex_folders").update({ job_id: jobId }).eq("id", legacy.id);
+      if (updateError) throw updateError;
+    }
+    const { error: seedError } = await supabase.from("flex_provisioning_nodes").upsert({
+      operation_id: operationId,
+      semantic_key: node.key,
+      parent_key: node.parentKey,
+      state: "persisted",
+      element_id: legacy.element_id,
+      tracking_row_id: legacy.id,
+      payload: node.payload,
+    }, { onConflict: "operation_id,semantic_key", ignoreDuplicates: true });
+    if (seedError) throw seedError;
+  }
+};
+
+export const makeJobStore = (supabase: SupabaseClient, operationId: string, job: Record<string, unknown>) =>
+  makeProvisioningStore(supabase, operationId, async (node, elementId, parentTrackingId) => {
     const tracking = node.tracking as { folderType: string; department?: string; sourceDepartment?: string; crewDepartment?: string; externalParentTrackingId?: string };
     const { data: existing, error: existingError } = await supabase.from("flex_folders").select("id").eq("element_id", elementId).maybeSingle(); if (existingError) throw existingError;
     let id = existing?.id;
@@ -167,7 +251,4 @@ export const makeJobStore = (supabase: SupabaseClient, operationId: string, job:
     if (!id) { const { data, error } = await supabase.from("flex_folders").insert({ job_id: job.id, tour_date_id: job.tour_date_id || null, parent_id: resolvedParentTrackingId || null, element_id: elementId, department: tracking.department || null, source_department: tracking.sourceDepartment || null, folder_type: tracking.folderType }).select("id").single(); if (error) throw error; id = data.id; }
     if (tracking.crewDepartment) { const { error } = await supabase.from("flex_crew_calls").upsert({ job_id: job.id, department: tracking.crewDepartment, flex_element_id: elementId }, { onConflict: "job_id,department" }); if (error) throw error; }
     return id;
-  },
-  markPersisted: async (node, elementId, trackingRowId) => { const { error } = await supabase.from("flex_provisioning_nodes").update({ state: "persisted", element_id: elementId, tracking_row_id: trackingRowId || null, safe_error: null }).eq("operation_id", operationId).eq("semantic_key", node.key); if (error) throw error; },
-  markNeedsReconciliation: async (node, safeError) => { const { error } = await supabase.from("flex_provisioning_nodes").update({ state: "needs_reconciliation", safe_error: safeError }).eq("operation_id", operationId).eq("semantic_key", node.key); if (error) throw error; },
-});
+  });

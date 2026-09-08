@@ -4,10 +4,11 @@ import { requireAuthenticatedRole } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import {
   executeProvisioningPlan,
+  FlexProvisioningDeterministicError,
   type ProvisioningNode,
-  type ProvisioningStore,
 } from "../_shared/flex-folders/engine.ts";
-import { buildJobPlan, makeJobStore } from "../_shared/flex-folders/jobPlan.ts";
+import { buildJobPlan, makeJobStore, seedKnownJobElements } from "../_shared/flex-folders/jobPlan.ts";
+import { makeProvisioningStore } from "../_shared/flex-folders/store.ts";
 import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
 import { getErrorStatus, HttpError } from "../_shared/http.ts";
 import {
@@ -75,9 +76,17 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
     },
     body: JSON.stringify(payload),
   }, { retryOnTimeout: false });
-  if (!response.ok) throw new Error(`Flex returned HTTP ${response.status}`);
+  if (!response.ok) {
+    const message = `Flex returned HTTP ${response.status}`;
+    if (response.status >= 400 && response.status < 500 && response.status !== 408) {
+      throw new FlexProvisioningDeterministicError(message);
+    }
+    throw new Error(message);
+  }
   return await response.json() as { elementId?: string };
 };
+const failureStatus = (error: unknown) =>
+  error instanceof FlexProvisioningDeterministicError ? "failed" : "needs_reconciliation";
 const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
   const { data, error } = await supabase
     .from("jobs")
@@ -89,6 +98,9 @@ const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Pr
     for (const row of job.job_departments || []) {
       if (typeof row.department === "string") selected.add(row.department);
     }
+  }
+  if (selected.size === 0) {
+    throw new HttpError(409, "Persist at least one technical department before creating tour folders");
   }
   return selected;
 };
@@ -203,27 +215,8 @@ const seedKnownTourElements = async (
   }
 };
 
-const makeStore = (supabase: SupabaseClient, operationId: string, tourId: string): ProvisioningStore => ({
-  load: async () => {
-    const { data, error } = await supabase.from("flex_provisioning_nodes")
-      .select("semantic_key,state,element_id,tracking_row_id").eq("operation_id", operationId);
-    if (error) throw error;
-    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined, trackingRowId: row.tracking_row_id || undefined }));
-  },
-  markCreating: async (node) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").upsert({
-      operation_id: operationId, semantic_key: node.key, parent_key: node.parentKey,
-      state: "creating", payload: node.payload,
-    }, { onConflict: "operation_id,semantic_key" });
-    if (error) throw error;
-  },
-  markRemoteElement: async (node, elementId) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").update({
-      state: "needs_reconciliation", element_id: elementId, updated_at: new Date().toISOString(),
-    }).eq("operation_id", operationId).eq("semantic_key", node.key);
-    if (error) throw error;
-  },
-  persistTracking: async (node, elementId, parentTrackingId) => {
+const makeStore = (supabase: SupabaseClient, operationId: string, tourId: string) =>
+  makeProvisioningStore(supabase, operationId, async (node, elementId, parentTrackingId) => {
     const tracking = node.tracking as { folderType: string; department?: string; tourColumn?: string };
     const { data: existing, error: readError } = await supabase.from("flex_folders")
       .select("id").eq("element_id", elementId).maybeSingle();
@@ -245,21 +238,7 @@ const makeStore = (supabase: SupabaseClient, operationId: string, tourId: string
       if (error) throw error;
     }
     return trackingId;
-  },
-  markPersisted: async (node, elementId, trackingRowId) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").update({
-      state: "persisted", element_id: elementId, tracking_row_id: trackingRowId || null,
-      safe_error: null, updated_at: new Date().toISOString(),
-    }).eq("operation_id", operationId).eq("semantic_key", node.key);
-    if (error) throw error;
-  },
-  markNeedsReconciliation: async (node, safeError) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").update({
-      state: "needs_reconciliation", safe_error: safeError, updated_at: new Date().toISOString(),
-    }).eq("operation_id", operationId).eq("semantic_key", node.key);
-    if (error) throw error;
-  },
-});
+  });
 
 const DRYHIRE_MONTHS = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -317,27 +296,7 @@ const buildDryhirePlan = (year: number): ProvisioningNode[] => {
 const makeDryhireStore = (
   supabase: SupabaseClient,
   operationId: string,
-): ProvisioningStore => ({
-  load: async () => {
-    const { data, error } = await supabase.from("flex_provisioning_nodes")
-      .select("semantic_key,state,element_id,tracking_row_id").eq("operation_id", operationId);
-    if (error) throw error;
-    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined, trackingRowId: row.tracking_row_id || undefined }));
-  },
-  markCreating: async (node) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").upsert({
-      operation_id: operationId, semantic_key: node.key, parent_key: node.parentKey,
-      state: "creating", payload: node.payload,
-    }, { onConflict: "operation_id,semantic_key" });
-    if (error) throw error;
-  },
-  markRemoteElement: async (node, elementId) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").update({
-      state: "needs_reconciliation", element_id: elementId, updated_at: new Date().toISOString(),
-    }).eq("operation_id", operationId).eq("semantic_key", node.key);
-    if (error) throw error;
-  },
-  persistTracking: async (node, elementId) => {
+) => makeProvisioningStore(supabase, operationId, async (node, elementId) => {
     const tracking = node.tracking as { kind: string; year: number; department: string; month?: string };
     if (tracking.kind === "root") return undefined;
     const { data: existing, error: readError } = await supabase.from("dryhire_parent_folders")
@@ -353,21 +312,7 @@ const makeDryhireStore = (
     }).select("id").single();
     if (error) throw error;
     return data.id;
-  },
-  markPersisted: async (node, elementId, trackingRowId) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").update({
-      state: "persisted", element_id: elementId, tracking_row_id: trackingRowId || null,
-      safe_error: null, updated_at: new Date().toISOString(),
-    }).eq("operation_id", operationId).eq("semantic_key", node.key);
-    if (error) throw error;
-  },
-  markNeedsReconciliation: async (node, safeError) => {
-    const { error } = await supabase.from("flex_provisioning_nodes").update({
-      state: "needs_reconciliation", safe_error: safeError, updated_at: new Date().toISOString(),
-    }).eq("operation_id", operationId).eq("semantic_key", node.key);
-    if (error) throw error;
-  },
-});
+  });
 
 const provisionDryhireYear = async (
   supabase: SupabaseClient,
@@ -412,7 +357,7 @@ const provisionDryhireYear = async (
   } catch (error) {
     await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
-      p_status: "needs_reconciliation", p_last_error: { code: "dryhire_year_interrupted" },
+      p_status: failureStatus(error), p_last_error: { code: "dryhire_year_interrupted" },
     }).then(() => undefined, () => undefined);
     throw error;
   }
@@ -521,26 +466,7 @@ const provisionArtistExtras = async (
     },
   ];
 
-  const store: ProvisioningStore = {
-    load: async () => {
-      const { data, error } = await supabase.from("flex_provisioning_nodes")
-        .select("semantic_key,state,element_id,tracking_row_id").eq("operation_id", lease.operation_id);
-      if (error) throw error;
-      return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined, trackingRowId: row.tracking_row_id || undefined }));
-    },
-    markCreating: async (node) => {
-      const { error } = await supabase.from("flex_provisioning_nodes").upsert({
-        operation_id: lease.operation_id, semantic_key: node.key, parent_key: node.parentKey,
-        state: "creating", payload: node.payload,
-      }, { onConflict: "operation_id,semantic_key" });
-      if (error) throw error;
-    },
-    markRemoteElement: async (node, elementId) => {
-      const { error } = await supabase.from("flex_provisioning_nodes").update({ state: "needs_reconciliation", element_id: elementId })
-        .eq("operation_id", lease.operation_id).eq("semantic_key", node.key);
-      if (error) throw error;
-    },
-    persistTracking: async (node, elementId, parentTrackingId) => {
+  const store = makeProvisioningStore(supabase, lease.operation_id, async (node, elementId, parentTrackingId) => {
       if (node.key === "extras:sound" && existingExtras) return existingExtras.id;
       const { data: tracked, error: trackedError } = await supabase.from("flex_folders")
         .select("id").eq("element_id", elementId).maybeSingle();
@@ -553,19 +479,7 @@ const provisionArtistExtras = async (
       }).select("id").single();
       if (error) throw error;
       return data.id;
-    },
-    markPersisted: async (node, elementId, trackingRowId) => {
-      const { error } = await supabase.from("flex_provisioning_nodes").update({
-        state: "persisted", element_id: elementId, tracking_row_id: trackingRowId || null, safe_error: null,
-      }).eq("operation_id", lease.operation_id).eq("semantic_key", node.key);
-      if (error) throw error;
-    },
-    markNeedsReconciliation: async (node, safeError) => {
-      const { error } = await supabase.from("flex_provisioning_nodes").update({ state: "needs_reconciliation", safe_error: safeError })
-        .eq("operation_id", lease.operation_id).eq("semantic_key", node.key);
-      if (error) throw error;
-    },
-  };
+    });
   try {
     const outcome = await executeProvisioningPlan(plan, store, (payload) => createFlexElement(payload, flexToken));
     const { error } = await supabase.rpc("finish_flex_provisioning_lease", {
@@ -576,7 +490,7 @@ const provisionArtistExtras = async (
   } catch (error) {
     await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
-      p_status: "needs_reconciliation", p_last_error: { code: "artist_extras_interrupted" },
+      p_status: failureStatus(error), p_last_error: { code: "artist_extras_interrupted" },
     }).then(() => undefined, () => undefined);
     throw error;
   }
@@ -615,6 +529,29 @@ const provisionJob = async (
   const end = flexDate(job.end_time);
   const documentNumber = documentNumberFor(job.start_time);
   const operationType = job.job_type === "tourdate" ? "tour-date" : "job";
+  let plan: ProvisioningNode[];
+  if (job.job_type === "dryhire") {
+    const timezone = typeof job.timezone === "string" && job.timezone ? job.timezone : "Europe/Madrid";
+    const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+    const wallClock = (value: string) => { const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map((part) => [part.type, part.value])); return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.000Z`; };
+    const dateParts = Object.fromEntries(formatter.formatToParts(new Date(job.start_time)).map((part) => [part.type, part.value]));
+    const year = Number(dateParts.year);
+    const month = String(dateParts.month);
+    const department = selected.has("lights") && !selected.has("sound") ? "lights" : "sound";
+    const { data: parent, error: parentError } = await supabase.from("dryhire_parent_folders").select("id,element_id").eq("year", year).eq("month", month).eq("department", department).single();
+    if (parentError || !parent) throw new HttpError(409, "Create the dry-hire year/month folders first");
+    const deptSuffix = DEPARTMENT_SUFFIXES[department];
+    const common = { open: true, locked: false, plannedStartDate: wallClock(job.start_time), plannedEndDate: wallClock(job.end_time), locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS[department], personResponsibleId: RESPONSIBLE_PERSON_IDS[department] };
+    plan = [
+      { key: "dryhire", externalParentElementId: parent.element_id, payload: { ...common, definitionId: FLEX_FOLDER_IDS.subFolder, name: `Dry Hire - ${job.title}`, documentNumber: `${String(dateParts.year).slice(-2)}${month}${dateParts.day}${deptSuffix}` }, tracking: { folderType: "dryhire", department, externalParentTrackingId: parent.id } },
+      { key: "dryhire:budget", parentKey: "dryhire", payload: { ...common, definitionId: FLEX_FOLDER_IDS.presupuestoDryHire, name: `Presupuesto - ${job.title}`, documentNumber: `${String(dateParts.year).slice(-2)}${month}${dateParts.day}${deptSuffix}DH` }, tracking: { folderType: "dryhire_presupuesto", department } },
+    ];
+  } else {
+    plan = buildJobPlan({ job, selected, options: options as never, start, end, documentNumber, tour, isTourPackOnly });
+  }
+  if (job.job_type === "tourdate" && plan.some((node) => node.externalParentElementId === "")) {
+    throw new HttpError(409, "Create or reconcile the tour roots first");
+  }
   const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
     p_scope_key: `${operationType}:${jobId}`, p_operation_type: operationType, p_scope_id: jobId,
     p_lease_seconds: 600, p_reconcile: reconcile,
@@ -624,29 +561,7 @@ const provisionJob = async (
   const lease = (leaseData?.[0] || null) as LeaseRow | null;
   if (!lease?.acquired || !lease.lease_token) return { success: lease?.status === "complete", status: lease?.status || "in_progress" };
   try {
-    let plan: ProvisioningNode[];
-    if (job.job_type === "dryhire") {
-      const timezone = typeof job.timezone === "string" && job.timezone ? job.timezone : "Europe/Madrid";
-      const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
-      const wallClock = (value: string) => { const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map((part) => [part.type, part.value])); return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.000Z`; };
-      const dateParts = Object.fromEntries(formatter.formatToParts(new Date(job.start_time)).map((part) => [part.type, part.value]));
-      const year = Number(dateParts.year);
-      const month = String(dateParts.month);
-      const department = selected.has("lights") && !selected.has("sound") ? "lights" : "sound";
-      const { data: parent, error: parentError } = await supabase.from("dryhire_parent_folders").select("id,element_id").eq("year", year).eq("month", month).eq("department", department).single();
-      if (parentError || !parent) throw new HttpError(409, "Create the dry-hire year/month folders first");
-      const deptSuffix = DEPARTMENT_SUFFIXES[department];
-      const common = { open: true, locked: false, plannedStartDate: wallClock(job.start_time), plannedEndDate: wallClock(job.end_time), locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS[department], personResponsibleId: RESPONSIBLE_PERSON_IDS[department] };
-      plan = [
-        { key: "dryhire", externalParentElementId: parent.element_id, payload: { ...common, definitionId: FLEX_FOLDER_IDS.subFolder, name: `Dry Hire - ${job.title}`, documentNumber: `${String(dateParts.year).slice(-2)}${month}${dateParts.day}${deptSuffix}` }, tracking: { folderType: "dryhire", department, externalParentTrackingId: parent.id } },
-        { key: "dryhire:budget", parentKey: "dryhire", payload: { ...common, definitionId: FLEX_FOLDER_IDS.presupuestoDryHire, name: `Presupuesto - ${job.title}`, documentNumber: `${String(dateParts.year).slice(-2)}${month}${dateParts.day}${deptSuffix}DH` }, tracking: { folderType: "dryhire_presupuesto", department } },
-      ];
-    } else {
-      plan = buildJobPlan({ job, selected, options: options as never, start, end, documentNumber, tour, isTourPackOnly });
-    }
-    if (job.job_type === "tourdate" && plan.some((node) => node.externalParentElementId === "")) {
-      throw new HttpError(409, "Create or reconcile the tour roots first");
-    }
+    await seedKnownJobElements(supabase, lease.operation_id, job, plan);
     const outcome = await executeProvisioningPlan(plan, makeJobStore(supabase, lease.operation_id, job), (payload) => createFlexElement(payload, flexToken));
     const { error: flagError } = await supabase.from("jobs").update({ flex_folders_created: true }).eq("id", jobId);
     if (flagError) throw flagError;
@@ -654,7 +569,7 @@ const provisionJob = async (
     if (finishError) throw finishError;
     return { success: true, status: "complete", data: outcome };
   } catch (error) {
-    await supabase.rpc("finish_flex_provisioning_lease", { p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: "needs_reconciliation", p_last_error: { code: "job_provisioning_interrupted" } }).then(() => undefined, () => undefined);
+    await supabase.rpc("finish_flex_provisioning_lease", { p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: failureStatus(error), p_last_error: { code: "job_provisioning_interrupted" } }).then(() => undefined, () => undefined);
     throw error;
   }
 };
@@ -725,6 +640,8 @@ serve(async (req) => {
       loadTourDepartments(supabase, tourId),
       loadTourRange(supabase, tour),
     ]);
+    const legacyExistingRoot = Boolean(tour.flex_main_folder_id);
+    const plan = buildRootPlan(tour, selected, range, !legacyExistingRoot);
 
     const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
       p_scope_key: `tour-root:${tourId}`,
@@ -743,9 +660,7 @@ serve(async (req) => {
       });
     }
 
-    const legacyExistingRoot = Boolean(tour.flex_main_folder_id);
     await seedKnownTourElements(supabase, lease.operation_id, tour);
-    const plan = buildRootPlan(tour, selected, range, !legacyExistingRoot);
     const outcome = await executeProvisioningPlan(
       plan,
       makeStore(supabase, lease.operation_id, tourId),
@@ -782,7 +697,7 @@ serve(async (req) => {
       await supabase.rpc("finish_flex_provisioning_lease", {
         p_operation_id: lease.operation_id,
         p_lease_token: lease.lease_token,
-        p_status: "needs_reconciliation",
+        p_status: failureStatus(error),
         p_last_error: { code: "provisioning_interrupted" },
       }).then(() => undefined, () => undefined);
     }

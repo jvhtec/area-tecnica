@@ -149,7 +149,7 @@ Picker options control children only. They never remove required department/date
 
 ## Tour root
 
-Technical roots are derived from the union of persisted department selections across all tour jobs. Production, Personnel, Comercial, and Estructura roots always exist.
+Technical roots are derived from the union of persisted department selections across all tour jobs. At least one persisted technical selection is required before the operation acquires a lease. Production, Personnel, Comercial, and Estructura roots always exist.
 
 For a new tour root:
 
@@ -295,9 +295,10 @@ The resume behavior depends on durable evidence:
 | `persisted` | present | Skip the remote write. |
 | `creating` or `needs_reconciliation` | present | Adopt the remote element and finish local persistence. |
 | `creating` or `needs_reconciliation` | absent | Stop automatic replay because the remote outcome is ambiguous. |
+| `failed` | absent | Retry; Flex returned a definite non-timeout 4xx rejection for the previous attempt. |
 | No node | absent | Create normally. |
 
-An expired operation lease moves the operation to `needs_reconciliation`. A caller must explicitly send `reconcile: true` to acquire that scope again. Completion is reported only after every requested node is persisted.
+An expired operation lease moves the operation to `needs_reconciliation`. A caller must explicitly send `reconcile: true`; that request transitions and reacquires the lease atomically. Completed scopes may be reacquired so later picker additions can extend the plan, and persisted nodes are skipped. Before a first durable run, legacy job and tour-date rows are mapped to semantic keys by tracking identity and adopted. Completion is reported only after every requested node is persisted.
 
 ## Deprecated and historical variants
 
@@ -332,6 +333,7 @@ The server reloads jobs, tours, dates, artists, department selections, ranges, a
 | Operation routing, tour roots, dry hire, artist extras | `supabase/functions/create-flex-folders/index.ts` |
 | Standard job and tour-date plan | `supabase/functions/_shared/flex-folders/jobPlan.ts` |
 | Node execution and forbidden definitions | `supabase/functions/_shared/flex-folders/engine.ts` |
+| Shared durable node-state transitions | `supabase/functions/_shared/flex-folders/store.ts` |
 | Roles by operation | `supabase/functions/_shared/flex-folders/access.ts` |
 | Picker schema and normalization | `src/utils/flex-folders/types.ts` |
 | Flex definitions, departments, suffixes, responsible people | `src/utils/flex-folders/constants.ts` |

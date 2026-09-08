@@ -36,6 +36,7 @@ export const useTourCreationMutation = () => {
       (left, right) => new Date(left.date).getTime() - new Date(right.date).getTime()
     );
     if (validDates.length === 0) throw new Error("At least one valid date is required");
+    if (departments.length === 0) throw new Error("Selecciona al menos un departamento técnico");
 
     const { data: tour, error: tourError } = await supabase
       .from("tours")
@@ -51,63 +52,69 @@ export const useTourCreationMutation = () => {
       .single();
     if (tourError) throw tourError;
 
-    // Persist dates, jobs, and their department selection first. The server
-    // provisioning operation loads this authoritative context and never turns
-    // a missing/failed selection read into "all departments".
-    for (const dateInfo of validDates) {
-      let locationId: string | null = null;
-      let locationName = "No Location";
-      if (dateInfo.location) {
-        locationId = await getOrCreateLocation(dateInfo.location);
-        locationName = dateInfo.location;
-      }
+    try {
+      // Persist dates, jobs, and their department selection first. The server
+      // provisioning operation loads this authoritative context and never turns
+      // a missing/failed selection read into "all departments".
+      for (const dateInfo of validDates) {
+        let locationId: string | null = null;
+        let locationName = "No Location";
+        if (dateInfo.location) {
+          locationId = await getOrCreateLocation(dateInfo.location);
+          locationName = dateInfo.location;
+        }
 
-      const { data: tourDate, error: tourDateError } = await supabase
-        .from("tour_dates")
-        .insert({
-          tour_id: tour.id,
-          date: dateInfo.date,
-          start_date: dateInfo.date,
-          end_date: dateInfo.date,
-          tour_date_type: "show",
-          location_id: locationId,
-        })
-        .select("id,date")
-        .single();
-      if (tourDateError) throw tourDateError;
+        const { data: tourDate, error: tourDateError } = await supabase
+          .from("tour_dates")
+          .insert({
+            tour_id: tour.id,
+            date: dateInfo.date,
+            start_date: dateInfo.date,
+            end_date: dateInfo.date,
+            tour_date_type: "show",
+            location_id: locationId,
+          })
+          .select("id,date")
+          .single();
+        if (tourDateError) throw tourDateError;
 
-      const { data: dateJob, error: dateJobError } = await supabase
-        .from("jobs")
-        .insert({
-          title: `${title} (${locationName})`,
-          description,
-          start_time: `${dateInfo.date}T00:00:00`,
-          end_time: `${dateInfo.date}T23:59:59`,
-          location_id: locationId,
-          job_type: "tourdate",
-          tour_date_id: tourDate.id,
-          tour_id: tour.id,
-          color,
-          invoicing_company: invoicingCompany,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-      if (dateJobError) throw dateJobError;
+        const { data: dateJob, error: dateJobError } = await supabase
+          .from("jobs")
+          .insert({
+            title: `${title} (${locationName})`,
+            description,
+            start_time: `${dateInfo.date}T00:00:00`,
+            end_time: `${dateInfo.date}T23:59:59`,
+            location_id: locationId,
+            job_type: "tourdate",
+            tour_date_id: tourDate.id,
+            tour_id: tour.id,
+            color,
+            invoicing_company: invoicingCompany,
+            created_by: user.id,
+          })
+          .select("id")
+          .single();
+        if (dateJobError) throw dateJobError;
 
-      if (departments.length > 0) {
         const { error: departmentError } = await supabase.from("job_departments").insert(
           departments.map((department) => ({ job_id: dateJob.id, department }))
         );
         if (departmentError) throw departmentError;
-      }
 
-      const { error: dateTypeError } = await supabase.from("job_date_types").insert({
-        job_id: dateJob.id,
-        date: dateInfo.date,
-        type: "show",
-      });
-      if (dateTypeError) throw dateTypeError;
+        const { error: dateTypeError } = await supabase.from("job_date_types").insert({
+          job_id: dateJob.id,
+          date: dateInfo.date,
+          type: "show",
+        });
+        if (dateTypeError) throw dateTypeError;
+      }
+    } catch (error) {
+      const { error: cleanupError } = await supabase.from("tours").delete().eq("id", tour.id);
+      if (cleanupError) {
+        throw new Error(`No se pudo revertir la gira incompleta: ${cleanupError.message}`);
+      }
+      throw error;
     }
 
     const provisioning = await createTourRootFolders(tour.id);

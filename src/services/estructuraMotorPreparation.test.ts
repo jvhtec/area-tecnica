@@ -180,10 +180,8 @@ describe("Estructura motor preparation", () => {
 
     expect(mocks.createAllFolders).toHaveBeenCalledWith(
       job,
-      "2026-08-30T10:00:00.000Z",
-      "2026-08-30T20:00:00.000Z",
-      "260830",
       {},
+      { reconcile: true },
     );
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
@@ -217,7 +215,7 @@ describe("Estructura motor preparation", () => {
 
     await reconcileEstructuraFoldersForJob("job-1");
 
-    expect(mocks.ensureTourRoot).toHaveBeenCalledWith("tour-1");
+    expect(mocks.ensureTourRoot).toHaveBeenCalledWith("tour-1", { reconcile: true });
     expect(mocks.createAllFolders).toHaveBeenCalledTimes(1);
     expect(mocks.ensureTourRoot.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.createAllFolders.mock.invocationCallOrder[0],
