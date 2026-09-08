@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-import { requireAdminOrManagement } from "../_shared/auth.ts";
+import { requireAuthenticatedRole } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import {
   executeProvisioningPlan,
@@ -9,6 +9,7 @@ import {
   type ProvisioningStore,
 } from "../_shared/flex-folders/engine.ts";
 import { buildJobPlan, makeJobStore } from "../_shared/flex-folders/jobPlan.ts";
+import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
 import { getErrorStatus, HttpError } from "../_shared/http.ts";
 import {
   DEPARTMENT_IDS,
@@ -216,9 +217,9 @@ const seedKnownTourElements = async (
 const makeStore = (supabase: SupabaseClient, operationId: string, tourId: string): ProvisioningStore => ({
   load: async () => {
     const { data, error } = await supabase.from("flex_provisioning_nodes")
-      .select("semantic_key,state,element_id").eq("operation_id", operationId);
+      .select("semantic_key,state,element_id,tracking_row_id").eq("operation_id", operationId);
     if (error) throw error;
-    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined }));
+    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined, trackingRowId: row.tracking_row_id || undefined }));
   },
   markCreating: async (node) => {
     const { error } = await supabase.from("flex_provisioning_nodes").upsert({
@@ -330,9 +331,9 @@ const makeDryhireStore = (
 ): ProvisioningStore => ({
   load: async () => {
     const { data, error } = await supabase.from("flex_provisioning_nodes")
-      .select("semantic_key,state,element_id").eq("operation_id", operationId);
+      .select("semantic_key,state,element_id,tracking_row_id").eq("operation_id", operationId);
     if (error) throw error;
-    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined }));
+    return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined, trackingRowId: row.tracking_row_id || undefined }));
   },
   markCreating: async (node) => {
     const { error } = await supabase.from("flex_provisioning_nodes").upsert({
@@ -384,6 +385,7 @@ const provisionDryhireYear = async (
   year: number,
   flexToken: string,
   reconcile: boolean,
+  requestedBy: string,
 ) => {
   const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
     p_scope_key: `dryhire-year:${year}`,
@@ -391,6 +393,7 @@ const provisionDryhireYear = async (
     p_scope_id: String(year),
     p_lease_seconds: 600,
     p_reconcile: reconcile,
+    p_requested_by: requestedBy,
   });
   if (leaseError) throw leaseError;
   const lease = (leaseData?.[0] || null) as LeaseRow | null;
@@ -444,6 +447,7 @@ const provisionArtistExtras = async (
   dayStartTime: string,
   flexToken: string,
   reconcile: boolean,
+  requestedBy: string,
 ) => {
   const { data: artist, error: artistError } = await supabase.from("festival_artists")
     .select("id,job_id,name,date,show_start,show_end,isaftermidnight").eq("id", artistId).single();
@@ -468,6 +472,7 @@ const provisionArtistExtras = async (
     p_scope_id: artistId,
     p_lease_seconds: 180,
     p_reconcile: reconcile,
+    p_requested_by: requestedBy,
   });
   if (leaseError) throw leaseError;
   const lease = (leaseData?.[0] || null) as LeaseRow | null;
@@ -530,9 +535,9 @@ const provisionArtistExtras = async (
   const store: ProvisioningStore = {
     load: async () => {
       const { data, error } = await supabase.from("flex_provisioning_nodes")
-        .select("semantic_key,state,element_id").eq("operation_id", lease.operation_id);
+        .select("semantic_key,state,element_id,tracking_row_id").eq("operation_id", lease.operation_id);
       if (error) throw error;
-      return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined }));
+      return (data || []).map((row) => ({ key: row.semantic_key, state: row.state, elementId: row.element_id || undefined, trackingRowId: row.tracking_row_id || undefined }));
     },
     markCreating: async (node) => {
       const { error } = await supabase.from("flex_provisioning_nodes").upsert({
@@ -594,6 +599,7 @@ const provisionJob = async (
   options: Record<string, unknown> | undefined,
   flexToken: string,
   reconcile: boolean,
+  requestedBy: string,
 ) => {
   const { data: job, error: jobError } = await supabase.from("jobs")
     .select("*,locations(name)").eq("id", jobId).single();
@@ -603,11 +609,18 @@ const provisionJob = async (
   if (departmentError) throw departmentError;
   const selected = new Set<string>((departmentRows || []).map((row) => row.department).filter(Boolean));
   let tour: Record<string, unknown> | undefined;
+  let isTourPackOnly = false;
   if (job.job_type === "tourdate") {
     if (!job.tour_id) throw new HttpError(409, "Tour date has no tour");
     const { data, error } = await supabase.from("tours").select("*").eq("id", job.tour_id).single();
     if (error || !data) throw new HttpError(404, "Tour not found");
     tour = data;
+    if (job.tour_date_id) {
+      const { data: tourDate, error: tourDateError } = await supabase.from("tour_dates")
+        .select("is_tour_pack_only").eq("id", job.tour_date_id).single();
+      if (tourDateError || !tourDate) throw new HttpError(404, "Tour date not found");
+      isTourPackOnly = tourDate.is_tour_pack_only === true;
+    }
   }
   const start = flexDate(job.start_time);
   const end = flexDate(job.end_time);
@@ -616,6 +629,7 @@ const provisionJob = async (
   const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
     p_scope_key: `${operationType}:${jobId}`, p_operation_type: operationType, p_scope_id: jobId,
     p_lease_seconds: 600, p_reconcile: reconcile,
+    p_requested_by: requestedBy,
   });
   if (leaseError) throw leaseError;
   const lease = (leaseData?.[0] || null) as LeaseRow | null;
@@ -639,7 +653,7 @@ const provisionJob = async (
         { key: "dryhire:budget", parentKey: "dryhire", payload: { ...common, definitionId: FLEX_FOLDER_IDS.presupuestoDryHire, name: `Presupuesto - ${job.title}`, documentNumber: `${String(dateParts.year).slice(-2)}${month}${dateParts.day}${deptSuffix}DH` }, tracking: { folderType: "dryhire_presupuesto", department } },
       ];
     } else {
-      plan = buildJobPlan({ job, selected, options: options as never, start, end, documentNumber, tour });
+      plan = buildJobPlan({ job, selected, options: options as never, start, end, documentNumber, tour, isTourPackOnly });
     }
     if (job.job_type === "tourdate" && plan.some((node) => node.externalParentElementId === "")) {
       throw new HttpError(409, "Create or reconcile the tour roots first");
@@ -674,7 +688,10 @@ serve(async (req) => {
     const flexToken = Deno.env.get("X_AUTH_TOKEN");
     if (!supabaseUrl || !serviceRoleKey || !flexToken) throw new Error("Missing environment variables");
     supabase = createClient(supabaseUrl, serviceRoleKey);
-    const caller = await requireAdminOrManagement(supabase, req, { logContext: "create-flex-folders" });
+    const caller = await requireAuthenticatedRole(supabase, req, {
+      logContext: "create-flex-folders",
+      allowedRoles: allowedRolesForProvisioningOperation(operation as FlexProvisioningOperation),
+    });
 
     if (operation === "job" || operation === "tour-date") {
       const jobId = typeof body.jobId === "string" ? body.jobId : "";
@@ -682,14 +699,14 @@ serve(async (req) => {
       const options = body.options && typeof body.options === "object" && !Array.isArray(body.options)
         ? body.options as Record<string, unknown>
         : body.options === undefined ? undefined : {};
-      const result = await provisionJob(supabase, jobId, options, flexToken, body.reconcile === true);
+      const result = await provisionJob(supabase, jobId, options, flexToken, body.reconcile === true, caller.userId);
       return new Response(JSON.stringify(result), { status: result.success ? 200 : 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (operation === "dryhire-year") {
       const year = Number(body.year);
       if (!Number.isInteger(year) || year < 2000 || year > 2200) throw new HttpError(400, "Invalid dry-hire year");
-      const dryhireResult = await provisionDryhireYear(supabase, year, flexToken, body.reconcile === true);
+      const dryhireResult = await provisionDryhireYear(supabase, year, flexToken, body.reconcile === true, caller.userId);
       return new Response(JSON.stringify(dryhireResult), {
         status: dryhireResult.success ? 200 : 409,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -702,7 +719,7 @@ serve(async (req) => {
       const dayStartTime = typeof body.dayStartTime === "string" ? body.dayStartTime : "07:00";
       if (!artistId || !jobId) throw new HttpError(400, "Artist ID and job ID are required");
       const artistResult = await provisionArtistExtras(
-        supabase, artistId, jobId, dayStartTime, flexToken, body.reconcile === true,
+        supabase, artistId, jobId, dayStartTime, flexToken, body.reconcile === true, caller.userId,
       );
       return new Response(JSON.stringify(artistResult), {
         status: artistResult.success ? 200 : 409,
@@ -726,6 +743,7 @@ serve(async (req) => {
       p_scope_id: tourId,
       p_lease_seconds: 300,
       p_reconcile: body.reconcile === true,
+      p_requested_by: caller.userId,
     });
     if (leaseError) throw leaseError;
     lease = (leaseData?.[0] || null) as LeaseRow | null;

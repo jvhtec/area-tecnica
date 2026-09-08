@@ -58,7 +58,8 @@ create or replace function public.acquire_flex_provisioning_lease(
   p_operation_type text,
   p_scope_id text,
   p_lease_seconds integer default 120,
-  p_reconcile boolean default false
+  p_reconcile boolean default false,
+  p_requested_by uuid default null
 )
 returns table(operation_id uuid, lease_token uuid, status text, acquired boolean)
 language plpgsql
@@ -85,7 +86,7 @@ begin
       scope_key, operation_type, scope_id, status, lease_token, lease_expires_at, requested_by
     ) values (
       p_scope_key, p_operation_type, p_scope_id, 'running', v_token,
-      now() + make_interval(secs => p_lease_seconds), auth.uid()
+      now() + make_interval(secs => p_lease_seconds), p_requested_by
     ) returning * into v_operation;
     return query select v_operation.id, v_token, v_operation.status, true;
     return;
@@ -116,7 +117,8 @@ begin
 
   update public.flex_provisioning_operations
     set status = 'running', lease_token = v_token,
-        lease_expires_at = now() + make_interval(secs => p_lease_seconds), updated_at = now()
+        lease_expires_at = now() + make_interval(secs => p_lease_seconds),
+        requested_by = coalesce(requested_by, p_requested_by), updated_at = now()
     where id = v_operation.id;
   return query select v_operation.id, v_token, 'running'::text, true;
 end
@@ -202,10 +204,10 @@ begin
 end
 $function$;
 
-revoke all on function public.acquire_flex_provisioning_lease(text, text, text, integer, boolean) from public, anon, authenticated;
+revoke all on function public.acquire_flex_provisioning_lease(text, text, text, integer, boolean, uuid) from public, anon, authenticated;
 revoke all on function public.allocate_flex_provisioning_sequence(uuid, text, integer) from public, anon, authenticated;
 revoke all on function public.finish_flex_provisioning_lease(uuid, uuid, text, jsonb) from public, anon, authenticated;
-grant execute on function public.acquire_flex_provisioning_lease(text, text, text, integer, boolean) to service_role;
+grant execute on function public.acquire_flex_provisioning_lease(text, text, text, integer, boolean, uuid) to service_role;
 grant execute on function public.allocate_flex_provisioning_sequence(uuid, text, integer) to service_role;
 grant execute on function public.finish_flex_provisioning_lease(uuid, uuid, text, jsonb) to service_role;
 

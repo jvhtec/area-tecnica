@@ -34,7 +34,7 @@ Legacy tour roots with known UUID columns are adopted. Because their historical 
 
 ## Authorization and rollout
 
-The server validates the caller with `requireAdminOrManagement`, loads tours, jobs, dates, and department selections using the service client, and accepts entity IDs plus the few allowed operation options. Callers cannot supply arbitrary Flex parents, definition IDs, department IDs, or responsible-person IDs.
+The server validates roles before using its service client. Job, tour-date, and tour-root operations allow admin, management, and logistics users, matching the existing folder controls. Dry-hire year setup and artist extras remain restricted to admin and management. The server loads tours, jobs, dates, and department selections authoritatively and accepts entity IDs plus the few allowed operation options. Callers cannot supply arbitrary Flex parents, definition IDs, department IDs, or responsible-person IDs.
 
 Deploy `20260908113000_add_flex_provisioning_state.sql` before the Edge function, then deploy clients that use the typed operation names. A production `supabase db push --linked --dry-run` and migration apply are human release steps. If provisioning must be paused, keep the Hoja removal and durable state records, disable new operations, and forward-fix adoption; do not delete remote elements or return to the deprecated date builder.
 

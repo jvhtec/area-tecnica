@@ -23,6 +23,7 @@ export interface StoredProvisioningNode {
   key: string;
   state: ProvisioningNodeState;
   elementId?: string;
+  trackingRowId?: string;
 }
 
 export interface ProvisioningStore {
@@ -65,6 +66,9 @@ export async function executeProvisioningPlan(
   const stored = new Map((await store.load()).map((node) => [node.key, node]));
   const resolvedElements = new Map<string, string>();
   const trackingRows = new Map<string, string>();
+  for (const node of stored.values()) {
+    if (node.trackingRowId) trackingRows.set(node.key, node.trackingRowId);
+  }
   let created = 0;
   let adopted = 0;
   let skipped = 0;

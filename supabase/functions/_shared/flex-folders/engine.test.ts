@@ -31,6 +31,20 @@ it("executor resumes known remote IDs without posting again", async () => {
   expect(result.adopted).toBe(1);
 });
 
+it("keeps a resumed parent's local tracking row for newly created children", async () => {
+  const { store } = makeStore([{ key: "root", state: "persisted", elementId: "remote-root", trackingRowId: "local-root" }]);
+  let insertedChild: { parent_id?: string } | undefined;
+  store.persistTracking = async (node, _elementId, parentTrackingId) => {
+    if (node.key === "child") insertedChild = { parent_id: parentTrackingId };
+    return `row:${node.key}`;
+  };
+  await executeProvisioningPlan([
+    { key: "root", payload: { definitionId: "allowed" }, tracking: {} },
+    { key: "child", parentKey: "root", payload: { definitionId: "allowed" }, tracking: {} },
+  ], store, async () => ({ elementId: "remote-child" }));
+  expect(insertedChild).toEqual({ parent_id: "local-root" });
+});
+
 it("executor refuses blind replay after an interrupted remote call", async () => {
   for (const state of ["creating", "needs_reconciliation"] as const) {
     const { store } = makeStore([{ key: "root", state }]);

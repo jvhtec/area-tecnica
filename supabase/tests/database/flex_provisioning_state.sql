@@ -9,7 +9,7 @@ SELECT has_column('public', 'flex_provisioning_operations', 'lease_expires_at', 
 SELECT has_column('public', 'flex_provisioning_operations', 'sequence_number', 'Operations persist allocated sequence numbers');
 SELECT has_column('public', 'flex_provisioning_nodes', 'semantic_key', 'Nodes have stable semantic keys');
 SELECT has_column('public', 'flex_provisioning_nodes', 'element_id', 'Known remote IDs survive tracking failures');
-SELECT has_function('public', 'acquire_flex_provisioning_lease', ARRAY['text', 'text', 'text', 'integer', 'boolean'], 'Lease acquisition is exposed through one RPC');
+SELECT has_function('public', 'acquire_flex_provisioning_lease', ARRAY['text', 'text', 'text', 'integer', 'boolean', 'uuid'], 'Lease acquisition is exposed through one RPC');
 SELECT has_function('public', 'allocate_flex_provisioning_sequence', ARRAY['uuid', 'text', 'integer'], 'Sequence allocation is exposed through one RPC');
 SELECT has_function('public', 'finish_flex_provisioning_lease', ARRAY['uuid', 'uuid', 'text', 'jsonb'], 'Lease completion is exposed through one RPC');
 
@@ -37,12 +37,12 @@ SELECT ok(
 );
 
 SELECT ok(
-  NOT has_function_privilege('anon', 'public.acquire_flex_provisioning_lease(text,text,text,integer,boolean)', 'EXECUTE'),
+  NOT has_function_privilege('anon', 'public.acquire_flex_provisioning_lease(text,text,text,integer,boolean,uuid)', 'EXECUTE'),
   'Anonymous callers cannot acquire provisioning leases'
 );
 
 SELECT ok(
-  NOT has_function_privilege('authenticated', 'public.acquire_flex_provisioning_lease(text,text,text,integer,boolean)', 'EXECUTE'),
+  NOT has_function_privilege('authenticated', 'public.acquire_flex_provisioning_lease(text,text,text,integer,boolean,uuid)', 'EXECUTE'),
   'Authenticated callers cannot bypass the Edge authorization boundary'
 );
 
