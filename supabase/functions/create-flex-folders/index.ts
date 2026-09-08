@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-
 import { requireAuthenticatedRole } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import {
@@ -17,20 +16,17 @@ import {
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
 } from "../../../src/utils/flex-folders/constants.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Max-Age": "86400",
 };
-
 const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") ||
   "https://sectorpro.flexrentalsolutions.com/f5/api";
 const TECHNICAL_DEPARTMENTS = ["sound", "lights", "video"] as const;
 const ROOT_DEPARTMENTS = ["sound", "lights", "video", "production", "personnel", "comercial"] as const;
 type RootDepartment = typeof ROOT_DEPARTMENTS[number];
-
 interface TourRecord {
   id: string;
   name: string;
@@ -46,20 +42,17 @@ interface TourRecord {
   flex_comercial_folder_id: string | null;
   flex_estructura_folder_id: string | null;
 }
-
 interface LeaseRow {
   operation_id: string;
   lease_token: string | null;
   status: string;
   acquired: boolean;
 }
-
 const flexDate = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw new HttpError(400, "Invalid tour date");
   return `${date.toISOString().split(".")[0]}.000Z`;
 };
-
 const documentNumberFor = (value: string): string => {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Madrid",
@@ -70,7 +63,6 @@ const documentNumberFor = (value: string): string => {
   const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map((part) => [part.type, part.value]));
   return `${parts.year}${parts.month}${parts.day}`;
 };
-
 const createFlexElement = async (payload: Record<string, unknown>, authToken: string) => {
   const response = await fetchWithRetry(`${FLEX_API_BASE_URL}/element`, {
     method: "POST",
@@ -86,7 +78,6 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
   if (!response.ok) throw new Error(`Flex returned HTTP ${response.status}`);
   return await response.json() as { elementId?: string };
 };
-
 const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
   const { data, error } = await supabase
     .from("jobs")
@@ -101,7 +92,6 @@ const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Pr
   }
   return selected;
 };
-
 const loadTourRange = async (supabase: SupabaseClient, tour: TourRecord) => {
   if (tour.start_date && tour.end_date) return { start: tour.start_date, end: tour.end_date };
   const { data, error } = await supabase
@@ -113,7 +103,6 @@ const loadTourRange = async (supabase: SupabaseClient, tour: TourRecord) => {
   if (!data?.length) throw new HttpError(400, "Tour has no dates");
   return { start: data[0].date, end: data[data.length - 1].date };
 };
-
 const buildRootPlan = (
   tour: TourRecord,
   selected: Set<string>,
