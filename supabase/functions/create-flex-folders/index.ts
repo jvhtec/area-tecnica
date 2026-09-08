@@ -17,7 +17,6 @@ import {
   flexDate,
   plannerOwnedTourSemanticKeys,
   ROOT_DEPARTMENTS,
-  TECHNICAL_DEPARTMENTS,
   type TourRecord,
 } from "../_shared/flex-folders/tourPlan.ts";
 import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
