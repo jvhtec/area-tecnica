@@ -2,6 +2,8 @@
 
 Flex provisioning creates remote elements and records their identities locally. These writes are not transactional, so every workflow must persist each returned Flex UUID before creating children and must stop when the outcome of a remote request is ambiguous.
 
+See the [Flex folder structures and variants](flex-folder-structures.md) catalog for the exact hierarchy, names, document numbers, picker branches, tracking types, and compatibility variants for every operation.
+
 ## Supported hierarchies
 
 - Standard jobs and festivals use the `job` server operation through `createAllFoldersForJob`: event root, selected technical departments, administrative departments, and Estructura. Picker options control typed children and custom entries.

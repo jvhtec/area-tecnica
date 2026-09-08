@@ -15,6 +15,8 @@ Detailed documentation for each major subsystem — key files, database tables, 
 - **[Hoja de Ruta](workflows/hoja-de-ruta.md)** — Route sheet builder (10-tab form, 13 DB tables, PDF/Excel export)
 - **[Festival Management](workflows/festival-management.md)** — Artists, riders, gear setup, shift scheduling
 - **[Tour Management](workflows/tour-management.md)** — Tour dates, crew sync, rates, Flex folders
+- **[Flex folder structures and variants](flex-folder-structures.md)** — Canonical trees, names, numbering, picker branches, tracking identities, retry states, and legacy behavior for every Flex provisioning operation
+- **[Flex folder provisioning workflow](flex-folder-workflows.md)** — Server ownership, durable execution, recovery, authorization, and rollout
 - **[Job Assignment Matrix](workflows/job-assignment-matrix.md)** — Virtualized crew matrix, conflict detection, staffing campaigns
 - **[Timesheet System](workflows/timesheet-system.md)** — Draft → submitted → approved workflow, server-side rate calculation
 - **[Equipment Management](workflows/equipment-management.md)** — Stock tracking, sub-rentals, presets
