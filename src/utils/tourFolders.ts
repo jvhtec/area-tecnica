@@ -1,299 +1,74 @@
-
 import { supabase } from "@/lib/supabase";
-import { 
-  FLEX_FOLDER_IDS, 
-  DEPARTMENT_IDS, 
-  RESPONSIBLE_PERSON_IDS, 
-  DEPARTMENT_SUFFIXES 
-} from "@/utils/flex-folders/constants";
-import { createFlexFolder } from "@/utils/flex-folders/api";
-import { ensureTourEstructuraRoot } from "@/utils/flex-folders/tourEstructuraRoot";
 import { getErrorMessage } from "@/utils/errorMessage";
+import { createAllFoldersForJob } from "@/utils/flex-folders";
+import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 
 export interface TourFolderCreationResult {
   success: boolean;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
 
-export async function createTourRootFolders(tourId: string): Promise<TourFolderCreationResult> {
+type TourProvisioningOperation = "tour-root";
+
+const provisionTourFolders = async (
+  tourId: string,
+  operation: TourProvisioningOperation,
+  reconcile = false,
+): Promise<TourFolderCreationResult> => {
   try {
-    console.log("Creating tour root folders for:", tourId);
-    
-    const { data, error } = await supabase.functions.invoke('create-flex-folders', {
-      body: {
-        tourId,
-        createRootFolders: true,
-        createDateFolders: false
-      }
+    const { data, error } = await supabase.functions.invoke("create-flex-folders", {
+      body: { operation, tourId, ...(reconcile ? { reconcile: true } : {}) },
     });
 
     if (error) {
-      console.error("Error creating tour root folders:", error);
-      return { success: false, error: error.message || "Failed to create tour root folders" };
+      return { success: false, error: error.message || "No se pudieron crear las carpetas Flex" };
     }
 
-    const estructuraRoot = await ensureTourEstructuraRoot(tourId);
-    console.log("Successfully created tour root folders:", data);
-    return {
-      success: true,
-      data: { ...data, flex_estructura_folder_id: estructuraRoot.elementId },
-    };
-  } catch (error) {
-    console.error("Exception creating tour root folders:", error);
-    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
-  }
-}
-
-export async function createTourDateFolders(tourId: string): Promise<TourFolderCreationResult> {
-  try {
-    console.log("Creating tour date folders for:", tourId);
-    await ensureTourEstructuraRoot(tourId);
-    
-    const { data, error } = await supabase.functions.invoke('create-flex-folders', {
-      body: {
-        tourId,
-        createRootFolders: false,
-        createDateFolders: true
-      }
-    });
-
-    if (error) {
-      console.error("Error creating tour date folders:", error);
-      return { success: false, error: error.message || "Failed to create tour date folders" };
+    const response = data as { success?: boolean; error?: string } | null;
+    if (response?.success === false) {
+      return { success: false, error: response.error || "No se pudieron crear las carpetas Flex" };
     }
 
-    console.log("Successfully created tour date folders:", data);
     return { success: true, data };
   } catch (error) {
-    console.error("Exception creating tour date folders:", error);
-    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
+    return { success: false, error: getErrorMessage(error, "No se pudieron crear las carpetas Flex") };
   }
-}
+};
 
-export async function createTourRootFoldersManual(tourId: string): Promise<TourFolderCreationResult> {
+export const createTourRootFolders = (tourId: string, settings?: { reconcile?: boolean }) =>
+  provisionTourFolders(tourId, "tour-root", settings?.reconcile);
+
+export const createTourDateFolders = async (tourId: string): Promise<TourFolderCreationResult> => {
   try {
-    console.log("Creating tour root folders manually using secure-flex-api for:", tourId);
-    
-    // Get tour information with tour dates
-    const { data: tour, error: tourError } = await supabase
-      .from("tours")
-      .select(`
-        *,
-        tour_dates (
-          id,
-          date,
-          location_id
-        )
-      `)
-      .eq("id", tourId)
-      .single();
+    const { data: jobs, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("tour_id", tourId)
+      .eq("job_type", "tourdate")
+      .order("start_time", { ascending: true });
+    if (error) throw error;
+    if (!jobs?.length) throw new Error("No hay fechas de gira con trabajo asociado");
 
-    if (tourError || !tour) {
-      throw new Error("Tour not found");
-    }
-
-    // Get date range from tour_dates if start_date/end_date are null
-    let startDate = tour.start_date;
-    let endDate = tour.end_date;
-    
-    if (!startDate || !endDate) {
-      const dates = tour.tour_dates?.map((td: any) => td.date).sort() || [];
-      if (dates.length === 0) {
-        throw new Error("No tour dates found");
+    for (const job of jobs as FlexFolderJob[]) {
+      if (!job.start_time || !job.end_time) {
+        throw new Error(`El trabajo ${job.id} no tiene fechas válidas`);
       }
-      startDate = dates[0];
-      endDate = dates[dates.length - 1];
+      await createAllFoldersForJob(job);
     }
 
-    const formattedStartDate = new Date(startDate).toISOString().split('.')[0] + '.000Z';
-    const formattedEndDate = new Date(endDate).toISOString().split('.')[0] + '.000Z';
-    const documentNumber = new Date(startDate).toISOString().slice(2, 10).replace(/-/g, '');
-
-    const mainFolderPayload = {
-      definitionId: FLEX_FOLDER_IDS.mainFolder,
-      open: true,
-      locked: false,
-      name: tour.name,
-      plannedStartDate: formattedStartDate,
-      plannedEndDate: formattedEndDate,
-      locationId: FLEX_FOLDER_IDS.location,
-      notes: "Manual folder creation from Web App",
-      documentNumber,
-      personResponsibleId: FLEX_FOLDER_IDS.mainResponsible
-    };
-
-    console.log("Creating main folder with payload:", mainFolderPayload);
-    const mainFolder = await createFlexFolder(mainFolderPayload);
-
-    const folderUpdates: any = {
-      flex_main_folder_id: mainFolder.elementId,
-      flex_main_folder_number: mainFolder.elementNumber,
-      flex_folders_created: true
-    };
-
-    // Include all departments to match the job creation
-    const departments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial', 'estructura'] as const;
-    
-    for (const dept of departments) {
-      const subFolderPayload = {
-        definitionId: FLEX_FOLDER_IDS.subFolder,
-        parentElementId: mainFolder.elementId,
-        open: true,
-        locked: false,
-        name: `${tour.name} - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
-        plannedStartDate: formattedStartDate,
-        plannedEndDate: formattedEndDate,
-        locationId: FLEX_FOLDER_IDS.location,
-        departmentId: DEPARTMENT_IDS[dept],
-        notes: `Manual subfolder creation for ${dept}`,
-        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`,
-        personResponsibleId: dept === 'estructura'
-          ? FLEX_FOLDER_IDS.mainResponsible
-          : RESPONSIBLE_PERSON_IDS[dept]
-      };
-
-      console.log(`Creating subfolder for ${dept} with payload:`, subFolderPayload);
-
-      try {
-        const subFolder = await createFlexFolder(subFolderPayload);
-        console.log(`${dept} subfolder created:`, subFolder);
-
-        folderUpdates[`flex_${dept}_folder_id`] = subFolder.elementId;
-        if (dept !== 'estructura') {
-          folderUpdates[`flex_${dept}_folder_number`] = subFolder.elementNumber;
-        }
-
-        await supabase
-          .from("flex_folders")
-          .insert({
-            job_id: null,
-            parent_id: mainFolder.elementId,
-            element_id: subFolder.elementId,
-            department: dept,
-            folder_type: "tour_department"
-          });
-
-        // Create department-specific hojaInfo elements for sound, lights, and video only
-        if (dept === "sound" || dept === "lights" || dept === "video") {
-          const hojaInfoType = dept === "sound" 
-            ? FLEX_FOLDER_IDS.hojaInfoSx 
-            : dept === "lights" 
-              ? FLEX_FOLDER_IDS.hojaInfoLx 
-              : FLEX_FOLDER_IDS.hojaInfoVx;
-          
-          const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
-          
-          const hojaInfoPayload = {
-            definitionId: hojaInfoType,
-            parentElementId: subFolder.elementId,
-            open: true,
-            locked: false,
-            name: `Hoja de Información - ${tour.name}`,
-            plannedStartDate: formattedStartDate,
-            plannedEndDate: formattedEndDate,
-            locationId: FLEX_FOLDER_IDS.location,
-            departmentId: DEPARTMENT_IDS[dept],
-            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${hojaInfoSuffix}`,
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
-          };
-          
-          console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-          try {
-            await createFlexFolder(hojaInfoPayload);
-          } catch (err) {
-            console.error(`Exception creating hojaInfo for ${dept}:`, err);
-          }
-        }
-
-        // Create additional subfolders only for technical departments (sound, lights, video, production)
-        if (dept === "sound" || dept === "lights" || dept === "video" || dept === "production") {
-          const additionalSubfolders = [
-            {
-              definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-              name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
-              suffix: "DT"
-            },
-            {
-              definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-              name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
-              suffix: "PR"
-            },
-            {
-              definitionId: FLEX_FOLDER_IDS.hojaGastos,
-              name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
-              suffix: "HG"
-            }
-          ];
-
-          for (const sf of additionalSubfolders) {
-            const childPayload = {
-              definitionId: sf.definitionId,
-              parentElementId: subFolder.elementId,
-              open: true,
-              locked: false,
-              name: sf.name,
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-              locationId: FLEX_FOLDER_IDS.location,
-              departmentId: DEPARTMENT_IDS[dept],
-              documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
-            };
-            console.log(`Creating additional subfolder for ${dept} with payload:`, childPayload);
-            try {
-              await createFlexFolder(childPayload);
-            } catch (err) {
-              console.error(`Exception creating additional subfolder for ${dept}:`, err);
-              continue;
-            }
-          }
-        }
-
-      } catch (error) {
-        console.error(`Error creating ${dept} subfolder:`, error);
-        continue;
-      }
-    }
-
-    const { error: updateError } = await supabase
-      .from("tours")
-      .update(folderUpdates)
-      .eq("id", tour.id);
-
-    if (updateError) {
-      console.error("Error updating tour with folder info:", updateError);
-      throw updateError;
-    }
-
-    return { success: true, data: folderUpdates };
+    return { success: true, data: { jobsProcessed: jobs.length } };
   } catch (error) {
-    console.error("Exception creating tour root folders manually:", error);
-    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
+    return { success: false, error: getErrorMessage(error, "No se pudieron crear las fechas Flex") };
   }
-}
+};
 
-export async function createAllTourFolders(tourId: string): Promise<TourFolderCreationResult> {
-  try {
-    console.log("Creating all tour folders for:", tourId);
-    
-    const { data, error } = await supabase.functions.invoke('create-flex-folders', {
-      body: {
-        tourId,
-        createRootFolders: true,
-        createDateFolders: true
-      }
-    });
+/** @deprecated Kept for stale callers; root creation is now always server-orchestrated. */
+export const createTourRootFoldersManual = (tourId: string) =>
+  provisionTourFolders(tourId, "tour-root");
 
-    if (error) {
-      console.error("Error creating all tour folders:", error);
-      return { success: false, error: error.message || "Failed to create tour folders" };
-    }
-
-    console.log("Successfully created all tour folders:", data);
-    return { success: true, data };
-  } catch (error) {
-    console.error("Exception creating all tour folders:", error);
-    return { success: false, error: getErrorMessage(error, "Unknown error occurred") };
-  }
-}
+export const createAllTourFolders = async (tourId: string): Promise<TourFolderCreationResult> => {
+  const rootResult = await createTourRootFolders(tourId);
+  if (!rootResult.success) return rootResult;
+  return createTourDateFolders(tourId);
+};

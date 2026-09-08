@@ -4,8 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { createAllFoldersForJob } from "@/utils/flex-folders/folders";
 import { toast } from "sonner";
-import { formatInTimeZone } from "date-fns-tz";
-import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import type { Database } from "@/integrations/supabase/types";
 import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 
@@ -51,18 +49,7 @@ export const useTourDateFlexFolders = (tourId: string) => {
         throw new Error(`No job found for tour date ${tourDate.id}`);
       }
 
-      // Use the correct ISO datetime format that works with Flex API
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
-      
-      // job.start_time is an instant; the Flex document number names the Madrid
-      // day it falls on. Reading getFullYear/getMonth/getDate off it took the
-      // *browser's* day instead, so creating folders from another timezone
-      // stamped the wrong one — at UTC-11, an 08:30Z start on 2026-07-05
-      // numbered the folder 260704.
-      const documentNumber = formatInTimeZone(new Date(job.start_time), MADRID_TIMEZONE, 'yyMMdd');
-
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
+      await createAllFoldersForJob(job);
 
       const { error: updateError } = await supabase
         .from('jobs')

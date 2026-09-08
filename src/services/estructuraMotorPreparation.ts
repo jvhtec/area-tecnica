@@ -3,7 +3,6 @@ import {
   ESTRUCTURA_SOURCE_DEPARTMENTS,
   type EstructuraSourceDepartment,
 } from "@/domain/estructura";
-import { formatInTimeZone } from "date-fns-tz";
 import { supabase } from "@/integrations/supabase/client";
 import {
   pushEquipmentToFlexDocumentStrict,
@@ -11,9 +10,8 @@ import {
   type StrictGroupedPushResult,
 } from "@/services/flexPullsheets";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
-import { ensureTourEstructuraRoot } from "@/utils/flex-folders/tourEstructuraRoot";
+import { createTourRootFolders } from "@/utils/tourFolders";
 import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
-import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
 export type EstructuraPullSheetTarget = {
   id: string;
@@ -132,7 +130,8 @@ export async function reconcileEstructuraFoldersForJob(
     if (!job.tour_id) {
       throw new Error("La fecha de gira no tiene una gira asociada para crear la raíz Estructura.");
     }
-    await ensureTourEstructuraRoot(job.tour_id);
+    const rootResult = await createTourRootFolders(job.tour_id, { reconcile: true });
+    if (!rootResult.success) throw new Error(rootResult.error || "No se pudo crear la raíz Estructura de la gira");
   }
 
   const startDate = new Date(job.start_time);
@@ -143,10 +142,8 @@ export async function reconcileEstructuraFoldersForJob(
 
   await createAllFoldersForJob(
     job as FlexFolderJob,
-    `${startDate.toISOString().split(".")[0]}.000Z`,
-    `${endDate.toISOString().split(".")[0]}.000Z`,
-    formatInTimeZone(startDate, MADRID_TIMEZONE, "yyMMdd"),
     {},
+    { reconcile: true },
   );
 
   const { error: updateError } = await supabase

@@ -76,9 +76,6 @@ describe("useTourDateFlexFolders", () => {
 
     expect(createAllFoldersForJobMock).toHaveBeenCalledWith(
       job,
-      "2026-07-05T08:30:00.000Z",
-      "2026-07-05T23:00:00.000Z",
-      "260705",
     );
     expect(updateQuery.update).toHaveBeenCalledWith({ flex_folders_created: true });
     expect(updateQuery.eq).toHaveBeenCalledWith("id", "job-1");

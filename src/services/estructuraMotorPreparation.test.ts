@@ -16,8 +16,8 @@ vi.mock("@/utils/flex-folders", () => ({
   createAllFoldersForJob: mocks.createAllFolders,
 }));
 
-vi.mock("@/utils/flex-folders/tourEstructuraRoot", () => ({
-  ensureTourEstructuraRoot: mocks.ensureTourRoot,
+vi.mock("@/utils/tourFolders", () => ({
+  createTourRootFolders: mocks.ensureTourRoot,
 }));
 
 vi.mock("@/services/flexPullsheets", () => ({
@@ -62,10 +62,7 @@ describe("Estructura motor preparation", () => {
     vi.clearAllMocks();
     mocks.createAllFolders.mockResolvedValue(undefined);
     mocks.invoke.mockResolvedValue({ data: { success: true }, error: null });
-    mocks.ensureTourRoot.mockResolvedValue({
-      elementId: "tour-estructura",
-      trackingId: "tour-estructura-row",
-    });
+    mocks.ensureTourRoot.mockResolvedValue({ success: true });
     mocks.pushStrict.mockResolvedValue(successfulPush);
   });
 
@@ -183,10 +180,8 @@ describe("Estructura motor preparation", () => {
 
     expect(mocks.createAllFolders).toHaveBeenCalledWith(
       job,
-      "2026-08-30T10:00:00.000Z",
-      "2026-08-30T20:00:00.000Z",
-      "260830",
       {},
+      { reconcile: true },
     );
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
@@ -220,7 +215,7 @@ describe("Estructura motor preparation", () => {
 
     await reconcileEstructuraFoldersForJob("job-1");
 
-    expect(mocks.ensureTourRoot).toHaveBeenCalledWith("tour-1");
+    expect(mocks.ensureTourRoot).toHaveBeenCalledWith("tour-1", { reconcile: true });
     expect(mocks.createAllFolders).toHaveBeenCalledTimes(1);
     expect(mocks.ensureTourRoot.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.createAllFolders.mock.invocationCallOrder[0],

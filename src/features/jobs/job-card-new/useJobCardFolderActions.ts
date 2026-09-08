@@ -318,16 +318,6 @@ export function useJobCardFolderActions({
         }
       }
 
-      const startDate = new Date(job.start_time);
-      const documentNumber = startDate
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, "");
-      const formattedStartDate =
-        new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate =
-        new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
-
       toast({
         title: mode === "create" ? "Creating folders..." : "Adding folders...",
         description:
@@ -335,13 +325,7 @@ export function useJobCardFolderActions({
             ? "Setting up Flex folder structure for this job."
             : "Creating the selected Flex folders.",
       });
-      await createAllFoldersForJob(
-        job,
-        formattedStartDate,
-        formattedEndDate,
-        documentNumber,
-        options,
-      );
+      await createAllFoldersForJob(job, options);
 
       const { error: updateError } = await dataLayerClient
         .from("jobs")

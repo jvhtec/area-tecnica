@@ -1,140 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-interface MockTourDate {
-  id: string;
-  date: string;
-  location_id: string | null;
-}
-
-interface MockTour {
-  id: string;
-  name: string;
-  start_date: string | null;
-  end_date: string | null;
-  tour_dates: MockTourDate[];
-}
-
-interface TourUpdate {
-  filters: Record<string, unknown>;
-  payload: unknown;
-}
-
-interface TestState {
-  flexFolderInserts: unknown[];
-  tourUpdates: TourUpdate[];
-  tour: MockTour | null;
-}
-
-interface FlexFolderMockResponse {
-  elementId: string;
-  elementNumber: string;
-}
-
-const { createFlexFolderMock, ensureTourEstructuraRootMock, functionInvokeMock, state } = vi.hoisted(() => {
-  const state: TestState = {
-    flexFolderInserts: [],
-    tourUpdates: [],
-    tour: null,
-  };
-
-  return {
-    createFlexFolderMock:
-      vi.fn<(payload: Record<string, unknown>) => Promise<FlexFolderMockResponse>>(),
-    ensureTourEstructuraRootMock: vi.fn(),
-    functionInvokeMock: vi.fn<() => Promise<unknown>>(),
-    state,
-  };
-});
-
-vi.mock("@/utils/flex-folders/api", () => ({
-  createFlexFolder: createFlexFolderMock,
+const mocks = vi.hoisted(() => ({
+  createAllFoldersForJob: vi.fn(),
+  invoke: vi.fn(),
+  jobs: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock("@/utils/flex-folders/tourEstructuraRoot", () => ({
-  ensureTourEstructuraRoot: ensureTourEstructuraRootMock,
+vi.mock("@/utils/flex-folders", () => ({
+  createAllFoldersForJob: mocks.createAllFoldersForJob,
 }));
 
-vi.mock("@/lib/supabase", () => {
-  type SupabaseResult<T> = Promise<{ data: T; error: unknown }>;
-
-  type QueryAction = "select" | "insert" | "update";
-
-  class MockQueryBuilder {
-    private table: string;
-    private action: QueryAction | null = null;
-    private payload: unknown = null;
-    private filters: Record<string, unknown> = {};
-
-    constructor(table: string) {
-      this.table = table;
-    }
-
-    select(_columns?: string) {
-      this.action = "select";
-      return this;
-    }
-
-    insert(payload: unknown) {
-      this.action = "insert";
-      this.payload = payload;
-      return this;
-    }
-
-    update(payload: unknown) {
-      this.action = "update";
-      this.payload = payload;
-      return this;
-    }
-
-    eq(column: string, value: unknown) {
-      this.filters[column] = value;
-      return this;
-    }
-
-    single() {
-      return this;
-    }
-
-    private async execute(): SupabaseResult<unknown> {
-      if (this.table === "tours" && this.action === "select") {
-        return { data: state.tour, error: state.tour ? null : { message: "not found" } };
-      }
-
-      if (this.table === "tours" && this.action === "update") {
-        state.tourUpdates.push({
-          filters: { ...this.filters },
-          payload: this.payload,
-        });
-        return { data: null, error: null };
-      }
-
-      if (this.table === "flex_folders" && this.action === "insert") {
-        state.flexFolderInserts.push(this.payload);
-        return { data: null, error: null };
-      }
-
-      return { data: null, error: null };
-    }
-
-    then<TResult1 = unknown, TResult2 = never>(
-      onfulfilled?:
-        | ((value: { data: unknown; error: unknown }) => TResult1 | PromiseLike<TResult1>)
-        | null,
-      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
-    ) {
-      return this.execute().then(onfulfilled, onrejected);
-    }
-  }
-
-  return {
-    supabase: {
-      from: (table: string) => new MockQueryBuilder(table),
-      functions: {
-        invoke: functionInvokeMock,
-      },
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    functions: { invoke: mocks.invoke },
+    from: (table: string) => {
+      if (table !== "jobs") throw new Error(`Unexpected table ${table}`);
+      const query = {
+        select: () => query,
+        eq: () => query,
+        order: async () => ({ data: mocks.jobs, error: null }),
+      };
+      return query;
     },
-  };
-});
+  },
+}));
 
 import {
   createTourDateFolders,
@@ -142,93 +31,51 @@ import {
   createTourRootFoldersManual,
 } from "@/utils/tourFolders";
 
-describe("createTourRootFoldersManual", () => {
+describe("canonical tour folder orchestration", () => {
   beforeEach(() => {
-    createFlexFolderMock.mockReset();
-    functionInvokeMock.mockReset();
-    functionInvokeMock.mockResolvedValue({ data: { success: true }, error: null });
-    ensureTourEstructuraRootMock.mockReset();
-    ensureTourEstructuraRootMock.mockResolvedValue({
-      elementId: "estructura-element",
-      trackingId: "estructura-tracking",
-    });
-    state.flexFolderInserts = [];
-    state.tourUpdates = [];
-    state.tour = {
-      id: "tour-1",
-      name: "Kase-O",
-      start_date: null,
-      end_date: null,
-      tour_dates: [
-        { id: "date-2", date: "2026-08-05", location_id: null },
-        { id: "date-1", date: "2026-08-01", location_id: null },
-      ],
-    };
-
-    let counter = 0;
-    createFlexFolderMock.mockImplementation(async () => ({
-      elementId: `flex-${counter}`,
-      elementNumber: `F-${counter++}`,
-    }));
+    mocks.createAllFoldersForJob.mockReset().mockResolvedValue(undefined);
+    mocks.invoke.mockReset().mockResolvedValue({ data: { success: true }, error: null });
+    mocks.jobs = [{
+      id: "job-1",
+      tour_id: "tour-1",
+      tour_date_id: "date-1",
+      job_type: "tourdate",
+      title: "Kase-O (Madrid)",
+      start_time: "2026-08-01T10:00:00.000Z",
+      end_time: "2026-08-01T22:00:00.000Z",
+    }];
   });
 
-  it("creates folders through the shared Flex API helper instead of invoking the proxy with a legacy payload", async () => {
-    const result = await createTourRootFoldersManual("tour-1");
+  it.each([createTourRootFolders, createTourRootFoldersManual])(
+    "routes root aliases through the same authenticated server operation",
+    async (createRoot) => {
+      await expect(createRoot("tour-1")).resolves.toMatchObject({ success: true });
+      expect(mocks.invoke).toHaveBeenCalledWith("create-flex-folders", {
+        body: { operation: "tour-root", tourId: "tour-1" },
+      });
+    },
+  );
 
-    expect(result.success).toBe(true);
-    expect(functionInvokeMock).not.toHaveBeenCalled();
-    expect(createFlexFolderMock).toHaveBeenCalled();
-    expect(createFlexFolderMock.mock.calls.some(([payload]) => payload.name === "Kase-O - Estructura")).toBe(true);
-
-    const [mainPayload] = createFlexFolderMock.mock.calls[0];
-    expect(mainPayload).toMatchObject({
-      name: "Kase-O",
-      documentNumber: "260801",
-      notes: "Manual folder creation from Web App",
-    });
-    expect(mainPayload).not.toHaveProperty("parentElementId");
-
-    expect(state.tourUpdates).toHaveLength(1);
-    expect(state.tourUpdates[0]).toMatchObject({
-      filters: { id: "tour-1" },
-      payload: {
-        flex_main_folder_id: "flex-0",
-        flex_main_folder_number: "F-0",
-        flex_folders_created: true,
-        flex_estructura_folder_id: expect.any(String),
-      },
-    });
-  });
-
-  it("verifies and repairs Estructura after the root Edge Function returns success", async () => {
-    await expect(createTourRootFolders("tour-1")).resolves.toMatchObject({
-      success: true,
-      data: { flex_estructura_folder_id: "estructura-element" },
-    });
-
-    expect(functionInvokeMock).toHaveBeenCalledWith("create-flex-folders", {
-      body: {
-        tourId: "tour-1",
-        createRootFolders: true,
-        createDateFolders: false,
-      },
-    });
-    expect(ensureTourEstructuraRootMock).toHaveBeenCalledWith("tour-1");
-  });
-
-  it("repairs Estructura before requesting bulk tour-date folders", async () => {
+  it("routes bulk dates through the same rich job/date creator as single dates", async () => {
     await expect(createTourDateFolders("tour-1")).resolves.toMatchObject({ success: true });
-
-    expect(ensureTourEstructuraRootMock).toHaveBeenCalledWith("tour-1");
-    expect(functionInvokeMock).toHaveBeenCalledWith("create-flex-folders", {
-      body: {
-        tourId: "tour-1",
-        createRootFolders: false,
-        createDateFolders: true,
-      },
-    });
-    expect(ensureTourEstructuraRootMock.mock.invocationCallOrder[0]).toBeLessThan(
-      functionInvokeMock.mock.invocationCallOrder[0],
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.createAllFoldersForJob).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "job-1", tour_date_id: "date-1" }),
     );
+  });
+
+  it("passes explicit reconciliation intent to the server", async () => {
+    await createTourRootFolders("tour-1", { reconcile: true });
+    expect(mocks.invoke).toHaveBeenCalledWith("create-flex-folders", {
+      body: { operation: "tour-root", tourId: "tour-1", reconcile: true },
+    });
+  });
+
+  it("does not mark a failed server result as success", async () => {
+    mocks.invoke.mockResolvedValue({ data: { success: false, error: "reconciliation required" }, error: null });
+    await expect(createTourRootFolders("tour-1")).resolves.toEqual({
+      success: false,
+      error: "reconciliation required",
+    });
   });
 });

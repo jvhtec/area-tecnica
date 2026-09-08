@@ -33,7 +33,6 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   sound: {
     label: "Sonido",
     items: [
-      // { key: "hojaInfo", label: "Hoja de Información (SIP)" }, // DEPRECATED - not used anymore
       { key: "documentacionTecnica", label: "Documentación Técnica" },
       { key: "presupuestosRecibidos", label: "Presupuestos Recibidos" },
       { key: "hojaGastos", label: "Hoja de Gastos" },
@@ -44,7 +43,6 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   lights: {
     label: "Luces",
     items: [
-      // { key: "hojaInfo", label: "Hoja de Información (LIP)" }, // DEPRECATED - not used anymore
       { key: "documentacionTecnica", label: "Documentación Técnica" },
       { key: "presupuestosRecibidos", label: "Presupuestos Recibidos" },
       { key: "hojaGastos", label: "Hoja de Gastos" },
@@ -53,7 +51,6 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   video: {
     label: "Video",
     items: [
-      // { key: "hojaInfo", label: "Hoja de Información (VIP)" }, // DEPRECATED - not used anymore
       { key: "documentacionTecnica", label: "Documentación Técnica" },
       { key: "presupuestosRecibidos", label: "Presupuestos Recibidos" },
       { key: "hojaGastos", label: "Hoja de Gastos" },

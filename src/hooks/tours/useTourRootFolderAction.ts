@@ -3,7 +3,7 @@ import { useState, type MouseEvent } from "react";
 
 import { useToast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/react-query";
-import { createTourRootFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
+import { createTourRootFolders } from "@/utils/tourFolders";
 
 type TourRootFolderState = {
   id: string;
@@ -34,9 +34,7 @@ export const useTourRootFolderAction = (tour: TourRootFolderState) => {
 
     setIsCreatingTourRootFolders(true);
     try {
-      const result = needsEstructuraRoot
-        ? await createTourRootFolders(tour.id)
-        : await createTourRootFoldersManual(tour.id);
+      const result = await createTourRootFolders(tour.id);
       if (!result.success) {
         throw new Error(result.error || (needsEstructuraRoot
           ? "No se pudo crear la carpeta Estructura de la gira"

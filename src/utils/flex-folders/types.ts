@@ -14,7 +14,6 @@ export type FlexDepartmentKey = DepartmentKey | OperationalFlexDepartment;
 
 // Toggleable items per department
 export type SubfolderKey =
-  | "hojaInfo" // SIP/LIP/VIP (only for sound/lights/video)
   | "documentacionTecnica" // DT
   | "presupuestosRecibidos" // PR
   | "hojaGastos" // HG (dept; also used for personnel “Gastos de Personal”)
@@ -59,6 +58,64 @@ export type CreateFoldersOptions = Partial<
   Record<DepartmentKey, DepartmentSelectionOptions>
 >;
 
+const DEPARTMENT_KEYS: readonly DepartmentKey[] = [
+  "sound",
+  "lights",
+  "video",
+  "production",
+  "personnel",
+  "comercial",
+];
+
+const SUBFOLDER_KEYS: ReadonlySet<string> = new Set<SubfolderKey>([
+  "documentacionTecnica",
+  "presupuestosRecibidos",
+  "hojaGastos",
+  "pullSheetTP",
+  "pullSheetPA",
+  "gastosDePersonal",
+  "workOrder",
+  "crewCallSound",
+  "crewCallLights",
+  "extrasSound",
+  "extrasLights",
+  "presupuestoSound",
+  "presupuestoLights",
+]);
+
+/**
+ * Normalizes persisted or stale-client picker input without widening it.
+ * Deprecated/unknown keys are discarded, while an explicit empty selection
+ * remains an explicit empty selection instead of becoming default-all.
+ */
+export const normalizeCreateFoldersOptions = (value: unknown): CreateFoldersOptions | undefined => {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const input = value as Record<string, unknown>;
+  const normalized: CreateFoldersOptions = {};
+
+  for (const department of DEPARTMENT_KEYS) {
+    const rawSelection = input[department];
+    if (!rawSelection || typeof rawSelection !== "object" || Array.isArray(rawSelection)) continue;
+
+    const selection = rawSelection as Record<string, unknown>;
+    const next: DepartmentSelectionOptions = {};
+    if (Array.isArray(selection.subfolders)) {
+      next.subfolders = selection.subfolders.filter(
+        (key): key is SubfolderKey => typeof key === "string" && SUBFOLDER_KEYS.has(key)
+      );
+    }
+    const customPullsheet = sanitizeCustomPullsheetSettings(selection.customPullsheet);
+    const extrasPresupuesto = sanitizeExtrasPresupuestoSettings(selection.extrasPresupuesto);
+    if (customPullsheet) next.customPullsheet = customPullsheet;
+    if (extrasPresupuesto) next.extrasPresupuesto = extrasPresupuesto;
+    normalized[department] = next;
+  }
+
+  return normalized;
+};
+
 const cloneMetadataEntries = (
   entries?: FlexFolderMetadataEntry[]
 ): FlexFolderMetadataEntry[] | undefined =>
@@ -69,15 +126,25 @@ const cloneMetadataEntries = (
   }));
 
 export const sanitizeMetadataEntries = (
-  entries?: FlexFolderMetadataEntry[]
+  entries?: unknown
 ): FlexFolderMetadataEntry[] => {
-  if (!entries) return [];
+  if (!Array.isArray(entries)) return [];
 
   return entries
+    .filter(
+      (entry): entry is Record<string, unknown> =>
+        Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
+    )
     .map(entry => ({
-      name: entry.name?.trim?.() ?? entry.name ?? "",
-      plannedStartDate: entry.plannedStartDate || undefined,
-      plannedEndDate: entry.plannedEndDate || undefined,
+      name: typeof entry.name === "string" ? entry.name.trim() : "",
+      plannedStartDate:
+        typeof entry.plannedStartDate === "string" && entry.plannedStartDate
+          ? entry.plannedStartDate
+          : undefined,
+      plannedEndDate:
+        typeof entry.plannedEndDate === "string" && entry.plannedEndDate
+          ? entry.plannedEndDate
+          : undefined,
     }))
     .filter(
       entry =>
@@ -289,15 +356,16 @@ export const setExtrasPresupuestoMetadataForDepartment = (
 };
 
 export const sanitizeCustomPullsheetSettings = (
-  value?: CustomPullsheetSettings
+  value?: unknown
 ): CustomPullsheetSettings | undefined => {
-  if (!value) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
 
-  const enabled = Boolean(value.enabled);
-  const name = value.name?.trim?.() ?? value.name ?? "";
-  const startDate = value.startDate || undefined;
-  const endDate = value.endDate || undefined;
-  const entries = sanitizeMetadataEntries(value.entries);
+  const enabled = input.enabled === true;
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  const startDate = typeof input.startDate === "string" && input.startDate ? input.startDate : undefined;
+  const endDate = typeof input.endDate === "string" && input.endDate ? input.endDate : undefined;
+  const entries = sanitizeMetadataEntries(input.entries);
 
   if (!enabled && !name && !startDate && !endDate && entries.length === 0) {
     return undefined;
@@ -316,13 +384,14 @@ export const sanitizeCustomPullsheetSettings = (
 };
 
 export const sanitizeExtrasPresupuestoSettings = (
-  value?: ExtrasPresupuestoSettings
+  value?: unknown
 ): ExtrasPresupuestoSettings | undefined => {
-  if (!value) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
 
-  const startDate = value.startDate || undefined;
-  const endDate = value.endDate || undefined;
-  const entries = sanitizeMetadataEntries(value.entries);
+  const startDate = typeof input.startDate === "string" && input.startDate ? input.startDate : undefined;
+  const endDate = typeof input.endDate === "string" && input.endDate ? input.endDate : undefined;
+  const entries = sanitizeMetadataEntries(input.entries);
 
   if (!startDate && !endDate && entries.length === 0) {
     return undefined;

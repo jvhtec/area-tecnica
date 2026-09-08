@@ -1,10 +1,15 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { parseISO } from "date-fns";
+import { act, renderHook } from "@testing-library/react";
 import {
   buildArtistFlexDateRange,
   formatArtistDateTimeForFlex,
   formatArtistExtrasFolderDocumentNumber,
+  useCreateExtrasPresupuesto,
 } from "@/hooks/festival/useCreateExtrasPresupuesto";
+
+const invoke = vi.hoisted(() => vi.fn());
 
 vi.mock("sonner", () => ({
   toast: {
@@ -14,8 +19,26 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {},
+  supabase: { functions: { invoke } },
 }));
+
+describe("useCreateExtrasPresupuesto orchestration", () => {
+  it("sends only entity identity and allowed schedule fallback to the server", async () => {
+    invoke.mockResolvedValue({ data: { success: true, documentNumber: "050826.1SQT" }, error: null });
+    const { result } = renderHook(() => useCreateExtrasPresupuesto("job-1", "06:30"));
+    await act(() => result.current.createExtrasPresupuesto(
+      "artist-1", "Untrusted name", "2026-08-05", "20:00", "21:00", false,
+    ));
+    expect(invoke).toHaveBeenCalledWith("create-flex-folders", {
+      body: {
+        operation: "festival-artist-extras",
+        artistId: "artist-1",
+        jobId: "job-1",
+        dayStartTime: "06:30",
+      },
+    });
+  });
+});
 
 vi.mock("@/utils/flex-folders/api", () => ({
   createFlexFolder: vi.fn(),

@@ -112,7 +112,7 @@ export const getJobDepartments = async (jobId: string): Promise<string[]> => {
 
   if (error) {
     console.error("Error fetching job departments:", error);
-    return [];
+    throw error;
   }
 
   return data
@@ -130,18 +130,18 @@ export const getTourJobDepartments = async (tourId: string): Promise<string[]> =
     .select(`
       job_departments (department)
     `)
-    .eq("tour_id", tourId)
-    .limit(1);
+    .eq("tour_id", tourId);
 
-  if (error || !data || data.length === 0) {
+  if (error) {
     console.error("Error fetching tour job departments:", error);
-    return [];
+    throw error;
   }
+  if (!data || data.length === 0) return [];
 
   const rows = data as TourJobDepartmentsRow[];
-  return rows[0].job_departments
-    ?.map((jobDepartment) => jobDepartment.department)
-    .filter((department): department is string => Boolean(department)) || [];
+  return [...new Set(rows.flatMap((row) => row.job_departments || [])
+    .map((jobDepartment) => jobDepartment.department)
+    .filter((department): department is string => Boolean(department)))];
 };
 
 export const upsertCrewCall = async (

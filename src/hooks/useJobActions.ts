@@ -98,9 +98,8 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
     try {
       setIsCreatingFolders(true);
 
-      // Check if folders already exist - createAllFoldersForJob is NOT fully idempotent
-      // and will create duplicates if run again (e.g., hojaInfo elements are created
-      // unconditionally without checking for existing flex_folders rows)
+      // This primary-create action remains separate from the picker-based add action.
+      // Recovery and repair paths call the reconciler directly.
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -116,18 +115,12 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         return;
       }
 
-      const startDate = new Date(job.start_time);
-      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
-
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
-
       toast({
         title: "Creating folders...",
         description: "Setting up Flex folder structure for this job."
       });
 
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
+      await createAllFoldersForJob(job);
 
       const { error: updateError } = await supabase
         .from('jobs')

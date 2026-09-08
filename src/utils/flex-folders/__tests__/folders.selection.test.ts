@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createFlexFolderMock } = vi.hoisted(() => ({
+const { createFlexFolderMock, invokeMock } = vi.hoisted(() => ({
   createFlexFolderMock: vi.fn(),
+  invokeMock: vi.fn(),
 }));
 
 vi.mock("../api", () => ({
@@ -11,7 +12,7 @@ vi.mock("../api", () => ({
 vi.mock("@/integrations/supabase/client", () => {
   type SupabaseResult<T> = Promise<{ data: T; error: unknown }>;
 
-  type QueryAction = "select" | "insert";
+  type QueryAction = "select" | "insert" | "update";
 
   class MockQueryBuilder {
     private table: string;
@@ -40,6 +41,12 @@ vi.mock("@/integrations/supabase/client", () => {
       return this;
     }
 
+    update(payload: unknown) {
+      this.action = "update";
+      this.insertPayload = payload;
+      return this;
+    }
+
     eq(column: string, value: any) {
       this.filters[column] = value;
       return this;
@@ -50,6 +57,11 @@ vi.mock("@/integrations/supabase/client", () => {
     }
 
     single() {
+      this.wantsSingle = true;
+      return this;
+    }
+
+    maybeSingle() {
       this.wantsSingle = true;
       return this;
     }
@@ -86,6 +98,8 @@ vi.mock("@/integrations/supabase/client", () => {
         return { data: null, error: null };
       }
 
+      if (this.action === "update") return { data: null, error: null };
+
       return { data: null, error: null };
     }
 
@@ -101,6 +115,7 @@ vi.mock("@/integrations/supabase/client", () => {
 
   const supabase = {
     from: (table: string) => new MockQueryBuilder(table),
+    functions: { invoke: invokeMock },
   };
 
   return { supabase };
@@ -109,8 +124,16 @@ vi.mock("@/integrations/supabase/client", () => {
 import { createAllFoldersForJob } from "../folders";
 
 describe("createAllFoldersForJob folder picker options", () => {
+  const forbiddenHojaDefinitionIds = [
+    "702029c3-ba89-4304-98fe-fbc6fc695eb0",
+    "4db54bad-b5fa-4c1f-85d4-525d991d7b62",
+    "484249f0-6307-47a3-a782-6352ee5ef493",
+  ];
+
   beforeEach(() => {
     createFlexFolderMock.mockReset();
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue({ data: { success: true }, error: null });
     let counter = 0;
     createFlexFolderMock.mockImplementation(async () => ({
       elementId: `element-${counter++}`,
@@ -128,24 +151,35 @@ describe("createAllFoldersForJob folder picker options", () => {
 
     await createAllFoldersForJob(
       job,
-      "2025-01-01T10:00:00.000Z",
-      "2025-01-02T10:00:00.000Z",
-      "250101",
       { sound: { subfolders: ["documentacionTecnica"] } }
     );
 
-    const names = createFlexFolderMock.mock.calls.map(([payload]) => payload?.name);
+    expect(invokeMock).toHaveBeenCalledWith("create-flex-folders", { body: {
+      operation: "job", jobId: "job-1",
+      options: { sound: { subfolders: ["documentacionTecnica"] } },
+    } });
+    expect(createFlexFolderMock).not.toHaveBeenCalled();
+  });
 
-    expect(names).toContain("Test Job - Documentación Técnica - Sound");
-    expect(names).toContain("Test Job - Estructura");
-    expect(names).toContain("Test Job - Estructura Sonido");
-    expect(names).toContain("Test Job - Estructura Luces");
-    expect(names.some((name: string) => name.includes(" - Documentación Técnica - Production"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Presupuestos Recibidos"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Hoja de Gastos"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Crew Call"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Orden de Trabajo"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Gastos de Personal"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Extras"))).toBe(false);
+  it.each([
+    ["default options", undefined],
+    ["explicit empty selection", { sound: { subfolders: [] } }],
+    ["stale Hoja selection", { sound: { subfolders: ["hojaInfo"] } }],
+  ])("never creates deprecated Hoja elements with %s", async (_label, options) => {
+    await createAllFoldersForJob(
+      {
+        id: "job-no-hoja",
+        job_type: "single",
+        title: "Trabajo sin Hoja",
+        start_time: "2026-09-08T10:00:00.000Z",
+        end_time: "2026-09-08T20:00:00.000Z",
+      },
+      options as never,
+    );
+
+    const request = JSON.stringify(invokeMock.mock.calls.at(-1));
+    for (const definitionId of forbiddenHojaDefinitionIds) expect(request).not.toContain(definitionId);
+    expect(request).not.toContain("hojaInfo");
+    expect(createFlexFolderMock).not.toHaveBeenCalled();
   });
 });
