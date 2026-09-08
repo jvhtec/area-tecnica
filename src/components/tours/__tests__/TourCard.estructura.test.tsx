@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createTourRootFolders: vi.fn(),
-  createTourRootFoldersManual: vi.fn(),
   toast: vi.fn(),
 }));
 
@@ -21,7 +20,6 @@ vi.mock("@/hooks/use-toast", () => ({
 vi.mock("@/utils/tourFolders", () => ({
   createTourDateFolders: vi.fn(),
   createTourRootFolders: mocks.createTourRootFolders,
-  createTourRootFoldersManual: mocks.createTourRootFoldersManual,
 }));
 
 vi.mock("@/services/dataLayerClient", () => {
@@ -100,7 +98,6 @@ describe("TourCard Estructura recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.createTourRootFolders.mockResolvedValue({ success: true });
-    mocks.createTourRootFoldersManual.mockResolvedValue({ success: true });
   });
 
   it("offers and runs a targeted Estructura root backfill for a legacy tour", async () => {
@@ -111,7 +108,6 @@ describe("TourCard Estructura recovery", () => {
     await waitFor(() => {
       expect(mocks.createTourRootFolders).toHaveBeenCalledWith("tour-1");
     });
-    expect(mocks.createTourRootFoldersManual).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
       title: "Carpeta Estructura creada",
     }));
@@ -123,7 +119,7 @@ describe("TourCard Estructura recovery", () => {
     expect(screen.queryByRole("button", { name: "Crear carpeta Estructura" })).not.toBeInTheDocument();
   });
 
-  it("keeps the full root creation path for tours that have no Flex root yet", async () => {
+  it("uses the canonical root operation for tours that have no Flex root yet", async () => {
     renderTourCard({
       flex_folders_created: false,
       flex_main_folder_id: null,
@@ -132,8 +128,7 @@ describe("TourCard Estructura recovery", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear carpetas raíz de gira" }));
 
     await waitFor(() => {
-      expect(mocks.createTourRootFoldersManual).toHaveBeenCalledWith("tour-1");
+      expect(mocks.createTourRootFolders).toHaveBeenCalledWith("tour-1");
     });
-    expect(mocks.createTourRootFolders).not.toHaveBeenCalled();
   });
 });

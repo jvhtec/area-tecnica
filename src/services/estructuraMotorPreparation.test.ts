@@ -16,8 +16,8 @@ vi.mock("@/utils/flex-folders", () => ({
   createAllFoldersForJob: mocks.createAllFolders,
 }));
 
-vi.mock("@/utils/flex-folders/tourEstructuraRoot", () => ({
-  ensureTourEstructuraRoot: mocks.ensureTourRoot,
+vi.mock("@/utils/tourFolders", () => ({
+  createTourRootFolders: mocks.ensureTourRoot,
 }));
 
 vi.mock("@/services/flexPullsheets", () => ({
@@ -62,10 +62,7 @@ describe("Estructura motor preparation", () => {
     vi.clearAllMocks();
     mocks.createAllFolders.mockResolvedValue(undefined);
     mocks.invoke.mockResolvedValue({ data: { success: true }, error: null });
-    mocks.ensureTourRoot.mockResolvedValue({
-      elementId: "tour-estructura",
-      trackingId: "tour-estructura-row",
-    });
+    mocks.ensureTourRoot.mockResolvedValue({ success: true });
     mocks.pushStrict.mockResolvedValue(successfulPush);
   });
 
