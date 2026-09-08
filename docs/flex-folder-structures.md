@@ -1,6 +1,6 @@
 # Flex folder structures and variants
 
-This is the canonical catalog of every Flex hierarchy created by Área Técnica. It records the remote tree, names, document-number rules, picker variants, local tracking identities, and legacy behavior. The implementation source of truth is the server planner in `supabase/functions/create-flex-folders/index.ts` and `supabase/functions/_shared/flex-folders/jobPlan.ts`.
+This is the canonical catalog of every Flex hierarchy created by Área Técnica. It records the remote tree, names, document-number rules, picker variants, local tracking identities, and legacy behavior. The implementation source of truth is the server operation in `supabase/functions/create-flex-folders/index.ts` and the planners in `supabase/functions/_shared/flex-folders/jobPlan.ts` and `supabase/functions/_shared/flex-folders/tourPlan.ts`.
 
 ## Notation and shared fields
 
@@ -110,9 +110,9 @@ Custom budget metadata changes the leaf names and dates:
 | Parent variant | Custom name `N` | Resulting name |
 | --- | --- | --- |
 | Extras exists | yes | `Extras T - N` |
-| Extras exists | no | `Extras T - Sonido|Luces - Presupuesto [n]` |
-| No Extras | yes | `T - Sonido|Luces - N` |
-| No Extras | no | `T - Sonido|Luces - Presupuesto [n]` |
+| Extras exists | no | `Extras T - Sonido\|Luces - Presupuesto [n]` |
+| No Extras | yes | `T - Sonido\|Luces - N` |
+| No Extras | no | `T - Sonido\|Luces - Presupuesto [n]` |
 
 A single budget keeps the base document number. Multiple budgets use `DSQTPR01`, `DSQTPR02`, ... or `DLQTPR01`, `DLQTPR02`, .... The same `extrasPresupuesto.entries` array supplies metadata to every enabled target branch.
 
@@ -173,7 +173,7 @@ Tour roots persist to `flex_folders` with `job_id = null`. Remote UUIDs also pop
 
 ### Existing tour-root variant
 
-When `tours.flex_main_folder_id` already exists, the operation seeds every known tour UUID into durable state and adopts it. Root-level technical documentation, received-budget, and expense children are omitted for the entire recovery plan because historical child UUIDs were not tracked consistently. Missing department roots and Estructura can still be created and tracked safely.
+When a tour UUID column already exists, the operation seeds that root into durable state with legacy provenance and adopts it. Canonical children stay suppressed on later reruns beneath an existing department root whose historical child identities are unknown. A missing department root is new work and receives its full canonical children. A department root created by the durable operation also keeps its children in later plans, so adding a new technical department or resuming a partial run creates each missing child exactly once.
 
 The legacy request `{ createRootFolders: true, createDateFolders: false, tourId }` is translated to `tour-root`. The old date-builder request is rejected.
 
@@ -267,14 +267,14 @@ The start time is `artist.show_start`, falling back to `dayStartTime` (default `
 | Standard root and descendants | `flex_folders.element_id`; rows include `job_id`, department, type, and local `parent_id` |
 | Tour root and department roots | `flex_folders.element_id` plus the matching `tours.flex_*_folder_id` column |
 | Tour-date nodes | `flex_folders.element_id` with `job_id` and `tour_date_id` |
-| Estructura source sheets | `folder_type = pull_sheet`, `department = estructura`, and `source_department = sound|lights` |
+| Estructura source sheets | `folder_type = pull_sheet`, `department = estructura`, and `source_department = sound\|lights` |
 | Crew calls | `flex_folders` plus `flex_crew_calls(job_id, department)` |
 | Dry-hire year roots | `flex_provisioning_nodes` only |
 | Dry-hire month parents | `dryhire_parent_folders(year, month, department)` plus provisioning state |
 | Dry-hire jobs and budgets | `flex_folders`, parented to the month row and then the dry-hire row |
 | Artist extras and budgets | `flex_folders`, always with `department = sound` |
 
-Every operation also has one `flex_provisioning_operations` row and stable semantic nodes in `flex_provisioning_nodes`. Important semantic keys include `root`, `department:<department>`, `estructura:source:<department>`, `department:<department>:<child>`, `dryhire`, `dryhire:budget`, and `artist:<artist-id>:budget`.
+Every operation also has one `flex_provisioning_operations` row and stable semantic nodes in `flex_provisioning_nodes`. Important semantic keys include `root`, `department:<department>`, `estructura:source:<department>`, `department:<department>:<child>`, `dryhire`, `dryhire:budget`, and `artist:<artist-id>:budget`. `flex_folders.element_id` is unique; migration cleanup redirects child, status-log, and provisioning-node references to one retained row before removing historical duplicates.
 
 ## Durable state and reconciliation variants
 
@@ -298,7 +298,7 @@ The resume behavior depends on durable evidence:
 | `failed` | absent | Retry; Flex returned a definite non-timeout 4xx rejection for the previous attempt. |
 | No node | absent | Create normally. |
 
-An expired operation lease moves the operation to `needs_reconciliation`. A caller must explicitly send `reconcile: true`; that request transitions and reacquires the lease atomically. Completed scopes may be reacquired so later picker additions can extend the plan, and persisted nodes are skipped. Before a first durable run, legacy job and tour-date rows are mapped to semantic keys by tracking identity and adopted. Completion is reported only after every requested node is persisted.
+An expired operation lease moves the operation to `needs_reconciliation`. A caller must explicitly send `reconcile: true`; that request transitions and reacquires the lease atomically. Completed scopes may be reacquired so later picker additions can extend the plan, and persisted nodes are skipped. Legacy job and tour-date rows are mapped incrementally on every run: existing semantic nodes reserve their tracking rows, while newly exposed plan keys can still adopt unclaimed legacy rows. Completion is reported only after every requested node is persisted. Artist schedule and count validation run before its lease; sequence or seed failures after acquisition finish as `failed`, which permits a normal retry when no remote write was attempted.
 
 ## Deprecated and historical variants
 
@@ -332,6 +332,7 @@ The server reloads jobs, tours, dates, artists, department selections, ranges, a
 | --- | --- |
 | Operation routing, tour roots, dry hire, artist extras | `supabase/functions/create-flex-folders/index.ts` |
 | Standard job and tour-date plan | `supabase/functions/_shared/flex-folders/jobPlan.ts` |
+| Tour-root plan and legacy child policy | `supabase/functions/_shared/flex-folders/tourPlan.ts` |
 | Node execution and forbidden definitions | `supabase/functions/_shared/flex-folders/engine.ts` |
 | Shared durable node-state transitions | `supabase/functions/_shared/flex-folders/store.ts` |
 | Roles by operation | `supabase/functions/_shared/flex-folders/access.ts` |

@@ -3,9 +3,15 @@ import {
   executeProvisioningPlan,
   FlexProvisioningDeterministicError,
   FlexProvisioningReconciliationError,
+  provisioningFailureStatus,
   type ProvisioningStore,
   type StoredProvisioningNode,
 } from "./engine.ts";
+
+it("keeps failures before a possible remote write immediately retryable", () => {
+  expect(provisioningFailureStatus(new Error("sequence allocation failed"), false)).toBe("failed");
+  expect(provisioningFailureStatus(new Error("remote outcome unknown"), true)).toBe("needs_reconciliation");
+});
 
 const makeStore = (initial: StoredProvisioningNode[] = []) => {
   const nodes = new Map(initial.map((node) => [node.key, { ...node }]));

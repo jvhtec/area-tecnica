@@ -50,6 +50,14 @@ export class FlexProvisioningReconciliationError extends Error {
   }
 }
 
+export const provisioningFailureStatus = (
+  error: unknown,
+  remoteWritePossible = true,
+): "failed" | "needs_reconciliation" =>
+  !remoteWritePossible || error instanceof FlexProvisioningDeterministicError
+    ? "failed"
+    : "needs_reconciliation";
+
 const retryRecord = async (record: () => Promise<void>): Promise<void> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {

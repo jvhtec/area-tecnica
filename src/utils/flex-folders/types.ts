@@ -106,12 +106,8 @@ export const normalizeCreateFoldersOptions = (value: unknown): CreateFoldersOpti
         (key): key is SubfolderKey => typeof key === "string" && SUBFOLDER_KEYS.has(key)
       );
     }
-    const customPullsheet = sanitizeCustomPullsheetSettings(
-      selection.customPullsheet as CustomPullsheetSettings | undefined
-    );
-    const extrasPresupuesto = sanitizeExtrasPresupuestoSettings(
-      selection.extrasPresupuesto as ExtrasPresupuestoSettings | undefined
-    );
+    const customPullsheet = sanitizeCustomPullsheetSettings(selection.customPullsheet);
+    const extrasPresupuesto = sanitizeExtrasPresupuestoSettings(selection.extrasPresupuesto);
     if (customPullsheet) next.customPullsheet = customPullsheet;
     if (extrasPresupuesto) next.extrasPresupuesto = extrasPresupuesto;
     normalized[department] = next;
@@ -130,15 +126,25 @@ const cloneMetadataEntries = (
   }));
 
 export const sanitizeMetadataEntries = (
-  entries?: FlexFolderMetadataEntry[]
+  entries?: unknown
 ): FlexFolderMetadataEntry[] => {
-  if (!entries) return [];
+  if (!Array.isArray(entries)) return [];
 
   return entries
+    .filter(
+      (entry): entry is Record<string, unknown> =>
+        Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
+    )
     .map(entry => ({
-      name: entry.name?.trim?.() ?? entry.name ?? "",
-      plannedStartDate: entry.plannedStartDate || undefined,
-      plannedEndDate: entry.plannedEndDate || undefined,
+      name: typeof entry.name === "string" ? entry.name.trim() : "",
+      plannedStartDate:
+        typeof entry.plannedStartDate === "string" && entry.plannedStartDate
+          ? entry.plannedStartDate
+          : undefined,
+      plannedEndDate:
+        typeof entry.plannedEndDate === "string" && entry.plannedEndDate
+          ? entry.plannedEndDate
+          : undefined,
     }))
     .filter(
       entry =>
@@ -350,15 +356,16 @@ export const setExtrasPresupuestoMetadataForDepartment = (
 };
 
 export const sanitizeCustomPullsheetSettings = (
-  value?: CustomPullsheetSettings
+  value?: unknown
 ): CustomPullsheetSettings | undefined => {
-  if (!value) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
 
-  const enabled = Boolean(value.enabled);
-  const name = value.name?.trim?.() ?? value.name ?? "";
-  const startDate = value.startDate || undefined;
-  const endDate = value.endDate || undefined;
-  const entries = sanitizeMetadataEntries(value.entries);
+  const enabled = input.enabled === true;
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  const startDate = typeof input.startDate === "string" && input.startDate ? input.startDate : undefined;
+  const endDate = typeof input.endDate === "string" && input.endDate ? input.endDate : undefined;
+  const entries = sanitizeMetadataEntries(input.entries);
 
   if (!enabled && !name && !startDate && !endDate && entries.length === 0) {
     return undefined;
@@ -377,13 +384,14 @@ export const sanitizeCustomPullsheetSettings = (
 };
 
 export const sanitizeExtrasPresupuestoSettings = (
-  value?: ExtrasPresupuestoSettings
+  value?: unknown
 ): ExtrasPresupuestoSettings | undefined => {
-  if (!value) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
 
-  const startDate = value.startDate || undefined;
-  const endDate = value.endDate || undefined;
-  const entries = sanitizeMetadataEntries(value.entries);
+  const startDate = typeof input.startDate === "string" && input.startDate ? input.startDate : undefined;
+  const endDate = typeof input.endDate === "string" && input.endDate ? input.endDate : undefined;
+  const entries = sanitizeMetadataEntries(input.entries);
 
   if (!startDate && !endDate && entries.length === 0) {
     return undefined;

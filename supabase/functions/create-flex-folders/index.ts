@@ -5,11 +5,23 @@ import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import {
   executeProvisioningPlan,
   FlexProvisioningDeterministicError,
+  provisioningFailureStatus,
   type ProvisioningNode,
 } from "../_shared/flex-folders/engine.ts";
 import { buildJobPlan, makeJobStore, seedKnownJobElements } from "../_shared/flex-folders/jobPlan.ts";
 import { makeProvisioningStore } from "../_shared/flex-folders/store.ts";
+import {
+  buildRootPlan,
+  childDepartmentsForTour,
+  documentNumberFor,
+  flexDate,
+  plannerOwnedTourSemanticKeys,
+  ROOT_DEPARTMENTS,
+  TECHNICAL_DEPARTMENTS,
+  type TourRecord,
+} from "../_shared/flex-folders/tourPlan.ts";
 import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
+import { buildArtistSchedule } from "../_shared/flex-folders/artistSchedule.ts";
 import { getErrorStatus, HttpError } from "../_shared/http.ts";
 import {
   DEPARTMENT_IDS,
@@ -25,45 +37,12 @@ const corsHeaders = {
 };
 const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") ||
   "https://sectorpro.flexrentalsolutions.com/f5/api";
-const TECHNICAL_DEPARTMENTS = ["sound", "lights", "video"] as const;
-const ROOT_DEPARTMENTS = ["sound", "lights", "video", "production", "personnel", "comercial"] as const;
-type RootDepartment = typeof ROOT_DEPARTMENTS[number];
-interface TourRecord {
-  id: string;
-  name: string;
-  start_date: string | null;
-  end_date: string | null;
-  flex_folders_created: boolean | null;
-  flex_main_folder_id: string | null;
-  flex_sound_folder_id: string | null;
-  flex_lights_folder_id: string | null;
-  flex_video_folder_id: string | null;
-  flex_production_folder_id: string | null;
-  flex_personnel_folder_id: string | null;
-  flex_comercial_folder_id: string | null;
-  flex_estructura_folder_id: string | null;
-}
 interface LeaseRow {
   operation_id: string;
   lease_token: string | null;
   status: string;
   acquired: boolean;
 }
-const flexDate = (value: string): string => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new HttpError(400, "Invalid tour date");
-  return `${date.toISOString().split(".")[0]}.000Z`;
-};
-const documentNumberFor = (value: string): string => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Madrid",
-    year: "2-digit",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = Object.fromEntries(formatter.formatToParts(new Date(value)).map((part) => [part.type, part.value]));
-  return `${parts.year}${parts.month}${parts.day}`;
-};
 const createFlexElement = async (payload: Record<string, unknown>, authToken: string) => {
   const response = await fetchWithRetry(`${FLEX_API_BASE_URL}/element`, {
     method: "POST",
@@ -85,8 +64,6 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
   }
   return await response.json() as { elementId?: string };
 };
-const failureStatus = (error: unknown) =>
-  error instanceof FlexProvisioningDeterministicError ? "failed" : "needs_reconciliation";
 const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
   const { data, error } = await supabase
     .from("jobs")
@@ -115,84 +92,25 @@ const loadTourRange = async (supabase: SupabaseClient, tour: TourRecord) => {
   if (!data?.length) throw new HttpError(400, "Tour has no dates");
   return { start: data[0].date, end: data[data.length - 1].date };
 };
-const buildRootPlan = (
-  tour: TourRecord,
-  selected: Set<string>,
-  range: { start: string; end: string },
-  includeChildren: boolean,
-): ProvisioningNode[] => {
-  const plannedStartDate = flexDate(range.start);
-  const plannedEndDate = flexDate(range.end);
-  const documentNumber = documentNumberFor(range.start);
-  const base = { open: true, locked: false, plannedStartDate, plannedEndDate, locationId: FLEX_FOLDER_IDS.location };
-  const nodes: ProvisioningNode[] = [{
-    key: "root",
-    payload: {
-      ...base,
-      definitionId: FLEX_FOLDER_IDS.mainFolder,
-      name: tour.name,
-      documentNumber,
-      personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
-      notes: "Provisioned by Sector Pro",
-    },
-    tracking: { folderType: "tour_root", tourColumn: "flex_main_folder_id" },
-  }];
 
-  for (const department of ROOT_DEPARTMENTS) {
-    if (TECHNICAL_DEPARTMENTS.includes(department as typeof TECHNICAL_DEPARTMENTS[number]) && !selected.has(department)) continue;
-    const label = department.charAt(0).toUpperCase() + department.slice(1);
-    nodes.push({
-      key: `department:${department}`,
-      parentKey: "root",
-      payload: {
-        ...base,
-        definitionId: FLEX_FOLDER_IDS.subFolder,
-        name: `${tour.name} - ${label}`,
-        departmentId: DEPARTMENT_IDS[department],
-        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[department]}`,
-        personResponsibleId: RESPONSIBLE_PERSON_IDS[department],
-      },
-      tracking: { folderType: "tour_department", department, tourColumn: `flex_${department}_folder_id` },
-    });
-
-    if (!includeChildren || ![...TECHNICAL_DEPARTMENTS, "production"].includes(department)) continue;
-    for (const child of [
-      { key: "technical-documentation", definitionId: FLEX_FOLDER_IDS.documentacionTecnica, name: "Documentación Técnica", suffix: "DT", folderType: "doc_tecnica" },
-      { key: "received-budgets", definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos, name: "Presupuestos Recibidos", suffix: "PR", folderType: "presupuestos_recibidos" },
-      { key: "expenses", definitionId: FLEX_FOLDER_IDS.hojaGastos, name: "Hoja de Gastos", suffix: "HG", folderType: "hoja_gastos" },
-    ]) {
-      nodes.push({
-        key: `department:${department}:${child.key}`,
-        parentKey: `department:${department}`,
-        payload: {
-          ...base,
-          definitionId: child.definitionId,
-          name: `${tour.name} - ${child.name} - ${label}`,
-          departmentId: DEPARTMENT_IDS[department],
-          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[department]}${child.suffix}`,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[department],
-        },
-        tracking: { folderType: child.folderType, department },
-      });
-    }
-  }
-
-  nodes.push({
-    key: "department:estructura",
-    parentKey: "root",
-    payload: {
-      ...base,
-      definitionId: FLEX_FOLDER_IDS.subFolder,
-      name: `${tour.name} - Estructura`,
-      departmentId: DEPARTMENT_IDS.estructura,
-      documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES.estructura}`,
-      personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
-    },
-    tracking: { folderType: "tour_department", department: "estructura", tourColumn: "flex_estructura_folder_id" },
-  });
-  return nodes;
+const loadTourPlannerOwnedSemanticKeys = async (
+  supabase: SupabaseClient,
+  tourId: string,
+): Promise<Set<string>> => {
+  const { data: operation, error: operationError } = await supabase
+    .from("flex_provisioning_operations")
+    .select("id")
+    .eq("scope_key", `tour-root:${tourId}`)
+    .maybeSingle();
+  if (operationError) throw operationError;
+  if (!operation) return new Set();
+  const { data: nodes, error: nodeError } = await supabase
+    .from("flex_provisioning_nodes")
+    .select("semantic_key,payload")
+    .eq("operation_id", operation.id);
+  if (nodeError) throw nodeError;
+  return plannerOwnedTourSemanticKeys(nodes || []);
 };
-
 const seedKnownTourElements = async (
   supabase: SupabaseClient,
   operationId: string,
@@ -210,6 +128,7 @@ const seedKnownTourElements = async (
       semantic_key: semanticKey,
       state: "needs_reconciliation",
       element_id: elementId,
+      payload: { provisioningOrigin: "legacy-tour-column" },
     }, { onConflict: "operation_id,semantic_key", ignoreDuplicates: true });
     if (error) throw error;
   }
@@ -357,21 +276,10 @@ const provisionDryhireYear = async (
   } catch (error) {
     await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
-      p_status: failureStatus(error), p_last_error: { code: "dryhire_year_interrupted" },
+      p_status: provisioningFailureStatus(error), p_last_error: { code: "dryhire_year_interrupted" },
     }).then(() => undefined, () => undefined);
     throw error;
   }
-};
-
-const artistWallClock = (date: string, time: string): string => {
-  if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) throw new HttpError(400, "Invalid artist time");
-  return `${date}T${time.length === 5 ? `${time}:00` : time}.000Z`;
-};
-
-const nextDate = (date: string): string => {
-  const value = new Date(`${date}T12:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + 1);
-  return value.toISOString().slice(0, 10);
 };
 
 const provisionArtistExtras = async (
@@ -400,6 +308,17 @@ const provisionArtistExtras = async (
     .eq("department", "sound").maybeSingle();
   if (extrasError) throw extrasError;
 
+  const { shortDate, schedule } = buildArtistSchedule({
+    date: String(artist.date),
+    show_start: artist.show_start,
+    show_end: artist.show_end,
+    isaftermidnight: artist.isaftermidnight,
+  }, dayStartTime);
+  const { count, error: countError } = await supabase.from("flex_folders")
+    .select("id", { count: "exact", head: true }).eq("job_id", artist.job_id)
+    .eq("folder_type", "comercial_presupuesto");
+  if (countError) throw countError;
+
   const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
     p_scope_key: `festival-artist-extras:${artistId}`,
     p_operation_type: "festival-artist-extras",
@@ -412,61 +331,48 @@ const provisionArtistExtras = async (
   const lease = (leaseData?.[0] || null) as LeaseRow | null;
   if (!lease?.acquired || !lease.lease_token) return { success: lease?.status === "complete", status: lease?.status };
 
-  const date = String(artist.date);
-  const startTime = String(artist.show_start || dayStartTime);
-  const endTime = String(artist.show_end || dayStartTime);
-  const endDate = artist.isaftermidnight || !artist.show_end ? nextDate(date) : date;
-  const dateParts = date.split("-");
-  const shortDate = `${dateParts[2]}${dateParts[1]}${dateParts[0].slice(-2)}`;
-  const { count, error: countError } = await supabase.from("flex_folders")
-    .select("id", { count: "exact", head: true }).eq("job_id", artist.job_id)
-    .eq("folder_type", "comercial_presupuesto");
-  if (countError) throw countError;
-  const { data: ordinal, error: ordinalError } = await supabase.rpc("allocate_flex_provisioning_sequence", {
-    p_operation_id: lease.operation_id,
-    p_sequence_group: `festival-artist-extras:${artist.job_id}`,
-    p_minimum: (count || 0) + 1,
-  });
-  if (ordinalError) throw ordinalError;
-  if (!Number.isInteger(ordinal) || ordinal < 1) throw new Error("Failed to allocate artist budget ordinal");
-  const documentNumber = `${shortDate}.${ordinal}SQT`;
-  const schedule = {
-    plannedStartDate: artistWallClock(date, startTime),
-    plannedEndDate: artistWallClock(endDate, endTime),
-  };
-  if (existingExtras) {
-    const { error } = await supabase.from("flex_provisioning_nodes").upsert({
-      operation_id: lease.operation_id, semantic_key: "extras:sound", state: "persisted",
-      element_id: existingExtras.element_id, tracking_row_id: existingExtras.id,
-    }, { onConflict: "operation_id,semantic_key", ignoreDuplicates: true });
-    if (error) throw error;
-  }
-  const plan: ProvisioningNode[] = [
-    {
-      key: "extras:sound",
-      externalParentElementId: commercial.element_id,
-      payload: {
-        definitionId: FLEX_FOLDER_IDS.subFolder, open: true, locked: false,
-        name: `Extras ${job.title?.trim() || "Sin título"} - Sonido`, ...schedule,
-        locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS.sound,
-        documentNumber: `${shortDate}ESQT`, personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
+  let remoteWritePossible = false;
+  try {
+    const { data: ordinal, error: ordinalError } = await supabase.rpc("allocate_flex_provisioning_sequence", {
+      p_operation_id: lease.operation_id,
+      p_sequence_group: `festival-artist-extras:${artist.job_id}`,
+      p_minimum: (count || 0) + 1,
+    });
+    if (ordinalError) throw ordinalError;
+    if (!Number.isInteger(ordinal) || ordinal < 1) throw new Error("Failed to allocate artist budget ordinal");
+    const documentNumber = `${shortDate}.${ordinal}SQT`;
+    if (existingExtras) {
+      const { error } = await supabase.from("flex_provisioning_nodes").upsert({
+        operation_id: lease.operation_id, semantic_key: "extras:sound", state: "persisted",
+        element_id: existingExtras.element_id, tracking_row_id: existingExtras.id,
+      }, { onConflict: "operation_id,semantic_key", ignoreDuplicates: true });
+      if (error) throw error;
+    }
+    const plan: ProvisioningNode[] = [
+      {
+        key: "extras:sound",
+        externalParentElementId: commercial.element_id,
+        payload: {
+          definitionId: FLEX_FOLDER_IDS.subFolder, open: true, locked: false,
+          name: `Extras ${job.title?.trim() || "Sin título"} - Sonido`, ...schedule,
+          locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS.sound,
+          documentNumber: `${shortDate}ESQT`, personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
+        },
+        tracking: { folderType: "comercial_extras" },
       },
-      tracking: { folderType: "comercial_extras" },
-    },
-    {
-      key: `artist:${artistId}:budget`,
-      parentKey: "extras:sound",
-      payload: {
-        definitionId: FLEX_FOLDER_IDS.presupuesto, open: true, locked: false,
-        name: `${artist.name} - Extras`, ...schedule,
-        locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS.sound,
-        documentNumber, personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
+      {
+        key: `artist:${artistId}:budget`,
+        parentKey: "extras:sound",
+        payload: {
+          definitionId: FLEX_FOLDER_IDS.presupuesto, open: true, locked: false,
+          name: `${artist.name} - Extras`, ...schedule,
+          locationId: FLEX_FOLDER_IDS.location, departmentId: DEPARTMENT_IDS.sound,
+          documentNumber, personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
+        },
+        tracking: { folderType: "comercial_presupuesto" },
       },
-      tracking: { folderType: "comercial_presupuesto" },
-    },
-  ];
-
-  const store = makeProvisioningStore(supabase, lease.operation_id, async (node, elementId, parentTrackingId) => {
+    ];
+    const store = makeProvisioningStore(supabase, lease.operation_id, async (node, elementId, parentTrackingId) => {
       if (node.key === "extras:sound" && existingExtras) return existingExtras.id;
       const { data: tracked, error: trackedError } = await supabase.from("flex_folders")
         .select("id").eq("element_id", elementId).maybeSingle();
@@ -480,8 +386,10 @@ const provisionArtistExtras = async (
       if (error) throw error;
       return data.id;
     });
-  try {
-    const outcome = await executeProvisioningPlan(plan, store, (payload) => createFlexElement(payload, flexToken));
+    const outcome = await executeProvisioningPlan(plan, store, (payload) => {
+      remoteWritePossible = true;
+      return createFlexElement(payload, flexToken);
+    });
     const { error } = await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: "complete", p_last_error: null,
     });
@@ -490,7 +398,7 @@ const provisionArtistExtras = async (
   } catch (error) {
     await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
-      p_status: failureStatus(error), p_last_error: { code: "artist_extras_interrupted" },
+      p_status: provisioningFailureStatus(error, remoteWritePossible), p_last_error: { code: "artist_extras_interrupted" },
     }).then(() => undefined, () => undefined);
     throw error;
   }
@@ -569,7 +477,7 @@ const provisionJob = async (
     if (finishError) throw finishError;
     return { success: true, status: "complete", data: outcome };
   } catch (error) {
-    await supabase.rpc("finish_flex_provisioning_lease", { p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: failureStatus(error), p_last_error: { code: "job_provisioning_interrupted" } }).then(() => undefined, () => undefined);
+    await supabase.rpc("finish_flex_provisioning_lease", { p_operation_id: lease.operation_id, p_lease_token: lease.lease_token, p_status: provisioningFailureStatus(error), p_last_error: { code: "job_provisioning_interrupted" } }).then(() => undefined, () => undefined);
     throw error;
   }
 };
@@ -636,12 +544,13 @@ serve(async (req) => {
     const { data: tourData, error: tourError } = await supabase.from("tours").select("*").eq("id", tourId).single();
     if (tourError || !tourData) throw new HttpError(404, "Tour not found");
     const tour = tourData as TourRecord;
-    const [selected, range] = await Promise.all([
+    const [selected, range, plannerOwnedSemanticKeys] = await Promise.all([
       loadTourDepartments(supabase, tourId),
       loadTourRange(supabase, tour),
+      loadTourPlannerOwnedSemanticKeys(supabase, tourId),
     ]);
-    const legacyExistingRoot = Boolean(tour.flex_main_folder_id);
-    const plan = buildRootPlan(tour, selected, range, !legacyExistingRoot);
+    const childDepartments = childDepartmentsForTour(tour, selected, plannerOwnedSemanticKeys);
+    const plan = buildRootPlan(tour, selected, range, childDepartments);
 
     const { data: leaseData, error: leaseError } = await supabase.rpc("acquire_flex_provisioning_lease", {
       p_scope_key: `tour-root:${tourId}`,
@@ -697,7 +606,7 @@ serve(async (req) => {
       await supabase.rpc("finish_flex_provisioning_lease", {
         p_operation_id: lease.operation_id,
         p_lease_token: lease.lease_token,
-        p_status: failureStatus(error),
+        p_status: provisioningFailureStatus(error),
         p_last_error: { code: "provisioning_interrupted" },
       }).then(() => undefined, () => undefined);
     }

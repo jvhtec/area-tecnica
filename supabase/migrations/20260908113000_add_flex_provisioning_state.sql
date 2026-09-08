@@ -37,6 +37,70 @@ create table public.flex_provisioning_nodes (
 create index flex_provisioning_nodes_state_idx
   on public.flex_provisioning_nodes (operation_id, state);
 
+-- Remote Flex UUIDs are identities. Consolidate any historical duplicates before
+-- enforcing that invariant, preserving the row most connected to durable state.
+do $deduplicate_flex_folders$
+declare
+  duplicate_row record;
+begin
+  for duplicate_row in
+    with ranked as (
+      select
+        folder.id,
+        folder.element_id,
+        row_number() over (
+          partition by folder.element_id
+          order by
+            (select count(*) from public.flex_provisioning_nodes node where node.tracking_row_id = folder.id) desc,
+            (select count(*) from public.flex_status_log status_log where status_log.folder_id = folder.id) desc,
+            (select count(*) from public.flex_folders child where child.parent_id = folder.id) desc,
+            (folder.job_id is not null) desc,
+            folder.created_at asc,
+            folder.id asc
+        ) as row_rank
+      from public.flex_folders folder
+    ), keepers as (
+      select element_id, id as keeper_id
+      from ranked
+      where row_rank = 1
+    )
+    select ranked.id as duplicate_id, keepers.keeper_id
+    from ranked
+    join keepers using (element_id)
+    where ranked.row_rank > 1
+  loop
+    update public.flex_folders keeper
+    set
+      job_id = coalesce(keeper.job_id, duplicate.job_id),
+      tour_date_id = coalesce(keeper.tour_date_id, duplicate.tour_date_id),
+      parent_id = coalesce(keeper.parent_id, duplicate.parent_id),
+      department = coalesce(keeper.department, duplicate.department),
+      source_department = coalesce(keeper.source_department, duplicate.source_department)
+    from public.flex_folders duplicate
+    where keeper.id = duplicate_row.keeper_id
+      and duplicate.id = duplicate_row.duplicate_id;
+
+    update public.flex_folders
+    set parent_id = duplicate_row.keeper_id
+    where parent_id = duplicate_row.duplicate_id;
+
+    update public.flex_status_log
+    set folder_id = duplicate_row.keeper_id
+    where folder_id = duplicate_row.duplicate_id;
+
+    update public.flex_provisioning_nodes
+    set tracking_row_id = duplicate_row.keeper_id
+    where tracking_row_id = duplicate_row.duplicate_id;
+
+    delete from public.flex_folders
+    where id = duplicate_row.duplicate_id;
+  end loop;
+end
+$deduplicate_flex_folders$;
+
+create unique index flex_folders_element_id_key
+  on public.flex_folders (element_id);
+
 alter table public.flex_provisioning_operations enable row level security;
 alter table public.flex_provisioning_nodes enable row level security;
 

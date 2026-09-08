@@ -159,14 +159,31 @@ export type LegacyFlexFolder = {
   job_id: string | null;
 };
 
+type ExistingProvisioningNode = {
+  semantic_key: string;
+  element_id: string | null;
+  tracking_row_id: string | null;
+};
+
 export const matchLegacyJobElements = (
   legacyRows: LegacyFlexFolder[],
   crewElements: Map<string, string>,
   plan: ProvisioningNode[],
+  existingNodes: ExistingProvisioningNode[] = [],
 ) => {
   const used = new Set<string>();
   const matched = new Map<string, LegacyFlexFolder>();
+  const existingKeys = new Set(existingNodes.map((node) => node.semantic_key));
+  for (const existing of existingNodes) {
+    const legacy = legacyRows.find((row) =>
+      row.id === existing.tracking_row_id || row.element_id === existing.element_id
+    );
+    if (!legacy) continue;
+    used.add(legacy.id);
+    matched.set(existing.semantic_key, legacy);
+  }
   for (const node of plan) {
+    if (existingKeys.has(node.key)) continue;
     const tracking = node.tracking as {
       folderType?: string; department?: string; sourceDepartment?: string | null; crewDepartment?: string;
     };
@@ -196,9 +213,8 @@ export const seedKnownJobElements = async (
   plan: ProvisioningNode[],
 ) => {
   const { data: existingNodes, error: existingNodeError } = await supabase.from("flex_provisioning_nodes")
-    .select("semantic_key").eq("operation_id", operationId).limit(1);
+    .select("semantic_key,element_id,tracking_row_id").eq("operation_id", operationId);
   if (existingNodeError) throw existingNodeError;
-  if (existingNodes?.length) return;
 
   const jobId = String(job.id);
   const filters = [`job_id.eq.${jobId}`];
@@ -214,8 +230,11 @@ export const seedKnownJobElements = async (
   if (crewError) throw crewError;
   const crewElements = new Map<string, string>((crewRows || []).map((row) => [row.department, row.flex_element_id]));
   const legacyRows = (data || []) as LegacyFlexFolder[];
-  const matched = matchLegacyJobElements(legacyRows, crewElements, plan);
+  const durableNodes = (existingNodes || []) as ExistingProvisioningNode[];
+  const existingKeys = new Set(durableNodes.map((node) => node.semantic_key));
+  const matched = matchLegacyJobElements(legacyRows, crewElements, plan, durableNodes);
   for (const node of plan) {
+    if (existingKeys.has(node.key)) continue;
     const legacy = matched.get(node.key);
     if (!legacy) continue;
     if (!legacy.job_id) {

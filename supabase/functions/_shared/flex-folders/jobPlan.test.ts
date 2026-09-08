@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildJobPlan, makeJobStore, matchLegacyJobElements } from "./jobPlan.ts";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { FORBIDDEN_HOJA_DEFINITION_IDS } from "./engine.ts";
+import { executeProvisioningPlan, FORBIDDEN_HOJA_DEFINITION_IDS } from "./engine.ts";
 
 const base = {
   selected: new Set(["sound"]),
@@ -92,6 +92,41 @@ describe("server-owned job plans", () => {
       ["department:sound:pullsheet:PA", "remote-pa"],
       ["estructura:source:sound", "remote-es"],
     ]);
+  });
+
+  it("incrementally adopts legacy children exposed by a later plan expansion", async () => {
+    const root = { key: "root", payload: {}, tracking: { folderType: "main_event" } };
+    const sound = { key: "department:sound", parentKey: "root", payload: {}, tracking: { folderType: "department", department: "sound" } };
+    const tp = { key: "department:sound:pullsheet:TP", parentKey: "department:sound", payload: {}, tracking: { folderType: "pull_sheet", department: "sound" } };
+    const pa = { key: "department:sound:pullsheet:PA", parentKey: "department:sound", payload: {}, tracking: { folderType: "pull_sheet", department: "sound" } };
+    const rows = [
+      { id: "local-root", element_id: "remote-root", parent_id: null, folder_type: "main_event", department: null, source_department: null, job_id: "job" },
+      { id: "local-sound", element_id: "remote-sound", parent_id: "local-root", folder_type: "department", department: "sound", source_department: null, job_id: "job" },
+      { id: "local-tp", element_id: "remote-tp", parent_id: "local-sound", folder_type: "pull_sheet", department: "sound", source_department: null, job_id: "job" },
+      { id: "local-pa", element_id: "remote-pa", parent_id: "local-sound", folder_type: "pull_sheet", department: "sound", source_department: null, job_id: "job" },
+    ];
+    const firstPlan = [root, sound, tp];
+    const firstMatches = matchLegacyJobElements(rows, new Map(), firstPlan);
+    const existingNodes = [...firstMatches].map(([semantic_key, row]) => ({
+      semantic_key,
+      element_id: row.element_id,
+      tracking_row_id: row.id,
+    }));
+    const expandedPlan = [root, sound, tp, pa];
+    const expandedMatches = matchLegacyJobElements(rows, new Map(), expandedPlan, existingNodes);
+    expect(expandedMatches.get(pa.key)?.element_id).toBe("remote-pa");
+
+    const createRemote = vi.fn();
+    await executeProvisioningPlan(expandedPlan, {
+      load: async () => [...expandedMatches].map(([key, row]) => ({ key, state: "persisted", elementId: row.element_id, trackingRowId: row.id })),
+      markCreating: async () => undefined,
+      markRemoteElement: async () => undefined,
+      persistTracking: async () => undefined,
+      markPersisted: async () => undefined,
+      markFailed: async () => undefined,
+      markNeedsReconciliation: async () => undefined,
+    }, createRemote);
+    expect(createRemote).not.toHaveBeenCalled();
   });
 
   it("places tour dates below authoritative tour department roots", () => {

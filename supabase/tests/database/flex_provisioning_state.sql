@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 
-SELECT plan(17);
+SELECT plan(20);
 
 SELECT has_table('public', 'flex_provisioning_operations', 'Provisioning operations are durable');
 SELECT has_table('public', 'flex_provisioning_nodes', 'Provisioning nodes are durable');
@@ -37,6 +37,29 @@ SELECT ok(
 );
 
 SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public' AND tablename = 'flex_folders'
+      AND indexdef ILIKE '%UNIQUE%element_id%'
+  ),
+  'A remote Flex element can only have one local tracking row'
+);
+
+INSERT INTO public.flex_folders (element_id, folder_type)
+VALUES ('f1000000-0000-4000-8000-000000000001', 'pgtap_unique_element');
+SELECT throws_ok(
+  $$
+    INSERT INTO public.flex_folders (element_id, folder_type)
+    VALUES ('f1000000-0000-4000-8000-000000000001', 'pgtap_duplicate_element')
+  $$,
+  '23505',
+  NULL,
+  'Duplicate remote Flex element IDs are rejected'
+);
+DELETE FROM public.flex_folders
+WHERE element_id = 'f1000000-0000-4000-8000-000000000001';
+
+SELECT ok(
   NOT has_function_privilege('anon', 'public.acquire_flex_provisioning_lease(text,text,text,integer,boolean,uuid)', 'EXECUTE'),
   'Anonymous callers cannot acquire provisioning leases'
 );
@@ -63,6 +86,16 @@ SELECT is(
   'A completed scope can reopen to process newly added semantic nodes'
 );
 
+INSERT INTO public.flex_provisioning_operations (scope_key, operation_type, scope_id, status)
+VALUES ('pgtap:flex:failed-retry', 'festival-artist-extras', 'failed-retry', 'failed');
+SELECT is(
+  (SELECT acquired FROM public.acquire_flex_provisioning_lease(
+    'pgtap:flex:failed-retry', 'festival-artist-extras', 'failed-retry', 30, false, null
+  )),
+  true,
+  'A pre-write artist extras failure can retry without reconciliation'
+);
+
 INSERT INTO public.flex_provisioning_operations (
   scope_key, operation_type, scope_id, status, lease_token, lease_expires_at
 ) VALUES (
@@ -77,6 +110,6 @@ SELECT is(
 );
 
 DELETE FROM public.flex_provisioning_operations
-WHERE scope_key IN ('pgtap:flex:complete-expansion', 'pgtap:flex:expired-reconcile');
+WHERE scope_key IN ('pgtap:flex:complete-expansion', 'pgtap:flex:failed-retry', 'pgtap:flex:expired-reconcile');
 
 SELECT * FROM finish();
