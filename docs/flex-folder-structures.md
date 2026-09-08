@@ -134,7 +134,7 @@ Lights, Video, and Production have no built-in pull sheets, so custom entries st
 
 ## Picker option semantics
 
-The canonical client normalizes picker input before sending it to the server. Only the keys in the tables above plus `extrasSound`, `extrasLights`, `presupuestoSound`, and `presupuestoLights` survive normalization.
+The canonical client normalizes picker input before sending it to the server. Only the keys in the tables above plus `customPullsheet`, `extrasSound`, `extrasLights`, `presupuestoSound`, and `presupuestoLights` survive normalization.
 
 | Input | Meaning |
 | --- | --- |

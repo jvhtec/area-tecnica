@@ -13,6 +13,16 @@ it("keeps failures before a possible remote write immediately retryable", () => 
   expect(provisioningFailureStatus(new Error("remote outcome unknown"), true)).toBe("needs_reconciliation");
 });
 
+it("classifies pre-write plan defects as deterministic", async () => {
+  const { store } = makeStore();
+  const duplicate = { key: "duplicate", payload: { definitionId: "allowed" }, tracking: {} };
+  await expect(executeProvisioningPlan(
+    [duplicate, duplicate],
+    store,
+    async () => ({ elementId: "unexpected" }),
+  )).rejects.toBeInstanceOf(FlexProvisioningDeterministicError);
+});
+
 const makeStore = (initial: StoredProvisioningNode[] = []) => {
   const nodes = new Map(initial.map((node) => [node.key, { ...node }]));
   const store: ProvisioningStore = {
@@ -92,6 +102,6 @@ it("executor rejects every deprecated Hoja definition", async () => {
       [{ key: "x", payload: { definitionId }, tracking: {} }],
       store,
       async () => ({ elementId: "x" }),
-    )).rejects.toThrow("Deprecated Hoja definition");
+    )).rejects.toBeInstanceOf(FlexProvisioningDeterministicError);
   }
 });

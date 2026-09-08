@@ -77,7 +77,9 @@ export async function executeProvisioningPlan(
   createRemote: (payload: Record<string, unknown>) => Promise<{ elementId?: string }>,
 ): Promise<{ created: number; adopted: number; skipped: number }> {
   const duplicateKeys = plan.filter((node, index) => plan.findIndex((candidate) => candidate.key === node.key) !== index);
-  if (duplicateKeys.length) throw new Error(`Duplicate provisioning node key: ${duplicateKeys[0].key}`);
+  if (duplicateKeys.length) {
+    throw new FlexProvisioningDeterministicError(`Duplicate provisioning node key: ${duplicateKeys[0].key}`);
+  }
 
   const stored = new Map((await store.load()).map((node) => [node.key, node]));
   const resolvedElements = new Map<string, string>();
@@ -92,7 +94,7 @@ export async function executeProvisioningPlan(
   for (const node of plan) {
     const definitionId = node.payload.definitionId;
     if (typeof definitionId === "string" && FORBIDDEN_HOJA_DEFINITION_IDS.has(definitionId)) {
-      throw new Error(`Deprecated Hoja definition is forbidden for node ${node.key}`);
+      throw new FlexProvisioningDeterministicError(`Deprecated Hoja definition is forbidden for node ${node.key}`);
     }
 
     const existing = stored.get(node.key);

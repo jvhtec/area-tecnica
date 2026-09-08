@@ -252,6 +252,7 @@ const provisionDryhireYear = async (
   if (!lease?.acquired || !lease.lease_token) {
     return { success: lease?.status === "complete", status: lease?.status || "in_progress" };
   }
+  let remoteWritePossible = false;
   try {
     const [{ data: legacyRows, error: legacyError }, { data: stateRows, error: stateError }] = await Promise.all([
       supabase.from("dryhire_parent_folders").select("id").eq("year", year).limit(1),
@@ -264,7 +265,10 @@ const provisionDryhireYear = async (
     const outcome = await executeProvisioningPlan(
       buildDryhirePlan(year),
       makeDryhireStore(supabase, lease.operation_id),
-      (payload) => createFlexElement(payload, flexToken),
+      (payload) => {
+        remoteWritePossible = true;
+        return createFlexElement(payload, flexToken);
+      },
     );
     const { error } = await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
@@ -275,7 +279,8 @@ const provisionDryhireYear = async (
   } catch (error) {
     await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id, p_lease_token: lease.lease_token,
-      p_status: provisioningFailureStatus(error), p_last_error: { code: "dryhire_year_interrupted" },
+      p_status: provisioningFailureStatus(error, remoteWritePossible),
+      p_last_error: { code: "dryhire_year_interrupted" },
     }).then(() => undefined, () => undefined);
     throw error;
   }
