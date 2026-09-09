@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 
-SELECT plan(20);
+SELECT plan(21);
 
 SELECT has_table('public', 'flex_provisioning_operations', 'Provisioning operations are durable');
 SELECT has_table('public', 'flex_provisioning_nodes', 'Provisioning nodes are durable');
@@ -74,6 +74,16 @@ SELECT ok(
   'Authenticated callers cannot forge provisioning completion'
 );
 
+SET ROLE service_role;
+SELECT is(
+  (SELECT acquired FROM public.acquire_flex_provisioning_lease(
+    'pgtap:flex:service-key', 'job', 'service-key', 30, false, null
+  )),
+  true,
+  'The service database role can acquire a lease without a legacy JWT claim'
+);
+RESET ROLE;
+
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 
 INSERT INTO public.flex_provisioning_operations (scope_key, operation_type, scope_id, status, completed_at)
@@ -110,6 +120,6 @@ SELECT is(
 );
 
 DELETE FROM public.flex_provisioning_operations
-WHERE scope_key IN ('pgtap:flex:complete-expansion', 'pgtap:flex:failed-retry', 'pgtap:flex:expired-reconcile');
+WHERE scope_key IN ('pgtap:flex:service-key', 'pgtap:flex:complete-expansion', 'pgtap:flex:failed-retry', 'pgtap:flex:expired-reconcile');
 
 SELECT * FROM finish();
