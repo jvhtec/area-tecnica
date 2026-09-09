@@ -40,7 +40,9 @@ class JsPDFMock {
 
 vi.mock('jspdf', () => ({
   __esModule: true,
-  default: vi.fn(() => new JsPDFMock()),
+  default: vi.fn(function () {
+    return new JsPDFMock();
+  }),
 }));
 
 vi.mock('@/utils/pdf/logoUtils', () => ({

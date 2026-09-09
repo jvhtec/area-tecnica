@@ -65,6 +65,19 @@ describe("shared Edge Function rate-limit helpers", () => {
     expect(first).not.toContain("token-1");
   });
 
+  it("normalizes primitive, structured, and non-serializable identifier parts", async () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    const hash = await buildRateLimitIdentifierHash(
+      new Request("https://example.com"),
+      [undefined, null, 42, true, 5n, { key: "value" }, Symbol("symbol"), circular],
+      { includeIp: false, includeUserAgent: false },
+    );
+
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it("hashes arbitrary values with SHA-256 hex encoding", async () => {
     await expect(sha256Hex("area-tecnica")).resolves.toMatch(/^[a-f0-9]{64}$/);
   });

@@ -48,7 +48,9 @@ const {
   return {
     loadPdfLibsMock: vi.fn(),
     getCompanyLogoMock: vi.fn(),
-    jsPdfConstructorMock: vi.fn(() => doc),
+    jsPdfConstructorMock: vi.fn(function () {
+      return doc;
+    }),
     autoTableMock: vi.fn((instance: any, options: any) => {
       options.didDrawPage?.({ pageNumber: 1 });
       instance.lastAutoTable = { finalY: 120 };
