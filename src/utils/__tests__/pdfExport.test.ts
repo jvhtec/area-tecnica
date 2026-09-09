@@ -79,7 +79,9 @@ describe('exportToPDF', () => {
     pdf = makePdf();
     vi.stubGlobal('Image', FailingImage);
     pdfMocks.loadPdfLibs.mockResolvedValue({
-      jsPDF: vi.fn(() => pdf),
+      jsPDF: vi.fn(function () {
+        return pdf;
+      }),
       autoTable: pdfMocks.autoTable,
     });
     pdfMocks.autoTable.mockImplementation((doc, options) => {

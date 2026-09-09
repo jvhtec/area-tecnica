@@ -3,7 +3,7 @@ import type jsPDF from 'jspdf';
 
 const pdfMocks = vi.hoisted(() => {
   const autoTable = vi.fn();
-  const constructor = vi.fn();
+  const constructor = vi.fn(function () {});
   const loadPdfLibs = vi.fn();
 
   return { autoTable, constructor, loadPdfLibs };
@@ -48,7 +48,9 @@ describe('PDF export helpers', () => {
 
   it('creates a jsPDF document through the lazy PDF loader', async () => {
     const pdf = makePdf();
-    pdfMocks.constructor.mockReturnValue(pdf);
+    pdfMocks.constructor.mockImplementation(function () {
+      return pdf;
+    });
     pdfMocks.loadPdfLibs.mockResolvedValue({
       jsPDF: pdfMocks.constructor,
       autoTable: pdfMocks.autoTable,

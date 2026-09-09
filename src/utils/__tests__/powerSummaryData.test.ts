@@ -96,6 +96,7 @@ describe('powerSummaryData', () => {
     expect(summary.departments.sound.totalWatts).toBe(1000);
     expect(summary.departments.sound.rows[0].positionLabel).toBe('FOH');
     expect(summary.departments.lights.rows[0].positionLabel).toBe('Custom Left');
+    expect(summary.departments.lights.rows[0].includesHoist).toBe(true);
     expect(summary.departments.lights.rows[0].notes).toContain('CEE32A');
     expect(summary.totalSystemWatts).toBe(4500);
     // Compatible 3φ supplies aggregate by ΣP/ΣQ, never by adding row currents.
@@ -681,7 +682,7 @@ describe('powerSummaryData', () => {
           custom_pdu_type: null,
           position: 'USL',
           custom_position: null,
-          includes_hoist: false,
+          includes_hoist: true,
           override_data: { rows: [], safetyMargin: 15, pf: 0.95 },
         },
       ],
@@ -719,6 +720,7 @@ describe('powerSummaryData', () => {
 
     expect(summary.departments.sound.rows[0].name).toBe('Override FoH');
     expect(summary.departments.sound.rows[0].positionLabel).toBe('USL');
+    expect(summary.departments.sound.rows[0].includesHoist).toBe(true);
     expect(summary.departments.sound.safetyMargin).toBe(15);
     expect(summary.departments.sound.rows[0].source).toBe('tour-override');
   });

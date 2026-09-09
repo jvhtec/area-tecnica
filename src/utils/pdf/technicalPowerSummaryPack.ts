@@ -30,6 +30,7 @@ import type {
 import { buildPowerStagePlot, type StagePlotTable } from '@/utils/powerStagePlot';
 import {
   drawPowerStagePlot,
+  estimatePowerStagePlotHeight,
   type StagePlotRgb,
 } from '@/utils/pdf/powerStagePlotPdf';
 
@@ -100,6 +101,35 @@ const buildStagePlotGroupKey = (
   if (!normalizedName) return 'general';
 
   return `stage-name-${encodeURIComponent(normalizedName)}`;
+};
+
+const paginateStagePlotTables = (
+  tables: StagePlotTable[],
+  availableHeight: number,
+  hasLegend: boolean,
+) => {
+  const pages: StagePlotTable[][] = [];
+  let currentPage: StagePlotTable[] = [];
+
+  tables.forEach((table) => {
+    const candidate = [...currentPage, table];
+    const candidateHeight = estimatePowerStagePlotHeight(
+      buildPowerStagePlot(candidate),
+      false,
+      hasLegend,
+    );
+
+    if (currentPage.length > 0 && candidateHeight > availableHeight) {
+      pages.push(currentPage);
+      currentPage = [table];
+      return;
+    }
+
+    currentPage = candidate;
+  });
+
+  if (currentPage.length > 0) pages.push(currentPage);
+  return pages;
 };
 
 const departmentTableBody = (department: DepartmentPowerSummaryData) =>
@@ -216,6 +246,7 @@ export const generateTechnicalPowerSummaryPack = async ({
             ? row.positionLabel
             : undefined,
         pduType: row.pduLabel && row.pduLabel !== 'N/A' ? row.pduLabel : '',
+        includesHoist: row.includesHoist,
         department: department.department,
         stageKey: buildStagePlotGroupKey(row.stageNumber, row.stageName),
         stageLabel:
@@ -248,22 +279,35 @@ export const generateTechnicalPowerSummaryPack = async ({
       : 'Distribución en escenario';
 
     doc.addPage();
-    const plotGeo: ReportGeometry = drawReportRunningHead(doc, {
+    let plotGeo: ReportGeometry = drawReportRunningHead(doc, {
       ...chrome,
       contextLabel: title,
     });
-    drawPowerStagePlot(doc, plot, {
-      startY: plotGeo.contentTop,
-      pageWidth: plotGeo.pageWidth,
-      pageHeight: plotGeo.pageHeight,
-      footerSpace: plotGeo.pageHeight - plotGeo.contentBottom,
-      pageBreakY: plotGeo.contentTop,
-      contentLeft: plotGeo.left,
-      contentRight: plotGeo.pageWidth - plotGeo.right,
-      titleColor: REPORT_INK,
-      title,
-      entryColorFor,
-      legend,
+    const plotPages = paginateStagePlotTables(
+      group.tables,
+      plotGeo.contentBottom - plotGeo.contentTop,
+      legend.length > 0,
+    );
+
+    plotPages.forEach((pageTables, pageIndex) => {
+      if (pageIndex > 0) {
+        doc.addPage();
+        plotGeo = drawReportRunningHead(doc, { ...chrome, contextLabel: title });
+      }
+
+      drawPowerStagePlot(doc, buildPowerStagePlot(pageTables), {
+        startY: plotGeo.contentTop,
+        pageWidth: plotGeo.pageWidth,
+        pageHeight: plotGeo.pageHeight,
+        footerSpace: plotGeo.pageHeight - plotGeo.contentBottom,
+        pageBreakY: plotGeo.contentTop,
+        contentLeft: plotGeo.left,
+        contentRight: plotGeo.pageWidth - plotGeo.right,
+        titleColor: REPORT_INK,
+        title,
+        entryColorFor,
+        legend,
+      });
     });
   });
 

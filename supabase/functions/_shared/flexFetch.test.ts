@@ -35,6 +35,26 @@ describe("fetchWithRetry", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
+  it("continues retrying when draining a failed response body rejects", async () => {
+    const cancel = vi.fn().mockRejectedValue(new Error("body already closed"));
+    const failedResponse = {
+      status: 503,
+      body: { cancel },
+    } as unknown as Response;
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(failedResponse)
+      .mockResolvedValueOnce(jsonResponse(200));
+
+    const res = await fetchWithRetry("https://flex.example/element", {}, {
+      fetchImpl,
+      sleep: noSleep,
+    });
+
+    expect(res.status).toBe(200);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it("uses the default sleep implementation between retries", async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse(503))

@@ -27,14 +27,17 @@ const riderDocument = {
   artist_id: "artist-1",
 };
 
+type ViewRider = (file: { file_path: string }) => void | Promise<void>;
+type DownloadRider = (file: { file_path: string; file_name: string }) => void | Promise<void>;
+
 function Harness({
   jobType = "single",
-  onViewRider = vi.fn(),
-  onDownloadRider = vi.fn(),
+  onViewRider = vi.fn<ViewRider>(),
+  onDownloadRider = vi.fn<DownloadRider>(),
 }: {
   jobType?: string;
-  onViewRider?: ReturnType<typeof vi.fn>;
-  onDownloadRider?: ReturnType<typeof vi.fn>;
+  onViewRider?: ViewRider;
+  onDownloadRider?: DownloadRider;
 }) {
   const [documentsCollapsed, setDocumentsCollapsed] = useState(false);
   const [tourDocumentsCollapsed, setTourDocumentsCollapsed] = useState(false);
@@ -98,8 +101,8 @@ describe("JobCardDocumentSections", () => {
 
   it("keeps rider view and download callbacks connected", async () => {
     const user = userEvent.setup();
-    const onViewRider = vi.fn();
-    const onDownloadRider = vi.fn();
+    const onViewRider = vi.fn<ViewRider>();
+    const onDownloadRider = vi.fn<DownloadRider>();
     render(<Harness onViewRider={onViewRider} onDownloadRider={onDownloadRider} />);
 
     const viewButtons = screen.getAllByTitle("Ver");

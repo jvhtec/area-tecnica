@@ -4,6 +4,16 @@ import { dirname, resolve } from "node:path"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+const environmentGlobs = [
+  "**/components/**/*.test.{ts,tsx}",
+  "**/src/utils/flex-folders/**/__tests__/**/*.test.{ts,tsx}",
+]
+const excludedGlobs = [
+  ...configDefaults.exclude,
+  "tests/e2e/**",
+  "playwright-report/**",
+  "test-results/**",
+]
 
 export default defineConfig({
   test: {
@@ -11,22 +21,27 @@ export default defineConfig({
     environment: "node",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    exclude: [
-      ...configDefaults.exclude,
-      "tests/e2e/**",
-      "playwright-report/**",
-      "test-results/**",
-    ],
-    // Allow per-file environment configuration via comments
-    environmentMatchGlobs: [
-      // Use jsdom for component tests
-      ["**/components/**/*.test.{ts,tsx}", "jsdom"],
-      // Some utilities interact with the DOM (e.g. openFlexElementSync, toast libs)
-      ["**/src/utils/flex-folders/**/__tests__/**/*.test.{ts,tsx}", "jsdom"],
+    exclude: excludedGlobs,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "jsdom",
+          environment: "jsdom",
+          include: environmentGlobs,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          exclude: [...excludedGlobs, ...environmentGlobs],
+        },
+      },
     ],
     coverage: {
       provider: "v8",
-      all: true,
       reporter: ["text", "html", "json-summary"],
       reportsDirectory: "./coverage",
       include: ["src/**/*.{ts,tsx}", "supabase/functions/**/*.{ts,tsx}"],
