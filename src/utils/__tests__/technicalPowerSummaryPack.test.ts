@@ -308,4 +308,58 @@ describe('technicalPowerSummaryPack', () => {
       expect.any(Number)
     );
   });
+
+  it('splits hoist-heavy stage plots across headed pages before they overflow', async () => {
+    await generateTechnicalPowerSummaryPack({
+      jobTitle: 'Festival Test',
+      summary: {
+        departments: {
+          sound: {
+            department: 'sound',
+            rows: Array.from({ length: 10 }, (_, index) => ({
+              name: `PA ${index + 1}`,
+              stageName: 'Main Stage',
+              pduLabel: 'CEE63A 3P+N+G',
+              positionLabel: 'CSC',
+              includesHoist: true,
+              totalWatts: 1000,
+              currentPerPhase: 4,
+              totalVa: 1052,
+              notes: 'Motor auxiliar CEE32A 3P+N+G excluido de totales',
+              source: 'job' as const,
+            })),
+            safetyMargin: null,
+            totalWatts: 10000,
+            totalAmps: 40,
+            totalKva: 10.52,
+          },
+          lights: {
+            department: 'lights',
+            rows: [],
+            safetyMargin: null,
+            totalWatts: 0,
+            totalAmps: 0,
+            totalKva: 0,
+          },
+          video: {
+            department: 'video',
+            rows: [],
+            safetyMargin: null,
+            totalWatts: 0,
+            totalAmps: 0,
+            totalKva: 0,
+          },
+        },
+        totalSystemWatts: 10000,
+        totalSystemAmps: 40,
+        totalSystemKva: 10.52,
+      },
+    });
+
+    const plotTitleCalls = docMock.text.mock.calls.filter(
+      ([text]) => text === 'DISTRIBUCIÓN EN ESCENARIO · MAIN STAGE'
+    );
+    expect(plotTitleCalls.length).toBeGreaterThan(1);
+    expect(docMock.addPage).toHaveBeenCalledTimes(plotTitleCalls.length + 2);
+  });
 });
