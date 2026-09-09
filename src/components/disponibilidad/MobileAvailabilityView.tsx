@@ -62,7 +62,7 @@ export function MobileAvailabilityView({
     };
 
     return (
-        <div className={cn("flex flex-col min-h-screen -mx-3 -mt-4 -mb-[calc(4.5rem+env(safe-area-inset-bottom))]", theme.bg)}>
+        <div className={cn("flex flex-col min-h-screen -mx-3 -mt-4 -mb-[calc(var(--mobile-nav-height)+env(safe-area-inset-bottom))]", theme.bg)}>
             {/* Header */}
             <div className={cn("border-b p-4 sticky top-0 z-20", theme.card, theme.divider)}>
                 <div className="flex items-center justify-between mb-3">
@@ -302,7 +302,7 @@ export function MobileAvailabilityView({
             </div>
 
             {/* Floating Action Button / Bottom Sheet */}
-            <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom)+1.5rem)] right-6 z-50">
+            <div className="fixed bottom-[calc(var(--mobile-nav-height)+env(safe-area-inset-bottom)+1.5rem)] right-6 z-50">
                 <Sheet>
                     <SheetTrigger asChild>
                         <Button
