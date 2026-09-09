@@ -44,6 +44,8 @@ export interface DepartmentPowerSummaryRow {
   stageNumber?: number | null;
   pduLabel: string;
   positionLabel: string;
+  /** Additional hoist/motor power required at this table's stage position. */
+  includesHoist?: boolean;
   totalWatts: number;
   currentPerPhase: number;
   totalVa: number;

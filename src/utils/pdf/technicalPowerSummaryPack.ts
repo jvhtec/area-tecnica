@@ -216,6 +216,7 @@ export const generateTechnicalPowerSummaryPack = async ({
             ? row.positionLabel
             : undefined,
         pduType: row.pduLabel && row.pduLabel !== 'N/A' ? row.pduLabel : '',
+        includesHoist: row.includesHoist,
         department: department.department,
         stageKey: buildStagePlotGroupKey(row.stageNumber, row.stageName),
         stageLabel:

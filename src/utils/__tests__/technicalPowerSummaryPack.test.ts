@@ -103,6 +103,7 @@ describe('technicalPowerSummaryPack', () => {
                 stageNumber: 0,
                 pduLabel: '32A',
                 positionLabel: 'FOH',
+                includesHoist: true,
                 totalWatts: 1000,
                 currentPerPhase: 4,
                 totalVa: 1052,
@@ -167,6 +168,12 @@ describe('technicalPowerSummaryPack', () => {
       expect.objectContaining({
         body: expect.arrayContaining([expect.arrayContaining(['Escenario 0'])]),
       })
+    );
+    expect(docMock.text).toHaveBeenCalledWith(
+      '+ Motor: CEE32A 3P+N+G',
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Object)
     );
   });
 
