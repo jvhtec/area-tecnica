@@ -21,7 +21,9 @@ export function useToggleTechnicianPayoutApproval() {
         .from('timesheets')
         .update({ approved_by_manager: approved })
         .eq('job_id', jobId)
-        .eq('technician_id', technicianId);
+        .eq('technician_id', technicianId)
+        // Voided timesheets are excluded from payout math; never carry approval.
+        .eq('is_active', true);
 
       if (error) throw error;
     },
