@@ -164,3 +164,15 @@ For the full production release checklist, use `docs/release/production-release-
 - If architecture/docs diverge from code, align new work with actual code and update docs.
 - `docs/README.md` is a partial index — it covers curated workflow/architecture docs but not the many one-off audit/fix/summary docs at the root of `docs/` or newer subfolders (`staffing/`, `operations/`, `performance/`, `release/`, `data_audit_phase0/`). If a topic isn't in the index, search `docs/` directly before concluding it isn't documented.
 - Repo-wide counts drift fast in this codebase (170+ Supabase migrations, 67 Edge Functions, 150+ hooks as of this writing) — don't trust a stale number from a doc; verify with `ls`/`wc -l` when a count matters for a decision.
+
+## Multi-model delegation policy
+
+Use **Sol** as the default prime/orchestrator and general engineer. Use **Luna** for cheap, mostly read-only repository archaeology, dependency tracing, focused research, and evidence gathering. Do not spawn agents for small, obvious work.
+
+For substantial UI/UX work, prefer **Claude Opus** as a normally read-only UI architect, then **Claude Sonnet** as UI implementer, with **Sol** performing independent integration and verification. Small UI fixes may go directly to Sol or Sonnet. If Opus designed the change, do not use that same pass as the independent reviewer.
+
+**Astra is an escalation model, not a default worker or reviewer.** Reserve it for difficult cross-cutting architecture, stubborn multi-subsystem bugs already isolated by Luna/Sol, or genuinely high-risk correctness review where its added capability is likely to change the outcome. Before escalation, give Astra a compact evidence packet with the objective, constraints, relevant files/architecture, established findings, tests/reproductions, failed approaches, and unresolved questions. Do not pay Astra to rediscover the repository.
+
+Area Tecnica candidates for stronger review include Supabase migrations/RLS/auth/RPC authorization, money/rates/payments/timesheets, personnel assignment/conflict logic, Flex folder synchronization, tour defaults/package propagation, shared PDF infrastructure, and deployment changes that can create false confidence. Increase evidence and tests first, then escalate model cost only if the remaining reasoning problem warrants it.
+
+Preferred routing: routine work **Sol -> Sol verify**; unfamiliar engineering **Luna investigate -> Sol implement -> Sol verify**; substantial UI **Opus architect -> Sonnet implement -> Sol verify**; hard architecture **Luna/Sol gather evidence -> Astra resolve the difficult question -> Sol implement/integrate -> independent verification**. Evidence, tests, and repository behavior outrank model prestige or majority vote.
