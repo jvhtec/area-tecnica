@@ -70,7 +70,15 @@ export const BasicInfoSection = ({
         <Input
           type="date"
           value={formData.date || ""}
-          onChange={(e) => onChange({ date: e.target.value })}
+          onChange={(e) => {
+            const nextDate = e.target.value;
+            onChange({
+              date: nextDate,
+              ...(!formData.soundcheck_date || formData.soundcheck_date === formData.date
+                ? { soundcheck_date: nextDate }
+                : {}),
+            });
+          }}
           disabled={locked("date")}
         />
       </div>
@@ -113,14 +121,28 @@ export const BasicInfoSection = ({
           <Checkbox
             id="soundcheck"
             checked={formData.soundcheck}
-            onCheckedChange={(checked) => onChange({ soundcheck: checked })}
+            onCheckedChange={(checked) => onChange({
+              soundcheck: checked,
+              ...(checked && !formData.soundcheck_date
+                ? { soundcheck_date: formData.date }
+                : {}),
+            })}
             disabled={locked("soundcheck")}
           />
           <Label htmlFor="soundcheck">{tx("Requiere Soundcheck", "Requires Soundcheck")}</Label>
         </div>
 
         {showSoundcheckTimes && formData.soundcheck && (
-          <div className="grid grid-cols-2 gap-4 ml-6">
+          <div className="grid grid-cols-1 gap-4 ml-6 sm:grid-cols-3">
+            <div>
+              <Label>{tx("Fecha del Soundcheck", "Soundcheck Date")}</Label>
+              <Input
+                type="date"
+                value={formData.soundcheck_date || formData.date || ""}
+                onChange={(e) => onChange({ soundcheck_date: e.target.value })}
+                disabled={locked("soundcheck_date")}
+              />
+            </div>
             <div>
               <Label>{tx("Inicio del Soundcheck", "Soundcheck Start")}</Label>
               <Input

@@ -331,6 +331,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         show_start: normalizeTime(asString(artistData.show_start)),
         show_end: normalizeTime(asString(artistData.show_end)),
         soundcheck: asBoolean(artistData.soundcheck),
+        soundcheck_date: asString(artistData.soundcheck_date) || asString(artistData.date),
         soundcheck_start: normalizeTime(asString(artistData.soundcheck_start)),
         soundcheck_end: normalizeTime(asString(artistData.soundcheck_end)),
         line_check: asBoolean(artistData.line_check),

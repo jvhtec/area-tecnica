@@ -23,6 +23,28 @@ describe('festivalPdfSectionBuilders', () => {
     expect(typeof artists[0].technical.monTech).toBe('boolean');
   });
 
+  it('keeps the effective soundcheck date for printed artist tables', () => {
+    const artists = buildArtistTableArtists([
+      {
+        name: 'Previous-day soundcheck',
+        date: '2026-09-10',
+        stage: 1,
+        show_start: '20:00',
+        show_end: '21:00',
+        soundcheck: true,
+        soundcheck_date: '2026-09-09',
+        soundcheck_start: '18:00',
+        soundcheck_end: '19:00',
+      },
+    ]);
+
+    expect(artists[0].soundcheck).toEqual({
+      date: '2026-09-09',
+      start: '18:00',
+      end: '19:00',
+    });
+  });
+
   it('buildInfrastructureArtists normalizes nested infra fields', () => {
     const artists = buildInfrastructureArtists([
       {

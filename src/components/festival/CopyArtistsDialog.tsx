@@ -11,8 +11,12 @@ import { CalendarIcon, Users, Clock, Search, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { rebaseSoundcheckDate } from "@/utils/artistScheduleDates";
 import { queryKeys } from "@/lib/react-query";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
+
+type FestivalArtistInsert = Database["public"]["Tables"]["festival_artists"]["Insert"];
 
 interface Festival {
   id: string;
@@ -265,6 +269,7 @@ export const CopyArtistsDialog = ({
       // Prepare artists data for copying
       const artistsToCopy = artistsData?.map(artist => {
         const { id, created_at, updated_at, ...artistData } = artist;
+        const scheduleData = artistData as typeof artistData & { soundcheck_date?: string | null };
 
         return {
           ...artistData,
@@ -281,6 +286,13 @@ export const CopyArtistsDialog = ({
           show_end: copyOptions.resetTimes ? null : artistData.show_end,
           soundcheck_start: copyOptions.resetTimes ? null : artistData.soundcheck_start,
           soundcheck_end: copyOptions.resetTimes ? null : artistData.soundcheck_end,
+          soundcheck_date: copyOptions.resetTimes
+            ? null
+            : rebaseSoundcheckDate({
+                soundcheckDate: scheduleData.soundcheck_date,
+                sourceShowDate: artistData.date,
+                targetShowDate: targetDate,
+              }),
           line_check_start: copyOptions.resetTimes ? null : artistData.line_check_start,
           line_check_end: copyOptions.resetTimes ? null : artistData.line_check_end,
           load_in_time: copyOptions.resetTimes ? null : artistData.load_in_time,
@@ -313,7 +325,10 @@ export const CopyArtistsDialog = ({
 
       // Insert copied artists
       const { error: insertError } = await dataLayerClient.from("festival_artists")
-        .insert(artistsToCopy);
+        // The additive migration is intentionally not hand-applied to the
+        // generated schema file; this compatibility cast can disappear after
+        // types are regenerated from a database containing soundcheck_date.
+        .insert(artistsToCopy as unknown as FestivalArtistInsert[]);
 
       if (insertError) throw insertError;
 

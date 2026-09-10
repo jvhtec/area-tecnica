@@ -47,22 +47,28 @@ describe("useArtistMutations", () => {
       wrapper: createWrapper(),
     });
 
-    act(() => {
-      result.current.createArtist({
+    const artist = {
         name: "Main Act",
+        date: "2026-06-29",
         show_start: "",
         show_end: "23:00",
         soundcheck_start: "",
-      });
+        soundcheck_date: "2026-06-29",
+      } as Parameters<typeof result.current.createArtist>[0] & { soundcheck_date: string };
+
+    act(() => {
+      result.current.createArtist(artist);
     });
 
     await waitFor(() => {
       expect(insertBuilder.insert).toHaveBeenCalledWith([
         {
           name: "Main Act",
+          date: "2026-06-29",
           show_start: null,
           show_end: "23:00",
           soundcheck_start: null,
+          soundcheck_date: null,
           job_id: "job-1",
         },
       ]);

@@ -328,6 +328,7 @@ function buildFormData(artist: Artist) {
     show_start: artist.show_start || "",
     show_end: artist.show_end || "",
     soundcheck: artist.soundcheck || false,
+    soundcheck_date: artist.soundcheck_date || artist.date || "",
     soundcheck_start: artist.soundcheck_start || "",
     soundcheck_end: artist.soundcheck_end || "",
     foh_console: artist.foh_console || "",

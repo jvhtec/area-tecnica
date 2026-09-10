@@ -80,7 +80,7 @@ export interface ArtistPdfData {
   schedule: {
     loadIn?: string;
     show: { start: string; end: string };
-    soundcheck?: { start: string; end: string };
+    soundcheck?: { date?: string; start: string; end: string };
     lineCheck?: { start: string; end: string };
   };
   technical: ArtistTechnicalInfo;

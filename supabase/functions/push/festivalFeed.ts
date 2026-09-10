@@ -6,6 +6,7 @@ import type { PushPayload } from "./types.ts";
 import {
   buildAssignedStagesByUserJob,
   buildAssignedUsersByShift,
+  buildFestivalArtistDateRangeFilter,
   buildFestivalFeedArtistEvents,
   buildFestivalFeedPayload,
   buildFestivalFeedShiftEvents,
@@ -100,11 +101,12 @@ const loadFestivalFeedData = async (
     client
       .from("festival_artists")
       .select(
-        "id, job_id, name, date, stage, show_start, soundcheck, soundcheck_start, line_check, line_check_start, timezone, isaftermidnight",
+        "id, job_id, name, date, stage, show_start, soundcheck, soundcheck_date, soundcheck_start, line_check, line_check_start, timezone, isaftermidnight",
       )
       .in("job_id", jobIds)
-      .gte("date", start)
-      .lte("date", end)
+      // A setup-day soundcheck may sit outside the nearby show-date window.
+      // Select by either event date so its reminder is still generated.
+      .or(buildFestivalArtistDateRangeFilter(start, end))
       .returns<FestivalFeedArtist[]>(),
     client
       .from("festival_shifts")

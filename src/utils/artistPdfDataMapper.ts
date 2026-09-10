@@ -12,6 +12,7 @@ interface ArtistPdfSource {
   show_start: string;
   show_end: string;
   soundcheck: boolean;
+  soundcheck_date?: string | null;
   soundcheck_start?: string;
   soundcheck_end?: string;
   line_check?: boolean;
@@ -96,7 +97,11 @@ export const buildArtistPdfData = async (artist: ArtistPdfSource, jobId?: string
     schedule: {
       loadIn: artist.load_in_time || undefined,
       show: { start: artist.show_start, end: artist.show_end },
-      soundcheck: artist.soundcheck ? { start: artist.soundcheck_start || "", end: artist.soundcheck_end || "" } : undefined,
+      soundcheck: artist.soundcheck ? {
+        date: artist.soundcheck_date || artist.date,
+        start: artist.soundcheck_start || "",
+        end: artist.soundcheck_end || "",
+      } : undefined,
       lineCheck: artist.line_check ? { start: artist.line_check_start || "", end: artist.line_check_end || "" } : undefined,
     },
     technical: {

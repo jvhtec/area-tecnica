@@ -21,6 +21,7 @@ export type FestivalFeedArtist = {
   stage: number | null;
   show_start: string | null;
   soundcheck: boolean | null;
+  soundcheck_date?: string | null;
   soundcheck_start: string | null;
   line_check: boolean | null;
   line_check_start: string | null;
@@ -175,6 +176,13 @@ export const addDaysToDateKey = (dateKey: string, days: number): string => {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 };
 
+/** Builds the PostgREST filter for show dates or independently scheduled soundchecks. */
+export const buildFestivalArtistDateRangeFilter = (start: string, end: string): string =>
+  [
+    `and(date.gte.${start},date.lte.${end})`,
+    `and(soundcheck_date.gte.${start},soundcheck_date.lte.${end})`,
+  ].join(",");
+
 const subtractMinutes = (date: Date, minutes: number): Date =>
   new Date(date.getTime() - minutes * 60 * 1000);
 
@@ -206,6 +214,9 @@ const getArtistMomentDateKey = (
   source: ArtistMomentConfig["source"],
 ): string | null => {
   if (!artist.date) return null;
+  if (source === "soundcheck" && artist.soundcheck_date) {
+    return artist.soundcheck_date;
+  }
   if ((source === "linecheck" || source === "show") && artist.isaftermidnight) {
     return addDaysToDateKey(artist.date, 1);
   }

@@ -1,4 +1,6 @@
 
+import { getEffectiveSoundcheckDate } from '@/utils/artistScheduleDates';
+
 interface Artist {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ interface Artist {
   show_start: string;
   show_end: string;
   soundcheck_start?: string;
+  soundcheck_date?: string | null;
   line_check_start?: string;
   load_in_time?: string;
   isaftermidnight?: boolean;
@@ -89,6 +92,14 @@ export const sortArtistsByField = (artists: Artist[], field: Exclude<ArtistSortF
     if (aTime === null && bTime === null) return (a.name || '').localeCompare(b.name || '');
     if (aTime === null) return 1;
     if (bTime === null) return -1;
+
+    if (field === 'soundcheck_start') {
+      const aDate = getEffectiveSoundcheckDate(a);
+      const bDate = getEffectiveSoundcheckDate(b);
+
+      if (aDate < bDate) return -1;
+      if (aDate > bDate) return 1;
+    }
 
     if (aTime < bTime) return -1;
     if (aTime > bTime) return 1;
