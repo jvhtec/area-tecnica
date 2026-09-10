@@ -23,10 +23,12 @@ describe('rfIemTablePdfExport helpers', () => {
     const row = buildRfIemTableRow({
       name: 'Artist A',
       stage: 2,
+      date: '2026-03-10',
       showStart: '20:00',
       showEnd: '21:00',
       soundcheckStart: '18:00',
       soundcheckEnd: '18:30',
+      soundcheckDate: '2026-03-09',
       wirelessSystems: [
         {
           model: 'Shure QLX Series',
@@ -50,7 +52,7 @@ describe('rfIemTablePdfExport helpers', () => {
 
     expect(row[0]).toBe('Artist A');
     expect(String(row[2])).toContain('Show: 20:00 - 21:00');
-    expect(String(row[2])).toContain('SC: 18:00 - 18:30');
+    expect(String(row[2])).toContain('SC 09/03: 18:00 - 18:30');
     expect(row[6]).toBe(4);
     expect(row[5]).toContain('G51 (470-534 MHz)');
     expect(row[11]).toContain('K3E (606-630 MHz)');

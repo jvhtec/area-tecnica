@@ -10,7 +10,7 @@ Main row per artist/date/stage with technical request fields.
 
 Representative field groups:
 
-- Identity/scheduling: `name`, `job_id`, `date`, `stage`, `show_start`, `show_end`, `soundcheck_*`.
+- Identity/scheduling: `name`, `job_id`, `date`, `stage`, `show_start`, `show_end`, `soundcheck_*`. `soundcheck_date` is an optional override for setup-day soundchecks; `NULL` means the artist's show date.
 - Console and monitoring: `foh_console`, `mon_console`, `monitors_enabled`, `monitors_quantity`.
 - RF/IEM/mics: `wireless_systems`, `iem_systems`, `wired_mics`, `mic_kit`.
 - Infrastructure: `infra_cat6_*`, `infra_hma_*`, `infra_coax_*`, `infra_opticalcon_duo_*`, `infra_analog`.

@@ -15,6 +15,7 @@ export interface Artist {
   show_start: string;
   show_end: string;
   soundcheck: boolean;
+  soundcheck_date?: string | null;
   soundcheck_start?: string;
   soundcheck_end?: string;
   line_check?: boolean;

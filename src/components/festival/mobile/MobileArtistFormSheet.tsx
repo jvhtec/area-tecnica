@@ -72,6 +72,7 @@ function buildFormData(artistData?: any, selectedDate?: string) {
     show_start: artistData?.show_start || "20:00",
     show_end: artistData?.show_end || "21:00",
     soundcheck: artistData?.soundcheck || false,
+    soundcheck_date: artistData?.soundcheck_date || artistData?.date || selectedDate || "",
     soundcheck_start: artistData?.soundcheck_start || "18:00",
     soundcheck_end: artistData?.soundcheck_end || "19:00",
     line_check: artistData?.line_check || false,

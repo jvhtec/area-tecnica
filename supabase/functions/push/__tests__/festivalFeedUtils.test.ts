@@ -24,6 +24,7 @@ const artistBase: FestivalFeedArtist = {
   stage: 2,
   show_start: "22:00:00",
   soundcheck: true,
+  soundcheck_date: null,
   soundcheck_start: "18:00:00",
   line_check: true,
   line_check_start: "21:30:00",
@@ -107,6 +108,22 @@ describe("festival feed event generation", () => {
       .toBe("2026-07-03T22:45:00.000Z");
     expect(events.find((event) => event.eventKind === "show_now")?.urlDate)
       .toBe("2026-07-03");
+  });
+
+  it("schedules soundcheck reminders on an explicit previous setup day", () => {
+    const events = buildFestivalFeedArtistEvents([
+      {
+        ...artistBase,
+        soundcheck_date: "2026-07-02",
+      },
+    ]);
+
+    expect(events.find((event) => event.eventKind === "soundcheck_now")).toMatchObject({
+      date: "2026-07-02",
+      urlDate: "2026-07-03",
+    });
+    expect(events.find((event) => event.eventKind === "soundcheck_now")?.dueAt.toISOString())
+      .toBe("2026-07-02T16:00:00.000Z");
   });
 
   it("builds shift start/end/ended moments across midnight", () => {

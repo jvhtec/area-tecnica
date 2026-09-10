@@ -68,6 +68,7 @@ export interface ArtistFormData {
   readonly show_start: string;
   readonly show_end: string;
   readonly soundcheck: boolean;
+  readonly soundcheck_date?: string;
   readonly soundcheck_start?: string;
   readonly soundcheck_end?: string;
   readonly line_check: boolean;

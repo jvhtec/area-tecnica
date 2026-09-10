@@ -37,6 +37,7 @@ import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPres
 import { ArtistActionButtons } from "./ArtistActionButtons";
 import { buildArtistPdfData } from "@/utils/artistPdfDataMapper";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
+import { formatDifferentScheduleDate, getEffectiveSoundcheckDate } from "@/utils/artistScheduleDates";
 
 import type { Artist, ArtistTableProps } from "@/components/festival/artistTableTypes";
 import { useArtistStagePlots } from "@/hooks/festival/useArtistStagePlots";
@@ -421,7 +422,8 @@ export const ArtistTable = ({
                           )}
                           <div className="font-medium">Show: {formatTimeRange(artist.show_start, artist.show_end)}</div>
                           {artist.soundcheck && (
-                            <div className="text-muted-foreground">SC: {formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)}</div>
+                            <div className="text-muted-foreground">SC: {[formatDifferentScheduleDate(getEffectiveSoundcheckDate(artist), artist.date),
+                              formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)].filter(Boolean).join(" · ")}</div>
                           )}
                           {artist.line_check && (
                             <div className="text-muted-foreground">LC: {formatTimeRange(artist.line_check_start, artist.line_check_end)}</div>

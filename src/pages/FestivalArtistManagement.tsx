@@ -429,6 +429,7 @@ const FestivalArtistManagement = () => {
             end: artist.show_end
           },
           soundcheck: artist.soundcheck ? {
+            date: artist.soundcheck_date || artist.date,
             start: artist.soundcheck_start ?? '',
             end: artist.soundcheck_end ?? ''
           } : undefined,
@@ -579,6 +580,7 @@ const FestivalArtistManagement = () => {
           show_end: artist.show_end,
           soundcheck_start: artist.soundcheck_start,
           soundcheck_end: artist.soundcheck_end,
+          soundcheck_date: (artist as typeof artist & { soundcheck_date?: string | null }).soundcheck_date,
           soundcheck: artist.soundcheck, line_check: artist.line_check,
           line_check_start: artist.line_check_start,
           line_check_end: artist.line_check_end,

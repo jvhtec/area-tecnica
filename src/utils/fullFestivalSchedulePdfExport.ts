@@ -13,6 +13,7 @@ import {
   loadFestivalIssuerMark,
 } from '@/utils/pdf/festival-report';
 import { loadImageWithTimeout } from '@/utils/pdf/shared/pdfExportShared';
+import { formatDifferentScheduleDate } from '@/utils/artistScheduleDates';
 
 // Artist data interface for full schedule export
 export interface FullScheduleArtist {
@@ -24,6 +25,7 @@ export interface FullScheduleArtist {
   show_end: string;
   soundcheck_start?: string;
   soundcheck_end?: string;
+  soundcheck_date?: string | null;
   soundcheck: boolean;
   line_check?: boolean;
   line_check_start?: string;
@@ -118,7 +120,12 @@ export const exportFullFestivalSchedulePDF = async (
       stageName(artist.stage),
       artist.load_in_time || '—',
       timeWindow(artist.show_start, artist.show_end),
-      timeWindow(artist.soundcheck_start, artist.soundcheck_end, artist.soundcheck),
+      artist.soundcheck
+        ? [
+            formatDifferentScheduleDate(artist.soundcheck_date || artist.date, artist.date),
+            timeWindow(artist.soundcheck_start, artist.soundcheck_end),
+          ].filter(Boolean).join(' · ')
+        : '—',
       timeWindow(artist.line_check_start, artist.line_check_end, artist.line_check),
     ]);
 

@@ -104,6 +104,7 @@ export const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistF
   show_start: "",
   show_end: "",
   soundcheck: false,
+  soundcheck_date: blankDate,
   soundcheck_start: "",
   soundcheck_end: "",
   line_check: false,

@@ -25,13 +25,14 @@ type ArtistTimeField =
   | "foh_drive"
   | "foh_drive_position"
   | "mon_position";
+type ArtistNullableScheduleField = ArtistTimeField | "soundcheck_date";
 type ArtistTimePayload = (FestivalArtistInsert | FestivalArtistUpdate) &
-  Partial<Record<ArtistTimeField, string | null>>;
+  Partial<Record<ArtistNullableScheduleField, string | null>>;
 
 // Time fields and nullable-enum fields (foh_drive, foh_drive_position,
 // mon_position) both need '' converted to null: the DB check constraints on
 // the enum fields reject an empty string as an invalid value.
-const artistTimeFields: ArtistTimeField[] = [
+const artistNullableScheduleFields: ArtistNullableScheduleField[] = [
   "show_start",
   "show_end",
   "soundcheck_start",
@@ -42,17 +43,24 @@ const artistTimeFields: ArtistTimeField[] = [
   "foh_drive",
   "foh_drive_position",
   "mon_position",
+  "soundcheck_date",
 ];
 
 // Helper function to format artist time data
 const formatArtistTimeData = <T extends ArtistTimePayload>(artistData: T): T => {
   const formattedData = { ...artistData };
 
-  artistTimeFields.forEach(field => {
+  artistNullableScheduleFields.forEach(field => {
     if (formattedData[field] === '') {
       formattedData[field] = null;
     }
   });
+
+  // Same-day is the legacy/default state. Persist only a real override so a
+  // later show-date edit can continue to move an ordinary soundcheck with it.
+  if (formattedData.soundcheck_date && formattedData.soundcheck_date === formattedData.date) {
+    formattedData.soundcheck_date = null;
+  }
   return formattedData;
 };
 

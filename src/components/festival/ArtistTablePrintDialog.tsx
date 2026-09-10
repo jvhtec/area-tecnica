@@ -211,6 +211,7 @@ export const ArtistTablePrintDialog = ({
             end: artist.show_end
           },
           soundcheck: artist.soundcheck ? {
+            date: artist.soundcheck_date || artist.date,
             start: artist.soundcheck_start || '',
             end: artist.soundcheck_end || ''
           } : undefined,

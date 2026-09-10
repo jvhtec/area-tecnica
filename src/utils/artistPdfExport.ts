@@ -121,7 +121,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
   ], yPosition);
 
 
-  yPosition = drawArtistScheduleSection(doc, geo, data.schedule, yPosition, language, templateMode);
+  yPosition = drawArtistScheduleSection(doc, geo, data.schedule, yPosition, language, templateMode, 1, data.date);
 
   if (templateMode && data.festivalOptions) {
     const checklistRows = buildFestivalOptionChecklistRows(data.festivalOptions, tx, checklist);

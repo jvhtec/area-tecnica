@@ -21,6 +21,7 @@ export type FestivalFeedArtist = {
   stage: number | null;
   show_start: string | null;
   soundcheck: boolean | null;
+  soundcheck_date?: string | null;
   soundcheck_start: string | null;
   line_check: boolean | null;
   line_check_start: string | null;
@@ -206,6 +207,9 @@ const getArtistMomentDateKey = (
   source: ArtistMomentConfig["source"],
 ): string | null => {
   if (!artist.date) return null;
+  if (source === "soundcheck" && artist.soundcheck_date) {
+    return artist.soundcheck_date;
+  }
   if ((source === "linecheck" || source === "show") && artist.isaftermidnight) {
     return addDaysToDateKey(artist.date, 1);
   }

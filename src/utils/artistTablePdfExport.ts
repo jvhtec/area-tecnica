@@ -33,6 +33,7 @@ import {
   type FestivalGeometry,
   type TimelineFinding,
 } from '@/utils/pdf/festival-report';
+import { formatDifferentScheduleDate } from '@/utils/artistScheduleDates';
 
 export interface ArtistTablePdfData {
   jobTitle: string;
@@ -44,7 +45,7 @@ export interface ArtistTablePdfData {
     stage: number;
     loadInTime?: string;
     showTime: { start: string; end: string };
-    soundcheck?: { start: string; end: string };
+    soundcheck?: { date?: string; start: string; end: string };
     lineCheck?: { start: string; end: string };
     technical: {
       fohTech: boolean;
@@ -122,8 +123,14 @@ const formatConsoleSection = (technical: ArtistTablePdfData['artists'][number]['
   return lines.join('\n');
 };
 
-const formatTimeRange = (range?: { start: string; end: string }): string =>
-  range && (range.start || range.end) ? `${range.start || '—'} – ${range.end || '—'}` : '—';
+const formatTimeRange = (
+  range?: { date?: string; start: string; end: string },
+  referenceDate?: string,
+): string => {
+  if (!range || (!range.start && !range.end)) return '—';
+  const dateLabel = formatDifferentScheduleDate(range.date, referenceDate);
+  return [dateLabel, `${range.start || '—'} – ${range.end || '—'}`].filter(Boolean).join(' · ');
+};
 
 const formatMismatches = (mismatches: GearMismatch[] = []): string => {
   if (mismatches.length === 0) return 'Correcto';
@@ -244,7 +251,11 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     let remaining = data.artists.map((artist) => ({
       name: artist.name,
       show: artist.showTime,
-      soundcheck: artist.soundcheck,
+      // A setup-day soundcheck is listed with its date in the table below,
+      // but it does not belong on this show day's 07:00 -> 07:00 timeline.
+      soundcheck: !artist.soundcheck?.date || artist.soundcheck.date === data.date
+        ? artist.soundcheck
+        : undefined,
     }));
     const findings: TimelineFinding[] = [];
     const skipped: string[] = [];
@@ -293,7 +304,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     artist.name,
     artist.loadInTime || '—',
     `${artist.showTime.start || '—'} – ${artist.showTime.end || '—'}`,
-    formatTimeRange(artist.soundcheck),
+    formatTimeRange(artist.soundcheck, data.date),
     formatTimeRange(artist.lineCheck),
     formatConsoleSection(artist.technical),
     stripProviderTokens(

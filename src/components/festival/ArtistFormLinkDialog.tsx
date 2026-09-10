@@ -188,12 +188,13 @@ export const ArtistFormLinkDialog = ({
     }
 
     const { data: artistData, error: artistError } = await dataLayerClient.from("festival_artists")
-      .select("name, stage, date, load_in_time, show_start, show_end, soundcheck, soundcheck_start, soundcheck_end, line_check, line_check_start, line_check_end")
+      .select("*")
       .eq("id", artistId)
       .maybeSingle();
 
     if (artistError) throw artistError;
 
+    const artistScheduleData = artistData as (typeof artistData & { soundcheck_date?: string | null }) | null;
     const templateDate = artistData?.date || selectedDate || new Date().toISOString().slice(0, 10);
     const templateName = artistData?.name || artistName || "Artista";
     const templateStage = typeof artistData?.stage === "number" ? artistData.stage : 1;
@@ -241,6 +242,7 @@ export const ArtistFormLinkDialog = ({
         },
         soundcheck: artistData?.soundcheck
           ? {
+              date: artistScheduleData?.soundcheck_date || templateDate,
               start: artistData?.soundcheck_start || "",
               end: artistData?.soundcheck_end || "",
             }

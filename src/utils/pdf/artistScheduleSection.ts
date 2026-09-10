@@ -7,11 +7,12 @@ import {
   setFestivalText,
   type FestivalGeometry,
 } from "@/utils/pdf/festival-report";
+import { formatDifferentScheduleDate } from "@/utils/artistScheduleDates";
 
 interface ArtistSchedule {
   loadIn?: string;
   show: { start: string; end: string };
-  soundcheck?: { start: string; end: string };
+  soundcheck?: { date?: string; start: string; end: string };
   lineCheck?: { start: string; end: string };
 }
 
@@ -28,6 +29,7 @@ export const drawArtistScheduleSection = (
   language: "es" | "en",
   templateMode = false,
   sectionNumber = 1,
+  showDate?: string,
 ): number => {
   const { mm } = geo;
   const tx = (es: string, en: string) => (language === "en" ? en : es);
@@ -41,7 +43,14 @@ export const drawArtistScheduleSection = (
     rows.push([tx("Carga", "Load in"), schedule.loadIn || blank]);
   }
   if (templateMode || schedule.soundcheck) {
-    rows.push([tx("Prueba de sonido", "Soundcheck"), range(schedule.soundcheck)]);
+    const dateLabel = formatDifferentScheduleDate(schedule.soundcheck?.date, showDate, {
+      language,
+      includeYear: true,
+    });
+    rows.push([
+      tx("Prueba de sonido", "Soundcheck"),
+      [dateLabel, range(schedule.soundcheck)].filter(Boolean).join(" · "),
+    ]);
   }
   if (templateMode || schedule.lineCheck) {
     rows.push([tx("Line check", "Line check"), range(schedule.lineCheck)]);

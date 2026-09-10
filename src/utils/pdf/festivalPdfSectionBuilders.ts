@@ -153,6 +153,7 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
       },
       soundcheck: artist.soundcheck_start
         ? {
+            date: toStringValue(artist.soundcheck_date || artist.date),
             start: toStringValue(artist.soundcheck_start),
             end: toStringValue(artist.soundcheck_end),
           }
@@ -248,6 +249,7 @@ export const buildRfIemArtists = (artists: Record<string, unknown>[] = []): Arti
       showEnd: toStringValue(artist.show_end || artist.showEnd),
       soundcheckStart: toStringValue(artist.soundcheck_start || artist.soundcheckStart),
       soundcheckEnd: toStringValue(artist.soundcheck_end || artist.soundcheckEnd),
+      soundcheckDate: toStringValue(artist.soundcheck_date || artist.soundcheckDate || artist.date),
       lineCheckStart: toStringValue(artist.line_check_start || artist.lineCheckStart),
       lineCheckEnd: toStringValue(artist.line_check_end || artist.lineCheckEnd),
     };

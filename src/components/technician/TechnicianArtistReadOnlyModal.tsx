@@ -54,6 +54,7 @@ type ReadOnlyArtist = {
   show_start: string;
   show_end: string;
   soundcheck: boolean;
+  soundcheck_date?: string | null;
   soundcheck_start?: string | null;
   soundcheck_end?: string | null;
   line_check?: boolean | null;
@@ -145,6 +146,7 @@ const mapRawToReadOnlyArtist = (artist: FestivalArtistRow): ReadOnlyArtist => ({
   show_start: artist.show_start || "",
   show_end: artist.show_end || "",
   soundcheck: Boolean(artist.soundcheck),
+  soundcheck_date: (artist as FestivalArtistRow & { soundcheck_date?: string | null }).soundcheck_date,
   foh_console: artist.foh_console || null,
   mon_console: artist.mon_console || null,
   foh_waves_models: asArray(artist.foh_waves_models),
@@ -170,6 +172,7 @@ const normalizeReadOnlyArtistForMobile = (artist: ReadOnlyArtist): Artist => ({
   show_start: artist.show_start,
   show_end: artist.show_end,
   soundcheck: artist.soundcheck,
+  soundcheck_date: artist.soundcheck_date,
   soundcheck_start: artist.soundcheck_start ?? undefined,
   soundcheck_end: artist.soundcheck_end ?? undefined,
   line_check: artist.line_check ?? undefined,

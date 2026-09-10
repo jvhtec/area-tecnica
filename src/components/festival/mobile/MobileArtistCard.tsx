@@ -19,6 +19,7 @@ import {
 } from "@/constants/consoleDrive";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 import type { Artist } from "@/components/festival/artistTableTypes";
+import { formatDifferentScheduleDate, getEffectiveSoundcheckDate } from "@/utils/artistScheduleDates";
 
 // --- Summary Formatters ---
 
@@ -284,7 +285,10 @@ export const MobileArtistCard = ({
           </div>
           {artist.soundcheck && (
             <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
-              <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Soundcheck</div>
+              <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">
+                {["Soundcheck", formatDifferentScheduleDate(getEffectiveSoundcheckDate(artist), artist.date)]
+                  .filter(Boolean).join(" · ")}
+              </div>
               <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)}</div>
             </div>
           )}

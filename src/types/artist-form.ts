@@ -13,6 +13,7 @@ export interface ArtistSectionProps {
     show_start: string;
     show_end: string;
     soundcheck: boolean;
+    soundcheck_date?: string;
     soundcheck_start?: string;
     soundcheck_end?: string;
     line_check: boolean;
