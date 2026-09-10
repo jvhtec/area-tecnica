@@ -28,11 +28,13 @@ const parseIsoDateUtc = (value?: string | null): number | null => {
   return timestamp;
 };
 
+/** Resolves the explicit soundcheck date, falling back to the artist show date. */
 export const getEffectiveSoundcheckDate = ({
   date,
   soundcheck_date,
 }: ArtistSoundcheckDateSource): string => soundcheck_date || date || "";
 
+/** Formats an ISO calendar date for compact schedule displays and printouts. */
 export const formatScheduleDate = (
   value?: string | null,
   options: { language?: "es" | "en"; includeYear?: boolean } = {},
@@ -46,6 +48,7 @@ export const formatScheduleDate = (
   return options.includeYear ? `${day}/${month}/${year}` : `${day}/${month}`;
 };
 
+/** Returns a formatted event date only when it differs from the reference date. */
 export const formatDifferentScheduleDate = (
   eventDate?: string | null,
   referenceDate?: string | null,
@@ -55,6 +58,7 @@ export const formatDifferentScheduleDate = (
   return formatScheduleDate(eventDate, options);
 };
 
+/** Preserves a soundcheck's relative day offset when copying an artist schedule. */
 export const rebaseSoundcheckDate = ({
   soundcheckDate,
   sourceShowDate,

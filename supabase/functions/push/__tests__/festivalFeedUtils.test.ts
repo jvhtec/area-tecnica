@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAssignedStagesByUserJob,
   buildAssignedUsersByShift,
+  buildFestivalArtistDateRangeFilter,
   buildFestivalFeedArtistEvents,
   buildFestivalFeedPayload,
   buildFestivalFeedShiftEvents,
@@ -33,6 +34,13 @@ const artistBase: FestivalFeedArtist = {
 };
 
 describe("festival feed event generation", () => {
+  it("loads artists whose show or explicit soundcheck date is in range", () => {
+    expect(buildFestivalArtistDateRangeFilter("2026-07-02", "2026-07-04")).toBe(
+      "and(date.gte.2026-07-02,date.lte.2026-07-04)," +
+        "and(soundcheck_date.gte.2026-07-02,soundcheck_date.lte.2026-07-04)",
+    );
+  });
+
   it("builds soundcheck, line check, and show artist moments with Spanish copy", () => {
     const stageNames = new Map([["job-1:2", "Escenario Norte"]]);
     const events = buildFestivalFeedArtistEvents([artistBase], stageNames);

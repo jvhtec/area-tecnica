@@ -24,7 +24,7 @@ export interface Artist {
   stage: number;
   date: string;
   profile_complete: boolean;
-  soundcheck_date?: string;
+  soundcheck_date?: string | null;
   soundcheck_start?: string;
   soundcheck_end?: string;
   show_start: string;

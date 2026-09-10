@@ -176,6 +176,13 @@ export const addDaysToDateKey = (dateKey: string, days: number): string => {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 };
 
+/** Builds the PostgREST filter for show dates or independently scheduled soundchecks. */
+export const buildFestivalArtistDateRangeFilter = (start: string, end: string): string =>
+  [
+    `and(date.gte.${start},date.lte.${end})`,
+    `and(soundcheck_date.gte.${start},soundcheck_date.lte.${end})`,
+  ].join(",");
+
 const subtractMinutes = (date: Date, minutes: number): Date =>
   new Date(date.getTime() - minutes * 60 * 1000);
 
