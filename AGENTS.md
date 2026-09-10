@@ -167,7 +167,7 @@ For the full production release checklist, use `docs/release/production-release-
 
 ## Multi-model delegation policy
 
-Use **Sol** as the default prime/orchestrator and general engineer. Use **Luna** for cheap, mostly read-only repository archaeology, dependency tracing, focused research, and evidence gathering. Do not spawn agents for small, obvious work.
+When the configured Codex/OpenCodex model roster exposes these models, use **Sol** as the preferred default prime/orchestrator and general engineer and **Luna** for cheap, mostly read-only repository archaeology, dependency tracing, focused research, and evidence gathering. If a named model is unavailable, preserve the role and use the closest capable configured model instead. Do not spawn agents for small, obvious work.
 
 For substantial UI/UX work, prefer **Claude Opus** as a normally read-only UI architect, then **Claude Sonnet** as UI implementer, with **Sol** performing independent integration and verification. Small UI fixes may go directly to Sol or Sonnet. If Opus designed the change, do not use that same pass as the independent reviewer.
 
