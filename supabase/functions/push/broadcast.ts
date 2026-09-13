@@ -212,6 +212,12 @@ export async function handleBroadcast(
     participants,
   });
 
+  // Family handlers may refine the destination after the initial URL is built.
+  // Validate the final value so a caller-supplied override cannot bypass the
+  // internal-only navigation boundary.
+  state.url = validateInternalUrl(state.url)
+    || resolveNotificationUrl(type, jobId, tourId, jobType);
+
   if (type === 'job.assignment.confirmed' || type === 'job.assignment.direct') {
     if (!body.recipient_id || body.recipient_id !== userId) {
       recipients.delete(userId);

@@ -41,8 +41,8 @@ export async function handleSubscribe(
       auth: body.subscription.keys?.auth ?? null,
     },
     {
-      title: "Push notifications ready",
-      body: "You'll now receive updates from Sector Pro.",
+      title: "Notificaciones listas",
+      body: "Ya puedes recibir avisos de Sector Pro.",
       url: "/",
       type: "welcome",
     },

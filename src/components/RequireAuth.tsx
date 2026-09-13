@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 interface RequireAuthProps {
@@ -9,6 +9,7 @@ interface RequireAuthProps {
 
 export const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
   const { session, isLoading } = useOptimizedAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -19,8 +20,8 @@ export const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
   }
 
   if (!session) {
-    // Redirect to login if not authenticated
-    return <Navigate to="/auth" replace />;
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to={`/auth?returnTo=${encodeURIComponent(returnTo)}`} replace />;
   }
 
   // If authenticated, render children

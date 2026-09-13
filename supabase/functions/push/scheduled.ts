@@ -6,6 +6,7 @@ import { sendPushNotification } from "./webpush.ts";
 import { handleFestivalFeedTick } from "./festivalFeed.ts";
 import { handleProgramaFeedTick } from "./programaFeed.ts";
 import { pushTargetFingerprint } from "./targetId.ts";
+import { isScheduleDue } from "./schedulePolicy.ts";
 import type {
   CheckScheduledBody,
   NativePushTokenRow,
@@ -511,6 +512,11 @@ async function checkAndGetScheduleConfig(
   const timezone = config.timezone || 'Europe/Madrid';
   const now = new Date();
 
+  if (!isScheduleDue(config, now)) {
+    console.log(`⏰ Fuera del minuto programado para ${config.schedule_time} (${timezone})`);
+    return { shouldSend: false, config };
+  }
+
   // Convert to target timezone using Intl API
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
@@ -528,64 +534,6 @@ async function checkAndGetScheduleConfig(
   const currentHour = parseInt(hourPart?.value || '0');
   const currentMinute = parseInt(minutePart?.value || '0');
   const currentWeekday = weekdayPart?.value;
-
-  // Map weekday to number (1=Monday, 7=Sunday)
-  const weekdayMap: Record<string, number> = {
-    'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7
-  };
-  const currentDayNum = weekdayMap[currentWeekday || ''] || 1;
-
-  // Parse schedule time (HH:MM:SS)
-  const [scheduleHour, scheduleMinute] = config.schedule_time.split(':').map((s: string) => parseInt(s));
-
-  // Check if current day is in allowed days
-  const daysOfWeek = config.days_of_week || [1, 2, 3, 4, 5];
-  if (!daysOfWeek.includes(currentDayNum)) {
-    console.log(`📅 Not scheduled for this day: ${currentWeekday} (${currentDayNum}), allowed: ${daysOfWeek}`);
-    return { shouldSend: false, config };
-  }
-
-  // Check if current hour matches schedule hour
-  if (currentHour !== scheduleHour) {
-    console.log(`⏰ Not scheduled time: ${currentHour}:${currentMinute}, scheduled: ${scheduleHour}:${scheduleMinute}`);
-    return { shouldSend: false, config };
-  }
-
-  // Check if already sent this hour (to avoid duplicate sends)
-  if (config.last_sent_at) {
-    const lastSent = new Date(config.last_sent_at);
-    const lastSentFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      hour12: false,
-    });
-
-    const lastSentParts = lastSentFormatter.formatToParts(lastSent);
-    const lastSentYear = lastSentParts.find(p => p.type === 'year')?.value;
-    const lastSentMonth = lastSentParts.find(p => p.type === 'month')?.value;
-    const lastSentDay = lastSentParts.find(p => p.type === 'day')?.value;
-    const lastSentHour = parseInt(lastSentParts.find(p => p.type === 'hour')?.value || '0');
-
-    const nowParts = formatter.formatToParts(now);
-    const nowFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const nowDateParts = nowFormatter.formatToParts(now);
-    const nowYear = nowDateParts.find(p => p.type === 'year')?.value;
-    const nowMonth = nowDateParts.find(p => p.type === 'month')?.value;
-    const nowDay = nowDateParts.find(p => p.type === 'day')?.value;
-
-    if (lastSentYear === nowYear && lastSentMonth === nowMonth && lastSentDay === nowDay && lastSentHour === currentHour) {
-      console.log(`✅ Already sent this hour: ${config.last_sent_at}`);
-      return { shouldSend: false, config };
-    }
-  }
 
   console.log(`✅ Time check passed! Sending at ${currentHour}:${currentMinute} on ${currentWeekday}`);
   return { shouldSend: true, config };

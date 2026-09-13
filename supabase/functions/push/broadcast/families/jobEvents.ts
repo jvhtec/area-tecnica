@@ -93,7 +93,7 @@ export async function handleJobEvents(context: BroadcastEventContext): Promise<B
   if (type.startsWith('jobdate.type.changed')) {
     const message = buildJobDateTypeChangedMessage(type, actor, jobTitle, body);
     setBroadcastMessage(state, message.title, message.text);
-    state.url = body.url || (jobId ? `/jobs/${jobId}` : state.url);
+    state.url = body.url || (jobId ? `/festival-management/${jobId}?singleJob=true` : state.url);
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
     return true;
@@ -102,7 +102,7 @@ export async function handleJobEvents(context: BroadcastEventContext): Promise<B
   if (type.startsWith('job.type.changed')) {
     const message = buildJobTypeChangedMessage(type, actor, jobTitle, body);
     setBroadcastMessage(state, message.title, message.text);
-    state.url = body.url || (jobId ? `/jobs/${jobId}` : state.url);
+    state.url = body.url || (jobId ? `/festival-management/${jobId}?singleJob=true` : state.url);
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
     return true;
