@@ -150,7 +150,10 @@ test.describe("mobile navigation smoke", () => {
     await expect(page.getByText("Nueva solicitud de transporte", { exact: true })).toBeVisible();
     const dialog = page.getByRole("dialog").last();
     await expect(dialog).toBeVisible();
-    await expectInsideViewport(page, dialog);
+    // Visibility is reached during the sheet's slide-in; measure its settled bounds.
+    await expect(async () => {
+      await expectInsideViewport(page, dialog);
+    }).toPass({ timeout: 5_000 });
 
     const dialogOverflow = await dialog.evaluate((element) => ({
       clientWidth: element.clientWidth,
