@@ -36,7 +36,11 @@ const priorityVariant = (priority: TransportRequestRecord["priority"]): "default
   return "outline";
 };
 
-export function TransportRequestsInbox() {
+interface TransportRequestsInboxProps {
+  readOnly?: boolean;
+}
+
+export function TransportRequestsInbox({ readOnly = false }: TransportRequestsInboxProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [stageFilter, setStageFilter] = useState<string>("active");
@@ -66,6 +70,7 @@ export function TransportRequestsInbox() {
   };
 
   const moveTo = async (request: TransportRequestRecord, stage: TransportPlanningStatus) => {
+    if (readOnly) return;
     try {
       await setTransportRequestStage(request.id, stage);
       toast({ title: `Solicitud ${TRANSPORT_STAGE_LABELS[stage].toLowerCase()}` });
@@ -98,7 +103,10 @@ export function TransportRequestsInbox() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Solicitudes de transporte</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-semibold">Solicitudes de transporte</h2>
+            {readOnly && <Badge variant="outline">Solo lectura</Badge>}
+          </div>
           <p className="text-sm text-muted-foreground">Demanda pendiente, planificación y confirmación en un único flujo.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -152,24 +160,26 @@ export function TransportRequestsInbox() {
                         {request.needed_at && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" />{formatInJobTimezone(request.needed_at, "dd/MM · HH:mm")}</span>}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {request.planning_status === "requested" && <Button size="sm" variant="secondary" onClick={() => void moveTo(request, "reviewing")}>Tomar</Button>}
-                      {ACTIVE_STAGES.includes(request.planning_status) && (
-                        <Button size="sm" onClick={() => setPlanningRequest(request)}>
-                          {request.events.length ? "Editar planificación" : "Planificar"}
-                        </Button>
-                      )}
-                      {(request.planning_status === "planned" || request.planning_status === "confirmed") && (
-                        <Button size="sm" variant="outline" onClick={() => void moveTo(request, "completed")}>
-                          <CheckCircle2 className="mr-1 h-4 w-4" />Completar
-                        </Button>
-                      )}
-                      {ACTIVE_STAGES.includes(request.planning_status) && (
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void moveTo(request, "cancelled")}>
-                          <XCircle className="mr-1 h-4 w-4" />Cancelar
-                        </Button>
-                      )}
-                    </div>
+                    {!readOnly && (
+                      <div className="flex flex-wrap gap-2">
+                        {request.planning_status === "requested" && <Button size="sm" variant="secondary" onClick={() => void moveTo(request, "reviewing")}>Tomar</Button>}
+                        {ACTIVE_STAGES.includes(request.planning_status) && (
+                          <Button size="sm" onClick={() => setPlanningRequest(request)}>
+                            {request.events.length ? "Editar planificación" : "Planificar"}
+                          </Button>
+                        )}
+                        {(request.planning_status === "planned" || request.planning_status === "confirmed") && (
+                          <Button size="sm" variant="outline" onClick={() => void moveTo(request, "completed")}>
+                            <CheckCircle2 className="mr-1 h-4 w-4" />Completar
+                          </Button>
+                        )}
+                        {ACTIVE_STAGES.includes(request.planning_status) && (
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void moveTo(request, "cancelled")}>
+                            <XCircle className="mr-1 h-4 w-4" />Cancelar
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -197,12 +207,14 @@ export function TransportRequestsInbox() {
         </div>
       )}
 
-      <TransportRequestPlanningDialog
-        open={Boolean(planningRequest)}
-        onOpenChange={(open) => { if (!open) setPlanningRequest(null); }}
-        request={planningRequest}
-        onSaved={() => void refresh()}
-      />
+      {!readOnly && (
+        <TransportRequestPlanningDialog
+          open={Boolean(planningRequest)}
+          onOpenChange={(open) => { if (!open) setPlanningRequest(null); }}
+          request={planningRequest}
+          onSaved={() => void refresh()}
+        />
+      )}
     </div>
   );
 }
