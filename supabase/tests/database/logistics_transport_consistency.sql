@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(12);
+SELECT plan(13);
 
 -- Seed/teardown as the trusted backend because auth.users provisioning also writes profiles.
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
@@ -109,6 +109,24 @@ SELECT throws_ok(
   'vehicle demand is immutable once execution has been planned'
 );
 
+-- A linked plan must stay complete. Calendar-level mistakes must not be able to terminalise
+-- a request while one half of its required load/unload pair is missing.
+DELETE FROM public.logistics_events
+WHERE id = (
+  SELECT id FROM public.logistics_events
+  WHERE transport_request_id = 'c3000000-0000-0000-0000-000000000001'::uuid
+    AND event_type = 'unload'
+  LIMIT 1
+);
+
+SELECT throws_ok(
+  $$ SELECT public.set_transport_request_stage(
+       'c3000000-0000-0000-0000-000000000001'::uuid, 'completed') $$,
+  '22023',
+  NULL,
+  'an incomplete execution plan cannot be completed'
+);
+
 SELECT lives_ok(
   $$ SELECT public.set_transport_request_stage(
        'c3000000-0000-0000-0000-000000000001'::uuid, 'reviewing') $$,
@@ -131,16 +149,17 @@ SELECT lives_ok(
 );
 
 SELECT lives_ok(
-  $$ SELECT public.set_transport_request_stage(
-       'c3000000-0000-0000-0000-000000000001'::uuid, 'cancelled') $$,
-  'a planned request can be cancelled atomically'
+  $$ UPDATE public.transport_requests
+     SET status = 'cancelled', updated_at = now()
+     WHERE id = 'c3000000-0000-0000-0000-000000000001'::uuid $$,
+  'direct compatible cancellation still obeys the lifecycle trigger'
 );
 
 SELECT is(
   (SELECT count(*)::integer FROM public.logistics_events
    WHERE transport_request_id = 'c3000000-0000-0000-0000-000000000001'::uuid),
   0,
-  'cancelling a planned request removes its load/unload events from the calendar'
+  'direct cancellation removes its load/unload events from the calendar'
 );
 
 SELECT is(
