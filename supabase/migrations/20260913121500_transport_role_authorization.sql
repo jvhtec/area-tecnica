@@ -38,7 +38,7 @@ $$;
 
 -- Final enforcement boundary for legacy direct-table callers and older RPC paths.
 -- Database/service operations without an authenticated user remain possible; authenticated
--- humans must be admin/management regardless of their department.
+-- humans must be admin/management regardless of their department. Missing roles fail closed.
 create or replace function public.enforce_transport_management_write()
 returns trigger
 language plpgsql
@@ -47,7 +47,7 @@ set search_path = public, pg_temp
 as $$
 begin
   if auth.uid() is not null
-     and public.get_current_user_role() <> all (array['admin'::text, 'management'::text]) then
+     and coalesce(public.get_current_user_role(), '') not in ('admin', 'management') then
     raise exception 'Transport operations require admin or management role'
       using errcode = '42501';
   end if;
