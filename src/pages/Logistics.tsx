@@ -6,6 +6,7 @@ import { MobileLogisticsCalendar } from "@/components/logistics/MobileLogisticsC
 import { TodayLogistics } from "@/components/logistics/TodayLogistics";
 import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
 import { TransportRequestsInbox } from "@/components/logistics/TransportRequestsInbox";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,6 +20,8 @@ const Logistics = () => {
   const isMobile = useIsMobile();
   const { userRole, isLoading: authLoading } = useOptimizedAuth();
   const canManageTransport = isManagementRole(userRole);
+  const canViewTransport = canManageTransport || userRole === "house_tech";
+  const readOnly = !canManageTransport;
 
   const requestJobId = searchParams.get("jobId");
   const requestedDepartment = searchParams.get("department");
@@ -46,14 +49,14 @@ const Logistics = () => {
     );
   }
 
-  if (!canManageTransport) {
+  if (!canViewTransport) {
     return (
       <div className="w-full max-w-full px-4 py-6">
         <Card>
           <CardContent className="py-10 text-center space-y-2">
             <h1 className="text-lg font-semibold">Logística</h1>
             <p className="text-sm text-muted-foreground">
-              La gestión y planificación de transportes está reservada a roles admin y management.
+              No tienes permisos para acceder a logística.
             </p>
           </CardContent>
         </Card>
@@ -63,11 +66,14 @@ const Logistics = () => {
 
   return (
     <div className="w-full max-w-full px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Logística</h1>
-        <p className="text-sm text-muted-foreground">
-          Solicitudes, planificación y calendario de transportes.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Logística</h1>
+          <p className="text-sm text-muted-foreground">
+            Solicitudes, planificación y calendario de transportes.
+          </p>
+        </div>
+        {readOnly && <Badge variant="outline">Solo lectura</Badge>}
       </div>
 
       <Tabs defaultValue="requests" className="space-y-4">
@@ -77,26 +83,26 @@ const Logistics = () => {
         </TabsList>
 
         <TabsContent value="requests" className="mt-0">
-          <TransportRequestsInbox />
+          <TransportRequestsInbox readOnly={readOnly} />
         </TabsContent>
 
         <TabsContent value="calendar" className="mt-0">
           {isMobile ? (
-            <MobileLogisticsCalendar date={selectedDate} onDateSelect={setSelectedDate} />
+            <MobileLogisticsCalendar date={selectedDate} onDateSelect={setSelectedDate} readOnly={readOnly} />
           ) : (
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
               <div className="lg:col-span-9 xl:col-span-10">
-                <LogisticsCalendar onDateSelect={setSelectedDate} />
+                <LogisticsCalendar onDateSelect={setSelectedDate} readOnly={readOnly} />
               </div>
               <div className="lg:col-span-3 xl:col-span-2">
-                <TodayLogistics selectedDate={selectedDate} />
+                <TodayLogistics selectedDate={selectedDate} readOnly={readOnly} />
               </div>
             </div>
           )}
         </TabsContent>
       </Tabs>
 
-      {requestJobId && requestDepartment && (
+      {requestJobId && requestDepartment && canManageTransport && (
         <TransportRequestDialog
           open={requestDialogOpen}
           onOpenChange={(open) => { if (!open) closeRequestDialog(); }}
