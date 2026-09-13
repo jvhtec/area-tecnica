@@ -139,15 +139,14 @@ export function useJobCardTransport({
   const canManageTransportRequests =
     currentUserDepartment === "logistics" || isManagementUser;
 
+  // Transport authority is admin/management only (see 20260913121500_transport_role_authorization),
+  // and JobCardActions renders this button for those roles alone. Requests that are already
+  // planned/confirmed still count here: they stay operationally open until explicitly completed.
   const transportButtonLabel = (() => {
-    if (canManageTransportRequests && allRequests.length > 0) {
-      return `Solicitudes (${allRequests.length})`;
-    }
-    if (isTechDept && myTransportRequest) return "Transporte solicitado";
+    if (!canManageTransportRequests) return undefined;
+    if (allRequests.length > 0) return `Solicitudes (${allRequests.length})`;
     if (isScheduled) return "Transporte programado";
-    if (canManageTransportRequests) return "Logística";
-    if (isTechDept) return "Solicitar transporte";
-    return undefined;
+    return "Logística";
   })();
 
   const transportButtonTone = hasRequest
@@ -395,8 +394,9 @@ export function useJobCardTransport({
     }
   };
 
-  const checkAndFulfillRequest = async (
-    _requestId: string,
+  // Completion is now an explicit, request-scoped lifecycle step owned by the Logistics
+  // workspace. Creating a calendar event only refreshes the views that show request state.
+  const refreshTransportRequestViews = async (
     departmentForRequest: string,
   ) => {
     await Promise.all([
@@ -414,7 +414,7 @@ export function useJobCardTransport({
 
   return {
     allRequests,
-    checkAndFulfillRequest,
+    refreshTransportRequestViews,
     handleCreateWhatsappGroup,
     handleRetryWhatsappGroup,
     handleTransportClick,

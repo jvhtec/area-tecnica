@@ -193,6 +193,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
                 key={event.id}
                 event={event}
                 onClick={(e) => handleEventClick(e, event)}
+                interactive={!readOnly}
                 className="w-full rounded-2xl"
               />
             ))}

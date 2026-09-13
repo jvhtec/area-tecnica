@@ -68,11 +68,12 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
               key={event.id}
               event={event}
               onClick={() => handleEventClick(event)}
+              interactive={!readOnly}
             />
           ))}
           {events?.length === 0 && (
             <div className="text-muted-foreground text-center py-4">
-              No logistics events scheduled for this day
+              No hay movimientos de logística para este día
             </div>
           )}
         </div>

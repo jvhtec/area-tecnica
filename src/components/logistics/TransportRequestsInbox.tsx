@@ -13,15 +13,29 @@ import {
   setTransportRequestStage,
   TRANSPORT_MOVEMENT_LABELS,
   TRANSPORT_PRIORITY_LABELS,
+  TRANSPORT_SOURCE_LABELS,
   TRANSPORT_STAGE_LABELS,
   type TransportPlanningStatus,
   type TransportRequestRecord,
 } from "@/features/logistics/transportRequests";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
+import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
 import { ACTIVE_DEPARTMENTS, getDepartmentLabel } from "@/types/department";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { TransportRequestPlanningDialog } from "./TransportRequestPlanningDialog";
 
 const ACTIVE_STAGES: TransportPlanningStatus[] = ["requested", "reviewing", "planned", "confirmed"];
+
+const providerLabel = (value: string | null): string | null => {
+  if (!value) return null;
+  return (TRANSPORT_PROVIDERS as Record<string, { label: string } | undefined>)[value]?.label ?? value;
+};
+
+// Events carry plain `yyyy-MM-dd` / `HH:mm:ss` columns, already in the operating timezone.
+const eventMoment = (date: string, time: string): string => {
+  const [, month, day] = date.split("-");
+  return day && month ? `${day}/${month} · ${time.slice(0, 5)}` : `${date} · ${time.slice(0, 5)}`;
+};
 
 const stageVariant = (stage: TransportPlanningStatus): "default" | "secondary" | "outline" | "destructive" => {
   if (stage === "cancelled") return "destructive";
@@ -139,7 +153,7 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
       ) : (
         <div className="grid gap-3">
           {filtered.map((request) => {
-            const vehicles = request.items.map((item) => item.transport_type.replace("_", " ")).join(" · ") || "Sin vehículo definido";
+            const vehicles = request.items.map((item) => getLogisticsTransportTypeLabel(item.transport_type)).join(" · ") || "Sin vehículo definido";
             const route = [request.origin, request.destination].filter(Boolean).join(" → ");
             const load = request.events.find((event) => event.event_type === "load");
             const unload = request.events.find((event) => event.event_type === "unload");
@@ -149,14 +163,14 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <CardTitle className="text-base sm:text-lg">{request.job_title}</CardTitle>
+                        <CardTitle className="min-w-0 break-words text-base sm:text-lg">{request.job_title}</CardTitle>
                         <Badge variant="outline">{getDepartmentLabel(request.department)}</Badge>
                         <Badge variant={stageVariant(request.planning_status)}>{TRANSPORT_STAGE_LABELS[request.planning_status]}</Badge>
                         {request.priority !== "normal" && <Badge variant={priorityVariant(request.priority)}>{TRANSPORT_PRIORITY_LABELS[request.priority]}</Badge>}
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-1"><Route className="h-3.5 w-3.5" />{TRANSPORT_MOVEMENT_LABELS[request.movement_type]}</span>
-                        <span className="inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5" />{vehicles}</span>
+                        <span className="inline-flex min-w-0 items-center gap-1"><Truck className="h-3.5 w-3.5 shrink-0" /><span className="break-words">{vehicles}</span></span>
                         {request.needed_at && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" />{formatInJobTimezone(request.needed_at, "dd/MM · HH:mm")}</span>}
                       </div>
                     </div>
@@ -183,21 +197,28 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {request.description && <p className="text-sm">{request.description}</p>}
-                  {route && <div className="flex items-start gap-2 text-sm"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><span>{route}</span></div>}
+                  {request.description && <p className="text-sm break-words">{request.description}</p>}
+                  {route && <div className="flex items-start gap-2 text-sm"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 break-words">{route}</span></div>}
                   {(load || unload) && (
                     <div className="rounded-md border bg-muted/30 p-3 text-xs sm:text-sm">
                       <div className="flex flex-wrap gap-x-5 gap-y-1">
-                        {load && <span>Carga: {load.event_date} · {load.event_time.slice(0, 5)}</span>}
-                        {unload && <span>Descarga: {unload.event_date} · {unload.event_time.slice(0, 5)}</span>}
-                        {(load?.transport_provider || unload?.transport_provider) && <span>Proveedor: {load?.transport_provider || unload?.transport_provider}</span>}
+                        {load && <span>Carga: {eventMoment(load.event_date, load.event_time)}</span>}
+                        {unload && <span>Descarga: {eventMoment(unload.event_date, unload.event_time)}</span>}
+                        {providerLabel(load?.transport_provider ?? unload?.transport_provider ?? null) && (
+                          <span>Proveedor: {providerLabel(load?.transport_provider ?? unload?.transport_provider ?? null)}</span>
+                        )}
                         {(load?.license_plate || unload?.license_plate) && <span>Matrícula: {load?.license_plate || unload?.license_plate}</span>}
                       </div>
+                      {request.events.length > 2 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {Math.ceil(request.events.length / 2)} vehículos planificados · consulta el calendario para verlos todos.
+                        </p>
+                      )}
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>Solicitó: {request.requester_name || "Usuario eliminado"}</span>
-                    <span>Origen: {request.source_type}</span>
+                    <span>Procedencia: {TRANSPORT_SOURCE_LABELS[request.source_type] ?? request.source_type}</span>
                     {!request.is_hoja_relevant && <span className="inline-flex items-center gap-1"><PackageCheck className="h-3.5 w-3.5" />Fuera de Hoja de Ruta</span>}
                   </div>
                 </CardContent>

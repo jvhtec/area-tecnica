@@ -5,7 +5,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +26,10 @@ const schema = z.object({
   licensePlate: z.string().max(40).optional(),
   loadingBay: z.string().max(120).optional(),
   notes: z.string().max(2000).optional(),
-});
+}).refine(
+  (values) => `${values.unloadDate}T${values.unloadTime}` >= `${values.loadDate}T${values.loadTime}`,
+  { path: ["unloadDate"], message: "La descarga no puede ser anterior a la carga" },
+);
 
 type FormValues = z.infer<typeof schema>;
 
@@ -104,13 +107,21 @@ export function TransportRequestPlanningDialog({ open, onOpenChange, request, on
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Planificar transporte{request ? ` · ${request.job_title}` : ""}</DialogTitle>
+        <DialogHeader className="pr-8">
+          <DialogTitle className="break-words">Planificar transporte</DialogTitle>
+          {request && <DialogDescription className="break-words">{request.job_title}</DialogDescription>}
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
           {request && request.items.length > 1 && (
             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
               Esta planificación se aplicará a los {request.items.length} vehículos solicitados y creará un par carga/descarga para cada uno. Después puedes ajustar cada movimiento individualmente desde el calendario.
+            </div>
+          )}
+
+          {request && request.events.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+              Al guardar se sustituirán {request.events.length === 1 ? "el movimiento ya planificado" : `los ${request.events.length} movimientos ya planificados`} de esta solicitud.
+              Se perderán los ajustes hechos por separado en el calendario (horas, matrículas o muelles distintos por vehículo).
             </div>
           )}
 
@@ -132,6 +143,7 @@ export function TransportRequestPlanningDialog({ open, onOpenChange, request, on
             <div className="space-y-2">
               <Label htmlFor="transport-unload-time">Descarga · hora</Label>
               <Input id="transport-unload-time" type="time" {...form.register("unloadTime")} />
+              {form.formState.errors.unloadTime && <p className="text-xs text-destructive">{form.formState.errors.unloadTime.message}</p>}
             </div>
           </div>
 

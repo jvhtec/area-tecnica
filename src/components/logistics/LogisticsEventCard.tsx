@@ -3,6 +3,8 @@ import { Package, PackageCheck, Truck, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
+import { getDepartmentLabel } from "@/types/department";
 import { memo } from "react";
 
 const isTransportProvider = (value: unknown): value is TransportProvider =>
@@ -13,6 +15,8 @@ interface LogisticsEventCardProps {
   onClick: (e: React.MouseEvent) => void;
   variant?: "calendar" | "detailed";
   compact?: boolean;
+  /** Read-only surfaces pass false so the card does not advertise a click it will ignore. */
+  interactive?: boolean;
   className?: string;
 }
 
@@ -21,6 +25,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
   onClick,
   variant = "detailed",
   compact = false,
+  interactive = true,
   className
 }: LogisticsEventCardProps) {
   // Default colors based on event type
@@ -61,19 +66,20 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
 
     // Fallback: show event type + transport type
     const typeLabel = event.event_type === 'load' ? 'Carga' : 'Descarga';
-    const transportLabel = event.transport_type ? ` - ${event.transport_type}` : '';
+    const transportLabel = event.transport_type ? ` - ${getLogisticsTransportTypeLabel(event.transport_type)}` : '';
     return `${typeLabel}${transportLabel}`;
   };
 
   return (
     <div
-      onClick={onClick}
+      onClick={interactive ? onClick : undefined}
       style={{
         borderColor: borderColor,
         backgroundColor: getBgColor(),
       }}
       className={cn(
-        "p-2 bg-card border rounded-md cursor-pointer hover:shadow-md transition-shadow",
+        "p-2 bg-card border rounded-md transition-shadow",
+        interactive ? "cursor-pointer hover:shadow-md" : "cursor-default",
         className
       )}
     >
@@ -99,7 +105,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
                 </Badge>
                 <Badge variant="outline" className="flex items-center gap-1">
                   <Truck className="h-3 w-3" />
-                  <span className="capitalize">{event.transport_type}</span>
+                  <span>{getLogisticsTransportTypeLabel(event.transport_type)}</span>
                 </Badge>
               </div>
             </div>
@@ -136,7 +142,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
           <div className="flex flex-wrap gap-1 mt-1">
             {event.departments?.map((dept: any) => (
               <Badge key={dept.department} variant="secondary" className="text-xs">
-                {dept.department}
+                {getDepartmentLabel(dept.department)}
               </Badge>
             ))}
           </div>

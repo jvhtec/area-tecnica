@@ -171,7 +171,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Event
+              Añadir evento
             </Button>
           )}
         </div>
@@ -212,6 +212,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
                               onClick={(e) => handleEventClick(e, event)}
                               compact
                               variant="calendar"
+                              interactive={!readOnly}
                               className={cn("px-1.5 py-0.5 text-xs truncate", !readOnly && "hover:bg-accent/50")}
                             />
                           </div>
@@ -220,6 +221,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
                           <LogisticsEventCard
                             event={event}
                             onClick={(e) => handleEventClick(e, event)}
+                            interactive={!readOnly}
                             className="border-0 shadow-none p-0"
                           />
                         </TooltipContent>
@@ -228,7 +230,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
 
                     {dayEvents && dayEvents.length > maxVisibleEvents && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        + {dayEvents.length - maxVisibleEvents} more
+                        + {dayEvents.length - maxVisibleEvents} más
                       </div>
                     )}
                   </div>

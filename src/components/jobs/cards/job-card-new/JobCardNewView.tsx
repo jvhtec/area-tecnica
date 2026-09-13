@@ -168,7 +168,7 @@ export interface JobCardNewViewProps {
   myTransportRequest: TransportRequestSummary | null | undefined;
   allRequests: TransportRequestSummary[];
   queryClient: QueryClient;
-  checkAndFulfillRequest: (requestId: string, dept: string) => Promise<void>;
+  refreshTransportRequestViews: (dept: string) => Promise<void>;
 
   requirementsDialogOpen: boolean;
 
@@ -280,7 +280,7 @@ export function JobCardNewView({
   myTransportRequest,
   allRequests,
   queryClient,
-  checkAndFulfillRequest,
+  refreshTransportRequestViews,
   requirementsDialogOpen,
   flexPickerOpen,
   setFlexPickerOpen,
@@ -722,8 +722,8 @@ export function JobCardNewView({
               initialTransportType={selectedTransportRequest?.selectedItem?.transport_type}
               initialEventType={logisticsInitialEventType}
               onCreated={(_details) => {
-                if (selectedTransportRequest?.id && selectedTransportRequest?.department) {
-                  void checkAndFulfillRequest(selectedTransportRequest.id, selectedTransportRequest.department);
+                if (selectedTransportRequest?.department) {
+                  void refreshTransportRequestViews(selectedTransportRequest.department);
                 }
                 setSelectedTransportRequest(null);
                 setLogisticsInitialEventType(undefined);

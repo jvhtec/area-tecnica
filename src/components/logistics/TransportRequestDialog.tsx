@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 import {
   listTransportRequests,
@@ -218,9 +219,9 @@ export function TransportRequestDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{view === "list" ? "Solicitudes de transporte" : editingId ? "Editar solicitud" : "Nueva solicitud de transporte"}</DialogTitle>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader className="pr-8">
+          <DialogTitle className="break-words">{view === "list" ? "Solicitudes de transporte" : editingId ? "Editar solicitud" : "Nueva solicitud de transporte"}</DialogTitle>
         </DialogHeader>
 
         {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Cargando solicitudes…</p>}
@@ -248,7 +249,7 @@ export function TransportRequestDialog({
                       {request.origin || request.destination ? ` · ${request.origin || "?"} → ${request.destination || "?"}` : ""}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {request.items.map((item) => item.transport_type.replace("_", " ")).join(" · ") || "Sin vehículo"}
+                      {request.items.map((item) => getLogisticsTransportTypeLabel(item.transport_type)).join(" · ") || "Sin vehículo"}
                     </p>
                   </div>
                   {request.planning_status !== "completed" && request.planning_status !== "cancelled" && (
@@ -319,25 +320,34 @@ export function TransportRequestDialog({
                 <div key={field.id} className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[180px_1fr_auto] sm:items-center">
                   <Select value={form.watch(`items.${index}.transport_type`)} onValueChange={(value) => form.setValue(`items.${index}.transport_type`, value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{REQUEST_TRANSPORT_OPTIONS.map((option) => <SelectItem key={option} value={option}>{option.replace("_", " ")}</SelectItem>)}</SelectContent>
+                    <SelectContent>{REQUEST_TRANSPORT_OPTIONS.map((option) => <SelectItem key={option} value={option}>{getLogisticsTransportTypeLabel(option)}</SelectItem>)}</SelectContent>
                   </Select>
                   <div className="relative">
                     <Truck className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       className="pl-9"
                       type="number"
+                      inputMode="decimal"
                       min={0}
                       step={0.1}
                       placeholder="Espacio sobrante (m), opcional"
-                      value={form.watch(`items.${index}.leftover_space_meters`) ?? ""}
+                      // Uncontrolled on purpose: echoing a parsed number back into `value`
+                      // discards in-progress decimals ("1." would render as "1").
+                      defaultValue={field.leftover_space_meters ?? ""}
                       onChange={(event) => {
                         const value = event.target.value;
-                        const parsed = value === "" ? null : Number(value);
-                        if (parsed === null || Number.isFinite(parsed)) form.setValue(`items.${index}.leftover_space_meters`, parsed === null ? null : Math.max(0, parsed));
+                        if (value === "") {
+                          form.setValue(`items.${index}.leftover_space_meters`, null);
+                          return;
+                        }
+                        const parsed = Number(value);
+                        if (Number.isFinite(parsed)) {
+                          form.setValue(`items.${index}.leftover_space_meters`, Math.max(0, parsed));
+                        }
                       }}
                     />
                   </div>
-                  <Button type="button" size="icon" variant="ghost" disabled={items.fields.length === 1} onClick={() => items.remove(index)} aria-label="Eliminar vehículo">
+                  <Button type="button" size="icon" variant="ghost" className="justify-self-end" disabled={items.fields.length === 1} onClick={() => items.remove(index)} aria-label="Eliminar vehículo">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

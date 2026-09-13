@@ -84,7 +84,11 @@ export type ScheduleTransportRequestInput = {
 
 type RpcResult = { data: unknown; error: { message?: string } | null };
 type UntypedRpc = (name: string, args?: Record<string, unknown>) => PromiseLike<RpcResult>;
-const rpc = dataLayerClient.rpc as unknown as UntypedRpc;
+
+// `rpc` must stay bound to the client: SupabaseClient.prototype.rpc reads `this.rest`,
+// so a detached reference throws "Cannot read properties of undefined (reading 'rest')".
+const rpc: UntypedRpc = (name, args) =>
+  (dataLayerClient.rpc as unknown as UntypedRpc).call(dataLayerClient, name, args);
 
 const throwRpcError = (error: RpcResult["error"], fallback: string) => {
   if (error) throw new Error(error.message || fallback);
@@ -104,6 +108,13 @@ export const TRANSPORT_PRIORITY_LABELS: Record<TransportPriority, string> = {
   normal: "Normal",
   high: "Alta",
   urgent: "Urgente",
+};
+
+export const TRANSPORT_SOURCE_LABELS: Record<TransportSourceType, string> = {
+  manual: "Manual",
+  subrental: "Subalquiler",
+  tour: "Gira",
+  truck_planner: "Planificador de camiones",
 };
 
 export const TRANSPORT_MOVEMENT_LABELS: Record<TransportMovementType, string> = {
