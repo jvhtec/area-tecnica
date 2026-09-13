@@ -176,7 +176,7 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
                     </div>
                     {!readOnly && (
                       <div className="flex flex-wrap gap-2">
-                        {request.planning_status === "requested" && <Button size="sm" variant="secondary" onClick={() => void moveTo(request, "reviewing")}>Tomar</Button>}
+                        {request.planning_status === "requested" && <Button size="sm" variant="secondary" onClick={() => void moveTo(request, "reviewing")}>Revisar</Button>}
                         {ACTIVE_STAGES.includes(request.planning_status) && (
                           <Button size="sm" onClick={() => setPlanningRequest(request)}>
                             {request.events.length ? "Editar planificación" : "Planificar"}
