@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(9);
+SELECT plan(11);
 
 SELECT like(
   pg_get_functiondef('public.transport_request_is_privileged()'::regprocedure),
@@ -72,6 +72,18 @@ SELECT like(
   pg_get_functiondef('public.set_transport_request_stage(uuid,text)'::regprocedure),
   '%Terminal transport requests cannot be reopened implicitly%',
   'terminal request lifecycle states cannot be silently resurrected'
+);
+
+SELECT like(
+  pg_get_functiondef('public.list_transport_requests(uuid,text,boolean)'::regprocedure),
+  '%admin%management%house_tech%',
+  'house techs may read the global transport request model'
+);
+
+SELECT unlike(
+  pg_get_functiondef('public.save_transport_request(uuid,uuid,text,text,text,timestamp with time zone,text,text,text,text,boolean,text,text,jsonb)'::regprocedure),
+  '%house_tech%',
+  'house techs are not granted transport write authority'
 );
 
 SELECT * FROM finish();
