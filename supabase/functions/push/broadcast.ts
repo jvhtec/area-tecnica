@@ -40,7 +40,10 @@ import type {
   BroadcastRecipients,
 } from "./broadcast/eventContext.ts";
 import type { BroadcastBody, PushPayload } from "./types.ts";
-import { sendTransportRequestEmail } from "./transportRequestEmail.ts";
+import {
+  sendTransportRequestEmail,
+  type TransportRequestEmailResult,
+} from "./transportRequestEmail.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
 
 /**
@@ -55,15 +58,26 @@ export async function handleBroadcast(
 ) {
   const type = body.type || '';
   // Email recipients and delivery are independent of push subscriptions and routing.
-  const emailResult = type === 'logistics.transport.requested'
-    ? { email: await sendTransportRequestEmail(client, userId, body.request_id) }
-    : {};
-  if (emailResult.email && (
-    emailResult.email.failed > 0 ||
-    ['data_unavailable', 'not_configured', 'unexpected_error'].includes(emailResult.email.reason || '')
-  )) {
-    logEvent('warn', 'transport_request_email_incomplete', { ...emailResult.email });
-  }
+  // The send starts here but is only awaited at each return site, so a slow or hung
+  // mail provider runs alongside the push path instead of delaying or starving it.
+  const pendingEmail = type === 'logistics.transport.requested'
+    ? sendTransportRequestEmail(client, userId, body.request_id).catch(
+      (): TransportRequestEmailResult => ({
+        status: 'skipped', sent: 0, failed: 0, skipped: 0, reason: 'unexpected_error',
+      }),
+    )
+    : null;
+  // Every return path goes through this so the email is never dropped by the isolate
+  // shutting down once a response is sent.
+  const withEmail = async (payload: Record<string, unknown>) => {
+    if (!pendingEmail) return payload;
+    const email = await pendingEmail;
+    if (email.failed > 0 ||
+      ['data_unavailable', 'not_configured', 'unexpected_error'].includes(email.reason || '')) {
+      logEvent('warn', 'transport_request_email_incomplete', { ...email });
+    }
+    return { ...payload, email };
+  };
   let jobId = body.job_id;
 
   if (!jobId && body.doc_id) {
@@ -176,6 +190,7 @@ export async function handleBroadcast(
 
   const routeResult = await routeBroadcastEvent(context);
   if (routeResult && routeResult !== true) {
+    await pendingEmail;
     return routeResult;
   }
 
@@ -204,7 +219,7 @@ export async function handleBroadcast(
   }
 
   if (recipients.size === 0) {
-    return jsonResponse({ status: 'skipped', reason: 'No recipients', ...emailResult });
+    return jsonResponse(await withEmail({ status: 'skipped', reason: 'No recipients' }));
   }
 
   const recipientIds = Array.from(recipients);
@@ -215,11 +230,11 @@ export async function handleBroadcast(
 
   if (subscriptionsError) {
     console.error('push broadcast fetch subs error', subscriptionsError);
-    return jsonResponse({ error: 'Failed to load subscriptions', ...emailResult }, 500);
+    return jsonResponse(await withEmail({ error: 'Failed to load subscriptions' }), 500);
   }
 
   if (subscriptions.length === 0 && nativeTokens.length === 0) {
-    return jsonResponse({ status: 'skipped', reason: 'No subscriptions for recipients', ...emailResult });
+    return jsonResponse(await withEmail({ status: 'skipped', reason: 'No subscriptions for recipients' }));
   }
 
   const payload: PushPayload = {
@@ -263,5 +278,5 @@ export async function handleBroadcast(
   };
 
   const results = await sendPayloadToTargets(client, subscriptions, nativeTokens, payload);
-  return jsonResponse({ status: 'sent', results, count: results.length, ...emailResult });
+  return jsonResponse(await withEmail({ status: 'sent', results, count: results.length }));
 }

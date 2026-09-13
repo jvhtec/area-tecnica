@@ -51,7 +51,8 @@ function mockClient(overrides: Partial<Tables> = {}, errorTable?: string) {
 function payload(index = 0) {
   return vi.mocked(sendBrevoEmail).mock.calls[index][1] as {
     to: Array<{ email: string }>; sender: { email: string; name: string };
-    subject: string; htmlContent: string; headers: { idempotencyKey: string };
+    subject: string; htmlContent: string; textContent: string;
+    replyTo?: { email: string; name?: string }; headers: { idempotencyKey: string };
   };
 }
 
@@ -74,7 +75,12 @@ describe("sendTransportRequestEmail", () => {
     expect(email.htmlContent).toContain("Festival &lt;Sol&gt;");
     expect(email.htmlContent).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(email.htmlContent).not.toContain("<script>");
-    for (const detail of ["Sonido", "14 sept 2026, 10:30", "Recogida", "Urgente", "Manual", "Almacén", "Recinto", "Tráiler", "Furgoneta", "0 m", "2.5 m"]) expect(email.htmlContent).toContain(detail);
+    for (const detail of ["Sonido", "14 sept 2026, 10:30", "Recogida", "Urgente", "Manual", "Almacén", "Recinto", "Tráiler", "Furgoneta", "0 m", "2,5 m"]) expect(email.htmlContent).toContain(detail);
+    expect(email.subject).toBe("[URGENTE] Solicitud de transporte · Festival <Sol>");
+    expect(email.textContent).toContain("Espacio sobrante: 2,5 m");
+    // The plain-text part is never interpolated into HTML, so it carries the raw text.
+    expect(email.textContent).toContain("Material <script>alert(1)</script>");
+    expect(email.replyTo).toEqual({ email: "ana@example.com", name: "Ana < García" });
     expect(email.htmlContent).toContain('href="https://sector-pro.work/logistics"');
     expect(email.htmlContent).not.toContain("jobId=");
     expect(from.mock.calls.map(([table]) => table)).not.toContain("push_subscriptions");
@@ -222,12 +228,25 @@ describe("sendTransportRequestEmail", () => {
     expect(payload().htmlContent).toContain("Subalquiler");
   });
 
+  it("omits empty optional rows instead of printing placeholder text", () => {
+    const content = formatTransportRequestEmail(
+      { ...request, origin: null, destination: null, description: null, note: null, priority: "normal" },
+      { ...job, start_time: null, end_time: null }, requester, items,
+    );
+    for (const heading of ["Ruta", "Descripción", "Notas", "Fechas del trabajo"]) {
+      expect(content.htmlContent).not.toContain(`>${heading}<`);
+    }
+    // An absent required-by date stays visible: logistics needs to know it was left blank.
+    expect(content.htmlContent).toContain("Fecha necesaria");
+    expect(content.htmlContent).not.toContain("Prioridad Normal");
+  });
+
   it("formats null dates, fallback timezones, legacy vehicles and subrentals safely", () => {
     const content = formatTransportRequestEmail({ ...request, source_type: "subrental", needed_at: null, description: null, note: null, transport_type: "6m" }, { ...job, timezone: "invalid", start_time: null, end_time: "invalid" }, requester, []);
     expect(content.htmlContent).toContain("No especificada");
     expect(content.htmlContent).not.toContain("Invalid Date");
     expect(content.htmlContent).toContain("Europe/Madrid");
     expect(content.htmlContent).toContain("Subalquiler");
-    expect(content.htmlContent).toContain("Camión 6 m");
+    expect(content.htmlContent).toContain("Camión 6m");
   });
 });

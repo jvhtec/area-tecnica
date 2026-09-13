@@ -74,6 +74,28 @@ describe("transport email alongside push", () => {
     expect(mocks.push).toHaveBeenCalledOnce();
   });
 
+  it("starts push delivery without waiting for a slow mail provider", async () => {
+    // The email only resolves once push has been sent; awaiting it first would deadlock.
+    let releaseEmail = () => {};
+    mocks.email.mockImplementation(() => new Promise((resolve) => {
+      releaseEmail = () => resolve({ status: "sent", sent: 1, failed: 0, skipped: 0 });
+    }));
+    mocks.native.mockResolvedValue([{ token: "native-token" }]);
+    mocks.push.mockImplementation(async () => { releaseEmail(); return [{ ok: true }]; });
+    const response = await handleBroadcast(client, "creator-id", body);
+    expect(await response.json()).toMatchObject({ status: "sent", email: { sent: 1 } });
+  });
+
+  it("keeps push delivery when the email path rejects outright", async () => {
+    mocks.email.mockRejectedValue(new Error("provider exploded"));
+    mocks.native.mockResolvedValue([{ token: "native-token" }]);
+    const response = await handleBroadcast(client, "creator-id", body);
+    expect(await response.json()).toMatchObject({
+      status: "sent", count: 1, email: { status: "skipped", reason: "unexpected_error" },
+    });
+    expect(mocks.push).toHaveBeenCalledOnce();
+  });
+
   it("does not email on unrelated logistics events", async () => {
     const response = await handleBroadcast(client, "creator-id", { ...body, type: "logistics.event.updated" });
     expect(mocks.email).not.toHaveBeenCalled();

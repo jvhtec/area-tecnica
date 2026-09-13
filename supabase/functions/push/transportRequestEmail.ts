@@ -123,8 +123,17 @@ export async function sendTransportRequestEmail(
       if (profiles.length < PAGE_SIZE) break;
     }
     if (!recipients.size) return skip("no_recipients");
+    const requester = requesterResult.data as TransportEmailProfile;
     const content = formatTransportRequestEmail(request, jobResult.data as TransportEmailJob,
-      requesterResult.data as TransportEmailProfile, itemsResult.data as TransportEmailItem[]);
+      requester, itemsResult.data as TransportEmailItem[]);
+    // Logistics replies land with the requester, not the unattended corporate sender.
+    const replyToEmail = normalizeEmail(requester.email);
+    const replyToName = [requester.first_name, requester.last_name].filter(Boolean).join(" ")
+      // Profile names are user-editable; never let control characters reach the header.
+      .replace(/[\p{Cc}\p{Cf}]/gu, " ").replace(/\s+/g, " ").trim();
+    const replyTo = replyToEmail
+      ? { replyTo: { email: replyToEmail, ...(replyToName ? { name: replyToName } : {}) } }
+      : {};
     const result: TransportRequestEmailResult = { status: "sent", sent: 0, failed: 0, skipped: 0 };
     const emails = Array.from(recipients);
     let next = 0;
@@ -135,6 +144,7 @@ export async function sendTransportRequestEmail(
           const response = await sendBrevoEmail(apiKey, {
             sender: { email: from, name: "Área Técnica | Sector Pro" },
             to: [{ email }],
+            ...replyTo,
             ...content,
             headers: { idempotencyKey: await idempotencyKey(request.id, email) },
           }, { timeoutMs: 10_000 });
