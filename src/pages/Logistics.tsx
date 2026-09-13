@@ -4,12 +4,44 @@ import { LogisticsCalendar } from "@/components/logistics/LogisticsCalendar";
 import { MobileLogisticsCalendar } from "@/components/logistics/MobileLogisticsCalendar";
 import { TodayLogistics } from "@/components/logistics/TodayLogistics";
 import { TransportRequestsInbox } from "@/components/logistics/TransportRequestsInbox";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { isManagementRole } from "@/utils/permissions";
 
 const Logistics = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const isMobile = useIsMobile();
+  const { userRole, isLoading: authLoading } = useOptimizedAuth();
+  const canManageTransport = isManagementRole(userRole);
+
+  if (authLoading) {
+    return (
+      <div className="w-full max-w-full px-4 py-6">
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            Cargando permisos…
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!canManageTransport) {
+    return (
+      <div className="w-full max-w-full px-4 py-6">
+        <Card>
+          <CardContent className="py-10 text-center space-y-2">
+            <h1 className="text-lg font-semibold">Logística</h1>
+            <p className="text-sm text-muted-foreground">
+              La gestión y planificación de transportes está reservada a usuarios de administración y management.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-full px-4 py-6 space-y-6">
