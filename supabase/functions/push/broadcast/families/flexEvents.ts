@@ -32,7 +32,7 @@ export async function handleFlexEvents(context: BroadcastEventContext): Promise<
     }
 
     setBroadcastMessage(state, 'Carpeta de fecha creada', text);
-    state.url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : state.url);
+    state.url = body.url || (body.tour_id ? `/tour-management/${body.tour_id}` : state.url);
     audience.addNaturalRecipients(Array.from(audience.mgmt));
     return true;
   }

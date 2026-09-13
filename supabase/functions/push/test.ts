@@ -37,8 +37,8 @@ export async function handleTest(
   }
 
   const payload = {
-    title: "Push notifications ready",
-    body: "You'll now receive updates from Sector Pro.",
+    title: "Notificaciones listas",
+    body: "Ya puedes recibir avisos de Sector Pro.",
     url: body.url ?? "/",
   };
 

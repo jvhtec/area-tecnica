@@ -8,6 +8,11 @@ import { EVENT_TYPES } from "./config.ts";
 export function validateInternalUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
 
+  if (url !== url.trim() || /[\\\u0000-\u001f\u007f]/.test(url)) {
+    console.warn("⚠️ Rejecting malformed internal URL");
+    return undefined;
+  }
+
   // Decode the URL to catch encoded slashes and other obfuscation
   let decoded: string;
   try {
@@ -19,12 +24,28 @@ export function validateInternalUrl(url: string | undefined): string | undefined
   }
 
   // Only allow internal URLs starting with / but not //, and reject encoded slashes
-  if (!url.startsWith('/') || url.startsWith('//') || decoded.startsWith('//')) {
+  if (
+    !url.startsWith('/')
+    || url.startsWith('//')
+    || decoded.startsWith('//')
+    || /[\\\u0000-\u001f\u007f]/.test(decoded)
+  ) {
     console.warn(`⚠️ Rejecting potentially unsafe URL: ${url}`);
     return undefined;
   }
 
-  return url;
+  try {
+    const base = new URL("https://sector-pro.invalid");
+    const parsed = new URL(url, base);
+    if (parsed.origin !== base.origin || parsed.username || parsed.password) {
+      console.warn(`⚠️ Rejecting external URL: ${url}`);
+      return undefined;
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    console.warn(`⚠️ Rejecting invalid internal URL: ${url}`);
+    return undefined;
+  }
 }
 
 /**
@@ -125,7 +146,7 @@ export function resolveNotificationUrl(
         ? `/festival-management/${jobId}`
         : `/festival-management/${jobId}?singleJob=true`;
     }
-    return tourId ? `/tours/${tourId}` : '/project-management';
+    return tourId ? `/tour-management/${tourId}` : '/project-management';
   }
   // Message notifications navigate to dashboard with messages panel
   else if (type === EVENT_TYPES.MESSAGE_RECEIVED) {
@@ -144,6 +165,6 @@ export function resolveNotificationUrl(
         ? `/festival-management/${jobId}`
         : `/festival-management/${jobId}?singleJob=true`;
     }
-    return tourId ? `/tours/${tourId}` : '/';
+    return tourId ? `/tour-management/${tourId}` : '/';
   }
 }
