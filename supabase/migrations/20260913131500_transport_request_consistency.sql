@@ -5,7 +5,7 @@
 -- truths in the UI. This migration makes those relationships transactional invariants.
 
 -- ---------------------------------------------------------------------------
--- 1. Planned demand is immutable to API callers.
+-- 1. Planned demand is immutable to ordinary API callers.
 -- ---------------------------------------------------------------------------
 create or replace function public.guard_transport_request_lifecycle()
 returns trigger
@@ -13,13 +13,11 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
-declare
-  v_has_jwt boolean := nullif(current_setting('request.jwt.claim.role', true), '') is not null
-    or nullif(current_setting('request.jwt.claims', true), '') is not null;
 begin
-  -- Direct database maintenance/migrations have no request JWT. API callers, including
-  -- service-role generators, must not rewrite demand behind an existing execution plan.
-  if v_has_jwt
+  -- Preserve the repository's trusted-backend contract: direct DB maintenance and the
+  -- service role may repair data, while normal authenticated callers cannot rewrite demand
+  -- behind an execution plan.
+  if not public.transport_write_actor_is_trusted()
      and old.planning_status in ('planned', 'confirmed', 'completed', 'cancelled')
      and (
        new.job_id is distinct from old.job_id
@@ -52,9 +50,6 @@ begin
 end;
 $$;
 
--- Item rows are part of the demand. Lock them at the same boundary. The no-JWT exception is
--- deliberately limited to direct database maintenance so test teardown and migrations remain
--- possible without weakening API consistency.
 create or replace function public.guard_transport_request_item_lifecycle()
 returns trigger
 language plpgsql
@@ -64,10 +59,8 @@ as $$
 declare
   v_request_id uuid;
   v_stage text;
-  v_has_jwt boolean := nullif(current_setting('request.jwt.claim.role', true), '') is not null
-    or nullif(current_setting('request.jwt.claims', true), '') is not null;
 begin
-  if not v_has_jwt then
+  if public.transport_write_actor_is_trusted() then
     if tg_op = 'DELETE' then return old; end if;
     return new;
   end if;
@@ -170,7 +163,6 @@ begin
     );
     delete from public.logistics_events where transport_request_id = p_request_id;
   elsif v_request.planning_status = 'confirmed' and p_stage = 'planned' then
-    -- A deliberate de-confirm keeps the timings but removes the confirmation markers.
     update public.logistics_events
     set transport_provider = null,
         license_plate = null

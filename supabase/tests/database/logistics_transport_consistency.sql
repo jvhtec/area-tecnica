@@ -4,8 +4,9 @@ SET search_path TO public, extensions;
 
 SELECT plan(12);
 
--- A dedicated fixture for demand/execution consistency. Keep it independent from the broader
--- authorization suite so regressions in this state machine fail with a small, readable trace.
+-- Seed/teardown as the trusted backend because auth.users provisioning also writes profiles.
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at, created_at,
   updated_at, raw_app_meta_data, raw_user_meta_data, aud, role
@@ -151,7 +152,7 @@ SELECT is(
 
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub', '', false);
-SELECT set_config('request.jwt.claim.role', '', false);
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
 
 DELETE FROM public.logistics_event_departments WHERE event_id IN (
   SELECT id FROM public.logistics_events
