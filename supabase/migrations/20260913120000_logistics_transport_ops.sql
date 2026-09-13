@@ -58,9 +58,9 @@ create index if not exists idx_logistics_events_transport_request_id
   on public.logistics_events(transport_request_id)
   where transport_request_id is not null;
 
-create unique index if not exists uq_logistics_events_transport_request_event_type
-  on public.logistics_events(transport_request_id, event_type)
-  where transport_request_id is not null;
+-- A request may need several trucks, therefore several load/unload events may legitimately
+-- execute the same request. Do not enforce one event type per request.
+drop index if exists public.uq_logistics_events_transport_request_event_type;
 
 -- Existing clients sometimes mark a request fulfilled merely because any load+unload exists
 -- for a department. Preserve their write contract but refuse to terminalise a request until
@@ -130,9 +130,9 @@ create trigger guard_logistics_event_transport_request_link
 before insert or update on public.logistics_events
 for each row execute function public.guard_logistics_event_transport_request_link();
 
--- Backfill pre-existing request/event pairs only where the old model makes the relationship
--- unambiguous. If several same-type events exist, link only the newest one so the new
--- one-load/one-unload invariant can never make this migration fail on historical duplication.
+-- Backfill pre-existing request/event pairs only where the old one-request-per-department
+-- model makes the relationship unambiguous. Multiple events remain linked because a single
+-- request may legitimately represent several vehicles.
 with active_request as (
   select
     tr.job_id,
@@ -150,13 +150,7 @@ single_department_event as (
   having count(*) = 1
 ),
 candidates as (
-  select
-    le.id as event_id,
-    ar.request_id,
-    row_number() over (
-      partition by ar.request_id, le.event_type
-      order by le.event_date desc nulls last, le.event_time desc nulls last, le.id::text desc
-    ) as request_event_rank
+  select le.id as event_id, ar.request_id
   from public.logistics_events le
   join single_department_event sde on sde.event_id = le.id
   join active_request ar on ar.job_id = le.job_id and ar.department = sde.department
@@ -166,5 +160,4 @@ candidates as (
 update public.logistics_events le
 set transport_request_id = candidates.request_id
 from candidates
-where le.id = candidates.event_id
-  and candidates.request_event_rank = 1;
+where le.id = candidates.event_id;
