@@ -7,6 +7,12 @@ SELECT plan(26);
 -- ---------------------------------------------------------------------------
 -- Fixtures
 -- ---------------------------------------------------------------------------
+-- Seed as the service role. Inserting an auth user fires handle_new_user, which
+-- auto-provisions a public.profiles row, so the upsert below takes the UPDATE path and
+-- trips enforce_profile_privilege_changes. That guard (like the transport write guard)
+-- exempts auth.role() = 'service_role'.
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+
 -- profiles.id is a foreign key onto auth.users, so the identities must exist first.
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at, created_at,
@@ -335,7 +341,7 @@ RESET ROLE;
 -- but leaves the JWT claims set, and the hardened write guard reads those claims, so the
 -- cleanup would otherwise be refused as the technician who ran the last assertion.
 SELECT set_config('request.jwt.claim.sub', '', false);
-SELECT set_config('request.jwt.claim.role', '', false);
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
 
 -- pg_prove runs every test file against one database, so clean up after ourselves.
 DELETE FROM public.logistics_event_departments WHERE event_id IN (
