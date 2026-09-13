@@ -4,19 +4,19 @@ SET search_path TO public, extensions;
 
 SELECT plan(11);
 
-SELECT like(
+SELECT alike(
   pg_get_functiondef('public.transport_request_is_privileged()'::regprocedure),
   '%admin%management%',
   'transport privilege is granted to admin/management roles'
 );
 
-SELECT unlike(
+SELECT unalike(
   pg_get_functiondef('public.transport_request_is_privileged()'::regprocedure),
   '%logistics%',
   'logistics is not treated as a transport authorization role'
 );
 
-SELECT unlike(
+SELECT unalike(
   pg_get_functiondef('public.tp_can_edit_department(text)'::regprocedure),
   '%house_tech%',
   'Truck Planner transport editing has no house-tech department exception'
@@ -62,25 +62,25 @@ SELECT ok(
   'logistics event department writes enforce management authorization'
 );
 
-SELECT like(
+SELECT alike(
   pg_get_functiondef('public.save_transport_request(uuid,uuid,text,text,text,timestamp with time zone,text,text,text,text,boolean,text,text,jsonb)'::regprocedure),
   '%production%administrative%logistics%',
   'manual requests accept every active office/technical department'
 );
 
-SELECT like(
+SELECT alike(
   pg_get_functiondef('public.set_transport_request_stage(uuid,text)'::regprocedure),
   '%Terminal transport requests cannot be reopened implicitly%',
   'terminal request lifecycle states cannot be silently resurrected'
 );
 
-SELECT like(
+SELECT alike(
   pg_get_functiondef('public.list_transport_requests(uuid,text,boolean)'::regprocedure),
   '%admin%management%house_tech%',
   'house techs may read the global transport request model'
 );
 
-SELECT unlike(
+SELECT unalike(
   pg_get_functiondef('public.save_transport_request(uuid,uuid,text,text,text,timestamp with time zone,text,text,text,text,boolean,text,text,jsonb)'::regprocedure),
   '%house_tech%',
   'house techs are not granted transport write authority'
