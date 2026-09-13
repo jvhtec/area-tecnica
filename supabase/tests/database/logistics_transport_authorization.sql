@@ -7,6 +7,22 @@ SELECT plan(26);
 -- ---------------------------------------------------------------------------
 -- Fixtures
 -- ---------------------------------------------------------------------------
+-- profiles.id is a foreign key onto auth.users, so the identities must exist first.
+INSERT INTO auth.users (
+  id, instance_id, email, encrypted_password, email_confirmed_at, created_at,
+  updated_at, raw_app_meta_data, raw_user_meta_data, aud, role
+) VALUES
+  ('b1000000-0000-0000-0000-000000000001'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
+   'transport-mgmt@test.local', 'test', now(), now(), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'),
+  ('b1000000-0000-0000-0000-000000000002'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
+   'transport-house@test.local', 'test', now(), now(), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated'),
+  ('b1000000-0000-0000-0000-000000000003'::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
+   'transport-tech@test.local', 'test', now(), now(), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, 'authenticated', 'authenticated')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public.profiles (id, email, first_name, last_name, role, department)
 VALUES
   ('b1000000-0000-0000-0000-000000000001'::uuid, 'transport-mgmt@test.local',  'Trans', 'Management', 'management', 'logistics'),
@@ -314,5 +330,32 @@ SELECT is(
 );
 
 RESET ROLE;
+
+-- Drop the simulated identity before tearing down: RESET ROLE restores the database role
+-- but leaves the JWT claims set, and the hardened write guard reads those claims, so the
+-- cleanup would otherwise be refused as the technician who ran the last assertion.
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claim.role', '', false);
+
+-- pg_prove runs every test file against one database, so clean up after ourselves.
+DELETE FROM public.logistics_event_departments WHERE event_id IN (
+  SELECT id FROM public.logistics_events WHERE job_id = 'b2000000-0000-0000-0000-000000000001'::uuid
+);
+DELETE FROM public.logistics_events WHERE job_id = 'b2000000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.transport_request_items WHERE request_id IN (
+  SELECT id FROM public.transport_requests WHERE job_id = 'b2000000-0000-0000-0000-000000000001'::uuid
+);
+DELETE FROM public.transport_requests WHERE job_id = 'b2000000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.jobs WHERE id = 'b2000000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.profiles WHERE id IN (
+  'b1000000-0000-0000-0000-000000000001'::uuid,
+  'b1000000-0000-0000-0000-000000000002'::uuid,
+  'b1000000-0000-0000-0000-000000000003'::uuid
+);
+DELETE FROM auth.users WHERE id IN (
+  'b1000000-0000-0000-0000-000000000001'::uuid,
+  'b1000000-0000-0000-0000-000000000002'::uuid,
+  'b1000000-0000-0000-0000-000000000003'::uuid
+);
 
 SELECT * FROM finish();
