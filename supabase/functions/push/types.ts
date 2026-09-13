@@ -53,6 +53,7 @@ export type BroadcastBody = {
   doc_id?: string;
   file_name?: string;
   event_id?: string;
+  request_id?: string;
   event_type?: string;
   event_date?: string;
   event_time?: string;
