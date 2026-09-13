@@ -1,20 +1,38 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { LogisticsCalendar } from "@/components/logistics/LogisticsCalendar";
 import { MobileLogisticsCalendar } from "@/components/logistics/MobileLogisticsCalendar";
 import { TodayLogistics } from "@/components/logistics/TodayLogistics";
+import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
 import { TransportRequestsInbox } from "@/components/logistics/TransportRequestsInbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { ACTIVE_DEPARTMENTS, type ActiveDepartment } from "@/types/department";
 import { isManagementRole } from "@/utils/permissions";
 
 const Logistics = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { userRole, isLoading: authLoading } = useOptimizedAuth();
   const canManageTransport = isManagementRole(userRole);
+
+  const requestJobId = searchParams.get("jobId");
+  const requestedDepartment = searchParams.get("department");
+  const requestDepartment = ACTIVE_DEPARTMENTS.includes(requestedDepartment as ActiveDepartment)
+    ? requestedDepartment as ActiveDepartment
+    : null;
+  const requestDialogOpen = Boolean(requestJobId && requestDepartment && canManageTransport);
+
+  const closeRequestDialog = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("jobId");
+    next.delete("department");
+    setSearchParams(next, { replace: true });
+  };
 
   if (authLoading) {
     return (
@@ -35,7 +53,7 @@ const Logistics = () => {
           <CardContent className="py-10 text-center space-y-2">
             <h1 className="text-lg font-semibold">Logística</h1>
             <p className="text-sm text-muted-foreground">
-              La gestión y planificación de transportes está reservada a usuarios de administración y management.
+              La gestión y planificación de transportes está reservada a roles admin y management.
             </p>
           </CardContent>
         </Card>
@@ -77,6 +95,16 @@ const Logistics = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {requestJobId && requestDepartment && (
+        <TransportRequestDialog
+          open={requestDialogOpen}
+          onOpenChange={(open) => { if (!open) closeRequestDialog(); }}
+          jobId={requestJobId}
+          department={requestDepartment}
+          onSubmitted={() => undefined}
+        />
+      )}
     </div>
   );
 };
