@@ -21,7 +21,7 @@ SELECT has_function(
   'public',
   'schedule_transport_request',
   ARRAY['uuid', 'date', 'time without time zone', 'date', 'time without time zone', 'text', 'text', 'text', 'text'],
-  'logistics can atomically plan linked load and unload events'
+  'logistics can atomically plan all requested vehicles'
 );
 SELECT has_function(
   'public',
@@ -41,10 +41,9 @@ SELECT ok(
     SELECT 1 FROM pg_indexes
     WHERE schemaname = 'public'
       AND tablename = 'logistics_events'
-      AND indexname = 'uq_logistics_events_transport_request_event_type'
-      AND indexdef ILIKE '%UNIQUE INDEX%'
+      AND indexname = 'idx_logistics_events_transport_request_id'
   ),
-  'a request has at most one linked load and unload event'
+  'linked execution events are indexed by transport request'
 );
 
 SELECT ok(
