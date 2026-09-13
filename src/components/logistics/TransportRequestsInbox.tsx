@@ -34,6 +34,7 @@ import { ACTIVE_DEPARTMENTS, getDepartmentLabel } from "@/types/department";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { TransportRequestDialog } from "./TransportRequestDialog";
 import { TransportRequestPlanningDialog } from "./TransportRequestPlanningDialog";
+import { LegacyTransportCompletionDialog } from "./LegacyTransportCompletionDialog";
 
 const ACTIVE_STAGES: TransportPlanningStatus[] = ["requested", "reviewing", "planned", "confirmed"];
 const EDITABLE_DEMAND_STAGES: TransportPlanningStatus[] = ["requested", "reviewing"];
@@ -66,9 +67,10 @@ const canEditDemand = (request: TransportRequestRecord) =>
 
 interface TransportRequestsInboxProps {
   readOnly?: boolean;
+  canCompleteLegacy?: boolean;
 }
 
-export function TransportRequestsInbox({ readOnly = false }: TransportRequestsInboxProps) {
+export function TransportRequestsInbox({ readOnly = false, canCompleteLegacy = false }: TransportRequestsInboxProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [stageFilter, setStageFilter] = useState<string>("active");
@@ -77,6 +79,7 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
   const [editingRequest, setEditingRequest] = useState<TransportRequestRecord | null>(null);
   const [cancelTarget, setCancelTarget] = useState<TransportRequestRecord | null>(null);
   const [reviewTarget, setReviewTarget] = useState<TransportRequestRecord | null>(null);
+  const [legacyTarget, setLegacyTarget] = useState<TransportRequestRecord | null>(null);
 
   const queryKey = queryKeys.scope("logistics-transport-inbox", stageFilter);
   const { data: requests = [], isLoading, isError, error, refetch } = useQuery({
@@ -194,6 +197,11 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
                     </div>
                     {!readOnly && (
                       <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+                        {canCompleteLegacy && request.legacy_completion_eligible && ACTIVE_STAGES.includes(request.planning_status) && (
+                          <Button className="col-span-2 w-full sm:w-auto" size="sm" variant="outline" onClick={() => setLegacyTarget(request)}>
+                            Completar solicitud antigua
+                          </Button>
+                        )}
                         {request.planning_status === "requested" && (
                           <Button className="w-full sm:w-auto" size="sm" variant="secondary" onClick={() => void moveTo(request, "reviewing")}>Revisar</Button>
                         )}
@@ -260,6 +268,11 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
 
       {!readOnly && (
         <>
+          {canCompleteLegacy && legacyTarget && (
+            <LegacyTransportCompletionDialog
+              request={legacyTarget} onClose={() => setLegacyTarget(null)} onCompleted={() => void refresh()}
+            />
+          )}
           <TransportRequestPlanningDialog
             open={Boolean(planningRequest)}
             onOpenChange={(open) => { if (!open) setPlanningRequest(null); }}

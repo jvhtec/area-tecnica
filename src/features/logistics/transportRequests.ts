@@ -52,6 +52,7 @@ export type TransportRequestRecord = {
   requester_name: string | null;
   items: TransportRequestItem[];
   events: TransportRequestEvent[];
+  legacy_completion_eligible?: boolean;
 };
 
 export type SaveTransportRequestInput = {
@@ -168,6 +169,14 @@ export async function setTransportRequestStage(requestId: string, stage: Transpo
     p_stage: stage,
   });
   throwRpcError(error, "No se pudo actualizar el estado de la solicitud");
+}
+
+export async function completeLegacyTransportRequest(requestId: string, reason: string): Promise<void> {
+  const { error } = await rpc("complete_legacy_transport_request", {
+    p_request_id: requestId,
+    p_reason: reason.trim(),
+  });
+  throwRpcError(error, "No se pudo completar la solicitud antigua");
 }
 
 export async function scheduleTransportRequest(input: ScheduleTransportRequestInput): Promise<void> {

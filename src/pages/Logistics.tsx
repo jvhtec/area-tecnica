@@ -83,7 +83,7 @@ const Logistics = () => {
         </TabsList>
 
         <TabsContent value="requests" className="min-w-0 mt-0">
-          <TransportRequestsInbox readOnly={readOnly} />
+          <TransportRequestsInbox readOnly={readOnly} canCompleteLegacy={userRole === "admin"} />
         </TabsContent>
 
         <TabsContent value="calendar" className="min-w-0 mt-0">

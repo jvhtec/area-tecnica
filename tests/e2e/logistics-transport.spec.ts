@@ -26,6 +26,7 @@ const pendingRequest: TransportRequestRecord = {
   requester_name: "María Transporte",
   items: [{ id: "transport-item", transport_type: "trailer", leftover_space_meters: null }],
   events: [],
+  legacy_completion_eligible: true,
 };
 
 const plannedRequest: TransportRequestRecord = {
@@ -34,6 +35,7 @@ const plannedRequest: TransportRequestRecord = {
   job_id: "transport-job-planned",
   job_title: "Festival con transporte planificado",
   planning_status: "planned",
+  legacy_completion_eligible: false,
   events: [{
     id: "transport-event-load",
     event_type: "load",
@@ -46,18 +48,19 @@ const plannedRequest: TransportRequestRecord = {
   }],
 };
 
-async function bootstrapTransport(page: Page, role: "admin" | "management" | "house_tech" | "technician") {
+async function bootstrapTransport(page: Page, role: "admin" | "management" | "house_tech" | "technician", department = "sound") {
   // Fix the calendar date without freezing timers used by auth and query loading.
   await page.clock.setFixedTime(new Date("2026-09-14T10:00:00Z"));
+  let legacyCompleted = false;
   return bootstrapApp(page, {
-    auth: { userId: "transport-user", role, department: "sound" },
+    auth: { userId: "transport-user", role, department },
     tables: {
       profiles: [{
         id: "transport-user",
         first_name: "María",
         last_name: "Transporte",
         role,
-        department: "sound",
+        department,
         selected_job_statuses: ["Confirmado", "Tentativa"],
       }],
       logistics_events: [{
@@ -69,7 +72,10 @@ async function bootstrapTransport(page: Page, role: "admin" | "management" | "ho
         notes: "Acceso por puerta norte",
       }],
     },
-    rpc: { list_transport_requests: [pendingRequest, plannedRequest] },
+    rpc: {
+      list_transport_requests: () => legacyCompleted ? [plannedRequest] : [pendingRequest, plannedRequest],
+      complete_legacy_transport_request: () => { legacyCompleted = true; return null; },
+    },
   });
 }
 
@@ -78,9 +84,47 @@ const transportMutationRpcs = new Set([
   "save_transport_request",
   "schedule_transport_request",
   "set_transport_request_stage",
+  "complete_legacy_transport_request",
 ]);
 
 test.describe("Logistics transport permissions and planning", () => {
+  test("only admins can close eligible legacy demand without an execution plan", async ({ page }) => {
+    const calls = await bootstrapTransport(page, "admin");
+    await page.goto("/logistics");
+    const closeLegacy = page.getByRole("button", { name: "Completar solicitud antigua", exact: true });
+    await expect(closeLegacy).toHaveCount(1);
+    await closeLegacy.click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog.getByText(/Los eventos existentes se conservarán/)).toBeVisible();
+    const confirm = dialog.getByRole("button", { name: "Confirmar cierre" });
+    await expect(confirm).toBeDisabled();
+    await dialog.getByLabel("Motivo del cierre").fill("   ");
+    await expect(confirm).toBeDisabled();
+    await dialog.getByRole("button", { name: "Volver", exact: true }).click();
+    expect(calls.rpcCalls.filter((call) => call.name === "complete_legacy_transport_request")).toEqual([]);
+
+    await closeLegacy.click();
+    await dialog.getByLabel("Motivo del cierre").fill("  Transporte realizado antes del nuevo flujo  ");
+    await confirm.click();
+    await expect.poll(() => calls.rpcCalls.filter((call) => call.name === "complete_legacy_transport_request")).toEqual([{
+      name: "complete_legacy_transport_request", method: "POST",
+      body: { p_request_id: pendingRequest.id, p_reason: "Transporte realizado antes del nuevo flujo" },
+    }]);
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText(pendingRequest.job_title, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(plannedRequest.job_title, { exact: true })).toBeVisible();
+  });
+
+  for (const department of ["sound", "logistics"]) {
+    test(`management in ${department} keeps normal completion without the legacy override`, async ({ page }) => {
+      await bootstrapTransport(page, "management", department);
+      await page.goto("/logistics");
+      await expect(page.getByText(pendingRequest.job_title, { exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Completar solicitud antigua", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Completar", exact: true })).toBeVisible();
+    });
+  }
+
   test("house technicians can read populated requests and calendar without mutation controls", async ({ page }) => {
     const calls = await bootstrapTransport(page, "house_tech");
     // A management creation link must remain read-only when opened by a house technician.
