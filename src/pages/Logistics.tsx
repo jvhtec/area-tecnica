@@ -53,7 +53,7 @@ const Logistics = () => {
     return (
       <div className="w-full max-w-full px-4 py-6">
         <Card>
-          <CardContent className="py-10 text-center space-y-2">
+          <CardContent className="space-y-2 py-10 text-center">
             <h1 className="text-lg font-semibold">Logística</h1>
             <p className="text-sm text-muted-foreground">
               No tienes permisos para acceder a logística.
@@ -65,36 +65,36 @@ const Logistics = () => {
   }
 
   return (
-    <div className="w-full max-w-full px-4 py-6 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <div className="w-full max-w-full space-y-6 px-3 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-4">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Logística</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="break-words text-sm text-muted-foreground">
             Solicitudes, planificación y calendario de transportes.
           </p>
         </div>
         {readOnly && <Badge variant="outline">Solo lectura</Badge>}
       </div>
 
-      <Tabs defaultValue="requests" className="space-y-4">
+      <Tabs defaultValue="requests" className="min-w-0 space-y-4">
         <TabsList className="grid w-full grid-cols-2 sm:w-[360px]">
           <TabsTrigger value="requests">Solicitudes</TabsTrigger>
           <TabsTrigger value="calendar">Calendario</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="requests" className="mt-0">
+        <TabsContent value="requests" className="min-w-0 mt-0">
           <TransportRequestsInbox readOnly={readOnly} />
         </TabsContent>
 
-        <TabsContent value="calendar" className="mt-0">
+        <TabsContent value="calendar" className="min-w-0 mt-0">
           {isMobile ? (
             <MobileLogisticsCalendar date={selectedDate} onDateSelect={setSelectedDate} readOnly={readOnly} />
           ) : (
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-              <div className="lg:col-span-9 xl:col-span-10">
+            <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
+              <div className="min-w-0 xl:col-span-10">
                 <LogisticsCalendar onDateSelect={setSelectedDate} readOnly={readOnly} />
               </div>
-              <div className="lg:col-span-3 xl:col-span-2">
+              <div className="min-w-0 xl:col-span-2">
                 <TodayLogistics selectedDate={selectedDate} readOnly={readOnly} />
               </div>
             </div>

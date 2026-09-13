@@ -1,12 +1,13 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
-import { useState } from "react";
-
 import { queryKeys } from "@/lib/react-query";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
@@ -19,33 +20,32 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
   const { toast } = useToast();
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
-  const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+  const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
   const { data: events, isLoading } = useQuery({
-    queryKey: queryKeys.scope('today-logistics', formattedDate),
+    queryKey: queryKeys.scope("today-logistics", formattedDate),
     queryFn: async () => {
-      console.log('Fetching logistics events for:', formattedDate);
-      const { data, error } = await dataLayerClient.from('logistics_events')
+      const { data, error } = await dataLayerClient.from("logistics_events")
         .select(`
           *,
           job:jobs(id, title),
           departments:logistics_event_departments(department)
         `)
-        .eq('event_date', formattedDate)
-        .order('event_time', { ascending: true });
+        .eq("event_date", formattedDate)
+        .order("event_time", { ascending: true });
 
       if (error) {
-        console.error('Error fetching events:', error);
+        console.error("Error fetching logistics events:", error);
         toast({
           title: "Error",
-          description: "Failed to load events",
+          description: "No se pudieron cargar los eventos de logística",
           variant: "destructive",
         });
         throw error;
       }
 
       return data;
-    }
+    },
   });
 
   const handleEventClick = (event: LogisticsCalendarEvent) => {
@@ -55,15 +55,18 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          Schedule for {format(selectedDate, 'MMMM do, yyyy')}
+    <Card className="min-w-0">
+      <CardHeader className="pb-3">
+        <CardTitle className="break-words text-base leading-snug">
+          {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {events?.map((event) => (
+      <CardContent className="min-w-0">
+        <div className="min-w-0 space-y-3">
+          {isLoading && (
+            <div className="py-6 text-center text-sm text-muted-foreground">Cargando movimientos…</div>
+          )}
+          {!isLoading && events?.map((event) => (
             <LogisticsEventCard
               key={event.id}
               event={event}
@@ -71,8 +74,8 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
               interactive={!readOnly}
             />
           ))}
-          {events?.length === 0 && (
-            <div className="text-muted-foreground text-center py-4">
+          {!isLoading && events?.length === 0 && (
+            <div className="py-4 text-center text-sm text-muted-foreground">
               No hay movimientos de logística para este día
             </div>
           )}
