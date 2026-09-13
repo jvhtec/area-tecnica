@@ -84,7 +84,12 @@ export function TransportRequestPlanningDialog({ open, onOpenChange, request, on
         loadingBay: values.loadingBay || null,
         notes: values.notes || null,
       });
-      toast({ title: "Transporte planificado", description: "Los eventos de carga y descarga han quedado vinculados a la solicitud." });
+      toast({
+        title: "Transporte planificado",
+        description: request.items.length > 1
+          ? `Se han creado los movimientos para ${request.items.length} vehículos.`
+          : "Los eventos de carga y descarga han quedado vinculados a la solicitud.",
+      });
       onSaved?.();
       onOpenChange(false);
     } catch (error) {
@@ -103,6 +108,12 @@ export function TransportRequestPlanningDialog({ open, onOpenChange, request, on
           <DialogTitle>Planificar transporte{request ? ` · ${request.job_title}` : ""}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
+          {request && request.items.length > 1 && (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              Esta planificación se aplicará a los {request.items.length} vehículos solicitados y creará un par carga/descarga para cada uno. Después puedes ajustar cada movimiento individualmente desde el calendario.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="transport-load-date">Carga · fecha</Label>
