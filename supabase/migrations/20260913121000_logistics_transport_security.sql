@@ -166,7 +166,11 @@ create trigger guard_logistics_event_transport_request_link
 before insert or update on public.logistics_events
 for each row execute function public.guard_logistics_event_transport_request_link();
 
+-- PostgreSQL fires same-phase triggers alphabetically. Source normalization must run before
+-- lifecycle validation so a subrental_id change cannot rewrite source_type/source_ref after
+-- the immutability guard has already approved a planned request.
 drop trigger if exists normalize_transport_request_source on public.transport_requests;
-create trigger normalize_transport_request_source
+drop trigger if exists a_normalize_transport_request_source on public.transport_requests;
+create trigger a_normalize_transport_request_source
 before insert or update of subrental_id on public.transport_requests
 for each row execute function public.normalize_transport_request_source();
