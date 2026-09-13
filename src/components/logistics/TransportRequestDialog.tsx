@@ -3,8 +3,6 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Pencil, Plus, Trash2, Truck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { formatInJobTimezone, localInputToUTC, utcToLocalInput } from "@/utils/timezoneUtils";
 
 const itemSchema = z.object({
   transport_type: z.string().min(1, "Selecciona un vehículo"),
@@ -71,13 +70,6 @@ const emptyValues: FormValues = {
   items: [{ transport_type: "trailer", leftover_space_meters: null }],
 };
 
-const toLocalDateTime = (value: string | null) => {
-  if (!value) return "";
-  const date = new Date(value);
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
 export function TransportRequestDialog({
   open,
   onOpenChange,
@@ -114,7 +106,7 @@ export function TransportRequestDialog({
     form.reset({
       description: request.description || "",
       note: request.note || "",
-      neededAt: toLocalDateTime(request.needed_at),
+      neededAt: request.needed_at ? utcToLocalInput(request.needed_at) : "",
       origin: request.origin || "",
       destination: request.destination || "",
       movementType: request.movement_type,
@@ -183,7 +175,7 @@ export function TransportRequestDialog({
         department,
         description: values.description || null,
         note: values.note || null,
-        neededAt: values.neededAt ? new Date(values.neededAt).toISOString() : null,
+        neededAt: values.neededAt ? localInputToUTC(values.neededAt).toISOString() : null,
         origin: values.origin || null,
         destination: values.destination || null,
         movementType: values.movementType,
@@ -211,7 +203,7 @@ export function TransportRequestDialog({
         }
       }
 
-      toast({ title: editingId ? "Solicitud actualizada" : "Solicitud enviada a Logística" });
+      toast({ title: editingId ? "Solicitud actualizada" : "Solicitud creada" });
       await refresh();
       setView("list");
       setEditingId(null);
@@ -252,7 +244,7 @@ export function TransportRequestDialog({
                     </div>
                     {request.description && <p className="text-sm">{request.description}</p>}
                     <p className="text-xs text-muted-foreground">
-                      {request.needed_at ? format(new Date(request.needed_at), "d MMM yyyy · HH:mm", { locale: es }) : "Sin fecha requerida"}
+                      {request.needed_at ? formatInJobTimezone(request.needed_at, "dd/MM/yyyy · HH:mm") : "Sin fecha requerida"}
                       {request.origin || request.destination ? ` · ${request.origin || "?"} → ${request.destination || "?"}` : ""}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -363,7 +355,7 @@ export function TransportRequestDialog({
                 {requests.length ? "Volver" : "Cancelar"}
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Guardando…" : editingId ? "Actualizar solicitud" : "Enviar solicitud"}
+                {form.formState.isSubmitting ? "Guardando…" : editingId ? "Actualizar solicitud" : "Crear solicitud"}
               </Button>
             </div>
           </form>
