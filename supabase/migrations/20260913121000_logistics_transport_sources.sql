@@ -70,6 +70,11 @@ begin
     raise exception 'Permission denied' using errcode = '42501';
   end if;
 
+  -- p_created_by remains in the signature for old generated clients, but is deliberately
+  -- ignored. SECURITY DEFINER code derives ownership from the authenticated actor.
+  perform p_created_by;
+  perform p_status;
+
   -- Trust a supplied id only when it is already owned by the tour generator.
   if p_request_id is not null then
     select source_type into v_existing_source
@@ -100,7 +105,7 @@ begin
       job_id, department, note, status, created_by,
       source_type, source_ref, planning_status, is_hoja_relevant
     ) values (
-      p_job_id, p_department, nullif(trim(p_note), ''), 'requested', coalesce(p_created_by, v_actor),
+      p_job_id, p_department, nullif(trim(p_note), ''), 'requested', v_actor,
       'tour', p_job_id::text, 'requested', true
     ) returning id into v_request_id;
   else
