@@ -40,6 +40,8 @@ import type {
   BroadcastRecipients,
 } from "./broadcast/eventContext.ts";
 import type { BroadcastBody, PushPayload } from "./types.ts";
+import { sendTransportRequestEmail } from "./transportRequestEmail.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 
 /**
  * Broadcasts a push notification for a given event to the correct audience,
@@ -52,6 +54,16 @@ export async function handleBroadcast(
   body: BroadcastBody,
 ) {
   const type = body.type || '';
+  // Email recipients and delivery are independent of push subscriptions and routing.
+  const emailResult = type === 'logistics.transport.requested'
+    ? { email: await sendTransportRequestEmail(client, userId, body.request_id) }
+    : {};
+  if (emailResult.email && (
+    emailResult.email.failed > 0 ||
+    ['data_unavailable', 'not_configured', 'unexpected_error'].includes(emailResult.email.reason || '')
+  )) {
+    logEvent('warn', 'transport_request_email_incomplete', { ...emailResult.email });
+  }
   let jobId = body.job_id;
 
   if (!jobId && body.doc_id) {
@@ -192,7 +204,7 @@ export async function handleBroadcast(
   }
 
   if (recipients.size === 0) {
-    return jsonResponse({ status: 'skipped', reason: 'No recipients' });
+    return jsonResponse({ status: 'skipped', reason: 'No recipients', ...emailResult });
   }
 
   const recipientIds = Array.from(recipients);
@@ -203,11 +215,11 @@ export async function handleBroadcast(
 
   if (subscriptionsError) {
     console.error('push broadcast fetch subs error', subscriptionsError);
-    return jsonResponse({ error: 'Failed to load subscriptions' }, 500);
+    return jsonResponse({ error: 'Failed to load subscriptions', ...emailResult }, 500);
   }
 
   if (subscriptions.length === 0 && nativeTokens.length === 0) {
-    return jsonResponse({ status: 'skipped', reason: 'No subscriptions for recipients' });
+    return jsonResponse({ status: 'skipped', reason: 'No subscriptions for recipients', ...emailResult });
   }
 
   const payload: PushPayload = {
@@ -251,5 +263,5 @@ export async function handleBroadcast(
   };
 
   const results = await sendPayloadToTargets(client, subscriptions, nativeTokens, payload);
-  return jsonResponse({ status: 'sent', results, count: results.length });
+  return jsonResponse({ status: 'sent', results, count: results.length, ...emailResult });
 }
