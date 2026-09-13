@@ -221,6 +221,8 @@ export const LogisticsEventDialog = ({
 
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-transport-inbox") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request") });
 
       const cancelledDepartments = (selectedEvent.departments || []).map((dept) => dept.department);
       try {
@@ -477,6 +479,8 @@ export const LogisticsEventDialog = ({
 
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-transport-inbox") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request") });
       onOpenChange(false);
     } catch (error) {
       toast({

@@ -98,7 +98,7 @@ export type JobCardSoundTasks = OptimizedJobCardResult["soundTasks"];
 
 export type JobCardTransportState = {
   allRequests: TransportRequestSummary[];
-  checkAndFulfillRequest: (requestId: string, department: string) => Promise<void>;
+  refreshTransportRequestViews: (department: string) => Promise<void>;
   handleCreateWhatsappGroup: (event: React.MouseEvent) => Promise<void>;
   handleRetryWhatsappGroup: (event: React.MouseEvent) => Promise<void>;
   handleTransportClick: (event: React.MouseEvent) => void;

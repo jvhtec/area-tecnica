@@ -170,8 +170,9 @@ vi.mock('@/hooks/use-toast', () => ({
   }),
 }));
 
+const navigateMock = vi.fn();
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigateMock,
 }));
 
 vi.mock('@/hooks/use-mobile', () => ({
@@ -892,21 +893,22 @@ describe('JobCardActions', () => {
 
     it('renders transport, document, and upload actions after the action-group split', async () => {
       const user = userEvent.setup();
-      const onTransportClick = vi.fn();
       const handleFileUpload = vi.fn();
       const props = {
         ...defaultProps,
         canUploadDocuments: true,
+        department: 'sound',
         handleFileUpload,
-        onTransportClick,
         showUpload: true,
         transportButtonLabel: 'Transporte',
       };
 
       const { container } = render(<JobCardActions {...props} />);
 
+      // Transport requests are created in the Logistics workspace, so the card navigates
+      // there with the job/department scope rather than opening a card-local dialog.
       await user.click(screen.getByRole('button', { name: 'Transporte' }));
-      expect(onTransportClick).toHaveBeenCalled();
+      expect(navigateMock).toHaveBeenCalledWith('/logistics?jobId=test-job-id&department=sound');
       expect(screen.getByRole('button', { name: /Archivar/i })).toBeTruthy();
       expect(screen.getByTitle('Rellenar Doc Técnica')).toBeTruthy();
 

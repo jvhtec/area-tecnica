@@ -60,6 +60,8 @@ const bootstrapManagement = async (page: Page) => {
       job_assignments: [],
       skills: [],
       job_required_roles_summary: [],
+      logistics_events: [],
+      logistics_event_departments: [],
     },
     rpc: {
       get_profiles_with_skills: [],
@@ -68,6 +70,7 @@ const bootstrapManagement = async (page: Page) => {
       get_assignment_matrix_staffing: [],
       get_assignment_matrix_staffing_filtered: [],
       get_staffing_requests_matrix_filtered: [],
+      list_transport_requests: [],
     },
   });
 };
@@ -79,6 +82,19 @@ const expectMobileShell = async (page: Page) => {
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.innerWidth + 1);
+};
+
+const expectInsideViewport = async (page: Page, locator: ReturnType<Page["locator"]>) => {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  if (!box || !viewport) return;
+
+  expect(box.x).toBeGreaterThanOrEqual(-1);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(box.y).toBeGreaterThanOrEqual(-1);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
 };
 
 test.describe("mobile navigation smoke", () => {
@@ -110,6 +126,44 @@ test.describe("mobile navigation smoke", () => {
     await page.goto("/sound");
 
     await expect(page.getByRole("heading", { name: "Sonido" })).toBeVisible();
+    await expectMobileShell(page);
+  });
+
+  test("keeps Logistics requests and mobile calendar inside the viewport", async ({ page }) => {
+    await bootstrapManagement(page);
+    await page.goto("/logistics");
+
+    await expect(page.getByRole("heading", { name: "Logística", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Solicitudes de transporte" })).toBeVisible();
+    await expectMobileShell(page);
+
+    await page.getByRole("tab", { name: "Calendario" }).click();
+    await expect(page.getByRole("heading", { name: "Agenda móvil" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Añadir evento" })).toBeVisible();
+    await expectMobileShell(page);
+  });
+
+  test("keeps the Logistics request sheet bounded and horizontally contained", async ({ page }) => {
+    await bootstrapManagement(page);
+    await page.goto("/logistics?jobId=mobile-smoke-job&department=sound");
+
+    await expect(page.getByText("Nueva solicitud de transporte", { exact: true })).toBeVisible();
+    const dialog = page.getByRole("dialog").last();
+    await expect(dialog).toBeVisible();
+    await expectInsideViewport(page, dialog);
+
+    const dialogOverflow = await dialog.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      overflowX: getComputedStyle(element).overflowX,
+    }));
+    expect(dialogOverflow.scrollWidth).toBeLessThanOrEqual(dialogOverflow.clientWidth + 1);
+    expect(dialogOverflow.overflowX).not.toBe("visible");
+    expect(dialogOverflow.scrollHeight).toBeGreaterThanOrEqual(dialogOverflow.clientHeight);
+
+    await expect(page.getByRole("button", { name: "Crear solicitud" })).toBeVisible();
     await expectMobileShell(page);
   });
 

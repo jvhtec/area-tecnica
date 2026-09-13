@@ -52,7 +52,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onOpenFlexLogs,
   transportButtonLabel,
   transportButtonTone,
-  onTransportClick,
   onCreateWhatsappGroup,
   onRetryWhatsappGroup,
   whatsappDisabled,
@@ -116,6 +115,16 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     e.stopPropagation();
     navigate(`/timesheets?jobId=${job.id}`);
   }, [job.id, navigate]);
+
+  // /logistics only opens the request dialog when it gets BOTH params, so a card without a
+  // department would land the user on an empty workspace with dead query params in the URL.
+  const canRequestTransport = Boolean(department);
+  const handleTransportNavigation = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!department) return;
+    const params = new URLSearchParams({ jobId: job.id, department });
+    navigate(`/logistics?${params.toString()}`);
+  }, [department, job.id, navigate]);
 
   const navigateToCalculator = React.useCallback((e: React.MouseEvent, type: "pesos" | "consumos") => {
     e.stopPropagation();
@@ -201,9 +210,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         canSyncFlex={canSyncFlex}
         onSyncFlex={onSyncFlex}
         onOpenFlexLogs={onOpenFlexLogs}
-        transportButtonLabel={transportButtonLabel}
+        transportButtonLabel={isManagementUser && canRequestTransport ? transportButtonLabel : undefined}
         transportButtonTone={transportButtonTone}
-        onTransportClick={onTransportClick}
+        onTransportClick={isManagementUser && canRequestTransport ? handleTransportNavigation : undefined}
         onCreateWhatsappGroup={onCreateWhatsappGroup}
         onRetryWhatsappGroup={onRetryWhatsappGroup}
         whatsappDisabled={whatsappDisabled}

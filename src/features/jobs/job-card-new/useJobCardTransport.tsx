@@ -49,12 +49,6 @@ type ClearWhatsappGroupResult = {
   can_retry?: boolean;
 };
 
-type LogisticsEventWithDepartments = {
-  id?: string;
-  event_type?: string | null;
-  logistics_event_departments?: Array<{ department?: string | null }> | null;
-};
-
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -86,10 +80,14 @@ export function useJobCardTransport({
         )
         .eq("job_id", job.id)
         .eq("department", currentUserDepartment)
+        .eq("status", "requested")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (error) return null;
+      if (error) {
+        console.error("Failed to load department transport request", error);
+        return null;
+      }
       return data as TransportRequestSummary | null;
     },
     enabled: Boolean(job.id && currentUserDepartment),
@@ -108,7 +106,10 @@ export function useJobCardTransport({
         .eq("job_id", job.id)
         .eq("status", "requested")
         .order("created_at", { ascending: false });
-      if (error) return [];
+      if (error) {
+        console.error("Failed to load job transport requests", error);
+        return [];
+      }
       return (data ?? []) as TransportRequestSummary[];
     },
     enabled: Boolean(
@@ -138,23 +139,20 @@ export function useJobCardTransport({
   const canManageTransportRequests =
     currentUserDepartment === "logistics" || isManagementUser;
 
+  // Transport authority is admin/management only (see 20260913121500_transport_role_authorization),
+  // and JobCardActions renders this button for those roles alone. Requests that are already
+  // planned/confirmed still count here: they stay operationally open until explicitly completed.
   const transportButtonLabel = (() => {
-    if (isScheduled) return "Transport Scheduled";
-    if (canManageTransportRequests) {
-      return allRequests.length > 0
-        ? `Requests (${allRequests.length})`
-        : "Logistics";
-    }
-    if (isTechDept) {
-      return myTransportRequest ? "Transport Requested" : "Request Transport";
-    }
-    return undefined;
+    if (!canManageTransportRequests) return undefined;
+    if (allRequests.length > 0) return `Solicitudes (${allRequests.length})`;
+    if (isScheduled) return "Transporte programado";
+    return "Logística";
   })();
 
-  const transportButtonTone = isScheduled
-    ? "default"
-    : hasRequest
-      ? "secondary"
+  const transportButtonTone = hasRequest
+    ? "secondary"
+    : isScheduled
+      ? "default"
       : "outline";
 
   const handleTransportClick = (event: React.MouseEvent) => {
@@ -396,50 +394,27 @@ export function useJobCardTransport({
     }
   };
 
-  const checkAndFulfillRequest = async (
-    requestId: string,
+  // Completion is now an explicit, request-scoped lifecycle step owned by the Logistics
+  // workspace. Creating a calendar event only refreshes the views that show request state.
+  const refreshTransportRequestViews = async (
     departmentForRequest: string,
   ) => {
-    try {
-      const { data: events } = await dataLayerClient
-        .from("logistics_events")
-        .select("id, event_type, logistics_event_departments(department)")
-        .eq("job_id", job.id)
-        .eq(
-          "logistics_event_departments.department",
-          departmentForRequest,
-        );
-      const logisticsEvents = (events ?? []) as LogisticsEventWithDepartments[];
-      const hasLoad = logisticsEvents.some(
-        (event) => event.event_type === "load",
-      );
-      const hasUnload = logisticsEvents.some(
-        (event) => event.event_type === "unload",
-      );
-      if (hasLoad && hasUnload) {
-        await dataLayerClient
-          .from("transport_requests")
-          .update({ status: "fulfilled" })
-          .eq("id", requestId);
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.scope(
-            "transport-request",
-            job.id,
-            departmentForRequest,
-          ),
-        });
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.scope("transport-requests-all", job.id),
-        });
-      }
-    } catch (error: unknown) {
-      console.error("checkAndFulfillRequest failed", error);
-    }
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.scope("transport-request", job.id, departmentForRequest),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.scope("transport-requests-all", job.id),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.scope("logistics-transport-inbox"),
+      }),
+    ]);
   };
 
   return {
     allRequests,
-    checkAndFulfillRequest,
+    refreshTransportRequestViews,
     handleCreateWhatsappGroup,
     handleRetryWhatsappGroup,
     handleTransportClick,

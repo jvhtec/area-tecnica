@@ -372,7 +372,7 @@ function JobCardNewFull({
 
   const {
     allRequests,
-    checkAndFulfillRequest,
+    refreshTransportRequestViews,
     handleCreateWhatsappGroup,
     handleRetryWhatsappGroup,
     handleTransportClick,
@@ -663,7 +663,7 @@ function JobCardNewFull({
       myTransportRequest={myTransportRequest}
       allRequests={allRequests}
       queryClient={queryClient}
-      checkAndFulfillRequest={checkAndFulfillRequest}
+      refreshTransportRequestViews={refreshTransportRequestViews}
       requirementsDialogOpen={requirementsDialogOpen}
       flexPickerOpen={flexPickerOpen}
       setFlexPickerOpen={setFlexPickerOpen}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Printer } from "lucide-react";
-import { format, addDays, subDays, isToday, isValid } from "date-fns";
+import { format, addDays, subDays, isToday } from "date-fns";
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -11,17 +12,19 @@ import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
-
 import { queryKeys } from "@/lib/react-query";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+
 interface MobileLogisticsCalendarProps {
   date: Date;
   onDateSelect: (date: Date) => void;
+  readOnly?: boolean;
 }
 
 export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = ({
   date,
   onDateSelect,
+  readOnly = false,
 }) => {
   const DEFAULT_VISIBLE_EVENTS = 10;
 
@@ -37,18 +40,18 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   }, [date]);
 
   const { data: events, isLoading } = useQuery({
-    queryKey: queryKeys.scope('logistics-events'),
+    queryKey: queryKeys.scope("logistics-events"),
     queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('logistics_events')
+      const { data, error } = await dataLayerClient.from("logistics_events")
         .select(`
           *,
           job:jobs(title),
           departments:logistics_event_departments(department)
         `)
-        .order('event_time', { ascending: true });
+        .order("event_time", { ascending: true });
 
       if (error) {
-        console.error('Error fetching events:', error);
+        console.error("Error fetching events:", error);
         toast({
           title: "Error",
           description: "No se pudieron cargar los eventos de logística",
@@ -57,21 +60,15 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         throw error;
       }
       return data;
-    }
+    },
   });
 
   const getEventsForDate = useCallback((targetDate: Date) => {
     if (!events) return [];
-    return events.filter(event => {
-      if (!event.event_date) return false;
-      try {
-        const eventDate = new Date(event.event_date);
-        return isValid(eventDate) && format(eventDate, 'yyyy-MM-dd') === format(targetDate, 'yyyy-MM-dd');
-      } catch (e) {
-        console.error('Invalid date in event:', event);
-        return false;
-      }
-    });
+    const targetDateKey = format(targetDate, "yyyy-MM-dd");
+    // event_date is a DATE column, not an instant. Comparing the serialized calendar date
+    // avoids shifting it to the previous day when an operator is browsing from another TZ.
+    return events.filter((event) => event.event_date === targetDateKey);
   }, [events]);
 
   const currentDateEvents = getEventsForDate(currentDate);
@@ -84,7 +81,6 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
     setVisibleEventsCount(DEFAULT_VISIBLE_EVENTS);
   }, [currentDate]);
 
-  // PDF export handler
   const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
     await generateLogisticsCalendarPDF(range, {
       events: events || [],
@@ -121,63 +117,70 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
 
   const handleEventClick = (e: React.MouseEvent, event: LogisticsCalendarEvent) => {
     e.stopPropagation();
+    if (readOnly) return;
     setSelectedEvent(event);
     setShowEventDialog(true);
   };
 
   const handleAddEvent = () => {
+    if (readOnly) return;
     setSelectedEvent(null);
     setShowEventDialog(true);
   };
 
   return (
-    <div className="w-full max-w-[520px] mx-auto space-y-4">
-      <div className="rounded-2xl border bg-card shadow-sm px-4 py-3 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Logística</p>
-            <h2 className="text-xl font-bold leading-tight">Agenda móvil</h2>
-            <p className="text-xs text-muted-foreground">Gestiona cargas y descargas con acciones rápidas.</p>
+    <div className="mx-auto w-full min-w-0 max-w-[520px] space-y-4">
+      <div className="min-w-0 space-y-3 rounded-2xl border bg-card px-4 py-3 shadow-sm">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Logística</p>
+            <h2 className="break-words text-xl font-bold leading-tight">Agenda móvil</h2>
+            <p className="text-xs text-muted-foreground">
+              {readOnly ? "Consulta de cargas y descargas." : "Gestiona cargas y descargas con acciones rápidas."}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
             <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Día siguiente">
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => setShowPrintDialog(true)} aria-label="Exportar logística">
-              <Printer className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-          <Calendar className="h-4 w-4 text-primary" />
-          <span className={cn(isToday(currentDate) && "text-primary font-bold")}>{format(currentDate, "EEE, MMM d")}</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-muted-foreground">
+          <Calendar className="h-4 w-4 shrink-0 text-primary" />
+          <span className={cn("min-w-0 break-words", isToday(currentDate) && "font-bold text-primary")}>
+            {format(currentDate, "EEE, d MMM", { locale: es })}
+          </span>
           <span className="text-muted-foreground">·</span>
-          <button onClick={navigateToToday} className="text-primary underline-offset-2 hover:underline">Hoy</button>
+          <Button type="button" variant="link" className="h-auto min-h-11 px-1 py-0 text-primary" onClick={navigateToToday}>
+            Hoy
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Button onClick={handleAddEvent} className="w-full rounded-xl flex items-center justify-center gap-2">
-            <Plus className="h-4 w-4" />
-            Añadir evento
-          </Button>
+        <div className={cn("grid gap-2", readOnly ? "grid-cols-1" : "grid-cols-2")}>
+          {!readOnly && (
+            <Button onClick={handleAddEvent} className="flex w-full items-center justify-center gap-2 rounded-xl">
+              <Plus className="h-4 w-4" />
+              Añadir evento
+            </Button>
+          )}
           <Button
             variant="outline"
             className="w-full rounded-xl"
             onClick={() => setShowPrintDialog(true)}
           >
-            <Printer className="h-4 w-4 mr-2" /> Exportar
+            <Printer className="mr-2 h-4 w-4" /> Exportar
           </Button>
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="min-w-0 space-y-3">
         {isLoading ? (
-          <div className="flex items-center justify-center py-10 rounded-2xl border bg-card text-muted-foreground">
-            Cargando eventos...
+          <div className="flex items-center justify-center rounded-2xl border bg-card py-10 text-muted-foreground">
+            Cargando eventos…
           </div>
         ) : currentDateEvents.length > 0 ? (
           <>
@@ -186,7 +189,8 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
                 key={event.id}
                 event={event}
                 onClick={(e) => handleEventClick(e, event)}
-                className="w-full rounded-2xl"
+                interactive={!readOnly}
+                className="w-full min-w-0 rounded-2xl"
               />
             ))}
             {currentDateEvents.length > visibleEventsCount ? (
@@ -201,20 +205,24 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
             ) : null}
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-center rounded-2xl border bg-card">
-            <Calendar className="h-8 w-8 mb-2" />
+          <div className="flex flex-col items-center justify-center rounded-2xl border bg-card px-4 py-12 text-center">
+            <Calendar className="mb-2 h-8 w-8" />
             <p className="text-muted-foreground">No hay eventos de logística programados</p>
-            <p className="text-sm text-muted-foreground">para {format(currentDate, "MMMM d, yyyy")}</p>
+            <p className="text-sm text-muted-foreground">
+              para {format(currentDate, "d 'de' MMMM 'de' yyyy", { locale: es })}
+            </p>
           </div>
         )}
       </div>
 
-      <LogisticsEventDialog
-        open={showEventDialog}
-        onOpenChange={setShowEventDialog}
-        selectedDate={currentDate}
-        selectedEvent={selectedEvent}
-      />
+      {!readOnly && (
+        <LogisticsEventDialog
+          open={showEventDialog}
+          onOpenChange={setShowEventDialog}
+          selectedDate={currentDate}
+          selectedEvent={selectedEvent}
+        />
+      )}
 
       <LogisticsCalendarPrintDialog
         showDialog={showPrintDialog}

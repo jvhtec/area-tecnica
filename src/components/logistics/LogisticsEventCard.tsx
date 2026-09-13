@@ -3,6 +3,8 @@ import { Package, PackageCheck, Truck, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
+import { getDepartmentLabel } from "@/types/department";
 import { memo } from "react";
 
 const isTransportProvider = (value: unknown): value is TransportProvider =>
@@ -13,6 +15,7 @@ interface LogisticsEventCardProps {
   onClick: (e: React.MouseEvent) => void;
   variant?: "calendar" | "detailed";
   compact?: boolean;
+  interactive?: boolean;
   className?: string;
 }
 
@@ -21,35 +24,31 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
   onClick,
   variant = "detailed",
   compact = false,
-  className
+  interactive = true,
+  className,
 }: LogisticsEventCardProps) {
-  // Default colors based on event type
-  const defaultColor = event.event_type === 'load' ? 'rgb(191, 219, 254)' : 'rgb(187, 247, 208)';
+  const defaultColor = event.event_type === "load" ? "rgb(191, 219, 254)" : "rgb(187, 247, 208)";
   const borderColor = event.color || defaultColor;
   const transportProvider = event.transport_provider;
   const providerConfig = isTransportProvider(transportProvider)
     ? TRANSPORT_PROVIDERS[transportProvider]
     : null;
 
-  // Create a slightly transparent version of the color for the background
   const getBgColor = () => {
-    if (!event.color) return '';
+    if (!event.color) return "";
     try {
-      // If it's a hex color, convert it to RGB
-      if (event.color.startsWith('#')) {
+      if (event.color.startsWith("#")) {
         const r = parseInt(event.color.slice(1, 3), 16);
         const g = parseInt(event.color.slice(3, 5), 16);
         const b = parseInt(event.color.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, 0.1)`;
       }
-      // If it's already RGB, just add transparency
-      return event.color.replace('rgb', 'rgba').replace(')', ', 0.1)');
-    } catch (e) {
-      return '';
+      return event.color.replace("rgb", "rgba").replace(")", ", 0.1)");
+    } catch {
+      return "";
     }
   };
 
-  // Helper to get display name with fallback
   const getDisplayName = () => {
     const title =
       event.title ||
@@ -59,53 +58,53 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
       event.job?.title;
     if (title) return title;
 
-    // Fallback: show event type + transport type
-    const typeLabel = event.event_type === 'load' ? 'Carga' : 'Descarga';
-    const transportLabel = event.transport_type ? ` - ${event.transport_type}` : '';
+    const typeLabel = event.event_type === "load" ? "Carga" : "Descarga";
+    const transportLabel = event.transport_type ? ` - ${getLogisticsTransportTypeLabel(event.transport_type)}` : "";
     return `${typeLabel}${transportLabel}`;
   };
 
   return (
     <div
-      onClick={onClick}
+      onClick={interactive ? onClick : undefined}
       style={{
-        borderColor: borderColor,
+        borderColor,
         backgroundColor: getBgColor(),
       }}
       className={cn(
-        "p-2 bg-card border rounded-md cursor-pointer hover:shadow-md transition-shadow",
-        className
+        "min-w-0 rounded-md border bg-card p-2 transition-shadow",
+        interactive ? "cursor-pointer hover:shadow-md" : "cursor-default",
+        className,
       )}
     >
       {variant === "calendar" ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs">{getDisplayName()}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate text-xs">{getDisplayName()}</span>
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-col gap-2 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Badge
-                  variant={event.event_type === 'load' ? 'default' : 'secondary'}
+                  variant={event.event_type === "load" ? "default" : "secondary"}
                   className="flex items-center gap-1"
                 >
-                  {event.event_type === 'load' ? (
+                  {event.event_type === "load" ? (
                     <Package className="h-3 w-3" />
                   ) : (
                     <PackageCheck className="h-3 w-3" />
                   )}
-                  <span className="capitalize">{event.event_type === 'load' ? 'Carga' : 'Descarga'}</span>
+                  <span className="capitalize">{event.event_type === "load" ? "Carga" : "Descarga"}</span>
                 </Badge>
-                <Badge variant="outline" className="flex items-center gap-1">
-                  <Truck className="h-3 w-3" />
-                  <span className="capitalize">{event.transport_type}</span>
+                <Badge variant="outline" className="flex max-w-full items-center gap-1">
+                  <Truck className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{getLogisticsTransportTypeLabel(event.transport_type)}</span>
                 </Badge>
               </div>
             </div>
 
             {providerConfig?.icon && (
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <img
                   src={providerConfig.icon}
                   alt={providerConfig.label}
@@ -113,44 +112,44 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
                   height={96}
                   loading="lazy"
                   decoding="async"
-                  className="w-24 h-24 object-contain"
+                  className="h-14 w-14 object-contain sm:h-20 sm:w-20 xl:h-16 xl:w-16 2xl:h-20 2xl:w-20"
                   onError={(e) => {
-                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.style.display = "none";
                   }}
                 />
               </div>
             )}
           </div>
 
-          <h3 className="font-medium mt-2">{getDisplayName()}</h3>
-          <div className="text-sm text-muted-foreground mt-1">
-            {format(new Date(`2000-01-01T${event.event_time}`), 'HH:mm')}
+          <h3 className="mt-2 min-w-0 break-words font-medium">{getDisplayName()}</h3>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {format(new Date(`2000-01-01T${event.event_time}`), "HH:mm")}
           </div>
 
           {event.license_plate && (
-            <div className="text-sm text-muted-foreground mt-1">
+            <div className="mt-1 break-words text-sm text-muted-foreground">
               {event.license_plate}
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1 mt-1">
+          <div className="mt-1 flex min-w-0 flex-wrap gap-1">
             {event.departments?.map((dept: any) => (
-              <Badge key={dept.department} variant="secondary" className="text-xs">
-                {dept.department}
+              <Badge key={dept.department} variant="secondary" className="max-w-full text-xs">
+                <span className="truncate">{getDepartmentLabel(dept.department)}</span>
               </Badge>
             ))}
           </div>
 
           {event.loading_bay && (
-            <div className="text-sm text-muted-foreground mt-2">
+            <div className="mt-2 break-words text-sm text-muted-foreground">
               Muelle: {event.loading_bay}
             </div>
           )}
 
           {event.notes && (
-            <div className="text-sm text-muted-foreground flex items-start gap-1.5 mt-2">
-              <MessageSquare className="w-4 h-4 shrink-0 mt-0.5" />
-              <span className="line-clamp-2">{event.notes}</span>
+            <div className="mt-2 flex min-w-0 items-start gap-1.5 text-sm text-muted-foreground">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="min-w-0 break-words line-clamp-2">{event.notes}</span>
             </div>
           )}
         </>
