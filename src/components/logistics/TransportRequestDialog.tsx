@@ -341,9 +341,9 @@ export function TransportRequestDialog({
                     <Input id="transport-needed-at" type="datetime-local" {...form.register("neededAt")} />
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Tipo de movimiento</Label>
+                    <Label htmlFor="transport-movement-type">Tipo de movimiento</Label>
                     <Select value={form.watch("movementType")} onValueChange={(value) => form.setValue("movementType", value as TransportMovementType, { shouldDirty: true })}>
-                      <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="transport-movement-type" className="w-full min-w-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(TRANSPORT_MOVEMENT_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
                       </SelectContent>
@@ -360,9 +360,9 @@ export function TransportRequestDialog({
                     {form.formState.errors.destination && <p className="text-xs text-destructive">{form.formState.errors.destination.message}</p>}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Prioridad</Label>
+                    <Label htmlFor="transport-priority">Prioridad</Label>
                     <Select value={form.watch("priority")} onValueChange={(value) => form.setValue("priority", value as TransportPriority, { shouldDirty: true })}>
-                      <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="transport-priority" className="w-full min-w-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(TRANSPORT_PRIORITY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
                       </SelectContent>
@@ -384,7 +384,7 @@ export function TransportRequestDialog({
                   {items.fields.map((field, index) => (
                     <div key={field.id} className="grid min-w-0 grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto] sm:items-center">
                       <Select value={form.watch(`items.${index}.transport_type`)} onValueChange={(value) => form.setValue(`items.${index}.transport_type`, value, { shouldDirty: true })}>
-                        <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label={`Tipo de vehículo ${index + 1}`} className="w-full min-w-0"><SelectValue /></SelectTrigger>
                         <SelectContent>{REQUEST_TRANSPORT_OPTIONS.map((option) => <SelectItem key={option} value={option}>{getLogisticsTransportTypeLabel(option)}</SelectItem>)}</SelectContent>
                       </Select>
                       <div className="min-w-0 space-y-1">
