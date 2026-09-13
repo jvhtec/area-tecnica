@@ -1,5 +1,9 @@
--- Logistics transport operations: turn transport requests into a durable demand -> dispatch workflow.
--- This migration is intentionally schema/backfill only. Operational RPCs follow in 20260913120500.
+-- Logistics transport operations — schema and backfill.
+--
+-- Adds the operational demand metadata, links execution events to the request they fulfil,
+-- and backfills the unambiguous legacy relationships. Consolidated from the incremental
+-- migrations this feature was developed across; the department CHECK is written once at its
+-- final value (every active department) rather than added narrow and widened later.
 
 alter table public.transport_requests
   add column if not exists needed_at timestamptz,
@@ -24,9 +28,15 @@ alter table public.transport_requests
     check (source_type in ('manual', 'subrental', 'tour', 'truck_planner')),
   drop constraint if exists transport_requests_planning_status_check,
   add constraint transport_requests_planning_status_check
-    check (planning_status in ('requested', 'reviewing', 'planned', 'confirmed', 'completed', 'cancelled'));
+    check (planning_status in ('requested', 'reviewing', 'planned', 'confirmed', 'completed', 'cancelled')),
+  -- Mirrors ACTIVE_DEPARTMENTS in src/types/department.ts.
+  drop constraint if exists transport_requests_department_check,
+  add constraint transport_requests_department_check
+    check (department = any (
+      array['sound', 'lights', 'video', 'production', 'administrative', 'logistics']
+    ));
 
--- Normalize terminal legacy rows before active-source indexes are evaluated.
+-- Normalize terminal legacy rows before the active-source index is evaluated.
 update public.transport_requests
 set planning_status = case
   when status = 'cancelled' then 'cancelled'
@@ -35,6 +45,13 @@ set planning_status = case
 end
 where (status = 'cancelled' and planning_status <> 'cancelled')
    or (status = 'fulfilled' and planning_status <> 'completed');
+
+-- Sub-rental demand carries a stable source identity.
+update public.transport_requests
+set source_type = 'subrental',
+    source_ref = subrental_id::text
+where subrental_id is not null
+  and (source_type <> 'subrental' or source_ref is distinct from subrental_id::text);
 
 create index if not exists idx_transport_requests_ops_queue
   on public.transport_requests(planning_status, needed_at, created_at)
@@ -61,74 +78,6 @@ create index if not exists idx_logistics_events_transport_request_id
 -- A request may need several trucks, therefore several load/unload events may legitimately
 -- execute the same request. Do not enforce one event type per request.
 drop index if exists public.uq_logistics_events_transport_request_event_type;
-
--- Existing clients sometimes mark a request fulfilled merely because any load+unload exists
--- for a department. Preserve their write contract but refuse to terminalise a request until
--- the new workflow explicitly marks the planning lifecycle completed.
-create or replace function public.guard_transport_request_lifecycle()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if new.status = 'cancelled' then
-    new.planning_status := 'cancelled';
-  elsif new.planning_status = 'completed' then
-    new.status := 'fulfilled';
-  elsif new.planning_status = 'cancelled' then
-    new.status := 'cancelled';
-  elsif new.status = 'fulfilled' and old.status is distinct from 'fulfilled' then
-    new.status := 'requested';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists guard_transport_request_lifecycle on public.transport_requests;
-create trigger guard_transport_request_lifecycle
-before update on public.transport_requests
-for each row execute function public.guard_transport_request_lifecycle();
-
--- Linked logistics events must belong to the same job. If a calendar event is moved to a
--- different job, intentionally detach it rather than retaining a stale cross-job request link.
-create or replace function public.guard_logistics_event_transport_request_link()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_request_job uuid;
-begin
-  if new.transport_request_id is null then
-    return new;
-  end if;
-
-  select job_id into v_request_job
-  from public.transport_requests
-  where id = new.transport_request_id;
-
-  if v_request_job is null then
-    raise exception 'Unknown transport request %', new.transport_request_id using errcode = '23503';
-  end if;
-
-  if new.job_id is distinct from v_request_job then
-    if tg_op = 'UPDATE' and old.job_id is distinct from new.job_id then
-      new.transport_request_id := null;
-      return new;
-    end if;
-    raise exception 'Transport request and logistics event must belong to the same job' using errcode = '23514';
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists guard_logistics_event_transport_request_link on public.logistics_events;
-create trigger guard_logistics_event_transport_request_link
-before insert or update on public.logistics_events
-for each row execute function public.guard_logistics_event_transport_request_link();
 
 -- Backfill pre-existing request/event pairs only where the old one-request-per-department
 -- model makes the relationship unambiguous. Multiple events remain linked because a single

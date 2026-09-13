@@ -1,90 +1,8 @@
--- Transport/logistics authorization hardening.
+-- Logistics transport operations — row level security and write guards.
 --
--- 20260913121500 introduced the role-based write model but enforced it in exactly one
--- place: the enforce_transport_management_write trigger. The RLS policies on these tables
--- still described the previous model, so the two layers disagreed:
---
---   * transport_requests INSERT still allowed any user assigned to the job (a technician).
---   * transport_requests UPDATE still allowed the row's creator, whatever their role.
---   * logistics_events and logistics_event_departments still granted INSERT/UPDATE/DELETE
---     to the 'logistics' and 'house_tech' roles, contradicting read-only house-tech access.
---
--- Dropping or replacing the trigger would therefore silently restore write access. This
--- migration makes RLS express the same model so the guard is genuinely redundant, and
--- closes the trigger's own bypass.
+-- RLS expresses the same admin/management write model the guard triggers enforce, so neither
+-- layer is load-bearing on its own. Runs after the function definitions it attaches.
 
--- ---------------------------------------------------------------------------
--- 1. Trust the JWT role claim, not the absence of a user id.
--- ---------------------------------------------------------------------------
--- The previous guard exempted any caller with a null auth.uid(). A request made with the
--- publishable anon key has no `sub` claim, so it satisfied that exemption and the trigger
--- became a no-op for it — leaving RLS as the only barrier. Key off the role claim instead:
--- service_role is the trusted backend, anon/authenticated must pass the role check, and a
--- session with no JWT at all is a direct database connection (migrations, psql, cron).
-create or replace function public.transport_write_actor_is_trusted()
-returns boolean
-language plpgsql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_role text;
-begin
-  begin
-    v_role := nullif(current_setting('request.jwt.claim.role', true), '');
-    if v_role is null then
-      v_role := nullif(
-        nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
-        ''
-      );
-    end if;
-  exception when others then
-    v_role := null;
-  end;
-
-  if v_role = 'service_role' then
-    return true;
-  end if;
-
-  -- Any other presented role (anon, authenticated) must satisfy the role check.
-  if v_role is not null then
-    return false;
-  end if;
-
-  -- No JWT presented: not a PostgREST request.
-  return true;
-end;
-$$;
-
-revoke all on function public.transport_write_actor_is_trusted() from public, anon;
-grant execute on function public.transport_write_actor_is_trusted() to authenticated, service_role;
-
-create or replace function public.enforce_transport_management_write()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if not public.transport_write_actor_is_trusted()
-     and coalesce(public.get_current_user_role(), '') not in ('admin', 'management') then
-    raise exception 'Transport operations require admin or management role'
-      using errcode = '42501';
-  end if;
-
-  if tg_op = 'DELETE' then
-    return old;
-  end if;
-  return new;
-end;
-$$;
-
-revoke all on function public.enforce_transport_management_write() from public, anon, authenticated;
-grant execute on function public.enforce_transport_management_write() to service_role;
-
--- ---------------------------------------------------------------------------
--- 2. Align RLS with the role model.
 -- ---------------------------------------------------------------------------
 -- Drop by discovery rather than by name: the baseline schema names these policies
 -- inconsistently ("Users can ...", "p_<table>_public_<op>_<hash>", "anon_..._for_realtime").
@@ -209,3 +127,46 @@ create policy logistics_event_departments_update_management
 create policy logistics_event_departments_delete_management
   on public.logistics_event_departments for delete to authenticated
   using (public.get_current_user_role() = any (array['admin', 'management']));
+
+-- ---------------------------------------------------------------------------
+-- Guard triggers
+-- ---------------------------------------------------------------------------
+drop trigger if exists enforce_transport_management_write on public.transport_requests;
+create trigger enforce_transport_management_write
+before insert or update or delete on public.transport_requests
+for each row execute function public.enforce_transport_management_write();
+
+drop trigger if exists enforce_transport_item_management_write on public.transport_request_items;
+create trigger enforce_transport_item_management_write
+before insert or update or delete on public.transport_request_items
+for each row execute function public.enforce_transport_management_write();
+
+drop trigger if exists enforce_logistics_event_management_write on public.logistics_events;
+create trigger enforce_logistics_event_management_write
+before insert or update or delete on public.logistics_events
+for each row execute function public.enforce_transport_management_write();
+
+drop trigger if exists enforce_logistics_event_department_management_write on public.logistics_event_departments;
+create trigger enforce_logistics_event_department_management_write
+before insert or update or delete on public.logistics_event_departments
+for each row execute function public.enforce_transport_management_write();
+
+drop trigger if exists guard_transport_request_lifecycle on public.transport_requests;
+create trigger guard_transport_request_lifecycle
+before update on public.transport_requests
+for each row execute function public.guard_transport_request_lifecycle();
+
+drop trigger if exists guard_transport_request_item_lifecycle on public.transport_request_items;
+create trigger guard_transport_request_item_lifecycle
+before insert or update or delete on public.transport_request_items
+for each row execute function public.guard_transport_request_item_lifecycle();
+
+drop trigger if exists guard_logistics_event_transport_request_link on public.logistics_events;
+create trigger guard_logistics_event_transport_request_link
+before insert or update on public.logistics_events
+for each row execute function public.guard_logistics_event_transport_request_link();
+
+drop trigger if exists normalize_transport_request_source on public.transport_requests;
+create trigger normalize_transport_request_source
+before insert or update of subrental_id on public.transport_requests
+for each row execute function public.normalize_transport_request_source();
