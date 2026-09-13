@@ -240,7 +240,7 @@ export const primaryAppRoutes: readonly AppRoute[] = [
     path: "/logistics",
     component: Logistics,
     layout: "app",
-    access: "projectAndHouseTech",
+    access: "management",
     subscriptions: "logistics",
     breadcrumb: { label: "Logística" },
     nav: {
