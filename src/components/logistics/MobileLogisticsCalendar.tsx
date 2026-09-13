@@ -11,17 +11,19 @@ import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
-
 import { queryKeys } from "@/lib/react-query";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+
 interface MobileLogisticsCalendarProps {
   date: Date;
   onDateSelect: (date: Date) => void;
+  readOnly?: boolean;
 }
 
 export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = ({
   date,
   onDateSelect,
+  readOnly = false,
 }) => {
   const DEFAULT_VISIBLE_EVENTS = 10;
 
@@ -84,7 +86,6 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
     setVisibleEventsCount(DEFAULT_VISIBLE_EVENTS);
   }, [currentDate]);
 
-  // PDF export handler
   const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
     await generateLogisticsCalendarPDF(range, {
       events: events || [],
@@ -121,11 +122,13 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
 
   const handleEventClick = (e: React.MouseEvent, event: LogisticsCalendarEvent) => {
     e.stopPropagation();
+    if (readOnly) return;
     setSelectedEvent(event);
     setShowEventDialog(true);
   };
 
   const handleAddEvent = () => {
+    if (readOnly) return;
     setSelectedEvent(null);
     setShowEventDialog(true);
   };
@@ -137,7 +140,9 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Logística</p>
             <h2 className="text-xl font-bold leading-tight">Agenda móvil</h2>
-            <p className="text-xs text-muted-foreground">Gestiona cargas y descargas con acciones rápidas.</p>
+            <p className="text-xs text-muted-foreground">
+              {readOnly ? "Consulta de cargas y descargas." : "Gestiona cargas y descargas con acciones rápidas."}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior">
@@ -159,11 +164,13 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
           <button onClick={navigateToToday} className="text-primary underline-offset-2 hover:underline">Hoy</button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Button onClick={handleAddEvent} className="w-full rounded-xl flex items-center justify-center gap-2">
-            <Plus className="h-4 w-4" />
-            Añadir evento
-          </Button>
+        <div className={cn("grid gap-2", readOnly ? "grid-cols-1" : "grid-cols-2")}>
+          {!readOnly && (
+            <Button onClick={handleAddEvent} className="w-full rounded-xl flex items-center justify-center gap-2">
+              <Plus className="h-4 w-4" />
+              Añadir evento
+            </Button>
+          )}
           <Button
             variant="outline"
             className="w-full rounded-xl"
@@ -209,12 +216,14 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         )}
       </div>
 
-      <LogisticsEventDialog
-        open={showEventDialog}
-        onOpenChange={setShowEventDialog}
-        selectedDate={currentDate}
-        selectedEvent={selectedEvent}
-      />
+      {!readOnly && (
+        <LogisticsEventDialog
+          open={showEventDialog}
+          onOpenChange={setShowEventDialog}
+          selectedDate={currentDate}
+          selectedEvent={selectedEvent}
+        />
+      )}
 
       <LogisticsCalendarPrintDialog
         showDialog={showPrintDialog}
