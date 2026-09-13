@@ -5,6 +5,7 @@ import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
+import { resolvePostAuthPath } from "@/lib/internalNavigation";
 import { UserRole } from "@/types/user";
 import { Mail, Lock, ChevronRight, Loader2 } from "lucide-react";
 
@@ -29,6 +30,7 @@ const Auth = () => {
   const [showSignUp, setShowSignUp] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const isRecovery = searchParams.get('type') === 'recovery';
+  const requestedReturnTo = searchParams.get('returnTo');
 
   // Track latest userRole in a ref to avoid stale closures in triggerTransition
   const latestRoleRef = useRef<UserRole | null>(userRole as UserRole | null);
@@ -55,9 +57,9 @@ const Auth = () => {
     setIsTransitioning(true);
     setTimeout(() => {
       const dashboardPath = getDashboardPath(latestRoleRef.current);
-      navigate(dashboardPath, { replace: true });
+      navigate(resolvePostAuthPath(requestedReturnTo, dashboardPath), { replace: true });
     }, 800);
-  }, [navigate]);
+  }, [navigate, requestedReturnTo]);
 
   // Handle login
   const handleLogin = async () => {
@@ -154,7 +156,7 @@ const Auth = () => {
   // Already logged in - immediate redirect (wait for role to be loaded)
   if (session && !isRecovery && !isTransitioning && userRole) {
     const dashboardPath = getDashboardPath(latestRoleRef.current);
-    return <Navigate to={dashboardPath} replace />;
+    return <Navigate to={resolvePostAuthPath(requestedReturnTo, dashboardPath)} replace />;
   }
 
   // Show legacy forms for signup/recovery
