@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(13);
+SELECT plan(14);
 
 -- Seed/teardown as the trusted backend because auth.users provisioning also writes profiles.
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
@@ -146,6 +146,15 @@ SELECT lives_ok(
        '2026-09-21'::date, '09:00'::time,
        '2026-09-21'::date, '17:00'::time) $$,
   'a reviewed request can be planned again'
+);
+
+SELECT throws_ok(
+  $$ UPDATE public.transport_requests
+     SET subrental_id = 'c4000000-0000-0000-0000-000000000001'::uuid
+     WHERE id = 'c3000000-0000-0000-0000-000000000001'::uuid $$,
+  '22023',
+  NULL,
+  'source normalization cannot bypass planned-demand immutability'
 );
 
 SELECT lives_ok(
