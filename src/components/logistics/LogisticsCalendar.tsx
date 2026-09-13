@@ -13,14 +13,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
-
 import { queryKeys } from "@/lib/react-query";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+
 interface LogisticsCalendarProps {
   onDateSelect?: (date: Date) => void;
+  readOnly?: boolean;
 }
 
-export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
+export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsCalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
@@ -99,7 +100,6 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
     setCurrentMonth(new Date());
   };
 
-  // PDF export handler
   const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
     await generateLogisticsCalendarPDF(range, {
       events: events || [],
@@ -125,6 +125,7 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
 
   const handleEventClick = (e: React.MouseEvent, event: LogisticsCalendarEvent) => {
     e.stopPropagation();
+    if (readOnly) return;
     setSelectedEvent(event);
     setShowEventDialog(true);
   };
@@ -161,16 +162,18 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
           >
             <Printer className="h-4 w-4" />
           </Button>
-          <Button
-            onClick={() => {
-              setSelectedEvent(null);
-              setShowEventDialog(true);
-            }}
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Event
-          </Button>
+          {!readOnly && (
+            <Button
+              onClick={() => {
+                setSelectedEvent(null);
+                setShowEventDialog(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Event
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex-grow p-4">
@@ -208,8 +211,8 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
                               event={event}
                               onClick={(e) => handleEventClick(e, event)}
                               compact
-                              variant="calendar" // Pass variant for calendar display
-                              className="px-1.5 py-0.5 text-xs truncate hover:bg-accent/50"
+                              variant="calendar"
+                              className={cn("px-1.5 py-0.5 text-xs truncate", !readOnly && "hover:bg-accent/50")}
                             />
                           </div>
                         </TooltipTrigger>
@@ -235,12 +238,14 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
           </div>
         </div>
 
-        <LogisticsEventDialog
-          open={showEventDialog}
-          onOpenChange={setShowEventDialog}
-          selectedDate={currentMonth}
-          selectedEvent={selectedEvent}
-        />
+        {!readOnly && (
+          <LogisticsEventDialog
+            open={showEventDialog}
+            onOpenChange={setShowEventDialog}
+            selectedDate={currentMonth}
+            selectedEvent={selectedEvent}
+          />
+        )}
       </CardContent>
     </Card>
   );
