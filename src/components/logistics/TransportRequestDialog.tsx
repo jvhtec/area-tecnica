@@ -5,10 +5,25 @@ import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, Truck } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +36,7 @@ import {
   setTransportRequestStage,
   TRANSPORT_MOVEMENT_LABELS,
   TRANSPORT_PRIORITY_LABELS,
+  TRANSPORT_SOURCE_LABELS,
   TRANSPORT_STAGE_LABELS,
   type TransportMovementType,
   type TransportPriority,
@@ -33,19 +49,22 @@ import { formatInJobTimezone, localInputToUTC, utcToLocalInput } from "@/utils/t
 
 const itemSchema = z.object({
   transport_type: z.string().min(1, "Selecciona un vehículo"),
-  leftover_space_meters: z.union([z.number().min(0), z.null()]),
+  leftover_space_meters: z.union([
+    z.number().min(0, "El espacio no puede ser negativo").max(100, "Máximo 100 m"),
+    z.null(),
+  ]),
 });
 
 const schema = z.object({
-  description: z.string().max(2000).optional(),
-  note: z.string().max(4000).optional(),
+  description: z.string().max(2000, "Máximo 2000 caracteres").optional(),
+  note: z.string().max(4000, "Máximo 4000 caracteres").optional(),
   neededAt: z.string().optional(),
-  origin: z.string().max(300).optional(),
-  destination: z.string().max(300).optional(),
+  origin: z.string().max(300, "Máximo 300 caracteres").optional(),
+  destination: z.string().max(300, "Máximo 300 caracteres").optional(),
   movementType: z.enum(["transfer", "pickup", "delivery", "return", "other"]),
   priority: z.enum(["low", "normal", "high", "urgent"]),
   isHojaRelevant: z.boolean(),
-  items: z.array(itemSchema).min(1, "Añade al menos un vehículo").max(20),
+  items: z.array(itemSchema).min(1, "Añade al menos un vehículo").max(20, "Máximo 20 vehículos"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -71,6 +90,10 @@ const emptyValues: FormValues = {
   items: [{ transport_type: "trailer", leftover_space_meters: null }],
 };
 
+const canEditDemand = (request: TransportRequestRecord) =>
+  request.source_type === "manual" &&
+  (request.planning_status === "requested" || request.planning_status === "reviewing");
+
 export function TransportRequestDialog({
   open,
   onOpenChange,
@@ -83,6 +106,7 @@ export function TransportRequestDialog({
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "form">("list");
+  const [cancelTarget, setCancelTarget] = useState<TransportRequestRecord | null>(null);
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: emptyValues });
   const items = useFieldArray({ control: form.control, name: "items" });
@@ -103,6 +127,7 @@ export function TransportRequestDialog({
   };
 
   const beginEdit = (request: TransportRequestRecord) => {
+    if (!canEditDemand(request)) return;
     setEditingId(request.id);
     form.reset({
       description: request.description || "",
@@ -127,19 +152,20 @@ export function TransportRequestDialog({
     if (!open) return;
     setEditingId(null);
     setView("list");
+    setCancelTarget(null);
   }, [open]);
 
   useEffect(() => {
     if (!open || isLoading || isError) return;
     if (requestId) {
       const requested = requestedById.get(requestId);
-      if (requested) {
+      if (requested && canEditDemand(requested)) {
         beginEdit(requested);
         return;
       }
     }
     if (requests.length === 0 && view === "list") beginCreate();
-    // beginCreate/beginEdit are intentionally driven only by the loaded request snapshot.
+    // Creation/editing is driven by the loaded request snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isError, isLoading, open, requestId, requestedById, requests.length]);
 
@@ -149,6 +175,8 @@ export function TransportRequestDialog({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request", jobId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", jobId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-transport-inbox") }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") }),
     ]);
     onSubmitted?.();
   };
@@ -169,6 +197,18 @@ export function TransportRequestDialog({
 
   const submit = form.handleSubmit(async (values) => {
     const isNew = !editingId;
+    const existingRequest = editingId ? requestedById.get(editingId) : null;
+    if (existingRequest && !canEditDemand(existingRequest)) {
+      toast({
+        title: "La solicitud ya no se puede editar",
+        description: "Una solicitud generada o ya planificada debe modificarse desde su origen o replantearse desde Logística.",
+        variant: "destructive",
+      });
+      setView("list");
+      setEditingId(null);
+      return;
+    }
+
     try {
       const requestIdentifier = await saveTransportRequest({
         requestId: editingId,
@@ -182,8 +222,8 @@ export function TransportRequestDialog({
         movementType: values.movementType,
         priority: values.priority,
         isHojaRelevant: values.isHojaRelevant,
-        sourceType: "manual",
-        sourceRef: null,
+        sourceType: existingRequest?.source_type ?? "manual",
+        sourceRef: existingRequest?.source_ref ?? null,
         items: values.items,
       });
 
@@ -218,159 +258,216 @@ export function TransportRequestDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader className="pr-8">
-          <DialogTitle className="break-words">{view === "list" ? "Solicitudes de transporte" : editingId ? "Editar solicitud" : "Nueva solicitud de transporte"}</DialogTitle>
-        </DialogHeader>
+    <>
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <ResponsiveDialogContent className="max-w-3xl p-0 sm:p-6">
+          <div className="min-w-0 space-y-4 px-4 pb-4 pt-2 sm:p-0">
+            <ResponsiveDialogHeader className="pr-10 sm:pr-8">
+              <ResponsiveDialogTitle className="break-words">
+                {view === "list" ? "Solicitudes de transporte" : editingId ? "Editar solicitud" : "Nueva solicitud de transporte"}
+              </ResponsiveDialogTitle>
+            </ResponsiveDialogHeader>
 
-        {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Cargando solicitudes…</p>}
-        {isError && (
-          <div className="space-y-3 py-6 text-center">
-            <p className="text-sm text-destructive">{error instanceof Error ? error.message : "No se pudieron cargar las solicitudes."}</p>
-            <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
-          </div>
-        )}
+            {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Cargando solicitudes…</p>}
+            {isError && (
+              <div className="space-y-3 py-6 text-center">
+                <p className="break-words text-sm text-destructive">{error instanceof Error ? error.message : "No se pudieron cargar las solicitudes."}</p>
+                <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
+              </div>
+            )}
 
-        {!isLoading && !isError && view === "list" && (
-          <div className="space-y-4">
-            {requests.map((request) => (
-              <div key={request.id} className="rounded-lg border p-4 space-y-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline">{TRANSPORT_STAGE_LABELS[request.planning_status]}</Badge>
-                      {request.priority !== "normal" && <Badge>{TRANSPORT_PRIORITY_LABELS[request.priority]}</Badge>}
-                      <span className="text-sm font-medium">{TRANSPORT_MOVEMENT_LABELS[request.movement_type]}</span>
+            {!isLoading && !isError && view === "list" && (
+              <div className="min-w-0 space-y-4">
+                {requests.map((request) => {
+                  const editable = canEditDemand(request);
+                  return (
+                    <div key={request.id} className="min-w-0 space-y-3 rounded-lg border p-4">
+                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <Badge variant="outline">{TRANSPORT_STAGE_LABELS[request.planning_status]}</Badge>
+                            {request.priority !== "normal" && <Badge>{TRANSPORT_PRIORITY_LABELS[request.priority]}</Badge>}
+                            {request.source_type !== "manual" && <Badge variant="secondary">{TRANSPORT_SOURCE_LABELS[request.source_type]}</Badge>}
+                            <span className="text-sm font-medium">{TRANSPORT_MOVEMENT_LABELS[request.movement_type]}</span>
+                          </div>
+                          {request.description && <p className="break-words text-sm">{request.description}</p>}
+                          <p className="break-words text-xs text-muted-foreground">
+                            {request.needed_at ? formatInJobTimezone(request.needed_at, "dd/MM/yyyy · HH:mm") : "Sin fecha requerida"}
+                            {request.origin || request.destination ? ` · ${request.origin || "?"} → ${request.destination || "?"}` : ""}
+                          </p>
+                          <p className="break-words text-xs text-muted-foreground">
+                            {request.items.map((item) => getLogisticsTransportTypeLabel(item.transport_type)).join(" · ") || "Sin vehículo"}
+                          </p>
+                          {!editable && request.planning_status !== "completed" && request.planning_status !== "cancelled" && (
+                            <p className="text-xs text-muted-foreground">
+                              {request.source_type !== "manual"
+                                ? "Solicitud generada: edítala desde su origen."
+                                : "La demanda queda bloqueada al planificarla; usa Editar planificación para cambiar su ejecución."}
+                            </p>
+                          )}
+                        </div>
+                        {request.planning_status !== "completed" && request.planning_status !== "cancelled" && (
+                          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                            {editable && (
+                              <Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => beginEdit(request)}>
+                                <Pencil className="mr-1 h-4 w-4" />Editar
+                              </Button>
+                            )}
+                            <Button className="w-full text-destructive sm:w-auto" size="sm" variant="ghost" onClick={() => setCancelTarget(request)}>
+                              <Trash2 className="mr-1 h-4 w-4" />Cancelar
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {request.description && <p className="text-sm">{request.description}</p>}
-                    <p className="text-xs text-muted-foreground">
-                      {request.needed_at ? formatInJobTimezone(request.needed_at, "dd/MM/yyyy · HH:mm") : "Sin fecha requerida"}
-                      {request.origin || request.destination ? ` · ${request.origin || "?"} → ${request.destination || "?"}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {request.items.map((item) => getLogisticsTransportTypeLabel(item.transport_type)).join(" · ") || "Sin vehículo"}
-                    </p>
-                  </div>
-                  {request.planning_status !== "completed" && request.planning_status !== "cancelled" && (
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => beginEdit(request)}><Pencil className="mr-1 h-4 w-4" />Editar</Button>
-                      <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void cancelRequest(request)}><Trash2 className="mr-1 h-4 w-4" />Cancelar</Button>
-                    </div>
-                  )}
+                  );
+                })}
+                <Button className="w-full sm:w-auto" onClick={beginCreate}><Plus className="mr-2 h-4 w-4" />Nueva solicitud</Button>
+              </div>
+            )}
+
+            {!isLoading && !isError && view === "form" && (
+              <form onSubmit={submit} className="min-w-0 space-y-5">
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="transport-description">Qué necesitas</Label>
+                  <Input id="transport-description" {...form.register("description")} placeholder="PA principal, recogida de subalquiler, devolución…" />
+                  {form.formState.errors.description && <p className="text-xs text-destructive">{form.formState.errors.description.message}</p>}
                 </div>
-              </div>
-            ))}
-            <Button onClick={beginCreate}><Plus className="mr-2 h-4 w-4" />Nueva solicitud</Button>
-          </div>
-        )}
 
-        {!isLoading && !isError && view === "form" && (
-          <form onSubmit={submit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="transport-description">Qué necesitas</Label>
-              <Input id="transport-description" {...form.register("description")} placeholder="PA principal, recogida de subalquiler, devolución…" />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="transport-needed-at">Necesario para</Label>
-                <Input id="transport-needed-at" type="datetime-local" {...form.register("neededAt")} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo de movimiento</Label>
-                <Select value={form.watch("movementType")} onValueChange={(value) => form.setValue("movementType", value as TransportMovementType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(TRANSPORT_MOVEMENT_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="transport-origin">Origen</Label>
-                <Input id="transport-origin" {...form.register("origin")} placeholder="Almacén, proveedor, recinto…" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="transport-destination">Destino</Label>
-                <Input id="transport-destination" {...form.register("destination")} placeholder="Recinto, almacén, proveedor…" />
-              </div>
-              <div className="space-y-2">
-                <Label>Prioridad</Label>
-                <Select value={form.watch("priority")} onValueChange={(value) => form.setValue("priority", value as TransportPriority)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(TRANSPORT_PRIORITY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2 self-end rounded-md border p-3">
-                <Checkbox id="transport-hoja" checked={form.watch("isHojaRelevant")} onCheckedChange={(checked) => form.setValue("isHojaRelevant", checked === true)} />
-                <Label htmlFor="transport-hoja" className="cursor-pointer font-normal">Incluir en Hoja de Ruta</Label>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Vehículos / capacidad</Label>
-                <Button type="button" size="sm" variant="secondary" onClick={() => items.append({ transport_type: "trailer", leftover_space_meters: null })}>
-                  <Plus className="mr-1 h-4 w-4" />Vehículo
-                </Button>
-              </div>
-              {items.fields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[180px_1fr_auto] sm:items-center">
-                  <Select value={form.watch(`items.${index}.transport_type`)} onValueChange={(value) => form.setValue(`items.${index}.transport_type`, value)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{REQUEST_TRANSPORT_OPTIONS.map((option) => <SelectItem key={option} value={option}>{getLogisticsTransportTypeLabel(option)}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <div className="relative">
-                    <Truck className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      className="pl-9"
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      step={0.1}
-                      placeholder="Espacio sobrante (m), opcional"
-                      // Uncontrolled on purpose: echoing a parsed number back into `value`
-                      // discards in-progress decimals ("1." would render as "1").
-                      defaultValue={field.leftover_space_meters ?? ""}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        if (value === "") {
-                          form.setValue(`items.${index}.leftover_space_meters`, null);
-                          return;
-                        }
-                        const parsed = Number(value);
-                        if (Number.isFinite(parsed)) {
-                          form.setValue(`items.${index}.leftover_space_meters`, Math.max(0, parsed));
-                        }
-                      }}
-                    />
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="min-w-0 space-y-2">
+                    <Label htmlFor="transport-needed-at">Necesario para</Label>
+                    <Input id="transport-needed-at" type="datetime-local" {...form.register("neededAt")} />
                   </div>
-                  <Button type="button" size="icon" variant="ghost" className="justify-self-end" disabled={items.fields.length === 1} onClick={() => items.remove(index)} aria-label="Eliminar vehículo">
-                    <Trash2 className="h-4 w-4" />
+                  <div className="min-w-0 space-y-2">
+                    <Label>Tipo de movimiento</Label>
+                    <Select value={form.watch("movementType")} onValueChange={(value) => form.setValue("movementType", value as TransportMovementType, { shouldDirty: true })}>
+                      <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(TRANSPORT_MOVEMENT_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <Label htmlFor="transport-origin">Origen</Label>
+                    <Input id="transport-origin" {...form.register("origin")} placeholder="Almacén, proveedor, recinto…" />
+                    {form.formState.errors.origin && <p className="text-xs text-destructive">{form.formState.errors.origin.message}</p>}
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <Label htmlFor="transport-destination">Destino</Label>
+                    <Input id="transport-destination" {...form.register("destination")} placeholder="Recinto, almacén, proveedor…" />
+                    {form.formState.errors.destination && <p className="text-xs text-destructive">{form.formState.errors.destination.message}</p>}
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <Label>Prioridad</Label>
+                    <Select value={form.watch("priority")} onValueChange={(value) => form.setValue("priority", value as TransportPriority, { shouldDirty: true })}>
+                      <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(TRANSPORT_PRIORITY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2 self-end rounded-md border p-3">
+                    <Checkbox id="transport-hoja" checked={form.watch("isHojaRelevant")} onCheckedChange={(checked) => form.setValue("isHojaRelevant", checked === true, { shouldDirty: true })} />
+                    <Label htmlFor="transport-hoja" className="min-w-0 cursor-pointer break-words font-normal">Incluir en Hoja de Ruta</Label>
+                  </div>
+                </div>
+
+                <div className="min-w-0 space-y-3">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <Label>Vehículos / capacidad</Label>
+                    <Button type="button" size="sm" variant="secondary" disabled={items.fields.length >= 20} onClick={() => items.append({ transport_type: "trailer", leftover_space_meters: null })}>
+                      <Plus className="mr-1 h-4 w-4" />Vehículo
+                    </Button>
+                  </div>
+                  {items.fields.map((field, index) => (
+                    <div key={field.id} className="grid min-w-0 grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto] sm:items-center">
+                      <Select value={form.watch(`items.${index}.transport_type`)} onValueChange={(value) => form.setValue(`items.${index}.transport_type`, value, { shouldDirty: true })}>
+                        <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+                        <SelectContent>{REQUEST_TRANSPORT_OPTIONS.map((option) => <SelectItem key={option} value={option}>{getLogisticsTransportTypeLabel(option)}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <div className="min-w-0 space-y-1">
+                        <div className="relative min-w-0">
+                          <Truck className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            className="pl-9"
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            max={100}
+                            step={0.1}
+                            placeholder="Espacio sobrante (m), opcional"
+                            defaultValue={field.leftover_space_meters ?? ""}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              if (value === "") {
+                                form.setValue(`items.${index}.leftover_space_meters`, null, { shouldDirty: true, shouldValidate: true });
+                                return;
+                              }
+                              const parsed = Number(value);
+                              if (Number.isFinite(parsed)) {
+                                form.setValue(`items.${index}.leftover_space_meters`, parsed, { shouldDirty: true, shouldValidate: true });
+                              }
+                            }}
+                          />
+                        </div>
+                        {form.formState.errors.items?.[index]?.leftover_space_meters && (
+                          <p className="text-xs text-destructive">{form.formState.errors.items[index]?.leftover_space_meters?.message}</p>
+                        )}
+                      </div>
+                      <Button type="button" size="icon" variant="ghost" className="justify-self-end" disabled={items.fields.length === 1} onClick={() => items.remove(index)} aria-label="Eliminar vehículo">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {form.formState.errors.items?.message && <p className="text-xs text-destructive">{form.formState.errors.items.message}</p>}
+                </div>
+
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="transport-note">Notas</Label>
+                  <Textarea id="transport-note" {...form.register("note")} rows={3} placeholder="Accesos, contacto, restricciones, devolución…" />
+                  {form.formState.errors.note && <p className="text-xs text-destructive">{form.formState.errors.note.message}</p>}
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => requests.length ? setView("list") : onOpenChange(false)}>
+                    {requests.length ? "Volver" : "Cancelar"}
+                  </Button>
+                  <Button type="submit" className="w-full sm:w-auto" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? "Guardando…" : editingId ? "Actualizar solicitud" : "Crear solicitud"}
                   </Button>
                 </div>
-              ))}
-              {form.formState.errors.items?.message && <p className="text-xs text-destructive">{form.formState.errors.items.message}</p>}
-            </div>
+              </form>
+            )}
+          </div>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
-            <div className="space-y-2">
-              <Label htmlFor="transport-note">Notas</Label>
-              <Textarea id="transport-note" {...form.register("note")} rows={3} placeholder="Accesos, contacto, restricciones, devolución…" />
-            </div>
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-              <Button type="button" variant="outline" onClick={() => requests.length ? setView("list") : onOpenChange(false)}>
-                {requests.length ? "Volver" : "Cancelar"}
-              </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Guardando…" : editingId ? "Actualizar solicitud" : "Crear solicitud"}
-              </Button>
-            </div>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+      <AlertDialog open={Boolean(cancelTarget)} onOpenChange={(nextOpen) => { if (!nextOpen) setCancelTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar solicitud de transporte</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelTarget?.events.length
+                ? "La solicitud y sus movimientos planificados se cancelarán y dejarán de aparecer en el calendario. Esta acción no se puede deshacer."
+                : "La solicitud se cancelará. Esta acción no se puede deshacer."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const target = cancelTarget;
+                setCancelTarget(null);
+                if (target) void cancelRequest(target);
+              }}
+            >
+              Cancelar solicitud
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

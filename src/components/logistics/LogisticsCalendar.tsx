@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, isValid, isToday } from "date-fns";
+import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -29,28 +30,27 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
   const { toast } = useToast();
 
   const { data: events, isLoading } = useQuery({
-    queryKey: queryKeys.scope('logistics-events'),
+    queryKey: queryKeys.scope("logistics-events"),
     queryFn: async () => {
-      console.log('Fetching logistics events');
-      const { data, error } = await dataLayerClient.from('logistics_events')
+      const { data, error } = await dataLayerClient.from("logistics_events")
         .select(`
           *,
           job:jobs(title),
           departments:logistics_event_departments(department)
         `)
-        .order('event_time', { ascending: true });
+        .order("event_time", { ascending: true });
 
       if (error) {
-        console.error('Error fetching events:', error);
+        console.error("Error fetching logistics events:", error);
         toast({
           title: "Error",
-          description: "Failed to load logistics events",
+          description: "No se pudieron cargar los eventos de logística",
           variant: "destructive",
         });
         throw error;
       }
       return data;
-    }
+    },
   });
 
   const firstDayOfMonth = startOfMonth(currentMonth);
@@ -76,16 +76,8 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
 
   const getDayEvents = (date: Date) => {
     if (!events) return [];
-    return events.filter(event => {
-      if (!event.event_date) return false;
-      try {
-        const eventDate = new Date(event.event_date);
-        return isValid(eventDate) && format(eventDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
-      } catch (e) {
-        console.error('Invalid date in event:', event);
-        return false;
-      }
-    });
+    const dateKey = format(date, "yyyy-MM-dd");
+    return events.filter((event) => event.event_date === dateKey);
   };
 
   const handlePreviousMonth = () => {
@@ -131,10 +123,10 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="text-xl font-bold">Logistics Calendar</CardTitle>
-        <div className="flex items-center space-x-2">
+    <Card className="flex h-full min-w-0 flex-col">
+      <CardHeader className="flex flex-col gap-3 space-y-0 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <CardTitle className="text-xl font-bold">Calendario de logística</CardTitle>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <LogisticsCalendarPrintDialog
             showDialog={showPrintDialog}
             setShowDialog={setShowPrintDialog}
@@ -142,23 +134,24 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
             onGeneratePDF={handleGeneratePDF}
             onGenerateXLS={handleGenerateXLS}
           />
-          <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
+          <Button variant="ghost" size="icon" onClick={handlePreviousMonth} aria-label="Mes anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="hidden sm:flex items-center gap-2 px-2 text-sm font-medium text-muted-foreground">
+          <div className="hidden items-center gap-2 px-2 text-sm font-medium text-muted-foreground sm:flex">
             <CalendarIcon className="h-4 w-4" />
-            <span>{format(currentMonth, 'MMMM yyyy')}</span>
+            <span>{format(currentMonth, "MMMM yyyy", { locale: es })}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+          <Button variant="ghost" size="icon" onClick={handleNextMonth} aria-label="Mes siguiente">
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={handleTodayClick}>
-            Today
+            Hoy
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowPrintDialog(true)}
+            aria-label="Exportar calendario"
           >
             <Printer className="h-4 w-4" />
           </Button>
@@ -170,17 +163,17 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
               }}
               size="sm"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 h-4 w-4" />
               Añadir evento
             </Button>
           )}
         </div>
       </CardHeader>
-      <CardContent className="flex-grow p-4">
-        <div className="border rounded-lg overflow-x-auto">
-          <div className="grid grid-cols-7 gap-px bg-muted" style={{ minWidth: '980px' }}>
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-              <div key={day} className="bg-background p-2 text-center text-sm text-muted-foreground font-medium">
+      <CardContent className="min-w-0 flex-grow p-4">
+        <div className="overflow-x-auto rounded-lg border">
+          <div className="grid min-w-[980px] grid-cols-7 gap-px bg-muted">
+            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
+              <div key={day} className="bg-background p-2 text-center text-sm font-medium text-muted-foreground">
                 {day}
               </div>
             ))}
@@ -194,16 +187,16 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
                 <div
                   key={i}
                   className={cn(
-                    "bg-background p-2 min-h-[200px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
+                    "relative min-h-[200px] cursor-pointer border-t bg-background p-2 transition-colors hover:bg-accent/50",
                     isTodayDate && "ring-2 ring-inset ring-primary bg-primary/5 hover:bg-primary/10",
-                    !isCurrentMonth && "text-muted-foreground/50"
+                    !isCurrentMonth && "text-muted-foreground/50",
                   )}
                   aria-current={isTodayDate ? "date" : undefined}
                   onClick={() => handleDayClick(day)}
                 >
-                  <span className={cn("text-sm", isTodayDate && "text-primary font-medium")}>{format(day, "d")}</span>
-                  <div className="space-y-1 mt-1">
-                    {dayEvents?.slice(0, maxVisibleEvents).map((event) => (
+                  <span className={cn("text-sm", isTodayDate && "font-medium text-primary")}>{format(day, "d")}</span>
+                  <div className="mt-1 space-y-1">
+                    {dayEvents.slice(0, maxVisibleEvents).map((event) => (
                       <Tooltip key={event.id}>
                         <TooltipTrigger asChild>
                           <div>
@@ -213,7 +206,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
                               compact
                               variant="calendar"
                               interactive={!readOnly}
-                              className={cn("px-1.5 py-0.5 text-xs truncate", !readOnly && "hover:bg-accent/50")}
+                              className={cn("truncate px-1.5 py-0.5 text-xs", !readOnly && "hover:bg-accent/50")}
                             />
                           </div>
                         </TooltipTrigger>
@@ -222,14 +215,14 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
                             event={event}
                             onClick={(e) => handleEventClick(e, event)}
                             interactive={!readOnly}
-                            className="border-0 shadow-none p-0"
+                            className="border-0 p-0 shadow-none"
                           />
                         </TooltipContent>
                       </Tooltip>
                     ))}
 
-                    {dayEvents && dayEvents.length > maxVisibleEvents && (
-                      <div className="text-xs text-muted-foreground mt-1">
+                    {dayEvents.length > maxVisibleEvents && (
+                      <div className="mt-1 text-xs text-muted-foreground">
                         + {dayEvents.length - maxVisibleEvents} más
                       </div>
                     )}
