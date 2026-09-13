@@ -7,14 +7,15 @@ import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { useState } from "react";
 
-
 import { queryKeys } from "@/lib/react-query";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+
 interface TodayLogisticsProps {
   selectedDate: Date;
+  readOnly?: boolean;
 }
 
-export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
+export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogisticsProps) => {
   const { toast } = useToast();
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
@@ -48,6 +49,7 @@ export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
   });
 
   const handleEventClick = (event: LogisticsCalendarEvent) => {
+    if (readOnly) return;
     setSelectedEvent(event);
     setShowEventDialog(true);
   };
@@ -75,12 +77,14 @@ export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
           )}
         </div>
 
-        <LogisticsEventDialog
-          open={showEventDialog}
-          onOpenChange={setShowEventDialog}
-          selectedDate={selectedDate}
-          selectedEvent={selectedEvent}
-        />
+        {!readOnly && (
+          <LogisticsEventDialog
+            open={showEventDialog}
+            onOpenChange={setShowEventDialog}
+            selectedDate={selectedDate}
+            selectedEvent={selectedEvent}
+          />
+        )}
       </CardContent>
     </Card>
   );
