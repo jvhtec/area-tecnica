@@ -75,7 +75,7 @@ export function TransportRequestPlanningDialog({ open, onOpenChange, request, on
       provider: load?.transport_provider || unload?.transport_provider || "",
       licensePlate: load?.license_plate || unload?.license_plate || "",
       loadingBay: load?.loading_bay || unload?.loading_bay || "",
-      notes: request.note || "",
+      notes: request.events.length ? (load ?? unload)?.notes ?? "" : request.note || "",
     });
   }, [form, open, request]);
 
@@ -164,9 +164,9 @@ export function TransportRequestPlanningDialog({ open, onOpenChange, request, on
 
             <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="min-w-0 space-y-2">
-                <Label>Proveedor</Label>
+                <Label htmlFor="transport-provider">Proveedor</Label>
                 <Select value={form.watch("provider") || "__none"} onValueChange={(value) => form.setValue("provider", value === "__none" ? "" : value, { shouldDirty: true })}>
-                  <SelectTrigger className="w-full min-w-0"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                  <SelectTrigger id="transport-provider" className="w-full min-w-0"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none">Sin asignar</SelectItem>
                     {Object.entries(TRANSPORT_PROVIDERS).map(([value, provider]) => (

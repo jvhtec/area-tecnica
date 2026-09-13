@@ -76,6 +76,7 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
   const [planningRequest, setPlanningRequest] = useState<TransportRequestRecord | null>(null);
   const [editingRequest, setEditingRequest] = useState<TransportRequestRecord | null>(null);
   const [cancelTarget, setCancelTarget] = useState<TransportRequestRecord | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<TransportRequestRecord | null>(null);
 
   const queryKey = queryKeys.scope("logistics-transport-inbox", stageFilter);
   const { data: requests = [], isLoading, isError, error, refetch } = useQuery({
@@ -207,6 +208,11 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
                           </Button>
                         )}
                         {(request.planning_status === "planned" || request.planning_status === "confirmed") && (
+                          <Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => setReviewTarget(request)}>
+                            Volver a revisión
+                          </Button>
+                        )}
+                        {(request.planning_status === "planned" || request.planning_status === "confirmed") && (
                           <Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => void moveTo(request, "completed")}>
                             <CheckCircle2 className="mr-1 h-4 w-4" />Completar
                           </Button>
@@ -273,12 +279,14 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
         </>
       )}
 
-      <AlertDialog open={Boolean(cancelTarget)} onOpenChange={(open) => { if (!open) setCancelTarget(null); }}>
+      <AlertDialog open={Boolean(cancelTarget || reviewTarget)} onOpenChange={(open) => { if (!open) { setCancelTarget(null); setReviewTarget(null); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar solicitud de transporte</AlertDialogTitle>
+            <AlertDialogTitle>{reviewTarget ? "Volver a revisión" : "Cancelar solicitud de transporte"}</AlertDialogTitle>
             <AlertDialogDescription>
-              {cancelTarget?.events.length
+              {reviewTarget
+                ? "Se retirarán todos los movimientos de esta solicitud del calendario. Podrás modificar la demanda y planificarla de nuevo. Los ajustes de los movimientos se perderán."
+                : cancelTarget?.events.length
                 ? "La solicitud y sus movimientos planificados se cancelarán y dejarán de aparecer en el calendario. Esta acción no se puede deshacer."
                 : "La solicitud se cancelará. Esta acción no se puede deshacer."}
             </AlertDialogDescription>
@@ -288,12 +296,14 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                const target = cancelTarget;
+                const target = reviewTarget || cancelTarget;
+                const stage = reviewTarget ? "reviewing" : "cancelled";
                 setCancelTarget(null);
-                if (target) void moveTo(target, "cancelled");
+                setReviewTarget(null);
+                if (target) void moveTo(target, stage);
               }}
             >
-              Cancelar solicitud
+              {reviewTarget ? "Retirar planificación" : "Cancelar solicitud"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

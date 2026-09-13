@@ -111,7 +111,8 @@ export function TransportRequestDialog({
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: emptyValues });
   const items = useFieldArray({ control: form.control, name: "items" });
 
-  const queryKey = queryKeys.scope("transport-request", jobId, department);
+  // Job cards cache a single summary at the parent key; this RPC returns a list.
+  const queryKey = queryKeys.scope("transport-request", jobId, department, "list");
   const { data: requests = [], isLoading, isError, error, refetch } = useQuery({
     queryKey,
     enabled: open && Boolean(jobId && department),

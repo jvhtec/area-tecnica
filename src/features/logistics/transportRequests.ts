@@ -26,6 +26,7 @@ export type TransportRequestEvent = {
   transport_provider: string | null;
   license_plate: string | null;
   loading_bay: string | null;
+  notes: string | null;
 };
 
 export type TransportRequestRecord = {

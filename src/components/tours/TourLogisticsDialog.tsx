@@ -32,8 +32,13 @@ type TransportRequestWithItems = Pick<
   TransportRequestRow,
   'id' | 'job_id' | 'department' | 'note' | 'status' | 'created_by'
 > & {
+  planning_status: 'requested' | 'reviewing' | 'planned' | 'confirmed'
   items?: Array<Pick<TransportRequestItemRow, 'transport_type' | 'leftover_space_meters'>> | null
 }
+
+const EMPTY_REQUESTS: TransportRequestWithItems[] = []
+const isLockedRequest = (request: TransportRequestWithItems) =>
+  request.planning_status === 'planned' || request.planning_status === 'confirmed'
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
@@ -61,6 +66,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
   const [note, setNote] = useState('')
   const [defaultItems, setDefaultItems] = useState<VehicleItem[]>([{ transport_type: 'trailer', leftover_space_meters: '' }])
   const [overrides, setOverrides] = useState<Record<string, VehicleItem[]>>({})
+  const [saving, setSaving] = useState(false)
 
   // Load tour jobs (tour dates)
   const { data: tourJobs = [] } = useQuery({
@@ -80,25 +86,31 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
   const jobIds = useMemo(() => tourJobs.map((j) => j.id), [tourJobs])
 
   // Load existing requests for current department
-  const { data: existingReqs = [], refetch: refetchRequests } = useQuery({
+  const { data: existingReqs = EMPTY_REQUESTS, refetch: refetchRequests, isFetching: loadingRequests, isError: requestsFailed } = useQuery({
     queryKey: queryKeys.scope('tour-logistics-requests', tourId, department, jobIds.join(',')),
     enabled: open && jobIds.length > 0,
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('transport_requests')
-        .select('id, job_id, department, note, status, created_by, items:transport_request_items(transport_type, leftover_space_meters)')
+        .select('id, job_id, department, note, status, planning_status, created_by, items:transport_request_items(transport_type, leftover_space_meters)')
         .in('job_id', jobIds)
         .eq('department', department)
+        .filter('source_type', 'eq', 'tour')
+        .in('planning_status', ['requested', 'reviewing', 'planned', 'confirmed'])
       if (error) throw error
-      return (data || []) as TransportRequestWithItems[]
+      // The generated schema predates the transport planning columns.
+      return (data || []) as unknown as TransportRequestWithItems[]
     },
   })
+
+  const editableReqs = useMemo(() => existingReqs.filter(r => !isLockedRequest(r)), [existingReqs])
+  const lockedJobIds = useMemo(() => new Set(existingReqs.filter(isLockedRequest).map(r => r.job_id)), [existingReqs])
 
   // Initialize defaults/overrides from existing on department change
   useEffect(() => {
     if (!open) return
     // Pick the first request as the default template if available
-    if (existingReqs.length > 0) {
-      const first = existingReqs[0]
+    if (editableReqs.length > 0) {
+      const first = editableReqs[0]
       const items: VehicleItem[] = Array.isArray(first.items) && first.items.length > 0
         ? first.items.map((it): VehicleItem => ({ transport_type: it.transport_type, leftover_space_meters: it.leftover_space_meters ?? '' }))
         : [{ transport_type: 'trailer', leftover_space_meters: '' }]
@@ -106,7 +118,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
       setNote(first.note || '')
 
       const nextOverrides: Record<string, VehicleItem[]> = {}
-      existingReqs.forEach((r) => {
+      editableReqs.forEach((r) => {
         const its: VehicleItem[] = Array.isArray(r.items)
           ? r.items.map((it): VehicleItem => ({ transport_type: it.transport_type, leftover_space_meters: it.leftover_space_meters ?? '' }))
           : []
@@ -120,7 +132,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
       setNote('')
       setOverrides({})
     }
-  }, [department, open, existingReqs])
+  }, [department, open, editableReqs])
 
   const setOverrideFor = (jobId: string, items: VehicleItem[]) => {
     setOverrides(prev => ({ ...prev, [jobId]: items }))
@@ -135,19 +147,27 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
   }
 
   const saveAll = async () => {
+    setSaving(true)
     try {
       // Ensure we have auth
       const { data: userData } = await dataLayerClient.auth.getUser()
       const userId = userData.user?.id
-      if (!userId) throw new Error('Not authenticated')
+      if (!userId) throw new Error('Debes iniciar sesión')
+
+      const savedIds: string[] = []
+      let skipped = 0
 
       for (const job of tourJobs) {
         const jobId = job.id
+        if (lockedJobIds.has(jobId)) {
+          skipped += 1
+          continue
+        }
         const items = overrides[jobId] || defaultItems
 
         // Find existing request for job+department
         const existing = existingReqs.find(r => r.job_id === jobId)
-        const { error } = await dataLayerClient.rpc('replace_transport_request_with_items', {
+        const { data: requestId, error } = await dataLayerClient.rpc('replace_transport_request_with_items', {
           // `p_request_id` / `p_note` are nullable text/uuid arguments; the generated
           // types do not model argument nullability.
           p_request_id: (existing?.id || null) as string,
@@ -160,13 +180,28 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
         })
 
         if (error) throw error
+        savedIds.push(requestId)
       }
 
-      toast({ title: 'Logística actualizada para las fechas de gira' })
-      await refetchRequests()
+      // A concurrent plan can make the generator RPC acknowledge without changing demand.
+      const refreshed = await refetchRequests()
+      if (refreshed.error) throw refreshed.error
+      let updated = 0
+      for (const id of savedIds) {
+        const request = refreshed.data?.find(r => r.id === id)
+        if (!request) throw new Error('No se pudo verificar el guardado. Recarga las solicitudes de gira.')
+        if (isLockedRequest(request)) skipped += 1
+        else updated += 1
+      }
+      toast({
+        title: updated ? `Fechas de gira actualizadas: ${updated}` : 'No se actualizaron solicitudes de gira',
+        description: skipped ? `Fechas omitidas por tener solicitudes planificadas o confirmadas: ${skipped}. Vuelve a revisión desde Logística para editarlas.` : undefined,
+      })
       onOpenChange(false)
     } catch (e: unknown) {
       toast({ title: 'Error', description: getErrorMessage(e) || 'Error al guardar la logística', variant: 'destructive' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -177,11 +212,17 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
           <ResponsiveDialogTitle className="text-base md:text-lg">Logística de Gira – Transporte</ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
 
+        <p className="text-sm text-muted-foreground">Este diálogo gestiona la demanda generada por la gira. Las solicitudes manuales existentes se mantienen separadas.</p>
+        {lockedJobIds.size > 0 && (
+          <p className="text-sm text-muted-foreground">Se omitirán {lockedJobIds.size} fechas con solicitudes planificadas o confirmadas. Vuelve a revisión desde Logística para editarlas.</p>
+        )}
+        {requestsFailed && <p role="alert" className="text-sm text-destructive">No se pudieron cargar las solicitudes de gira.</p>}
+
         {/* Department + Note */}
         <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
           <div className="w-full sm:w-auto">
             <Label>Departamento</Label>
-            <Select value={department} onValueChange={(v) => setDepartment(v as Department)}>
+            <Select value={department} disabled={saving} onValueChange={(v) => setDepartment(v as Department)}>
               <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="sound">Sonido</SelectItem>
@@ -195,7 +236,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota opcional" />
           </div>
           <div className="w-full sm:ml-auto sm:w-auto">
-            <Button onClick={saveAll} className="w-full sm:w-auto">Guardar en todas las fechas</Button>
+            <Button onClick={saveAll} disabled={saving || loadingRequests || requestsFailed || tourJobs.length === 0 || lockedJobIds.size === tourJobs.length} className="w-full sm:w-auto">{saving ? 'Guardando…' : 'Guardar en fechas editables'}</Button>
           </div>
         </div>
 
@@ -261,6 +302,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
           <div className="mt-2 space-y-3 max-h-[40vh] overflow-y-auto pr-2">
             {tourJobs.map((job) => {
               const items = overrides[job.id]
+              const locked = lockedJobIds.has(job.id)
               return (
                 <div key={job.id} className="p-3 border rounded-md">
                   <div className="mb-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -272,14 +314,16 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                       {job.status === 'Cancelado' && (
                         <Badge variant="destructive" className="text-[10px]">Cancelado</Badge>
                       )}
-                      {items ? (
+                      {locked ? (
+                        <Badge variant="secondary">Plan bloqueado · se omitirá</Badge>
+                      ) : items ? (
                         <Button variant="outline" size="sm" onClick={() => removeOverrideFor(job.id)}>Usar por defecto</Button>
                       ) : (
                         <Button variant="secondary" size="sm" onClick={() => setOverrideFor(job.id, defaultItems)}>Anular</Button>
                       )}
                     </div>
                   </div>
-                  {items && (
+                  {!locked && items && (
                     <div className="space-y-2">
                       {items.map((it, idx) => (
                         <div key={idx} className="grid grid-cols-1 gap-2 rounded-lg border p-2 sm:flex sm:items-center sm:border-0 sm:p-0">
