@@ -52,7 +52,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onOpenFlexLogs,
   transportButtonLabel,
   transportButtonTone,
-  onTransportClick,
   onCreateWhatsappGroup,
   onRetryWhatsappGroup,
   whatsappDisabled,
@@ -116,6 +115,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     e.stopPropagation();
     navigate(`/timesheets?jobId=${job.id}`);
   }, [job.id, navigate]);
+
+  const handleTransportNavigation = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const params = new URLSearchParams({ jobId: job.id });
+    if (department) params.set("department", department);
+    navigate(`/logistics?${params.toString()}`);
+  }, [department, job.id, navigate]);
 
   const navigateToCalculator = React.useCallback((e: React.MouseEvent, type: "pesos" | "consumos") => {
     e.stopPropagation();
@@ -203,7 +209,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         onOpenFlexLogs={onOpenFlexLogs}
         transportButtonLabel={isManagementUser ? transportButtonLabel : undefined}
         transportButtonTone={transportButtonTone}
-        onTransportClick={isManagementUser ? onTransportClick : undefined}
+        onTransportClick={isManagementUser ? handleTransportNavigation : undefined}
         onCreateWhatsappGroup={onCreateWhatsappGroup}
         onRetryWhatsappGroup={onRetryWhatsappGroup}
         whatsappDisabled={whatsappDisabled}
