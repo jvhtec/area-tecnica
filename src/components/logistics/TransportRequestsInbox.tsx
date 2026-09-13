@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { CalendarClock, CheckCircle2, MapPin, PackageCheck, Route, Truck, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +17,8 @@ import {
   type TransportPlanningStatus,
   type TransportRequestRecord,
 } from "@/features/logistics/transportRequests";
+import { ACTIVE_DEPARTMENTS, getDepartmentLabel } from "@/types/department";
+import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { TransportRequestPlanningDialog } from "./TransportRequestPlanningDialog";
 
 const ACTIVE_STAGES: TransportPlanningStatus[] = ["requested", "reviewing", "planned", "confirmed"];
@@ -35,8 +35,6 @@ const priorityVariant = (priority: TransportRequestRecord["priority"]): "default
   if (priority === "high") return "default";
   return "outline";
 };
-
-const departmentLabel = (department: string) => ({ sound: "Sonido", lights: "Luces", video: "Vídeo" }[department] || department);
 
 export function TransportRequestsInbox() {
   const { toast } = useToast();
@@ -105,12 +103,12 @@ export function TransportRequestsInbox() {
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-            <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los dptos.</SelectItem>
-              <SelectItem value="sound">Sonido</SelectItem>
-              <SelectItem value="lights">Luces</SelectItem>
-              <SelectItem value="video">Vídeo</SelectItem>
+              {ACTIVE_DEPARTMENTS.map((department) => (
+                <SelectItem key={department} value={department}>{getDepartmentLabel(department)}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={stageFilter} onValueChange={setStageFilter}>
@@ -144,14 +142,14 @@ export function TransportRequestsInbox() {
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <CardTitle className="text-base sm:text-lg">{request.job_title}</CardTitle>
-                        <Badge variant="outline">{departmentLabel(request.department)}</Badge>
+                        <Badge variant="outline">{getDepartmentLabel(request.department)}</Badge>
                         <Badge variant={stageVariant(request.planning_status)}>{TRANSPORT_STAGE_LABELS[request.planning_status]}</Badge>
                         {request.priority !== "normal" && <Badge variant={priorityVariant(request.priority)}>{TRANSPORT_PRIORITY_LABELS[request.priority]}</Badge>}
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-1"><Route className="h-3.5 w-3.5" />{TRANSPORT_MOVEMENT_LABELS[request.movement_type]}</span>
                         <span className="inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5" />{vehicles}</span>
-                        {request.needed_at && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" />{format(new Date(request.needed_at), "d MMM · HH:mm", { locale: es })}</span>}
+                        {request.needed_at && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" />{formatInJobTimezone(request.needed_at, "dd/MM · HH:mm")}</span>}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
