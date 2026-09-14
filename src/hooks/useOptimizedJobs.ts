@@ -6,6 +6,7 @@ import { Department } from "@/types/department";
 import { sanitizeLogData } from "@/lib/enhanced-security-config";
 import { OPS_JOB_TYPES_NO_DRYHIRE, OPS_JOB_TYPES_WITH_DRYHIRE } from "@/utils/jobType";
 import { shouldHideJobForTourState } from "@/utils/cancelledTourJobs";
+import { fetchJobProducerClaims } from "@/features/jobs/producer-claims/producerClaims";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -32,6 +33,7 @@ export const useOptimizedJobs = (
   useMultiTableSubscription([
     { table: 'jobs', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
     { table: 'job_assignments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
+    { table: 'job_producer_claims', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
     { table: 'job_departments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
     { table: 'job_date_types', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
     { table: 'festival_artists', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
@@ -157,9 +159,14 @@ export const useOptimizedJobs = (
 
     const jobs = data || [];
     // Process the data to match expected format with optimized processing
+    const producerClaims = await fetchJobProducerClaims(jobs.map((job) => job.id)).catch((claimError) => {
+      console.warn("useOptimizedJobs: Failed to load producer claims", sanitizeLogData(claimError));
+      return [];
+    });
     const processedJobs = jobs.map(job => ({
       ...job,
       job_documents: job.job_documents || [],
+      job_producer_claims: producerClaims.filter((claim) => claim.job_id === job.id),
       festival_artists: job.festival_artists || [],
       flex_folders_exist: (job.flex_folders?.length || 0) > 0,
     }));

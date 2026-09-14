@@ -26,6 +26,9 @@ export const normalizeDepartmentKey = (value?: UserDepartment): string =>
 export const isAdministrativeDepartment = (department?: UserDepartment): boolean =>
   ADMINISTRATIVE_DEPARTMENT_KEYS.has(normalizeDepartmentKey(department));
 
+export const isProductionDepartment = (department?: UserDepartment): boolean =>
+  PRODUCTION_DEPARTMENT_KEYS.has(normalizeDepartmentKey(department));
+
 export const isAdminRole = (role: UserRole): boolean => role === 'admin';
 
 export const isManagementRole = (role: UserRole): boolean => MANAGEMENT_ROLES.has(role as AppUserRole);

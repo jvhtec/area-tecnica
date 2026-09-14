@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 import { bootstrapApp } from "./support/app";
 
 test("loads project management with the department default and mocked jobs", async ({ page }) => {
+  const start = new Date();
+  const end = new Date(start.getTime() + 9 * 60 * 60 * 1000);
+
   await bootstrapApp(page, {
     auth: {
       role: "management",
@@ -19,8 +22,8 @@ test("loads project management with the department default and mocked jobs", asy
         {
           id: "job-smoke-1",
           title: "Smoke PM Job",
-          start_time: "2026-03-10T09:00:00.000Z",
-          end_time: "2026-03-10T18:00:00.000Z",
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
           status: "Confirmado",
           job_type: "single",
           location: {

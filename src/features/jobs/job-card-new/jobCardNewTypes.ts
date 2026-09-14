@@ -12,6 +12,7 @@ import type { Database } from "@/integrations/supabase/types";
 import type { Department } from "@/types/department";
 import type { TourDateLike } from "@/utils/assignmentWorkDates";
 import type { CalendarArtist } from "@/utils/calendarArtists";
+import type { JobProducerClaim } from "@/features/jobs/producer-claims/producerClaims";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 
@@ -43,6 +44,7 @@ export type JobCardJob = OptimizedJobCardJob &
     festival_artists?: CalendarArtist[] | null;
     job_date_types?: JobDateTypeForCard[] | null;
     job_departments?: JobDepartmentRef[] | null;
+    job_producer_claims?: JobProducerClaim[] | null;
     job_name?: JobCardActionsJob["job_name"];
     job_type: JobCardActionsJob["job_type"];
     location?: JobCardActionsJob["location"];
