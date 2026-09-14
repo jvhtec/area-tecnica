@@ -159,10 +159,9 @@ export const useOptimizedJobs = (
 
     const jobs = data || [];
     // Process the data to match expected format with optimized processing
-    const producerClaims = await fetchJobProducerClaims(jobs.map((job) => job.id)).catch((claimError) => {
-      console.warn("useOptimizedJobs: Failed to load producer claims", sanitizeLogData(claimError));
-      return [];
-    });
+    // Claims are decoration on top of the job list: a failure here must not
+    // blank the calendar, so fall back to an unclaimed view.
+    const producerClaims = await fetchJobProducerClaims(jobs.map((job) => job.id)).catch(() => []);
     const processedJobs = jobs.map(job => ({
       ...job,
       job_documents: job.job_documents || [],

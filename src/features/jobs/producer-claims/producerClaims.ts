@@ -14,6 +14,8 @@ export type DocumentContact = {
   technician_id?: string;
 };
 
+const claimsTable = "job_producer_claims" as never;
+
 export const fetchJobProducerClaims = async (jobIds: string[]): Promise<JobProducerClaim[]> => {
   if (jobIds.length === 0) return [];
   const { data, error } = await dataLayerClient.rpc(
@@ -26,14 +28,14 @@ export const fetchJobProducerClaims = async (jobIds: string[]): Promise<JobProdu
 
 export const claimJobForProducer = async (jobId: string, producerId: string) => {
   const { error } = await dataLayerClient
-    .from("job_producer_claims" as never)
+    .from(claimsTable)
     .insert({ job_id: jobId, producer_id: producerId } as never);
   if (error) throw error;
 };
 
 export const releaseJobForProducer = async (jobId: string, producerId: string) => {
   const { error } = await dataLayerClient
-    .from("job_producer_claims" as never)
+    .from(claimsTable)
     .delete()
     .eq("job_id", jobId)
     .eq("producer_id", producerId);
@@ -46,20 +48,11 @@ export const mergeProducerClaimsIntoContacts = (
 ): DocumentContact[] => {
   const merged = [...contacts];
 
-  for (const claim of claims) {
-    const name = claim.display_name;
-    if (merged.some((contact) =>
-      contact.technician_id === claim.producer_id
-      || contact.name?.trim() === name
-    )) {
-      continue;
-    }
-
-    merged.push({
-      name,
-      role: "Producción",
-      technician_id: claim.producer_id,
-    });
+  for (const { producer_id, display_name } of claims) {
+    const listed = merged.some(
+      (contact) => contact.technician_id === producer_id || contact.name?.trim() === display_name,
+    );
+    if (!listed) merged.push({ name: display_name, role: "Producción", technician_id: producer_id });
   }
 
   return merged;
