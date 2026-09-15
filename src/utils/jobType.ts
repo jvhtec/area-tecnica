@@ -21,6 +21,12 @@ export function isFestivalLikeJobType(jobType?: string | null): boolean {
   return jobType === "festival" || jobType === "ciclo";
 }
 
+// Canonical dry-hire check. Reused wherever dry-hire jobs must hide
+// staffing/production-only UI (e.g. producer claims, transport, tasks).
+export function isDryHireJobType(jobType?: string | null): boolean {
+  return jobType === "dryhire";
+}
+
 export function isKnownJobType(jobType?: string | null): jobType is JobType {
   if (!jobType) return false;
   return [

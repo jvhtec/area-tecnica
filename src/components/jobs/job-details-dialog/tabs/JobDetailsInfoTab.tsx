@@ -211,7 +211,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
             {jobDetails?.description && <p className="text-muted-foreground mt-1">{jobDetails.description}</p>}
           </div>
 
-          <JobProducerClaims jobId={resolvedJobId} />
+          <JobProducerClaims jobId={resolvedJobId} jobType={jobDetails?.job_type || job?.job_type} />
 
           <Separator />
 
