@@ -67,31 +67,35 @@ export const useJobProducerClaims = (
     ? candidates.filter((candidate) => candidate.id !== producerId && !claimedIds.has(candidate.id))
     : [];
 
-  const toggleClaim = async () => {
-    if (!producerId) return;
-    setIsPending(true);
+  const runClaimMutation = async (
+    action: Promise<void>,
+    setBusy: (value: boolean) => void,
+    errorMessage: string,
+  ) => {
+    setBusy(true);
     try {
-      await (isClaimedByCurrentUser
-        ? releaseJobForProducer(jobId, producerId)
-        : claimJobForProducer(jobId, producerId));
+      await action;
       setClaims(await fetchJobProducerClaims([jobId]));
     } catch {
-      toast.error("No se pudo actualizar");
+      toast.error(errorMessage);
     } finally {
-      setIsPending(false);
+      setBusy(false);
     }
   };
 
-  const assignProducer = async (candidateId: string) => {
-    setIsAssigning(true);
-    try {
-      await claimJobForProducer(jobId, candidateId);
-      setClaims(await fetchJobProducerClaims([jobId]));
-    } catch {
-      toast.error("No se pudo asignar");
-    } finally {
-      setIsAssigning(false);
-    }
+  const toggleClaim = () => {
+    if (!producerId) return;
+    void runClaimMutation(
+      isClaimedByCurrentUser
+        ? releaseJobForProducer(jobId, producerId)
+        : claimJobForProducer(jobId, producerId),
+      setIsPending,
+      "No se pudo actualizar",
+    );
+  };
+
+  const assignProducer = (candidateId: string) => {
+    void runClaimMutation(claimJobForProducer(jobId, candidateId), setIsAssigning, "No se pudo asignar");
   };
 
   return {
@@ -100,10 +104,10 @@ export const useJobProducerClaims = (
     isClaimedByCurrentUser,
     isLoading: claims === undefined,
     isPending,
-    toggleClaim: () => void toggleClaim(),
+    toggleClaim,
     canAssign,
     candidates: assignableCandidates,
     isAssigning,
-    assignProducer: (candidateId: string) => void assignProducer(candidateId),
+    assignProducer,
   };
 };
