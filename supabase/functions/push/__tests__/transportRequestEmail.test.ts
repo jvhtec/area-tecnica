@@ -48,6 +48,18 @@ function mockClient(overrides: Partial<Tables> = {}, errorTable?: string) {
   return { client: { from } as unknown as SupabaseClient, from };
 }
 
+// Sends run concurrently (CONCURRENCY = 4) and each worker awaits its
+// idempotency-key digest before calling the provider, so provider call order
+// does not follow recipient order. Index payloads by recipient instead.
+function payloadsByRecipient(fromIndex = 0) {
+  const byRecipient = new Map<string, ReturnType<typeof payload>>();
+  vi.mocked(sendBrevoEmail).mock.calls.slice(fromIndex).forEach((_call, offset) => {
+    const entry = payload(fromIndex + offset);
+    byRecipient.set(entry.to[0].email, entry);
+  });
+  return byRecipient;
+}
+
 function payload(index = 0) {
   return vi.mocked(sendBrevoEmail).mock.calls[index][1] as {
     to: Array<{ email: string }>; sender: { email: string; name: string };
@@ -159,15 +171,21 @@ describe("sendTransportRequestEmail", () => {
   it("deduplicates normalized logistics recipients, isolates messages and uses stable per-recipient UUID keys", async () => {
     const { client } = mockClient({ profiles: [requester, ...[" LOG@example.com ", "log@example.com", "other@example.com"].map((email) => ({ email, department: "logistics" }))] });
     expect(await sendTransportRequestEmail(client, creatorId, requestId)).toMatchObject({ sent: 2 });
-    const first = payload(); const second = payload(1);
+    const sent = payloadsByRecipient();
+    // Three logistics rows collapse to two recipients: the padded/uppercase
+    // duplicate normalizes onto log@example.com.
+    expect([...sent.keys()].sort()).toEqual(["log@example.com", "other@example.com"]);
+    const first = sent.get("log@example.com")!; const second = sent.get("other@example.com")!;
     expect(first.to).toEqual([{ email: "log@example.com" }]);
     expect(second.to).toEqual([{ email: "other@example.com" }]);
     expect(first).not.toHaveProperty("cc"); expect(first).not.toHaveProperty("bcc");
     expect(first.htmlContent).not.toContain("other@example.com");
     expect(first.headers.idempotencyKey).toMatch(/^[\da-f]{8}-[\da-f]{4}-8[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/);
     expect(first.headers.idempotencyKey).not.toBe(second.headers.idempotencyKey);
+    const sentBefore = vi.mocked(sendBrevoEmail).mock.calls.length;
     await sendTransportRequestEmail(client, creatorId, requestId);
-    expect(payload(2).headers.idempotencyKey).toBe(first.headers.idempotencyKey);
+    expect(payloadsByRecipient(sentBefore).get("log@example.com")!.headers.idempotencyKey)
+      .toBe(first.headers.idempotencyKey);
   });
 
   it("bounds concurrency to four and isolates individual provider failures", async () => {
