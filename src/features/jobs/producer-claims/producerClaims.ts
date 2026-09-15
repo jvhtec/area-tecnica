@@ -1,9 +1,17 @@
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { isProductionDepartment } from "@/utils/permissions";
 
 export type JobProducerClaim = {
   job_id: string;
   producer_id: string;
   display_name: string;
+};
+
+// Feature code only keeps the candidate id and display name; every other
+// profile-directory field is dropped at this boundary.
+export type ProducerCandidate = {
+  id: string;
+  displayName: string;
 };
 
 export type DocumentContact = {
@@ -40,6 +48,42 @@ export const releaseJobForProducer = async (jobId: string, producerId: string) =
     .eq("job_id", jobId)
     .eq("producer_id", producerId);
   if (error) throw error;
+};
+
+// Module-level cache so every card/dialog on a page shares one profile
+// directory request instead of each issuing its own. Resolved data stays
+// cached for the session; a failure clears the cache so the next caller
+// retries instead of being stuck on a rejected promise.
+let producerCandidatesPromise: Promise<ProducerCandidate[]> | null = null;
+
+export const fetchProducerCandidates = (): Promise<ProducerCandidate[]> => {
+  if (!producerCandidatesPromise) {
+    producerCandidatesPromise = Promise.resolve(
+      dataLayerClient.rpc("get_profile_directory" as never, { p_profile_ids: null } as never),
+    )
+      .then(({ data, error }: { data: unknown; error: unknown }) => {
+        if (error) throw error;
+        const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+        return rows
+          .filter((row) => isProductionDepartment(row.department as string | null))
+          .map((row) => ({
+            id: row.id as string,
+            displayName:
+              [row.first_name, row.last_name].filter(Boolean).join(" ").trim() ||
+              (row.nickname as string) ||
+              "Producción",
+          }));
+      })
+      .catch((error: unknown) => {
+        producerCandidatesPromise = null;
+        throw error;
+      });
+  }
+  return producerCandidatesPromise;
+};
+
+export const __resetProducerCandidatesCacheForTests = () => {
+  producerCandidatesPromise = null;
 };
 
 export const mergeProducerClaimsIntoContacts = (

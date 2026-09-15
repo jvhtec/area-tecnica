@@ -35,6 +35,11 @@ export const isManagementRole = (role: UserRole): boolean => MANAGEMENT_ROLES.ha
 
 export const isDepartmentManagementRole = (role: UserRole): boolean => role === 'management';
 
+// Only department-management users (not admin) in the production department
+// may assign the job-producer claim to another production-department user.
+export const canAssignJobProducerClaims = (role: UserRole, department?: UserDepartment): boolean =>
+  isDepartmentManagementRole(role) && isProductionDepartment(department);
+
 export const canAccessDashboard = (role: UserRole): boolean => DASHBOARD_ROLES.has(role as AppUserRole);
 
 export const canAccessDisponibilidad = (role: UserRole, department?: UserDepartment): boolean =>

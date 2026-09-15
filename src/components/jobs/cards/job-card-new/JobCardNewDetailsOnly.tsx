@@ -76,6 +76,7 @@ export function JobCardNewDetailsOnly({
 
           <JobProducerClaims
             jobId={job.id}
+            jobType={job.job_type}
             initialClaims={job.job_producer_claims ?? undefined}
           />
 

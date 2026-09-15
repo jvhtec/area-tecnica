@@ -5,6 +5,7 @@ import {
   canAccessExpenses,
   canAccessProjectManagement,
   canAccessSoundVision,
+  canAssignJobProducerClaims,
   canDeleteDocuments,
   canDeleteSoundVisionFiles,
   canDeleteTourDocuments,
@@ -199,5 +200,26 @@ describe('management role helpers', () => {
     expect(canViewProfilePushControls('logistics')).toBe(false);
     expect(canSubmitTechnicianIncidentReports('technician')).toBe(true);
     expect(canSubmitTechnicianIncidentReports('house_tech')).toBe(false);
+  });
+});
+
+describe('job producer claim assignment', () => {
+  it('allows only department-management production users to assign a claim', () => {
+    expect(canAssignJobProducerClaims('management', 'production')).toBe(true);
+    expect(canAssignJobProducerClaims('management', 'produccion')).toBe(true);
+  });
+
+  it('does not grant admin a bypass', () => {
+    expect(canAssignJobProducerClaims('admin', 'production')).toBe(false);
+  });
+
+  it('rejects management users outside the production department', () => {
+    expect(canAssignJobProducerClaims('management', 'sound')).toBe(false);
+    expect(canAssignJobProducerClaims('management', null)).toBe(false);
+  });
+
+  it('rejects non-management production users', () => {
+    expect(canAssignJobProducerClaims('technician', 'production')).toBe(false);
+    expect(canAssignJobProducerClaims(null, 'production')).toBe(false);
   });
 });

@@ -383,6 +383,7 @@ export function JobCardNewView({
         <div className="px-4 pb-2 sm:px-6">
           <JobProducerClaims
             jobId={job.id}
+            jobType={job.job_type}
             initialClaims={job.job_producer_claims ?? undefined}
           />
         </div>
