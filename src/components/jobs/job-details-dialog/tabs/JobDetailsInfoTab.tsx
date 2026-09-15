@@ -21,6 +21,7 @@ import { sendJobPayoutEmails } from "@/lib/job-payout-email";
 import { prepareJobPayoutData } from "@/lib/job-payout-data";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import { JobPayoutTotalsPanel } from "@/components/jobs/JobPayoutTotalsPanel";
+import { JobProducerClaims } from "@/components/jobs/producer-claims/JobProducerClaims";
 import { useJobApprovalStatus } from "@/hooks/useJobApprovalStatus";
 import { attachPayoutOverridesToTourQuotes } from "@/services/tourPayoutOverrides";
 
@@ -209,6 +210,8 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
             <h3 className="font-semibold text-lg">{jobDetails?.title}</h3>
             {jobDetails?.description && <p className="text-muted-foreground mt-1">{jobDetails.description}</p>}
           </div>
+
+          <JobProducerClaims jobId={resolvedJobId} />
 
           <Separator />
 

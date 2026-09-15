@@ -11,6 +11,7 @@ import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
+import { JobProducerClaims } from "@/components/jobs/producer-claims/JobProducerClaims";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
@@ -378,6 +379,13 @@ export function JobCardNewView({
           isProjectManagementPage={isProjectManagementPage}
           userRole={userRole}
         />
+
+        <div className="px-4 pb-2 sm:px-6">
+          <JobProducerClaims
+            jobId={job.id}
+            initialClaims={job.job_producer_claims ?? undefined}
+          />
+        </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-6">
           <div className="flex flex-wrap items-center gap-2">

@@ -84,8 +84,33 @@ const expectMobileShell = async (page: Page) => {
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.innerWidth + 1);
 };
 
+// The request sheet slides up when it opens, so a box read taken the moment its
+// title becomes visible can still be mid-transition and report a bottom edge
+// below the fold. Containment is a property of the sheet at rest, so settle on
+// two consecutive identical boxes before measuring it.
+const settledBoundingBox = async (locator: ReturnType<Page["locator"]>) => {
+  let previous = await locator.boundingBox();
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await locator.page().waitForTimeout(50);
+    const current = await locator.boundingBox();
+
+    if (
+      previous && current
+      && previous.x === current.x && previous.y === current.y
+      && previous.width === current.width && previous.height === current.height
+    ) {
+      return current;
+    }
+
+    previous = current;
+  }
+
+  return previous;
+};
+
 const expectInsideViewport = async (page: Page, locator: ReturnType<Page["locator"]>) => {
-  const box = await locator.boundingBox();
+  const box = await settledBoundingBox(locator);
   expect(box).not.toBeNull();
   const viewport = page.viewportSize();
   expect(viewport).not.toBeNull();

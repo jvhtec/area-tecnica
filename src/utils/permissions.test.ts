@@ -33,6 +33,7 @@ import {
   isAdministrativeDepartment,
   isDepartmentManagementRole,
   isManagementRole,
+  isProductionDepartment,
   normalizeDepartmentKey,
 } from './permissions';
 
@@ -61,6 +62,12 @@ describe('department normalization', () => {
   it('normalizes accented department names', () => {
     expect(normalizeDepartmentKey('Administración')).toBe('administracion');
     expect(isAdministrativeDepartment('Administración')).toBe(true);
+  });
+
+  it('recognizes production department aliases for producer claims', () => {
+    expect(isProductionDepartment('production')).toBe(true);
+    expect(isProductionDepartment('Producción')).toBe(true);
+    expect(isProductionDepartment('sound')).toBe(false);
   });
 });
 

@@ -1,6 +1,7 @@
 import { format, isValid } from "date-fns";
 
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
+import { JobProducerClaims } from "@/components/jobs/producer-claims/JobProducerClaims";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -72,6 +73,11 @@ export function JobCardNewDetailsOnly({
           <h3 className="font-semibold text-lg truncate" title={jobName}>
             {jobName}
           </h3>
+
+          <JobProducerClaims
+            jobId={job.id}
+            initialClaims={job.job_producer_claims ?? undefined}
+          />
 
           {visibleArtistNames.length > 0 && (
             <div className="flex flex-wrap gap-1.5" aria-label="Artistas programados para esta fecha">

@@ -12,6 +12,7 @@ import {
 import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { HojaDeRutaPrintPreviewTarget } from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
 import type { HojaDeRutaPdfPreview } from "@/components/hoja-de-ruta/HojaDeRutaPdfPreviewDialog";
+import { fetchJobProducerClaims, mergeProducerClaimsIntoContacts } from "@/features/jobs/producer-claims/producerClaims";
 
 /**
  * The subset of `hoja_de_ruta` metadata the export flow reads. Nullable because it comes
@@ -88,19 +89,24 @@ export const useHojaDeRutaExports = ({
     return "draft";
   };
 
-  const buildPdfEventData = (): EventData => ({
-    ...eventData,
-    metadata: hojaDeRuta
-      ? {
-          id: hojaDeRuta.id ?? undefined,
-          document_version: hojaDeRuta.document_version || 1,
-          status: normalizeHojaStatus(hojaDeRuta.status),
-          created_at: hojaDeRuta.created_at || new Date().toISOString(),
-          updated_at: hojaDeRuta.updated_at || new Date().toISOString(),
-          last_modified: hojaDeRuta.last_modified || new Date().toISOString(),
-        }
-      : undefined,
-  });
+  const buildDocumentEventData = async (jobId: string): Promise<EventData> => {
+    const claims = await fetchJobProducerClaims([jobId]);
+
+    return {
+      ...eventData,
+      contacts: mergeProducerClaimsIntoContacts(eventData.contacts, claims),
+      metadata: hojaDeRuta
+        ? {
+            id: hojaDeRuta.id ?? undefined,
+            document_version: hojaDeRuta.document_version || 1,
+            status: normalizeHojaStatus(hojaDeRuta.status),
+            created_at: hojaDeRuta.created_at || new Date().toISOString(),
+            updated_at: hojaDeRuta.updated_at || new Date().toISOString(),
+            last_modified: hojaDeRuta.last_modified || new Date().toISOString(),
+          }
+        : undefined,
+    };
+  };
 
   const getRequiredSelectedJobId = () => {
     if (selectedJobId) return selectedJobId;
@@ -191,7 +197,7 @@ export const useHojaDeRutaExports = ({
       await saveBeforePdfGeneration();
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
-      const enhancedEventData = buildPdfEventData();
+      const enhancedEventData = await buildDocumentEventData(currentJobId);
 
       const jobDetails = getSelectedJobDetails(currentJobId);
       // Convert accommodations to legacy room assignments for PDF generation
@@ -245,7 +251,7 @@ export const useHojaDeRutaExports = ({
       const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
       await generatePDF(
-        buildPdfEventData(),
+        await buildDocumentEventData(currentJobId),
         travelArrangements,
         legacyRoomAssignments,
         imagePreviews,
@@ -286,7 +292,7 @@ export const useHojaDeRutaExports = ({
       const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
       const generatedPdf = await generatePDFPreview(
-        buildPdfEventData(),
+        await buildDocumentEventData(currentJobId),
         travelArrangements,
         legacyRoomAssignments,
         imagePreviews,
@@ -327,9 +333,10 @@ export const useHojaDeRutaExports = ({
       );
 
       const jobDetails = getSelectedJobDetails(currentJobId);
+      const documentEventData = await buildDocumentEventData(currentJobId);
 
       await generateDriverCertificatePDF({
-        eventData,
+        eventData: documentEventData,
         selectedJobId: currentJobId,
         jobTitle: jobDetails?.title || "",
         jobDate: jobDetails?.start_time || undefined,
@@ -362,9 +369,10 @@ export const useHojaDeRutaExports = ({
         "@/utils/hoja-de-ruta/pdf"
       );
       const jobDetails = getSelectedJobDetails(currentJobId);
+      const documentEventData = await buildDocumentEventData(currentJobId);
 
       const generatedPdf = await generateDriverCertificatePDFPreview({
-        eventData,
+        eventData: documentEventData,
         selectedJobId: currentJobId,
         jobTitle: jobDetails?.title || "",
         jobDate: jobDetails?.start_time || undefined,
@@ -402,7 +410,7 @@ export const useHojaDeRutaExports = ({
       const jobDetails = jobs?.find((job) => job.id === selectedJobId);
 
       await generateHojaDeRutaXLS({
-        eventData,
+        eventData: await buildDocumentEventData(selectedJobId),
         travelArrangements,
         accommodations,
         jobTitle: jobDetails?.title || "",
