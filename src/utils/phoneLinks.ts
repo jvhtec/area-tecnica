@@ -23,7 +23,12 @@ export const normalizePhoneToE164 = (raw?: string | null): string | null => {
 
   if (digits.startsWith("00")) digits = `+${digits.slice(2)}`;
   if (!digits.startsWith("+")) {
-    digits = /^[67]\d{8}$/.test(digits) ? `+34${digits}` : `${DEFAULT_COUNTRY_CODE}${digits}`;
+    // A country code typed without `+` or `00` (34600111222) must not be
+    // prefixed again — `+3434600111222` still satisfies the E.164 shape below,
+    // so the bad number would reach wa.me/tel: instead of being rejected.
+    if (/^34\d{9}$/.test(digits)) digits = `+${digits}`;
+    else if (/^[67]\d{8}$/.test(digits)) digits = `+34${digits}`;
+    else digits = `${DEFAULT_COUNTRY_CODE}${digits}`;
   }
 
   return /^\+\d{7,15}$/.test(digits) ? digits : null;

@@ -22,6 +22,14 @@ describe("normalizePhoneToE164", () => {
     expect(normalizePhoneToE164("711222333")).toBe("+34711222333");
   });
 
+  it("passes through a country code typed without + or 00", () => {
+    // Regression: this used to become +3434600111222, which still satisfies the
+    // E.164 shape and so silently produced a link to the wrong number.
+    expect(normalizePhoneToE164("34600111222")).toBe("+34600111222");
+    expect(normalizePhoneToE164("34 600 11 12 22")).toBe("+34600111222");
+    expect(normalizePhoneToE164("34911222333")).toBe("+34911222333");
+  });
+
   it("falls back to the default country code for other local numbers", () => {
     expect(normalizePhoneToE164("911222333")).toBe("+34911222333");
   });

@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(34);
+SELECT plan(37);
 
 SELECT has_table('public', 'job_producer_claims', 'job_producer_claims table exists');
 
@@ -169,7 +169,8 @@ DELETE FROM public.profiles WHERE id IN (
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
-  'd9100000-0000-0000-0000-000000000007'::uuid
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000001'::uuid,
@@ -178,7 +179,8 @@ DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
-  'd9100000-0000-0000-0000-000000000007'::uuid
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 
 INSERT INTO auth.users (
@@ -233,6 +235,13 @@ INSERT INTO auth.users (
     'claim-unrelated-tech@test.local', 'test', now(), now(), now(),
     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
     'authenticated', 'authenticated'
+  ),
+  (
+    'd9100000-0000-0000-0000-000000000008'::uuid,
+    '00000000-0000-0000-0000-000000000000'::uuid,
+    'claim-logistics@test.local', 'test', now(), now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+    'authenticated', 'authenticated'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -244,7 +253,8 @@ VALUES
   ('d9100000-0000-0000-0000-000000000004'::uuid, 'claim-production-user@test.local', 'Olga', 'Producción', NULL, 'technician', 'produccion', '  +34 600 33 34 44  '),
   ('d9100000-0000-0000-0000-000000000005'::uuid, 'claim-sound-manager@test.local', 'Mario', 'Sonido', NULL, 'management', 'sound', NULL),
   ('d9100000-0000-0000-0000-000000000006'::uuid, 'claim-production-admin@test.local', 'Adela', 'Admin', NULL, 'admin', 'production', NULL),
-  ('d9100000-0000-0000-0000-000000000007'::uuid, 'claim-unrelated-tech@test.local', 'Nuria', 'Nadie', NULL, 'technician', 'sound', NULL)
+  ('d9100000-0000-0000-0000-000000000007'::uuid, 'claim-unrelated-tech@test.local', 'Nuria', 'Nadie', NULL, 'technician', 'sound', NULL),
+  ('d9100000-0000-0000-0000-000000000008'::uuid, 'claim-logistics@test.local', 'Lola', 'Logística', NULL, 'logistics', 'logistics', NULL)
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
     first_name = excluded.first_name,
@@ -596,6 +606,51 @@ SELECT results_eq(
 );
 
 RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000001', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'management reaches the producer without being staffed on the job'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000006', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'admin reaches the producer without being staffed on the job'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000008', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'logistics reaches the producer without being staffed on the job'
+);
+
+RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
 
@@ -631,7 +686,8 @@ DELETE FROM public.profiles WHERE id IN (
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
-  'd9100000-0000-0000-0000-000000000007'::uuid
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000001'::uuid,
@@ -640,7 +696,8 @@ DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
-  'd9100000-0000-0000-0000-000000000007'::uuid
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 
 SELECT * FROM finish();
