@@ -646,6 +646,16 @@ narrow properly. `filter(Boolean)` does not narrow: use `isTruthy` / `isPresent`
 - **Timesheets**: Auto-generated when assignments are created, synced on changes
 - **Cascade Logic**: Removing tour assignment removes all related job assignments and timesheets
 
+### Responsable de Producción (Job Producer Claims)
+
+Who in the production department is carrying a job — the person crew asks about anything non-technical. Full reference: `docs/workflows/job-producer-claims.md`.
+
+- **Table**: `job_producer_claims` (`job_id` + `producer_id` PK, `claimed_at`). Additive (several producers per job), immutable (no `UPDATE` grant — release and re-claim), and **completely independent from staffing** — a claim never creates a `job_assignment`, timesheet, rate row, or staffing side effect.
+- **Never on `dry-hire` jobs**: a trigger rejects the claim, and converting a job to dry-hire drops every existing claim.
+- **Two read RPCs, and the difference matters**: `get_job_producer_claims()` returns names only and is open to any authenticated caller; `get_job_producer_contacts()` also returns `phone`/`email` and releases each row only to `admin`/`management`/`logistics`, the producer themselves, or a technician assigned to that job. `profiles.phone`/`email` are private — never reach for the `profiles` table to get them.
+- **Assigning a peer is `management` + production only**, not `admin`. Use `canAssignJobProducerClaims` / `isProductionDepartment` from `@/utils/permissions`; the department column holds `production`, `produccion` and `producción` interchangeably.
+- **Surfaces**: job cards and the job details dialog (`JobProducerClaims`), the tech super app job details modal Info tab (`ProducerContactPanel`, with WhatsApp/`tel:`/`mailto:` shortcuts), and Hoja de Ruta exports via `mergeProducerClaimsIntoContacts`. Add the producer to any new job-facing document or surface you build.
+
 ### Timesheet Calculation
 Handled server-side via `compute_timesheet_hours()` RPC function:
 - Calculates regular hours, overtime, night hours
@@ -1051,6 +1061,9 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Options for `createHttpHandler` go inside its call** — `serve(createHttpHandler(handler, { onError }))`. Writing `serve(createHttpHandler(handler), { onError })` passes them to std's `serve`, whose `onError` must return a `Response`.
 - **Never commit .env files** — all dotenv files are gitignored; secrets go in Cloudflare Pages dashboard or Supabase secrets
 - **Staging uses a separate Supabase project** — don't point staging at production; use `.env.staging.local` and `npm run dev:staging`
+- **Producer claims never touch staffing** — `job_producer_claims` records who in production owns a job; claiming or releasing must not create or delete `job_assignments`, timesheets or rates
+- **Producer contact details come from `get_job_producer_contacts()`** — never read `profiles.phone`/`profiles.email` to show a producer's contact info; the RPC applies the per-job entitlement check and returning no rows is a normal denial, not an error
+- **Normalize phone numbers through `@/utils/phoneLinks`** — `buildWhatsAppHref` / `buildTelHref` / `normalizePhoneToE164` mirror the Spain-default E.164 rules of the `send-job-whatsapp-message` edge function; don't hand-build `wa.me` links
 - **Staffing campaign state machine** — don't bypass status transitions in the staffing orchestrator flow
 - **CI requires Node 20** — GitHub Actions workflow uses Node 20; match locally for consistency
 - **Playwright needs Chromium** — `npm run test:e2e` requires Playwright browsers installed (`npx playwright install chromium`)

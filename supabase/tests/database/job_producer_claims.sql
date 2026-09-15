@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(28);
+SELECT plan(37);
 
 SELECT has_table('public', 'job_producer_claims', 'job_producer_claims table exists');
 
@@ -71,6 +71,25 @@ SELECT function_privs_are(
   'authenticated users can call the safe producer directory function'
 );
 
+SELECT function_privs_are(
+  'public',
+  'get_job_producer_contacts',
+  ARRAY['uuid[]'],
+  'authenticated',
+  ARRAY['EXECUTE'],
+  'authenticated users can call the producer contact function'
+);
+
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.get_job_producer_contacts(uuid[])', 'EXECUTE')
+    AND (
+      SELECT procedure.prosecdef
+      FROM pg_proc AS procedure
+      WHERE procedure.oid = 'public.get_job_producer_contacts(uuid[])'::regprocedure
+    ),
+  'the producer contact function is a definer function closed to anonymous callers'
+);
+
 SELECT ok(
   NOT has_function_privilege('anon', 'public.enforce_job_producer_claim_department()', 'EXECUTE')
     AND NOT has_function_privilege('authenticated', 'public.enforce_job_producer_claim_department()', 'EXECUTE')
@@ -125,6 +144,18 @@ WHERE job_id IN (
   'd9200000-0000-0000-0000-000000000003'::uuid,
   'd9200000-0000-0000-0000-000000000004'::uuid
 );
+DELETE FROM public.timesheets WHERE job_id IN (
+  'd9200000-0000-0000-0000-000000000001'::uuid,
+  'd9200000-0000-0000-0000-000000000002'::uuid,
+  'd9200000-0000-0000-0000-000000000003'::uuid,
+  'd9200000-0000-0000-0000-000000000004'::uuid
+);
+DELETE FROM public.job_assignments WHERE job_id IN (
+  'd9200000-0000-0000-0000-000000000001'::uuid,
+  'd9200000-0000-0000-0000-000000000002'::uuid,
+  'd9200000-0000-0000-0000-000000000003'::uuid,
+  'd9200000-0000-0000-0000-000000000004'::uuid
+);
 DELETE FROM public.jobs WHERE id IN (
   'd9200000-0000-0000-0000-000000000001'::uuid,
   'd9200000-0000-0000-0000-000000000002'::uuid,
@@ -137,7 +168,9 @@ DELETE FROM public.profiles WHERE id IN (
   'd9100000-0000-0000-0000-000000000003'::uuid,
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
-  'd9100000-0000-0000-0000-000000000006'::uuid
+  'd9100000-0000-0000-0000-000000000006'::uuid,
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000001'::uuid,
@@ -145,7 +178,9 @@ DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000003'::uuid,
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
-  'd9100000-0000-0000-0000-000000000006'::uuid
+  'd9100000-0000-0000-0000-000000000006'::uuid,
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 
 INSERT INTO auth.users (
@@ -193,24 +228,41 @@ INSERT INTO auth.users (
     'claim-production-admin@test.local', 'test', now(), now(), now(),
     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
     'authenticated', 'authenticated'
+  ),
+  (
+    'd9100000-0000-0000-0000-000000000007'::uuid,
+    '00000000-0000-0000-0000-000000000000'::uuid,
+    'claim-unrelated-tech@test.local', 'test', now(), now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+    'authenticated', 'authenticated'
+  ),
+  (
+    'd9100000-0000-0000-0000-000000000008'::uuid,
+    '00000000-0000-0000-0000-000000000000'::uuid,
+    'claim-logistics@test.local', 'test', now(), now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+    'authenticated', 'authenticated'
   )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.profiles (id, email, first_name, last_name, nickname, role, department)
+INSERT INTO public.profiles (id, email, first_name, last_name, nickname, role, department, phone)
 VALUES
-  ('d9100000-0000-0000-0000-000000000001'::uuid, 'claim-production-one@test.local', 'Ana', 'Ruiz', NULL, 'management', 'production'),
-  ('d9100000-0000-0000-0000-000000000002'::uuid, 'claim-production-two@test.local', 'Luis', 'Pérez', 'Lucho', 'technician', 'producción'),
-  ('d9100000-0000-0000-0000-000000000003'::uuid, 'claim-sound@test.local', 'Sara', 'Sonido', NULL, 'technician', 'sound'),
-  ('d9100000-0000-0000-0000-000000000004'::uuid, 'claim-production-user@test.local', 'Olga', 'Producción', NULL, 'technician', 'produccion'),
-  ('d9100000-0000-0000-0000-000000000005'::uuid, 'claim-sound-manager@test.local', 'Mario', 'Sonido', NULL, 'management', 'sound'),
-  ('d9100000-0000-0000-0000-000000000006'::uuid, 'claim-production-admin@test.local', 'Adela', 'Admin', NULL, 'admin', 'production')
+  ('d9100000-0000-0000-0000-000000000001'::uuid, 'claim-production-one@test.local', 'Ana', 'Ruiz', NULL, 'management', 'production', '+34600111222'),
+  ('d9100000-0000-0000-0000-000000000002'::uuid, 'claim-production-two@test.local', 'Luis', 'Pérez', 'Lucho', 'technician', 'producción', NULL),
+  ('d9100000-0000-0000-0000-000000000003'::uuid, 'claim-sound@test.local', 'Sara', 'Sonido', NULL, 'technician', 'sound', NULL),
+  ('d9100000-0000-0000-0000-000000000004'::uuid, 'claim-production-user@test.local', 'Olga', 'Producción', NULL, 'technician', 'produccion', '  +34 600 33 34 44  '),
+  ('d9100000-0000-0000-0000-000000000005'::uuid, 'claim-sound-manager@test.local', 'Mario', 'Sonido', NULL, 'management', 'sound', NULL),
+  ('d9100000-0000-0000-0000-000000000006'::uuid, 'claim-production-admin@test.local', 'Adela', 'Admin', NULL, 'admin', 'production', NULL),
+  ('d9100000-0000-0000-0000-000000000007'::uuid, 'claim-unrelated-tech@test.local', 'Nuria', 'Nadie', NULL, 'technician', 'sound', NULL),
+  ('d9100000-0000-0000-0000-000000000008'::uuid, 'claim-logistics@test.local', 'Lola', 'Logística', NULL, 'logistics', 'logistics', NULL)
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
     first_name = excluded.first_name,
     last_name = excluded.last_name,
     nickname = excluded.nickname,
     role = excluded.role,
-    department = excluded.department;
+    department = excluded.department,
+    phone = excluded.phone;
 
 INSERT INTO public.jobs (id, title, start_time, end_time, job_type)
 VALUES
@@ -245,6 +297,15 @@ VALUES
 ON CONFLICT (id) DO UPDATE
 SET title = excluded.title,
     job_type = excluded.job_type;
+
+-- Sara is staffed on the authorization job, so she is entitled to its producer
+-- contact details. Nuria is staffed nowhere and must not be.
+INSERT INTO public.job_assignments (job_id, technician_id)
+VALUES (
+  'd9200000-0000-0000-0000-000000000004'::uuid,
+  'd9100000-0000-0000-0000-000000000003'::uuid
+)
+ON CONFLICT DO NOTHING;
 
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000001', false);
@@ -484,11 +545,129 @@ SELECT is(
 );
 
 RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000004', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone, email
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$
+    VALUES (
+      'Olga Producción'::text,
+      '+34 600 33 34 44'::text,
+      'claim-production-user@test.local'::text
+    )
+  $$,
+  'a producer sees their own contact row with surrounding whitespace trimmed'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000003', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'a technician staffed on the job can reach its producer'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000007', false);
+SET ROLE authenticated;
+
+SELECT is_empty(
+  $$
+    SELECT producer_id
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  'a technician who does not work the job gets no producer contact details'
+);
+
+SELECT results_eq(
+  $$
+    SELECT display_name
+    FROM public.get_job_producer_claims(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text)$$,
+  'the name-only directory stays open to every authenticated caller'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000001', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'management reaches the producer without being staffed on the job'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000006', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'admin reaches the producer without being staffed on the job'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000008', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'logistics reaches the producer without being staffed on the job'
+);
+
+RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
 
 DELETE FROM public.job_producer_claims
 WHERE job_id IN (
+  'd9200000-0000-0000-0000-000000000001'::uuid,
+  'd9200000-0000-0000-0000-000000000002'::uuid,
+  'd9200000-0000-0000-0000-000000000003'::uuid,
+  'd9200000-0000-0000-0000-000000000004'::uuid
+);
+DELETE FROM public.timesheets WHERE job_id IN (
+  'd9200000-0000-0000-0000-000000000001'::uuid,
+  'd9200000-0000-0000-0000-000000000002'::uuid,
+  'd9200000-0000-0000-0000-000000000003'::uuid,
+  'd9200000-0000-0000-0000-000000000004'::uuid
+);
+DELETE FROM public.job_assignments WHERE job_id IN (
   'd9200000-0000-0000-0000-000000000001'::uuid,
   'd9200000-0000-0000-0000-000000000002'::uuid,
   'd9200000-0000-0000-0000-000000000003'::uuid,
@@ -506,7 +685,9 @@ DELETE FROM public.profiles WHERE id IN (
   'd9100000-0000-0000-0000-000000000003'::uuid,
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
-  'd9100000-0000-0000-0000-000000000006'::uuid
+  'd9100000-0000-0000-0000-000000000006'::uuid,
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000001'::uuid,
@@ -514,7 +695,9 @@ DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000003'::uuid,
   'd9100000-0000-0000-0000-000000000004'::uuid,
   'd9100000-0000-0000-0000-000000000005'::uuid,
-  'd9100000-0000-0000-0000-000000000006'::uuid
+  'd9100000-0000-0000-0000-000000000006'::uuid,
+  'd9100000-0000-0000-0000-000000000007'::uuid,
+  'd9100000-0000-0000-0000-000000000008'::uuid
 );
 
 SELECT * FROM finish();

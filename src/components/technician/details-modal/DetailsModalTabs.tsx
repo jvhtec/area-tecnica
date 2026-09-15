@@ -32,6 +32,7 @@ import {
   getLogisticsTransportTypeLabel,
   getTravelTransportTypeLabel,
 } from "@/components/technician/details-modal/formatters";
+import { ProducerContactPanel } from "@/components/technician/details-modal/ProducerContactPanel";
 import type { DetailsModalViewModel } from "@/components/technician/details-modal/useDetailsModalData";
 import type { JobDocument, StaffAssignment } from "@/types/job";
 import { labelForCode } from "@/utils/roles";
@@ -60,6 +61,8 @@ export const InfoTab = ({ vm }: TabProps) => {
     jobDateTypesLoading,
     jobEndDate,
     jobStartDate,
+    producerContacts,
+    producerContactsLoading,
     roomOccupantsLoading,
     roomStaffIds,
     techShiftAssignmentsByDate,
@@ -93,6 +96,14 @@ export const InfoTab = ({ vm }: TabProps) => {
           </div>
         </div>
       </div>
+
+      <ProducerContactPanel
+        contacts={producerContacts}
+        isDark={isDark}
+        isLoading={producerContactsLoading}
+        jobTitle={job?.title}
+        theme={theme}
+      />
 
       {user?.id && (
         <div>

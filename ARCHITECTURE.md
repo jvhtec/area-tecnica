@@ -464,7 +464,7 @@ under `src/utils/hoja-de-ruta/pdf/` for route-sheet-specific composition.
 | `profiles` | User profiles | role, department, autonomo, skill_level, waha_endpoint |
 | `jobs` | Individual gigs/shows | job_type, status, location, start_time, end_time |
 | `tours` | Tour/festival containers | Groups multiple jobs |
-| `job_producer_claims` | Production ownership of a job | job_id, producer_id, claimed_at; independent from staffing |
+| `job_producer_claims` | Production ownership of a job (*responsable de producción*) | job_id, producer_id, claimed_at; additive, immutable, never on dry-hire jobs; independent from staffing. Read via `get_job_producer_claims()` (names) or `get_job_producer_contacts()` (names + phone/email, entitled callers only) — see [docs/workflows/job-producer-claims.md](docs/workflows/job-producer-claims.md) |
 | `job_assignments` | Tech → Job mapping | status (invited/confirmed/declined), department, sound_role |
 | `tour_assignments` | Tech → Tour mapping | Cascades to job_assignments + timesheets |
 | `timesheets` | Time tracking & payroll | hours, amount, category (tecnico/especialista/responsable), is_active |

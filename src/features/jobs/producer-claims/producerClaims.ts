@@ -7,6 +7,16 @@ export type JobProducerClaim = {
   display_name: string;
 };
 
+/**
+ * A producer claim plus the contact details needed to actually reach them.
+ * `phone`/`email` come from a separate RPC that only releases them to callers
+ * entitled to the job (see 20260915154500_add_job_producer_contact_directory).
+ */
+export type JobProducerContact = JobProducerClaim & {
+  phone: string | null;
+  email: string | null;
+};
+
 // Feature code only keeps the candidate id and display name; every other
 // profile-directory field is dropped at this boundary.
 export type ProducerCandidate = {
@@ -32,6 +42,16 @@ export const fetchJobProducerClaims = async (jobIds: string[]): Promise<JobProdu
   );
   if (error) throw error;
   return Array.isArray(data) ? data as unknown as JobProducerClaim[] : [];
+};
+
+export const fetchJobProducerContacts = async (jobIds: string[]): Promise<JobProducerContact[]> => {
+  if (jobIds.length === 0) return [];
+  const { data, error } = await dataLayerClient.rpc(
+    "get_job_producer_contacts" as never,
+    { p_job_ids: jobIds } as never,
+  );
+  if (error) throw error;
+  return Array.isArray(data) ? data as unknown as JobProducerContact[] : [];
 };
 
 export const claimJobForProducer = async (jobId: string, producerId: string) => {
@@ -86,17 +106,45 @@ export const __resetProducerCandidatesCacheForTests = () => {
   producerCandidatesPromise = null;
 };
 
+/**
+ * Add every producer carrying the job to a generated document's contact list.
+ *
+ * A producer already listed (same profile or same name) is not duplicated, but
+ * its phone/email are backfilled: the existing entry usually comes from job
+ * staffing and can be missing the contact columns this projection carries.
+ */
 export const mergeProducerClaimsIntoContacts = (
   contacts: DocumentContact[],
-  claims: JobProducerClaim[],
+  claims: Array<JobProducerClaim | JobProducerContact>,
 ): DocumentContact[] => {
   const merged = [...contacts];
 
-  for (const { producer_id, display_name } of claims) {
-    const listed = merged.some(
+  for (const claim of claims) {
+    const { producer_id, display_name } = claim;
+    const phone = "phone" in claim ? claim.phone ?? undefined : undefined;
+    const email = "email" in claim ? claim.email ?? undefined : undefined;
+
+    const existingIndex = merged.findIndex(
       (contact) => contact.technician_id === producer_id || contact.name?.trim() === display_name,
     );
-    if (!listed) merged.push({ name: display_name, role: "Producción", technician_id: producer_id });
+
+    if (existingIndex === -1) {
+      merged.push({
+        name: display_name,
+        role: "Producción",
+        technician_id: producer_id,
+        ...(phone ? { phone } : {}),
+        ...(email ? { email } : {}),
+      });
+      continue;
+    }
+
+    const existing = merged[existingIndex];
+    merged[existingIndex] = {
+      ...existing,
+      phone: existing.phone || phone,
+      email: existing.email || email,
+    };
   }
 
   return merged;

@@ -25,12 +25,32 @@ const claims = [
   },
 ];
 
+const contactClaims = [
+  { ...claims[0], phone: "+34600111222", email: "ana@sector-pro.com" },
+  { ...claims[1], phone: null, email: null },
+];
+
 describe("producer claims", () => {
   it("adds claimed producers to generated-document contacts", () => {
     const contacts = mergeProducerClaimsIntoContacts([], claims);
 
     expect(contacts).toEqual([
       { name: "Ana Ruiz", role: "Producción", technician_id: "producer-1" },
+      { name: "Luis Pérez", role: "Producción", technician_id: "producer-2" },
+    ]);
+  });
+
+  it("carries the producer's phone and email into document contacts", () => {
+    const contacts = mergeProducerClaimsIntoContacts([], contactClaims);
+
+    expect(contacts).toEqual([
+      {
+        name: "Ana Ruiz",
+        role: "Producción",
+        technician_id: "producer-1",
+        phone: "+34600111222",
+        email: "ana@sector-pro.com",
+      },
       { name: "Luis Pérez", role: "Producción", technician_id: "producer-2" },
     ]);
   });
@@ -42,6 +62,31 @@ describe("producer claims", () => {
     );
 
     expect(contacts).toHaveLength(2);
+  });
+
+  it("backfills contact details onto a producer already listed from staffing", () => {
+    const contacts = mergeProducerClaimsIntoContacts(
+      [{ name: "Ana Ruiz", role: "Jefe de producción", technician_id: "producer-1" }],
+      contactClaims,
+    );
+
+    expect(contacts[0]).toEqual({
+      name: "Ana Ruiz",
+      role: "Jefe de producción",
+      technician_id: "producer-1",
+      phone: "+34600111222",
+      email: "ana@sector-pro.com",
+    });
+  });
+
+  it("keeps a contact detail the document already had", () => {
+    const contacts = mergeProducerClaimsIntoContacts(
+      [{ name: "Ana Ruiz", role: "Producción", technician_id: "producer-1", phone: "+34911000000" }],
+      contactClaims,
+    );
+
+    expect(contacts[0].phone).toBe("+34911000000");
+    expect(contacts[0].email).toBe("ana@sector-pro.com");
   });
 });
 

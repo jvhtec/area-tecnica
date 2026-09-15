@@ -67,6 +67,8 @@ const createVm = (overrides: Partial<DetailsModalViewModel> = {}) => ({
   jobEndDate: "16 de mayo de 2026 a las 12:00",
   jobStartDate: "16 de mayo de 2026 a las 10:00",
   riderFiles: [],
+  producerContacts: [],
+  producerContactsLoading: false,
   riderFilesError: null,
   roomOccupantsLoading: false,
   roomStaffIds: [],
@@ -91,6 +93,45 @@ const createVm = (overrides: Partial<DetailsModalViewModel> = {}) => ({
 }) as unknown as DetailsModalViewModel;
 
 describe("DetailsModal tabs", () => {
+  it("shows the production contact and its WhatsApp shortcut in the info tab", () => {
+    const vm = createVm({
+      producerContacts: [
+        {
+          job_id: "job-1",
+          producer_id: "producer-1",
+          display_name: "Ana Ruiz",
+          phone: "600 111 222",
+          email: "ana@sector-pro.com",
+        },
+      ],
+    });
+
+    renderWithProviders(<InfoTab vm={vm} />);
+
+    expect(screen.getByText("Responsable de producción")).toBeInTheDocument();
+    expect(screen.getByText("Ana Ruiz")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Escribir por WhatsApp a Ana Ruiz" }),
+    ).toHaveAttribute(
+      "href",
+      "https://wa.me/34600111222?text=Hola%20Ana%20Ruiz%2C%20te%20escribo%20por%20%C2%ABTechnician%20Job%C2%BB.",
+    );
+    expect(screen.getByRole("link", { name: "Llamar a Ana Ruiz" })).toHaveAttribute(
+      "href",
+      "tel:+34600111222",
+    );
+    expect(screen.getByRole("link", { name: "Enviar un correo a Ana Ruiz" })).toHaveAttribute(
+      "href",
+      "mailto:ana@sector-pro.com",
+    );
+  });
+
+  it("omits the production block when the job has no claimed producer", () => {
+    renderWithProviders(<InfoTab vm={createVm()} />);
+
+    expect(screen.queryByText("Responsable de producción")).not.toBeInTheDocument();
+  });
+
   it("renders assigned dates, shift detail, accommodation, and job basics in the info tab", () => {
     const vm = createVm({
       allAssignedDates: ["2026-05-16"],
