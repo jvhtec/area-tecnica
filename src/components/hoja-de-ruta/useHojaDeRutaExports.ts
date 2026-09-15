@@ -12,7 +12,7 @@ import {
 import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { HojaDeRutaPrintPreviewTarget } from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
 import type { HojaDeRutaPdfPreview } from "@/components/hoja-de-ruta/HojaDeRutaPdfPreviewDialog";
-import { fetchJobProducerClaims, mergeProducerClaimsIntoContacts } from "@/features/jobs/producer-claims/producerClaims";
+import { fetchJobProducerContacts, mergeProducerClaimsIntoContacts } from "@/features/jobs/producer-claims/producerClaims";
 
 /**
  * The subset of `hoja_de_ruta` metadata the export flow reads. Nullable because it comes
@@ -90,7 +90,7 @@ export const useHojaDeRutaExports = ({
   };
 
   const buildDocumentEventData = async (jobId: string): Promise<EventData> => {
-    const claims = await fetchJobProducerClaims([jobId]);
+    const claims = await fetchJobProducerContacts([jobId]);
 
     return {
       ...eventData,

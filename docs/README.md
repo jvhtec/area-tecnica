@@ -19,6 +19,7 @@ Detailed documentation for each major subsystem — key files, database tables, 
 - **[Flex folder provisioning workflow](flex-folder-workflows.md)** — Server ownership, durable execution, recovery, authorization, and rollout
 - **[Job Assignment Matrix](workflows/job-assignment-matrix.md)** — Virtualized crew matrix, conflict detection, staffing campaigns
 - **[Timesheet System](workflows/timesheet-system.md)** — Draft → submitted → approved workflow, server-side rate calculation
+- **[Responsable de Producción](workflows/job-producer-claims.md)** — Job producer claims, contact release rules, WhatsApp/phone shortcuts, document contacts
 - **[Equipment Management](workflows/equipment-management.md)** — Stock tracking, sub-rentals, presets
 - **[Individual Motor Certificates](workflows/motor-certificates.md)** — Per-job certificates for serialized Flex motors, selected from outbound manifests with manual fallback
 - **[Rates & Payouts](workflows/rates-and-payouts.md)** — Rate catalog, approval workflow, payout overrides

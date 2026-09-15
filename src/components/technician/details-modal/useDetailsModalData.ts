@@ -29,6 +29,10 @@ import type {
   TechShiftAssignmentDetail,
   TabId,
 } from "@/components/technician/details-modal/types";
+import {
+  fetchJobProducerContacts,
+  type JobProducerContact,
+} from "@/features/jobs/producer-claims/producerClaims";
 import type { TourDocument } from "@/hooks/useTourDocuments";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useWeatherData } from "@/hooks/useWeatherData";
@@ -104,6 +108,18 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
           ? assignment.technician[0] ?? undefined
           : assignment.technician ?? undefined,
       }));
+    },
+    enabled: !!job?.id,
+  });
+
+  // Who in production is carrying this job, so the tech knows who to ask about
+  // anything that is not technical. The RPC only releases contact details to
+  // callers entitled to the job, so an empty result is a normal outcome.
+  const { data: producerContacts = [], isLoading: producerContactsLoading } = useQuery({
+    queryKey: createQueryKey.technicianJobModal.producerContacts(job?.id),
+    queryFn: async (): Promise<JobProducerContact[]> => {
+      if (!job?.id) return [];
+      return fetchJobProducerContacts([job.id]);
     },
     enabled: !!job?.id,
   });
@@ -738,6 +754,8 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
     locationData,
     mapPreviewUrl,
     onClose,
+    producerContacts,
+    producerContactsLoading,
     restaurants,
     riderFiles,
     riderFilesError,

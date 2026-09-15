@@ -162,6 +162,7 @@ export const createQueryKey = {
       ['technician-hoja-travel-arrangements', hojaId ?? null] as const,
     hojaTransport: (hojaId?: string | null) => ['technician-hoja-logistics-transport', hojaId ?? null] as const,
     roomOccupants: (profileIds?: string[]) => ['technician-hoja-room-occupants', profileIds ?? []] as const,
+    producerContacts: (jobId?: string | null) => ['technician-job-producer-contacts', jobId ?? null] as const,
   },
 };
 
