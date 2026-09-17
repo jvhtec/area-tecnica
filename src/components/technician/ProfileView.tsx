@@ -7,9 +7,8 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIcon, Lock, ChevronRight, LogOut, X, Bell, BellOff, AlertTriangle, Shield, ExternalLink, UserX } from 'lucide-react';
+import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIcon, Lock, ChevronRight, LogOut, X, Bell, Shield, ExternalLink, UserX } from 'lucide-react';
 import { Theme } from './types';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/api-config';
 
@@ -47,20 +46,6 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     const queryClient = useQueryClient();
     const [selectedColor, setSelectedColor] = useState(userProfile?.bg_color || '#3b82f6');
     const [appVersion, setAppVersion] = useState<string>('...');
-
-    // Push notifications hook
-    const {
-        isSupported: pushSupported,
-        permission: pushPermission,
-        subscription: pushSubscription,
-        isInitializing: pushInitializing,
-        isEnabling: pushEnabling,
-        isDisabling: pushDisabling,
-        error: pushError,
-        enable: enablePush,
-        disable: disablePush,
-        canEnable: canEnablePush,
-    } = usePushNotifications();
 
     // Password change modal state
     const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -236,27 +221,6 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         }
     };
 
-    // Handle push notifications enable/disable
-    const handleEnablePush = async () => {
-        try {
-            await enablePush();
-            toast.success('Notificaciones push activadas');
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Error al activar notificaciones';
-            toast.error(message);
-        }
-    };
-
-    const handleDisablePush = async () => {
-        try {
-            await disablePush();
-            toast.success('Notificaciones push desactivadas');
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Error al desactivar notificaciones';
-            toast.error(message);
-        }
-    };
-
     // Save profile mutation
     const saveProfileMutation = useMutation({
         mutationFn: async () => {
@@ -424,74 +388,18 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                     Ajustes de App
                 </h3>
 
-                {/* Push Notifications */}
-                <div className={`p-4 rounded-xl border mb-3 ${theme.card}`}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${pushSubscription ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-400'}`}>
-                                {pushSubscription ? <Bell size={18} /> : <BellOff size={18} />}
-                            </div>
-                            <div>
-                                <div className={`font-bold text-sm ${theme.textMain}`}>Notificaciones Push</div>
-                                <div className={`text-xs mt-0.5 ${theme.textMuted}`}>
-                                    {pushInitializing ? 'Cargando...' :
-                                        pushPermission === 'denied' ? 'Bloqueadas en el navegador' :
-                                            pushSubscription ? 'Activadas' : 'Desactivadas'}
-                                </div>
-                            </div>
+                <div
+                    onClick={() => navigate('/notifications')}
+                    className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400"><Bell size={18} /></div>
+                        <div>
+                            <div className={`font-bold text-sm ${theme.textMain}`}>Centro de notificaciones</div>
+                            <div className={`text-xs mt-0.5 ${theme.textMuted}`}>Bandeja, preferencias y dispositivos</div>
                         </div>
-
-                        {pushInitializing ? (
-                            <Loader2 size={20} className="animate-spin text-blue-500" />
-                        ) : pushPermission === 'denied' ? (
-                            <span className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'}`}>
-                                Bloqueado
-                            </span>
-                        ) : pushSubscription ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleDisablePush}
-                                disabled={pushDisabling}
-                                className="text-xs"
-                            >
-                                {pushDisabling ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-                                Desactivar
-                            </Button>
-                        ) : canEnablePush ? (
-                            <Button
-                                size="sm"
-                                onClick={handleEnablePush}
-                                disabled={pushEnabling}
-                                className="text-xs bg-blue-600 hover:bg-blue-500 text-white"
-                            >
-                                {pushEnabling ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-                                Activar
-                            </Button>
-                        ) : null}
                     </div>
-
-                    {/* Error message */}
-                    {pushError && (
-                        <div className={`mt-3 p-2 rounded-lg text-xs flex items-center gap-2 ${isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
-                            <AlertTriangle size={14} />
-                            {pushError}
-                        </div>
-                    )}
-
-                    {/* Permission denied hint */}
-                    {pushPermission === 'denied' && (
-                        <div className={`mt-3 p-2 rounded-lg text-xs ${isDark ? 'bg-white/5' : 'bg-slate-50'} ${theme.textMuted}`}>
-                            Para activar las notificaciones, debes desbloquearlas en la configuración de tu navegador.
-                        </div>
-                    )}
-
-                    {/* Not supported hint */}
-                    {!pushSupported && (
-                        <div className={`mt-3 p-2 rounded-lg text-xs ${isDark ? 'bg-white/5' : 'bg-slate-50'} ${theme.textMuted}`}>
-                            Las notificaciones push no están soportadas en este navegador.
-                        </div>
-                    )}
+                    <ChevronRight size={18} className={theme.textMuted} />
                 </div>
 
                 {/* Achievements */}

@@ -1,72 +1,47 @@
 // @vitest-environment jsdom
-import { act, render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
+import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from '@/test/mockSupabase'
 
-vi.mock("@/services/dataLayerClient", () => ({ dataLayerClient: mockSupabase }));
-vi.mock("@/hooks/useAppBadgeSource", () => ({ useAppBadgeSource: vi.fn() }));
-vi.mock("react-router-dom", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("react-router-dom")>()),
+vi.mock('@/services/dataLayerClient', () => ({ dataLayerClient: mockSupabase }))
+vi.mock('@/hooks/useAppBadgeSource', () => ({ useAppBadgeSource: vi.fn() }))
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
   useNavigate: () => vi.fn(),
-}));
+}))
 
-import { NotificationBadge } from "../NotificationBadge";
+import { NotificationBadge } from '../NotificationBadge'
 
-describe("NotificationBadge query scope", () => {
+describe('NotificationBadge', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.clearAllMocks();
-    resetMockSupabase();
-  });
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    resetMockSupabase()
+  })
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  afterEach(() => vi.useRealTimers())
 
-  const renderBadge = async (userDepartment: string | null) => {
-    const messageBuilder = createMockQueryBuilder({ data: null, error: null, count: 0 });
-    const directBuilder = createMockQueryBuilder({ data: null, error: null, count: 0 });
-    mockSupabase.from
-      .mockImplementationOnce(() => messageBuilder)
-      .mockImplementationOnce(() => directBuilder);
+  it('counts the current user unread notification inbox', async () => {
+    const builder = createMockQueryBuilder({ data: null, error: null, count: 3 })
+    mockSupabase.from.mockReturnValue(builder)
+    render(<NotificationBadge userId="user-1" userRole="technician" userDepartment={null} />)
+    await act(async () => undefined)
 
-    render(
-      <NotificationBadge
-        userId="manager-1"
-        userRole="management"
-        userDepartment={userDepartment}
-      />,
-    );
+    expect(mockSupabase.from).toHaveBeenCalledWith('notification_inbox')
+    expect(builder.eq).toHaveBeenCalledWith('user_id', 'user-1')
+    expect(builder.is).toHaveBeenCalledWith('read_at', null)
+  })
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
-    });
-    expect(mockSupabase.from).toHaveBeenCalledTimes(2);
-    return { messageBuilder };
-  };
-
-  it("uses sender scope for a management profile without a department", async () => {
-    const { messageBuilder: builder } = await renderBadge(null);
-
-    expect(builder.eq).toHaveBeenCalledWith("sender_id", "manager-1");
-    expect(builder.eq).not.toHaveBeenCalledWith("department", expect.anything());
-  });
-
-  it("uses department scope when management has a department", async () => {
-    const { messageBuilder: builder } = await renderBadge("sound");
-
-    expect(builder.eq).toHaveBeenCalledWith("department", "sound");
-    expect(builder.eq).not.toHaveBeenCalledWith("sender_id", expect.anything());
-  });
-
-  it("does not restart polling whenever loading state changes", async () => {
-    await renderBadge("sound");
+  it('polls on a stable thirty-second interval', async () => {
+    mockSupabase.from.mockImplementation(() => createMockQueryBuilder({ data: null, error: null, count: 0 }))
+    render(<NotificationBadge userId="user-1" userRole="management" userDepartment="sound" />)
+    await act(async () => undefined)
+    expect(mockSupabase.from).toHaveBeenCalledTimes(1)
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1_000);
-    });
-
-    expect(mockSupabase.from).toHaveBeenCalledTimes(2);
-  });
-});
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(mockSupabase.from).toHaveBeenCalledTimes(2)
+  })
+})

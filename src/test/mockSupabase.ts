@@ -16,6 +16,7 @@ type MockChainMethod =
   | "eq"
   | "neq"
   | "in"
+  | "is"
   | "gte"
   | "lte"
   | "lt"
@@ -39,6 +40,7 @@ const chainMethods: MockChainMethod[] = [
   "eq",
   "neq",
   "in",
+  "is",
   "gte",
   "lte",
   "lt",
@@ -63,6 +65,7 @@ interface MockQueryBuilder<T> extends Promise<MockSupabaseResult<T>> {
   eq: ReturnType<typeof vi.fn>;
   neq: ReturnType<typeof vi.fn>;
   in: ReturnType<typeof vi.fn>;
+  is: ReturnType<typeof vi.fn>;
   gte: ReturnType<typeof vi.fn>;
   lte: ReturnType<typeof vi.fn>;
   lt: ReturnType<typeof vi.fn>;

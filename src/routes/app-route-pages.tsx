@@ -12,6 +12,7 @@ export const Sound = lazyPage(() => import("@/pages/Sound"));
 export const Lights = lazyPage(() => import("@/pages/Lights"));
 export const Video = lazyPage(() => import("@/pages/Video"));
 export const Profile = lazyPage(() => import("@/pages/Profile"));
+export const Notifications = lazyPage(() => import("@/pages/Notifications"));
 export const Settings = lazyPage(() => import("@/pages/Settings"));
 export const ProjectManagement = lazyPage(() => import("@/pages/ProjectManagement"));
 export const JobSetup = lazyPage(() => import("@/pages/JobSetup"));

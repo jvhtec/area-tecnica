@@ -17,6 +17,7 @@ import {
   Lights,
   Logistics,
   MorningSummary,
+  Notifications,
   PayoutsDueFortnights,
   Personal,
   Privacy,
@@ -278,6 +279,20 @@ export const primaryAppRoutes: readonly AppRoute[] = [
       label: "Ajustes",
       mobileLabel: "Ajustes",
       shortcut: { id: "nav-settings", keybind: "Ctrl+,", icon: "Settings" },
+    },
+  },
+  {
+    id: "notifications",
+    path: "/notifications",
+    component: Notifications,
+    layout: "app",
+    access: "authenticated",
+    breadcrumb: { label: "Notificaciones" },
+    nav: {
+      id: "notifications",
+      label: "Notificaciones",
+      mobileLabel: "Avisos",
+      shortcut: { id: "nav-notifications", icon: "Bell" },
     },
   },
   {

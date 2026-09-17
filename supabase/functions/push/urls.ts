@@ -1,4 +1,11 @@
 import { EVENT_TYPES } from "./config.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
+
+const hasForbiddenPathCharacter = (value: string): boolean =>
+  Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return character === "\\" || code <= 31 || code === 127;
+  });
 
 /**
  * Validates and sanitizes a URL to prevent open-redirect attacks.
@@ -8,8 +15,8 @@ import { EVENT_TYPES } from "./config.ts";
 export function validateInternalUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
 
-  if (url !== url.trim() || /[\\\u0000-\u001f\u007f]/.test(url)) {
-    console.warn("⚠️ Rejecting malformed internal URL");
+  if (url !== url.trim() || hasForbiddenPathCharacter(url)) {
+    logEvent("warn", "push_url_rejected", { reason: "malformed" });
     return undefined;
   }
 
@@ -17,9 +24,9 @@ export function validateInternalUrl(url: string | undefined): string | undefined
   let decoded: string;
   try {
     decoded = decodeURIComponent(url);
-  } catch (e) {
+  } catch {
     // If decoding fails, reject the URL
-    console.warn(`⚠️ Rejecting URL with invalid encoding: ${url}`);
+    logEvent("warn", "push_url_rejected", { reason: "invalid_encoding" });
     return undefined;
   }
 
@@ -28,9 +35,9 @@ export function validateInternalUrl(url: string | undefined): string | undefined
     !url.startsWith('/')
     || url.startsWith('//')
     || decoded.startsWith('//')
-    || /[\\\u0000-\u001f\u007f]/.test(decoded)
+    || hasForbiddenPathCharacter(decoded)
   ) {
-    console.warn(`⚠️ Rejecting potentially unsafe URL: ${url}`);
+    logEvent("warn", "push_url_rejected", { reason: "unsafe" });
     return undefined;
   }
 
@@ -38,12 +45,12 @@ export function validateInternalUrl(url: string | undefined): string | undefined
     const base = new URL("https://sector-pro.invalid");
     const parsed = new URL(url, base);
     if (parsed.origin !== base.origin || parsed.username || parsed.password) {
-      console.warn(`⚠️ Rejecting external URL: ${url}`);
+      logEvent("warn", "push_url_rejected", { reason: "external" });
       return undefined;
     }
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
-    console.warn(`⚠️ Rejecting invalid internal URL: ${url}`);
+    logEvent("warn", "push_url_rejected", { reason: "invalid" });
     return undefined;
   }
 }

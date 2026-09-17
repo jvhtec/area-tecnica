@@ -1,17 +1,22 @@
 import type { SupabaseClient } from "./deps.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
-import { sendNativePushNotification } from "./apns.ts";
-import { sendPushNotification } from "./webpush.ts";
 import { handleFestivalFeedTick } from "./festivalFeed.ts";
 import { handleProgramaFeedTick } from "./programaFeed.ts";
-import { pushTargetFingerprint } from "./targetId.ts";
+import { loadNativeTokens, sendPayloadToTargets } from "./broadcast/delivery.ts";
+import { claimInboxItems, recordDeliveryResults } from "./inbox.ts";
+import {
+  buildEventKey,
+  decoratePayloadPolicy,
+  loadRecipientPreferences,
+  urgencyForEvent,
+} from "./notificationPolicy.ts";
 import { isScheduleDue } from "./schedulePolicy.ts";
 import type {
+  BroadcastBody,
   CheckScheduledBody,
-  NativePushTokenRow,
   PushPayload,
-  PushSendResult,
   PushSubscriptionRow,
 } from "./types.ts";
 
@@ -59,35 +64,6 @@ function getErrorMessage(value: unknown): string | unknown {
   if (isRecord(value) && typeof value.message === 'string') return value.message;
   return value;
 }
-
-function getPushSendMetadata(result: PushSendResult): Pick<PushDeliveryResult, 'status' | 'skipped'> {
-  return {
-    status: 'status' in result ? result.status : undefined,
-    skipped: 'skipped' in result ? result.skipped : undefined,
-  };
-}
-
-const loadNativeTokens = async (
-  client: SupabaseClient,
-  userIds: string[],
-): Promise<NativePushTokenRow[]> => {
-  if (userIds.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await client
-    .from("push_device_tokens")
-    .select("user_id, device_token, platform")
-    .in("user_id", userIds)
-    .returns<NativePushTokenRow[]>();
-
-  if (error) {
-    console.error("scheduled push fetch native tokens error", error);
-    return [];
-  }
-
-  return data ?? [];
-};
 
 // ============================================================================
 // DAILY MORNING SUMMARY HELPERS
@@ -544,6 +520,14 @@ export async function handleCheckScheduled(
   body: CheckScheduledBody,
 ) {
   const type = body.type;
+  const supportedTypes = new Set<string>([
+    EVENT_TYPES.DAILY_MORNING_SUMMARY,
+    EVENT_TYPES.FESTIVAL_FEED_TICK,
+    EVENT_TYPES.PROGRAMA_FEED_TICK,
+  ]);
+  if (!supportedTypes.has(type)) {
+    return jsonResponse({ status: 'error', reason: 'Unsupported scheduled notification type' }, 400);
+  }
   console.log(`🔍 Checking scheduled notification: ${type}`);
 
   if (type === EVENT_TYPES.FESTIVAL_FEED_TICK) {
@@ -576,6 +560,20 @@ export async function handleCheckScheduled(
   const month = parts.find(p => p.type === 'month')?.value;
   const day = parts.find(p => p.type === 'day')?.value;
   const targetDate = `${year}-${month}-${day}`;
+  const occurrenceKey = body.force
+    ? `manual:${targetDate}:${Date.now()}`
+    : `${targetDate}:${config.schedule_time}`;
+  const { data: claimed, error: claimError } = await client.rpc('claim_push_schedule', {
+    p_event_type: type,
+    p_occurrence_key: occurrenceKey,
+  });
+  if (claimError) {
+    console.error('❌ Failed to claim scheduled occurrence:', claimError);
+    return jsonResponse({ status: 'error', reason: 'Failed to claim scheduled occurrence' }, 500);
+  }
+  if (!claimed) {
+    return jsonResponse({ status: 'skipped', reason: 'Occurrence already claimed' });
+  }
 
   // For daily morning summary, use granular user subscriptions
   if (type === EVENT_TYPES.DAILY_MORNING_SUMMARY) {
@@ -588,11 +586,23 @@ export async function handleCheckScheduled(
 
     if (subsError) {
       console.error('❌ Failed to load subscriptions:', subsError);
+      await client.rpc('finish_push_schedule', {
+        p_event_type: type,
+        p_occurrence_key: occurrenceKey,
+        p_success: false,
+        p_error: 'subscription_lookup_failed',
+      });
       return jsonResponse({ error: 'Failed to load user subscriptions' }, 500);
     }
 
     if (!subscriptions || subscriptions.length === 0) {
       console.log('⚠️ No users subscribed to morning summary');
+      await client.rpc('finish_push_schedule', {
+        p_event_type: type,
+        p_occurrence_key: occurrenceKey,
+        p_success: true,
+        p_error: null,
+      });
       return jsonResponse({ status: 'skipped', reason: 'No users subscribed' });
     }
 
@@ -604,6 +614,7 @@ export async function handleCheckScheduled(
     // Process each user
     const allResults: PushDeliveryResult[] = [];
     let successfulUsers = 0;
+    let hadOperationalFailure = false;
 
     for (const subscription of subscriptions) {
       const userId = subscription.user_id;
@@ -642,29 +653,20 @@ export async function handleCheckScheduled(
 
       console.log(`  📝 Message: ${title}`);
 
-      // Load push subscriptions for this user
-      const { data: pushSubs, error: pushSubsErr } = await client
-        .from('push_subscriptions')
-        .select('endpoint, p256dh, auth')
-        .eq('user_id', userId)
-        .returns<PushSubscriptionRow[]>();
-
-      if (pushSubsErr) {
-        console.error(`  ❌ Failed to load push subscriptions for user ${userId}:`, pushSubsErr);
-        continue;
-      }
-
-      const nativeTokens = await loadNativeTokens(client, [userId]);
-      if ((!pushSubs || pushSubs.length === 0) && nativeTokens.length === 0) {
-        console.log(`  ⚠️ User ${userId} has no push subscriptions`);
-        continue;
-      }
-
       // Build URL with query parameters for in-app viewing
       const deptParam = departments.join(',');
       const summaryUrl = `/morning-summary?date=${targetDate}&departments=${deptParam}`;
 
-      const payload: PushPayload = {
+      const notificationBody: BroadcastBody = {
+        action: 'broadcast',
+        type,
+        event_id: occurrenceKey,
+        recipient_id: userId,
+        target_date: targetDate,
+      };
+      const eventKey = await buildEventKey(notificationBody);
+      const urgency = urgencyForEvent(type);
+      const payload = decoratePayloadPolicy({
         title,
         body: text,
         url: summaryUrl,
@@ -673,42 +675,76 @@ export async function handleCheckScheduled(
           departments,
           targetDate,
         },
-      };
+      } satisfies PushPayload, notificationBody, eventKey, urgency);
 
-      // Send to all devices for this user
-      let userSent = false;
-      const sendPromises: Promise<void>[] = [];
-      for (const pushSub of pushSubs || []) {
-        sendPromises.push((async () => {
-          const result = await sendPushNotification(
-            client,
-            { endpoint: pushSub.endpoint, p256dh: pushSub.p256dh, auth: pushSub.auth },
-            payload
-          );
-          allResults.push({
-            endpoint: await pushTargetFingerprint("webpush", pushSub.endpoint),
-            ok: result.ok,
-            ...getPushSendMetadata(result),
-            user_id: userId,
-          });
-          if (result.ok) userSent = true;
-        })());
+      const inboxIds = await claimInboxItems(
+        client,
+        [userId],
+        eventKey,
+        notificationBody,
+        payload,
+        urgency,
+        true,
+      );
+      if (inboxIds.size === 0) continue;
+
+      const preference = (await loadRecipientPreferences(client, [userId], notificationBody, urgency)).get(userId);
+      if (
+        preference?.accountEnabled === false
+        || preference?.categoryEnabled === false
+        || preference?.quietNow === true
+        || preference?.muted === true
+      ) {
+        await recordDeliveryResults(client, inboxIds, [], [userId]);
+        continue;
       }
 
-      for (const tokenRow of nativeTokens) {
-        sendPromises.push((async () => {
-          const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
-          allResults.push({
-            endpoint: await pushTargetFingerprint("apns", tokenRow.device_token),
-            ok: result.ok,
-            ...getPushSendMetadata(result),
-            user_id: userId,
-          });
-          if (result.ok) userSent = true;
-        })());
+      // Load push subscriptions only after the durable inbox item is claimed.
+      const { data: pushSubs, error: pushSubsErr } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth')
+        .eq('user_id', userId)
+        .eq('enabled', true)
+        .returns<PushSubscriptionRow[]>();
+
+      if (pushSubsErr) {
+        hadOperationalFailure = true;
+        logEvent("error", "scheduled_push_subscription_lookup_failed", {
+          errorCode: pushSubsErr.code ?? "unknown",
+        });
+        await recordDeliveryResults(client, inboxIds, [], [], [userId]);
+        continue;
       }
 
-      await Promise.all(sendPromises);
+      const nativeResult = await loadNativeTokens(client, [userId]);
+      if (nativeResult.error) {
+        hadOperationalFailure = true;
+        await recordDeliveryResults(client, inboxIds, [], [], [userId]);
+        continue;
+      }
+      const nativeTokens = nativeResult.tokens;
+      if ((!pushSubs || pushSubs.length === 0) && nativeTokens.length === 0) {
+        console.log(`  ⚠️ User ${userId} has no push subscriptions`);
+        await recordDeliveryResults(client, inboxIds, [], [userId]);
+        continue;
+      }
+
+      // Send with the shared bounded-concurrency and transient-retry policy.
+      const deliveryResults = await sendPayloadToTargets(
+        client,
+        (pushSubs || []).map((subscription) => ({ ...subscription, user_id: userId })),
+        nativeTokens,
+        payload,
+      );
+      await recordDeliveryResults(client, inboxIds, deliveryResults, []);
+      const userSent = deliveryResults.some((result) => result.ok);
+      allResults.push(...deliveryResults.map((result) => ({
+        endpoint: result.endpoint,
+        ok: result.ok,
+        status: result.status,
+        skipped: result.skipped,
+        user_id: userId,
+      })));
 
       if (userSent) {
         successfulUsers++;
@@ -716,20 +752,32 @@ export async function handleCheckScheduled(
       }
     }
 
-    // Update last_sent_at timestamp
-    await client
-      .from('push_notification_schedules')
-      .update({ last_sent_at: new Date().toISOString() })
-      .eq('event_type', type);
+    const hadProviderAttempts = allResults.length > 0;
+    const scheduleSucceeded = !hadOperationalFailure && (successfulUsers > 0 || !hadProviderAttempts);
+    const { error: finishError } = await client.rpc('finish_push_schedule', {
+      p_event_type: type,
+      p_occurrence_key: occurrenceKey,
+      p_success: scheduleSucceeded,
+      p_error: scheduleSucceeded ? null : 'no_provider_acceptance',
+    });
+    if (finishError) console.error('❌ Failed to finalize scheduled occurrence:', finishError);
+
+    if (successfulUsers > 0) {
+      const { error: updateScheduleError } = await client
+        .from('push_notification_schedules')
+        .update({ last_sent_at: new Date().toISOString() })
+        .eq('event_type', type);
+      if (updateScheduleError) console.error('❌ Failed to update last_sent_at:', updateScheduleError);
+    }
 
     console.log(`\n✅ Summary: Sent to ${successfulUsers}/${subscriptions.length} users, ${allResults.length} total notifications`);
 
     return jsonResponse({
-      status: 'sent',
+      status: scheduleSucceeded ? (successfulUsers > 0 ? 'accepted' : 'skipped') : 'failed',
       results: allResults,
       count: allResults.length,
       users: successfulUsers,
-    });
+    }, scheduleSucceeded ? 200 : 502);
   }
 
   // For other scheduled notification types (future expansion)

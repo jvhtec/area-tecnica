@@ -328,8 +328,8 @@ self.addEventListener('push', (event) => {
       meta: payload.meta || {}
     },
     actions: [{ action: 'open', title: 'Abrir' }],
-    tag: payload.meta?.tag || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    renotify: true,
+    tag: payload.meta?.tag || payload.eventKey || payload.type || 'sector-pro',
+    renotify: payload.meta?.renotify === true,
     silent: false,
   }
 
@@ -362,7 +362,11 @@ self.addEventListener('notificationclick', (event) => {
       let targetUrl = '/'
       try {
         const parsedTarget = new URL(requestedUrl, self.location.origin)
-        if (parsedTarget.origin === self.location.origin && !/[\\\\\u0000-\u001f\u007f]/.test(requestedUrl)) {
+        if (
+          typeof requestedUrl === 'string' &&
+          parsedTarget.origin === self.location.origin &&
+          !/[\\\u0000-\u001f\u007f]/.test(requestedUrl)
+        ) {
           targetUrl = `${parsedTarget.pathname}${parsedTarget.search}${parsedTarget.hash}`
         }
       } catch (error) {

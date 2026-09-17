@@ -1,7 +1,13 @@
 const APP_ORIGIN = "https://sector-pro.invalid";
 
+const hasForbiddenPathCharacter = (value: string): boolean =>
+  Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return character === "\\" || code <= 31 || code === 127;
+  });
+
 export function normalizeInternalPath(value: string | null | undefined): string | null {
-  if (!value || value !== value.trim() || /[\\\u0000-\u001f\u007f]/.test(value)) return null;
+  if (!value || value !== value.trim() || hasForbiddenPathCharacter(value)) return null;
   if (!value.startsWith("/") || value.startsWith("//")) return null;
 
   let decoded: string;
@@ -10,7 +16,7 @@ export function normalizeInternalPath(value: string | null | undefined): string 
   } catch {
     return null;
   }
-  if (decoded.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(decoded)) return null;
+  if (decoded.startsWith("//") || hasForbiddenPathCharacter(decoded)) return null;
 
   try {
     const parsed = new URL(value, APP_ORIGIN);

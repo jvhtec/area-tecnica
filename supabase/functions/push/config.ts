@@ -102,6 +102,8 @@ export const PUSH_CONFIG = {
   URGENCY_NORMAL: 'normal' as const,
   URGENCY_LOW: 'low' as const,
   MAX_RETRIES: 3,
+  REQUEST_TIMEOUT_MS: 10_000,
+  DELIVERY_CONCURRENCY: 8,
   DEFAULT_ICON: '/icon-192.png',
   DEFAULT_BADGE: '/badge-72.png',
 };

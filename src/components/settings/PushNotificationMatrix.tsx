@@ -35,109 +35,111 @@ type MatrixUser = {
 };
 
 const DEPARTMENTS: Array<{ id: string; label: string }> = [
-  { id: 'sound', label: 'Sound' },
-  { id: 'lights', label: 'Lights' },
-  { id: 'video', label: 'Video' },
-  { id: 'logistics', label: 'Logistics' },
-  { id: 'production', label: 'Production' },
+  { id: 'sound', label: 'Sonido' },
+  { id: 'lights', label: 'Iluminación' },
+  { id: 'video', label: 'Vídeo' },
+  { id: 'logistics', label: 'Logística' },
+  { id: 'production', label: 'Producción' },
 ];
 
 const FALLBACK_EVENTS: EventInfo[] = [
   // Job events
-  { code: 'job.created', label: 'Job created' },
-  { code: 'job.updated', label: 'Job updated' },
-  { code: 'job.requirements.updated', label: 'Job requirements updated' },
-  { code: 'job.deleted', label: '🗑️ Job deleted (CRITICAL)' },
-  { code: 'job.status.confirmed', label: 'Job confirmed' },
-  { code: 'job.status.cancelled', label: 'Job cancelled' },
-  { code: 'job.invoicing_company.changed', label: 'Invoicing company changed' },
+  { code: 'job.created', label: 'Trabajo creado' },
+  { code: 'job.updated', label: 'Trabajo actualizado' },
+  { code: 'job.requirements.updated', label: 'Requisitos del trabajo actualizados' },
+  { code: 'job.deleted', label: '🗑️ Trabajo eliminado (CRÍTICO)' },
+  { code: 'job.status.confirmed', label: 'Trabajo confirmado' },
+  { code: 'job.status.cancelled', label: 'Trabajo cancelado' },
+  { code: 'job.invoicing_company.changed', label: 'Empresa de facturación cambiada' },
 
   // Assignment events
-  { code: 'job.assignment.confirmed', label: 'Assignment confirmed' },
-  { code: 'job.assignment.direct', label: 'Direct job assignment' },
-  { code: 'assignment.removed', label: '🚫 Assignment removed (CRITICAL)' },
+  { code: 'job.assignment.confirmed', label: 'Asignación confirmada' },
+  { code: 'job.assignment.direct', label: 'Asignación directa' },
+  { code: 'assignment.removed', label: '🚫 Asignación retirada (CRÍTICO)' },
 
   // Job type changes
-  { code: 'job.type.changed', label: 'Job type changed' },
-  { code: 'job.type.changed.single', label: 'Job changed to Single' },
-  { code: 'job.type.changed.tour', label: 'Job changed to Tour' },
-  { code: 'job.type.changed.festival', label: 'Job changed to Festival' },
-  { code: 'job.type.changed.ciclo', label: 'Job changed to Ciclo' },
-  { code: 'job.type.changed.dryhire', label: 'Job changed to Dry Hire' },
-  { code: 'job.type.changed.tourdate', label: 'Job changed to Tour Date' },
+  { code: 'job.type.changed', label: 'Tipo de trabajo cambiado' },
+  { code: 'job.type.changed.single', label: 'Trabajo cambiado a evento único' },
+  { code: 'job.type.changed.tour', label: 'Trabajo cambiado a gira' },
+  { code: 'job.type.changed.festival', label: 'Trabajo cambiado a festival' },
+  { code: 'job.type.changed.ciclo', label: 'Trabajo cambiado a ciclo' },
+  { code: 'job.type.changed.dryhire', label: 'Trabajo cambiado a alquiler' },
+  { code: 'job.type.changed.tourdate', label: 'Trabajo cambiado a fecha de gira' },
+  { code: 'job.type.changed.evento', label: 'Trabajo cambiado a evento' },
 
   // Document events
-  { code: 'document.uploaded', label: 'Document uploaded' },
-  { code: 'document.deleted', label: 'Document deleted' },
-  { code: 'document.tech_visible.enabled', label: 'Document visible to technicians' },
-  { code: 'document.tech_visible.disabled', label: 'Document hidden from technicians' },
+  { code: 'document.uploaded', label: 'Documento subido' },
+  { code: 'document.deleted', label: 'Documento eliminado' },
+  { code: 'document.tech_visible.enabled', label: 'Documento visible para técnicos' },
+  { code: 'document.tech_visible.disabled', label: 'Documento oculto para técnicos' },
 
   // Incident reports (CRITICAL - Safety)
-  { code: 'incident.report.uploaded', label: '⚠️ Incident report uploaded (CRITICAL)' },
+  { code: 'incident.report.uploaded', label: '⚠️ Informe de incidencia subido (CRÍTICO)' },
 
   // Staffing events
-  { code: 'staffing.availability.sent', label: 'Availability requested' },
-  { code: 'staffing.availability.confirmed', label: 'Availability confirmed' },
-  { code: 'staffing.availability.declined', label: 'Availability declined' },
-  { code: 'staffing.availability.cancelled', label: 'Availability cancelled' },
-  { code: 'staffing.offer.sent', label: 'Offer sent' },
-  { code: 'staffing.offer.confirmed', label: 'Offer accepted' },
-  { code: 'staffing.offer.declined', label: 'Offer declined' },
+  { code: 'staffing.availability.sent', label: 'Disponibilidad solicitada' },
+  { code: 'staffing.availability.confirmed', label: 'Disponibilidad confirmada' },
+  { code: 'staffing.availability.declined', label: 'Disponibilidad rechazada' },
+  { code: 'staffing.availability.cancelled', label: 'Solicitud de disponibilidad cancelada' },
+  { code: 'staffing.offer.sent', label: 'Oferta enviada' },
+  { code: 'staffing.offer.confirmed', label: 'Oferta aceptada' },
+  { code: 'staffing.offer.declined', label: 'Oferta rechazada' },
 
   // Timesheet events
-  { code: 'timesheet.submitted', label: 'Timesheet submitted' },
-  { code: 'timesheet.approved', label: '✅ Timesheet approved' },
-  { code: 'timesheet.rejected', label: '❌ Timesheet rejected' },
+  { code: 'timesheet.submitted', label: 'Parte de horas enviado' },
+  { code: 'timesheet.approved', label: '✅ Parte de horas aprobado' },
+  { code: 'timesheet.rejected', label: '❌ Parte de horas rechazado' },
 
   // Task events
-  { code: 'task.assigned', label: 'Task assigned' },
-  { code: 'task.updated', label: 'Task updated' },
-  { code: 'task.completed', label: 'Task completed' },
+  { code: 'task.assigned', label: 'Tarea asignada' },
+  { code: 'task.updated', label: 'Tarea actualizada' },
+  { code: 'task.completed', label: 'Tarea completada' },
 
   // Logistics events
-  { code: 'logistics.transport.requested', label: 'Transport requested' },
-  { code: 'logistics.event.created', label: 'Logistics event created' },
-  { code: 'logistics.event.updated', label: 'Logistics event updated' },
-  { code: 'logistics.event.cancelled', label: 'Logistics event cancelled' },
+  { code: 'logistics.transport.requested', label: 'Transporte solicitado' },
+  { code: 'logistics.event.created', label: 'Evento logístico creado' },
+  { code: 'logistics.event.updated', label: 'Evento logístico actualizado' },
+  { code: 'logistics.event.cancelled', label: 'Evento logístico cancelado' },
 
   // Flex events
-  { code: 'flex.folders.created', label: 'Flex folders created' },
-  { code: 'flex.tourdate_folder.created', label: 'Tour date folder created' },
+  { code: 'flex.folders.created', label: 'Carpetas de Flex creadas' },
+  { code: 'flex.tourdate_folder.created', label: 'Carpeta de fecha de gira creada' },
 
   // Messaging
-  { code: 'message.received', label: 'Message received' },
+  { code: 'message.received', label: 'Mensaje recibido' },
 
   // Tour date events
-  { code: 'tourdate.created', label: 'Tour date created' },
-  { code: 'tourdate.updated', label: 'Tour date updated' },
-  { code: 'tourdate.deleted', label: 'Tour date deleted' },
-  { code: 'tourdate.type.changed', label: 'Tour date type changed' },
-  { code: 'tourdate.type.changed.show', label: 'Tour date changed to Show' },
-  { code: 'tourdate.type.changed.rehearsal', label: 'Tour date changed to Rehearsal' },
-  { code: 'tourdate.type.changed.travel', label: 'Tour date changed to Travel' },
-  { code: 'tourdate.type.changed.setup', label: 'Tour date changed to Setup' },
-  { code: 'tourdate.type.changed.rigging', label: 'Tour date changed to Rigging' },
-  { code: 'tourdate.type.changed.off', label: 'Tour date changed to Day Off' },
+  { code: 'tourdate.created', label: 'Fecha de gira creada' },
+  { code: 'tourdate.updated', label: 'Fecha de gira actualizada' },
+  { code: 'tourdate.deleted', label: 'Fecha de gira eliminada' },
+  { code: 'tourdate.type.changed', label: 'Tipo de fecha de gira cambiado' },
+  { code: 'tourdate.type.changed.show', label: 'Fecha de gira cambiada a concierto' },
+  { code: 'tourdate.type.changed.rehearsal', label: 'Fecha de gira cambiada a ensayo' },
+  { code: 'tourdate.type.changed.travel', label: 'Fecha de gira cambiada a viaje' },
+  { code: 'tourdate.type.changed.setup', label: 'Fecha de gira cambiada a montaje' },
+  { code: 'tourdate.type.changed.rigging', label: 'Fecha de gira cambiada a rigging' },
+  { code: 'tourdate.type.changed.off', label: 'Fecha de gira cambiada a día libre' },
 
   // Job date events
-  { code: 'jobdate.type.changed', label: 'Job date type changed' },
-  { code: 'jobdate.type.changed.show', label: 'Job date changed to Show' },
-  { code: 'jobdate.type.changed.rehearsal', label: 'Job date changed to Rehearsal' },
-  { code: 'jobdate.type.changed.travel', label: 'Job date changed to Travel' },
-  { code: 'jobdate.type.changed.setup', label: 'Job date changed to Setup' },
-  { code: 'jobdate.type.changed.rigging', label: 'Job date changed to Rigging' },
-  { code: 'jobdate.type.changed.off', label: 'Job date changed to Day Off' },
+  { code: 'jobdate.type.changed', label: 'Tipo de fecha de trabajo cambiado' },
+  { code: 'jobdate.type.changed.show', label: 'Fecha de trabajo cambiada a concierto' },
+  { code: 'jobdate.type.changed.rehearsal', label: 'Fecha de trabajo cambiada a ensayo' },
+  { code: 'jobdate.type.changed.travel', label: 'Fecha de trabajo cambiada a viaje' },
+  { code: 'jobdate.type.changed.setup', label: 'Fecha de trabajo cambiada a montaje' },
+  { code: 'jobdate.type.changed.rigging', label: 'Fecha de trabajo cambiada a rigging' },
+  { code: 'jobdate.type.changed.off', label: 'Fecha de trabajo cambiada a día libre' },
+  { code: 'jobdate.type.changed.prep_day', label: 'Fecha de trabajo cambiada a día de preparación' },
 
   // SoundVision
-  { code: 'soundvision.file.uploaded', label: 'SoundVision file uploaded' },
-  { code: 'soundvision.file.downloaded', label: 'SoundVision file downloaded' },
+  { code: 'soundvision.file.uploaded', label: 'Archivo de SoundVision subido' },
+  { code: 'soundvision.file.downloaded', label: 'Archivo de SoundVision descargado' },
 
   // Festival public artist workflows
-  { code: 'festival.public_form.submitted', label: 'Public artist form submitted' },
-  { code: 'festival.public_rider.uploaded', label: 'Public rider uploaded' },
+  { code: 'festival.public_form.submitted', label: 'Formulario público de artista enviado' },
+  { code: 'festival.public_rider.uploaded', label: 'Rider público subido' },
 
   // App updates
-  { code: 'changelog.updated', label: '📝 Changelog updated' },
+  { code: 'changelog.updated', label: '📝 Registro de cambios actualizado' },
 ];
 
 function routeKey(event: string, type: RecipientType, target: string | null) {
@@ -385,20 +387,20 @@ export function PushNotificationMatrix() {
 
   if (isMobile) {
     return (
-      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-30">
-        <Card className="rounded-t-lg rounded-b-none border-x-0 border-b-0 shadow-lg">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
+        <Card>
           <CollapsibleTrigger asChild>
             <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors pb-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-base">Push Routing Matrix</CardTitle>
+                  <CardTitle className="text-base">Matriz de rutas push</CardTitle>
                   <CardDescription className="text-xs">
-                    {isOpen ? 'Configure notification routing' : 'Tap to configure notifications'}
+                    {isOpen ? 'Configura el reparto de avisos' : 'Toca para configurar los avisos'}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {pendingCount > 0 && (
-                    <span className="text-xs text-muted-foreground">Saving {pendingCount}…</span>
+                    <span className="text-xs text-muted-foreground">Guardando {pendingCount}…</span>
                   )}
                   {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
                 </div>
@@ -408,12 +410,12 @@ export function PushNotificationMatrix() {
           <CollapsibleContent>
             <CardContent className="max-h-[60vh] overflow-y-auto pt-0">
               {loading ? (
-                <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+                <div className="p-4 text-sm text-muted-foreground">Cargando…</div>
               ) : (
                 <div>
                   <div className="flex justify-end mb-3">
                     <Button variant="outline" size="sm" onClick={() => void load()} disabled={refreshing}>
-                      {refreshing ? 'Refreshing…' : 'Refresh'}
+                      {refreshing ? 'Actualizando…' : 'Actualizar'}
                     </Button>
                   </div>
                   <div className="space-y-4">
@@ -426,7 +428,7 @@ export function PushNotificationMatrix() {
                         <div className="space-y-2">
                           {/* Natural recipients */}
                           <div className="flex items-center justify-between">
-                            <div className="text-sm">Natural recipients</div>
+                            <div className="text-sm">Destinatarios naturales</div>
                             <Checkbox
                               checked={hasNatural(ev.code)}
                               onCheckedChange={(val) => isManagement && toggleNatural(ev.code, Boolean(val))}
@@ -435,7 +437,7 @@ export function PushNotificationMatrix() {
                           </div>
                           {/* Broadcast to management */}
                           <div className="flex items-center justify-between">
-                            <div className="text-sm">Broadcast to management</div>
+                            <div className="text-sm">Enviar a dirección</div>
                             <Checkbox
                               checked={hasRoute(ev.code, 'broadcast', null)}
                               onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'broadcast', null, Boolean(val))}
@@ -445,7 +447,7 @@ export function PushNotificationMatrix() {
                           {/* Assigned technicians */}
                           {isAssignedTechRelevant(ev.code) && (
                             <div className="flex items-center justify-between">
-                              <div className="text-sm">Assigned technicians</div>
+                              <div className="text-sm">Técnicos asignados</div>
                               <Checkbox
                                 checked={hasRoute(ev.code, 'assigned_technicians', null)}
                                 onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'assigned_technicians', null, Boolean(val))}
@@ -455,7 +457,7 @@ export function PushNotificationMatrix() {
                           )}
                           {/* Departments */}
                           <div>
-                            <div className="text-xs font-medium text-muted-foreground mb-1">Departments</div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Departamentos</div>
                             <div className="grid grid-cols-2 gap-2">
                               {DEPARTMENTS.map((d) => (
                                 <label key={`${ev.code}|${d.id}`} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
@@ -472,7 +474,7 @@ export function PushNotificationMatrix() {
                           {/* Individual matrix users (admin/management/oscar) */}
                           {sortedUsers.length > 0 && (
                             <div>
-                              <div className="text-xs font-medium text-muted-foreground mb-1">Admin/Management/Oscar users</div>
+                              <div className="text-xs font-medium text-muted-foreground mb-1">Usuarios de administración, dirección y Óscar</div>
                               <div className="space-y-2">
                                 {sortedUsers.map((u) => (
                                   <label key={`${ev.code}|${u.id}`} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
@@ -494,7 +496,7 @@ export function PushNotificationMatrix() {
                 </div>
               )}
               {!isManagement && (
-                <p className="mt-3 text-xs text-muted-foreground">Viewing only — editing requires management role.</p>
+                <p className="mt-3 text-xs text-muted-foreground">Solo lectura. Para editar necesitas un rol de dirección.</p>
               )}
             </CardContent>
           </CollapsibleContent>
@@ -509,34 +511,34 @@ export function PushNotificationMatrix() {
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
           <div>
-            <CardTitle>Push Routing Matrix</CardTitle>
+            <CardTitle>Matriz de rutas push</CardTitle>
             <CardDescription>
-              Configure which admin/management/oscar users, departments, and assigned technicians receive each event. Natural recipients toggle preserves default recipients.
+              Configura qué usuarios de administración, dirección y Óscar, departamentos y técnicos asignados reciben cada evento. Los destinatarios naturales conservan el reparto predeterminado.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
             {pendingCount > 0 && (
-              <span className="text-muted-foreground">Saving {pendingCount}…</span>
+              <span className="text-muted-foreground">Guardando {pendingCount}…</span>
             )}
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={refreshing}>
-              {refreshing ? 'Refreshing…' : 'Refresh'}
+              {refreshing ? 'Actualizando…' : 'Actualizar'}
             </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+          <div className="p-4 text-sm text-muted-foreground">Cargando…</div>
         ) : (
           <div>
             <div ref={scrollRef} className="relative overflow-auto border rounded-md max-h-[600px]">
               <table className="w-full caption-bottom text-sm border-separate border-spacing-0">
                 <TableHeader className="sticky top-0 z-30 bg-background shadow-[0_2px_5px_-2px_rgba(0,0,0,0.1)]">
                   <TableRow>
-                    <TableHead className="min-w-[220px] sticky left-0 top-0 z-40 bg-background border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Event</TableHead>
-                    <TableHead className="min-w-[120px]">Natural</TableHead>
-                    <TableHead className="min-w-[120px]">Broadcast</TableHead>
-                    <TableHead className="min-w-[180px]">Assigned technicians</TableHead>
+                    <TableHead className="min-w-[220px] sticky left-0 top-0 z-40 bg-background border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Evento</TableHead>
+                    <TableHead className="min-w-[120px]">Naturales</TableHead>
+                    <TableHead className="min-w-[120px]">Dirección</TableHead>
+                    <TableHead className="min-w-[180px]">Técnicos asignados</TableHead>
                     {DEPARTMENTS.map((d) => (
                       <TableHead key={d.id} className="min-w-[140px]">{d.label}</TableHead>
                     ))}
@@ -608,7 +610,7 @@ export function PushNotificationMatrix() {
           </div>
         )}
         {!isManagement && (
-          <p className="mt-3 text-xs text-muted-foreground">Viewing only — editing requires management role.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Solo lectura. Para editar necesitas un rol de dirección.</p>
         )}
       </CardContent>
     </Card>

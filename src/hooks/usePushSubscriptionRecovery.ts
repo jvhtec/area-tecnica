@@ -1,113 +1,81 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react'
 
-/**
- * Hook to detect when a user previously had push notifications enabled
- * but lost their subscription (e.g., after clearing browser data, reinstalling PWA)
- *
- * When detected, prompts the user to re-enable push notifications.
- *
- * Note: Due to browser security, we cannot automatically restore push subscriptions.
- * Users must explicitly grant permission again.
- */
+/** Reconciles the current device with the server without requesting permission. */
 export function usePushSubscriptionRecovery() {
-  const hasPrompted = useRef(false);
-  const isChecking = useRef(false);
+  const hasPrompted = useRef(false)
+  const isChecking = useRef(false)
 
   useEffect(() => {
-    // Only check once per session
-    if (hasPrompted.current || isChecking.current) {
-      return;
-    }
+    let disposed = false
 
-    isChecking.current = true;
-
-    const checkForLostSubscription = async () => {
+    const reconcile = async () => {
+      if (disposed || isChecking.current) return
+      isChecking.current = true
       try {
         const [
           { toast },
           { supabase },
-          { getExistingPushSubscription, isPushSupported },
-          { isNativePushSupported },
+          webPush,
+          nativePush,
         ] = await Promise.all([
           import('sonner'),
           import('@/lib/supabase'),
           import('@/lib/push'),
           import('@/lib/push-native'),
-        ]);
+        ])
 
-        // Only run if push is supported
-        if (isNativePushSupported() || !isPushSupported()) {
-          return;
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || disposed) return
+
+        if (nativePush.isNativePushSupported()) {
+          if (nativePush.getStoredNativePushToken()) {
+            await nativePush.synchronizeNativePush()
+          }
+          return
+        }
+        if (!webPush.isPushSupported()) return
+
+        const existing = await webPush.getExistingPushSubscription()
+        if (existing) {
+          await webPush.synchronizeExistingPushSubscription()
+          return
         }
 
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          return; // Not logged in
-        }
+        const { data: preference, error } = await supabase
+          .from('notification_preferences')
+          .select('account_enabled')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (error || !preference?.account_enabled || hasPrompted.current || disposed) return
 
-        // Check if user previously had push enabled
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('push_notifications_enabled')
-          .eq('id', user.id)
-          .limit(1);
-
-        if (error) {
-          console.warn('[Push Recovery] Failed to fetch profile push preference:', error);
-          return;
-        }
-
-        const profile = data?.[0] ?? null;
-
-        if (!profile?.push_notifications_enabled) {
-          return; // User never enabled push or disabled it intentionally
-        }
-
-        // Check if they currently have a subscription
-        const currentSubscription = await getExistingPushSubscription();
-
-        if (currentSubscription) {
-          return; // Subscription exists, all good!
-        }
-
-        // User had push enabled but subscription is lost
-        // Show recovery prompt
-        hasPrompted.current = true;
-
-        toast.warning('Notificaciones push desactivadas', {
-          description: 'Parece que perdiste tu suscripción de notificaciones push. ¿Quieres reactivarlas?',
-          duration: 10000, // Show for 10 seconds
+        hasPrompted.current = true
+        toast.warning('Este dispositivo necesita atención', {
+          description: 'Las notificaciones están activadas en tu cuenta, pero este dispositivo no está registrado.',
+          duration: 10000,
           action: {
-            label: 'Reactivar',
+            label: 'Reparar',
             onClick: () => {
-              // Navigate to notifications settings
-              // User will need to manually re-enable
-              window.location.href = '/profile';
+              window.location.href = '/notifications?section=devices'
             },
           },
-          cancel: {
-            label: 'Ahora no',
-            onClick: () => {
-              // User dismissed - don't bother them again this session
-            },
-          },
-        });
-
+          cancel: { label: 'Ahora no', onClick: () => undefined },
+        })
       } catch (error) {
-        console.error('[Push Recovery] Failed to check for lost subscription:', error);
+        console.error('[Push Recovery] No se pudo comprobar la suscripción:', error)
       } finally {
-        isChecking.current = false;
+        isChecking.current = false
       }
-    };
+    }
 
-    // Run check after a short delay to avoid blocking initial app load
-    const timeoutId = setTimeout(() => {
-      void checkForLostSubscription();
-    }, 3000); // Wait 3 seconds after mount
-
+    const timeoutId = window.setTimeout(() => void reconcile(), 3000)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void reconcile()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
-      clearTimeout(timeoutId);
-    };
-  }, []);
+      disposed = true
+      window.clearTimeout(timeoutId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [])
 }
