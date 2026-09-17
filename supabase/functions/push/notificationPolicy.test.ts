@@ -66,3 +66,43 @@ describe('notification policy', () => {
       .toBe('daily.morning.summary:2026-09-17:08:45:00')
   })
 })
+
+describe('policy coverage for the newer event families', () => {
+  it('files money movements under their own category', () => {
+    expect(categoryForEvent('expense.submitted')).toBe('finance')
+    expect(categoryForEvent('expense.approved')).toBe('finance')
+    expect(categoryForEvent('payout.override.applied')).toBe('finance')
+  })
+
+  it('keeps the remaining new families in a sensible category', () => {
+    expect(categoryForEvent('vacation.request.submitted')).toBe('staffing')
+    expect(categoryForEvent('job.producer.claimed')).toBe('jobs')
+    expect(categoryForEvent('logistics.transport.status.changed')).toBe('logistics')
+    expect(categoryForEvent('soundvision.access.requested')).toBe('documents')
+    expect(categoryForEvent('announcement.published')).toBe('system')
+    expect(categoryForEvent('bug.report.resolved')).toBe('system')
+    expect(categoryForEvent('timesheet.reminder.due')).toBe('timesheets')
+  })
+
+  it('treats a transport change as urgent so it bypasses quiet hours', () => {
+    expect(urgencyForEvent('logistics.transport.status.changed')).toBe('urgent')
+  })
+
+  it('does not let routine campaign or bug traffic interrupt anyone', () => {
+    expect(urgencyForEvent('staffing.campaign.completed')).toBe('low')
+    expect(urgencyForEvent('bug.report.resolved')).toBe('low')
+  })
+
+  it('separates two expenses on one job instead of deduping them together', async () => {
+    const base = { action: 'broadcast', type: 'expense.submitted', job_id: 'job-1' } as const
+    const first = await buildEventKey({ ...base, expense_id: 'exp-1' } as never, 0)
+    const second = await buildEventKey({ ...base, expense_id: 'exp-2' } as never, 0)
+    expect(first).not.toBe(second)
+  })
+
+  it('still groups an expense event under its own entity', () => {
+    expect(groupingTag('expense.submitted', {
+      action: 'broadcast', type: 'expense.submitted', job_id: 'job-1', expense_id: 'exp-1',
+    } as never)).toBe('finance:expense:exp-1')
+  })
+})

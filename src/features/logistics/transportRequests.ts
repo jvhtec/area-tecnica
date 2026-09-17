@@ -73,6 +73,8 @@ export type SaveTransportRequestInput = {
 
 export type ScheduleTransportRequestInput = {
   requestId: string;
+  // Optional: only used to attach the notification to its job, never sent to the RPC.
+  jobId?: string | null;
   loadDate: string;
   loadTime: string;
   unloadDate: string;
@@ -162,12 +164,36 @@ export async function saveTransportRequest(input: SaveTransportRequestInput): Pr
   return data;
 }
 
-export async function setTransportRequestStage(requestId: string, stage: TransportPlanningStatus): Promise<void> {
+/**
+ * Announces a planning-stage change to the crew and logistics. Fire-and-forget:
+ * the stage is already committed once the RPC returns, so a push failure must
+ * not present a successful change as a failed one.
+ */
+function notifyTransportStage(requestId: string, stage: TransportPlanningStatus, jobId?: string | null) {
+  void dataLayerClient.functions
+    .invoke("push", {
+      body: {
+        action: "broadcast",
+        type: "logistics.transport.status.changed",
+        request_id: requestId,
+        job_id: jobId ?? undefined,
+        planning_status: stage,
+      },
+    })
+    .catch(() => undefined);
+}
+
+export async function setTransportRequestStage(
+  requestId: string,
+  stage: TransportPlanningStatus,
+  jobId?: string | null,
+): Promise<void> {
   const { error } = await rpc("set_transport_request_stage", {
     p_request_id: requestId,
     p_stage: stage,
   });
   throwRpcError(error, "No se pudo actualizar el estado de la solicitud");
+  notifyTransportStage(requestId, stage, jobId);
 }
 
 export async function scheduleTransportRequest(input: ScheduleTransportRequestInput): Promise<void> {
@@ -183,4 +209,7 @@ export async function scheduleTransportRequest(input: ScheduleTransportRequestIn
     p_notes: input.notes ?? null,
   });
   throwRpcError(error, "No se pudo planificar el transporte");
+  // Scheduling moves the request to 'planned'; the server-side RPC owns that
+  // transition, so report the stage it lands on rather than re-deriving it.
+  notifyTransportStage(input.requestId, "planned", input.jobId);
 }

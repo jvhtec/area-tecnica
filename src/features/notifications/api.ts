@@ -174,6 +174,27 @@ export async function listPushDevices(userId: string): Promise<PushDevice[]> {
   ]
 }
 
+/**
+ * Turns a registered device on or off without unregistering it. Disabling keeps
+ * the row so the device keeps its history and can be re-enabled from here, which
+ * removal cannot: a removed device only comes back from the device itself.
+ */
+export async function setPushDeviceEnabled(device: PushDevice, enabled: boolean): Promise<void> {
+  const table = device.kind === 'webpush' ? 'push_subscriptions' : 'push_device_tokens'
+  const { error } = await dataLayerClient
+    .from(table)
+    .update({
+      enabled,
+      sync_status: enabled ? 'active' : 'disabled',
+      disabled_at: enabled ? null : new Date().toISOString(),
+      // Re-enabling clears the accumulated failure streak so the device is not
+      // immediately re-flagged by health tracking on its next delivery.
+      ...(enabled ? { failure_count: 0, last_failure_at: null } : {}),
+    })
+    .eq('id', device.id)
+  if (error) throw error
+}
+
 export async function removePushDevice(device: PushDevice): Promise<void> {
   const table = device.kind === 'webpush' ? 'push_subscriptions' : 'push_device_tokens'
   const { error } = await dataLayerClient.from(table).delete().eq('id', device.id)

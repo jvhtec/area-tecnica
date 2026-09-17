@@ -114,6 +114,25 @@ export type BroadcastBody = {
   // Changelog optional hints
   version?: string;
   content?: string;
+  // Vacation / absence requests
+  vacation_request_id?: string;
+  start_date?: string;
+  end_date?: string;
+  // Expenses and payouts
+  expense_id?: string;
+  amount_eur?: number;
+  category_slug?: string;
+  // Bug reports
+  bug_report_id?: string;
+  // Announcements
+  announcement_id?: string;
+  announcement_level?: string;
+  // Transport lifecycle
+  planning_status?: string;
+  previous_planning_status?: string;
+  // Producer claims
+  producer_id?: string;
+  producer_name?: string;
 };
 
 export type CheckScheduledBody = {

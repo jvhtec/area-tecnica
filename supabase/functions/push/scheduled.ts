@@ -13,7 +13,9 @@ import {
   type RecipientPreference,
   urgencyForEvent,
 } from "./notificationPolicy.ts";
-import { isScheduleDue } from "./schedulePolicy.ts";
+import { isScheduleDue, occurrenceDate } from "./schedulePolicy.ts";
+import { formatMorningSummary, formatMultiDepartmentSummary } from "./morningSummaryFormat.ts";
+import type { MorningSummaryData } from "./morningSummaryTypes.ts";
 import type {
   BroadcastBody,
   CheckScheduledBody,
@@ -70,35 +72,6 @@ function getErrorMessage(value: unknown): string | unknown {
 // DAILY MORNING SUMMARY HELPERS
 // ============================================================================
 
-type MorningSummaryData = {
-  assignments: Array<{
-    technician_id: string;
-    job: {
-      title: string;
-      start_time: string;
-    };
-    profile: {
-      first_name: string;
-      last_name: string;
-      nickname: string | null;
-    };
-  }>;
-  unavailable: Array<{
-    user_id: string;
-    source: string;
-    profile: {
-      first_name: string;
-      last_name: string;
-      nickname: string | null;
-    };
-  }>;
-  allTechs: Array<{
-    id: string;
-    first_name: string;
-    last_name: string;
-    nickname: string | null;
-  }>;
-};
 
 async function getMorningSummaryDataForDepartment(
   client: SupabaseClient,
@@ -206,256 +179,6 @@ async function getMorningSummaryDataForDepartment(
   };
 }
 
-function formatMorningSummary(
-  department: string,
-  data: MorningSummaryData,
-  targetDate: string,
-): { title: string; body: string } {
-  // Format date in Spanish
-  const dateObj = new Date(targetDate + 'T00:00:00Z');
-  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const dayName = dayNames[dateObj.getUTCDay()];
-  const dayNum = dateObj.getUTCDate();
-  const monthName = monthNames[dateObj.getUTCMonth()];
-  const formattedDate = `${dayName} ${dayNum} de ${monthName}`;
-
-  // Department names in Spanish (capitalize)
-  const deptMap: Record<string, string> = {
-    sound: 'Sonido',
-    lights: 'Iluminación',
-    video: 'Vídeo',
-    logistics: 'Logística',
-    production: 'Producción',
-  };
-  const deptName = deptMap[department] || department.toUpperCase();
-
-  let message = `📅 Resumen ${deptName} - ${formattedDate}\n\n`;
-
-  // Group assignments by job
-  const jobGroups: Record<string, typeof data.assignments> = {};
-  for (const assignment of data.assignments) {
-    const jobTitle = assignment.job.title;
-    if (!jobGroups[jobTitle]) {
-      jobGroups[jobTitle] = [];
-    }
-    jobGroups[jobTitle].push(assignment);
-  }
-
-  // Format jobs section
-  if (Object.keys(jobGroups).length > 0) {
-    message += `🎤 EN TRABAJOS:\n`;
-    for (const [jobTitle, assignments] of Object.entries(jobGroups)) {
-      const techNames = assignments
-        .map(a => a.profile.nickname || a.profile.first_name)
-        .join(', ');
-      message += `  • ${jobTitle}: ${techNames}\n`;
-    }
-    message += '\n';
-  }
-
-  // Calculate warehouse techs (available, not on jobs, not unavailable)
-  const assignedTechIds = new Set(data.assignments.map(a => a.technician_id));
-  const unavailableTechIds = new Set(data.unavailable.map(a => a.user_id));
-  const warehouseTechs = data.allTechs.filter(
-    t => !assignedTechIds.has(t.id) && !unavailableTechIds.has(t.id)
-  );
-
-  if (warehouseTechs.length > 0) {
-    const names = warehouseTechs
-      .map(t => t.nickname || t.first_name)
-      .join(', ');
-    message += `🏢 EN ALMACÉN: ${names}\n\n`;
-  }
-
-  // Group unavailable by source
-  const bySource: Record<string, typeof data.unavailable> = {};
-  for (const avail of data.unavailable) {
-    const source = avail.source || 'other';
-    if (!bySource[source]) {
-      bySource[source] = [];
-    }
-    bySource[source].push(avail);
-  }
-
-  // Vacation
-  if (bySource.vacation?.length) {
-    const names = bySource.vacation
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `🏖️ DE VACACIONES: ${names}\n`;
-  }
-
-  // Travel
-  if (bySource.travel?.length) {
-    const names = bySource.travel
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `✈️ DE VIAJE: ${names}\n`;
-  }
-
-  // Sick
-  if (bySource.sick?.length) {
-    const names = bySource.sick
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `🤒 ENFERMOS: ${names}\n`;
-  }
-
-  // Day off
-  if (bySource.day_off?.length) {
-    const names = bySource.day_off
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `📅 DÍA LIBRE: ${names}\n`;
-  }
-
-  // Warehouse (manual)
-  if (bySource.warehouse?.length) {
-    const names = bySource.warehouse
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `🏢 MARCADOS EN ALMACÉN: ${names}\n`;
-  }
-
-  // Summary stats
-  const totalTechs = data.allTechs.length;
-  const availableCount = warehouseTechs.length;
-  message += `\n📊 ${availableCount}/${totalTechs} técnicos disponibles`;
-
-  return {
-    title: `Resumen del día - ${deptName}`,
-    body: message,
-  };
-}
-
-function formatMultiDepartmentSummary(
-  departments: string[],
-  dataByDept: Map<string, MorningSummaryData>,
-  targetDate: string,
-): { title: string; body: string } {
-  // Format date in Spanish
-  const dateObj = new Date(targetDate + 'T00:00:00Z');
-  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const dayName = dayNames[dateObj.getUTCDay()];
-  const dayNum = dateObj.getUTCDate();
-  const monthName = monthNames[dateObj.getUTCMonth()];
-  const formattedDate = `${dayName} ${dayNum} de ${monthName}`;
-
-  // Department names in Spanish
-  const deptMap: Record<string, string> = {
-    sound: 'Sonido',
-    lights: 'Iluminación',
-    video: 'Vídeo',
-    logistics: 'Logística',
-    production: 'Producción',
-  };
-
-  let fullMessage = `📅 Resumen del día - ${formattedDate}\n\n`;
-
-  // Process each department
-  for (let i = 0; i < departments.length; i++) {
-    const department = departments[i];
-    const data = dataByDept.get(department);
-
-    if (!data) continue;
-
-    const deptName = deptMap[department] || department.toUpperCase();
-    fullMessage += `━━━ ${deptName.toUpperCase()} ━━━\n\n`;
-
-    // Group assignments by job
-    const jobGroups: Record<string, typeof data.assignments> = {};
-    for (const assignment of data.assignments) {
-      const jobTitle = assignment.job.title;
-      if (!jobGroups[jobTitle]) {
-        jobGroups[jobTitle] = [];
-      }
-      jobGroups[jobTitle].push(assignment);
-    }
-
-    // Format jobs section
-    if (Object.keys(jobGroups).length > 0) {
-      fullMessage += `🎤 EN TRABAJOS:\n`;
-      for (const [jobTitle, assignments] of Object.entries(jobGroups)) {
-        const techNames = assignments
-          .map(a => a.profile.nickname || a.profile.first_name)
-          .join(', ');
-        fullMessage += `  • ${jobTitle}: ${techNames}\n`;
-      }
-      fullMessage += '\n';
-    }
-
-    // Calculate warehouse techs
-    const assignedTechIds = new Set(data.assignments.map(a => a.technician_id));
-    const unavailableTechIds = new Set(data.unavailable.map(a => a.user_id));
-    const warehouseTechs = data.allTechs.filter(
-      t => !assignedTechIds.has(t.id) && !unavailableTechIds.has(t.id)
-    );
-
-    if (warehouseTechs.length > 0) {
-      const names = warehouseTechs
-        .map(t => t.nickname || t.first_name)
-        .join(', ');
-      fullMessage += `🏢 EN ALMACÉN: ${names}\n\n`;
-    }
-
-    // Group unavailable by source
-    const bySource: Record<string, typeof data.unavailable> = {};
-    for (const avail of data.unavailable) {
-      const source = avail.source || 'other';
-      if (!bySource[source]) {
-        bySource[source] = [];
-      }
-      bySource[source].push(avail);
-    }
-
-    // Format unavailability
-    let hasUnavailable = false;
-    if (bySource.vacation?.length) {
-      const names = bySource.vacation.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `🏖️ DE VACACIONES: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.travel?.length) {
-      const names = bySource.travel.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `✈️ DE VIAJE: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.sick?.length) {
-      const names = bySource.sick.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `🤒 ENFERMOS: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.day_off?.length) {
-      const names = bySource.day_off.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `📅 DÍA LIBRE: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.warehouse?.length) {
-      const names = bySource.warehouse.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `🏢 MARCADOS EN ALMACÉN: ${names}\n`;
-      hasUnavailable = true;
-    }
-
-    // Summary stats
-    const totalTechs = data.allTechs.length;
-    const availableCount = warehouseTechs.length;
-    fullMessage += `\n📊 ${availableCount}/${totalTechs} técnicos disponibles\n`;
-
-    // Add separator between departments (except last one)
-    if (i < departments.length - 1) {
-      fullMessage += '\n';
-    }
-  }
-
-  const deptNames = departments.map(d => deptMap[d] || d).join(', ');
-  return {
-    title: `Resumen del día - ${deptNames}`,
-    body: fullMessage,
-  };
-}
-
 async function checkAndGetScheduleConfig(
   client: SupabaseClient,
   eventType: string,
@@ -516,6 +239,22 @@ async function checkAndGetScheduleConfig(
   return { shouldSend: true, config };
 }
 
+/**
+ * Current calendar date in the schedule's timezone, as YYYY-MM-DD.
+ */
+function currentDateInTimezone(timezone: string, now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 export async function handleCheckScheduled(
   client: SupabaseClient,
   body: CheckScheduledBody,
@@ -542,39 +281,59 @@ export async function handleCheckScheduled(
   // Check if it's time to send
   const { shouldSend, config } = await checkAndGetScheduleConfig(client, type, body.force);
 
-  if (!shouldSend || !config) {
+  if (!config) {
+    return jsonResponse({ status: 'skipped', reason: 'Not scheduled time or already sent' });
+  }
+
+  const timezone = config.timezone || 'Europe/Madrid';
+  let occurrenceKey: string | null = null;
+  let resumed = false;
+
+  if (shouldSend) {
+    const freshKey = body.force
+      ? `manual:${currentDateInTimezone(timezone)}:${Date.now()}`
+      : `${currentDateInTimezone(timezone)}:${config.schedule_time}`;
+    const { data: claimed, error: claimError } = await client.rpc('claim_push_schedule', {
+      p_event_type: type,
+      p_occurrence_key: freshKey,
+    });
+    if (claimError) {
+      console.error('❌ Failed to claim scheduled occurrence:', claimError);
+      return jsonResponse({ status: 'error', reason: 'Failed to claim scheduled occurrence' }, 500);
+    }
+    if (claimed) occurrenceKey = freshKey;
+  }
+
+  // The minute gate above opens once a day, so an occurrence left 'retryable' by
+  // a partial send would never be revisited under its own key. Resume it on any
+  // tick instead, independently of the gate. A forced run always starts a fresh
+  // occurrence, so it never adopts an interrupted one.
+  if (!occurrenceKey && !body.force) {
+    const { data: retryKey, error: retryError } = await client.rpc('claim_push_schedule_retry', {
+      p_event_type: type,
+    });
+    if (retryError) {
+      logEvent('error', 'push_schedule_retry_claim_failed', {
+        errorCode: retryError.code ?? 'unknown',
+      });
+    } else if (typeof retryKey === 'string' && retryKey.length > 0) {
+      occurrenceKey = retryKey;
+      resumed = true;
+      console.log(`🔁 Resuming interrupted scheduled occurrence: ${retryKey}`);
+    }
+  }
+
+  if (!occurrenceKey) {
     return jsonResponse({ status: 'skipped', reason: 'Not scheduled time or already sent' });
   }
 
   console.log(`✅ Proceeding to send scheduled notification: ${type}`);
 
-  // Get current date in configured timezone
-  const timezone = config.timezone || 'Europe/Madrid';
-  const dateFormatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = dateFormatter.formatToParts(new Date());
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  const targetDate = `${year}-${month}-${day}`;
-  const occurrenceKey = body.force
-    ? `manual:${targetDate}:${Date.now()}`
-    : `${targetDate}:${config.schedule_time}`;
-  const { data: claimed, error: claimError } = await client.rpc('claim_push_schedule', {
-    p_event_type: type,
-    p_occurrence_key: occurrenceKey,
-  });
-  if (claimError) {
-    console.error('❌ Failed to claim scheduled occurrence:', claimError);
-    return jsonResponse({ status: 'error', reason: 'Failed to claim scheduled occurrence' }, 500);
-  }
-  if (!claimed) {
-    return jsonResponse({ status: 'skipped', reason: 'Occurrence already claimed' });
-  }
+  // A resumed occurrence must keep reporting against the day it was created for,
+  // not the day the retry happens to run, or its inbox rows and summary would
+  // silently target the wrong date.
+  const targetDate = (resumed ? occurrenceDate(occurrenceKey) : null)
+    ?? currentDateInTimezone(timezone);
 
   // For daily morning summary, use granular user subscriptions
   if (type === EVENT_TYPES.DAILY_MORNING_SUMMARY) {

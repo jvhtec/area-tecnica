@@ -51,4 +51,77 @@ describe('push broadcast authorization', () => {
     expect(request.actor_name).toBeUndefined()
     expect(request.actor_id).toBe('manager')
   })
+
+  it('lets a technician raise their own vacation, expense and SoundVision requests', async () => {
+    for (const [type, extra] of [
+      ['vacation.request.submitted', { technician_id: 'tech-1' }],
+      ['expense.submitted', { technician_id: 'tech-1' }],
+      ['soundvision.access.requested', { technician_id: 'tech-1' }],
+    ] as const) {
+      await expect(authorizeBroadcast(
+        clientForProfile('technician'),
+        { userId: 'tech-1', isService: false },
+        body(type, extra),
+      )).resolves.toBeUndefined()
+    }
+  })
+
+  it('stops a technician raising a self-service event on behalf of someone else', async () => {
+    await expect(authorizeBroadcast(
+      clientForProfile('technician'),
+      { userId: 'tech-1', isService: false },
+      body('expense.submitted', { technician_id: 'tech-2' }),
+    )).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('keeps decision outcomes closed to the user who would benefit from them', async () => {
+    for (const type of [
+      'vacation.request.approved',
+      'payout.override.applied',
+      'bug.report.resolved',
+      'timesheet.reminder.due',
+      'soundvision.access.approved',
+      'staffing.campaign.completed',
+    ]) {
+      await expect(authorizeBroadcast(
+        clientForProfile('management'),
+        { userId: 'manager', isService: false },
+        body(type),
+      )).rejects.toMatchObject({ status: 403 })
+    }
+  })
+
+  it('allows management to decide an expense, matching the approve_job_expense RPC', async () => {
+    await expect(authorizeBroadcast(
+      clientForProfile('management'),
+      { userId: 'manager', isService: false },
+      body('expense.approved', { technician_id: 'tech-1' }),
+    )).resolves.toBeUndefined()
+  })
+
+  it('lets a production technician claim a job without being management', async () => {
+    for (const department of ['production', 'produccion', 'producci\u00f3n']) {
+      await expect(authorizeBroadcast(
+        clientForProfile('technician', department),
+        { userId: 'prod-1', isService: false },
+        body('job.producer.claimed', { job_id: 'job-1' }),
+      )).resolves.toBeUndefined()
+    }
+  })
+
+  it('stops a non-production technician claiming a job', async () => {
+    await expect(authorizeBroadcast(
+      clientForProfile('technician', 'sound'),
+      { userId: 'tech-1', isService: false },
+      body('job.producer.claimed', { job_id: 'job-1' }),
+    )).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('stops an ordinary user publishing a company-wide announcement', async () => {
+    await expect(authorizeBroadcast(
+      clientForProfile('technician', 'sound'),
+      { userId: 'tech-1', isService: false },
+      body('announcement.published'),
+    )).rejects.toMatchObject({ status: 403 })
+  })
 })

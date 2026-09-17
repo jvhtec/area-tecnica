@@ -17,11 +17,12 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { getPushDeviceId } from '@/lib/pushDevice'
 import { queryKeys } from '@/lib/react-query'
 import { dataLayerClient } from '@/services/dataLayerClient'
-import { listPushDevices, removePushDevice, type PushDevice } from './api'
+import { listPushDevices, removePushDevice, setPushDeviceEnabled, type PushDevice } from './api'
 
 const statusLabel = (device: PushDevice): string => {
   if (!device.enabled || device.syncStatus === 'disabled') return 'Desactivado'
@@ -49,6 +50,15 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
       toast.success('Dispositivo eliminado')
     },
     onError: () => toast.error('No se pudo eliminar el dispositivo'),
+  })
+  const setEnabled = useMutation({
+    mutationFn: ({ device, enabled }: { device: PushDevice; enabled: boolean }) =>
+      setPushDeviceEnabled(device, enabled),
+    onSuccess: async (_result, { enabled }) => {
+      await queryClient.invalidateQueries({ queryKey })
+      toast.success(enabled ? 'Dispositivo activado' : 'Dispositivo desactivado')
+    },
+    onError: () => toast.error('No se pudo actualizar el dispositivo'),
   })
   const currentServerDevice = data.find((device) => device.deviceId === currentDeviceId)
   const currentStatus = !push.isSupported
@@ -167,6 +177,13 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
                     <p className="mt-1 text-xs text-muted-foreground">Última verificación: {formatLastSeen(device.lastVerifiedAt || device.lastSeenAt)}</p>
                   </div>
                   {device.deviceId !== currentDeviceId && (
+                    <div className="flex shrink-0 items-center gap-2">
+                    <Switch
+                      checked={device.enabled}
+                      disabled={setEnabled.isPending}
+                      aria-label={`Recibir notificaciones en ${device.name}`}
+                      onCheckedChange={(checked) => setEnabled.mutate({ device, enabled: checked })}
+                    />
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button className="h-10 w-full shrink-0 sm:w-10" variant="ghost" size="icon" aria-label={`Eliminar ${device.name}`}><Trash2 className="h-4 w-4" /></Button>
@@ -182,6 +199,7 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+                    </div>
                   )}
                 </li>
               ))}

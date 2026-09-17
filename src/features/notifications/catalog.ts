@@ -8,6 +8,7 @@ export const NOTIFICATION_CATEGORIES = [
   { key: 'logistics', label: 'Logística' },
   { key: 'tours', label: 'Giras' },
   { key: 'festival', label: 'Festivales' },
+  { key: 'finance', label: 'Gastos y pagos' },
   { key: 'system', label: 'Sistema y resúmenes' },
 ] as const
 

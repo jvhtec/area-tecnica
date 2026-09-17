@@ -109,41 +109,24 @@ export const useSoundVisionAccessRequest = () => {
 
       if (messageError) throw messageError;
 
-      // Get sound management and admin user IDs for notifications
-      const { data: soundManagers, error: managersError } = await supabase
-        .from('profiles')
-        .select('id')
-        .or('role.eq.admin,and(role.eq.management,department.eq.sound)');
-
-      if (managersError) {
-        console.warn('Failed to fetch sound managers for notifications:', managersError);
-      }
-
-      const recipientIds = soundManagers?.map((m) => m.id).filter(Boolean) || [];
-
-      // Send push notifications to each recipient
-      if (recipientIds.length > 0) {
-        try {
-          // Fan out notifications per recipient
-          await Promise.all(
-            recipientIds.map((recipientId) =>
-              supabase.functions.invoke('push', {
-                body: {
-                  action: 'broadcast',
-                  type: 'message.received',
-                  recipient_id: recipientId,
-                  message_preview: note.substring(0, 100),
-                  message_id: message.id,
-                  actor_name: userName,
-                  url: '/messages'
-                }
-              })
-            )
-          );
-        } catch (pushError) {
-          console.warn('Failed to send push notifications:', pushError);
-          // Don't fail the whole operation if push fails
-        }
+      // One broadcast, not a per-recipient fan-out: the server derives the sound
+      // management/admin audience itself, and a user-originated event has its
+      // caller-supplied recipient list stripped by the push authorization layer
+      // anyway. The dedicated event also lets a recipient mute SoundVision
+      // traffic without muting every internal message.
+      try {
+        await supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'soundvision.access.requested',
+            technician_id: user.id,
+            message_id: message.id,
+            description: note.substring(0, 200),
+          }
+        });
+      } catch (pushError) {
+        console.warn('Failed to send push notifications:', pushError);
+        // Don't fail the whole operation if push fails
       }
 
       return { vacationRequest, message };

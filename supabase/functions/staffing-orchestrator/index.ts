@@ -11,6 +11,7 @@ import {
   buildRequiredRoleQuantityMap,
   canResumeCampaignStatus,
 } from "./orchestrationUtils.ts";
+import { finalizeCampaignTick } from "./campaignFinalization.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1109,21 +1110,20 @@ async function tickCampaign(
       : tickIntervalSeconds;
     const nextRun = allFilled ? null : new Date(now.getTime() + runIntervalSeconds * 1000);
 
-    const { error: campaignUpdateError } = await supabase
-      .from('staffing_campaigns')
-      .update({
-        run_lock: null,
-        next_run_at: nextRun?.toISOString() || null,
-        status: allFilled ? 'completed' : 'active',
-        updated_at: now.toISOString(),
-      })
-      .eq('id', campaign_id)
-      .eq('run_lock', lockId);
+    const campaignUpdateError = await finalizeCampaignTick(supabase, {
+      campaignId: campaign_id,
+      lockId,
+      allFilled,
+      nextRunAt: nextRun?.toISOString() || null,
+      now: now.toISOString(),
+      jobId: campaign.job_id ?? null,
+      department: campaign.department ?? null, createdBy: campaign.created_by ?? null,
+    });
 
     lockAcquired = false;
 
     if (campaignUpdateError) {
-      return { status: 500, body: { error: campaignUpdateError.message } };
+      return { status: 500, body: { error: campaignUpdateError } };
     }
 
     return {

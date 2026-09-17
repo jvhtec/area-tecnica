@@ -82,3 +82,15 @@ export function isScheduleDue(
     && lastSent.minute === current.minute
   );
 }
+
+/**
+ * Recovers the target date an occurrence key was minted for. Keys are either
+ * `YYYY-MM-DD:HH:MM:SS` or, for forced runs, `manual:YYYY-MM-DD:<epoch>`.
+ */
+export function occurrenceDate(occurrenceKey: string): string | null {
+  const withoutPrefix = occurrenceKey.startsWith('manual:')
+    ? occurrenceKey.slice('manual:'.length)
+    : occurrenceKey;
+  const match = /^(\d{4}-\d{2}-\d{2})(?::|$)/.exec(withoutPrefix);
+  return match ? match[1] : null;
+}

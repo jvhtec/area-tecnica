@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { joinedSingle } from "../_shared/joins.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { broadcastPush } from "../_shared/pushBroadcast.ts";
+
+// Mirrors SOUNDVISION_REQUEST_PREFIX in src/hooks/useSoundVisionAccessRequest.ts.
+const SOUNDVISION_REQUEST_PREFIX = "[SoundVision Access]";
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 import {
   drawReportChrome,
@@ -452,6 +456,28 @@ serve(async (req) => {
         if (!sendRes.ok) {
           const msg = await sendRes.text();
           throw new Error(`Brevo error: ${sendRes.status} ${sendRes.statusText} ${msg}`);
+        }
+
+        // The decision is now durable and the email has gone out; mirror it to the
+        // requester's devices. Push is best-effort and must not fail the send.
+        if (reqRow.status === 'approved' || reqRow.status === 'rejected') {
+          // SoundVision library access is modelled as a same-day vacation request
+          // carrying a marker in `reason`, so the decision surfaces under its own
+          // event rather than as a confusing "vacations approved" notification.
+          const isSoundVisionAccess = (reqRow.reason ?? '').startsWith(SOUNDVISION_REQUEST_PREFIX);
+          const approved = reqRow.status === 'approved';
+          await broadcastPush({
+            type: isSoundVisionAccess
+              ? (approved ? 'soundvision.access.approved' : 'soundvision.access.rejected')
+              : (approved ? 'vacation.request.approved' : 'vacation.request.rejected'),
+            vacation_request_id: reqRow.id,
+            recipient_id: reqRow.technician_id,
+            technician_id: reqRow.technician_id,
+            actor_id: reqRow.approved_by ?? undefined,
+            start_date: reqRow.start_date,
+            end_date: reqRow.end_date,
+            rejection_reason: reqRow.rejection_reason ?? undefined,
+          }, { supabaseUrl: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
         }
 
         results.push({ id: reqRow.id, sent: true });

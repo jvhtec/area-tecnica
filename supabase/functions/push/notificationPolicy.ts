@@ -12,6 +12,7 @@ export type NotificationCategory =
   | "logistics"
   | "tours"
   | "festival"
+  | "finance"
   | "system";
 
 export type NotificationUrgency = "low" | "normal" | "high" | "urgent";
@@ -42,8 +43,18 @@ const SCHEDULE_OCCURRENCE_EVENT_TYPES = new Set([
 ]);
 
 export function categoryForEvent(type: string): NotificationCategory {
+  // Money movements get their own category so a technician can mute routine job
+  // chatter without losing sight of what they are owed.
+  if (
+    type.startsWith("expense.")
+    || type.startsWith("payout.")
+  ) return "finance";
+  if (type.startsWith("vacation.")) return "staffing";
   if (type.startsWith("staffing.") || type.startsWith("job.assignment") || type === "assignment.removed") return "staffing";
+  if (type.startsWith("job.producer.")) return "jobs";
   if (type.startsWith("timesheet.")) return "timesheets";
+  if (type.startsWith("soundvision.")) return "documents";
+  if (type === "announcement.published" || type === "bug.report.resolved") return "system";
   if (type.startsWith("task.")) return "tasks";
   if (type.startsWith("message.")) return "messages";
   if (type.startsWith("document.") || type.startsWith("hoja.")) return "documents";
@@ -60,17 +71,29 @@ export function urgencyForEvent(type: string): NotificationUrgency {
     || type === "assignment.removed"
     || type === "incident.report.uploaded"
     || type === "timesheet.rejected"
+    // A transport that has been cancelled or re-planned strands a crew, so it
+    // bypasses quiet hours the same way an assignment removal does.
+    || type === "logistics.transport.status.changed"
   ) return "urgent";
   if (
     type.includes("assignment")
     || type.includes("calltime")
     || type.startsWith("staffing.offer.")
     || type === "timesheet.approved"
+    || type === "timesheet.reminder.due"
+    || type.startsWith("vacation.request.")
+    || type === "expense.approved"
+    || type === "expense.rejected"
+    || type === "payout.override.applied"
+    || type.startsWith("soundvision.access.")
+    || type === "announcement.published"
   ) return "high";
   if (
     type.startsWith("document.")
     || type.startsWith("flex.")
     || type === "changelog.updated"
+    || type === "bug.report.resolved"
+    || type.startsWith("staffing.campaign.")
   ) return "low";
   return "normal";
 }
@@ -84,6 +107,14 @@ export function ttlSecondsForUrgency(urgency: NotificationUrgency): number {
 
 function entityKey(body: BroadcastBody): string | null {
   const pairs = [
+    // Entities carried only by the newer event families come first: several of
+    // them also carry job_id, and falling back to the job would let two distinct
+    // records (two expenses on one job, say) collide into a single event key and
+    // silently dedupe one away.
+    ["expense", body.expense_id],
+    ["vacation", body.vacation_request_id],
+    ["announcement", body.announcement_id],
+    ["report", body.bug_report_id],
     ["job", body.job_id],
     ["tour", body.tour_id],
     ["task", body.task_id],

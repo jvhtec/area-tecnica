@@ -13,6 +13,9 @@ type CallerProfile = {
 };
 
 const PRIVILEGED_ROLES = new Set(["admin", "management"]);
+// Mirrors the job_producer_claims department trigger, which accepts all three
+// spellings stored in profiles.department.
+const PRODUCTION_DEPARTMENTS = new Set(["production", "produccion", "producción"]);
 const SERVICE_ONLY_EVENTS = new Set([
   "job.invoicing_company.changed",
   "staffing.availability.sent",
@@ -23,6 +26,16 @@ const SERVICE_ONLY_EVENTS = new Set([
   "staffing.offer.declined",
   "festival.public_form.submitted",
   "festival.public_rider.uploaded",
+  // Outcomes of a decision or an automated sweep. Letting a user emit these
+  // would let them announce their own approval or a payout change.
+  "vacation.request.approved",
+  "vacation.request.rejected",
+  "payout.override.applied",
+  "timesheet.reminder.due",
+  "bug.report.resolved",
+  "soundvision.access.approved",
+  "soundvision.access.rejected",
+  "staffing.campaign.completed",
 ]);
 const TASK_TABLES = [
   "sound_job_tasks",
@@ -49,6 +62,16 @@ const KNOWN_EVENT_PATTERNS = [
   /^soundvision\.file\.(uploaded|downloaded)$/,
   /^festival\.public_(form\.submitted|rider\.uploaded)$/,
   /^changelog\.updated$/,
+  /^vacation\.request\.(submitted|approved|rejected)$/,
+  /^expense\.(submitted|approved|rejected)$/,
+  /^payout\.override\.applied$/,
+  /^timesheet\.reminder\.due$/,
+  /^bug\.report\.resolved$/,
+  /^logistics\.transport\.status\.changed$/,
+  /^job\.producer\.(claimed|released)$/,
+  /^soundvision\.access\.(requested|approved|rejected)$/,
+  /^announcement\.published$/,
+  /^staffing\.campaign\.completed$/,
 ] as const;
 
 const USER_SELF_EVENTS = new Set([
@@ -57,6 +80,9 @@ const USER_SELF_EVENTS = new Set([
   "staffing.offer.confirmed",
   "staffing.offer.declined",
   "timesheet.submitted",
+  "vacation.request.submitted",
+  "expense.submitted",
+  "soundvision.access.requested",
 ]);
 
 function isKnownEvent(type: string): boolean {
@@ -179,6 +205,16 @@ export async function authorizeBroadcast(
   if (
     type === "document.uploaded"
     && (profile.role === "technician" || profile.role === "house_tech")
+    && body.job_id
+  ) {
+    return;
+  }
+
+  // Claiming or releasing the responsable de producción is self-service inside
+  // the production department, so it is not limited to management there.
+  if (
+    type.startsWith("job.producer.")
+    && PRODUCTION_DEPARTMENTS.has(profile.department ?? "")
     && body.job_id
   ) {
     return;

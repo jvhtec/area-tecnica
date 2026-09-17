@@ -89,6 +89,43 @@ export const EVENT_TYPES = {
   // Changelog
   CHANGELOG_UPDATED: 'changelog.updated',
 
+  // Vacation / absence requests
+  VACATION_REQUEST_SUBMITTED: 'vacation.request.submitted',
+  VACATION_REQUEST_APPROVED: 'vacation.request.approved',
+  VACATION_REQUEST_REJECTED: 'vacation.request.rejected',
+
+  // Expenses
+  EXPENSE_SUBMITTED: 'expense.submitted',
+  EXPENSE_APPROVED: 'expense.approved',
+  EXPENSE_REJECTED: 'expense.rejected',
+
+  // Payouts
+  PAYOUT_OVERRIDE_APPLIED: 'payout.override.applied',
+
+  // Timesheet reminders
+  TIMESHEET_REMINDER_DUE: 'timesheet.reminder.due',
+
+  // Bug reports
+  BUG_REPORT_RESOLVED: 'bug.report.resolved',
+
+  // Transport lifecycle (beyond the initial request)
+  LOGISTICS_TRANSPORT_STATUS_CHANGED: 'logistics.transport.status.changed',
+
+  // Responsable de producción
+  JOB_PRODUCER_CLAIMED: 'job.producer.claimed',
+  JOB_PRODUCER_RELEASED: 'job.producer.released',
+
+  // SoundVision access workflow
+  SOUNDVISION_ACCESS_REQUESTED: 'soundvision.access.requested',
+  SOUNDVISION_ACCESS_APPROVED: 'soundvision.access.approved',
+  SOUNDVISION_ACCESS_REJECTED: 'soundvision.access.rejected',
+
+  // Announcements
+  ANNOUNCEMENT_PUBLISHED: 'announcement.published',
+
+  // Staffing campaigns
+  STAFFING_CAMPAIGN_COMPLETED: 'staffing.campaign.completed',
+
   // Scheduled notifications
   DAILY_MORNING_SUMMARY: 'daily.morning.summary',
   FESTIVAL_FEED_TICK: 'festival.feed.tick',

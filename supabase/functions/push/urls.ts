@@ -172,6 +172,47 @@ export function resolveNotificationUrl(
            type === EVENT_TYPES.FESTIVAL_PUBLIC_RIDER_UPLOADED) {
     return jobId ? `/festival-management/${jobId}/artists` : '/festival-management';
   }
+  // Vacation requests: the reviewer works from the availability board, the
+  // technician sees the outcome on their own personal page.
+  else if (type === EVENT_TYPES.VACATION_REQUEST_SUBMITTED) {
+    return '/disponibilidad';
+  }
+  else if (type === EVENT_TYPES.VACATION_REQUEST_APPROVED ||
+           type === EVENT_TYPES.VACATION_REQUEST_REJECTED) {
+    return '/personal';
+  }
+  // Expenses live on the gastos page for both submitter and approver.
+  else if (type === EVENT_TYPES.EXPENSE_SUBMITTED ||
+           type === EVENT_TYPES.EXPENSE_APPROVED ||
+           type === EVENT_TYPES.EXPENSE_REJECTED) {
+    return '/gastos';
+  }
+  // A payout override changes what a technician is owed for a job, which they
+  // read from their own timesheets rather than the management payout board.
+  else if (type === EVENT_TYPES.PAYOUT_OVERRIDE_APPLIED) {
+    return '/timesheets';
+  }
+  else if (type === EVENT_TYPES.TIMESHEET_REMINDER_DUE) {
+    return '/timesheets';
+  }
+  else if (type === EVENT_TYPES.BUG_REPORT_RESOLVED) {
+    return '/feedback';
+  }
+  else if (type === EVENT_TYPES.ANNOUNCEMENT_PUBLISHED) {
+    return '/announcements';
+  }
+  else if (type === EVENT_TYPES.LOGISTICS_TRANSPORT_STATUS_CHANGED) {
+    return '/logistics';
+  }
+  else if (type === EVENT_TYPES.SOUNDVISION_ACCESS_REQUESTED ||
+           type === EVENT_TYPES.SOUNDVISION_ACCESS_APPROVED ||
+           type === EVENT_TYPES.SOUNDVISION_ACCESS_REJECTED) {
+    return '/soundvision-files';
+  }
+  else if (type === EVENT_TYPES.STAFFING_CAMPAIGN_COMPLETED) {
+    return '/job-assignment-matrix';
+  }
+  // job.producer.* intentionally falls through to the job destination below.
   // Default fallback: job, tour, or home
   else {
     if (jobId) {

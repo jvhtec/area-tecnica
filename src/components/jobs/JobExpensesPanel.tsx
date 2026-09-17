@@ -40,6 +40,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { dataLayerClient } from '@/services/dataLayerClient';
+import { notifyExpenseDecision } from '@/features/expenses/expenseNotifications';
 import { formatCurrency } from '@/lib/utils';
 
 
@@ -277,13 +278,18 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         });
         if (error) throw error;
         toast.success('Gasto aprobado');
+        const decided = expenses.find((expense) => expense.id === expenseId);
+        notifyExpenseDecision({
+          jobId, expenseId, approved: true,
+          technicianId: decided?.technician_id, amountEur: decided?.amount_eur,
+        });
         await invalidateExpenseContext();
       } catch (error) {
         console.error('[JobExpensesPanel] Failed to approve expense', error);
         toast.error('No se pudo aprobar el gasto');
       }
     },
-    [invalidateExpenseContext]
+    [expenses, invalidateExpenseContext, jobId]
   );
 
   const handleRejectExpense = React.useCallback(
@@ -296,13 +302,19 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         });
         if (error) throw error;
         toast.success('Gasto rechazado');
+        const decided = expenses.find((expense) => expense.id === expenseId);
+        notifyExpenseDecision({
+          jobId, expenseId, approved: false,
+          technicianId: decided?.technician_id, amountEur: decided?.amount_eur,
+          rejectionReason: reason,
+        });
         await invalidateExpenseContext();
       } catch (error) {
         console.error('[JobExpensesPanel] Failed to reject expense', error);
         toast.error('No se pudo rechazar el gasto');
       }
     },
-    [invalidateExpenseContext]
+    [expenses, invalidateExpenseContext, jobId]
   );
 
   const handleViewReceipt = React.useCallback(
