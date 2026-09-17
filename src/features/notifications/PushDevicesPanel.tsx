@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, CircleAlert, Smartphone, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -38,6 +39,8 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
   const queryKey = queryKeys.scope('push-devices', userId)
   const currentDeviceId = getPushDeviceId()
   const push = usePushNotifications()
+  const [isDeviceActionPending, setIsDeviceActionPending] = useState(false)
+  const [isTestPending, setIsTestPending] = useState(false)
   const { data = [], isLoading, error } = useQuery({ queryKey, queryFn: () => listPushDevices(userId) })
   const remove = useMutation({
     mutationFn: removePushDevice,
@@ -61,14 +64,17 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
             : 'Sin configurar'
 
   const toggleCurrent = async () => {
+    if (isDeviceActionPending) return
+    setIsDeviceActionPending(true)
     try {
       const wasEnabled = Boolean(push.subscription && currentServerDevice)
-      if (push.subscription && !currentServerDevice) await push.synchronize()
+      const neededSynchronization = Boolean(push.subscription && !currentServerDevice)
+      if (neededSynchronization) await push.synchronize()
       else if (push.subscription) await push.disable()
       else await push.enable()
       await queryClient.invalidateQueries({ queryKey })
       toast.success(
-        push.subscription && !currentServerDevice
+        neededSynchronization
           ? 'Dispositivo sincronizado'
           : wasEnabled
             ? 'Notificaciones desactivadas en este dispositivo'
@@ -76,35 +82,47 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
       )
     } catch {
       toast.error('No se pudo actualizar este dispositivo')
+    } finally {
+      setIsDeviceActionPending(false)
     }
   }
 
   const sendTest = async () => {
-    const { data: result, error: testError } = await dataLayerClient.functions.invoke('push', {
-      body: { action: 'test', device_id: currentDeviceId, url: '/notifications?section=diagnostics' },
-    })
-    if (testError) throw testError
-    const status = (result as { status?: string })?.status
-    if (status === 'accepted' || status === 'partial') {
-      toast.success('Prueba aceptada por el servicio push')
-      return
+    if (isTestPending) return
+    setIsTestPending(true)
+    try {
+      const { data: result, error: testError } = await dataLayerClient.functions.invoke('push', {
+        body: { action: 'test', device_id: currentDeviceId, url: '/notifications?section=diagnostics' },
+      })
+      if (testError) throw testError
+      const status = (result as { status?: string })?.status
+      if (status === 'accepted' || status === 'partial') {
+        toast.success('Prueba aceptada por el servicio push')
+        return
+      }
+      toast.error('El servicio push no aceptó la prueba')
+    } catch {
+      toast.error('No se pudo enviar la prueba')
+    } finally {
+      setIsTestPending(false)
     }
-    toast.error('El servicio push no aceptó la prueba')
   }
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Comprobando dispositivos…</p>
   if (error) return <p role="alert" className="text-sm text-destructive">No se pudieron cargar los dispositivos.</p>
 
+  const controlsBusy = push.isInitializing || push.isEnabling || push.isDisabling || isDeviceActionPending
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5" />Este dispositivo</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5 shrink-0" />Este dispositivo</CardTitle>
           <CardDescription>Activarlo o desactivarlo no cambia tus preferencias de cuenta ni otros dispositivos.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
-            {currentStatus === 'Activo' ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <CircleAlert className="h-5 w-5 text-amber-600" />}
+            {currentStatus === 'Activo' ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" /> : <CircleAlert className="h-5 w-5 shrink-0 text-amber-600" />}
             <span className="font-medium">{currentStatus}</span>
           </div>
           {push.error && <p role="alert" className="text-sm text-destructive">{push.error}</p>}
@@ -112,11 +130,17 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
             <p className="text-sm text-muted-foreground">Permite las notificaciones en los ajustes del navegador o del sistema y vuelve a abrir esta página.</p>
           )}
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button onClick={() => void toggleCurrent()} disabled={!push.isSupported || push.isInitializing || push.isEnabling || push.isDisabling || push.permission === 'denied'}>
-              {currentStatus === 'Necesita sincronización' ? 'Sincronizar' : push.subscription ? 'Desactivar en este dispositivo' : 'Activar en este dispositivo'}
+            <Button className="w-full sm:w-auto" onClick={() => void toggleCurrent()} disabled={!push.isSupported || controlsBusy || push.permission === 'denied'}>
+              {isDeviceActionPending
+                ? 'Actualizando…'
+                : currentStatus === 'Necesita sincronización'
+                  ? 'Sincronizar'
+                  : push.subscription
+                    ? 'Desactivar en este dispositivo'
+                    : 'Activar en este dispositivo'}
             </Button>
-            <Button variant="outline" onClick={() => void sendTest().catch(() => toast.error('No se pudo enviar la prueba'))} disabled={!push.subscription || !currentServerDevice}>
-              Enviar prueba a este dispositivo
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => void sendTest()} disabled={!push.subscription || !currentServerDevice || isTestPending || controlsBusy}>
+              {isTestPending ? 'Enviando prueba…' : 'Enviar prueba a este dispositivo'}
             </Button>
           </div>
         </CardContent>
@@ -133,19 +157,19 @@ export function PushDevicesPanel({ userId }: { userId: string }) {
           ) : (
             <ul className="space-y-2">
               {data.map((device) => (
-                <li key={`${device.kind}-${device.id}`} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                  <div className="min-w-0">
+                <li key={`${device.kind}-${device.id}`} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate font-medium">{device.name}</span>
+                      <span className="min-w-0 break-words font-medium">{device.name}</span>
                       {device.deviceId === currentDeviceId && <Badge>Este dispositivo</Badge>}
                       <Badge variant="outline">{statusLabel(device)}</Badge>
                     </div>
-                    <p className="truncate text-xs text-muted-foreground">Última verificación: {formatLastSeen(device.lastVerifiedAt || device.lastSeenAt)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Última verificación: {formatLastSeen(device.lastVerifiedAt || device.lastSeenAt)}</p>
                   </div>
                   {device.deviceId !== currentDeviceId && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label={`Eliminar ${device.name}`}><Trash2 className="h-4 w-4" /></Button>
+                        <Button className="h-10 w-full shrink-0 sm:w-10" variant="ghost" size="icon" aria-label={`Eliminar ${device.name}`}><Trash2 className="h-4 w-4" /></Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
