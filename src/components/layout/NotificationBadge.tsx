@@ -29,7 +29,7 @@ export const NotificationBadge = ({
     setIsLoading(true)
     try {
       const count = await getUnreadNotificationCount(userId)
-      // Overlapping refreshes (the 30s interval and the invalidate event) can
+      // Overlapping refreshes (the 30s interval and invalidate events) can
       // resolve out of order; only the most recently started call may apply.
       if (seq === refreshSeq.current) setUnreadCount(count)
     } catch (error) {
@@ -43,10 +43,23 @@ export const NotificationBadge = ({
     void refresh()
     const intervalId = window.setInterval(() => void refresh(), 30_000)
     const handleInvalidate = () => void refresh()
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const message = event.data as { source?: string; type?: string } | undefined
+      if (message?.source !== 'sw') return
+      if (message.type === 'notification-shown' || message.type === 'notification-click') {
+        void refresh()
+      }
+    }
     window.addEventListener('notifications_invalidated', handleInvalidate)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
+    }
     return () => {
       window.clearInterval(intervalId)
       window.removeEventListener('notifications_invalidated', handleInvalidate)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
+      }
     }
   }, [refresh])
 
@@ -62,8 +75,8 @@ export const NotificationBadge = ({
         variant="ghost"
         size="icon"
         onClick={() => navigate('/notifications')}
-        disabled={isLoading}
         className={cn('relative h-9 w-9 rounded-full border border-border/60 bg-background/70 text-muted-foreground shadow-sm hover:bg-accent/30 hover:text-foreground', hasUnread && 'text-amber-500', className)}
+        aria-busy={isLoading}
         aria-label={hasUnread ? `${unreadCount} notificaciones sin leer` : 'Abrir notificaciones'}
       >
         <Icon className="h-5 w-5" aria-hidden="true" />
@@ -77,7 +90,7 @@ export const NotificationBadge = ({
   }
 
   return (
-    <Button type="button" variant="ghost" className={cn('w-full justify-start gap-2', hasUnread && 'text-amber-500', className)} onClick={() => navigate('/notifications')} disabled={isLoading}>
+    <Button type="button" variant="ghost" className={cn('w-full justify-start gap-2', hasUnread && 'text-amber-500', className)} onClick={() => navigate('/notifications')} aria-busy={isLoading}>
       {hasUnread ? <BellDot className="h-4 w-4" aria-hidden="true" /> : <Bell className="h-4 w-4" aria-hidden="true" />}
       <span>Notificaciones</span>
       {hasUnread && <span className="ml-auto text-xs font-semibold">{readableCount}</span>}
