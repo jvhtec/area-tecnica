@@ -71,6 +71,8 @@ const PRIMARY_NAVIGATION_PROFILE_MAP: Record<string, readonly string[]> = {
   ],
 }
 
+const TECHNICIAN_LAYOUT_ROUTES = new Set(["/syscalc", "/notifications"])
+
 interface SelectPrimaryNavigationItemsParams {
   items: NavigationItem[]
   userDepartment: string | null | undefined
@@ -193,8 +195,8 @@ const Layout = () => {
 
   // Redirect technician users to the technician app (after all hooks run).
   // Preserve showAbout query param for deeplinks.
-  // Allow-list technician-accessible routes that still live under Layout (e.g. SysCalc).
-  const isAllowedTechnicianLayoutRoute = location.pathname === '/syscalc'
+  // Keep this allow-list aligned with AuthenticatedShell's technician guard.
+  const isAllowedTechnicianLayoutRoute = TECHNICIAN_LAYOUT_ROUTES.has(location.pathname)
   const showAboutParam = searchParams.get('showAbout')
   const technicianRedirectPath = showAboutParam ? `/tech-app?showAbout=${showAboutParam}` : '/tech-app'
   const shouldRedirectTechnician =
