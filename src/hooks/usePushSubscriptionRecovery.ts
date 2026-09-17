@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 
+const RECONCILE_MIN_INTERVAL_MS = 5 * 60 * 1000
+
 /** Reconciles the current device with the server without requesting permission. */
 export function usePushSubscriptionRecovery() {
   const hasPrompted = useRef(false)
@@ -7,9 +9,13 @@ export function usePushSubscriptionRecovery() {
 
   useEffect(() => {
     let disposed = false
+    let lastRunAt = 0
 
-    const reconcile = async () => {
+    const reconcile = async (force = false) => {
       if (disposed || isChecking.current) return
+      const now = Date.now()
+      if (!force && now - lastRunAt < RECONCILE_MIN_INTERVAL_MS) return
+      lastRunAt = now
       isChecking.current = true
       try {
         const [
@@ -67,7 +73,10 @@ export function usePushSubscriptionRecovery() {
       }
     }
 
-    const timeoutId = window.setTimeout(() => void reconcile(), 3000)
+    // The first reconciliation should always run once after startup. Later
+    // visibility changes are throttled so ordinary tab switching does not
+    // write the same device registration over and over.
+    const timeoutId = window.setTimeout(() => void reconcile(true), 3000)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') void reconcile()
     }
