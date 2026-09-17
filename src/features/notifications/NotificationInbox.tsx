@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -27,6 +27,16 @@ function formatDate(value: string): string {
   }).format(new Date(value))
 }
 
+function deliveryLabel(status: string): string | null {
+  switch (status) {
+    case 'failed': return 'Push no entregado'
+    case 'partial': return 'Entrega parcial'
+    case 'pending': return 'Entrega pendiente'
+    case 'skipped': return 'Solo en bandeja'
+    default: return null
+  }
+}
+
 export function NotificationInbox() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -35,6 +45,7 @@ export function NotificationInbox() {
   const { data = [], isLoading, error } = useQuery({
     queryKey: inboxKey,
     queryFn: listNotificationInbox,
+    refetchInterval: 30_000,
   })
   const readOne = useMutation({
     mutationFn: markNotificationRead,
@@ -43,7 +54,22 @@ export function NotificationInbox() {
   const readAll = useMutation({
     mutationFn: markAllNotificationsRead,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: inboxKey }),
+    onError: () => toast.error('No se pudieron marcar las notificaciones como leídas.'),
   })
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const message = event.data as { source?: string; type?: string } | undefined
+      if (message?.source !== 'sw') return
+      if (message.type === 'notification-shown' || message.type === 'notification-click') {
+        void queryClient.invalidateQueries({ queryKey: inboxKey })
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
+  }, [queryClient])
+
   const items = useMemo(() => data.filter((item) => {
     if (view === 'unread' && item.read_at) return false
     return category === 'all' || item.category === category
@@ -73,13 +99,16 @@ export function NotificationInbox() {
   return (
     <div className="space-y-4" aria-busy={readOne.isPending || readAll.isPending}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={view} onValueChange={(value) => setView(value as 'unread' | 'all')}>
-          <TabsList aria-label="Filtrar notificaciones por estado">
-            <TabsTrigger value="unread">No leídas ({unreadCount})</TabsTrigger>
-            <TabsTrigger value="all">Todas</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="overflow-x-auto overscroll-x-contain">
+          <Tabs value={view} onValueChange={(value) => setView(value as 'unread' | 'all')}>
+            <TabsList className="min-w-max" aria-label="Filtrar notificaciones por estado">
+              <TabsTrigger className="min-h-10" value="unread">No leídas ({unreadCount})</TabsTrigger>
+              <TabsTrigger className="min-h-10" value="all">Todas</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
         <Button
+          className="w-full sm:w-auto"
           variant="outline"
           size="sm"
           onClick={() => readAll.mutate()}
@@ -90,10 +119,10 @@ export function NotificationInbox() {
         </Button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Filtrar por categoría">
-        <Button size="sm" variant={category === 'all' ? 'default' : 'outline'} onClick={() => setCategory('all')}>Todas</Button>
+      <div className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="Filtrar por categoría">
+        <Button className="min-h-9 shrink-0" size="sm" variant={category === 'all' ? 'default' : 'outline'} onClick={() => setCategory('all')}>Todas</Button>
         {NOTIFICATION_CATEGORIES.map((item) => (
-          <Button key={item.key} size="sm" variant={category === item.key ? 'default' : 'outline'} onClick={() => setCategory(item.key)}>
+          <Button className="min-h-9 shrink-0" key={item.key} size="sm" variant={category === item.key ? 'default' : 'outline'} onClick={() => setCategory(item.key)}>
             {item.label}
           </Button>
         ))}
@@ -108,30 +137,32 @@ export function NotificationInbox() {
         </Card>
       ) : (
         <ul className="space-y-2">
-          {items.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                onClick={() => openItem(item)}
-                className="w-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
+          {items.map((item) => {
+            const providerLabel = deliveryLabel(item.provider_status)
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => openItem(item)}
+                  className="min-h-14 w-full rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4"
+                >
+                  <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{item.title}</span>
+                      <span className="min-w-0 font-medium">{item.title}</span>
                       {!item.read_at && <Badge><span className="sr-only">Estado: </span>Nueva</Badge>}
+                      {item.urgency === 'urgent' && <Badge variant="destructive">Urgente</Badge>}
                       <Badge variant="outline">{categoryLabel(item.category)}</Badge>
                     </div>
-                    {item.body && <p className="line-clamp-2 text-sm text-muted-foreground">{item.body}</p>}
-                    <p className="text-xs text-muted-foreground">{formatDate(item.created_at)}</p>
+                    {item.body && <p className="line-clamp-3 text-sm text-muted-foreground sm:line-clamp-2">{item.body}</p>}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{formatDate(item.created_at)}</span>
+                      {providerLabel && <span>{providerLabel}</span>}
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {item.provider_status === 'failed' ? 'Push fallido · disponible aquí' : ''}
-                  </span>
-                </div>
-              </button>
-            </li>
-          ))}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
