@@ -36,4 +36,33 @@ describe('notification policy', () => {
     expect(await buildEventKey(first, now)).not.toBe(await buildEventKey(first, now + 5 * 60 * 1000))
     expect(groupingTag(first.type, first)).toBe('jobs:job:job-1')
   })
+
+  it('does not treat a domain event id as a permanent dedupe key', async () => {
+    const now = Date.parse('2026-09-17T10:02:00Z')
+    const firstUpdate = body('logistics.event.updated', {
+      event_id: 'logistics-event-1',
+      changes: { event_time: { from: '08:00', to: '09:00' } },
+    })
+    const secondUpdate = body('logistics.event.updated', {
+      event_id: 'logistics-event-1',
+      changes: { event_time: { from: '09:00', to: '10:00' } },
+    })
+
+    expect(await buildEventKey(firstUpdate, now)).not.toBe(await buildEventKey(secondUpdate, now))
+    expect(await buildEventKey(firstUpdate, now)).toBe(await buildEventKey(firstUpdate, now))
+    expect(groupingTag(firstUpdate.type, firstUpdate)).toBe('logistics:event:logistics-event-1')
+  })
+
+  it('keeps scheduled occurrence ids stable across retries', async () => {
+    const scheduled = body('daily.morning.summary', {
+      event_id: '2026-09-17:08:45:00',
+      recipient_id: 'user-1',
+      target_date: '2026-09-17',
+    })
+
+    expect(await buildEventKey(scheduled, Date.parse('2026-09-17T06:45:00Z')))
+      .toBe('daily.morning.summary:2026-09-17:08:45:00')
+    expect(await buildEventKey(scheduled, Date.parse('2026-09-17T07:10:00Z')))
+      .toBe('daily.morning.summary:2026-09-17:08:45:00')
+  })
 })
