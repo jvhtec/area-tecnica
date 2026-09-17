@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(23);
+SELECT plan(24);
 
 SELECT has_table('public', 'notification_inbox', 'notification inbox exists');
 SELECT has_table('public', 'push_delivery_attempts', 'push delivery attempts exist');
@@ -120,6 +120,15 @@ SELECT ok(
       AND pg_get_functiondef(oid) ILIKE '%push_subscriptions%'
       AND pg_get_functiondef(oid) ILIKE '%push_device_tokens%'),
   'target health records successes and increments provider failures'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_proc
+    WHERE oid = to_regprocedure('public.finish_push_schedule(text,text,boolean,text)')
+      AND pg_get_functiondef(oid) ILIKE '%notification_inbox%'
+      AND pg_get_functiondef(oid) ILIKE '%provider_status%'
+      AND pg_get_functiondef(oid) ILIKE '%pending%'
+      AND pg_get_functiondef(oid) ILIKE '%failed%'),
+  'schedule completion remains retryable while recipient delivery is incomplete'
 );
 
 SELECT * FROM finish();
