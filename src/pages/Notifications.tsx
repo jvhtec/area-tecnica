@@ -18,25 +18,25 @@ export default function Notifications() {
   if (!user) return null
 
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-5 px-3 py-4 pb-24 sm:px-6 md:py-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Notificaciones</h1>
+    <section className="mx-auto w-full max-w-5xl space-y-5" aria-labelledby="notifications-title">
+      <div className="space-y-1">
+        <h1 id="notifications-title" className="text-2xl font-semibold tracking-tight">Notificaciones</h1>
         <p className="text-sm text-muted-foreground">Consulta tus avisos, elige qué recibir y comprueba tus dispositivos.</p>
       </div>
       <Tabs value={section} onValueChange={(value) => setSearchParams({ section: value }, { replace: true })}>
-        <div className="sticky top-0 z-20 -mx-3 overflow-x-auto bg-background/95 px-3 py-2 backdrop-blur sm:mx-0 sm:px-0">
-          <TabsList className="h-auto min-w-max" aria-label="Secciones de notificaciones">
-            <TabsTrigger value="inbox">Bandeja</TabsTrigger>
-            <TabsTrigger value="preferences">Preferencias</TabsTrigger>
-            <TabsTrigger value="devices">Dispositivos</TabsTrigger>
-            <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>
+        <div className="sticky top-0 z-20 -mx-3 overflow-x-auto overscroll-x-contain bg-background/95 px-3 py-2 backdrop-blur sm:mx-0 sm:px-0">
+          <TabsList className="h-auto min-w-max gap-1 p-1" aria-label="Secciones de notificaciones">
+            <TabsTrigger className="min-h-10 px-3" value="inbox">Bandeja</TabsTrigger>
+            <TabsTrigger className="min-h-10 px-3" value="preferences">Preferencias</TabsTrigger>
+            <TabsTrigger className="min-h-10 px-3" value="devices">Dispositivos</TabsTrigger>
+            <TabsTrigger className="min-h-10 px-3" value="diagnostics">Diagnóstico</TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="inbox"><NotificationInbox /></TabsContent>
-        <TabsContent value="preferences"><NotificationPreferencesForm userId={user.id} /></TabsContent>
-        <TabsContent value="devices"><PushDevicesPanel userId={user.id} /></TabsContent>
-        <TabsContent value="diagnostics"><PushDiagnosticsPanel userId={user.id} /></TabsContent>
+        <TabsContent className="mt-4" value="inbox"><NotificationInbox /></TabsContent>
+        <TabsContent className="mt-4" value="preferences"><NotificationPreferencesForm userId={user.id} /></TabsContent>
+        <TabsContent className="mt-4" value="devices"><PushDevicesPanel userId={user.id} /></TabsContent>
+        <TabsContent className="mt-4" value="diagnostics"><PushDiagnosticsPanel userId={user.id} /></TabsContent>
       </Tabs>
-    </main>
+    </section>
   )
 }
