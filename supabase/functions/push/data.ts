@@ -32,6 +32,20 @@ export async function getManagementUserIds(client: SupabaseClient): Promise<stri
   return getStringIds(data);
 }
 
+/**
+ * Every account, for the one family that is genuinely company-wide. Recipients
+ * without a registered device still get a durable inbox item; the delivery layer
+ * and the recipient's own preferences decide whether a push is attempted.
+ */
+export async function getAllUserIds(client: SupabaseClient): Promise<string[]> {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .returns<IdRow[]>();
+  if (error || !data) return [];
+  return getStringIds(data);
+}
+
 export async function getSoundDepartmentUserIds(client: SupabaseClient): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')

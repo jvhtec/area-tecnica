@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "./deps.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 import {
   getAdminUserIds,
   getJobDepartment,
@@ -44,7 +45,13 @@ import {
   sendTransportRequestEmail,
   type TransportRequestEmailResult,
 } from "./transportRequestEmail.ts";
-import { logEvent } from "../_shared/structuredLogger.ts";
+import { claimInboxItems, recordAttemptResult, recordDeliveryOutcomes } from "./inbox.ts";
+import {
+  buildEventKey,
+  decoratePayloadPolicy,
+  loadRecipientPreferences,
+  urgencyForEvent,
+} from "./notificationPolicy.ts";
 
 /**
  * Broadcasts a push notification for a given event to the correct audience,
@@ -212,6 +219,12 @@ export async function handleBroadcast(
     participants,
   });
 
+  // Family handlers may refine the destination after the initial URL is built.
+  // Validate the final value so a caller-supplied override cannot bypass the
+  // internal-only navigation boundary.
+  state.url = validateInternalUrl(state.url)
+    || resolveNotificationUrl(type, jobId, tourId, jobType);
+
   if (type === 'job.assignment.confirmed' || type === 'job.assignment.direct') {
     if (!body.recipient_id || body.recipient_id !== userId) {
       recipients.delete(userId);
@@ -223,21 +236,9 @@ export async function handleBroadcast(
   }
 
   const recipientIds = Array.from(recipients);
-  const [{ subscriptions, error: subscriptionsError }, nativeTokens] = await Promise.all([
-    loadPushSubscriptions(client, recipientIds),
-    loadNativeTokens(client, recipientIds),
-  ]);
-
-  if (subscriptionsError) {
-    console.error('push broadcast fetch subs error', subscriptionsError);
-    return jsonResponse(await withEmail({ error: 'Failed to load subscriptions' }), 500);
-  }
-
-  if (subscriptions.length === 0 && nativeTokens.length === 0) {
-    return jsonResponse(await withEmail({ status: 'skipped', reason: 'No subscriptions for recipients' }));
-  }
-
-  const payload: PushPayload = {
+  const eventKey = await buildEventKey(body);
+  const urgency = urgencyForEvent(type);
+  const payload = decoratePayloadPolicy({
     title: state.title,
     body: state.text,
     url: state.url,
@@ -275,8 +276,100 @@ export async function handleBroadcast(
       ...(state.metaExtras.requirementsSummary ? { departmentRoles: state.metaExtras.requirementsSummary } : {}),
       ...(state.metaExtras.requirementsSummaryText ? { departmentRolesText: state.metaExtras.requirementsSummaryText } : {}),
     },
-  };
+  } satisfies PushPayload, body, eventKey, urgency);
 
-  const results = await sendPayloadToTargets(client, subscriptions, nativeTokens, payload);
-  return jsonResponse(await withEmail({ status: 'sent', results, count: results.length }));
+  let inboxIds: Map<string, string>;
+  try {
+    inboxIds = await claimInboxItems(client, recipientIds, eventKey, body, payload, urgency);
+  } catch (error) {
+    logEvent("error", "notification_inbox_claim_failed", {
+      errorCode: error instanceof Error ? error.name : "unknown",
+    });
+    return jsonResponse(await withEmail({ status: "failed", reason: "inbox_persistence_failed" }), 500);
+  }
+  if (inboxIds.size === 0) {
+    return jsonResponse(await withEmail({ status: "skipped", reason: "duplicate_event", eventKey }));
+  }
+
+  const claimedRecipientIds = Array.from(inboxIds.keys());
+  let preferences: Awaited<ReturnType<typeof loadRecipientPreferences>>;
+  try {
+    preferences = await loadRecipientPreferences(client, claimedRecipientIds, body, urgency);
+  } catch (error) {
+    logEvent("error", "push_broadcast_preference_lookup_failed", {
+      errorCode: error instanceof Error ? error.name : "unknown",
+    });
+    // A failed lookup must not silently fall back to "everyone is opted in";
+    // treat every claimed recipient as failed so a stored opt-out can never
+    // be bypassed by a transient database error.
+    await recordDeliveryOutcomes(client, inboxIds, [], [], claimedRecipientIds);
+    return jsonResponse(await withEmail({ status: "failed", reason: "preference_lookup_failed", eventKey }), 500);
+  }
+  const eligibleRecipientIds = claimedRecipientIds.filter((recipientId) => {
+    const preference = preferences.get(recipientId);
+    return preference?.accountEnabled !== false
+      && preference?.categoryEnabled !== false
+      && preference?.quietNow !== true
+      && preference?.muted !== true;
+  });
+  const skippedUserIds = claimedRecipientIds.filter((id) => !eligibleRecipientIds.includes(id));
+
+  if (eligibleRecipientIds.length === 0) {
+    await recordDeliveryOutcomes(client, inboxIds, [], skippedUserIds);
+    return jsonResponse(await withEmail({
+      status: "skipped",
+      reason: "recipient_preferences",
+      inboxCount: inboxIds.size,
+      eventKey,
+    }));
+  }
+
+  const [{ subscriptions, error: subscriptionsError }, nativeResult] = await Promise.all([
+    loadPushSubscriptions(client, eligibleRecipientIds),
+    loadNativeTokens(client, eligibleRecipientIds),
+  ]);
+
+  if (subscriptionsError || nativeResult.error) {
+    logEvent("error", "push_broadcast_target_lookup_failed", {
+      webFailed: Boolean(subscriptionsError),
+      nativeFailed: Boolean(nativeResult.error),
+    });
+    await recordDeliveryOutcomes(client, inboxIds, [], [], claimedRecipientIds);
+    return jsonResponse(await withEmail({ status: "failed", reason: "target_lookup_failed", eventKey }), 500);
+  }
+
+  if (subscriptions.length === 0 && nativeResult.tokens.length === 0) {
+    // No target is a terminal non-error outcome for this occurrence: the inbox
+    // item remains available, but there was simply nowhere to deliver a push.
+    await recordDeliveryOutcomes(client, inboxIds, [], claimedRecipientIds);
+    return jsonResponse(await withEmail({
+      status: 'skipped',
+      reason: 'no_registered_devices',
+      inboxCount: inboxIds.size,
+      eventKey,
+    }));
+  }
+
+  const results = await sendPayloadToTargets(client, subscriptions, nativeResult.tokens, payload, async (result) => {
+    const inboxId = result.userId ? inboxIds.get(result.userId) : undefined;
+    if (inboxId) await recordAttemptResult(client, inboxId, result);
+  });
+  await recordDeliveryOutcomes(client, inboxIds, results, skippedUserIds);
+  const accepted = results.filter((result) => result.ok).length;
+  const failed = results.filter((result) => !result.ok && !result.skipped).length;
+  const skipped = results.filter((result) => result.skipped).length + skippedUserIds.length;
+  const status = accepted > 0 && failed > 0
+    ? "partial"
+    : accepted > 0
+      ? "accepted"
+      : failed > 0
+        ? "failed"
+        : "skipped";
+  return jsonResponse(await withEmail({
+    status,
+    eventKey,
+    results,
+    outcomes: { accepted, failed, skipped },
+    inboxCount: inboxIds.size,
+  }), status === "failed" ? 502 : 200);
 }

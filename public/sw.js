@@ -317,7 +317,7 @@ self.addEventListener('push', (event) => {
     )
   }
 
-  const title = payload.title || 'Update'
+  const title = payload.title || 'Nueva actualización'
   const options = {
     body: payload.body || '',
     icon: '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png',
@@ -327,9 +327,9 @@ self.addEventListener('push', (event) => {
       type: payload.type,
       meta: payload.meta || {}
     },
-    actions: [{ action: 'open', title: 'Open' }],
-    tag: payload.meta?.tag || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    renotify: true,
+    actions: [{ action: 'open', title: 'Abrir' }],
+    tag: payload.meta?.tag || payload.eventKey || payload.type || 'sector-pro',
+    renotify: payload.meta?.renotify === true,
     silent: false,
   }
 
@@ -355,25 +355,43 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const targetUrl = event.notification.data?.url || '/'
+  const requestedUrl = event.notification.data?.url || '/'
 
   event.waitUntil(
     (async () => {
+      let targetUrl = '/'
+      try {
+        const parsedTarget = new URL(requestedUrl, self.location.origin)
+        if (
+          typeof requestedUrl === 'string' &&
+          parsedTarget.origin === self.location.origin &&
+          !/[\\\u0000-\u001f\u007f]/.test(requestedUrl)
+        ) {
+          targetUrl = `${parsedTarget.pathname}${parsedTarget.search}${parsedTarget.hash}`
+        }
+      } catch (error) {
+        console.warn('[sw] Rejected invalid notification URL', error)
+      }
       const windows = await clients.matchAll({
         type: 'window',
         includeUncontrolled: true
       })
       const absoluteTarget = new URL(targetUrl, self.location.origin).toString()
-      const existingWindow = windows.find((windowClient) => {
-        const url = new URL(windowClient.url)
-        url.hash = ''
-        url.search = ''
-        return url.toString() === absoluteTarget
+      const existingWindow = windows.find((windowClient) => windowClient.url === absoluteTarget)
+      const reusableWindow = existingWindow || windows.find((windowClient) => {
+        try {
+          return new URL(windowClient.url).origin === self.location.origin
+        } catch {
+          return false
+        }
       })
 
-      if (existingWindow) {
+      if (reusableWindow) {
         await self.broadcastToClients('notification-click', { url: targetUrl, reused: true })
-        return existingWindow.focus()
+        if (reusableWindow.url !== absoluteTarget && reusableWindow.navigate) {
+          await reusableWindow.navigate(targetUrl)
+        }
+        return reusableWindow.focus()
       }
 
       await self.broadcastToClients('notification-click', { url: targetUrl, reused: false })
@@ -392,8 +410,8 @@ self.addEventListener('message', (event) => {
     event.waitUntil(
       (async () => {
         try {
-          await self.registration.showNotification(data?.title || 'SW test', {
-            body: data?.body || 'Local SW notification',
+          await self.registration.showNotification(data?.title || 'Prueba local', {
+            body: data?.body || 'Notificación local del service worker',
           })
           await self.broadcastToClients('test-notification-shown', {})
         } catch (e) {

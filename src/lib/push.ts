@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getPushDeviceId, getPushDeviceName } from '@/lib/pushDevice'
 
 const base64Padding = (base64: string): string =>
   base64 + '='.repeat((4 - (base64.length % 4 || 4)) % 4)
@@ -43,10 +44,11 @@ export const requestPushPermission = async (): Promise<NotificationPermission> =
 }
 
 export const enablePush = async (
-  vapidPublicKey: string
+  vapidPublicKey: string,
+  options: { sendWelcome?: boolean } = {},
 ): Promise<PushSubscription | null> => {
   if (!isPushSupported()) {
-    throw new Error('Push notifications are not supported in this browser')
+    throw new Error('Este navegador no admite notificaciones push.')
   }
 
   const permission = await requestPushPermission()
@@ -63,7 +65,7 @@ export const enablePush = async (
     } catch (error) {
       console.error('Failed to register service worker for push', error)
       throw new Error(
-        'Unable to register the service worker required for push notifications. Reload the page and try again.'
+        'No se pudo registrar el servicio necesario para las notificaciones. Recarga la página e inténtalo de nuevo.'
       )
     }
   }
@@ -72,7 +74,7 @@ export const enablePush = async (
     registration = await navigator.serviceWorker.ready
   } catch (error) {
     console.error('Service worker failed to become ready for push', error)
-    throw new Error('The service worker failed to initialize. Reload the page and try again.')
+    throw new Error('El servicio de notificaciones no pudo iniciarse. Recarga la página e inténtalo de nuevo.')
   }
 
   let subscription = await registration.pushManager.getSubscription()
@@ -87,27 +89,34 @@ export const enablePush = async (
   const { error } = await supabase.functions.invoke('push', {
     body: {
       action: 'subscribe',
-      subscription: subscription.toJSON()
+      subscription: subscription.toJSON(),
+      device_id: getPushDeviceId(),
+      device_name: getPushDeviceName(),
+      send_welcome: options.sendWelcome ?? true,
     }
   })
 
   if (error) {
-    throw new Error(error.message || 'Failed to persist push subscription')
-  }
-
-  // Track that user has enabled push notifications in their profile
-  // This allows detecting when subscriptions are lost and prompting re-enablement
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    await supabase
-      .from('profiles')
-      .update({ push_notifications_enabled: true })
-      .eq('id', user.id)
-      .select()
-      .single()
+    throw new Error(error.message || 'No se pudo guardar la suscripción push.')
   }
 
   return subscription
+}
+
+export const synchronizeExistingPushSubscription = async (): Promise<boolean> => {
+  const subscription = await getExistingPushSubscription()
+  if (!subscription) return false
+  const { error } = await supabase.functions.invoke('push', {
+    body: {
+      action: 'subscribe',
+      subscription: subscription.toJSON(),
+      device_id: getPushDeviceId(),
+      device_name: getPushDeviceName(),
+      send_welcome: false,
+    },
+  })
+  if (error) throw new Error(error.message || 'No se pudo sincronizar la suscripción push.')
+  return true
 }
 
 export const getExistingPushSubscription = async (): Promise<PushSubscription | null> => {
@@ -129,29 +138,17 @@ export const getExistingPushSubscription = async (): Promise<PushSubscription | 
 export const disablePush = async (): Promise<void> => {
   const subscription = await getExistingPushSubscription()
 
-  if (!subscription) {
-    return
-  }
-
   const { error } = await supabase.functions.invoke('push', {
     body: {
       action: 'unsubscribe',
-      endpoint: subscription.endpoint
+      endpoint: subscription?.endpoint,
+      device_id: getPushDeviceId(),
     }
   })
 
   if (error) {
-    throw new Error(error.message || 'Failed to remove push subscription')
+    throw new Error(error.message || 'No se pudo eliminar la suscripción push.')
   }
 
-  await subscription.unsubscribe()
-
-  // Clear the push notifications preference in the user's profile
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    await supabase
-      .from('profiles')
-      .update({ push_notifications_enabled: false })
-      .eq('id', user.id)
-  }
+  await subscription?.unsubscribe()
 }

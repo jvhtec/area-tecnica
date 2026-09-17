@@ -27,6 +27,7 @@ function TechnicianRouteGuard(): null {
       location.pathname === "/tech-app" ||
       location.pathname === "/syscalc" ||
       location.pathname === "/achievements" ||
+      location.pathname === "/notifications" ||
       location.pathname === "/auth" ||
       location.pathname.startsWith("/auth");
 
@@ -53,6 +54,7 @@ function OscarRouteGuard(): null {
       location.pathname === "/dashboard" ||
       location.pathname === "/tasks" ||
       location.pathname === "/profile" ||
+      location.pathname === "/notifications" ||
       location.pathname === "/auth" ||
       location.pathname.startsWith("/auth");
 

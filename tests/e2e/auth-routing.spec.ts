@@ -10,7 +10,7 @@ test.describe("auth routing smoke", () => {
 
     await page.goto("/dashboard");
 
-    await expect(page).toHaveURL(/\/auth$/);
+    await expect(page).toHaveURL(/\/auth\?returnTo=%2Fdashboard$/);
   });
 
   test("redirects technicians from dashboard routes to /tech-app", async ({ page }) => {

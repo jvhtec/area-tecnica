@@ -1,4 +1,11 @@
 import { EVENT_TYPES } from "./config.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
+
+const hasForbiddenPathCharacter = (value: string): boolean =>
+  Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return character === "\\" || code <= 31 || code === 127;
+  });
 
 /**
  * Validates and sanitizes a URL to prevent open-redirect attacks.
@@ -8,23 +15,52 @@ import { EVENT_TYPES } from "./config.ts";
 export function validateInternalUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
 
+  if (url !== url.trim() || hasForbiddenPathCharacter(url)) {
+    logEvent("warn", "push_url_rejected", { reason: "malformed" });
+    return undefined;
+  }
+
   // Decode the URL to catch encoded slashes and other obfuscation
   let decoded: string;
   try {
     decoded = decodeURIComponent(url);
-  } catch (e) {
+  } catch {
     // If decoding fails, reject the URL
-    console.warn(`⚠️ Rejecting URL with invalid encoding: ${url}`);
+    logEvent("warn", "push_url_rejected", { reason: "invalid_encoding" });
     return undefined;
   }
 
   // Only allow internal URLs starting with / but not //, and reject encoded slashes
-  if (!url.startsWith('/') || url.startsWith('//') || decoded.startsWith('//')) {
-    console.warn(`⚠️ Rejecting potentially unsafe URL: ${url}`);
+  if (
+    !url.startsWith('/')
+    || url.startsWith('//')
+    || decoded.startsWith('//')
+    || hasForbiddenPathCharacter(decoded)
+  ) {
+    logEvent("warn", "push_url_rejected", { reason: "unsafe" });
     return undefined;
   }
 
-  return url;
+  try {
+    const base = new URL("https://sector-pro.invalid");
+    const parsed = new URL(url, base);
+    if (parsed.origin !== base.origin || parsed.username || parsed.password) {
+      logEvent("warn", "push_url_rejected", { reason: "external" });
+      return undefined;
+    }
+    const reconstructed = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    // A path like "/%2e%2e//outside.invalid" passes the pre-parse checks above
+    // but can canonicalize to a protocol-relative "//outside.invalid" once the
+    // URL parser resolves the encoded traversal. Reject it here too.
+    if (reconstructed.startsWith("//")) {
+      logEvent("warn", "push_url_rejected", { reason: "protocol_relative" });
+      return undefined;
+    }
+    return reconstructed;
+  } catch {
+    logEvent("warn", "push_url_rejected", { reason: "invalid" });
+    return undefined;
+  }
 }
 
 /**
@@ -125,7 +161,7 @@ export function resolveNotificationUrl(
         ? `/festival-management/${jobId}`
         : `/festival-management/${jobId}?singleJob=true`;
     }
-    return tourId ? `/tours/${tourId}` : '/project-management';
+    return tourId ? `/tour-management/${tourId}` : '/project-management';
   }
   // Message notifications navigate to dashboard with messages panel
   else if (type === EVENT_TYPES.MESSAGE_RECEIVED) {
@@ -136,6 +172,47 @@ export function resolveNotificationUrl(
            type === EVENT_TYPES.FESTIVAL_PUBLIC_RIDER_UPLOADED) {
     return jobId ? `/festival-management/${jobId}/artists` : '/festival-management';
   }
+  // Vacation requests: the reviewer works from the availability board, the
+  // technician sees the outcome on their own personal page.
+  else if (type === EVENT_TYPES.VACATION_REQUEST_SUBMITTED) {
+    return '/disponibilidad';
+  }
+  else if (type === EVENT_TYPES.VACATION_REQUEST_APPROVED ||
+           type === EVENT_TYPES.VACATION_REQUEST_REJECTED) {
+    return '/personal';
+  }
+  // Expenses live on the gastos page for both submitter and approver.
+  else if (type === EVENT_TYPES.EXPENSE_SUBMITTED ||
+           type === EVENT_TYPES.EXPENSE_APPROVED ||
+           type === EVENT_TYPES.EXPENSE_REJECTED) {
+    return '/gastos';
+  }
+  // A payout override changes what a technician is owed for a job, which they
+  // read from their own timesheets rather than the management payout board.
+  else if (type === EVENT_TYPES.PAYOUT_OVERRIDE_APPLIED) {
+    return '/timesheets';
+  }
+  else if (type === EVENT_TYPES.TIMESHEET_REMINDER_DUE) {
+    return '/timesheets';
+  }
+  else if (type === EVENT_TYPES.BUG_REPORT_RESOLVED) {
+    return '/feedback';
+  }
+  else if (type === EVENT_TYPES.ANNOUNCEMENT_PUBLISHED) {
+    return '/announcements';
+  }
+  else if (type === EVENT_TYPES.LOGISTICS_TRANSPORT_STATUS_CHANGED) {
+    return '/logistics';
+  }
+  else if (type === EVENT_TYPES.SOUNDVISION_ACCESS_REQUESTED ||
+           type === EVENT_TYPES.SOUNDVISION_ACCESS_APPROVED ||
+           type === EVENT_TYPES.SOUNDVISION_ACCESS_REJECTED) {
+    return '/soundvision-files';
+  }
+  else if (type === EVENT_TYPES.STAFFING_CAMPAIGN_COMPLETED) {
+    return '/job-assignment-matrix';
+  }
+  // job.producer.* intentionally falls through to the job destination below.
   // Default fallback: job, tour, or home
   else {
     if (jobId) {
@@ -144,6 +221,6 @@ export function resolveNotificationUrl(
         ? `/festival-management/${jobId}`
         : `/festival-management/${jobId}?singleJob=true`;
     }
-    return tourId ? `/tours/${tourId}` : '/';
+    return tourId ? `/tour-management/${tourId}` : '/';
   }
 }

@@ -198,10 +198,25 @@ export const useJobExpenseMutations = () => {
       if (error) throw error;
       return expense;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (expense, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-expenses', variables.job_id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-totals') });
       toast.success(expenseCopy.success.submitted);
+      // Let the approvers know there is something waiting. Fire-and-forget: the
+      // expense is already stored, so a push failure must not surface as one.
+      void supabase.functions
+        .invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'expense.submitted',
+            job_id: variables.job_id,
+            expense_id: typeof expense === 'string' ? expense : undefined,
+            technician_id: user?.id,
+            amount_eur: variables.amount_original,
+            category_slug: variables.category_slug,
+          },
+        })
+        .catch(() => undefined);
     },
     onError: (error: Error) => {
       console.error('Error submitting expense:', error);

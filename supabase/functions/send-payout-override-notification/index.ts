@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { broadcastPush } from "../_shared/pushBroadcast.ts";
 
 import {
   correlationHeaders,
@@ -487,6 +488,18 @@ serve(createHttpHandler(async (req) => {
         exposeDetails: false,
       });
     }
+
+    // The finance recipients have been emailed; the technician whose payout moved
+    // is told on their own devices. Best-effort: a push failure must not turn a
+    // delivered notification into a failed request.
+    await broadcastPush({
+      type: "payout.override.applied",
+      job_id: jobId ?? undefined,
+      technician_id: technicianId,
+      recipient_id: technicianId,
+      actor_id: actorId,
+      amount_eur: newOverrideAmountEur ?? undefined,
+    }, { supabaseUrl, serviceRoleKey });
 
     return respond({
       success: true,

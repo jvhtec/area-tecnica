@@ -15,6 +15,14 @@ function numberFromUnknown(value: unknown): number | null {
   return null;
 }
 
+function retryAfterMsFromUnknown(value: unknown): number | undefined {
+  if (typeof value !== "string") return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
+}
+
 console.log('🔐 VAPID keys loaded:', {
   publicKeyPresent: !!VAPID_PUBLIC_KEY,
   privateKeyPresent: !!VAPID_PRIVATE_KEY,
@@ -56,8 +64,13 @@ export async function sendPushNotification(
       },
       JSON.stringify(payload),
       {
-        TTL: PUSH_CONFIG.TTL_SECONDS,
-        urgency: PUSH_CONFIG.URGENCY_HIGH,
+        TTL: payload.ttlSeconds ?? PUSH_CONFIG.TTL_SECONDS,
+        urgency: payload.urgency === "low"
+          ? PUSH_CONFIG.URGENCY_LOW
+          : payload.urgency === "normal"
+            ? PUSH_CONFIG.URGENCY_NORMAL
+            : PUSH_CONFIG.URGENCY_HIGH,
+        timeout: PUSH_CONFIG.REQUEST_TIMEOUT_MS,
       },
     );
 
@@ -75,13 +88,24 @@ export async function sendPushNotification(
     if (status === 404 || status === 410) {
       console.log('🗑️ Cleaning up expired subscription');
       try {
-        await client.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
+        const { error: cleanupError } = await client
+          .from("push_subscriptions")
+          .delete()
+          .eq("endpoint", subscription.endpoint);
+        if (cleanupError) throw cleanupError;
       } catch (cleanupErr) {
         console.error('⚠️ Failed to cleanup subscription:', cleanupErr);
         // Don't fail the whole operation if cleanup fails
       }
     }
 
-    return { ok: false, status };
+    const headers = isRecord(errorInfo.headers) ? errorInfo.headers : {};
+    const retryAfter = headers["retry-after"] ?? headers["Retry-After"];
+    return {
+      ok: false,
+      status,
+      retryAfterMs: retryAfterMsFromUnknown(retryAfter),
+      reason: status === 404 || status === 410 ? "invalid_subscription" : "provider_rejected",
+    };
   }
 }

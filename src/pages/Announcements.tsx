@@ -81,11 +81,28 @@ export default function Announcements() {
     if (error) {
       toast({ title: 'Create failed', description: error.message, variant: 'destructive' });
     } else {
+      const publishedMessage = newMsg.trim();
+      const publishedLevel = newLevel;
+      const wasActive = newActive;
       setNewMsg('');
       setNewLevel('info');
       setNewActive(true);
       fetchAll();
       toast({ title: 'Announcement added' });
+      // Only a live announcement is worth interrupting anyone for. Fire-and-forget:
+      // the row is already stored, so a push failure must not read as a failed save.
+      if (wasActive) {
+        void dataLayerClient.functions
+          .invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'announcement.published',
+              description: publishedMessage,
+              announcement_level: publishedLevel,
+            },
+          })
+          .catch(() => undefined);
+      }
     }
   };
 

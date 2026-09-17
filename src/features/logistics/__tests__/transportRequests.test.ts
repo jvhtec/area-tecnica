@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const rpcCalls: Array<{ name: string; args: Record<string, unknown> | undefined }> = [];
 let rpcResult: { data: unknown; error: { message?: string } | null } = { data: [], error: null };
 
+const pushCalls: Array<Record<string, unknown>> = [];
+
 const fakeClient = {
   rest: { marker: "postgrest" },
   rpc(this: { rest: unknown }, name: string, args?: Record<string, unknown>) {
@@ -12,6 +14,12 @@ const fakeClient = {
     void (this.rest as { marker: string }).marker;
     rpcCalls.push({ name, args });
     return Promise.resolve(rpcResult);
+  },
+  functions: {
+    invoke(_name: string, options?: { body?: Record<string, unknown> }) {
+      if (options?.body) pushCalls.push(options.body);
+      return Promise.resolve({ data: null, error: null });
+    },
   },
 };
 
@@ -27,6 +35,7 @@ const {
 describe("transport request RPCs", () => {
   beforeEach(() => {
     rpcCalls.length = 0;
+    pushCalls.length = 0;
     rpcResult = { data: [], error: null };
   });
 
@@ -84,5 +93,43 @@ describe("transport request RPCs", () => {
       p_unload_time: "18:00",
       p_provider: null,
     });
+  });
+
+  it("announces the stage a transport request lands on", async () => {
+    await setTransportRequestStage("req-1", "confirmed", "job-9");
+
+    expect(pushCalls).toHaveLength(1);
+    expect(pushCalls[0]).toMatchObject({
+      action: "broadcast",
+      type: "logistics.transport.status.changed",
+      request_id: "req-1",
+      job_id: "job-9",
+      planning_status: "confirmed",
+    });
+  });
+
+  it("reports the planned stage after scheduling, not the stage it came from", async () => {
+    await scheduleTransportRequest({
+      requestId: "req-2",
+      jobId: "job-9",
+      loadDate: "2026-09-20",
+      loadTime: "08:00",
+      unloadDate: "2026-09-20",
+      unloadTime: "18:00",
+    });
+
+    expect(pushCalls).toHaveLength(1);
+    expect(pushCalls[0]).toMatchObject({
+      type: "logistics.transport.status.changed",
+      request_id: "req-2",
+      planning_status: "planned",
+    });
+  });
+
+  it("does not announce a stage change the RPC rejected", async () => {
+    rpcResult = { data: null, error: { message: "denied" } };
+
+    await expect(setTransportRequestStage("req-3", "cancelled")).rejects.toThrow();
+    expect(pushCalls).toHaveLength(0);
   });
 });

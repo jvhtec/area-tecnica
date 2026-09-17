@@ -5,14 +5,16 @@ import {
   enablePush,
   getExistingPushSubscription,
   getPushPermissionStatus,
-  isPushSupported
+  isPushSupported,
+  synchronizeExistingPushSubscription,
 } from '@/lib/push'
 import {
   disableNativePush,
   enableNativePush,
   getNativePushPermissionStatus,
   getStoredNativePushToken,
-  isNativePushSupported
+  isNativePushSupported,
+  synchronizeNativePush,
 } from '@/lib/push-native'
 
 type PushState = {
@@ -25,6 +27,7 @@ type PushState = {
   error: string | null
   enable: () => Promise<PushSubscription | NativePushSubscription | null>
   disable: () => Promise<void>
+  synchronize: () => Promise<boolean>
   canEnable: boolean
 }
 
@@ -36,10 +39,10 @@ type NativePushSubscription = {
 const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
 
 const getUnsupportedError = (): string =>
-  'Push notifications are not supported on this device.'
+  'Este dispositivo no admite notificaciones push.'
 
 const getMissingVapidKeyError = (): string =>
-  'VITE_VAPID_PUBLIC_KEY is not configured. Ask an administrator to set it before enabling push notifications.'
+  'Las notificaciones web todavía no están configuradas. Contacta con administración.'
 
 export const usePushNotifications = (): PushState => {
   const isNative = useMemo(() => isNativePushSupported(), [])
@@ -93,7 +96,7 @@ export const usePushNotifications = (): PushState => {
           setError(
             err instanceof Error
               ? err.message
-              : 'Unable to load the existing push subscription.'
+              : 'No se pudo comprobar la suscripción existente.'
           )
         }
       } finally {
@@ -158,14 +161,14 @@ export const usePushNotifications = (): PushState => {
       const message =
         err instanceof Error
           ? err.message
-          : 'Unable to enable push notifications at this time.'
+          : 'No se pudieron activar las notificaciones.'
       console.error('❌ Push enable error:', err)
       setError(message)
       throw err instanceof Error ? err : new Error(message)
     } finally {
       setIsEnabling(false)
     }
-  }, [supported])
+  }, [supported, isNative])
 
   const disable = useCallback(async () => {
     if (!supported) {
@@ -192,13 +195,29 @@ export const usePushNotifications = (): PushState => {
       const message =
         err instanceof Error
           ? err.message
-          : 'Unable to disable push notifications at this time.'
+          : 'No se pudieron desactivar las notificaciones.'
       setError(message)
       throw err instanceof Error ? err : new Error(message)
     } finally {
       setIsDisabling(false)
     }
   }, [supported, isNative])
+
+  const synchronize = useCallback(async () => {
+    if (!subscription) return false
+    setError(null)
+    try {
+      return isNative
+        ? await synchronizeNativePush()
+        : await synchronizeExistingPushSubscription()
+    } catch (err) {
+      const message = err instanceof Error
+        ? err.message
+        : 'No se pudo sincronizar este dispositivo.'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
+    }
+  }, [isNative, subscription])
 
   const canEnable =
     supported &&
@@ -216,6 +235,7 @@ export const usePushNotifications = (): PushState => {
     error,
     enable,
     disable,
+    synchronize,
     canEnable
   }
 }
