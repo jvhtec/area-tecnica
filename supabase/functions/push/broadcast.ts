@@ -339,6 +339,8 @@ export async function handleBroadcast(
   }
 
   if (subscriptions.length === 0 && nativeResult.tokens.length === 0) {
+    // No target is a terminal non-error outcome for this occurrence: the inbox
+    // item remains available, but there was simply nowhere to deliver a push.
     await recordDeliveryOutcomes(client, inboxIds, [], claimedRecipientIds);
     return jsonResponse(await withEmail({
       status: 'skipped',
