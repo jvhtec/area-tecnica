@@ -24,29 +24,39 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
     queryFn: () => getNotificationPreferences(userId),
   })
   const [draft, setDraft] = useState<NotificationPreferences | null>(null)
-  useEffect(() => setDraft(data ?? null), [data])
+  const [isDirty, setIsDirty] = useState(false)
   const save = useMutation({
-    mutationFn: async () => {
-      if (!draft) return
-      const { user_id: _userId, ...patch } = draft
+    mutationFn: async (nextDraft: NotificationPreferences) => {
+      const { user_id: _userId, ...patch } = nextDraft
       await updateNotificationPreferences(userId, patch)
+      return nextDraft
     },
-    onSuccess: async () => {
+    onSuccess: async (savedDraft) => {
       await queryClient.invalidateQueries({ queryKey })
+      const refreshed = queryClient.getQueryData<NotificationPreferences>(queryKey)
+      setDraft(refreshed ?? savedDraft)
+      setIsDirty(false)
       toast.success('Preferencias guardadas')
     },
     onError: () => toast.error('No se pudieron guardar las preferencias'),
   })
 
+  // Background refetches (window focus, another panel invalidating queries, etc.)
+  // must never erase an unsaved local edit. Once a save completes we explicitly
+  // replace the draft with the refreshed server snapshot above.
+  useEffect(() => {
+    if (!isDirty && !save.isPending) setDraft(data ?? null)
+  }, [data, isDirty, save.isPending])
+
   if (error) return <p role="alert" className="text-sm text-destructive">No se pudieron cargar las preferencias.</p>
   if (isLoading || !draft) return <p className="text-sm text-muted-foreground">Cargando preferencias…</p>
 
   const categoryEnabled = (key: string) => draft.category_preferences[key] !== false
-  // The success handler awaits invalidateQueries before isPending flips back
-  // to false, so disabling every control for that whole window prevents an
-  // edit made during the refetch from being silently replaced by useEffect
-  // when the server snapshot lands.
   const controlsDisabled = save.isPending
+  const updateDraft = (next: NotificationPreferences) => {
+    setDraft(next)
+    setIsDirty(true)
+  }
 
   return (
     <div className="space-y-4" aria-busy={controlsDisabled}>
@@ -57,12 +67,13 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between gap-4">
-            <Label htmlFor="notifications-account-enabled">Recibir notificaciones push</Label>
+            <Label className="min-w-0 flex-1" htmlFor="notifications-account-enabled">Recibir notificaciones push</Label>
             <Switch
+              className="shrink-0"
               id="notifications-account-enabled"
               checked={draft.account_enabled}
               disabled={controlsDisabled}
-              onCheckedChange={(checked) => setDraft({ ...draft, account_enabled: checked })}
+              onCheckedChange={(checked) => updateDraft({ ...draft, account_enabled: checked })}
             />
           </div>
         </CardContent>
@@ -76,12 +87,13 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
         <CardContent className="divide-y">
           {NOTIFICATION_CATEGORIES.map((item) => (
             <div key={item.key} className="flex min-h-12 items-center justify-between gap-4 py-2">
-              <Label htmlFor={`notification-category-${item.key}`}>{item.label}</Label>
+              <Label className="min-w-0 flex-1" htmlFor={`notification-category-${item.key}`}>{item.label}</Label>
               <Switch
+                className="shrink-0"
                 id={`notification-category-${item.key}`}
                 checked={categoryEnabled(item.key)}
                 disabled={controlsDisabled}
-                onCheckedChange={(checked) => setDraft({
+                onCheckedChange={(checked) => updateDraft({
                   ...draft,
                   category_preferences: { ...draft.category_preferences, [item.key]: checked },
                 })}
@@ -98,27 +110,28 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-4">
-            <Label htmlFor="quiet-hours-enabled">Activar horas de silencio</Label>
+            <Label className="min-w-0 flex-1" htmlFor="quiet-hours-enabled">Activar horas de silencio</Label>
             <Switch
+              className="shrink-0"
               id="quiet-hours-enabled"
               checked={draft.quiet_hours_enabled}
               disabled={controlsDisabled}
-              onCheckedChange={(checked) => setDraft({ ...draft, quiet_hours_enabled: checked })}
+              onCheckedChange={(checked) => updateDraft({ ...draft, quiet_hours_enabled: checked })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="quiet-hours-start">Desde</Label>
-              <Input id="quiet-hours-start" type="time" disabled={controlsDisabled} value={draft.quiet_hours_start.slice(0, 5)} onChange={(event) => setDraft({ ...draft, quiet_hours_start: `${event.target.value}:00` })} />
+              <Input id="quiet-hours-start" type="time" disabled={controlsDisabled} value={draft.quiet_hours_start.slice(0, 5)} onChange={(event) => updateDraft({ ...draft, quiet_hours_start: `${event.target.value}:00` })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="quiet-hours-end">Hasta</Label>
-              <Input id="quiet-hours-end" type="time" disabled={controlsDisabled} value={draft.quiet_hours_end.slice(0, 5)} onChange={(event) => setDraft({ ...draft, quiet_hours_end: `${event.target.value}:00` })} />
+              <Input id="quiet-hours-end" type="time" disabled={controlsDisabled} value={draft.quiet_hours_end.slice(0, 5)} onChange={(event) => updateDraft({ ...draft, quiet_hours_end: `${event.target.value}:00` })} />
             </div>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <Label htmlFor="urgent-bypass">Permitir avisos urgentes durante el silencio</Label>
-            <Switch id="urgent-bypass" checked={draft.urgent_bypass} disabled={controlsDisabled} onCheckedChange={(checked) => setDraft({ ...draft, urgent_bypass: checked })} />
+            <Label className="min-w-0 flex-1" htmlFor="urgent-bypass">Permitir avisos urgentes durante el silencio</Label>
+            <Switch className="shrink-0" id="urgent-bypass" checked={draft.urgent_bypass} disabled={controlsDisabled} onCheckedChange={(checked) => updateDraft({ ...draft, urgent_bypass: checked })} />
           </div>
           <Alert>
             <AlertTitle>Avisos urgentes</AlertTitle>
@@ -132,18 +145,21 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
           <CardHeader><CardTitle>Elementos silenciados</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {draft.muted_entities.map((entity) => (
-              <div key={entity} className="flex items-center justify-between gap-3 rounded border p-2">
-                <span className="truncate text-sm">{entity}</span>
-                <Button variant="ghost" size="sm" disabled={controlsDisabled} onClick={() => setDraft({ ...draft, muted_entities: draft.muted_entities.filter((item) => item !== entity) })}>Quitar silencio</Button>
+              <div key={entity} className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="min-w-0 truncate text-sm">{entity}</span>
+                <Button className="w-full sm:w-auto" variant="ghost" size="sm" disabled={controlsDisabled} onClick={() => updateDraft({ ...draft, muted_entities: draft.muted_entities.filter((item) => item !== entity) })}>Quitar silencio</Button>
               </div>
             ))}
           </CardContent>
         </Card>
       )}
 
-      <Button onClick={() => save.mutate()} disabled={save.isPending} className="w-full sm:w-auto">
-        {save.isPending ? 'Guardando…' : 'Guardar preferencias'}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button onClick={() => save.mutate(draft)} disabled={save.isPending || !isDirty} className="w-full sm:w-auto">
+          {save.isPending ? 'Guardando…' : isDirty ? 'Guardar preferencias' : 'Preferencias guardadas'}
+        </Button>
+        {isDirty && !save.isPending && <p className="text-xs text-muted-foreground">Hay cambios sin guardar.</p>}
+      </div>
     </div>
   )
 }
