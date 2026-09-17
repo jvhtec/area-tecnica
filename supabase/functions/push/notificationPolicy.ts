@@ -35,6 +35,12 @@ type PreferenceRow = {
   muted_entities: unknown;
 };
 
+const SCHEDULE_OCCURRENCE_EVENT_TYPES = new Set([
+  "daily.morning.summary",
+  "festival.feed.tick",
+  "programa.feed.tick",
+]);
+
 export function categoryForEvent(type: string): NotificationCategory {
   if (type.startsWith("staffing.") || type.startsWith("job.assignment") || type === "assignment.removed") return "staffing";
   if (type.startsWith("timesheet.")) return "timesheets";
@@ -110,8 +116,19 @@ async function shortHash(value: unknown): Promise<string> {
     .join("");
 }
 
+/**
+ * Builds an idempotency key for one notification occurrence.
+ *
+ * `event_id` is normally the identity of the domain entity (for example a
+ * logistics event), not the identity of the notification occurrence. Treating
+ * it as a global dedupe key would suppress every later update of that entity.
+ * Scheduled events are the exception: their `event_id` is deliberately the
+ * scheduler occurrence key and therefore remains stable across retries.
+ */
 export async function buildEventKey(body: BroadcastBody, now = Date.now()): Promise<string> {
-  if (body.event_id) return `${body.type}:${body.event_id}`;
+  if (body.event_id && SCHEDULE_OCCURRENCE_EVENT_TYPES.has(body.type)) {
+    return `${body.type}:${body.event_id}`;
+  }
   const identity = {
     type: body.type,
     entity: entityKey(body),
@@ -119,6 +136,20 @@ export async function buildEventKey(body: BroadcastBody, now = Date.now()): Prom
     status: body.status || body.assignment_status,
     targetDate: body.target_date,
     changes: body.changes,
+    eventFacts: {
+      eventType: body.event_type,
+      eventDate: body.event_date,
+      eventTime: body.event_time,
+      title: body.title,
+      description: body.description,
+      department: body.department,
+      departments: body.departments,
+      oldType: body.old_type,
+      newType: body.new_type,
+      roleCode: body.role_code,
+      fileName: body.file_name,
+      version: body.version,
+    },
     fiveMinuteWindow: Math.floor(now / (5 * 60 * 1000)),
   };
   return `${body.type}:${await shortHash(identity)}`;
