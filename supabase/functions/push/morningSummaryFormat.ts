@@ -205,31 +205,25 @@ export function formatMultiDepartmentSummary(
     }
 
     // Format unavailability
-    let hasUnavailable = false;
     if (bySource.vacation?.length) {
       const names = bySource.vacation.map(a => a.profile.nickname || a.profile.first_name).join(', ');
       fullMessage += `🏖️ DE VACACIONES: ${names}\n`;
-      hasUnavailable = true;
     }
     if (bySource.travel?.length) {
       const names = bySource.travel.map(a => a.profile.nickname || a.profile.first_name).join(', ');
       fullMessage += `✈️ DE VIAJE: ${names}\n`;
-      hasUnavailable = true;
     }
     if (bySource.sick?.length) {
       const names = bySource.sick.map(a => a.profile.nickname || a.profile.first_name).join(', ');
       fullMessage += `🤒 ENFERMOS: ${names}\n`;
-      hasUnavailable = true;
     }
     if (bySource.day_off?.length) {
       const names = bySource.day_off.map(a => a.profile.nickname || a.profile.first_name).join(', ');
       fullMessage += `📅 DÍA LIBRE: ${names}\n`;
-      hasUnavailable = true;
     }
     if (bySource.warehouse?.length) {
       const names = bySource.warehouse.map(a => a.profile.nickname || a.profile.first_name).join(', ');
       fullMessage += `🏢 MARCADOS EN ALMACÉN: ${names}\n`;
-      hasUnavailable = true;
     }
 
     // Summary stats
