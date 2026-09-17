@@ -50,14 +50,21 @@ export function NotificationInbox() {
   }), [category, data, view])
   const unreadCount = data.filter((item) => !item.read_at).length
 
-  const openItem = async (item: NotificationInboxItem) => {
-    if (!item.read_at) await readOne.mutateAsync(item.id)
+  const openItem = (item: NotificationInboxItem) => {
     const target = normalizeInternalPath(item.url)
-    if (target) {
-      navigate(target)
+    if (!target) {
+      toast.error('El destino de esta notificación ya no está disponible.')
       return
     }
-    toast.error('El destino de esta notificación ya no está disponible.')
+    // Marking the item as read is best-effort: navigation should not be
+    // blocked or reverted by a failed mutation, since the destination is
+    // already known to be valid.
+    if (!item.read_at) {
+      readOne.mutate(item.id, {
+        onError: () => toast.error('No se pudo marcar la notificación como leída.'),
+      })
+    }
+    navigate(target)
   }
 
   if (isLoading) return <p aria-live="polite" className="text-sm text-muted-foreground">Cargando notificaciones…</p>
@@ -105,7 +112,7 @@ export function NotificationInbox() {
             <li key={item.id}>
               <button
                 type="button"
-                onClick={() => void openItem(item)}
+                onClick={() => openItem(item)}
                 className="w-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="flex items-start justify-between gap-3">

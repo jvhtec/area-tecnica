@@ -48,7 +48,15 @@ export function validateInternalUrl(url: string | undefined): string | undefined
       logEvent("warn", "push_url_rejected", { reason: "external" });
       return undefined;
     }
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const reconstructed = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    // A path like "/%2e%2e//outside.invalid" passes the pre-parse checks above
+    // but can canonicalize to a protocol-relative "//outside.invalid" once the
+    // URL parser resolves the encoded traversal. Reject it here too.
+    if (reconstructed.startsWith("//")) {
+      logEvent("warn", "push_url_rejected", { reason: "protocol_relative" });
+      return undefined;
+    }
+    return reconstructed;
   } catch {
     logEvent("warn", "push_url_rejected", { reason: "invalid" });
     return undefined;

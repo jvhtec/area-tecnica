@@ -42,9 +42,14 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
   if (isLoading || !draft) return <p className="text-sm text-muted-foreground">Cargando preferencias…</p>
 
   const categoryEnabled = (key: string) => draft.category_preferences[key] !== false
+  // The success handler awaits invalidateQueries before isPending flips back
+  // to false, so disabling every control for that whole window prevents an
+  // edit made during the refetch from being silently replaced by useEffect
+  // when the server snapshot lands.
+  const controlsDisabled = save.isPending
 
   return (
-    <div className="space-y-4" aria-busy={save.isPending}>
+    <div className="space-y-4" aria-busy={controlsDisabled}>
       <Card>
         <CardHeader>
           <CardTitle>Entrega en la cuenta</CardTitle>
@@ -56,6 +61,7 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
             <Switch
               id="notifications-account-enabled"
               checked={draft.account_enabled}
+              disabled={controlsDisabled}
               onCheckedChange={(checked) => setDraft({ ...draft, account_enabled: checked })}
             />
           </div>
@@ -74,6 +80,7 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
               <Switch
                 id={`notification-category-${item.key}`}
                 checked={categoryEnabled(item.key)}
+                disabled={controlsDisabled}
                 onCheckedChange={(checked) => setDraft({
                   ...draft,
                   category_preferences: { ...draft.category_preferences, [item.key]: checked },
@@ -95,22 +102,23 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
             <Switch
               id="quiet-hours-enabled"
               checked={draft.quiet_hours_enabled}
+              disabled={controlsDisabled}
               onCheckedChange={(checked) => setDraft({ ...draft, quiet_hours_enabled: checked })}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="quiet-hours-start">Desde</Label>
-              <Input id="quiet-hours-start" type="time" value={draft.quiet_hours_start.slice(0, 5)} onChange={(event) => setDraft({ ...draft, quiet_hours_start: `${event.target.value}:00` })} />
+              <Input id="quiet-hours-start" type="time" disabled={controlsDisabled} value={draft.quiet_hours_start.slice(0, 5)} onChange={(event) => setDraft({ ...draft, quiet_hours_start: `${event.target.value}:00` })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="quiet-hours-end">Hasta</Label>
-              <Input id="quiet-hours-end" type="time" value={draft.quiet_hours_end.slice(0, 5)} onChange={(event) => setDraft({ ...draft, quiet_hours_end: `${event.target.value}:00` })} />
+              <Input id="quiet-hours-end" type="time" disabled={controlsDisabled} value={draft.quiet_hours_end.slice(0, 5)} onChange={(event) => setDraft({ ...draft, quiet_hours_end: `${event.target.value}:00` })} />
             </div>
           </div>
           <div className="flex items-center justify-between gap-4">
             <Label htmlFor="urgent-bypass">Permitir avisos urgentes durante el silencio</Label>
-            <Switch id="urgent-bypass" checked={draft.urgent_bypass} onCheckedChange={(checked) => setDraft({ ...draft, urgent_bypass: checked })} />
+            <Switch id="urgent-bypass" checked={draft.urgent_bypass} disabled={controlsDisabled} onCheckedChange={(checked) => setDraft({ ...draft, urgent_bypass: checked })} />
           </div>
           <Alert>
             <AlertTitle>Avisos urgentes</AlertTitle>
@@ -126,7 +134,7 @@ export function NotificationPreferencesForm({ userId }: { userId: string }) {
             {draft.muted_entities.map((entity) => (
               <div key={entity} className="flex items-center justify-between gap-3 rounded border p-2">
                 <span className="truncate text-sm">{entity}</span>
-                <Button variant="ghost" size="sm" onClick={() => setDraft({ ...draft, muted_entities: draft.muted_entities.filter((item) => item !== entity) })}>Quitar silencio</Button>
+                <Button variant="ghost" size="sm" disabled={controlsDisabled} onClick={() => setDraft({ ...draft, muted_entities: draft.muted_entities.filter((item) => item !== entity) })}>Quitar silencio</Button>
               </div>
             ))}
           </CardContent>

@@ -388,9 +388,10 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                     Ajustes de App
                 </h3>
 
-                <div
+                <button
+                    type="button"
                     onClick={() => navigate('/notifications')}
-                    className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
+                    className={`w-full p-4 rounded-xl border mb-3 flex items-center justify-between text-left ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
                 >
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400"><Bell size={18} /></div>
@@ -400,7 +401,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                         </div>
                     </div>
                     <ChevronRight size={18} className={theme.textMuted} />
-                </div>
+                </button>
 
                 {/* Achievements */}
                 <div

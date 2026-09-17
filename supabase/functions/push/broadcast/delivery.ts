@@ -119,6 +119,11 @@ export async function sendPayloadToTargets(
   subscriptions: PushSubscriptionTarget[],
   nativeTokens: NativePushTokenRow[],
   payload: PushPayload,
+  // Invoked as each target's delivery attempt finishes (success or exhausted
+  // retries), before the whole batch resolves. Callers that persist results
+  // per-target here avoid losing that forensic detail if the surrounding
+  // request later times out mid-batch under high fan-out.
+  onResult?: (result: DeliveryResult) => void | Promise<void>,
 ): Promise<DeliveryResult[]> {
   const tasks: Array<() => Promise<DeliveryResult>> = [
     ...subscriptions.map((sub) => async () => {
@@ -132,7 +137,7 @@ export async function sendPayloadToTargets(
             if (!("skipped" in result)) {
               await recordTargetHealth(client, "webpush", sub.endpoint, result.ok);
             }
-            return {
+            const finalResult: DeliveryResult = {
               endpoint: targetId,
               userId: sub.user_id ?? undefined,
               channel: "webpush" as const,
@@ -142,6 +147,8 @@ export async function sendPayloadToTargets(
               attempts,
               errorCode: !result.ok ? ("reason" in result ? result.reason : undefined) : undefined,
             };
+            await onResult?.(finalResult);
+            return finalResult;
           }
           await pauseBeforeRetry(attempts, result.retryAfterMs);
         } catch (error) {
@@ -151,7 +158,7 @@ export async function sendPayloadToTargets(
           });
           if (attempts >= MAX_DELIVERY_ATTEMPTS) {
             await recordTargetHealth(client, "webpush", sub.endpoint, false);
-            return {
+            const finalResult: DeliveryResult = {
               endpoint: targetId,
               userId: sub.user_id ?? undefined,
               channel: "webpush" as const,
@@ -159,6 +166,8 @@ export async function sendPayloadToTargets(
               attempts,
               errorCode: error instanceof Error ? error.name : "unexpected_error",
             };
+            await onResult?.(finalResult);
+            return finalResult;
           }
           await pauseBeforeRetry(attempts);
         }
@@ -176,7 +185,7 @@ export async function sendPayloadToTargets(
             if (!("skipped" in result)) {
               await recordTargetHealth(client, "apns", tokenRow.device_token, result.ok);
             }
-            return {
+            const finalResult: DeliveryResult = {
               endpoint: targetId,
               userId: tokenRow.user_id,
               channel: "apns" as const,
@@ -186,6 +195,8 @@ export async function sendPayloadToTargets(
               attempts,
               errorCode: !result.ok ? ("reason" in result ? result.reason : undefined) : undefined,
             };
+            await onResult?.(finalResult);
+            return finalResult;
           }
           await pauseBeforeRetry(attempts, result.retryAfterMs);
         } catch (error) {
@@ -195,7 +206,7 @@ export async function sendPayloadToTargets(
           });
           if (attempts >= MAX_DELIVERY_ATTEMPTS) {
             await recordTargetHealth(client, "apns", tokenRow.device_token, false);
-            return {
+            const finalResult: DeliveryResult = {
               endpoint: targetId,
               userId: tokenRow.user_id,
               channel: "apns" as const,
@@ -203,6 +214,8 @@ export async function sendPayloadToTargets(
               attempts,
               errorCode: error instanceof Error ? error.name : "unexpected_error",
             };
+            await onResult?.(finalResult);
+            return finalResult;
           }
           await pauseBeforeRetry(attempts);
         }

@@ -13,6 +13,7 @@ describe("internal navigation", () => {
     "//outside.invalid/path",
     "/\\outside.invalid/path",
     "/%5coutside.invalid/path",
+    "/%2e%2e//outside.invalid",
     " /dashboard",
   ])("rejects unsafe paths", (path) => {
     expect(normalizeInternalPath(path)).toBeNull();

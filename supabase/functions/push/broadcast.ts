@@ -45,7 +45,7 @@ import {
   sendTransportRequestEmail,
   type TransportRequestEmailResult,
 } from "./transportRequestEmail.ts";
-import { claimInboxItems, recordDeliveryResults } from "./inbox.ts";
+import { claimInboxItems, recordAttemptResult, recordDeliveryOutcomes } from "./inbox.ts";
 import {
   buildEventKey,
   decoratePayloadPolicy,
@@ -292,7 +292,19 @@ export async function handleBroadcast(
   }
 
   const claimedRecipientIds = Array.from(inboxIds.keys());
-  const preferences = await loadRecipientPreferences(client, claimedRecipientIds, body, urgency);
+  let preferences: Awaited<ReturnType<typeof loadRecipientPreferences>>;
+  try {
+    preferences = await loadRecipientPreferences(client, claimedRecipientIds, body, urgency);
+  } catch (error) {
+    logEvent("error", "push_broadcast_preference_lookup_failed", {
+      errorCode: error instanceof Error ? error.name : "unknown",
+    });
+    // A failed lookup must not silently fall back to "everyone is opted in";
+    // treat every claimed recipient as failed so a stored opt-out can never
+    // be bypassed by a transient database error.
+    await recordDeliveryOutcomes(client, inboxIds, [], [], claimedRecipientIds);
+    return jsonResponse(await withEmail({ status: "failed", reason: "preference_lookup_failed", eventKey }), 500);
+  }
   const eligibleRecipientIds = claimedRecipientIds.filter((recipientId) => {
     const preference = preferences.get(recipientId);
     return preference?.accountEnabled !== false
@@ -303,7 +315,7 @@ export async function handleBroadcast(
   const skippedUserIds = claimedRecipientIds.filter((id) => !eligibleRecipientIds.includes(id));
 
   if (eligibleRecipientIds.length === 0) {
-    await recordDeliveryResults(client, inboxIds, [], skippedUserIds);
+    await recordDeliveryOutcomes(client, inboxIds, [], skippedUserIds);
     return jsonResponse(await withEmail({
       status: "skipped",
       reason: "recipient_preferences",
@@ -322,12 +334,12 @@ export async function handleBroadcast(
       webFailed: Boolean(subscriptionsError),
       nativeFailed: Boolean(nativeResult.error),
     });
-    await recordDeliveryResults(client, inboxIds, [], [], claimedRecipientIds);
+    await recordDeliveryOutcomes(client, inboxIds, [], [], claimedRecipientIds);
     return jsonResponse(await withEmail({ status: "failed", reason: "target_lookup_failed", eventKey }), 500);
   }
 
   if (subscriptions.length === 0 && nativeResult.tokens.length === 0) {
-    await recordDeliveryResults(client, inboxIds, [], claimedRecipientIds);
+    await recordDeliveryOutcomes(client, inboxIds, [], claimedRecipientIds);
     return jsonResponse(await withEmail({
       status: 'skipped',
       reason: 'no_registered_devices',
@@ -336,8 +348,11 @@ export async function handleBroadcast(
     }));
   }
 
-  const results = await sendPayloadToTargets(client, subscriptions, nativeResult.tokens, payload);
-  await recordDeliveryResults(client, inboxIds, results, skippedUserIds);
+  const results = await sendPayloadToTargets(client, subscriptions, nativeResult.tokens, payload, async (result) => {
+    const inboxId = result.userId ? inboxIds.get(result.userId) : undefined;
+    if (inboxId) await recordAttemptResult(client, inboxId, result);
+  });
+  await recordDeliveryOutcomes(client, inboxIds, results, skippedUserIds);
   const accepted = results.filter((result) => result.ok).length;
   const failed = results.filter((result) => !result.ok && !result.skipped).length;
   const skipped = results.filter((result) => result.skipped).length + skippedUserIds.length;

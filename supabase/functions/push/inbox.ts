@@ -59,6 +59,49 @@ export async function recordDeliveryResults(
   skippedUserIds: string[],
   failedUserIds: string[] = [],
 ): Promise<void> {
+  await recordDeliveryAttempts(client, inboxIds, results);
+  await recordDeliveryOutcomes(client, inboxIds, results, skippedUserIds, failedUserIds);
+}
+
+/**
+ * Persists a single target's delivery attempt as soon as it completes,
+ * rather than waiting for the whole batch. Under high fan-out, a request
+ * that later times out before every target finishes still keeps forensic
+ * detail (channel, status, error code) for every target that already got a
+ * definitive answer, instead of losing it along with the unsent response.
+ */
+export async function recordAttemptResult(
+  client: SupabaseClient,
+  inboxId: string,
+  result: DeliveryResult,
+): Promise<void> {
+  if (!result.userId) return;
+  const { error } = await client
+    .from("push_delivery_attempts")
+    .upsert({
+      inbox_id: inboxId,
+      user_id: result.userId,
+      channel: result.channel,
+      target_fingerprint: result.endpoint,
+      status: result.ok ? "accepted" : result.skipped ? "skipped" : "failed",
+      status_code: result.status ?? null,
+      attempt_count: result.attempts,
+      last_error_code: result.errorCode ?? null,
+      attempted_at: new Date().toISOString(),
+      accepted_at: result.ok ? new Date().toISOString() : null,
+    }, { onConflict: "inbox_id,target_fingerprint" });
+  if (error) {
+    logEvent("error", "push_delivery_attempt_persistence_failed", {
+      errorCode: error.code ?? "unknown",
+    });
+  }
+}
+
+async function recordDeliveryAttempts(
+  client: SupabaseClient,
+  inboxIds: Map<string, string>,
+  results: DeliveryResult[],
+): Promise<void> {
   const attempts = results.flatMap((result) => {
     const inboxId = result.userId ? inboxIds.get(result.userId) : undefined;
     if (!inboxId || !result.userId) return [];
@@ -85,7 +128,21 @@ export async function recordDeliveryResults(
       });
     }
   }
+}
 
+/**
+ * Rolls up per-target results into the recipient-facing aggregate columns on
+ * notification_inbox. Safe to call even when the individual attempt rows
+ * were already persisted incrementally via recordAttemptResult: this only
+ * touches notification_inbox, not push_delivery_attempts.
+ */
+export async function recordDeliveryOutcomes(
+  client: SupabaseClient,
+  inboxIds: Map<string, string>,
+  results: DeliveryResult[],
+  skippedUserIds: string[],
+  failedUserIds: string[] = [],
+): Promise<void> {
   for (const [userId, inboxId] of inboxIds) {
     const userResults = results.filter((result) => result.userId === userId);
     const accepted = userResults.filter((result) => result.ok).length;

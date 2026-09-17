@@ -21,7 +21,12 @@ export function normalizeInternalPath(value: string | null | undefined): string 
   try {
     const parsed = new URL(value, APP_ORIGIN);
     if (parsed.origin !== APP_ORIGIN || parsed.username || parsed.password) return null;
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const reconstructed = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    // A path like "/%2e%2e//outside.invalid" passes the pre-parse checks above
+    // but can canonicalize to a protocol-relative "//outside.invalid" once the
+    // URL parser resolves the encoded traversal. Reject it here too.
+    if (reconstructed.startsWith("//")) return null;
+    return reconstructed;
   } catch {
     return null;
   }

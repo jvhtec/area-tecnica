@@ -15,6 +15,7 @@ describe("validateInternalUrl", () => {
     "//outside.invalid/path",
     "/\\outside.invalid/path",
     "/%5coutside.invalid/path",
+    "/%2e%2e//outside.invalid",
     " /dashboard",
     "/dashboard\n",
   ])("rejects unsafe destination %s", (url) => {

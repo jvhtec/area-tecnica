@@ -193,6 +193,9 @@ export async function loadRecipientPreferences(
     logEvent("error", "push_preference_lookup_failed", {
       errorCode: error.code ?? "unknown",
     });
+    // Fail closed: a transient lookup error must not fall through to the
+    // default (fully enabled) preference and override a stored opt-out.
+    throw error;
   }
   const byUser = new Map((data ?? []).map((row) => [row.user_id, row]));
   for (const userId of userIds) {

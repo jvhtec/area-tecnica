@@ -10,6 +10,7 @@ import {
   buildEventKey,
   decoratePayloadPolicy,
   loadRecipientPreferences,
+  type RecipientPreference,
   urgencyForEvent,
 } from "./notificationPolicy.ts";
 import { isScheduleDue } from "./schedulePolicy.ts";
@@ -688,7 +689,17 @@ export async function handleCheckScheduled(
       );
       if (inboxIds.size === 0) continue;
 
-      const preference = (await loadRecipientPreferences(client, [userId], notificationBody, urgency)).get(userId);
+      let preference: RecipientPreference | undefined;
+      try {
+        preference = (await loadRecipientPreferences(client, [userId], notificationBody, urgency)).get(userId);
+      } catch (error) {
+        hadOperationalFailure = true;
+        logEvent("error", "scheduled_push_preference_lookup_failed", {
+          errorCode: error instanceof Error ? error.name : "unknown",
+        });
+        await recordDeliveryResults(client, inboxIds, [], [], [userId]);
+        continue;
+      }
       if (
         preference?.accountEnabled === false
         || preference?.categoryEnabled === false

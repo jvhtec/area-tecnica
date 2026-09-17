@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell, BellDot } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -22,15 +22,20 @@ export const NotificationBadge = ({
   const navigate = useNavigate()
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const refreshSeq = useRef(0)
 
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeq.current
     setIsLoading(true)
     try {
-      setUnreadCount(await getUnreadNotificationCount(userId))
+      const count = await getUnreadNotificationCount(userId)
+      // Overlapping refreshes (the 30s interval and the invalidate event) can
+      // resolve out of order; only the most recently started call may apply.
+      if (seq === refreshSeq.current) setUnreadCount(count)
     } catch (error) {
       console.error('No se pudo comprobar la bandeja de notificaciones:', error)
     } finally {
-      setIsLoading(false)
+      if (seq === refreshSeq.current) setIsLoading(false)
     }
   }, [userId])
 

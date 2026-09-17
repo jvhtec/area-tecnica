@@ -37,7 +37,8 @@ vi.mock("../broadcast/delivery.ts", () => ({
 vi.mock("../inbox.ts", () => ({
   claimInboxItems: async (_client: unknown, recipientIds: string[]) =>
     new Map(recipientIds.map((userId) => [userId, `inbox-${userId}`])),
-  recordDeliveryResults: async () => undefined,
+  recordAttemptResult: async () => undefined,
+  recordDeliveryOutcomes: async () => undefined,
 }));
 vi.mock("../notificationPolicy.ts", () => ({
   buildEventKey: async () => "event-key",
