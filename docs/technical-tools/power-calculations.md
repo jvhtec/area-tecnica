@@ -13,9 +13,13 @@ The calculator is a planning aid for connected event loads. It reports:
 - line current, `I`, in amperes (A).
 
 The default Spanish/European supplies are 230 V single-phase and 400 V
-three-phase line-to-line, consistent with IEC 60038 nominal low-voltage
-systems. The voltage remains editable because the actual supply must be
-confirmed on site. See [IEC 60038](https://webstore.iec.ch/en/publication/153).
+three-phase line-to-line at 50 Hz, the nominal low-voltage values of
+UNE-EN 60038 (IEC 60038 / CENELEC HD 472 S1), which REBT ITC-BT-04 uses for
+Spain. Those two numbers live in one place,
+`src/features/technical-tools/power/electricalStandards.ts`, and every code
+path that needs a default voltage reads them through `getVoltageForPhase`.
+The voltage remains editable because the actual supply must be confirmed on
+site. See [IEC 60038](https://webstore.iec.ch/en/publication/153).
 
 ## Canonical equations
 
@@ -126,6 +130,70 @@ Line currents are never scalar-added. “Not aggregable” is not the same as no
 load; the report continues to show the raw and adjusted watt totals and the
 reason aggregation was withheld.
 
+## Spanish design rules checked on top of the calculation
+
+The power triangle above gives the electrical result. Spanish practice adds
+requirements the triangle does not carry, so each generated table is also run
+through `evaluatePowerStandards`
+(`src/features/technical-tools/power/electricalStandards.ts`). These checks
+**never change a stored total, a current or a PDU recommendation** — they
+produce advisory findings shown under the table in the calculator and as
+notices in the power report.
+
+### Discharge lighting — REBT ITC-BT-44 apdo. 3.1
+
+A circuit feeding discharge lamps must be designed for a minimum load, in
+volt-amperes, of **1,8 times the lamp power in watts**. That single factor
+covers ballast losses, power factor and harmonic content together, so it is a
+floor on the circuit rating rather than a claim about what the fixture draws.
+
+For a table containing discharge rows the floor is
+
+```text
+S_min = k × (1.8 × ΣP_discharge + sqrt(ΣP_other² + ΣQ_other²))
+```
+
+where `k` is the same planning margin used everywhere else. Adding the
+discharge floor to the vector sum of the remaining rows is the conservative
+reading when both families share one circuit. A finding is raised only when
+`S_min` exceeds the calculated `S_adjusted`. Because the floor is conservative
+by construction it is reported as information, and escalates to a warning only
+when `S_min` no longer fits the recommended PDU's planning limit — the one case
+where it changes the connector to order.
+
+Only rows typed `discharge` count. Sound and video tables carry no fixture
+type, so the rule does not fire there; the catalogue's discharge entries are
+fixture *input* power, which already includes the ballast, so `S_min` is a
+deliberately conservative circuit floor rather than a corrected load figure.
+
+### Neutral loading — UNE-HD 60364-5-52 Annex E / REBT ITC-BT-19
+
+Past roughly a third of third-harmonic content, the neutral of a three-phase
+circuit can carry more current than the lines and becomes the conductor that
+sets the cable size. When more than 33% of a three-phase table's typed load is
+non-linear (LED, discharge, hazers, consoles — anything fronted by a
+rectifier), the table carries a warning that the figure reported is the line
+current only. The calculator does not compute neutral current: doing that
+needs measured or declared per-fixture harmonic spectra, which the catalogue
+does not hold.
+
+### Motor feeds — REBT ITC-BT-47 apdo. 3.1
+
+Conductors feeding a single motor are sized for **125% of full-load current**.
+Hoist supplies are recorded here as a connector requirement only and are
+excluded from the totals, so the rule is surfaced as a reminder next to the
+auxiliary-supply note rather than applied to anything.
+
+### Deliberately not modelled
+
+The 80% PDU planning factor below is company policy. IEC/UNE has no general
+continuous-load derating of a protective device — the 80% continuous-load rule
+is a North American one (NEC 210.20(A)) — so it is presented as a planning
+limit and never as conformity. Diversity factors (REBT ITC-BT-10), voltage
+drop limits (ITC-BT-19), temporary-installation rules for shows and stands
+(ITC-BT-34), breaker curve selection against tungsten inrush (UNE-EN 60898),
+RCD selection, earthing and fault-current coordination all stay out of scope.
+
 ## Loads excluded from totals
 
 Hoist power and the FoH 16 A schuko requirement are auxiliary supply notes.
@@ -160,6 +228,9 @@ electrical professional.
 
 - Canonical calculations and validation:
   `src/features/technical-tools/power/powerCalculations.ts`
+- Nominal voltages and Spanish design-rule checks:
+  `src/features/technical-tools/power/electricalStandards.ts`, applied to a
+  table through `src/features/technical-tools/power/powerStandardsAssessment.ts`
 - Snapshot parsing/legacy reconstruction:
   `src/features/technical-tools/power/powerSnapshots.ts`
 - Compatible-system aggregation:

@@ -6,6 +6,8 @@ import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyTo
 import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
 import type { PhaseMode, PowerTable } from "@/features/technical-tools/power/types";
 import { PowerTableControls } from "@/features/technical-tools/power/PowerTableControls";
+import { PowerStandardsNotes } from "@/features/technical-tools/power/PowerStandardsNotes";
+import { assessPowerTableStandards } from "@/features/technical-tools/power/powerStandardsAssessment";
 import { getResolvedPowerPosition } from "@/utils/powerPositions";
 import {
   DEFAULT_FIXTURE_TYPE,
@@ -58,6 +60,7 @@ export const GeneratedPowerTableCard: React.FC<{
   const tableId = table.id ?? table.name;
   const safetyMargin = table.calculation?.safetyMargin ?? 0;
   const effectivePhaseMode = table.calculation?.phaseMode ?? phaseMode;
+  const standards = assessPowerTableStandards(table);
 
   return (
     <div className="border rounded-lg overflow-hidden mt-6 first:mt-0">
@@ -210,6 +213,10 @@ export const GeneratedPowerTableCard: React.FC<{
           </tbody>
         </table>
       </div>
+
+      {standards && standards.findings.length > 0 && (
+        <PowerStandardsNotes className="p-4 pt-0" findings={standards.findings} />
+      )}
     </div>
   );
 };

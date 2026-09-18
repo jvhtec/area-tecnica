@@ -31,6 +31,8 @@ export interface ExportTableRow {
   totalWeight?: number;
   totalWatts?: number;
   pf?: string;
+  /** Lights only: drives the ITC-BT-44 discharge-circuit check. */
+  fixtureType?: string;
   // rigging-specific
   x?: number; // position in meters
   reactionKg?: number;

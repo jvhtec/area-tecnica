@@ -1,3 +1,7 @@
+import {
+  NOMINAL_LINE_TO_LINE_VOLTAGE,
+  NOMINAL_LINE_TO_NEUTRAL_VOLTAGE,
+} from "@/features/technical-tools/power/electricalStandards";
 import type {
   PhaseMode,
   PowerComponent,
@@ -30,7 +34,9 @@ export const POWER_PDU_OPTIONS: Record<TechnicalDepartment, Record<PhaseMode, st
   },
 };
 
-export const getVoltageForPhase = (phaseMode: PhaseMode) => (phaseMode === "single" ? 230 : 400);
+/** Nominal Spanish/CENELEC supply voltage for the chosen phase mode. */
+export const getVoltageForPhase = (phaseMode: PhaseMode) =>
+  phaseMode === "single" ? NOMINAL_LINE_TO_NEUTRAL_VOLTAGE : NOMINAL_LINE_TO_LINE_VOLTAGE;
 
 export const getPowerPduOptions = (department: TechnicalDepartment, phaseMode: PhaseMode) =>
   POWER_PDU_OPTIONS[department][phaseMode];

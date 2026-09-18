@@ -1,3 +1,7 @@
+import {
+  evaluatePowerStandards,
+  type PowerStandardsFinding,
+} from "@/features/technical-tools/power/electricalStandards";
 import { aggregatePowerCalculations } from "@/features/technical-tools/power/powerAggregation";
 import {
   getPowerPduAmpRating,
@@ -22,6 +26,8 @@ export type PowerCircuitSummary = {
   pduLimit: number | null;
   pduStatus: "ok" | "over" | "unknown";
   positionLabel: string;
+  /** REBT / UNE-HD 60364 advisories; never folded into the totals above. */
+  standardsFindings: PowerStandardsFinding[];
   totalVa: number | null;
   totalWatts: number;
   adjustedWatts: number;
@@ -168,6 +174,15 @@ const buildCircuitSummary = (
       ? null
       : pduRating * POWER_PDU_PLANNING_LOAD_FACTOR;
 
+  const standardsFindings = calculation
+    ? evaluatePowerStandards({
+        calculation,
+        includesHoist: Boolean(table.includesHoist),
+        pduLimitCurrent: pduLimit,
+        rows: table.rows ?? [],
+      }).findings
+    : [];
+
   return {
     adjustedWatts,
     currentLine,
@@ -185,6 +200,7 @@ const buildCircuitSummary = (
     positionLabel:
       getResolvedPowerPosition(table.position, table.customPosition) ||
       "Sin posición",
+    standardsFindings,
     totalVa: calculation?.totalVa ?? table.totalVa ?? null,
     totalWatts,
   };

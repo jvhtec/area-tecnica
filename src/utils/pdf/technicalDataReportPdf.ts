@@ -393,11 +393,29 @@ const drawDetailTables = ({
     if (type === "power") {
       y = ensureReportSpace(doc, y, 26);
       y = drawPowerCircuitNote(doc, circuit, table, y) + 7;
+      // The motor finding is left out here: the auxiliary-supply notice below
+      // already carries it, worded for the circuit it belongs to.
+      circuit.standardsFindings
+        .filter((finding) => finding.code !== "itc-bt-47-motor-feed")
+        .forEach((finding) => {
+          y = ensureReportSpace(doc, y, 26);
+          y = drawNotice(
+            doc,
+            `${finding.reference} - ${finding.message}`,
+            y,
+            finding.severity === "warning" ? "danger" : "neutral",
+            fontFamily,
+          ) + 7;
+        });
       if (table.includesHoist) {
         y = drawNotice(
           doc,
-          `Suministro auxiliar de motores para ${table.name}: CEE32A 3P+N+G, excluido de los totales.`,
+          `Suministro auxiliar de motores para ${table.name}: CEE32A 3P+N+G, excluido de los ` +
+            "totales. Dimensiónelo al 125 % de la intensidad a plena carga del motor " +
+            "(REBT ITC-BT-47 apdo. 3.1).",
           y,
+          "neutral",
+          fontFamily,
         ) + 7;
       }
     }
