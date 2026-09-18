@@ -99,7 +99,7 @@ vi.mock("@/utils/hoja-de-ruta/pdf-upload", () => ({
 const { PDFEngine } = await import("@/utils/hoja-de-ruta/pdf/pdf-engine");
 
 const renderSections = async (options: {
-  sections?: ("schedule" | "logistics")[];
+  sections?: ("schedule" | "logistics" | "power")[];
   excludedSections?: string[];
 }) => {
   contentSectionCalls.length = 0;
@@ -122,18 +122,23 @@ describe("Hoja de Ruta print-section exclusions", () => {
     contentSectionCalls.length = 0;
   });
 
-  it("prints the power summary in a Programa export by default", async () => {
-    expect(await renderSections({ sections: ["schedule"] })).toContain("power");
+  it("exports the power summary on its own, without the programme", async () => {
+    const rendered = await renderSections({ sections: ["power"] });
+
+    expect(rendered).toEqual(["power"]);
   });
 
-  it("honours the power exclusion when only the Programa section is exported", async () => {
-    const rendered = await renderSections({
-      sections: ["schedule"],
-      excludedSections: ["power"],
-    });
+  it("no longer smuggles the power summary into a Programa export", async () => {
+    const rendered = await renderSections({ sections: ["schedule"] });
 
-    expect(rendered).not.toContain("power");
     expect(rendered).toContain("program");
+    expect(rendered).not.toContain("power");
+  });
+
+  it("honours the power exclusion on a power-only export", async () => {
+    expect(
+      await renderSections({ sections: ["power"], excludedSections: ["power"] })
+    ).toEqual([]);
   });
 
   it("honours the power exclusion in the full document too", async () => {
@@ -148,7 +153,6 @@ describe("Hoja de Ruta print-section exclusions", () => {
     });
 
     expect(rendered).toContain("program");
-    expect(rendered).toContain("power");
   });
 
   it("drops the Programa block entirely when both program blocks are excluded", async () => {
@@ -157,7 +161,13 @@ describe("Hoja de Ruta print-section exclusions", () => {
       excludedSections: ["program", "schedule-notes"],
     });
 
-    expect(rendered).not.toContain("program");
-    expect(rendered).toContain("power");
+    expect(rendered).toEqual([]);
+  });
+
+  it("still treats a legacy 'schedule' exclusion as covering the power block", async () => {
+    // Records written before power became its own section stored the tab id.
+    expect(
+      await renderSections({ sections: ["power"], excludedSections: ["schedule"] })
+    ).toEqual([]);
   });
 });

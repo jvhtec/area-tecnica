@@ -83,10 +83,15 @@ legacy per-tab ids into the finer print-section ids.
 The exclusions apply to **every** export path — the full document, a
 single-section export, and both previews. `useHojaDeRutaExports.buildPdfOptions`
 attaches them regardless of whether a section was picked, and both
-`generateFullDocument` and `generateSelectedSections` gate on them. This matters
-for the power summary in particular: it belongs to the `schedule` PDF section
-but has its own `power` print id, so exporting only "Programa" must still leave
-it out when the user switched it off.
+`generateFullDocument` and `generateSelectedSections` gate on them.
+
+`power` is its own PDF section, so the power summary exports on its own even
+though it is edited inside the Programa tab. The form's tab list
+(`tabPresentationConfig`) and the print dialog's section list
+(`printSectionConfig`) are therefore deliberately different: the dialog carries
+one entry the form has no tab for. Records written before the split stored the
+tab id, so `LEGACY_PRINT_SECTION_EXPANSIONS` still expands a legacy `schedule`
+exclusion to cover `power`.
 
 ### Power summary source
 
@@ -94,6 +99,19 @@ it out when the user switched it off.
 `power_requirement_tables` via `formatPowerRequirementsText`, and a manually
 edited value always wins on reload
 (`resolvePowerRequirementsForHojaInitialization`).
+
+Because the saved copy always wins, later calculator changes never reach a Hoja
+on their own. `useJobPowerRequirementsText` re-derives what the calculator would
+produce right now and `getHojaPowerSummaryStatus` compares it with the saved
+text, so the Programa tab can offer to insert a summary the Hoja is missing or
+refresh one that has fallen behind. The offer never overwrites anything by
+itself — the user clicks.
+
+The generated text mirrors the power report rather than a subset of it:
+calculation power and margin, apparent power, the supply the current came from,
+the PDU, and the REBT advisories. Rows saved before calculation snapshots
+existed cannot be reproduced, so they report the stored line current and say
+they are estimates instead of implying a calculation.
 
 The Consumos calculator is the only writer of those rows. It replaces a whole
 generation at a time and sweeps stale rows **per stage**, so a table that moved

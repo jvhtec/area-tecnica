@@ -342,11 +342,15 @@ export class PDFEngine {
           includeScheduleText,
         });
       }
+    }
 
-      if (this.includesPrintSection("power") && this.contentSections.hasPowerData(this.options.eventData)) {
-        const currentY = this.addSectionHeader("Requerimientos eléctricos");
-        this.contentSections.addPowerSection(this.options.eventData, currentY);
-      }
+    if (
+      sectionSelection.has("power") &&
+      this.includesPrintSection("power") &&
+      this.contentSections.hasPowerData(this.options.eventData)
+    ) {
+      const currentY = this.addSectionHeader("Requerimientos eléctricos");
+      this.contentSections.addPowerSection(this.options.eventData, currentY);
     }
 
     if (sectionSelection.has("restaurants") && this.includesPrintSection("restaurants") && this.contentSections.hasRestaurantsData(this.options.eventData)) {

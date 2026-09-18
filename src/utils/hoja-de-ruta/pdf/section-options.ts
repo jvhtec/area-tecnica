@@ -8,6 +8,7 @@ export const HOJA_DE_RUTA_PDF_SECTIONS = [
   { id: "accommodation", label: "Alojamiento", filenameLabel: "Alojamiento" },
   { id: "logistics", label: "Logística", filenameLabel: "Logistica" },
   { id: "schedule", label: "Programa", filenameLabel: "Programa" },
+  { id: "power", label: "Energía", filenameLabel: "Energia" },
   { id: "restaurants", label: "Restaurantes", filenameLabel: "Restaurantes" },
 ] as const;
 
@@ -32,7 +33,7 @@ export const HOJA_DE_RUTA_PRINT_SECTIONS = [
   { id: "logistics-details", label: "Logística del Evento", parentSectionId: "logistics" },
   { id: "program", label: "Programa", parentSectionId: "schedule" },
   { id: "schedule-notes", label: "Programa (Texto Libre)", parentSectionId: "schedule" },
-  { id: "power", label: "Requisitos de Energía", parentSectionId: "schedule" },
+  { id: "power", label: "Requisitos de Energía", parentSectionId: "power" },
   { id: "restaurants", label: "Restaurantes", parentSectionId: "restaurants" },
 ] as const satisfies readonly {
   id: string;
@@ -57,7 +58,10 @@ const LEGACY_PRINT_SECTION_EXPANSIONS: Record<HojaDeRutaPdfSectionId, HojaDeRuta
   travel: ["travel"],
   accommodation: ["accommodation"],
   logistics: ["logistics-transport", "logistics-details"],
+  // "power" used to live under the Programa tab. A legacy record that excluded
+  // "schedule" meant the power block too, so that expansion keeps it.
   schedule: ["program", "schedule-notes", "power"],
+  power: ["power"],
   restaurants: ["restaurants"],
 };
 

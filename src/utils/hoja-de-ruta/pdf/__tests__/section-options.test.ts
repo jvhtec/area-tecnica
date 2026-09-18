@@ -22,6 +22,7 @@ describe("hoja de ruta PDF section options", () => {
       "accommodation",
       "logistics",
       "schedule",
+      "power",
       "restaurants",
     ]);
   });

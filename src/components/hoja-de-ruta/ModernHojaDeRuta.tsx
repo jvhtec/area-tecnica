@@ -25,7 +25,8 @@ import {
   UtensilsCrossed,
   AlertCircle,
   FileDown,
-  CloudSun
+  CloudSun,
+  Zap
 } from "lucide-react";
 
 // Import the working hooks
@@ -312,6 +313,19 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     label: getHojaDeRutaPdfSectionLabel(section.id),
   }));
 
+  // The power summary is edited inside the Programa tab but exports on its own,
+  // so the print dialog offers one more section than the form has tabs.
+  const printSectionConfig: HojaDeRutaTabOption[] = [
+    ...tabConfig.slice(0, tabConfig.findIndex((tab) => tab.id === "schedule") + 1),
+    {
+      id: "power",
+      icon: Zap,
+      color: "text-yellow-600",
+      label: getHojaDeRutaPdfSectionLabel("power"),
+    },
+    ...tabConfig.slice(tabConfig.findIndex((tab) => tab.id === "schedule") + 1),
+  ];
+
   const excludedPrintSections = normalizeHojaDeRutaPrintSections(eventData.printExcludedSections);
   const excludedPrintSectionSet = new Set<HojaDeRutaPrintSectionId>(excludedPrintSections);
   const isPrintSectionExcluded = (sectionId: HojaDeRutaPrintSectionId) =>
@@ -597,6 +611,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                         setEventData={setEventData}
                         isPrintSectionExcluded={isPrintSectionExcluded}
                         onPrintSectionExcludedChange={handlePrintExclusionChange}
+                        selectedJobId={jobId || selectedJobId}
                       />
                     </TabsContent>
 
@@ -636,7 +651,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         onPreviewDriverCertificatePDF={handlePreviewDriverCertificatePDF}
         onPreviewSectionPDF={handlePreviewPDF}
         onGenerateXLS={handleGenerateXLS}
-        sections={tabConfig}
+        sections={printSectionConfig}
         isGenerating={isGenerating}
         generatingSectionId={generatingSectionId}
         isPreviewing={isPreviewing}
