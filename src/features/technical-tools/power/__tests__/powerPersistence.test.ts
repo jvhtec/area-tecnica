@@ -5,6 +5,7 @@ import {
   buildPowerTableMetadata,
   buildPowerRequirementInsert,
   buildTourPowerDefaultTable,
+  deleteJobPowerRequirementTable,
   getPowerReportUploadCategory,
   resolveRetiredPowerRequirementIds,
   saveJobPowerRequirementTable,
@@ -414,6 +415,39 @@ describe("technical power persistence payloads", () => {
     expect(operations).not.toEqual(
       expect.arrayContaining([{ method: "in", args: ["id", expect.anything()] }])
     );
+  });
+});
+
+describe("deleteJobPowerRequirementTable", () => {
+  it("scopes the delete to the row id and its job", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await deleteJobPowerRequirementTable({
+      client,
+      jobId: "job-1",
+      table: { powerRequirementId: "row-1" },
+    });
+
+    expect(operations).toEqual(
+      expect.arrayContaining([
+        { method: "from", args: ["power_requirement_tables"] },
+        { method: "delete", args: [] },
+        { method: "eq", args: ["id", "row-1"] },
+        { method: "eq", args: ["job_id", "job-1"] },
+      ])
+    );
+  });
+
+  it("does nothing for a table that was never persisted", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await deleteJobPowerRequirementTable({
+      client,
+      jobId: "job-1",
+      table: { powerRequirementId: undefined },
+    });
+
+    expect(operations).toEqual([]);
   });
 });
 

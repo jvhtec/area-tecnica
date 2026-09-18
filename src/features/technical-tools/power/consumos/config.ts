@@ -155,6 +155,7 @@ export type ConsumosLabels = {
   toastOverrideUpdated: string;
   toastOverrideDeleted: string;
   toastOverrideDeleteError: string;
+  toastTableDeleteError: string;
   toastTableNotFound: string;
   controls: PowerTableControlLabels;
 };

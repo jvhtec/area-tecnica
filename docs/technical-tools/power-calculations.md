@@ -139,6 +139,10 @@ run, and both are needed:
   `resolveRetiredPowerRequirementIds` from what the editor loaded, what it is
   saving, and what it still holds for other stages.
 
+Removing a table from the editor deletes its row straight away rather than
+waiting for the next save to sweep it — leaving it alive was a second way for
+a deleted table to keep feeding reports and the Hoja de Ruta power summary.
+
 The second pass exists because the first cannot see a row whose stage changed.
 A table built with no stage selected and later saved under a stage — or removed
 from the editor while a different stage was selected — is filed under a stage
@@ -146,6 +150,12 @@ the new payload never mentions, so the per-stage sweep skips it. The orphan then
 keeps appearing in reports and, most visibly, gets listed a second time in the
 Hoja de Ruta power summary. Rows belonging to tables the editor still holds but
 is not saving right now are never retired.
+
+`scripts/sql/audit_power_requirement_duplicates.sql` is a read-only audit that
+mirrors the reader's stage scoping and lists the rows that are still orphaned.
+Rows the editor cannot tell apart from legitimate unstaged tables are not
+cleaned up automatically: delete them from the Consumos tool, which now removes
+the row with them.
 
 ## Report aggregation
 

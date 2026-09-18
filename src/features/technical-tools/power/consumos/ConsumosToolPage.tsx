@@ -153,7 +153,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
           : undefined
       }
       onEdit={() => startEditingTable(table)}
-      onRemove={() => removeTable(table.id as number | string)}
+      onRemove={() => void removeTable(table.id as number | string)}
       onSaveDefault={() => saveTourDefault(table)}
       onUpdateSettings={(patch) => updateTableSettings(table.id as number | string, patch)}
     />

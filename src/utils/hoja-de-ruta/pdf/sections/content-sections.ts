@@ -6,7 +6,6 @@ import { ContactsSection } from './contacts';
 import { StaffSection } from './staff';
 import { TravelSection } from './travel';
 import { AccommodationSection } from './accommodation';
-import { ScheduleSection } from './schedule';
 import { LogisticsSection } from './logistics';
 import { DeliveryCertificateSection } from './delivery-certificate';
 import type { StampImage } from '../services/stamp-service';
@@ -25,7 +24,6 @@ export class ContentSections {
   private staffSection: StaffSection;
   private travelSection: TravelSection;
   private accommodationSection: AccommodationSection;
-  private scheduleSection: ScheduleSection;
   private logisticsSection: LogisticsSection;
   private deliveryCertificateSection: DeliveryCertificateSection;
   private weatherSection: WeatherSection;
@@ -42,7 +40,6 @@ export class ContentSections {
     this.staffSection = new StaffSection(pdfDoc);
     this.travelSection = new TravelSection(pdfDoc);
     this.accommodationSection = new AccommodationSection(pdfDoc);
-    this.scheduleSection = new ScheduleSection(pdfDoc);
     this.logisticsSection = new LogisticsSection(pdfDoc);
     this.deliveryCertificateSection = new DeliveryCertificateSection(pdfDoc);
     this.weatherSection = new WeatherSection(pdfDoc);
@@ -89,10 +86,6 @@ export class ContentSections {
 
   addStaffSection(eventData: EventData, yPosition: number): number {
     return this.staffSection.addStaffSection(eventData, yPosition);
-  }
-
-  addScheduleSection(eventData: EventData, yPosition: number): number {
-    return this.scheduleSection.addScheduleSection(eventData, yPosition);
   }
 
   addLogisticsSection(

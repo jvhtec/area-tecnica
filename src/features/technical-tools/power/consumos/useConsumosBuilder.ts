@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -11,6 +12,7 @@ import {
   buildPowerOverridePayload,
   buildPowerTableData,
   buildPowerTableMetadata,
+  deleteJobPowerRequirementTable,
   resolveRetiredPowerRequirementIds,
 } from "@/features/technical-tools/power/powerPersistence";
 import { parsePowerCalculationSnapshot } from "@/features/technical-tools/power/powerSnapshots";
@@ -44,6 +46,7 @@ import {
 import type { ConsumosJob } from "./consumosUtils";
 import type { CustomPowerComponentInput } from "./useCustomPowerComponents";
 import {
+  jobPowerRequirementTablesQueryKey,
   mapPowerRequirementRowToTable,
   useJobPowerRequirementTables,
 } from "./useJobPowerRequirementTables";
@@ -199,6 +202,7 @@ export function useConsumosBuilder({
 
   // NEW: load the saved power requirement set for the job so it can be edited
   // instead of forcing users to rebuild it from scratch.
+  const queryClient = useQueryClient();
   const savedTablesQuery = useJobPowerRequirementTables({
     department,
     enabled: isNormalMode,
@@ -712,7 +716,13 @@ export function useConsumosBuilder({
     }
   };
 
-  const removeTable = (tableId: number | string) => {
+  /**
+   * Removing a table also deletes the row it was loaded from. Dropping it only
+   * from local state left the row alive until a later save happened to sweep
+   * its stage, so a table deleted here kept feeding reports and the Hoja de
+   * Ruta power summary if the user navigated away without exporting again.
+   */
+  const removeTable = async (tableId: number | string) => {
     const tableToRemove = tables.find((table) => table.id === tableId);
     if (!tableToRemove) {
       toast({
@@ -722,6 +732,30 @@ export function useConsumosBuilder({
       });
       return;
     }
+
+    const persistedId = tableToRemove.powerRequirementId;
+    if (isNormalMode && selectedJobId && persistedId) {
+      try {
+        await deleteJobPowerRequirementTable({
+          client: dataLayerClient,
+          jobId: selectedJobId,
+          table: tableToRemove,
+        });
+        await queryClient.invalidateQueries({
+          queryKey: jobPowerRequirementTablesQueryKey(selectedJobId, department),
+        });
+      } catch (error) {
+        // The row is still there, so the editor must keep showing the table.
+        console.error("Error deleting saved power requirement table:", error);
+        toast({
+          title: labels.toastError,
+          description: labels.toastTableDeleteError,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setTables((prev) => prev.filter((table) => table.id !== tableId));
     if (editing?.kind === "table" && editing.id === tableId) {
       resetCurrentTable();
