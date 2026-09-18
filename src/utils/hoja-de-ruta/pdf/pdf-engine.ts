@@ -246,20 +246,29 @@ export class PDFEngine {
     }
   }
 
+  /**
+   * Exporting a single section still respects the per-block "Excluir al
+   * imprimir" switches: picking "Programa" must not smuggle back a power
+   * summary the user turned off.
+   */
+  private includesPrintSection(sectionId: HojaDeRutaPrintSectionId): boolean {
+    return !this.isPrintSectionExcluded(sectionId);
+  }
+
   private async generateSelectedSections(sectionSelection: Set<HojaDeRutaPdfSectionId>): Promise<void> {
     if (sectionSelection.has("event")) {
-      if (this.contentSections.hasEventDetailsData(this.options.eventData)) {
+      if (this.includesPrintSection("event-details") && this.contentSections.hasEventDetailsData(this.options.eventData)) {
         const currentY = this.addSectionHeader("Evento");
         this.contentSections.addEventDetailsSection(this.options.eventData, currentY);
       }
 
-      if (this.contentSections.hasAuxNeedsData(this.options.eventData)) {
+      if (this.includesPrintSection("aux-needs") && this.contentSections.hasAuxNeedsData(this.options.eventData)) {
         const currentY = this.addSectionHeader("Necesidades auxiliares");
         this.contentSections.addAuxNeedsSection(this.options.eventData, currentY);
       }
     }
 
-    if (sectionSelection.has("venue") && this.hasVenueExportData()) {
+    if (sectionSelection.has("venue") && this.includesPrintSection("venue") && this.hasVenueExportData()) {
       const currentY = this.addSectionHeader("Recinto");
       await this.contentSections.addVenueSection(
         this.options.eventData,
@@ -273,17 +282,17 @@ export class PDFEngine {
       await this.addWeatherSectionIfAvailable();
     }
 
-    if (sectionSelection.has("contacts") && this.contentSections.hasContactsData(this.options.eventData)) {
+    if (sectionSelection.has("contacts") && this.includesPrintSection("contacts") && this.contentSections.hasContactsData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Contactos");
       this.contentSections.addContactsSection(this.options.eventData, currentY);
     }
 
-    if (sectionSelection.has("staff") && this.contentSections.hasStaffData(this.options.eventData)) {
+    if (sectionSelection.has("staff") && this.includesPrintSection("staff") && this.contentSections.hasStaffData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Personal");
       this.contentSections.addStaffSection(this.options.eventData, currentY);
     }
 
-    if (sectionSelection.has("travel") && this.contentSections.hasTravelData(this.options.travelArrangements)) {
+    if (sectionSelection.has("travel") && this.includesPrintSection("travel") && this.contentSections.hasTravelData(this.options.travelArrangements)) {
       const currentY = this.addSectionHeader("Viajes");
       await this.contentSections.addTravelSection(
         this.options.travelArrangements,
@@ -292,7 +301,7 @@ export class PDFEngine {
       );
     }
 
-    if (sectionSelection.has("accommodation") && this.contentSections.hasAccommodationData(this.options.accommodations)) {
+    if (sectionSelection.has("accommodation") && this.includesPrintSection("accommodation") && this.contentSections.hasAccommodationData(this.options.accommodations)) {
       const currentY = this.addSectionHeader("Alojamiento");
       await this.contentSections.addAccommodationSection(
         this.options.accommodations || [],
@@ -301,24 +310,46 @@ export class PDFEngine {
       );
     }
 
-    if (sectionSelection.has("logistics") && this.contentSections.hasLogisticsData(this.options.eventData)) {
-      const currentY = this.addSectionHeader("Logística");
-      this.contentSections.addLogisticsSection(this.options.eventData, currentY);
+    if (sectionSelection.has("logistics")) {
+      const includeTransport =
+        this.includesPrintSection("logistics-transport") &&
+        this.contentSections.hasLogisticsTransportData(this.options.eventData);
+      const includeDetails =
+        this.includesPrintSection("logistics-details") &&
+        this.contentSections.hasLogisticsDetailsData(this.options.eventData);
+
+      if (includeTransport || includeDetails) {
+        const currentY = this.addSectionHeader("Logística");
+        this.contentSections.addLogisticsSection(this.options.eventData, currentY, {
+          includeTransport,
+          includeDetails,
+        });
+      }
     }
 
     if (sectionSelection.has("schedule")) {
-      if (this.contentSections.hasProgramData(this.options.eventData)) {
+      const includeStructuredProgram =
+        this.includesPrintSection("program") &&
+        this.contentSections.hasStructuredProgramData(this.options.eventData);
+      const includeScheduleText =
+        this.includesPrintSection("schedule-notes") &&
+        this.contentSections.hasScheduleTextData(this.options.eventData);
+
+      if (includeStructuredProgram || includeScheduleText) {
         const currentY = this.addSectionHeader("Programa");
-        this.contentSections.addProgramSection(this.options.eventData, currentY);
+        this.contentSections.addProgramSection(this.options.eventData, currentY, {
+          includeStructured: includeStructuredProgram,
+          includeScheduleText,
+        });
       }
 
-      if (this.contentSections.hasPowerData(this.options.eventData)) {
+      if (this.includesPrintSection("power") && this.contentSections.hasPowerData(this.options.eventData)) {
         const currentY = this.addSectionHeader("Requerimientos eléctricos");
         this.contentSections.addPowerSection(this.options.eventData, currentY);
       }
     }
 
-    if (sectionSelection.has("restaurants") && this.contentSections.hasRestaurantsData(this.options.eventData)) {
+    if (sectionSelection.has("restaurants") && this.includesPrintSection("restaurants") && this.contentSections.hasRestaurantsData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Restaurantes");
       await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
     }

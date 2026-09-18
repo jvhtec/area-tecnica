@@ -112,6 +112,27 @@ saved fields and department defaults and are visibly marked **legacy
 estimate**. The legacy manual tour-default form stores watts and current
 independently; its records therefore remain estimates.
 
+## Persistence of a job's saved set
+
+Saving from the calculator writes a whole **generation** of rows into
+`power_requirement_tables` and then removes the rows it replaced. Two sweeps
+run, and both are needed:
+
+- a per-stage sweep that clears the older rows of every stage present in the
+  new payload — it is scoped by stage so that saving one stage of a festival
+  never deletes another stage's tables;
+- a retirement pass over the specific row ids the save supersedes, computed by
+  `resolveRetiredPowerRequirementIds` from what the editor loaded, what it is
+  saving, and what it still holds for other stages.
+
+The second pass exists because the first cannot see a row whose stage changed.
+A table built with no stage selected and later saved under a stage — or removed
+from the editor while a different stage was selected — is filed under a stage
+the new payload never mentions, so the per-stage sweep skips it. The orphan then
+keeps appearing in reports and, most visibly, gets listed a second time in the
+Hoja de Ruta power summary. Rows belonging to tables the editor still holds but
+is not saving right now are never retired.
+
 ## Report aggregation
 
 Raw and adjusted watts can always be summed. System current and kVA are only
@@ -236,5 +257,7 @@ electrical professional.
 - Compatible-system aggregation:
   `src/features/technical-tools/power/powerAggregation.ts`
 - Tour/report normalization: `src/utils/tourPowerTables.ts`
+- Job set persistence and row retirement:
+  `src/features/technical-tools/power/powerPersistence.ts`
 - Tests: `src/features/technical-tools/power/__tests__/` and
   `src/utils/__tests__/tourPowerTables.test.ts`

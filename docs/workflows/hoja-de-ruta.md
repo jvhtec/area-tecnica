@@ -72,6 +72,37 @@ Uses a modular PDF engine in `src/utils/hoja-de-ruta/pdf/`:
 - **Services**: LogoService, HeaderService, FooterService, QRService, MapService, StampService, PlacesImageService
 - PDF uploaded to job storage after generation
 
+### Print exclusions
+
+Each form block carries an "Excluir al imprimir" switch
+(`PrintSectionExclusionToggle`). The selected ids are stored on
+`eventData.printExcludedSections` (column `print_excluded_sections`) and are
+normalized through `normalizeHojaDeRutaPrintSections`, which also expands the
+legacy per-tab ids into the finer print-section ids.
+
+The exclusions apply to **every** export path — the full document, a
+single-section export, and both previews. `useHojaDeRutaExports.buildPdfOptions`
+attaches them regardless of whether a section was picked, and both
+`generateFullDocument` and `generateSelectedSections` gate on them. This matters
+for the power summary in particular: it belongs to the `schedule` PDF section
+but has its own `power` print id, so exporting only "Programa" must still leave
+it out when the user switched it off.
+
+### Power summary source
+
+`eventData.powerRequirements` is auto-populated from the job's
+`power_requirement_tables` via `formatPowerRequirementsText`, and a manually
+edited value always wins on reload
+(`resolvePowerRequirementsForHojaInitialization`).
+
+The Consumos calculator is the only writer of those rows. It replaces a whole
+generation at a time and sweeps stale rows **per stage**, so a table that moved
+between stages — or was deleted from the editor while another stage was
+selected — used to leave its old row behind and show up a second time in this
+summary. `resolveRetiredPowerRequirementIds` now names the rows each save
+supersedes so they are removed whatever stage they were filed under; see
+`docs/technical-tools/power-calculations.md`.
+
 ## Excel Export
 
 Generates a 10-sheet workbook via ExcelJS: Evento, Recinto, Contactos, Personal, Viajes, Alojamiento, Logística, Programa, Meteorología, Restaurantes.

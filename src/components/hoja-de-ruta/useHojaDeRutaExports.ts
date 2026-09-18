@@ -129,12 +129,21 @@ export const useHojaDeRutaExports = ({
     }
   };
 
-  const buildFullDocumentPdfOptions = () => {
+  /**
+   * Print exclusions apply to every export, not just the full document: a
+   * single-section PDF must not bring back a block the user switched off.
+   */
+  const buildPdfOptions = (sectionId?: HojaDeRutaPdfSectionId) => {
     const excludedSections = normalizeHojaDeRutaPrintSections(
       eventData.printExcludedSections
     );
-    return excludedSections.length > 0 ? { excludedSections } : undefined;
+    const sections = sectionId ? { sections: [sectionId] } : undefined;
+
+    if (excludedSections.length === 0) return sections;
+    return { ...sections, excludedSections };
   };
+
+  const buildFullDocumentPdfOptions = () => buildPdfOptions();
 
   const handlePrintExclusionChange = (
     sectionId: HojaDeRutaPrintSectionId,
@@ -261,7 +270,7 @@ export const useHojaDeRutaExports = ({
         jobDetails?.start_time || undefined,
         toast,
         accommodations,
-        { sections: [sectionId] }
+        buildPdfOptions(sectionId)
       );
     } catch (error) {
       console.error("Error generating section PDF:", error);
@@ -302,7 +311,7 @@ export const useHojaDeRutaExports = ({
         jobDetails?.start_time || undefined,
         undefined,
         accommodations,
-        sectionId ? { sections: [sectionId] } : buildFullDocumentPdfOptions()
+        buildPdfOptions(sectionId)
       );
 
       openGeneratedPdfPreview(generatedPdf);

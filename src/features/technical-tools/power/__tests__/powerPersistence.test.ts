@@ -6,6 +6,7 @@ import {
   buildPowerRequirementInsert,
   buildTourPowerDefaultTable,
   getPowerReportUploadCategory,
+  resolveRetiredPowerRequirementIds,
   saveJobPowerRequirementTable,
   saveJobPowerRequirementTablesGeneration,
 } from "@/features/technical-tools/power/powerPersistence";
@@ -62,6 +63,10 @@ const createPowerRequirementTableClient = () => {
       insert: vi.fn((payload: unknown) => {
         insertedPayload = payload;
         operations.push({ method: "insert", args: [payload] });
+        return builder;
+      }),
+      in: vi.fn((column: string, value: unknown) => {
+        operations.push({ method: "in", args: [column, value] });
         return builder;
       }),
       is: vi.fn((column: string, value: unknown) => {
@@ -330,5 +335,129 @@ describe("technical power persistence payloads", () => {
     );
     expect(operations).not.toEqual(expect.arrayContaining([{ method: "eq", args: ["stage_number", expect.anything()] }]));
     expect(operations).not.toEqual(expect.arrayContaining([{ method: "is", args: ["stage_number", null] }]));
+  });
+
+  it("retires rows the save supersedes even when their stage changed", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await saveJobPowerRequirementTablesGeneration({
+      client,
+      department: "sound",
+      jobId: "job-1",
+      // The table used to live on "no stage"; it is now filed under stage 2, so
+      // the per-stage sweep alone would leave the old row behind and the Hoja de
+      // Ruta power summary would list it twice.
+      retiredPowerRequirementIds: ["stale-no-stage-row"],
+      settings,
+      stage: { number: 2, name: "Club Stage" },
+      tables: [table],
+    });
+
+    expect(operations).toEqual(
+      expect.arrayContaining([
+        { method: "in", args: ["id", ["stale-no-stage-row"]] },
+      ])
+    );
+  });
+
+  it("retires superseded rows when the last table of a stage is removed", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await saveJobPowerRequirementTablesGeneration({
+      client,
+      department: "sound",
+      jobId: "job-1",
+      retiredPowerRequirementIds: ["removed-row"],
+      settings,
+      stage: { number: 2, name: "Club Stage" },
+      tables: [],
+    });
+
+    expect(operations).toEqual(
+      expect.arrayContaining([{ method: "in", args: ["id", ["removed-row"]] }])
+    );
+  });
+
+  it("never retires a row this generation just inserted", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await saveJobPowerRequirementTablesGeneration({
+      client,
+      department: "sound",
+      jobId: "job-1",
+      retiredPowerRequirementIds: ["new-power-requirement-id-1", "old-row"],
+      settings,
+      tables: [table],
+    });
+
+    expect(operations).toEqual(
+      expect.arrayContaining([{ method: "in", args: ["id", ["old-row"]] }])
+    );
+    expect(operations).not.toEqual(
+      expect.arrayContaining([
+        { method: "in", args: ["id", ["new-power-requirement-id-1", "old-row"]] },
+      ])
+    );
+  });
+
+  it("issues no retirement delete when nothing is superseded", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await saveJobPowerRequirementTablesGeneration({
+      client,
+      department: "sound",
+      jobId: "job-1",
+      settings,
+      tables: [table],
+    });
+
+    expect(operations).not.toEqual(
+      expect.arrayContaining([{ method: "in", args: ["id", expect.anything()] }])
+    );
+  });
+});
+
+describe("resolveRetiredPowerRequirementIds", () => {
+  const savedOnStageOne = { powerRequirementId: "row-stage-1" };
+  const savedOnStageTwo = { powerRequirementId: "row-stage-2" };
+
+  it("retires the rows of the tables being saved so a stage move leaves nothing behind", () => {
+    expect(
+      resolveRetiredPowerRequirementIds({
+        loadedIds: ["row-stage-1", "row-stage-2"],
+        savingTables: [savedOnStageOne],
+        tables: [savedOnStageOne, savedOnStageTwo],
+      })
+    ).toEqual(["row-stage-1"]);
+  });
+
+  it("retires rows whose table the user removed from the editor", () => {
+    expect(
+      resolveRetiredPowerRequirementIds({
+        loadedIds: ["row-stage-1", "row-stage-2"],
+        savingTables: [savedOnStageOne],
+        tables: [savedOnStageOne],
+      })
+    ).toEqual(["row-stage-1", "row-stage-2"]);
+  });
+
+  it("leaves other stages alone while one stage is being saved", () => {
+    expect(
+      resolveRetiredPowerRequirementIds({
+        loadedIds: ["row-stage-1", "row-stage-2"],
+        savingTables: [],
+        tables: [savedOnStageOne, savedOnStageTwo],
+      })
+    ).toEqual([]);
+  });
+
+  it("ignores tables that were never persisted", () => {
+    expect(
+      resolveRetiredPowerRequirementIds({
+        loadedIds: [],
+        savingTables: [{ powerRequirementId: undefined }],
+        tables: [{ powerRequirementId: undefined }],
+      })
+    ).toEqual([]);
   });
 });

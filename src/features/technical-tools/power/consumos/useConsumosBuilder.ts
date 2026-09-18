@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   calculateMixedLoadApparentPower,
@@ -11,6 +11,7 @@ import {
   buildPowerOverridePayload,
   buildPowerTableData,
   buildPowerTableMetadata,
+  resolveRetiredPowerRequirementIds,
 } from "@/features/technical-tools/power/powerPersistence";
 import { parsePowerCalculationSnapshot } from "@/features/technical-tools/power/powerSnapshots";
 import type {
@@ -233,6 +234,19 @@ export function useConsumosBuilder({
     config.defaultPowerFactor,
     config.defaultSafetyMargin,
   ]);
+
+  const loadedPowerRequirementIds = useMemo(
+    () => (savedTablesQuery.data ?? []).map((row) => row.id),
+    [savedTablesQuery.data],
+  );
+
+  /** Persisted rows the next save of `savingTables` replaces — see the helper. */
+  const getRetiredPowerRequirementIds = (savingTables: PowerTable[]) =>
+    resolveRetiredPowerRequirementIds({
+      loadedIds: loadedPowerRequirementIds,
+      savingTables,
+      tables,
+    });
 
   const activeTables = selectedStage
     ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
@@ -744,6 +758,7 @@ export function useConsumosBuilder({
     fohSchukoRequired,
     fohSchukoSetting,
     generateTable,
+    getRetiredPowerRequirementIds,
     getTableSnapshotSettings,
     handleJobSelect,
     includesHoist,
