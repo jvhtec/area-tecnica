@@ -102,6 +102,10 @@ export const calculateElectricalTotals = ({
     : rawApparentPowerVa * loadMultiplier;
   const canCalculateCurrent =
     settings.voltage > 0 && (rawApparentPowerVa !== undefined || powerFactor > 0);
+  // Balanced three-phase line current from the line-to-line voltage:
+  // I = S / (sqrt(3) * V_LL), which for a PF-derived S is P / (sqrt(3) * V_LL * PF).
+  // Dividing the load across three phases and then by V_LL would mix a
+  // per-phase power with a line-to-line voltage and understate I by sqrt(3).
   const phaseDivisor = settings.phaseMode === "single" ? 1 : SQRT3;
   return {
     adjustedWatts,

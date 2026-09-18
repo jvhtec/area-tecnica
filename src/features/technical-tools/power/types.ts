@@ -71,6 +71,14 @@ export type PowerTable = {
 export type PowerElectricalSettings = {
   safetyMargin: number;
   phaseMode: PhaseMode;
+  /**
+   * Nominal supply voltage, in volts. Line-to-neutral when `phaseMode` is
+   * `"single"` (230 V in Spain) and **line-to-line** when it is `"three"`
+   * (400 V). The three-phase line current is therefore
+   * `I = S / (sqrt(3) * V_LL)` — never `S / 3 / V_LL`, and never V_LL paired
+   * with a per-phase power.
+   */
   voltage: number;
+  /** 0 < PF <= 1. Omitted when the table resolves a power factor per row. */
   powerFactor?: number;
 };

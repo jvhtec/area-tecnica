@@ -61,10 +61,24 @@ single phase:        I = S_adjusted / V_LN
 balanced 3 phase:   I_line = S_adjusted / (sqrt(3) × V_LL)
 ```
 
-The single-phase voltage is line-to-neutral. The three-phase voltage is
-line-to-line and the load is assumed balanced. These are the same standard
-single/three-phase load relationships summarized by
+The single-phase voltage is line-to-neutral (230 V). The three-phase voltage is
+line-to-line (400 V) and the load is assumed balanced. These are the same
+standard single/three-phase load relationships summarized by
 [Schneider Electric](https://www.se.com/us/en/faqs/FA101600/).
+
+Written out against the global-PF case, the three-phase line current is
+
+```text
+I_line = S_adjusted / (sqrt(3) × V_LL) = P_adjusted / (sqrt(3) × V_LL × PF)
+```
+
+The load is **not** split across three phases before dividing by `V_LL`.
+Doing that pairs a per-phase power with a line-to-line voltage and understates
+the current by a factor of sqrt(3): 34,8 kW at PF 0,85 on 400 V is 59,1 A per
+line, not the 34,1 A that `P / (3 × V_LL × PF)` gives, nor the 29 A that
+`(P / 3) / V_LL` gives. Both mistakes would undersize the supply, so
+`powerCalculations.test.ts` pins the 59,1 A result and asserts against both
+wrong values.
 
 ## Input validation
 
