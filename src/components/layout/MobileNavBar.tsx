@@ -194,6 +194,8 @@ export const MobileNavBar = ({
     : undefined
 
   const nav = (
+    // If the nav's height or base padding changes, update --mobile-nav-height
+    // in index.css — content offsets above the nav are derived from it.
     <nav
       role="navigation"
       aria-label="Navegación principal"
