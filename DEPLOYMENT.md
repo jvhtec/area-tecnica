@@ -208,6 +208,52 @@ To update custom domain settings:
 - [Vite Deployment Guide](https://vitejs.dev/guide/static-deploy.html)
 - [Troubleshooting Builds](https://developers.cloudflare.com/pages/platform/build-configuration/)
 
+## Supabase Edge Functions
+
+Edge Functions are **not** deployed by merging to `main`. Cloudflare Pages only serves the
+front end; a function goes live only when someone deploys it. Several functions have
+external side effects the moment they ship (`create-flex-folders` writes to Flex,
+`staffing-orchestrator` emails technicians), so deploys stay deliberate.
+
+### Deploy from GitHub Actions (preferred)
+
+Run the **Deploy Edge Functions** workflow
+(`.github/workflows/deploy-functions.yml`) via *Actions → Deploy Edge Functions → Run
+workflow*:
+
+- **functions** — slugs to deploy, space- or comma-separated (e.g.
+  `create-flex-folders`), or `all` for every function.
+- **ref** — git ref to deploy from; defaults to `main`.
+
+The deployment target is **pinned** in the workflow's `EXPECTED_PROJECT_REF`, and the
+checked-out `supabase/config.toml` is cross-checked against it: the run aborts if they
+disagree. The workflow file always comes from the default branch, so the pinned value is
+trusted, while `config.toml` comes from the arbitrary `ref` input and is not — a ref
+carrying a different `project_id` therefore cannot redirect a deploy to another project.
+If the linked project genuinely changes, update `EXPECTED_PROJECT_REF` on the default
+branch. Deploys are serialized by a `concurrency` group so two dispatches cannot
+interleave and land stale code, and the workflow rejects unknown slugs and `_shared`
+before contacting Supabase. `verify_jwt` comes from `supabase/config.toml` — a function with no entry there
+defaults to `verify_jwt = true`. Never add `--no-verify-jwt` to the deploy step: that
+would silently change a function's exposure classification, which
+`npm run governance:exposure` gates on.
+
+**Required secret**: `SUPABASE_ACCESS_TOKEN` under *Settings → Secrets and variables →
+Actions*. Generate it at
+[supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
+Without it the workflow fails fast with an explicit message.
+
+### Deploy from a local machine
+
+Requires `supabase login` first — the `project-ref` committed in `supabase/.temp` records
+*which* project to talk to, but the access token is a separate per-machine credential:
+
+```bash
+npx supabase functions deploy <function-name> --project-ref syldobdcdsgfgjtbuwxm
+```
+
+Secrets are managed separately: `npx supabase secrets set KEY=VALUE`.
+
 ### Related Documentation
 
 - [DEVELOPMENT.md](./DEVELOPMENT.md) - Local development setup
