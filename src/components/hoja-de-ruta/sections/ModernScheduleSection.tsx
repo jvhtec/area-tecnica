@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
-import { Activity, Zap, Calendar, RefreshCw } from "lucide-react";
+import { Activity, Zap, RefreshCw } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
 import { ScheduleBuilder } from "@/components/schedule/ScheduleBuilder";
 import { MultiDayScheduleBuilder } from "@/components/schedule/MultiDayScheduleBuilder";

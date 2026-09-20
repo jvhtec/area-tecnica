@@ -257,7 +257,7 @@ const ENGLISH_LABELS: ConsumosLabels = {
   toastOverrideUpdated: "Override updated successfully",
   toastOverrideDeleted: "Override deleted successfully",
   toastOverrideDeleteError: "Failed to delete override",
-  toastTableDeleteError: "No se pudo eliminar la tabla guardada",
+  toastTableDeleteError: "Failed to delete the saved table",
   toastTableNotFound: "Power requirement table not found",
   controls: ENGLISH_POWER_TABLE_CONTROL_LABELS,
 };
