@@ -638,12 +638,15 @@ serve(async (req) => {
       (payload) => createFlexElement(payload, flexToken),
     );
 
+    // The root structure is durable once every planned node persisted, so record that before the
+    // tour flag write. A Flex custom-field rejection then costs only the flag and still fails the
+    // operation, instead of leaving a fully provisioned tour unable to create its date folders.
+    const { error: tourUpdateError } = await supabase.from("tours").update({ flex_folders_created: true }).eq("id", tourId);
+    if (tourUpdateError) throw tourUpdateError;
+
     // Custom Field 2 on the root Event Folder is the explicit report discriminator for tours.
     // Standard jobs leave the Boolean at its Flex default (false).
     await markTourRoot(supabase, lease.operation_id, flexToken);
-
-    const { error: tourUpdateError } = await supabase.from("tours").update({ flex_folders_created: true }).eq("id", tourId);
-    if (tourUpdateError) throw tourUpdateError;
     const { error: finishError } = await supabase.rpc("finish_flex_provisioning_lease", {
       p_operation_id: lease.operation_id,
       p_lease_token: lease.lease_token,

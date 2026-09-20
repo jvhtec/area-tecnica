@@ -123,6 +123,38 @@ describe("TourCard Flex root reconciliation", () => {
     });
   });
 
+  it("reports how many folders a sync actually added", async () => {
+    mocks.createTourRootFolders.mockResolvedValue({
+      success: true,
+      data: { success: true, status: "complete", data: { created: 3, adopted: 0, skipped: 8 } },
+    });
+    renderTourCard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar estructura Flex" }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+        description: "Se han añadido 3 carpetas nuevas a la estructura de la gira.",
+      }));
+    });
+  });
+
+  it("does not claim a sync completed the structure when nothing was created", async () => {
+    mocks.createTourRootFolders.mockResolvedValue({
+      success: true,
+      data: { success: true, status: "complete", data: { created: 0, adopted: 0, skipped: 11 } },
+    });
+    renderTourCard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar estructura Flex" }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+        description: "La estructura de la gira ya estaba al día. No se ha añadido ninguna carpeta nueva.",
+      }));
+    });
+  });
+
   it("uses the canonical root operation for tours that have no Flex root yet", async () => {
     renderTourCard({
       flex_folders_created: false,
