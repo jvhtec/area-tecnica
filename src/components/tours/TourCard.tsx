@@ -88,6 +88,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
     handleCreateTourRootFolders,
     hasTourRootFolders,
     isCreatingTourRootFolders,
+    needsEstructuraRoot,
   } = useTourRootFolderAction(tour);
 
   // Fetch tour logo
@@ -708,7 +709,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
               {tour.flex_folders_created && !needsEstructuraRoot ? (
                 <Badge variant="secondary" className="text-xs">
                   <FileText className="h-3 w-3 mr-1" />
-                  Flex preparado
+                  Flex raíz creada
                 </Badge>
               ) : needsEstructuraRoot ? (
                 <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
