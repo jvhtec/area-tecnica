@@ -25,6 +25,7 @@ import { getErrorStatus, HttpError } from "../_shared/http.ts";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
+  FLEX_CUSTOM_FIELD_TYPES,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
 } from "../../../src/utils/flex-folders/constants.ts";
@@ -62,6 +63,63 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
     throw new Error(message);
   }
   return await response.json() as { elementId?: string };
+};
+
+const updateFlexElementHeader = async (
+  elementId: string,
+  fieldType: string,
+  value: string | boolean,
+  authToken: string,
+) => {
+  const response = await fetchWithRetry(
+    `${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/header-update`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": authToken,
+        apikey: authToken,
+        "X-Requested-With": "XMLHttpRequest",
+        "X-API-Client": "flex5-desktop",
+      },
+      body: JSON.stringify({
+        fieldType,
+        payloadValue: value,
+        displayValue: String(value),
+      }),
+    },
+    // Header updates are idempotent for the same field/value, so a timeout may be retried safely.
+    { retryOnTimeout: true },
+  );
+  if (!response.ok) {
+    const message = `Flex returned HTTP ${response.status} while updating ${fieldType}`;
+    if (response.status >= 400 && response.status < 500 && response.status !== 408) {
+      throw new FlexProvisioningDeterministicError(message);
+    }
+    throw new Error(message);
+  }
+};
+
+const markTourRoot = async (
+  supabase: SupabaseClient,
+  operationId: string,
+  flexToken: string,
+) => {
+  const { data: rootNode, error: rootError } = await supabase
+    .from("flex_provisioning_nodes")
+    .select("element_id")
+    .eq("operation_id", operationId)
+    .eq("semantic_key", "root")
+    .single();
+  if (rootError || !rootNode?.element_id) {
+    throw rootError || new Error("Tour root provisioning node has no Flex element ID");
+  }
+  await updateFlexElementHeader(
+    String(rootNode.element_id),
+    FLEX_CUSTOM_FIELD_TYPES.isTour,
+    true,
+    flexToken,
+  );
 };
 const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
   const { data, error } = await supabase
@@ -579,6 +637,10 @@ serve(async (req) => {
       makeStore(supabase, lease.operation_id, tourId),
       (payload) => createFlexElement(payload, flexToken),
     );
+
+    // Custom Field 2 on the root Event Folder is the explicit report discriminator for tours.
+    // Standard jobs leave the Boolean at its Flex default (false).
+    await markTourRoot(supabase, lease.operation_id, flexToken);
 
     const { error: tourUpdateError } = await supabase.from("tours").update({ flex_folders_created: true }).eq("id", tourId);
     if (tourUpdateError) throw tourUpdateError;
