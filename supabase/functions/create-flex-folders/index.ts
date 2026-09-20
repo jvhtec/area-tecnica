@@ -116,7 +116,7 @@ const markTourRoot = async (
   }
   await updateFlexElementHeader(
     String(rootNode.element_id),
-    FLEX_CUSTOM_FIELD_TYPES.isTour,
+    Deno.env.get("FLEX_TOUR_FLAG_FIELD_TYPE") || FLEX_CUSTOM_FIELD_TYPES.isTour,
     true,
     flexToken,
   );
