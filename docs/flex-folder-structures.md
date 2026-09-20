@@ -269,7 +269,7 @@ The start time is `artist.show_start`, falling back to `dayStartTime` (default `
 | --- | --- |
 | Standard root and descendants | `flex_folders.element_id`; rows include `job_id`, department, type, and local `parent_id` |
 | Tour root and department roots | `flex_folders.element_id` plus the matching `tours.flex_*_folder_id` column |
-| Tour Comercial package containers | `flex_folders.element_id`, `folder_type = tour_commercial_department`, department `sound|lights|video` |
+| Tour Comercial package containers | `flex_folders.element_id`, `folder_type = tour_commercial_department`, department `sound, lights, video` |
 | Tour-date nodes | `flex_folders.element_id` with `job_id` and `tour_date_id` |
 | Estructura source sheets | `folder_type = pull_sheet`, `department = estructura`, and `source_department = sound\|lights` |
 | Crew calls | `flex_folders` plus `flex_crew_calls(job_id, department)` |
