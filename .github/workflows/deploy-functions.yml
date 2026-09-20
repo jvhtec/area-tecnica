@@ -19,8 +19,21 @@ on:
 permissions:
   contents: read
 
+# One deploy to the project at a time. Overlapping dispatches could otherwise
+# interleave per function, letting an older ref land last and silently restore stale
+# code while both runs report success. Queued rather than cancelled: cancelling a run
+# mid-flight could leave a multi-function deploy half applied.
+concurrency:
+  group: supabase-edge-function-deploy
+  cancel-in-progress: false
+
 env:
   SUPABASE_CLI_VERSION: 2.107.0
+  # Pinned deployment target. The workflow file is always read from the dispatch ref,
+  # so this value is trusted; supabase/config.toml comes from the arbitrary inputs.ref
+  # and is not. The run aborts if they disagree, so a ref carrying a different
+  # project_id cannot redirect the deploy to another project.
+  EXPECTED_PROJECT_REF: syldobdcdsgfgjtbuwxm
 
 jobs:
   deploy:
@@ -40,9 +53,10 @@ jobs:
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
-      # The project ref is read from supabase/config.toml rather than duplicated here,
-      # so this workflow cannot drift from the linked project.
-      - name: Resolve project ref
+      # The target is pinned in env above; the checked-out config is only cross-checked
+      # against it. This catches both a ref that would redirect the deploy elsewhere and
+      # a genuine change of linked project, instead of silently following either.
+      - name: Verify deployment target
         id: project
         run: |
           set -euo pipefail
@@ -51,8 +65,12 @@ jobs:
             echo "::error::Could not read project_id from supabase/config.toml"
             exit 1
           fi
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-          echo "Project ref: $ref"
+          if [ "$ref" != "$EXPECTED_PROJECT_REF" ]; then
+            echo "::error::supabase/config.toml project_id ($ref) does not match the pinned deployment target ($EXPECTED_PROJECT_REF). Refusing to deploy. If the project genuinely changed, update EXPECTED_PROJECT_REF in this workflow on the default branch."
+            exit 1
+          fi
+          echo "ref=$EXPECTED_PROJECT_REF" >> "$GITHUB_OUTPUT"
+          echo "Deployment target: $EXPECTED_PROJECT_REF (config.toml agrees)"
 
       # The dispatch input is passed through the environment, never interpolated into
       # the script body, so a crafted input cannot inject shell commands.

@@ -225,9 +225,15 @@ workflow*:
   `create-flex-folders`), or `all` for every function.
 - **ref** — git ref to deploy from; defaults to `main`.
 
-The workflow reads the project ref from `supabase/config.toml`, so it cannot drift from
-the linked project, and it rejects unknown slugs and `_shared` before contacting
-Supabase. `verify_jwt` comes from `supabase/config.toml` — a function with no entry there
+The deployment target is **pinned** in the workflow's `EXPECTED_PROJECT_REF`, and the
+checked-out `supabase/config.toml` is cross-checked against it: the run aborts if they
+disagree. The workflow file always comes from the default branch, so the pinned value is
+trusted, while `config.toml` comes from the arbitrary `ref` input and is not — a ref
+carrying a different `project_id` therefore cannot redirect a deploy to another project.
+If the linked project genuinely changes, update `EXPECTED_PROJECT_REF` on the default
+branch. Deploys are serialized by a `concurrency` group so two dispatches cannot
+interleave and land stale code, and the workflow rejects unknown slugs and `_shared`
+before contacting Supabase. `verify_jwt` comes from `supabase/config.toml` — a function with no entry there
 defaults to `verify_jwt = true`. Never add `--no-verify-jwt` to the deploy step: that
 would silently change a function's exposure classification, which
 `npm run governance:exposure` gates on.
