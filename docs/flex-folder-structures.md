@@ -149,7 +149,7 @@ Picker options control children only. They never remove required department/date
 
 ## Tour root
 
-Technical roots are derived from the union of persisted department selections across all tour jobs. At least one persisted technical selection is required before the operation acquires a lease. Production, Personnel, Comercial, and Estructura roots always exist. The root Event Folder is also marked with Custom Field 2 (`userFieldTwo`) = `true`; Custom Field 1 remains reserved for the project discount.
+Technical roots are derived from the union of persisted department selections across all tour jobs. At least one persisted technical selection is required before the operation acquires a lease. Production, Personnel, Comercial, and Estructura roots always exist. The root Event Folder is also marked with Custom Field 2 (`Gira`, boolean) = `true`; Custom Field 1 (`Descuento %`, float) remains reserved for the project discount.
 
 For a new tour root:
 

@@ -20,14 +20,22 @@ export const FLEX_FOLDER_IDS = {
 };
 
 /**
- * Custom Flex header field types used by Area Tecnica.
+ * Custom fields on the root Event Folder definition.
  *
- * Custom Field 1 is reserved for the project discount.
- * Custom Field 2 is the Boolean "is tour" marker on root event folders.
+ * Flex addresses every custom field with the generic `fieldType` literal
+ * "customField" plus a `customFieldId` UUID — there is no per-field fieldType
+ * token. The UUIDs below come from
+ * `GET /element/<definitionId>/fields`, which reports them as
+ * `customField1Value` ("Descuento %", float) and `customField2Value`
+ * ("Gira", boolean).
  */
-export const FLEX_CUSTOM_FIELD_TYPES = {
-  projectDiscount: "userFieldOne",
-  isTour: "userFieldTwo",
+export const FLEX_CUSTOM_FIELD_TYPE = "customField" as const;
+
+export const FLEX_CUSTOM_FIELD_IDS = {
+  /** Custom Field 1 — "Descuento %", float. Not written by provisioning. */
+  projectDiscount: "0997d92e-caf3-4d32-907a-5d4dfdf7d631",
+  /** Custom Field 2 — "Gira", boolean. Set to true on tour roots. */
+  isTour: "41ef9116-0cee-48d3-b47d-f3308295c85b",
 } as const;
 
 /**

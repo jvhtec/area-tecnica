@@ -22,10 +22,12 @@ import {
 import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
 import { buildArtistSchedule } from "../_shared/flex-folders/artistSchedule.ts";
 import { getErrorStatus, HttpError } from "../_shared/http.ts";
+import { logEvent, type SafeLogFields } from "../_shared/structuredLogger.ts";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
-  FLEX_CUSTOM_FIELD_TYPES,
+  FLEX_CUSTOM_FIELD_IDS,
+  FLEX_CUSTOM_FIELD_TYPE,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
 } from "../../../src/utils/flex-folders/constants.ts";
@@ -65,11 +67,75 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
   return await response.json() as { elementId?: string };
 };
 
+/**
+ * Extracts diagnostic fields from a Flex error body.
+ *
+ * Allowlists specific keys rather than logging the provider body: structuredLogger
+ * only redacts by top-level key, so a nested {"token": "..."} inside a raw body would
+ * be logged verbatim and persist.
+ *
+ * The read has its own deadline because fetchWithRetry clears its timeout as soon as
+ * the Response resolves — a body that stalls mid-stream would otherwise leave this
+ * await pending forever, so the handler would never reach the failure path that
+ * releases the provisioning lease.
+ *
+ * Key names avoid structuredLogger's sensitive-key pattern: "exceptionMessage" matches
+ * /message/ and "flexBodyRead" matches /body/, so either would be redacted to
+ * [REDACTED] and the diagnostic lost.
+ */
+const readFlexErrorFields = async (response: Response, timeoutMs = 2000): Promise<SafeLogFields> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let raw: string;
+  try {
+    raw = await Promise.race([
+      response.text(),
+      new Promise<string>((_, reject) => {
+        timer = setTimeout(() => {
+          void response.body?.cancel().catch(() => undefined);
+          reject(new Error("Flex error body read timed out"));
+        }, timeoutMs);
+      }),
+    ]);
+  } catch {
+    return { flexRead: "unavailable" };
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Not JSON (an HTML error page, a proxy response): record shape only, never content.
+    return { flexRead: "unparsed", flexBytes: raw.length };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { flexRead: "unparsed", flexBytes: raw.length };
+  }
+
+  const body = parsed as Record<string, unknown>;
+  const text = (value: unknown): string | undefined =>
+    typeof value === "string" ? value.slice(0, 300) : undefined;
+  return {
+    flexCode: text(body.exceptionCode),
+    flexReason: text(body.exceptionMessage),
+    flexExceptionId: text(body.exceptionId),
+  };
+};
+
+/**
+ * Updates one header field on a Flex element.
+ *
+ * Custom fields are addressed by the generic fieldType "customField" plus a
+ * customFieldId; built-in fields (documentNumber, plannedStartDate, ...) use their
+ * own fieldType and no id.
+ */
 const updateFlexElementHeader = async (
   elementId: string,
   fieldType: string,
-  value: string,
+  value: string | number | boolean,
   authToken: string,
+  customFieldId?: string,
 ) => {
   const response = await fetchWithRetry(
     `${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/header-update`,
@@ -84,6 +150,7 @@ const updateFlexElementHeader = async (
       },
       body: JSON.stringify({
         fieldType,
+        ...(customFieldId ? { customFieldId } : {}),
         payloadValue: value,
         displayValue: String(value),
       }),
@@ -92,6 +159,16 @@ const updateFlexElementHeader = async (
     { retryOnTimeout: true },
   );
   if (!response.ok) {
+    // Flex's rejection reason is only in the response body, and the thrown message never
+    // reaches the client (HttpError hides details) or the operation record (last_error
+    // stores a bare code). Log it here or the cause is unrecoverable after the fact.
+    logEvent("error", "flex.header_update_failed", {
+      fieldType,
+      customFieldId,
+      status: response.status,
+      elementId,
+      ...(await readFlexErrorFields(response)),
+    });
     const message = `Flex returned HTTP ${response.status} while updating ${fieldType}`;
     if (response.status >= 400 && response.status < 500 && response.status !== 408) {
       throw new FlexProvisioningDeterministicError(message);
@@ -116,9 +193,10 @@ const markTourRoot = async (
   }
   await updateFlexElementHeader(
     String(rootNode.element_id),
-    Deno.env.get("FLEX_TOUR_FLAG_FIELD_TYPE") || FLEX_CUSTOM_FIELD_TYPES.isTour,
-    "true",
+    FLEX_CUSTOM_FIELD_TYPE,
+    true,
     flexToken,
+    Deno.env.get("FLEX_TOUR_FLAG_CUSTOM_FIELD_ID") || FLEX_CUSTOM_FIELD_IDS.isTour,
   );
 };
 const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
