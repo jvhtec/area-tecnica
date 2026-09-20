@@ -23,36 +23,30 @@ export const useTourRootFolderAction = (tour: TourRootFolderState) => {
     event.stopPropagation();
     if (isCreatingTourRootFolders) return;
 
-    if (hasTourRootFolders && !needsEstructuraRoot) {
-      toast({
-        title: "Las carpetas raíz ya existen",
-        description: "Las carpetas raíz de esta gira ya están creadas.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    const isSync = hasTourRootFolders;
     setIsCreatingTourRootFolders(true);
     try {
-      const result = await createTourRootFolders(tour.id);
+      const result = isSync
+        ? await createTourRootFolders(tour.id, { reconcile: true })
+        : await createTourRootFolders(tour.id);
       if (!result.success) {
-        throw new Error(result.error || (needsEstructuraRoot
-          ? "No se pudo crear la carpeta Estructura de la gira"
+        throw new Error(result.error || (isSync
+          ? "No se pudo sincronizar la estructura Flex de la gira"
           : "No se pudieron crear las carpetas raíz de la gira"));
       }
 
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tour.id) });
       toast({
-        title: needsEstructuraRoot ? "Carpeta Estructura creada" : "Carpetas creadas",
-        description: needsEstructuraRoot
-          ? "La carpeta raíz Estructura de la gira ya está disponible."
+        title: isSync ? "Estructura Flex sincronizada" : "Carpetas creadas",
+        description: isSync
+          ? "La estructura raíz de la gira se ha reconciliado y completado."
           : "Las carpetas raíz de la gira se han creado correctamente.",
       });
     } catch (error) {
       toast({
-        title: needsEstructuraRoot
-          ? "Error al crear la carpeta Estructura"
+        title: isSync
+          ? "Error al sincronizar la estructura Flex"
           : "Error al crear las carpetas raíz de la gira",
         description: error instanceof Error ? error.message : "No se pudieron crear las carpetas de la gira.",
         variant: "destructive",
