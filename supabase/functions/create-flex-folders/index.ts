@@ -26,7 +26,8 @@ import { logEvent } from "../_shared/structuredLogger.ts";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
-  FLEX_CUSTOM_FIELD_TYPES,
+  FLEX_CUSTOM_FIELD_IDS,
+  FLEX_CUSTOM_FIELD_TYPE,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
 } from "../../../src/utils/flex-folders/constants.ts";
@@ -66,11 +67,19 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
   return await response.json() as { elementId?: string };
 };
 
+/**
+ * Updates one header field on a Flex element.
+ *
+ * Custom fields are addressed by the generic fieldType "customField" plus a
+ * customFieldId; built-in fields (documentNumber, plannedStartDate, ...) use their
+ * own fieldType and no id.
+ */
 const updateFlexElementHeader = async (
   elementId: string,
   fieldType: string,
-  value: string,
+  value: string | number | boolean,
   authToken: string,
+  customFieldId?: string,
 ) => {
   const response = await fetchWithRetry(
     `${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/header-update`,
@@ -85,6 +94,7 @@ const updateFlexElementHeader = async (
       },
       body: JSON.stringify({
         fieldType,
+        ...(customFieldId ? { customFieldId } : {}),
         payloadValue: value,
         displayValue: String(value),
       }),
@@ -100,6 +110,7 @@ const updateFlexElementHeader = async (
     const detail = (await response.text().catch(() => "")).slice(0, 300);
     logEvent("error", "flex.header_update_failed", {
       fieldType,
+      customFieldId,
       status: response.status,
       elementId,
       detail,
@@ -128,9 +139,10 @@ const markTourRoot = async (
   }
   await updateFlexElementHeader(
     String(rootNode.element_id),
-    Deno.env.get("FLEX_TOUR_FLAG_FIELD_TYPE") || FLEX_CUSTOM_FIELD_TYPES.isTour,
-    "true",
+    FLEX_CUSTOM_FIELD_TYPE,
+    true,
     flexToken,
+    Deno.env.get("FLEX_TOUR_FLAG_CUSTOM_FIELD_ID") || FLEX_CUSTOM_FIELD_IDS.isTour,
   );
 };
 const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
