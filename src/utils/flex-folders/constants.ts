@@ -20,6 +20,17 @@ export const FLEX_FOLDER_IDS = {
 };
 
 /**
+ * Custom Flex header field types used by Area Tecnica.
+ *
+ * Custom Field 1 is reserved for the project discount.
+ * Custom Field 2 is the Boolean "is tour" marker on root event folders.
+ */
+export const FLEX_CUSTOM_FIELD_TYPES = {
+  projectDiscount: "userFieldOne",
+  isTour: "userFieldTwo",
+} as const;
+
+/**
  * Department IDs in the Flex system
  */
 export const DEPARTMENT_IDS = {

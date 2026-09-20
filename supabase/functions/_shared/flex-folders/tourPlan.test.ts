@@ -63,4 +63,74 @@ describe("tour root plan expansion", () => {
     expect(plan.some((node) => node.key.startsWith("department:sound:"))).toBe(false);
     expect(plan.filter((node) => node.key.startsWith("department:lights:"))).toHaveLength(3);
   });
+
+  it("creates one stable commercial package container for every selected technical department", () => {
+    const record = tour({
+      flex_main_folder_id: null,
+      flex_sound_folder_id: null,
+      flex_lights_folder_id: null,
+      flex_video_folder_id: null,
+      flex_production_folder_id: null,
+      flex_personnel_folder_id: null,
+      flex_comercial_folder_id: null,
+      flex_estructura_folder_id: null,
+    });
+    const selected = new Set(["sound", "lights", "video"]);
+    const childDepartments = childDepartmentsForTour(record, selected, new Set());
+    const plan = buildRootPlan(record, selected, { start: record.start_date!, end: record.end_date! }, childDepartments);
+    const commercial = plan.filter((node) => node.key.startsWith("department:comercial:packages:"));
+
+    expect(commercial.map((node) => node.key)).toEqual([
+      "department:comercial:packages:sound",
+      "department:comercial:packages:lights",
+      "department:comercial:packages:video",
+    ]);
+    expect(commercial.map((node) => node.payload.name)).toEqual([
+      "Tour - Comercial - Sonido",
+      "Tour - Comercial - Luces",
+      "Tour - Comercial - Video",
+    ]);
+    expect(commercial.map((node) => node.payload.documentNumber)).toEqual([
+      "260908SQT",
+      "260908LQT",
+      "260908VQT",
+    ]);
+    expect(commercial.every((node) =>
+      node.parentKey === "department:comercial" &&
+      node.tracking.folderType === "tour_commercial_department"
+    )).toBe(true);
+  });
+
+  it("does not create a commercial package branch for an unselected technical department", () => {
+    const record = tour({ flex_comercial_folder_id: null });
+    const selected = new Set(["sound", "lights"]);
+    const childDepartments = childDepartmentsForTour(record, selected, new Set());
+    const plan = buildRootPlan(record, selected, { start: record.start_date!, end: record.end_date! }, childDepartments);
+
+    expect(plan.some((node) => node.key === "department:comercial:packages:sound")).toBe(true);
+    expect(plan.some((node) => node.key === "department:comercial:packages:lights")).toBe(true);
+    expect(plan.some((node) => node.key === "department:comercial:packages:video")).toBe(false);
+  });
+
+  it("adds missing commercial package branches when the commercial root belongs to the durable planner", () => {
+    const record = tour();
+    const selected = new Set(["sound", "lights", "video"]);
+    const childDepartments = childDepartmentsForTour(
+      record,
+      selected,
+      new Set(["root", "department:comercial"]),
+    );
+    const plan = buildRootPlan(record, selected, { start: record.start_date!, end: record.end_date! }, childDepartments);
+
+    expect(plan.filter((node) => node.key.startsWith("department:comercial:packages:"))).toHaveLength(3);
+  });
+
+  it("does not guess package children beneath an adopted legacy commercial root", () => {
+    const record = tour();
+    const selected = new Set(["sound", "lights", "video"]);
+    const childDepartments = childDepartmentsForTour(record, selected, new Set());
+    const plan = buildRootPlan(record, selected, { start: record.start_date!, end: record.end_date! }, childDepartments);
+
+    expect(plan.some((node) => node.key.startsWith("department:comercial:packages:"))).toBe(false);
+  });
 });
