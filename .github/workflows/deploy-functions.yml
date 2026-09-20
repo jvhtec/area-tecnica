@@ -1,0 +1,152 @@
+name: Deploy Edge Functions
+
+# Manual-only. Edge Functions are not deployed by merging to main: a deploy is an
+# explicit, human-initiated action, because several functions (create-flex-folders,
+# staffing-orchestrator) have external side effects the moment they go live.
+on:
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: 'Function slugs to deploy, space- or comma-separated (e.g. "create-flex-folders"). Use "all" to deploy every function.'
+        required: true
+        type: string
+      ref:
+        description: "Git ref to deploy from."
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+# One deploy to the project at a time. Overlapping dispatches could otherwise
+# interleave per function, letting an older ref land last and silently restore stale
+# code while both runs report success. Queued rather than cancelled: cancelling a run
+# mid-flight could leave a multi-function deploy half applied.
+concurrency:
+  group: supabase-edge-function-deploy
+  cancel-in-progress: false
+
+env:
+  SUPABASE_CLI_VERSION: 2.107.0
+  # Pinned deployment target. The workflow file is always read from the dispatch ref,
+  # so this value is trusted; supabase/config.toml comes from the arbitrary inputs.ref
+  # and is not. The run aborts if they disagree, so a ref carrying a different
+  # project_id cannot redirect the deploy to another project.
+  EXPECTED_PROJECT_REF: syldobdcdsgfgjtbuwxm
+
+jobs:
+  deploy:
+    name: Deploy to Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      # The target is pinned in env above; the checked-out config is only cross-checked
+      # against it. This catches both a ref that would redirect the deploy elsewhere and
+      # a genuine change of linked project, instead of silently following either.
+      - name: Verify deployment target
+        id: project
+        run: |
+          set -euo pipefail
+          ref="$(sed -n 's/^project_id[[:space:]]*=[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' supabase/config.toml | head -n 1)"
+          if [ -z "$ref" ]; then
+            echo "::error::Could not read project_id from supabase/config.toml"
+            exit 1
+          fi
+          if [ "$ref" != "$EXPECTED_PROJECT_REF" ]; then
+            echo "::error::supabase/config.toml project_id ($ref) does not match the pinned deployment target ($EXPECTED_PROJECT_REF). Refusing to deploy. If the project genuinely changed, update EXPECTED_PROJECT_REF in this workflow on the default branch."
+            exit 1
+          fi
+          echo "ref=$EXPECTED_PROJECT_REF" >> "$GITHUB_OUTPUT"
+          echo "Deployment target: $EXPECTED_PROJECT_REF (config.toml agrees)"
+
+      # The dispatch input is passed through the environment, never interpolated into
+      # the script body, so a crafted input cannot inject shell commands.
+      - name: Resolve and validate function list
+        id: resolve
+        env:
+          FUNCTIONS_INPUT: ${{ inputs.functions }}
+        run: |
+          set -euo pipefail
+          requested="$(printf '%s' "$FUNCTIONS_INPUT" | tr ',' ' ' | xargs || true)"
+          if [ -z "$requested" ]; then
+            echo "::error::No functions requested."
+            exit 1
+          fi
+
+          if [ "$requested" = "all" ]; then
+            resolved="$(find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_*' -printf '%f\n' | sort | xargs)"
+            echo "Deploying every function."
+          else
+            resolved="$requested"
+          fi
+
+          for slug in $resolved; do
+            case "$slug" in
+              _*|*/*|*..*)
+                echo "::error::Invalid function slug: $slug"
+                exit 1
+                ;;
+            esac
+            if [ ! -f "supabase/functions/$slug/index.ts" ]; then
+              echo "::error::No such function: supabase/functions/$slug/index.ts does not exist"
+              exit 1
+            fi
+          done
+
+          echo "slugs=$resolved" >> "$GITHUB_OUTPUT"
+          echo "Resolved: $resolved"
+
+      # verify_jwt is taken from supabase/config.toml by the CLI. Functions with no
+      # entry there default to verify_jwt = true; do not pass --no-verify-jwt here,
+      # or a function's exposure classification would silently change on deploy.
+      - name: Deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ steps.project.outputs.ref }}
+          SLUGS: ${{ steps.resolve.outputs.slugs }}
+          DEPLOY_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+          failed=""
+          for slug in $SLUGS; do
+            echo "::group::Deploying $slug"
+            if supabase functions deploy "$slug" --project-ref "$PROJECT_REF"; then
+              echo "Deployed $slug"
+            else
+              echo "::error::Failed to deploy $slug"
+              failed="$failed $slug"
+            fi
+            echo "::endgroup::"
+          done
+
+          {
+            echo "### Edge Function deploy"
+            echo ""
+            echo "- Project: \`$PROJECT_REF\`"
+            echo "- Ref: \`$DEPLOY_REF\`"
+            echo "- Requested: \`$SLUGS\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$failed" ]; then
+            echo "- Failed: \`$failed\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "- Result: all deployed" >> "$GITHUB_STEP_SUMMARY"
