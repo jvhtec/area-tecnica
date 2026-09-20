@@ -22,7 +22,7 @@ import {
 import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
 import { buildArtistSchedule } from "../_shared/flex-folders/artistSchedule.ts";
 import { getErrorStatus, HttpError } from "../_shared/http.ts";
-import { logEvent } from "../_shared/structuredLogger.ts";
+import { logEvent, type SafeLogFields } from "../_shared/structuredLogger.ts";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
@@ -68,6 +68,62 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
 };
 
 /**
+ * Extracts diagnostic fields from a Flex error body.
+ *
+ * Allowlists specific keys rather than logging the provider body: structuredLogger
+ * only redacts by top-level key, so a nested {"token": "..."} inside a raw body would
+ * be logged verbatim and persist.
+ *
+ * The read has its own deadline because fetchWithRetry clears its timeout as soon as
+ * the Response resolves — a body that stalls mid-stream would otherwise leave this
+ * await pending forever, so the handler would never reach the failure path that
+ * releases the provisioning lease.
+ *
+ * Key names avoid structuredLogger's sensitive-key pattern: "exceptionMessage" matches
+ * /message/ and "flexBodyRead" matches /body/, so either would be redacted to
+ * [REDACTED] and the diagnostic lost.
+ */
+const readFlexErrorFields = async (response: Response, timeoutMs = 2000): Promise<SafeLogFields> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let raw: string;
+  try {
+    raw = await Promise.race([
+      response.text(),
+      new Promise<string>((_, reject) => {
+        timer = setTimeout(() => {
+          void response.body?.cancel().catch(() => undefined);
+          reject(new Error("Flex error body read timed out"));
+        }, timeoutMs);
+      }),
+    ]);
+  } catch {
+    return { flexRead: "unavailable" };
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Not JSON (an HTML error page, a proxy response): record shape only, never content.
+    return { flexRead: "unparsed", flexBytes: raw.length };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { flexRead: "unparsed", flexBytes: raw.length };
+  }
+
+  const body = parsed as Record<string, unknown>;
+  const text = (value: unknown): string | undefined =>
+    typeof value === "string" ? value.slice(0, 300) : undefined;
+  return {
+    flexCode: text(body.exceptionCode),
+    flexReason: text(body.exceptionMessage),
+    flexExceptionId: text(body.exceptionId),
+  };
+};
+
+/**
  * Updates one header field on a Flex element.
  *
  * Custom fields are addressed by the generic fieldType "customField" plus a
@@ -106,14 +162,12 @@ const updateFlexElementHeader = async (
     // Flex's rejection reason is only in the response body, and the thrown message never
     // reaches the client (HttpError hides details) or the operation record (last_error
     // stores a bare code). Log it here or the cause is unrecoverable after the fact.
-    // structuredLogger redacts sensitive keys and strips emails/URL credentials.
-    const detail = (await response.text().catch(() => "")).slice(0, 300);
     logEvent("error", "flex.header_update_failed", {
       fieldType,
       customFieldId,
       status: response.status,
       elementId,
-      detail,
+      ...(await readFlexErrorFields(response)),
     });
     const message = `Flex returned HTTP ${response.status} while updating ${fieldType}`;
     if (response.status >= 400 && response.status < 500 && response.status !== 408) {
