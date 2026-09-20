@@ -48,7 +48,7 @@ The live Flex typed payload contract and representative staging fixtures must be
 Area Tecnica reserves the root Event Folder custom fields as follows:
 
 - Custom Field 1 / `userFieldOne`: project discount metadata.
-- Custom Field 2 / `userFieldTwo`: Boolean tour discriminator. `tour-root` writes `true` through Flex's header-update endpoint before the provisioning lease is marked complete.
+- Custom Field 2 / `userFieldTwo`: Boolean tour discriminator. `tour-root` writes `true` through Flex's header-update endpoint before the provisioning lease is marked complete. If this tenant exposes a different API field token, `FLEX_TOUR_FLAG_FIELD_TYPE` can override the default without another code change.
 - Standard jobs and festivals do not write Custom Field 2, so the Flex Boolean default remains false.
 
 The Custom Field 2 definition must exist on the root Event Folder definition before deploying this change. A definite Flex 4xx while writing the flag leaves the provisioning operation retryable as a failed operation rather than silently reporting a complete tour structure.
