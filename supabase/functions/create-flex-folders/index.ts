@@ -22,6 +22,7 @@ import {
 import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
 import { buildArtistSchedule } from "../_shared/flex-folders/artistSchedule.ts";
 import { getErrorStatus, HttpError } from "../_shared/http.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
@@ -92,6 +93,17 @@ const updateFlexElementHeader = async (
     { retryOnTimeout: true },
   );
   if (!response.ok) {
+    // Flex's rejection reason is only in the response body, and the thrown message never
+    // reaches the client (HttpError hides details) or the operation record (last_error
+    // stores a bare code). Log it here or the cause is unrecoverable after the fact.
+    // structuredLogger redacts sensitive keys and strips emails/URL credentials.
+    const detail = (await response.text().catch(() => "")).slice(0, 300);
+    logEvent("error", "flex.header_update_failed", {
+      fieldType,
+      status: response.status,
+      elementId,
+      detail,
+    });
     const message = `Flex returned HTTP ${response.status} while updating ${fieldType}`;
     if (response.status >= 400 && response.status < 500 && response.status !== 408) {
       throw new FlexProvisioningDeterministicError(message);
