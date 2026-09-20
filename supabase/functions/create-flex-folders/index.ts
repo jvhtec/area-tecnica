@@ -68,7 +68,7 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
 const updateFlexElementHeader = async (
   elementId: string,
   fieldType: string,
-  value: string | boolean,
+  value: string,
   authToken: string,
 ) => {
   const response = await fetchWithRetry(
@@ -117,7 +117,7 @@ const markTourRoot = async (
   await updateFlexElementHeader(
     String(rootNode.element_id),
     Deno.env.get("FLEX_TOUR_FLAG_FIELD_TYPE") || FLEX_CUSTOM_FIELD_TYPES.isTour,
-    true,
+    "true",
     flexToken,
   );
 };
