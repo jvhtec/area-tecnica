@@ -93,7 +93,7 @@ database access.
 
 ## Troubleshooting
 
-- **Acceso denegado immediately:** the shared token is absent, incorrect, or the
+- **Access denied immediately:** the shared token is absent, incorrect, or the
   auth secrets are not configured.
 - **Authenticated display receives 403:** the verified user's profile role is
   not `admin`, `management`, or `wallboard`.
