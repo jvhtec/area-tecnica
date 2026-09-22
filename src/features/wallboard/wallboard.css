@@ -55,7 +55,7 @@
   border-bottom: 1px solid var(--wb-line);
   white-space: nowrap;
 }
-.wb-brand { height: calc(var(--u) * 2.6); width: auto; cursor: pointer; user-select: none; }
+.wb-brand { height: calc(var(--u) * 2.6); width: auto; user-select: none; }
 .wb-title { font-size: calc(var(--u) * 2.5); font-weight: 700; letter-spacing: -0.01em; }
 .wb-subtitle { font-size: calc(var(--u) * 1.25); color: var(--wb-muted); }
 .wb-dots { display: flex; gap: calc(var(--u) * 0.45); margin-left: auto; }
@@ -199,16 +199,3 @@
 .wb-ticker-item { display: inline-flex; align-items: center; gap: calc(var(--u) * 0.6); }
 .wb-level { font-family: var(--wb-mono); font-weight: 600; font-size: calc(var(--u) * 0.95); letter-spacing: 0.05em; padding: calc(var(--u) * 0.15) calc(var(--u) * 0.55); border-radius: calc(var(--u) * 0.25); }
 .wb-ticker-sep { color: var(--wb-faint); }
-
-/* ---------- Alien easter egg: same shell, amber-on-black tokens ---------- */
-.wb-root.is-alien {
-  --wb-bg: #000000;
-  --wb-card: #000000;
-  --wb-line: #92400e;
-  --wb-ink: #fbbf24;
-  --wb-muted: #d97706;
-  --wb-faint: #92400e;
-  color-scheme: dark;
-  font-family: var(--wb-mono);
-}
-.wb-root.is-alien .wb-brand { filter: sepia(1) saturate(4) hue-rotate(-10deg); }

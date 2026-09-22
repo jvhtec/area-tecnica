@@ -13,7 +13,6 @@ type Props = {
   panelIndex: number;
   lastUpdatedAt: number | null;
   staleAfterMs: number;
-  onBrandClick?: () => void;
 };
 
 /**
@@ -27,7 +26,6 @@ export const WallboardHeader = ({
   panelIndex,
   lastUpdatedAt,
   staleAfterMs,
-  onBrandClick,
 }: Props) => {
   const [now, setNow] = useState(() => Date.now());
   const [logoIndex, setLogoIndex] = useState(0);
@@ -52,7 +50,6 @@ export const WallboardHeader = ({
         className="wb-brand"
         decoding="async"
         onError={() => setLogoIndex((index) => index + 1)}
-        onClick={onBrandClick}
       />
       <span className="wb-title">{title}</span>
       {subtitle ? <span className="wb-subtitle">{subtitle}</span> : null}

@@ -107,7 +107,7 @@ the next panel. Highlight announcements give a job a steady amber outline.
 The display is light only. `src/features/wallboard/wallboard.css` sizes
 everything in `--u` (1/100 of the 16:9 frame that fits the viewport), so 1080p,
 4K and desktop windows show the same composition. A shared header shows the
-logo (click toggles the Alien theme), panel title, rotation dots, data freshness
+logo, panel title, rotation dots, data freshness
 from `snapshot.generatedAt` (amber after two missed polls) and the Madrid clock.
 All dates and times are formatted in `Europe/Madrid` with `es-ES`
 (`src/features/wallboard/format.ts`), independent of the TV's locale and clock.

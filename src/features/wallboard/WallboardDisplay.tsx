@@ -66,7 +66,6 @@ export function WallboardDisplay({
   useLgScreensaverBlock();
 
   const [isLoading, setIsLoading] = useState(!skipSplash);
-  const [isAlien, setIsAlien] = useState(false);
   const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_PANEL_ORDER]);
   const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({ ...DEFAULT_PANEL_DURATIONS });
   const [rotationFallbackSeconds, setRotationFallbackSeconds] = useState(DEFAULT_ROTATION_FALLBACK_SECONDS);
@@ -212,7 +211,7 @@ export function WallboardDisplay({
   })();
 
   return (
-    <div className={`wb-root${isAlien ? ' is-alien' : ''}`}>
+    <div className="wb-root">
       <div>
         <WallboardHeader
           title={PANEL_TITLES[currentPanel]}
@@ -221,7 +220,6 @@ export function WallboardDisplay({
           panelIndex={safeIndex}
           lastUpdatedAt={lastUpdatedAt}
           staleAfterMs={pollIntervalMs * 2 + 5_000}
-          onBrandClick={() => setIsAlien((value) => !value)}
         />
         {presetMessage ? <div className="wb-banner">{presetMessage}</div> : null}
       </div>
@@ -231,7 +229,6 @@ export function WallboardDisplay({
           crew={crew}
           current={currentPanel}
           highlightJobs={highlightJobs}
-          isAlien={isAlien}
           logistics={logistics}
           now={now}
           overview={overview}
