@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardDisplay } from './Wallboard';
@@ -19,69 +19,71 @@ import { getErrorMessage, getErrorStack, getErrorStatus } from '@/utils/errorMes
 export default function WallboardPublic() {
   const { token, presetSlug } = useParams<{ token: string; presetSlug?: string }>();
   const navigate = useNavigate();
-  const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSplash, setShowSplash] = useState(true);
+  const [splashComplete, setSplashComplete] = useState(false);
   const [authComplete, setAuthComplete] = useState(false);
   const [wallboardToken, setWallboardToken] = useState<string | null>(null);
+  const [refreshAt, setRefreshAt] = useState<number | null>(null);
+  const wallboardTokenRef = useRef<string | null>(null);
 
-  // Handle splash screen completion
-  const handleSplashComplete = () => {
-    // Only hide splash if auth is also complete
-    if (authComplete) {
+  useEffect(() => {
+    if (authComplete && splashComplete) {
       setShowSplash(false);
     }
-  };
+  }, [authComplete, splashComplete]);
 
-  // When auth completes, check if splash timer has also finished
-  useEffect(() => {
-    if (authComplete && !showSplash) {
-      // Both complete, do nothing (already hidden)
+  const authenticate = useCallback(async (isRenewal = false) => {
+    if (!token) {
+      setError('No se ha proporcionado un token de acceso.');
+      setIsValid(false);
+      setAuthComplete(true);
+      return false;
     }
-  }, [authComplete, showSplash]);
+
+    try {
+      const result = await exchangeWallboardToken(token, presetSlug);
+      wallboardTokenRef.current = result.token;
+      setWallboardToken(result.token);
+      setRefreshAt(Date.now() + Math.max(30, result.expiresIn - 60) * 1000);
+      setError(null);
+      setIsValid(true);
+      setAuthComplete(true);
+      return true;
+    } catch (err) {
+      console.error('Wallboard token exchange failed', {
+        message: getErrorMessage(err),
+        status: getErrorStatus(err),
+        stack: getErrorStack(err),
+      });
+      if (isRenewal && wallboardTokenRef.current) {
+        setRefreshAt(Date.now() + 30_000);
+        return false;
+      }
+      setError(`No se pudo iniciar la sesión del wallboard: ${getErrorMessage(err, 'error desconocido')}. Actualice el enlace compartido.`);
+      setIsValid(false);
+      setAuthComplete(true);
+      return false;
+    }
+  }, [presetSlug, token]);
 
   useEffect(() => {
-    const validateTokenAndAuthenticate = async () => {
-      if (!token) {
-        setError('No token provided');
-        setIsValidating(false);
-        setAuthComplete(true);
-        return;
-      }
+    setAuthComplete(false);
+    void authenticate();
+  }, [authenticate]);
 
-      console.log('🔐 Attempting token exchange...', { tokenLength: token.length });
+  useEffect(() => {
+    if (!refreshAt) return;
+    const timeoutId = window.setTimeout(() => {
+      void authenticate(true);
+    }, Math.max(1_000, refreshAt - Date.now()));
+    return () => window.clearTimeout(timeoutId);
+  }, [authenticate, refreshAt]);
 
-      // Step 1: Exchange the shared token for a short-lived JWT
-      try {
-        const result = await exchangeWallboardToken(token, presetSlug);
-        console.log('✅ Token exchange successful', { jwtLength: result.token.length, expiresIn: result.expiresIn });
-        setWallboardToken(result.token);
-        setIsValid(true);
-        setIsValidating(false);
-        setAuthComplete(true);
-      } catch (err) {
-        console.error('❌ Wallboard token exchange failed:', err);
-        console.error('Error details:', {
-          message: getErrorMessage(err),
-          status: getErrorStatus(err),
-          stack: getErrorStack(err),
-        });
-        setError(`Failed to initialize wallboard session: ${getErrorMessage(err, 'Unknown error')}. Please refresh your shared link.`);
-        setIsValid(false);
-        setIsValidating(false);
-        setAuthComplete(true);
-      }
-    };
-
-    validateTokenAndAuthenticate();
-  }, [token]);
-
-  const handleWallboardFatalError = (message?: string) => {
-    setError(message || 'Access token expired or invalid. Please request a new wallboard link.');
-    setIsValid(false);
-    setAuthComplete(true);
-  };
+  const handleWallboardFatalError = useCallback(() => {
+    void authenticate();
+  }, [authenticate]);
 
   // Show error if token is invalid (before splash completes)
   if (!isValid && error && authComplete) {
@@ -102,15 +104,15 @@ export default function WallboardPublic() {
                 target.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
               }}
             />
-            <h1 className="text-3xl font-bold text-red-500 mb-4">Access Denied</h1>
+            <h1 className="text-3xl font-bold text-red-500 mb-4">Acceso denegado</h1>
             <p className="text-zinc-400 mb-6">
-              {error || 'Invalid or expired access token. Please contact your administrator for a valid wallboard link.'}
+              {error || 'El token de acceso no es válido o ha caducado. Solicite un enlace nuevo al administrador.'}
             </p>
             <button
               onClick={() => navigate('/')}
               className="px-6 py-3 bg-white text-black rounded hover:bg-zinc-200 transition-colors"
             >
-              Return to Home
+              Volver al inicio
             </button>
           </div>
         </div>
@@ -124,7 +126,7 @@ export default function WallboardPublic() {
 
   return (
     <>
-      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+      {showSplash && <SplashScreen onComplete={() => setSplashComplete(true)} />}
       {shouldLoadWallboard && (
         <div style={{ visibility: showSplash ? 'hidden' : 'visible' }}>
           <WallboardDisplay

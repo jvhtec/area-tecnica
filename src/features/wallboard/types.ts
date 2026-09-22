@@ -69,6 +69,16 @@ export interface PendingActionsFeed {
   items: Array<{ severity: 'red' | 'yellow'; text: string }>;
 }
 
+export interface AnnouncementsFeed {
+  announcements: Array<{
+    id: string;
+    message: string;
+    level: string;
+    created_at: string;
+    active: boolean;
+  }>;
+}
+
 export interface LogisticsItem {
   id: string;
   date: string;
@@ -83,6 +93,22 @@ export interface LogisticsItem {
   departments: string[];
   color?: string | null;
   notes?: string | null;
+}
+
+export interface LogisticsFeed {
+  items: LogisticsItem[];
+}
+
+export interface WallboardSnapshotFeed {
+  schemaVersion: 1;
+  generatedAt: string;
+  presetSlug?: string | null;
+  overview: JobsOverviewFeed;
+  calendar: CalendarFeed;
+  crew: CrewAssignmentsFeed;
+  pending: PendingActionsFeed;
+  logistics: LogisticsFeed;
+  announcements: AnnouncementsFeed;
 }
 
 export type JobDateType = DateType;

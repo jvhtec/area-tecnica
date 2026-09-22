@@ -78,11 +78,18 @@ export function buildCalendarModel(
   currentMonthOnly: boolean = true
 ): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
   const today = new Date();
-  const grid = getMadridMonthGrid(today);
+  const fallbackGrid = getMadridMonthGrid(today);
   const highlightSet = highlightIds ? new Set(highlightIds) : new Set<string>();
 
   const dayCount = 42;
-  const todayKey = grid.todayKey;
+  const todayKey = formatMadridDateKey(today);
+  const gridStartKey = data
+    ? formatMadridDateKey(new Date(data.range.start))
+    : fallbackGrid.gridStartKey;
+  const dateKeys = Array.from({ length: dayCount }, (_, index) => addMadridCalendarDays(gridStartKey, index));
+  const focusYear = data?.focusYear ?? fallbackGrid.focusYear;
+  const focusMonth = data?.focusMonth ?? fallbackGrid.focusMonth;
+  const focusMonthKey = `${focusYear}-${String(focusMonth + 1).padStart(2, '0')}`;
 
   const jobsByKey = data?.jobsByDate ?? {};
   const highlightByKey = new Map<string, Set<string>>();
@@ -97,12 +104,10 @@ export function buildCalendarModel(
   }
 
   const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: MADRID_TIMEZONE });
-  const monthLabel = monthFormatter.format(fromMadridDateKey(grid.monthStartKey, '12:00:00'));
-
-  const focusMonthKey = grid.monthStartKey.slice(0, 7);
+  const monthLabel = monthFormatter.format(fromMadridDateKey(`${focusMonthKey}-01`, '12:00:00'));
 
   const cells: CalendarCell[] = Array.from({ length: dayCount }, (_, idx) => {
-    const isoKey = grid.dateKeys[idx];
+    const isoKey = dateKeys[idx];
     const date = fromMadridDateKey(isoKey, '12:00:00');
     const jobs = jobsByKey[isoKey] ?? [];
     const highlightBucket = highlightByKey.get(isoKey) ?? new Set<string>();

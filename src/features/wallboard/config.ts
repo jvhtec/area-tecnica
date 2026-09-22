@@ -25,12 +25,6 @@ export function normalisePanelOrder(order?: string[] | null): PanelKey[] {
     }
   }
   if (!filtered.length) return [...DEFAULT_PANEL_ORDER];
-  PANEL_KEYS.forEach((key) => {
-    if (!seen.has(key)) {
-      filtered.push(key);
-      seen.add(key);
-    }
-  });
   return filtered;
 }
 
@@ -40,4 +34,3 @@ export function coerceSeconds(value: unknown, fallback: number, min = 1, max = 6
   const clamped = Math.min(Math.max(num, min), max);
   return Math.round(clamped);
 }
-

@@ -42,7 +42,10 @@ export const useWallboardAnnouncements = (
           const createdAt = announcement.created_at ? new Date(announcement.created_at).getTime() : now;
           const expiresAt = createdAt + ttl;
           if (expiresAt > now) updated.set(match[1], expiresAt);
-          else if (announcement.id) staleIds.push(announcement.id);
+          else {
+            if (announcement.id) staleIds.push(announcement.id);
+            return;
+          }
           message = message.replace(regex, "");
         }
         if (message.trim()) messages.push({ message: message.trim(), level });
