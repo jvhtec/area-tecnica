@@ -19,6 +19,7 @@ const ALLOWED_PATH_PREFIXES = [
   "/element",
   "/line-item",
   "/financial-document-line-item",
+  "/data-producer",
 ];
 const ALLOWED_FORWARD_HEADERS = new Set([
   "accept",
@@ -140,6 +141,17 @@ serve(createHttpHandler(async (req) => {
   }
 
   const target = validateEndpoint(requestBody.endpoint);
+  const baseUrl = new URL(FLEX_API_BASE_URL);
+  const basePath = baseUrl.pathname.replace(/\/$/, "");
+  const relativePath = target.pathname.slice(basePath.length);
+  if (relativePath === "/data-producer" || relativePath.startsWith("/data-producer/")) {
+    if (method !== "GET") {
+      throw new HttpError(400, "Flex data producers are read-only through this proxy", {
+        code: "flex_data_producer_read_only",
+      });
+    }
+  }
+
   const body = requestBody.body;
   if (body !== undefined && typeof body !== "string") {
     throw new HttpError(400, "Flex API body must be a string", {
