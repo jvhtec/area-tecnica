@@ -2,7 +2,11 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { joinedMany, joinedSingle } from "../_shared/joins.ts";
 import {
   buildWallboardSnapshot,
+  DEFAULT_HIGHLIGHT_TTL_SECONDS,
   getSnapshotWindows,
+  HIGHLIGHT_ANNOUNCEMENT_LIKE_PATTERN,
+  normalizeHighlightTtlSeconds,
+  SNAPSHOT_ANNOUNCEMENT_LIMIT,
   SNAPSHOT_JOB_STATUSES,
   SNAPSHOT_JOB_TYPES,
   type DocCountRow,
@@ -105,8 +109,23 @@ export async function loadWallboardSnapshot(
   generatedAt = new Date(),
 ) {
   const windows = getSnapshotWindows(generatedAt);
+  let highlightTtlSeconds = DEFAULT_HIGHLIGHT_TTL_SECONDS;
 
-  const [jobsResult, docRequirementsResult, logisticsResult, announcementsResult] = await Promise.all([
+  if (presetSlug) {
+    const presetResult = await sb
+      .from("wallboard_presets")
+      .select("highlight_ttl_seconds")
+      .eq("slug", presetSlug)
+      .maybeSingle();
+    if (presetResult.error) {
+      throw new Error(`Wallboard snapshot preset query failed: ${presetResult.error.message}`);
+    }
+    highlightTtlSeconds = normalizeHighlightTtlSeconds(presetResult.data?.highlight_ttl_seconds);
+  }
+
+  const highlightCutoffISO = new Date(generatedAt.getTime() - highlightTtlSeconds * 1000).toISOString();
+
+  const [jobsResult, docRequirementsResult, logisticsResult, tickerAnnouncementsResult, highlightAnnouncementsResult] = await Promise.all([
     sb
       .from("jobs")
       .select(`
@@ -154,8 +173,17 @@ export async function loadWallboardSnapshot(
       .from("announcements")
       .select("id, message, level, active, created_at")
       .eq("active", true)
+      .not("message", "ilike", HIGHLIGHT_ANNOUNCEMENT_LIKE_PATTERN)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(SNAPSHOT_ANNOUNCEMENT_LIMIT),
+    sb
+      .from("announcements")
+      .select("id, message, level, active, created_at")
+      .eq("active", true)
+      .ilike("message", HIGHLIGHT_ANNOUNCEMENT_LIKE_PATTERN)
+      .gte("created_at", highlightCutoffISO)
+      .order("created_at", { ascending: false })
+      .limit(SNAPSHOT_ANNOUNCEMENT_LIMIT),
   ]);
 
   const allJobs = requireData(jobsResult, "jobs").map((row) => normalizeJob(row as unknown as RawJobRow));
@@ -201,6 +229,7 @@ export async function loadWallboardSnapshot(
   return buildWallboardSnapshot({
     generatedAt,
     presetSlug,
+    highlightTtlSeconds,
     visibleJobs,
     overdueJobs,
     cancelledTourIds,
@@ -210,7 +239,10 @@ export async function loadWallboardSnapshot(
     timesheets: requireData(timesheetsResult, "timesheet statuses") as TimesheetStatusRow[],
     profiles: requireData(profilesResult, "profiles") as ProfileRow[],
     logistics: requireData(logisticsResult, "logistics").map((row) => normalizeLogistics(row as unknown as RawLogisticsRow)),
-    announcements: requireData(announcementsResult, "announcements") as SnapshotAnnouncementRow[],
+    announcements: [
+      ...requireData(tickerAnnouncementsResult, "ticker announcements"),
+      ...requireData(highlightAnnouncementsResult, "highlight announcements"),
+    ] as SnapshotAnnouncementRow[],
     windows,
   });
 }

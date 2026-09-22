@@ -193,7 +193,11 @@ function getFunctionsBaseUrl(): string {
 
 export class WallboardApi {
   private token?: string;
-  constructor(token?: string) { this.token = token; }
+  private presetSlug?: string;
+  constructor(token?: string, presetSlug?: string) {
+    this.token = token;
+    this.presetSlug = presetSlug?.trim().toLowerCase() || undefined;
+  }
 
   // Prefer Supabase invoke to avoid dev-server rewrites returning HTML
   private async request<T>(path: string): Promise<T> {
@@ -201,7 +205,7 @@ export class WallboardApi {
     try {
       const headers: Record<string, string> = this.token ? { "x-wallboard-jwt": this.token } : {};
       const { data, error } = await supabase.functions.invoke('wallboard-feed', {
-        body: { path },
+        body: { path, ...(this.presetSlug ? { presetSlug: this.presetSlug } : {}) },
         headers,
       });
       if (error) throw error;
@@ -216,7 +220,8 @@ export class WallboardApi {
       if (bearerToken) {
         headers["Authorization"] = `Bearer ${bearerToken}`;
       }
-      const res = await fetch(`${getFunctionsBaseUrl()}/wallboard-feed${path}`, {
+      const presetQuery = this.presetSlug ? `?presetSlug=${encodeURIComponent(this.presetSlug)}` : '';
+      const res = await fetch(`${getFunctionsBaseUrl()}/wallboard-feed${path}${presetQuery}`, {
         headers,
         cache: 'no-store'
       });

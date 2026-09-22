@@ -111,7 +111,7 @@ export function WallboardDisplay({
     let cancelled = false;
     let inFlight = false;
     let refreshQueued = false;
-    const api = new WallboardApi(wallboardApiToken);
+    const api = new WallboardApi(wallboardApiToken, effectiveSlug);
     const pollIntervalMs = Math.min(MAX_REFRESH_INTERVAL_MS, Math.max(MIN_REFRESH_INTERVAL_MS, tickerIntervalMs));
 
     const fetchSnapshot = async () => {
@@ -160,7 +160,7 @@ export function WallboardDisplay({
       cancelled = true;
       window.clearInterval(pollId);
     };
-  }, [onFatalError, processAnnouncements, tickerIntervalMs, wallboardApiToken]);
+  }, [effectiveSlug, onFatalError, processAnnouncements, tickerIntervalMs, wallboardApiToken]);
 
   const activePanels = panelOrder.length ? panelOrder : DEFAULT_PANEL_ORDER;
   const safeIndex = activePanels.length ? idx % activePanels.length : 0;

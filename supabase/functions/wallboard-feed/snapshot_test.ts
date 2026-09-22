@@ -1,6 +1,7 @@
 import {
   buildWallboardSnapshot,
   getSnapshotWindows,
+  selectSnapshotAnnouncements,
   type SnapshotInputs,
   type SnapshotJobRow,
 } from "./snapshotModel.ts";
@@ -84,6 +85,7 @@ Deno.test("canonical snapshot maps staffing, docs, overdue alerts and display-sa
   const inputs: SnapshotInputs = {
     generatedAt,
     presetSlug: "produccion",
+    highlightTtlSeconds: 300,
     visibleJobs: [
       job({}),
       overdue,
@@ -182,4 +184,26 @@ Deno.test("canonical snapshot maps staffing, docs, overdue alerts and display-sa
   const serialized = JSON.stringify(snapshot);
   assert(!serialized.includes("private@example.com"), "does not expose non-display profile fields");
   assert(!serialized.includes("technician_id"), "does not expose technician identifiers");
+});
+
+Deno.test("expired highlights cannot crowd valid ticker announcements out of the snapshot", () => {
+  const generatedAt = new Date("2026-09-22T10:00:00.000Z");
+  const staleHighlights = Array.from({ length: 25 }, (_, index) => ({
+    id: `stale-${index}`,
+    message: `[HIGHLIGHT_JOB:dead-beef-${index.toString(16)}] Antiguo`,
+    level: "warn",
+    active: true,
+    created_at: `2026-09-22T09:${String(40 + (index % 10)).padStart(2, "0")}:00.000Z`,
+  }));
+  const ticker = {
+    id: "ticker-valid",
+    message: "Reunión a las 12:00",
+    level: "info",
+    active: true,
+    created_at: "2026-09-22T08:00:00.000Z",
+  };
+
+  const selected = selectSnapshotAnnouncements([...staleHighlights, ticker], generatedAt, 300);
+
+  assertEquals(selected, [ticker], "filters expired highlights before applying the feed limit");
 });

@@ -16,6 +16,10 @@ const DEPARTMENTS: readonly Dept[] = ["sound", "lights", "video"];
 const MADRID_TIMEZONE = "Europe/Madrid";
 const OVERDUE_TIMESHEET_LOOKBACK_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_HIGHLIGHT_TTL_SECONDS = 300;
+export const SNAPSHOT_ANNOUNCEMENT_LIMIT = 20;
+export const HIGHLIGHT_ANNOUNCEMENT_LIKE_PATTERN = "%[HIGHLIGHT_JOB:%";
+const HIGHLIGHT_ANNOUNCEMENT_PATTERN = /^\s*\[HIGHLIGHT_JOB:[a-f0-9-]+\]\s*/i;
 const DEPARTMENT_LABELS: Record<Dept, string> = {
   sound: "sonido",
   lights: "luces",
@@ -117,6 +121,7 @@ export type SnapshotWindows = {
 export type SnapshotInputs = {
   generatedAt: Date;
   presetSlug?: string | null;
+  highlightTtlSeconds: number;
   visibleJobs: SnapshotJobRow[];
   overdueJobs: SnapshotJobRow[];
   cancelledTourIds: Set<string>;
@@ -129,6 +134,32 @@ export type SnapshotInputs = {
   announcements: SnapshotAnnouncementRow[];
   windows: SnapshotWindows;
 };
+
+export function normalizeHighlightTtlSeconds(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_HIGHLIGHT_TTL_SECONDS;
+  return Math.min(3600, Math.max(30, Math.round(parsed)));
+}
+
+export function selectSnapshotAnnouncements(
+  rows: SnapshotAnnouncementRow[],
+  generatedAt: Date,
+  highlightTtlSeconds: number,
+  limit = SNAPSHOT_ANNOUNCEMENT_LIMIT,
+): SnapshotAnnouncementRow[] {
+  const now = generatedAt.getTime();
+  const ttlMs = normalizeHighlightTtlSeconds(highlightTtlSeconds) * 1000;
+
+  return rows
+    .filter((row) => {
+      if (!row.active) return false;
+      if (!HIGHLIGHT_ANNOUNCEMENT_PATTERN.test(row.message)) return true;
+      const createdAt = new Date(row.created_at).getTime();
+      return Number.isFinite(createdAt) && createdAt + ttlMs > now;
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, Math.max(0, limit));
+}
 
 const madridFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: MADRID_TIMEZONE,
@@ -483,6 +514,12 @@ export function buildWallboardSnapshot(inputs: SnapshotInputs) {
     crew: { jobs: crewJobs },
     pending: { items: pendingItems },
     logistics: { items: logisticsItems },
-    announcements: { announcements: inputs.announcements },
+    announcements: {
+      announcements: selectSnapshotAnnouncements(
+        inputs.announcements,
+        inputs.generatedAt,
+        inputs.highlightTtlSeconds,
+      ),
+    },
   };
 }

@@ -63,7 +63,7 @@ export function useWallboardPreset({
       if (isApiMode) {
         try {
           console.log('🌐 [Wallboard] Fetching preset via API...', { effectiveSlug });
-          const api = new WallboardApi(wallboardApiToken as string);
+          const api = new WallboardApi(wallboardApiToken as string, effectiveSlug);
           const response = await api.presetConfig();
           data = response.config;
           console.log('✅ [Wallboard] Preset fetched via API:', {

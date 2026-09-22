@@ -101,9 +101,9 @@ describe('WallboardApi.snapshot', () => {
   it('returns a validated canonical snapshot', async () => {
     invokeMock.mockResolvedValue({ data: snapshotFixture, error: null });
 
-    await expect(new WallboardApi('wallboard-jwt').snapshot()).resolves.toEqual(snapshotFixture);
+    await expect(new WallboardApi('wallboard-jwt', 'Produccion').snapshot()).resolves.toEqual(snapshotFixture);
     expect(invokeMock).toHaveBeenCalledWith('wallboard-feed', {
-      body: { path: '/snapshot' },
+      body: { path: '/snapshot', presetSlug: 'produccion' },
       headers: { 'x-wallboard-jwt': 'wallboard-jwt' },
     });
   });
@@ -117,8 +117,8 @@ describe('WallboardApi.snapshot', () => {
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(new WallboardApi().snapshot()).resolves.toEqual(snapshotFixture);
-    expect(fetchMock).toHaveBeenCalledWith('https://example.supabase.co/functions/v1/wallboard-feed/snapshot', {
+    await expect(new WallboardApi(undefined, 'Default').snapshot()).resolves.toEqual(snapshotFixture);
+    expect(fetchMock).toHaveBeenCalledWith('https://example.supabase.co/functions/v1/wallboard-feed/snapshot?presetSlug=default', {
       headers: { Authorization: 'Bearer user-jwt' },
       cache: 'no-store',
     });

@@ -138,6 +138,7 @@ serve(async (req) => {
     // Fallback to URL pathname if body parsing fails (for direct HTTP calls)
     path = url.pathname.replace(/\/+$/, "");
   }
+  requestedPresetSlug ??= url.searchParams.get("presetSlug")?.trim().toLowerCase() || undefined;
 
   try {
     const auth = await authenticate(req, url, {
