@@ -11,8 +11,8 @@ import { getErrorMessage, getErrorStack, getErrorStatus } from '@/utils/errorMes
  * URL format: /wallboard/public/:token/:presetSlug?
  *
  * Authentication flow:
- * 1. Validates the provided token against VITE_WALLBOARD_TOKEN
- * 2. Calls the wallboard-auth edge function to get a JWT
+ * 1. Sends the shared link token to the wallboard-auth edge function
+ * 2. Receives a short-lived, wallboard-scoped JWT
  * 3. Passes that JWT to WallboardDisplay so it can call wallboard feeds directly
  * 4. Displays the wallboard with proper data access
  */
@@ -106,7 +106,7 @@ export default function WallboardPublic() {
             />
             <h1 className="text-3xl font-bold text-red-500 mb-4">Acceso denegado</h1>
             <p className="text-zinc-400 mb-6">
-              {error || 'El token de acceso no es válido o ha caducado. Solicite un enlace nuevo al administrador.'}
+              {error}
             </p>
             <button
               onClick={() => navigate('/')}
