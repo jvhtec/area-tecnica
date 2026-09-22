@@ -146,7 +146,9 @@ export async function loadWallboardSnapshot(
       .lt("start_time", windows.calendarEndExclusiveISO)
       .gte("end_time", windows.queryStartISO)
       .order("start_time", { ascending: true }),
-    sb.from("required_docs").select("department, key, label").eq("is_required", true),
+    // Ordered by id so documents keep the seeded business order (pesos, consumos,
+    // material, SoundVision, memoria) and never reshuffle between polls.
+    sb.from("required_docs").select("department, key, label").eq("is_required", true).order("id", { ascending: true }),
     sb
       .from("logistics_events")
       .select(`

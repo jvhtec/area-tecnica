@@ -133,6 +133,8 @@ const isPendingActionsFeed = (value: unknown): value is PendingActionsFeed =>
     && typeof item.text === 'string'
     && (item.kind === undefined || (typeof item.kind === 'string' && PENDING_KINDS.has(item.kind)))
     && (item.jobId === undefined || typeof item.jobId === 'string')
+    && (item.jobTitle === undefined || typeof item.jobTitle === 'string')
+    && (item.startTime === undefined || typeof item.startTime === 'string')
     && (item.count === undefined || typeof item.count === 'number')
     && (item.dept === undefined || item.dept === null || isDept(item.dept))
     && isOptionalStringOrNull(item.detail)

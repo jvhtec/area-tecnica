@@ -134,6 +134,23 @@ describe('WallboardApi.snapshot', () => {
         items: [{ ...snapshotFixture.logistics.items[0], departments: [null] }],
       },
     }],
+    ['a pending alert with a non-string start time', {
+      ...snapshotFixture,
+      pending: { items: [{ severity: 'red', text: 'Gala', kind: 'docs', jobId: 'job-1', startTime: 1790000000 }] },
+    }],
+    ['a pending alert with a null job title', {
+      ...snapshotFixture,
+      pending: { items: [{ severity: 'red', text: 'Gala', kind: 'docs', jobId: 'job-1', jobTitle: null }] },
+    }],
+    ['a document checklist with an unknown state', {
+      ...snapshotFixture,
+      overview: {
+        jobs: [{
+          ...snapshotFixture.overview.jobs[0],
+          docChecklist: [{ dept: 'sound', key: 'pesos', label: 'Pesos', state: 'lost' }],
+        }],
+      },
+    }],
   ])('rejects %s', async (_description, payload) => {
     invokeMock.mockResolvedValue({ data: payload, error: null });
 
