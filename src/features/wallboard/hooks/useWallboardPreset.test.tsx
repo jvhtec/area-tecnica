@@ -93,6 +93,7 @@ describe('useWallboardPreset', () => {
       });
       expect(setters.setPanelDurations).toHaveBeenLastCalledWith({
         overview: 19,
+        docs: 19,
         crew: 19,
         logistics: 19,
         pending: 47,

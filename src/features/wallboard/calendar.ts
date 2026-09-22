@@ -3,92 +3,65 @@ import {
   addMadridCalendarDays,
   formatMadridDateKey,
   fromMadridDateKey,
-  getMadridMonthGrid,
   MADRID_TIMEZONE,
 } from '@/utils/timezoneUtils';
 
 export const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
-export const MS_PER_DAY = 24 * 60 * 60 * 1000;
-export const SPANISH_DAY_NAMES = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'] as const;
+
+const DEFAULT_DAY_COUNT = 28;
+const MAX_DAY_COUNT = 42;
 
 export type CalendarCell = {
   date: Date;
   isoKey: string;
   inMonth: boolean;
   isToday: boolean;
+  isWeekend: boolean;
   jobs: JobsOverviewJob[];
   hasHighlight: boolean;
   highlightJobIds: Set<string>;
 };
 
-export function formatDateKey(date: Date): string {
-  return formatMadridDateKey(date);
+/** Monday of the Madrid week containing `date`. */
+function madridMondayKey(date: Date): string {
+  const key = formatMadridDateKey(date);
+  const weekday = new Date(`${key}T12:00:00Z`).getUTCDay();
+  return addMadridCalendarDays(key, -((weekday + 6) % 7));
 }
 
-export function buildCalendarFromJobsList(jobs: JobsOverviewJob[]): CalendarFeed {
-  const now = new Date();
-  const grid = getMadridMonthGrid(now);
-
-  const calendarStartISO = grid.gridStart.toISOString();
-  const calendarEndISO = grid.gridEnd.toISOString();
-  const calendarStartMs = grid.gridStart.getTime();
-  const calendarEndMs = grid.gridEnd.getTime();
-
-  const jobsByDate: Record<string, JobsOverviewJob[]> = {};
-  const jobDateLookup: Record<string, string> = {};
-  const sorted = [...jobs].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  sorted.forEach((job) => {
-    const startTs = new Date(job.start_time).getTime();
-    const endTs = new Date(job.end_time).getTime();
-    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) return;
-
-    const spanStart = Math.max(startTs, calendarStartMs);
-    const spanEnd = Math.min(endTs, calendarEndMs);
-    if (spanEnd < spanStart) return;
-
-    const primaryKey = formatMadridDateKey(new Date(job.start_time));
-    jobDateLookup[job.id] = primaryKey;
-
-    let dayKey = formatMadridDateKey(new Date(spanStart));
-    const lastDayKey = formatMadridDateKey(new Date(spanEnd));
-
-    while (dayKey <= lastDayKey) {
-      const bucket = jobsByDate[dayKey] ?? (jobsByDate[dayKey] = []);
-      bucket.push(job);
-      const nextDayKey = addMadridCalendarDays(dayKey, 1);
-      if (nextDayKey === dayKey) break;
-      dayKey = nextDayKey;
-    }
-  });
-
-  return {
-    jobs: sorted,
-    jobsByDate,
-    jobDateLookup,
-    range: { start: calendarStartISO, end: calendarEndISO },
-    focusMonth: grid.focusMonth,
-    focusYear: grid.focusYear,
-  };
+function dayCountBetween(startKey: string, endKey: string): number {
+  let count = 1;
+  let cursor = startKey;
+  while (cursor < endKey && count < MAX_DAY_COUNT) {
+    cursor = addMadridCalendarDays(cursor, 1);
+    count += 1;
+  }
+  return count;
 }
 
+/**
+ * Builds the calendar cells from the server-owned Madrid range. The server
+ * decides the window (currently four weeks from this Monday); without a feed
+ * the display falls back to the same rule on the device clock.
+ */
 export function buildCalendarModel(
   data: CalendarFeed | null,
   highlightIds?: Set<string>,
-  currentMonthOnly: boolean = true
 ): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
   const today = new Date();
-  const fallbackGrid = getMadridMonthGrid(today);
+  const todayKey = formatMadridDateKey(today);
   const highlightSet = highlightIds ? new Set(highlightIds) : new Set<string>();
 
-  const dayCount = 42;
-  const todayKey = formatMadridDateKey(today);
-  const gridStartKey = data
-    ? formatMadridDateKey(new Date(data.range.start))
-    : fallbackGrid.gridStartKey;
+  const gridStartKey = data ? formatMadridDateKey(new Date(data.range.start)) : madridMondayKey(today);
+  const rawCount = data
+    ? dayCountBetween(gridStartKey, formatMadridDateKey(new Date(data.range.end)))
+    : DEFAULT_DAY_COUNT;
+  const dayCount = Math.min(MAX_DAY_COUNT, Math.max(7, Math.ceil(rawCount / 7) * 7));
   const dateKeys = Array.from({ length: dayCount }, (_, index) => addMadridCalendarDays(gridStartKey, index));
-  const focusYear = data?.focusYear ?? fallbackGrid.focusYear;
-  const focusMonth = data?.focusMonth ?? fallbackGrid.focusMonth;
+
+  const [todayYear, todayMonth] = todayKey.split('-').map(Number);
+  const focusYear = data?.focusYear ?? todayYear;
+  const focusMonth = data?.focusMonth ?? todayMonth - 1;
   const focusMonthKey = `${focusYear}-${String(focusMonth + 1).padStart(2, '0')}`;
 
   const jobsByKey = data?.jobsByDate ?? {};
@@ -106,17 +79,15 @@ export function buildCalendarModel(
   const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: MADRID_TIMEZONE });
   const monthLabel = monthFormatter.format(fromMadridDateKey(`${focusMonthKey}-01`, '12:00:00'));
 
-  const cells: CalendarCell[] = Array.from({ length: dayCount }, (_, idx) => {
-    const isoKey = dateKeys[idx];
-    const date = fromMadridDateKey(isoKey, '12:00:00');
-    const jobs = jobsByKey[isoKey] ?? [];
+  const cells: CalendarCell[] = dateKeys.map((isoKey, index) => {
     const highlightBucket = highlightByKey.get(isoKey) ?? new Set<string>();
     return {
-      date,
+      date: fromMadridDateKey(isoKey, '12:00:00'),
       isoKey,
       inMonth: isoKey.startsWith(focusMonthKey),
       isToday: isoKey === todayKey,
-      jobs,
+      isWeekend: index % 7 >= 5,
+      jobs: jobsByKey[isoKey] ?? [],
       hasHighlight: highlightBucket.size > 0,
       highlightJobIds: new Set<string>(highlightBucket),
     };

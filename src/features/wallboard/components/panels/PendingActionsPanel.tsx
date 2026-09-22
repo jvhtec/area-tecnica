@@ -1,41 +1,82 @@
-import React from 'react';
-import type { PendingActionsFeed } from '../../types';
-import { getJobCardBackground } from '../../utils';
-import { AutoScrollWrapper, PanelContainer } from '../shared';
+import type { CSSProperties } from 'react';
 
-export const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null; theme?: 'light' | 'dark' }> = ({
+import type { PendingActionsFeed } from '../../types';
+import { formatRelativeDay } from '../../format';
+import {
+  PANEL_PAGE_SIZES,
+  PENDING_TAGS,
+  describePendingItem,
+  getPendingTotals,
+  groupPendingItems,
+  paginate,
+} from '../../model';
+import { EmptyState, JobSwatch } from '../shared';
+
+const kpiStyle = (color: string): CSSProperties & { '--kpi-color': string } => ({ '--kpi-color': color });
+
+const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
+
+export const PendingActionsPanel = ({
   data,
-  theme = 'light',
+  page = 0,
+  now = new Date(),
+}: {
+  data: PendingActionsFeed | null;
+  page?: number;
+  now?: Date;
 }) => {
-  const resetKey = (data?.items ?? []).map((it) => `${it.severity}:${it.text}`).join('|');
+  const items = data?.items ?? [];
+  if (!items.length) return <EmptyState ok>Todo en orden ✓</EmptyState>;
+
+  const totals = getPendingTotals(items);
+  const groups = paginate(groupPendingItems(items), page, PANEL_PAGE_SIZES.pending);
+
   return (
-    <AutoScrollWrapper speed={50} resetKey={resetKey}>
-      <PanelContainer theme={theme}>
-        <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
-          <h1 className="text-5xl font-semibold">Acciones Pendientes</h1>
+    <div className="wb-body" style={{ gap: 'calc(var(--u) * 1.2)' }}>
+      {totals.structured ? (
+        <div className="wb-kpis">
+          <div className="wb-kpi" style={kpiStyle(totals.staffing ? 'var(--wb-crit)' : 'var(--wb-ok)')}>
+            <b>{totals.staffing}</b>
+            <span>
+              {plural(totals.staffing, 'plaza sin cubrir', 'plazas sin cubrir')}
+              <small>{totals.staffingJobs} {plural(totals.staffingJobs, 'trabajo', 'trabajos')} · próximos 7 días</small>
+            </span>
+          </div>
+          <div className="wb-kpi" style={kpiStyle(totals.docsMissing ? 'var(--wb-crit)' : 'var(--wb-ok)')}>
+            <b>{totals.docsMissing}</b>
+            <span>
+              {plural(totals.docsMissing, 'documento que falta', 'documentos que faltan')}
+              <small>trabajos en las próximas 72 h</small>
+            </span>
+          </div>
+          <div className="wb-kpi" style={kpiStyle(totals.timesheets ? 'var(--wb-warn)' : 'var(--wb-ok)')}>
+            <b>{totals.timesheets}</b>
+            <span>
+              {plural(totals.timesheets, 'parte de horas vencido', 'partes de horas vencidos')}
+              <small>{totals.timesheetJobs} {plural(totals.timesheetJobs, 'trabajo terminado', 'trabajos terminados')}</small>
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col gap-3 text-38">
-          {(data?.items ?? []).map((it, i) => (
-            <div
-              key={i}
-              className={`rounded-md px-4 py-3 border ${
-                it.severity === 'red'
-                  ? theme === 'light'
-                    ? 'border-red-500/60'
-                    : 'border-red-500/60'
-                  : theme === 'light'
-                    ? 'border-amber-500/60'
-                    : 'border-amber-500/60'
-              }`}
-              style={{ backgroundColor: it.severity === 'red' ? getJobCardBackground('#ef4444', theme) : getJobCardBackground('#f59e0b', theme) }}
-            >
-              {it.text}
+      ) : null}
+      <div className="wb-grid-2" style={{ display: 'grid', gap: 'calc(var(--u) * 1)', alignContent: 'start' }}>
+        {groups.map((group) => (
+          <article key={group.key} className="wb-card wb-alert-group">
+            <div className="wb-alert-head">
+              <JobSwatch color={group.color} />
+              <span>{group.title}</span>
+              {group.startTime ? <span className="wb-mono">{formatRelativeDay(group.startTime, now)}</span> : null}
             </div>
-          ))}
-          {(data?.items.length ?? 0) === 0 && <div className={theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}>Todo bien ✅</div>}
-        </div>
-      </PanelContainer>
-    </AutoScrollWrapper>
+            {group.items.map((item, index) => (
+              <div key={`${item.kind ?? 'item'}-${index}`} className="wb-alert">
+                <span className={`wb-tag ${item.severity === 'red' ? 'wb-crit' : 'wb-warn'}`}>
+                  {item.kind ? PENDING_TAGS[item.kind] : item.severity === 'red' ? 'URGENTE' : 'AVISO'}
+                </span>
+                {describePendingItem(item)}
+              </div>
+            ))}
+          </article>
+        ))}
+      </div>
+    </div>
   );
 };
-

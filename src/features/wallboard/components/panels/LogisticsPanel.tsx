@@ -1,110 +1,97 @@
-import React from 'react';
-import { TRANSPORT_PROVIDERS } from '@/constants/transportProviders';
-import type { LogisticsItem } from '../../types';
-import { SPANISH_DAY_NAMES } from '../../calendar';
-import { getJobCardBackground, getTransportIcon } from '../../utils';
-import { WALLBOARD_PANEL_PAGE_SIZES } from '../../panelPageSizes';
-import { AutoScrollWrapper, PanelContainer } from '../shared';
+import { useState } from 'react';
 
-export const LogisticsPanel: React.FC<{
+import { TRANSPORT_PROVIDERS, type TransportProvider } from '@/constants/transportProviders';
+
+import type { LogisticsItem } from '../../types';
+import { formatDayHeading } from '../../format';
+import {
+  PANEL_PAGE_SIZES,
+  getDeptLabel,
+  getProcedureLabel,
+  getVehicleLabel,
+  groupLogisticsByDay,
+  paginate,
+} from '../../model';
+import { EmptyState, JobSwatch } from '../shared';
+
+const isTransportProvider = (value: unknown): value is TransportProvider =>
+  typeof value === 'string' && value in TRANSPORT_PROVIDERS;
+
+/** Fixed-size slot so every row lines up; falls back to the provider name. */
+const ProviderSlot = ({ provider }: { provider: string | null | undefined }) => {
+  const [failed, setFailed] = useState(false);
+  if (!isTransportProvider(provider)) return <div className="wb-provider" />;
+  const entry = TRANSPORT_PROVIDERS[provider];
+  return (
+    <div className="wb-provider">
+      {entry.icon && !failed ? (
+        <img
+          src={entry.icon}
+          alt={entry.label}
+          className={entry.tone === 'light' ? 'is-light-tone' : undefined}
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span>{entry.label}</span>
+      )}
+    </div>
+  );
+};
+
+export const LogisticsPanel = ({
+  data,
+  page = 0,
+  now = new Date(),
+}: {
   data: LogisticsItem[] | null;
   page?: number;
-  pageSize?: number;
-  theme?: 'light' | 'dark';
-}> = ({ data, page = 0, pageSize = WALLBOARD_PANEL_PAGE_SIZES.logistics, theme = 'light' }) => {
+  now?: Date;
+}) => {
   const items = data ?? [];
-  const paginatedItems = items.slice(page * pageSize, (page + 1) * pageSize);
-  const totalPages = Math.ceil(items.length / pageSize);
+  if (!items.length) return <EmptyState>No hay movimientos de logística en los próximos 7 días</EmptyState>;
+
+  const days = groupLogisticsByDay(paginate(items, page, PANEL_PAGE_SIZES.logistics));
 
   return (
-    <AutoScrollWrapper speed={75}>
-      <PanelContainer theme={theme}>
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-5xl font-semibold">Logística – Próximos días</h1>
-          {totalPages > 1 && (
-            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>
-              Página {page + 1} de {totalPages}
+    <div className="wb-body" style={{ gap: 'calc(var(--u) * 0.6)' }}>
+      {days.map((day) => {
+        const heading = formatDayHeading(day.dateKey, now);
+        return (
+          <section key={day.dateKey} style={{ display: 'contents' }}>
+            <div className="wb-day">
+              {heading.relative ? <b>{heading.relative}</b> : null}
+              {heading.label}
             </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-3">
-          {paginatedItems.map((ev) => (
-            <div
-              key={ev.id}
-              className={`border rounded p-3 flex items-center justify-between ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
-              style={{ backgroundColor: getJobCardBackground(ev.color || undefined, theme) }}
-            >
-              <div className="flex items-center gap-4 flex-1">
-                <div>
-                  <div className={`text-32 tabular-nums ${theme === 'light' ? 'text-zinc-700' : 'text-zinc-200'}`}>
-                    {ev.date} {ev.time?.slice(0, 5)}
-                  </div>
-                  <div className={`text-2xl font-semibold ${theme === 'light' ? 'text-zinc-700' : 'text-zinc-100'}`}>
-                    {SPANISH_DAY_NAMES[new Date(ev.date).getDay()]}
-                  </div>
-                </div>
-                {getTransportIcon(ev.transport_type as any, ev.procedure as any, 'text-38')}
-                <div className="flex-1">
-                  <div className="text-38 font-medium">{ev.title}</div>
-                  <div className={`mt-1 flex flex-wrap items-center gap-2 text-2xl ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                    {ev.procedure ? (
-                      <span className={`px-2 py-0.5 rounded capitalize ${theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}>
-                        {ev.procedure.replace(/_/g, ' ')}
+            {day.items.map((item) => {
+              const procedure = getProcedureLabel(item.procedure);
+              const departments = item.departments.map(getDeptLabel).join(' · ');
+              return (
+                <div key={item.id} className="wb-move">
+                  <span className="wb-move-time">{item.time?.slice(0, 5) || '—'}</span>
+                  <span className={`wb-proc${procedure.tone === 'other' ? '' : ` is-${procedure.tone}`}`}>{procedure.label}</span>
+                  <div className="wb-move-main">
+                    <span className="wb-move-title"><JobSwatch color={item.color} />{item.title}</span>
+                    <span className="wb-move-sub">
+                      <span>
+                        {getVehicleLabel(item.transport_type)}
+                        {item.plate ? <> · <span className="wb-mono">{item.plate}</span></> : null}
                       </span>
-                    ) : null}
-                    <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>{ev.transport_type || 'transport'}</span>
-                    {ev.transport_provider &&
-                      TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS] && (
-                        <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>
-                          {TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS].label}
-                        </span>
-                      )}
-                    {ev.loadingBay && <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>Bay {ev.loadingBay}</span>}
-                    {ev.plate && <span className={theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}>Plate {ev.plate}</span>}
+                      {departments ? <span>{departments}</span> : null}
+                      {item.notes ? <span>{item.notes}</span> : null}
+                    </span>
                   </div>
-                  {ev.departments.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {ev.departments.map((dep) => (
-                        <span
-                          key={dep}
-                          className={`px-2 py-0.5 rounded text-lg uppercase tracking-wide ${
-                            theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'
-                          }`}
-                        >
-                          {dep}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {ev.notes && <div className="text-sm opacity-80 line-clamp-1 mt-1">{ev.notes}</div>}
+                  <ProviderSlot provider={item.transport_provider} />
+                  <div className="wb-bay">
+                    <small>Muelle</small>
+                    <b>{item.loadingBay || '—'}</b>
+                  </div>
                 </div>
-              </div>
-              {ev.transport_provider &&
-                TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS] &&
-                TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS].icon && (
-                  <div className="flex-shrink-0 ml-4">
-                    <img
-                      src={TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS].icon!}
-                      alt={TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS].label}
-                      width={192}
-                      height={192}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-48 h-48 object-contain"
-                      onError={(e) => {
-                        console.error('Logo failed to load:', e.currentTarget.src);
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
-            </div>
-          ))}
-          {items.length === 0 && (
-            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay logística en los próximos 7 días</div>
-          )}
-        </div>
-      </PanelContainer>
-    </AutoScrollWrapper>
+              );
+            })}
+          </section>
+        );
+      })}
+    </div>
   );
 };

@@ -25,4 +25,26 @@ describe('buildCalendarModel', () => {
     expect(model.monthLabel).toContain('septiembre');
     expect(model.monthLabel).toContain('2026');
   });
+
+  it('shows the rolling four-week window the server sends', () => {
+    const calendar: CalendarFeed = {
+      jobs: [],
+      jobsByDate: {},
+      jobDateLookup: {},
+      range: {
+        start: '2026-09-20T22:00:00.000Z',
+        end: '2026-10-18T21:59:59.999Z',
+      },
+      focusMonth: 8,
+      focusYear: 2026,
+    };
+
+    const model = buildCalendarModel(calendar);
+
+    expect(model.cells).toHaveLength(28);
+    expect(model.cells[0].isoKey).toBe('2026-09-21');
+    expect(model.cells[27].isoKey).toBe('2026-10-18');
+    expect(model.cells[5].isWeekend).toBe(true);
+    expect(model.cells[4].isWeekend).toBe(false);
+  });
 });

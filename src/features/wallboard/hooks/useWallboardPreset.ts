@@ -101,13 +101,7 @@ export function useWallboardPreset({
       if (error || !data) {
         if (isProduccionPreset) {
           setPanelOrder(['calendar']);
-          setPanelDurations({
-            overview: DEFAULT_PANEL_DURATIONS.overview,
-            crew: DEFAULT_PANEL_DURATIONS.crew,
-            logistics: DEFAULT_PANEL_DURATIONS.logistics,
-            pending: DEFAULT_PANEL_DURATIONS.pending,
-            calendar: 30,
-          });
+          setPanelDurations({ ...DEFAULT_PANEL_DURATIONS, calendar: 30 });
           setRotationFallbackSeconds(30);
           setHighlightTtlMs(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
           setTickerIntervalMs(DEFAULT_TICKER_SECONDS * 1000);

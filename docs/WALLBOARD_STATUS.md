@@ -38,7 +38,7 @@ The snapshot uses one coherent query pass for:
 
 - jobs, departments, assignments, locations, and cancelled-tour filtering;
 - required-role staffing totals and assignment coverage;
-- document counts and requirements;
+- per-document requirement status (see "Document requirements" below);
 - sanitized profile names and timesheet statuses;
 - overdue timesheet actions;
 - logistics events; and
@@ -51,18 +51,70 @@ Legacy per-panel Edge endpoints remain available for compatibility, but
 `WallboardDisplay` no longer calls them and no longer rebuilds an independent
 feed from many browser-side database queries.
 
+## Document requirements
+
+`required_docs` lists what each department owes per job (seeded by
+`20260922190000_seed_wallboard_required_docs.sql`; `is_required` and `label`
+stay editable per row):
+
+| Department | Keys |
+| --- | --- |
+| sound | `pesos`, `consumos`, `lista_material`, `soundvision`, `memoria` |
+| lights | `consumos`, `memoria` |
+| video | `consumos` |
+
+`wallboard-feed/docRules.ts` detects each document from where the app saves it:
+calculator PDFs in `job_documents` under `calculators/pesos/`,
+`calculators/consumos/` (sound and video told apart by file name, exactly like
+`src/utils/powerReportReadiness.ts`), `calculators/lights-consumos/`,
+`calculators/lista-material/sound/` and `calculators/sv-report/` (legacy or
+`<jobId>/calculators/…` layout), and the three memoria técnica tables once
+`final_document_url` is set. Uploaded files outside those folders (riders,
+photos) never count.
+
+Each overview job carries `docChecklist: [{ dept, key, label, state }]` where
+`state` is `delivered`, `pending` (job starts more than 72 h out) or `missing`
+(72 h or less, or already started). Documents are only loaded for the seven-day
+window; calendar-only jobs further out return an empty checklist. The legacy
+`wallboard_doc_counts` view (any file under `sound/`, `lights/`, `video/`) is
+no longer used by the snapshot.
+
+Video is now part of readiness, crew and documents; it used to be dropped.
+
 ## Panels
 
 Supported panel keys are:
 
-- `overview` — próximos trabajos and readiness;
-- `crew` — assignments and timesheet state;
-- `logistics` — upcoming transport movements;
-- `pending` — staffing and overdue-timesheet attention items; and
-- `calendar` — the current Madrid calendar grid.
+- `overview` — próximos trabajos: status pill (staffing + documents), crew bar
+  and document chips per department, most urgent first, four per page;
+- `docs` — documentación: jobs × required documents matrix, eight per page;
+- `crew` — equipo asignado: people per department with dashed vacancies;
+  timesheet state only after the job has ended; two jobs per page;
+- `logistics` — movements grouped by day with carga/descarga, vehicle, plate,
+  transport company logo and loading bay; five per page;
+- `pending` — atención: staffing, document and overdue-timesheet totals plus
+  alerts grouped by job; skipped by the rotation while empty; and
+- `calendar` — four weeks from the current Madrid Monday.
 
-Rotation advances through pages before moving to the next panel. Highlight
-announcements can temporarily emphasize jobs.
+Existing presets keep their saved panel order, so `docs` appears on a screen
+only after it is added in the preset editor.
+
+Pages cut rather than scroll. Rotation advances through pages before moving to
+the next panel. Highlight announcements give a job a steady amber outline.
+
+## Display
+
+The display is light only. `src/features/wallboard/wallboard.css` sizes
+everything in `--u` (1/100 of the 16:9 frame that fits the viewport), so 1080p,
+4K and desktop windows show the same composition. A shared header shows the
+logo (click toggles the Alien theme), panel title, rotation dots, data freshness
+from `snapshot.generatedAt` (amber after two missed polls) and the Madrid clock.
+All dates and times are formatted in `Europe/Madrid` with `es-ES`
+(`src/features/wallboard/format.ts`), independent of the TV's locale and clock.
+
+Transport company logos come from `TRANSPORT_PROVIDERS`; entries with
+`tone: 'light'` (white-on-transparent files) are darkened with
+`filter: brightness(0)` on the light theme.
 
 ## Presets
 
@@ -126,7 +178,14 @@ preset disablement, slow authentication, token renewal, Madrid DST boundaries,
 cancelled tours, staffing requirements, document counts, and overdue
 timesheets.
 
-No database migration is required for snapshot schema version 1. Any future
+Snapshot schema version 1 only grows additively: `docChecklist` on overview
+jobs, `departments`/`crewNeeded` on crew jobs, and `kind`, `jobId`, `jobTitle`,
+`color`, `startTime`, `dept`, `count`, `detail` on pending items are optional in
+the browser validator, so a display keeps working against an older Edge
+Function during a deploy.
+
+The only migration is the data-only `required_docs` seed
+(`supabase/tests/database/wallboard_required_docs.sql` covers it). Any future
 device-token, preset-filter, announcement-scheduling, or heartbeat tables make
 that PR database high-risk and require pgTAP coverage plus the human production
 dry-run workflow.

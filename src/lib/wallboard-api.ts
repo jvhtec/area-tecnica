@@ -25,6 +25,8 @@ export type {
 const DEPARTMENTS = new Set<Dept>(['sound', 'lights', 'video']);
 const JOB_STATUSES = new Set(['green', 'yellow', 'red']);
 const TIMESHEET_STATUSES = new Set(['submitted', 'draft', 'missing', 'approved', 'rejected']);
+const DOC_STATES = new Set(['delivered', 'pending', 'missing']);
+const PENDING_KINDS = new Set(['staffing', 'docs', 'timesheet']);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -53,6 +55,14 @@ const isJobsOverviewJob = (job: unknown): boolean => {
     && isRecord(progress)
     && typeof progress.have === 'number'
     && typeof progress.need === 'number');
+  const checklistIsValid = job.docChecklist === undefined
+    || (Array.isArray(job.docChecklist) && job.docChecklist.every((item) =>
+      isRecord(item)
+      && isDept(item.dept)
+      && typeof item.key === 'string'
+      && typeof item.label === 'string'
+      && typeof item.state === 'string'
+      && DOC_STATES.has(item.state)));
 
   return typeof job.id === 'string'
     && typeof job.title === 'string'
@@ -63,6 +73,7 @@ const isJobsOverviewJob = (job: unknown): boolean => {
     && isDeptCounts(job.crewAssigned)
     && isDeptCounts(job.crewNeeded)
     && docsAreValid
+    && checklistIsValid
     && typeof job.status === 'string'
     && JOB_STATUSES.has(job.status)
     && isOptionalStringOrNull(job.color)
@@ -102,6 +113,8 @@ const isCrewAssignmentsFeed = (value: unknown): value is CrewAssignmentsFeed => 
 
     return typeof job.id === 'string'
       && typeof job.title === 'string'
+      && (job.departments === undefined || (Array.isArray(job.departments) && job.departments.every(isDept)))
+      && (job.crewNeeded === undefined || isDeptCounts(job.crewNeeded))
       && isOptionalStringOrNull(job.jobType)
       && isOptionalStringOrNull(job.job_type)
       && (job.start_time === undefined || typeof job.start_time === 'string')
@@ -117,7 +130,13 @@ const isPendingActionsFeed = (value: unknown): value is PendingActionsFeed =>
   && value.items.every((item) =>
     isRecord(item)
     && (item.severity === 'red' || item.severity === 'yellow')
-    && typeof item.text === 'string');
+    && typeof item.text === 'string'
+    && (item.kind === undefined || (typeof item.kind === 'string' && PENDING_KINDS.has(item.kind)))
+    && (item.jobId === undefined || typeof item.jobId === 'string')
+    && (item.count === undefined || typeof item.count === 'number')
+    && (item.dept === undefined || item.dept === null || isDept(item.dept))
+    && isOptionalStringOrNull(item.detail)
+    && isOptionalStringOrNull(item.color));
 
 const isLogisticsFeed = (value: unknown): value is LogisticsFeed =>
   isRecord(value)

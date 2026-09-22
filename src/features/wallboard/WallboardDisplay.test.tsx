@@ -30,7 +30,7 @@ vi.mock('./useWallboardRotation', () => ({ useWallboardRotation: vi.fn() }));
 vi.mock('./useWallboardAnnouncements', () => ({
   useWallboardAnnouncements: () => mocks.processAnnouncements,
 }));
-vi.mock('./components/FooterLogo', () => ({ FooterLogo: () => null }));
+vi.mock('./components/WallboardHeader', () => ({ WallboardHeader: ({ title }: { title: string }) => <h1>{title}</h1> }));
 vi.mock('./components/Ticker', () => ({ Ticker: () => null }));
 vi.mock('./components/WallboardActivePanel', () => ({
   WallboardActivePanel: ({ overview }: { overview: WallboardSnapshotFeed['overview'] | null }) => (

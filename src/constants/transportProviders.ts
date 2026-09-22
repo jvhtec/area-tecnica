@@ -15,11 +15,17 @@ export const TRANSPORT_PROVIDERS: Record<
   {
     label: string;
     icon: string | null;
+    /**
+     * `light` marks a white-on-transparent logo file. Light surfaces must darken
+     * it (e.g. `filter: brightness(0)`) or it disappears.
+     */
+    tone?: 'light';
   }
 > = {
   camionaje: {
     label: 'Camionaje',
     icon: '/Logos/Logo-Camionaje.png',
+    tone: 'light',
   },
   transluminaria: {
     label: 'Transluminaria',
@@ -44,6 +50,7 @@ export const TRANSPORT_PROVIDERS: Record<
   grupo_sese: {
     label: 'Grupo Sesé',
     icon: '/Logos/Logo_Sese60_blanco_RGB.png',
+    tone: 'light',
   },
   nacex: {
     label: 'Nacex',
