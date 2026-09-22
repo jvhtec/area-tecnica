@@ -54,8 +54,8 @@ Deno.test("Madrid snapshot windows remain calendar-safe across spring DST", () =
   assertEquals(windows.todayKey, "2026-03-29", "uses the Madrid calendar day");
   assertEquals(windows.weekStartISO, "2026-03-28T23:00:00.000Z", "starts at Madrid midnight before DST");
   assertEquals(windows.weekEndISO, "2026-04-04T21:59:59.999Z", "ends at Madrid midnight after DST");
-  assertEquals(windows.gridStartKey, "2026-02-23", "uses a Monday-based six-week grid");
-  assertEquals(windows.gridEndKey, "2026-04-05", "keeps exactly 42 Madrid date keys");
+  assertEquals(windows.gridStartKey, "2026-03-23", "starts the rolling calendar on the current Madrid Monday");
+  assertEquals(windows.gridEndKey, "2026-04-19", "keeps exactly 28 Madrid date keys");
 });
 
 Deno.test("Madrid snapshot windows remain calendar-safe across autumn DST", () => {
@@ -64,8 +64,8 @@ Deno.test("Madrid snapshot windows remain calendar-safe across autumn DST", () =
   assertEquals(windows.todayKey, "2026-10-25", "uses the Madrid calendar day");
   assertEquals(windows.weekStartISO, "2026-10-24T22:00:00.000Z", "starts at Madrid midnight before the clock change");
   assertEquals(windows.weekEndISO, "2026-10-31T22:59:59.999Z", "ends at Madrid midnight after the clock change");
-  assertEquals(windows.gridStartKey, "2026-09-28", "uses a Monday-based six-week grid");
-  assertEquals(windows.gridEndKey, "2026-11-08", "keeps exactly 42 Madrid date keys");
+  assertEquals(windows.gridStartKey, "2026-10-19", "starts the rolling calendar on the current Madrid Monday");
+  assertEquals(windows.gridEndKey, "2026-11-15", "keeps exactly 28 Madrid date keys");
 });
 
 Deno.test("canonical snapshot maps staffing, docs, overdue alerts and display-safe fields", () => {
@@ -107,11 +107,18 @@ Deno.test("canonical snapshot maps staffing, docs, overdue alerts and display-sa
       { job_id: "job-1", department: "lights", total_required: 1 },
       { job_id: "multi-day", department: "sound", total_required: 1 },
     ],
-    docCounts: [{ job_id: "job-1", department: "sound", have: 1 }],
     docRequirements: [
-      { department: "sound", need: 3 },
-      { department: "lights", need: 2 },
+      { department: "sound", key: "pesos", label: "Pesos" },
+      { department: "sound", key: "consumos", label: "Consumos" },
+      { department: "sound", key: "memoria", label: "Memoria técnica de sonido" },
+      { department: "lights", key: "consumos", label: "Consumos" },
+      { department: "video", key: "consumos", label: "Consumos" },
+      { department: "unknown", key: "ignored", label: "Ignorado" },
     ],
+    deliveredDocs: new Map([
+      ["job-1", new Set(["sound:pesos", "video:consumos"])],
+      ["multi-day", new Set(["sound:pesos", "sound:consumos", "sound:memoria"])],
+    ]),
     timesheets: [
       { job_id: "job-1", technician_id: "tech-sound", status: "submitted" },
       { job_id: "job-overdue", technician_id: "tech-overdue", status: "draft" },
@@ -161,17 +168,32 @@ Deno.test("canonical snapshot maps staffing, docs, overdue alerts and display-sa
   ], "keeps the versioned top-level contract exact");
   assertEquals(snapshot.overview.jobs.map((item) => item.id), ["job-1"], "excludes dry hire and cancelled tours");
   const overview = snapshot.overview.jobs[0];
-  assertEquals(overview.departments, ["sound", "lights"], "hides video from operational readiness");
+  assertEquals(overview.departments, ["sound", "lights", "video"], "includes video so its Consumos can be checked");
   assertEquals(overview.crewAssigned, { sound: 1, lights: 0, video: 1, total: 2 }, "counts assigned roles");
   assertEquals(overview.crewNeeded, { sound: 2, lights: 1, video: 0, total: 3 }, "uses required-role totals");
-  assertEquals(overview.docs, { sound: { have: 1, need: 3 }, lights: { have: 0, need: 2 } }, "uses document views");
+  assertEquals(overview.docs, {
+    sound: { have: 1, need: 3 },
+    lights: { have: 0, need: 1 },
+    video: { have: 1, need: 1 },
+  }, "counts only the specific required documents that were delivered");
+  assertEquals(overview.docChecklist.map((item) => `${item.dept}:${item.key}:${item.state}`), [
+    "sound:pesos:delivered",
+    "sound:consumos:missing",
+    "sound:memoria:missing",
+    "lights:consumos:missing",
+    "video:consumos:delivered",
+  ], "marks undelivered documents as missing inside the 72 h window");
   assertEquals(overview.status, "red", "derives readiness from required versus assigned crew");
-  assertEquals(snapshot.crew.jobs[0].crew.map((member) => member.role), ["responsable", "asignado"], "localizes fallback roles");
-  assertEquals(snapshot.pending.items, [
-    { severity: "red", text: "Montaje principal – falta 1 puesto de sonido" },
-    { severity: "red", text: "Montaje principal – falta 1 puesto de luces" },
-    { severity: "red", text: "Evento finalizado – falta 1 parte de horas" },
-  ], "includes localized open-slot and ended-job timesheet alerts");
+  assertEquals(snapshot.crew.jobs[0].crew.map((member) => member.role), ["responsable", "operador", "asignado"], "localizes fallback roles");
+  assertEquals(snapshot.crew.jobs[0].crewNeeded, overview.crewNeeded, "gives the crew panel the required totals for vacancies");
+  assertEquals(snapshot.pending.items.map((item) => [item.kind, item.severity, item.count, item.text]), [
+    ["staffing", "red", 1, "Montaje principal – falta 1 puesto de sonido"],
+    ["staffing", "red", 1, "Montaje principal – falta 1 puesto de luces"],
+    ["docs", "red", 3, "Montaje principal – faltan 3 documentos (Sonido: consumos, memoria técnica de sonido · Luces: consumos)"],
+    ["timesheet", "red", 1, "Evento finalizado – falta 1 parte de horas"],
+  ], "includes structured open-slot, document and ended-job timesheet alerts");
+  assertEquals(snapshot.pending.items[0].jobId, "job-1", "links each alert to its job");
+  assertEquals(snapshot.pending.items[2].detail, "Sonido: consumos, memoria técnica de sonido · Luces: consumos", "groups missing documents by department");
   assertEquals(snapshot.logistics.items[0].title, "Logística", "localizes the logistics fallback");
   assertEquals(Object.keys(snapshot.calendar.jobsByDate).filter((key) => key >= "2026-09-30"), [
     "2026-09-30",
@@ -181,9 +203,33 @@ Deno.test("canonical snapshot maps staffing, docs, overdue alerts and display-sa
   const futureCalendarJob = snapshot.calendar.jobs.find((item) => item.id === "multi-day");
   assertEquals(futureCalendarJob?.crewNeeded.sound, 1, "keeps real readiness data outside the seven-day overview");
   assertEquals(futureCalendarJob?.status, "red", "derives calendar readiness instead of zeroing future jobs");
+  assertEquals(futureCalendarJob?.docChecklist, [], "does not report documents for jobs whose documents were not loaded");
   const serialized = JSON.stringify(snapshot);
   assert(!serialized.includes("private@example.com"), "does not expose non-display profile fields");
   assert(!serialized.includes("technician_id"), "does not expose technician identifiers");
+});
+
+Deno.test("documents still missing more than 72 h before the start are pending, not missing", () => {
+  const generatedAt = new Date("2026-09-22T10:00:00.000Z");
+  const snapshot = buildWallboardSnapshot({
+    generatedAt,
+    highlightTtlSeconds: 300,
+    visibleJobs: [job({ id: "later", start_time: "2026-09-26T10:00:00.000Z", end_time: "2026-09-26T20:00:00.000Z", departments: ["lights"], assignments: [] })],
+    overdueJobs: [],
+    cancelledTourIds: new Set(),
+    requiredRoles: [],
+    docRequirements: [{ department: "lights", key: "memoria", label: "Memoria técnica de iluminación" }],
+    deliveredDocs: new Map(),
+    timesheets: [],
+    profiles: [],
+    logistics: [],
+    announcements: [],
+    windows: getSnapshotWindows(generatedAt),
+  });
+
+  assertEquals(snapshot.overview.jobs[0].docChecklist[0].state, "pending", "four days out is a warning");
+  const docsAlert = snapshot.pending.items.find((item) => item.kind === "docs");
+  assertEquals(docsAlert?.severity, "yellow", "pending documents raise a yellow alert");
 });
 
 Deno.test("expired highlights cannot crowd valid ticker announcements out of the snapshot", () => {

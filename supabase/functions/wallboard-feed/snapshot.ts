@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { joinedMany, joinedSingle } from "../_shared/joins.ts";
+import { buildDeliveredDocIndex, type JobDocumentRow, type MemoriaRow } from "./docRules.ts";
 import {
   buildWallboardSnapshot,
   DEFAULT_HIGHLIGHT_TTL_SECONDS,
@@ -9,7 +10,6 @@ import {
   SNAPSHOT_ANNOUNCEMENT_LIMIT,
   SNAPSHOT_JOB_STATUSES,
   SNAPSHOT_JOB_TYPES,
-  type DocCountRow,
   type DocRequirementRow,
   type ProfileRow,
   type RequiredRoleRow,
@@ -146,7 +146,7 @@ export async function loadWallboardSnapshot(
       .lt("start_time", windows.calendarEndExclusiveISO)
       .gte("end_time", windows.queryStartISO)
       .order("start_time", { ascending: true }),
-    sb.from("wallboard_doc_requirements").select("department, need"),
+    sb.from("required_docs").select("department, key, label").eq("is_required", true),
     sb
       .from("logistics_events")
       .select(`
@@ -195,6 +195,10 @@ export async function loadWallboardSnapshot(
     return end >= overdueStartMs && end < overdueCutoffMs;
   });
   const relevantJobs = [...visibleJobs, ...overdueJobs];
+  // Document checks only matter for the jobs shown in detail (the next 7 days).
+  const upcomingJobIds = Array.from(new Set(
+    visibleJobs.filter((job) => overlaps(job, windows.weekStartISO, windows.weekEndISO)).map((job) => job.id),
+  ));
   const relevantJobIds = Array.from(new Set(relevantJobs.map((job) => job.id)));
   const tourIds = Array.from(new Set(relevantJobs.map((job) => job.tour_id).filter((id): id is string => Boolean(id))));
   const technicianIds = Array.from(new Set(
@@ -202,13 +206,35 @@ export async function loadWallboardSnapshot(
       .filter((id): id is string => typeof id === "string" && id.length > 0),
   ));
 
-  const [requiredRolesResult, docCountsResult, timesheetsResult, profilesResult, toursResult] = await Promise.all([
+  const emptyRows = <T>() => Promise.resolve({ data: [] as T[], error: null });
+  const [
+    requiredRolesResult,
+    jobDocumentsResult,
+    soundMemoriaResult,
+    lightsMemoriaResult,
+    videoMemoriaResult,
+    timesheetsResult,
+    profilesResult,
+    toursResult,
+  ] = await Promise.all([
     relevantJobIds.length
       ? sb.from("job_required_roles_summary").select("job_id, department, total_required").in("job_id", relevantJobIds)
       : Promise.resolve({ data: [] as RequiredRoleRow[], error: null }),
-    relevantJobIds.length
-      ? sb.from("wallboard_doc_counts").select("job_id, department, have").in("job_id", relevantJobIds)
-      : Promise.resolve({ data: [] as DocCountRow[], error: null }),
+    upcomingJobIds.length
+      ? sb.from("job_documents")
+        .select("job_id, file_path, file_name")
+        .in("job_id", upcomingJobIds)
+        .or("file_path.like.calculators/%,file_path.like.%/calculators/%")
+      : emptyRows<JobDocumentRow>(),
+    upcomingJobIds.length
+      ? sb.from("memoria_tecnica_documents").select("job_id, final_document_url").in("job_id", upcomingJobIds)
+      : emptyRows<MemoriaRow>(),
+    upcomingJobIds.length
+      ? sb.from("lights_memoria_tecnica_documents").select("job_id, final_document_url").in("job_id", upcomingJobIds)
+      : emptyRows<MemoriaRow>(),
+    upcomingJobIds.length
+      ? sb.from("video_memoria_tecnica_documents").select("job_id, final_document_url").in("job_id", upcomingJobIds)
+      : emptyRows<MemoriaRow>(),
     relevantJobIds.length
       ? sb.from("wallboard_timesheet_status").select("job_id, technician_id, status").in("job_id", relevantJobIds)
       : Promise.resolve({ data: [] as TimesheetStatusRow[], error: null }),
@@ -234,8 +260,15 @@ export async function loadWallboardSnapshot(
     overdueJobs,
     cancelledTourIds,
     requiredRoles: requireData(requiredRolesResult, "required roles") as RequiredRoleRow[],
-    docCounts: requireData(docCountsResult, "document counts") as DocCountRow[],
     docRequirements: requireData(docRequirementsResult, "document requirements") as DocRequirementRow[],
+    deliveredDocs: buildDeliveredDocIndex(
+      requireData(jobDocumentsResult, "job documents") as JobDocumentRow[],
+      {
+        sound: requireData(soundMemoriaResult, "sound memorias") as MemoriaRow[],
+        lights: requireData(lightsMemoriaResult, "lights memorias") as MemoriaRow[],
+        video: requireData(videoMemoriaResult, "video memorias") as MemoriaRow[],
+      },
+    ),
     timesheets: requireData(timesheetsResult, "timesheet statuses") as TimesheetStatusRow[],
     profiles: requireData(profilesResult, "profiles") as ProfileRow[],
     logistics: requireData(logisticsResult, "logistics").map((row) => normalizeLogistics(row as unknown as RawLogisticsRow)),

@@ -1,4 +1,6 @@
-export type Dept = "sound" | "lights" | "video";
+import type { DocDept } from "./docRules.ts";
+
+export type Dept = DocDept;
 export type Readiness = "green" | "yellow" | "red";
 export type TimesheetStatus = "submitted" | "draft" | "missing" | "approved" | "rejected";
 
@@ -16,6 +18,10 @@ const DEPARTMENTS: readonly Dept[] = ["sound", "lights", "video"];
 const MADRID_TIMEZONE = "Europe/Madrid";
 const OVERDUE_TIMESHEET_LOOKBACK_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** A required document still missing this close to the job start is critical. */
+export const DOC_CRITICAL_WINDOW_MS = 72 * 60 * 60 * 1000;
+/** The calendar shows four weeks starting on the current Madrid Monday. */
+export const CALENDAR_DAYS = 28;
 export const DEFAULT_HIGHLIGHT_TTL_SECONDS = 300;
 export const SNAPSHOT_ANNOUNCEMENT_LIMIT = 20;
 export const HIGHLIGHT_ANNOUNCEMENT_LIKE_PATTERN = "%[HIGHLIGHT_JOB:%";
@@ -53,15 +59,34 @@ export type RequiredRoleRow = {
   total_required: number | null;
 };
 
-export type DocCountRow = {
-  job_id: string;
-  department: string | null;
-  have: number | null;
-};
-
 export type DocRequirementRow = {
   department: string | null;
-  need: number | null;
+  key: string;
+  label: string | null;
+};
+
+export type DocState = "delivered" | "pending" | "missing";
+
+export type DocChecklistItem = {
+  dept: Dept;
+  key: string;
+  label: string;
+  state: DocState;
+};
+
+export type PendingKind = "staffing" | "docs" | "timesheet";
+
+export type PendingItem = {
+  severity: "red" | "yellow";
+  text: string;
+  kind: PendingKind;
+  jobId: string;
+  jobTitle: string;
+  color: string | null;
+  startTime: string;
+  dept: Dept | null;
+  count: number;
+  detail: string | null;
 };
 
 export type TimesheetStatusRow = {
@@ -126,8 +151,9 @@ export type SnapshotInputs = {
   overdueJobs: SnapshotJobRow[];
   cancelledTourIds: Set<string>;
   requiredRoles: RequiredRoleRow[];
-  docCounts: DocCountRow[];
   docRequirements: DocRequirementRow[];
+  /** `jobId -> Set<"dept:key">` of documents already delivered, see docRules.ts. */
+  deliveredDocs: Map<string, Set<string>>;
   timesheets: TimesheetStatusRow[];
   profiles: ProfileRow[];
   logistics: SnapshotLogisticsRow[];
@@ -228,12 +254,10 @@ function madridMidnight(dateKey: string): Date {
 
 export function getSnapshotWindows(generatedAt: Date): SnapshotWindows {
   const todayKey = formatMadridDateKey(generatedAt);
-  const { year, month } = parseDateKey(todayKey);
-  const monthStartKey = `${year}-${String(month).padStart(2, "0")}-01`;
-  const monthStart = parseDateKey(monthStartKey);
-  const weekday = new Date(Date.UTC(monthStart.year, monthStart.month - 1, monthStart.day, 12)).getUTCDay();
-  const gridStartKey = addMadridCalendarDays(monthStartKey, -((weekday + 6) % 7));
-  const gridEndKey = addMadridCalendarDays(gridStartKey, 41);
+  const { year, month, day } = parseDateKey(todayKey);
+  const weekday = new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
+  const gridStartKey = addMadridCalendarDays(todayKey, -((weekday + 6) % 7));
+  const gridEndKey = addMadridCalendarDays(gridStartKey, CALENDAR_DAYS - 1);
   const weekEndKey = addMadridCalendarDays(todayKey, 6);
   const weekEndExclusive = madridMidnight(addMadridCalendarDays(weekEndKey, 1));
   const calendarEndExclusive = madridMidnight(addMadridCalendarDays(gridEndKey, 1));
@@ -294,13 +318,14 @@ function buildSnapshotIndexes(inputs: SnapshotInputs) {
   inputs.requiredRoles.forEach((row) => {
     if (isDept(row.department)) required.set(`${row.job_id}:${row.department}`, Number(row.total_required ?? 0));
   });
-  const docHave = new Map<string, number>();
-  inputs.docCounts.forEach((row) => {
-    if (isDept(row.department)) docHave.set(`${row.job_id}:${row.department}`, Number(row.have ?? 0));
-  });
-  const docNeed = new Map<Dept, number>();
+  const docRequirements = new Map<Dept, Array<{ key: string; label: string }>>();
   inputs.docRequirements.forEach((row) => {
-    if (isDept(row.department)) docNeed.set(row.department, Number(row.need ?? 0));
+    if (!isDept(row.department) || !row.key) return;
+    const list = docRequirements.get(row.department) ?? [];
+    if (!list.some((entry) => entry.key === row.key)) {
+      list.push({ key: row.key, label: row.label?.trim() || row.key });
+    }
+    docRequirements.set(row.department, list);
   });
   const timesheets = new Map<string, TimesheetStatus>();
   inputs.timesheets.forEach((row) => {
@@ -313,8 +338,9 @@ function buildSnapshotIndexes(inputs: SnapshotInputs) {
   });
   return {
     required,
-    docHave,
-    docNeed,
+    docRequirements,
+    deliveredDocs: inputs.deliveredDocs,
+    generatedAtMs: inputs.generatedAt.getTime(),
     timesheets,
     profiles: buildIndex(inputs.profiles, (row) => row.id),
   };
@@ -322,8 +348,12 @@ function buildSnapshotIndexes(inputs: SnapshotInputs) {
 
 type SnapshotIndexes = ReturnType<typeof buildSnapshotIndexes>;
 
-function mapOverviewJob(job: SnapshotJobRow, indexes: SnapshotIndexes) {
-  const departments = Array.from(new Set(job.departments.filter(isDept))).filter((dept) => dept !== "video");
+/**
+ * `includeDocs` is false for calendar-only jobs beyond the seven-day window:
+ * their documents are not loaded, so reporting them as undelivered would be wrong.
+ */
+function mapOverviewJob(job: SnapshotJobRow, indexes: SnapshotIndexes, includeDocs = true) {
+  const departments = DEPARTMENTS.filter((dept) => job.departments.includes(dept));
   const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 };
   job.assignments.forEach((assignment) => {
     if (assignment.sound_role) crewAssigned.sound += 1;
@@ -353,12 +383,20 @@ function mapOverviewJob(job: SnapshotJobRow, indexes: SnapshotIndexes) {
       : present.some((count) => count > 0) ? "yellow" : "red";
   }
 
+  const delivered = indexes.deliveredDocs.get(job.id) ?? new Set<string>();
+  const startsInMs = new Date(job.start_time).getTime() - indexes.generatedAtMs;
+  const undeliveredState: DocState = startsInMs <= DOC_CRITICAL_WINDOW_MS ? "missing" : "pending";
+  const docChecklist: DocChecklistItem[] = [];
   const docs: Partial<Record<Dept, { have: number; need: number }>> = {};
   departments.forEach((dept) => {
-    docs[dept] = {
-      have: indexes.docHave.get(`${job.id}:${dept}`) ?? 0,
-      need: indexes.docNeed.get(dept) ?? 0,
-    };
+    const requirements = includeDocs ? indexes.docRequirements.get(dept) ?? [] : [];
+    let have = 0;
+    requirements.forEach(({ key, label }) => {
+      const isDelivered = delivered.has(`${dept}:${key}`);
+      if (isDelivered) have += 1;
+      docChecklist.push({ dept, key, label, state: isDelivered ? "delivered" : undeliveredState });
+    });
+    docs[dept] = { have, need: requirements.length };
   });
 
   return {
@@ -371,10 +409,23 @@ function mapOverviewJob(job: SnapshotJobRow, indexes: SnapshotIndexes) {
     crewAssigned,
     crewNeeded,
     docs,
+    docChecklist,
     status,
     color: job.color,
     job_type: job.job_type,
   };
+}
+
+const DEPARTMENT_TITLES: Record<Dept, string> = { sound: "Sonido", lights: "Luces", video: "Vídeo" };
+
+function describeMissingDocs(items: DocChecklistItem[]): string {
+  return DEPARTMENTS
+    .map((dept) => {
+      const labels = items.filter((item) => item.dept === dept).map((item) => item.label.toLowerCase());
+      return labels.length ? `${DEPARTMENT_TITLES[dept]}: ${labels.join(", ")}` : null;
+    })
+    .filter((entry): entry is string => entry !== null)
+    .join(" · ");
 }
 
 function buildCalendar(jobs: ReturnType<typeof mapOverviewJob>[], windows: SnapshotWindows) {
@@ -421,12 +472,13 @@ export function buildWallboardSnapshot(inputs: SnapshotInputs) {
   const detailJobs = visibleJobs.filter((job) => job.job_type !== "dryhire" && overlaps(job, weekStartMs, weekEndMs));
   const calendarJobs = visibleJobs
     .filter((job) => job.job_type !== "dryhire" && overlaps(job, calendarStartMs, calendarEndMs))
-    .map((job) => mapOverviewJob(job, indexes))
+    .map((job) => mapOverviewJob(job, indexes, overlaps(job, weekStartMs, weekEndMs)))
     .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   const overviewJobs = detailJobs
     .map((job) => mapOverviewJob(job, indexes))
     .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
+  const overviewById = new Map(overviewJobs.map((job) => [job.id, job]));
   const crewJobs = detailJobs.map((job) => ({
     id: job.id,
     title: job.title,
@@ -435,8 +487,10 @@ export function buildWallboardSnapshot(inputs: SnapshotInputs) {
     start_time: job.start_time,
     end_time: job.end_time,
     color: job.color,
+    departments: overviewById.get(job.id)?.departments ?? [],
+    crewNeeded: overviewById.get(job.id)?.crewNeeded ?? { sound: 0, lights: 0, video: 0, total: 0 },
     crew: job.assignments
-      .filter((assignment) => assignmentDepartment(assignment) !== "video" && isTechnicianId(assignment.technician_id))
+      .filter((assignment) => isTechnicianId(assignment.technician_id))
       .map((assignment) => {
         const technicianId = assignment.technician_id as string;
         const profile = indexes.profiles.get(technicianId);
@@ -449,7 +503,13 @@ export function buildWallboardSnapshot(inputs: SnapshotInputs) {
       }),
   }));
 
-  const pendingItems: Array<{ severity: "red" | "yellow"; text: string }> = [];
+  const pendingItems: PendingItem[] = [];
+  const pendingBase = (job: { id: string; title: string; color?: string | null; start_time: string }) => ({
+    jobId: job.id,
+    jobTitle: job.title,
+    color: job.color ?? null,
+    startTime: job.start_time,
+  });
   overviewJobs.forEach((job) => {
     job.departments.forEach((dept) => {
       const need = job.crewNeeded[dept];
@@ -457,13 +517,34 @@ export function buildWallboardSnapshot(inputs: SnapshotInputs) {
       if (need > 0 && have < need) {
         const within24Hours = new Date(job.start_time).getTime() - generatedAtMs <= DAY_MS;
         pendingItems.push({
+          ...pendingBase(job),
+          kind: "staffing",
           severity: within24Hours ? "red" : "yellow",
+          dept,
+          count: need - have,
+          detail: null,
           text: need - have === 1
             ? `${job.title} – falta 1 puesto de ${DEPARTMENT_LABELS[dept]}`
             : `${job.title} – faltan ${need - have} puestos de ${DEPARTMENT_LABELS[dept]}`,
         });
       }
     });
+
+    const undelivered = job.docChecklist.filter((item) => item.state !== "delivered");
+    if (undelivered.length > 0) {
+      const detail = describeMissingDocs(undelivered);
+      pendingItems.push({
+        ...pendingBase(job),
+        kind: "docs",
+        severity: undelivered.some((item) => item.state === "missing") ? "red" : "yellow",
+        dept: null,
+        count: undelivered.length,
+        detail,
+        text: undelivered.length === 1
+          ? `${job.title} – falta 1 documento (${detail})`
+          : `${job.title} – faltan ${undelivered.length} documentos (${detail})`,
+      });
+    }
   });
 
   overdueJobs
@@ -471,7 +552,6 @@ export function buildWallboardSnapshot(inputs: SnapshotInputs) {
     .forEach((job) => {
       const technicianIds = Array.from(new Set(
         job.assignments
-          .filter((assignment) => assignmentDepartment(assignment) !== "video")
           .map((assignment) => assignment.technician_id)
           .filter(isTechnicianId),
       ));
@@ -481,7 +561,12 @@ export function buildWallboardSnapshot(inputs: SnapshotInputs) {
       }).length;
       if (missingCount > 0) {
         pendingItems.push({
+          ...pendingBase(job),
+          kind: "timesheet",
           severity: "red",
+          dept: null,
+          count: missingCount,
+          detail: null,
           text: missingCount === 1
             ? `${job.title} – falta 1 parte de horas`
             : `${job.title} – faltan ${missingCount} partes de horas`,
