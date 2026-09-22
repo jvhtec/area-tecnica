@@ -217,3 +217,73 @@ do update set
   notes = excluded.notes,
   is_active = true,
   updated_at = now();
+
+-- Read model used by the Area Tecnica Sound Pull Sheet normalizer.  Keeping the
+-- join in SQL means the UI consumes one deterministic rule/profile snapshot and
+-- does not have to perform multiple client-side table reads.
+create or replace function public.tp_get_sound_transport_rules()
+returns table (
+  rule_id uuid,
+  source_barcode text,
+  source_name text,
+  equipment_units_per_transport numeric,
+  profile_id uuid,
+  sku_id text,
+  profile_name text,
+  length_mm integer,
+  width_mm integer,
+  height_mm integer,
+  weight_kg numeric,
+  transport_kind text,
+  blocks_vertical_column boolean,
+  upright_only boolean,
+  tilt_allowed boolean,
+  allowed_yaw integer[],
+  can_be_base boolean,
+  top_contact_allowed boolean,
+  max_load_above_kg numeric,
+  min_support_ratio numeric,
+  stack_class text,
+  source_kind text,
+  source_url text,
+  source_external_key text
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select
+    rule.id,
+    rule.source_barcode,
+    rule.source_name,
+    rule.equipment_units_per_transport,
+    sku.id,
+    sku.sku_id,
+    sku.name,
+    sku.length_mm,
+    sku.width_mm,
+    sku.height_mm,
+    sku.weight_kg,
+    sku.transport_kind,
+    sku.blocks_vertical_column,
+    sku.upright_only,
+    sku.tilt_allowed,
+    sku.allowed_yaw,
+    sku.can_be_base,
+    sku.top_contact_allowed,
+    sku.max_load_above_kg,
+    sku.min_support_ratio,
+    sku.stack_class,
+    sku.source_kind,
+    sku.source_url,
+    sku.source_external_key
+  from public.truck_planner_sound_transport_rules rule
+  join public.truck_planner_case_skus sku on sku.id = rule.case_sku_id
+  where rule.is_active
+    and sku.is_active
+  order by coalesce(rule.source_barcode, ''), coalesce(rule.source_name, ''), rule.id;
+$$;
+
+revoke all on function public.tp_get_sound_transport_rules() from public;
+grant execute on function public.tp_get_sound_transport_rules() to authenticated;
