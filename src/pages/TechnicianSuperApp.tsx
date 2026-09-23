@@ -66,7 +66,6 @@ import { FestivalPushFeedButton } from '@/components/festival/FestivalPushFeedBu
 import { AmpRackDesigner } from '@/components/sound/amplifier-tool/rack-designer/AmpRackDesigner';
 import type { JobWithLocationAndDocs } from '@/types/job';
 
-
 import { queryKeys } from "@/lib/react-query";
 // --- TYPE DEFINITIONS ---
 interface TechnicianJobData extends JobWithLocationAndDocs {
@@ -366,17 +365,10 @@ export default function TechnicianSuperApp() {
 
   const t = getThemeStyles(isDark);
 
-  const handleOpenAction = (action: string, jobData?: TechnicianJobData) => {
-    // TechJobCard already extracts job data before calling onAction
-    if (action === 'artists') {
-      setArtistDeepLinkFilters({});
-    }
-    setSelectedJob(jobData || null);
-    setActiveModal(action);
-  };
-
-  // Push notifications about a job link freelancers to ?open=details&jobId=.
-  useTechAppJobDeepLink<TechnicianJobData>({
+  // The open job-details modal lives in the URL (?open=details&jobId=&detailsTab=)
+  // so push links can target it and it survives the reload that can follow
+  // closing a document opened outside the app.
+  const jobDetailsLink = useTechAppJobDeepLink<TechnicianJobData>({
     isReady: Boolean(user?.id) && !isLoading,
     resolveJob: (jobId) => (assignments as TechnicianAssignment[]).find(
       (assignment) => assignment.job_id === jobId || assignment.jobs?.id === jobId,
@@ -386,6 +378,18 @@ export default function TechnicianSuperApp() {
       setActiveModal('details');
     },
   });
+
+  const handleOpenAction = (action: string, jobData?: TechnicianJobData) => {
+    // TechJobCard already extracts job data before calling onAction
+    if (action === 'artists') {
+      setArtistDeepLinkFilters({});
+    }
+    if (action === 'details' && jobData?.id) {
+      jobDetailsLink.rememberOpenDetails(jobData.id);
+    }
+    setSelectedJob(jobData || null);
+    setActiveModal(action);
+  };
 
   useEffect(() => {
     const openTarget = searchParams.get('open');
@@ -594,7 +598,13 @@ export default function TechnicianSuperApp() {
         ].map(item => (
           <button
             key={item.id}
-            onClick={() => setTab(item.id)}
+            onClick={() => {
+              setTab(item.id);
+              // Keep the section in the URL so a reload returns to it.
+              const nextParams = new URLSearchParams(searchParams);
+              nextParams.set('tab', item.id);
+              setSearchParams(nextParams, { replace: true });
+            }}
             className={`flex flex-col items-center justify-center gap-1 ${tab === item.id ? (isDark ? 'text-blue-400' : 'text-blue-700') : isDark ? 'text-gray-500' : 'text-slate-600'
               }`}
           >
@@ -616,7 +626,17 @@ export default function TechnicianSuperApp() {
         />
       )}
       {activeModal === 'details' && selectedJob && (
-        <DetailsModal theme={t} isDark={isDark} job={selectedJob} onClose={() => setActiveModal(null)} />
+        <DetailsModal
+          theme={t}
+          isDark={isDark}
+          job={selectedJob}
+          initialTab={jobDetailsLink.detailsTab}
+          onTabChange={jobDetailsLink.rememberDetailsTab}
+          onClose={() => {
+            setActiveModal(null);
+            jobDetailsLink.forgetOpenDetails();
+          }}
+        />
       )}
       {activeModal === 'artists' && selectedJob && (
         <TechnicianArtistReadOnlyModal

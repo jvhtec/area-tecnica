@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 
 const toastInfo = vi.hoisted(() => vi.fn());
@@ -18,12 +18,12 @@ function renderAt(url: string, isReady: boolean, onOpenDetails = vi.fn()) {
   );
   const hook = renderHook(
     (props: { isReady: boolean }) => {
-      useTechAppJobDeepLink<Job>({
+      const link = useTechAppJobDeepLink<Job>({
         isReady: props.isReady,
         resolveJob: (jobId) => jobs.find((job) => job.id === jobId),
         onOpenDetails,
       });
-      return useLocation();
+      return { link, location: useLocation() };
     },
     { wrapper, initialProps: { isReady } },
   );
@@ -31,24 +31,48 @@ function renderAt(url: string, isReady: boolean, onOpenDetails = vi.fn()) {
 }
 
 describe("useTechAppJobDeepLink", () => {
-  it("waits for assignments, then opens the job and clears the params", () => {
-    const { result, rerender, onOpenDetails } = renderAt("/tech-app?tab=jobs&jobId=job-1&open=details", false);
+  it("waits for assignments, then reopens the job on the remembered tab", () => {
+    const { result, rerender, onOpenDetails } = renderAt(
+      "/tech-app?tab=jobs&open=details&jobId=job-1&detailsTab=Docs",
+      false,
+    );
     expect(onOpenDetails).not.toHaveBeenCalled();
 
     rerender({ isReady: true });
     expect(onOpenDetails).toHaveBeenCalledWith(jobs[0]);
-    expect(result.current.search).toBe("?tab=jobs");
+    expect(result.current.link.detailsTab).toBe("Docs");
+    // The params stay while the modal is open, so a reload restores it.
+    expect(result.current.location.search).toContain("open=details");
+  });
+
+  it("records the open job and tab, and clears them on close", () => {
+    const { result, onOpenDetails } = renderAt("/tech-app?tab=jobs", true);
+
+    act(() => result.current.link.rememberOpenDetails("job-1"));
+    act(() => result.current.link.rememberDetailsTab("Docs"));
+    expect(result.current.location.search).toBe("?tab=jobs&open=details&jobId=job-1&detailsTab=Docs");
+    // Opening it ourselves must not trigger a second open from the URL.
+    expect(onOpenDetails).not.toHaveBeenCalled();
+
+    act(() => result.current.link.forgetOpenDetails());
+    expect(result.current.location.search).toBe("?tab=jobs");
+  });
+
+  it("ignores unknown details tabs", () => {
+    const { result } = renderAt("/tech-app?open=details&jobId=job-1&detailsTab=bogus", true);
+    expect(result.current.link.detailsTab).toBeUndefined();
   });
 
   it("tells the technician when the job is no longer theirs", () => {
-    const { onOpenDetails } = renderAt("/tech-app?jobId=job-gone&open=details", true);
+    const { result, onOpenDetails } = renderAt("/tech-app?jobId=job-gone&open=details", true);
     expect(onOpenDetails).not.toHaveBeenCalled();
     expect(toastInfo).toHaveBeenCalledWith("Este trabajo ya no figura en tu agenda");
+    expect(result.current.location.search).toBe("");
   });
 
   it("ignores other deep links", () => {
     const { onOpenDetails, result } = renderAt("/tech-app?jobId=job-1&open=artists", true);
     expect(onOpenDetails).not.toHaveBeenCalled();
-    expect(result.current.search).toBe("?jobId=job-1&open=artists");
+    expect(result.current.location.search).toBe("?jobId=job-1&open=artists");
   });
 });

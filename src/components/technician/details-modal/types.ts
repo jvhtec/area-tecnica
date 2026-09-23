@@ -8,6 +8,9 @@ export interface DetailsModalProps {
   isDark: boolean;
   job: JobWithLocationAndDocs;
   onClose: () => void;
+  /** Tab to show first, e.g. restored from the URL after a reload. */
+  initialTab?: TabId;
+  onTabChange?: (tab: TabId) => void;
 }
 
 export type TabId = "Info" | "Ubicación" | "Transp." | "Personal" | "Docs" | "Restau." | "Clima";

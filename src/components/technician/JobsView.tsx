@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { addWeeks, addMonths } from 'date-fns';
 import { Loader2, Briefcase } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { TechJobCard } from './TechJobCard';
+import { filterJobsForView } from './jobsViewFilter';
 import { Theme } from './types';
 
 interface JobsViewProps {
@@ -25,66 +25,8 @@ export const JobsView = ({ theme, isDark, assignments, isLoading, onOpenAction, 
         return category === 'responsable';
     });
 
-    // Calculate date ranges based on timeSpan
-    const getDateRange = () => {
-        const now = new Date();
-        let startDate: Date;
-        let endDate: Date;
-
-        if (viewMode === 'upcoming') {
-            startDate = now;
-            switch (timeSpan) {
-                case '1week':
-                    endDate = addWeeks(now, 1);
-                    break;
-                case '2weeks':
-                    endDate = addWeeks(now, 2);
-                    break;
-                case '1month':
-                    endDate = addMonths(now, 1);
-                    break;
-                case '3months':
-                    endDate = addMonths(now, 3);
-                    break;
-                default:
-                    endDate = addWeeks(now, 2);
-            }
-        } else {
-            endDate = now;
-            switch (timeSpan) {
-                case '1week':
-                    startDate = addWeeks(now, -1);
-                    break;
-                case '2weeks':
-                    startDate = addWeeks(now, -2);
-                    break;
-                case '1month':
-                    startDate = addMonths(now, -1);
-                    break;
-                case '3months':
-                    startDate = addMonths(now, -3);
-                    break;
-                default:
-                    startDate = addWeeks(now, -2);
-            }
-        }
-        return { startDate, endDate };
-    };
-
     // Filter assignments based on view mode and time span
-    const filteredAssignments = assignments.filter(assignment => {
-        const jobData = assignment.jobs || assignment;
-        if (!jobData?.start_time) return false;
-
-        const jobStart = new Date(jobData.start_time);
-        const { startDate, endDate } = getDateRange();
-
-        if (viewMode === 'upcoming') {
-            return jobStart >= startDate && jobStart <= endDate;
-        } else {
-            return jobStart >= startDate && jobStart < endDate;
-        }
-    });
+    const filteredAssignments = filterJobsForView(assignments, viewMode, timeSpan);
 
     // Time span options based on view mode
     const timeSpanOptions = viewMode === 'upcoming'
