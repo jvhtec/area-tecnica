@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { DETAILS_MODAL_TABS } from '@/components/technician/details-modal/constants';
 import type { TabId } from '@/components/technician/details-modal/types';
+import { clearDocumentReturn, consumeDocumentReturn } from '@/lib/techAppReturn';
 
 type Options<Job> = {
   /** True once the technician's assignments have loaded. */
@@ -32,7 +33,11 @@ const isDetailsTab = (value: string | null): value is TabId =>
  *   state in the URL they come back to the same job and tab instead of the
  *   dashboard.
  *
- * URL updates use `replace`, so the back button behaves exactly as before.
+ * If the document replaced the app entirely (native shell), the app restarts
+ * at "/" and the URL is lost; the location saved when the document was opened
+ * (techAppReturn.ts) is restored on mount instead.
+ *
+ * URL updates use `replace`, so browser history is unchanged.
  */
 export function useTechAppJobDeepLink<Job>({ isReady, resolveJob, onOpenDetails }: Options<Job>) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -55,7 +60,24 @@ export function useTechAppJobDeepLink<Job>({ isReady, resolveJob, onOpenDetails 
     }, { replace: true });
   }, [setSearchParams]);
 
+  const navigate = useNavigate();
+  useEffect(() => {
+    // Mount only: an explicit link (push notification, reload with params)
+    // wins over the saved return point, which is dropped either way.
+    const savedPath = consumeDocumentReturn();
+    if (savedPath && !searchParams.get(OPEN_PARAM)) navigate(savedPath, { replace: true });
+
+    // Coming back to a still-running app means nothing was lost.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') clearDocumentReturn();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore once per mount
+  }, []);
+
   const clearDetailsParams = useCallback(() => {
+    clearDocumentReturn();
     updateParams((params) => {
       params.delete(OPEN_PARAM);
       params.delete(JOB_PARAM);
