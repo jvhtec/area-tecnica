@@ -480,20 +480,18 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
           <span>Reactivar gira</span>
         </div>
       )}
-      {(!hasTourRootFolders || needsEstructuraRoot) && (
-        <div
-          className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${isCreatingTourRootFolders ? 'opacity-50 cursor-not-allowed' : ''}`}
-          onClick={isCreatingTourRootFolders ? undefined : (event) => {
-            setIsMobileMenuOpen(false);
-            void handleCreateTourRootFolders(event);
-          }}
-        >
-          <FolderPlus className="h-4 w-4 mr-3" />
-          <span>
-            {needsEstructuraRoot ? "Crear carpeta Estructura" : "Crear carpetas raíz de gira"}
-          </span>
-        </div>
-      )}
+      <div
+        className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${isCreatingTourRootFolders ? 'opacity-50 cursor-not-allowed' : ''}`}
+        onClick={isCreatingTourRootFolders ? undefined : (event) => {
+          setIsMobileMenuOpen(false);
+          void handleCreateTourRootFolders(event);
+        }}
+      >
+        <FolderPlus className="h-4 w-4 mr-3" />
+        <span>
+          {hasTourRootFolders ? "Sincronizar estructura Flex" : "Crear carpetas raíz de gira"}
+        </span>
+      </div>
       <div
         className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${!tour.flex_folders_created ? 'opacity-50 cursor-not-allowed' : ''
           }`}
@@ -630,15 +628,13 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
                       Reactivar gira
                     </DropdownMenuItem>
                   )}
-                  {(!hasTourRootFolders || needsEstructuraRoot) && (
-                    <DropdownMenuItem
-                      onClick={handleCreateTourRootFolders}
-                      disabled={isCreatingTourRootFolders}
-                    >
-                      <FolderPlus className="h-4 w-4 mr-2" />
-                      {needsEstructuraRoot ? "Crear carpeta Estructura" : "Crear carpetas raíz de gira"}
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem
+                    onClick={handleCreateTourRootFolders}
+                    disabled={isCreatingTourRootFolders}
+                  >
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    {hasTourRootFolders ? "Sincronizar estructura Flex" : "Crear carpetas raíz de gira"}
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleCreateFlexFolders}
                     disabled={!tour.flex_folders_created}
@@ -713,7 +709,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
               {tour.flex_folders_created && !needsEstructuraRoot ? (
                 <Badge variant="secondary" className="text-xs">
                   <FileText className="h-3 w-3 mr-1" />
-                  Flex preparado
+                  Flex raíz creada
                 </Badge>
               ) : needsEstructuraRoot ? (
                 <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
