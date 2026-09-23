@@ -149,7 +149,7 @@ Picker options control children only. They never remove required department/date
 
 ## Tour root
 
-Technical roots are derived from the union of persisted department selections across all tour jobs. At least one persisted technical selection is required before the operation acquires a lease. Production, Personnel, Comercial, and Estructura roots always exist.
+Technical roots are derived from the union of persisted department selections across all tour jobs. At least one persisted technical selection is required before the operation acquires a lease. Production, Personnel, Comercial, and Estructura roots always exist. The root Event Folder is also marked with Custom Field 2 (`Gira`, boolean) = `true`; Custom Field 1 (`Descuento %`, float) remains reserved for the project discount.
 
 For a new tour root:
 
@@ -163,17 +163,20 @@ Tour name                                      [D]       tour_root
 ├── Tour name - Video                         [DV]      same children, if selected
 ├── Tour name - Production                    [DP]      same three children
 ├── Tour name - Personnel                     [DHR]     no root-level typed children
-├── Tour name - Comercial                     [DQT]     no root-level typed children
+├── Tour name - Comercial                     [DQT]
+│   ├── Tour name - Comercial - Sonido        [DSQT]    tour_commercial_department, if Sound selected
+│   ├── Tour name - Comercial - Luces         [DLQT]    tour_commercial_department, if Lights selected
+│   └── Tour name - Comercial - Video         [DVQT]    tour_commercial_department, if Video selected
 └── Tour name - Estructura                     [DE]      no root-level source sheets
 ```
 
-The tour range comes from `tours.start_date` and `tours.end_date`; if either is absent, it spans the earliest through latest `tour_dates.date`. `D` uses the range start.
+The tour range comes from `tours.start_date` and `tours.end_date`; if either is absent, it spans the earliest through latest `tour_dates.date`. `D` uses the range start. The Comercial department containers are structural only: S/M/L/XL package Quotes are created and maintained inside them by the commercial workflow rather than by root provisioning.
 
-Tour roots persist to `flex_folders` with `job_id = null`. Remote UUIDs also populate `tours.flex_main_folder_id`, each `tours.flex_<department>_folder_id`, and `tours.flex_estructura_folder_id`.
+Tour roots persist to `flex_folders` with `job_id = null`. Remote UUIDs also populate `tours.flex_main_folder_id`, each `tours.flex_<department>_folder_id`, and `tours.flex_estructura_folder_id`. The three Comercial package containers use stable semantic keys `department:comercial:packages:<department>` and `folder_type = tour_commercial_department`.
 
 ### Existing tour-root variant
 
-When a tour UUID column already exists, the operation seeds that root into durable state with legacy provenance and adopts it. Canonical children stay suppressed on later reruns beneath an existing department root whose historical child identities are unknown. A missing department root is new work and receives its full canonical children. A department root created by the durable operation also keeps its children in later plans, so adding a new technical department or resuming a partial run creates each missing child exactly once.
+When a tour UUID column already exists, the operation seeds that root into durable state with legacy provenance and adopts it. Canonical children stay suppressed on later reruns beneath an existing department root whose historical child identities are unknown. This includes legacy Comercial roots so manually-created historical package folders are not duplicated. A missing department root is new work and receives its full canonical children. A department root created by the durable operation also keeps its children in later plans, so adding a new technical department, adding the canonical Comercial package containers, or resuming a partial run creates each missing child exactly once. Re-running `tour-root` on a completed durable tour is therefore the supported structure-sync operation.
 
 The legacy request `{ createRootFolders: true, createDateFolders: false, tourId }` is translated to `tour-root`. The old date-builder request is rejected.
 
@@ -266,6 +269,7 @@ The start time is `artist.show_start`, falling back to `dayStartTime` (default `
 | --- | --- |
 | Standard root and descendants | `flex_folders.element_id`; rows include `job_id`, department, type, and local `parent_id` |
 | Tour root and department roots | `flex_folders.element_id` plus the matching `tours.flex_*_folder_id` column |
+| Tour Comercial package containers | `flex_folders.element_id`, `folder_type = tour_commercial_department`, department `sound, lights, video` |
 | Tour-date nodes | `flex_folders.element_id` with `job_id` and `tour_date_id` |
 | Estructura source sheets | `folder_type = pull_sheet`, `department = estructura`, and `source_department = sound\|lights` |
 | Crew calls | `flex_folders` plus `flex_crew_calls(job_id, department)` |
@@ -274,7 +278,7 @@ The start time is `artist.show_start`, falling back to `dayStartTime` (default `
 | Dry-hire jobs and budgets | `flex_folders`, parented to the month row and then the dry-hire row |
 | Artist extras and budgets | `flex_folders`, always with `department = sound` |
 
-Every operation also has one `flex_provisioning_operations` row and stable semantic nodes in `flex_provisioning_nodes`. Important semantic keys include `root`, `department:<department>`, `estructura:source:<department>`, `department:<department>:<child>`, `dryhire`, `dryhire:budget`, and `artist:<artist-id>:budget`. `flex_folders.element_id` is unique; migration cleanup redirects child, status-log, and provisioning-node references to one retained row before removing historical duplicates.
+Every operation also has one `flex_provisioning_operations` row and stable semantic nodes in `flex_provisioning_nodes`. Important semantic keys include `root`, `department:<department>`, `department:comercial:packages:<department>`, `estructura:source:<department>`, `department:<department>:<child>`, `dryhire`, `dryhire:budget`, and `artist:<artist-id>:budget`. `flex_folders.element_id` is unique; migration cleanup redirects child, status-log, and provisioning-node references to one retained row before removing historical duplicates.
 
 ## Durable state and reconciliation variants
 

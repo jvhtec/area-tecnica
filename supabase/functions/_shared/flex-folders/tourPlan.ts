@@ -8,6 +8,7 @@ import { HttpError } from "../http.ts";
 import type { ProvisioningNode } from "./engine.ts";
 
 export const TECHNICAL_DEPARTMENTS = ["sound", "lights", "video"] as const;
+export const TOUR_COMMERCIAL_DEPARTMENTS = TECHNICAL_DEPARTMENTS;
 export const ROOT_DEPARTMENTS = ["sound", "lights", "video", "production", "personnel", "comercial"] as const;
 type RootDepartment = typeof ROOT_DEPARTMENTS[number];
 
@@ -112,7 +113,30 @@ export const buildRootPlan = (
       tracking: { folderType: "tour_department", department, tourColumn: `flex_${department}_folder_id` },
     });
 
-    if (!childDepartments.has(department) || ![...TECHNICAL_DEPARTMENTS, "production"].includes(department)) continue;
+    if (!childDepartments.has(department)) continue;
+
+    if (department === "comercial") {
+      for (const target of TOUR_COMMERCIAL_DEPARTMENTS) {
+        if (!selected.has(target)) continue;
+        const targetLabel = target === "sound" ? "Sonido" : target === "lights" ? "Luces" : "Video";
+        nodes.push({
+          key: `department:comercial:packages:${target}`,
+          parentKey: "department:comercial",
+          payload: {
+            ...base,
+            definitionId: FLEX_FOLDER_IDS.subFolder,
+            name: `${tour.name} - Comercial - ${targetLabel}`,
+            departmentId: DEPARTMENT_IDS[target],
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[target]}QT`,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[target],
+          },
+          tracking: { folderType: "tour_commercial_department", department: target },
+        });
+      }
+      continue;
+    }
+
+    if (![...TECHNICAL_DEPARTMENTS, "production"].includes(department)) continue;
     for (const child of [
       { key: "technical-documentation", definitionId: FLEX_FOLDER_IDS.documentacionTecnica, name: "Documentación Técnica", suffix: "DT", folderType: "doc_tecnica" },
       { key: "received-budgets", definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos, name: "Presupuestos Recibidos", suffix: "PR", folderType: "presupuestos_recibidos" },

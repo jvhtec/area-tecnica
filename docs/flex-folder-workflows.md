@@ -7,7 +7,7 @@ See the [Flex folder structures and variants](flex-folder-structures.md) catalog
 ## Supported hierarchies
 
 - Standard jobs and festivals use the `job` server operation through `createAllFoldersForJob`: event root, selected technical departments, administrative departments, and Estructura. Picker options control typed children and custom entries.
-- Tour roots use the authenticated `create-flex-folders` operation `tour-root`. Manual, card, bulk, repair, and automatic-tour aliases all call this operation. Technical roots use the union of the tour jobs' persisted department selections; the operation refuses an empty selection before acquiring a lease. Production, Personnel, and Commercial remain administrative roots.
+- Tour roots use the authenticated `create-flex-folders` operation `tour-root`. Manual, card, bulk, repair, and automatic-tour aliases all call this operation. Technical roots use the union of the tour jobs' persisted department selections; the operation refuses an empty selection before acquiring a lease. Production, Personnel, and Commercial remain administrative roots. Commercial owns stable Sound/Lights/Video package-container children for the selected technical departments, and the root Event Folder is marked Custom Field 2 (`Gira`) = `true`.
 - Tour dates use the `tour-date` server operation for single and bulk runs: `Tour → department → date → typed children`. The former Edge hierarchy `Tour → date → department` is rejected for new requests so stale clients cannot create a competing tree.
 - Dry-hire jobs use the `job` server operation and keep their monthly parent → dry hire → Presupuesto structure. Year setup uses the `dryhire-year` server operation, Spanish month names, and the `666.YY.MM`/`555.YY.MM` numbering contracts.
 - Artist extras use the `festival-artist-extras` server operation. It loads the artist and job authoritatively and keeps its artist-specific identity, atomically allocated per-job ordinal, wall-clock schedule, and overnight rules because those differ from job commercial defaults.
@@ -30,7 +30,7 @@ Historical `flex_folders` rows and remote elements are retained. Date-change rea
 4. Mark the node `persisted` only after its consumer record is durable.
 5. Mark the operation complete only after every node in the requested plan is persisted. Activity is emitted only when the run created remote nodes.
 
-An interrupted node with no returned UUID becomes `needs_reconciliation`; automatic replay is refused. A definite non-timeout 4xx rejection becomes `failed` and can be retried because Flex confirmed that it did not accept the request. A node with a known UUID is adopted and its local persistence can resume without another Flex POST. An explicit repair sends `reconcile: true`; it reacquires an expired lease in the same request. Completed scopes can reopen when the requested plan gains nodes, while already-persisted semantic keys are skipped.
+An interrupted node with no returned UUID becomes `needs_reconciliation`; automatic replay is refused. A definite non-timeout 4xx rejection becomes `failed` and can be retried because Flex confirmed that it did not accept the request. A node with a known UUID is adopted and its local persistence can resume without another Flex POST. An explicit repair sends `reconcile: true`; it reacquires an expired lease in the same request. Completed scopes can reopen when the requested plan gains nodes, while already-persisted semantic keys are skipped. The TourCard exposes this as `Sincronizar estructura Flex`, allowing durable tours created before a planner expansion to acquire newly canonical nodes without recreating existing roots. It reports the number of nodes the run actually created, because a completed scope — or a legacy tour whose adopted roots keep their canonical children suppressed — is a legitimate no-op rather than a repair.
 
 Legacy tour roots with known UUID columns are adopted and retain an explicit legacy provenance marker. Canonical children remain suppressed per existing legacy department root whose child identities are unknown; missing departments and departments created by the durable planner keep their complete child plan. Legacy job and tour-date `flex_folders` rows are matched incrementally to semantic keys by folder type, department, source department, parent, and crew-call identity on every expansion, excluding rows already claimed by durable nodes. A partially populated legacy dry-hire year whose root UUID is unknown requires manual parent reconciliation; new year operations are resumable node by node.
 
@@ -41,3 +41,16 @@ The server validates roles before using its service client. Job, tour-date, and 
 Deploy `20260908113000_add_flex_provisioning_state.sql` before the Edge function, then deploy clients that use the typed operation names. A production `supabase db push --linked --dry-run` and migration apply are human release steps. If provisioning must be paused, keep the Hoja removal and durable state records, disable new operations, and forward-fix adoption; do not delete remote elements or return to the deprecated date builder.
 
 The live Flex typed payload contract and representative staging fixtures must be checked before production rollout because local tests do not issue remote Flex writes.
+
+
+## Tour custom-field contract
+
+Area Tecnica reserves the root Event Folder custom fields as follows:
+
+- Custom Field 1 — caption `Descuento  %`, type `float`, `customFieldId` `0997d92e-caf3-4d32-907a-5d4dfdf7d631`: project discount metadata. Not written by provisioning.
+- Custom Field 2 — caption `Gira`, type `boolean`, `customFieldId` `41ef9116-0cee-48d3-b47d-f3308295c85b`: tour discriminator. `tour-root` writes `true` through Flex's header-update endpoint before the provisioning lease is marked complete. `FLEX_TOUR_FLAG_CUSTOM_FIELD_ID` overrides the id if the field is recreated.
+
+Flex addresses **every** custom field with the generic `fieldType` literal `customField` plus a `customFieldId`; there is no per-field fieldType token. Built-in fields (`documentNumber`, `plannedStartDate`, `name`, ...) use their own `fieldType` and no id. `GET /element/<definitionId>/fields` is authoritative for both — it reports the custom fields as `customField1Value` and `customField2Value` with their ids, captions and types.
+- Standard jobs and festivals do not write Custom Field 2, so the Flex Boolean default remains false.
+
+The Custom Field 2 definition must exist on the root Event Folder definition, and its `customFieldId` must match the constant, before deploying this change. A definite Flex 4xx while writing the flag leaves the provisioning operation retryable as a failed operation rather than silently reporting a complete tour structure. The flag is written after `tours.flex_folders_created` is set, so a missing or misconfigured field costs only the flag: the provisioned roots stay usable and tour-date provisioning is not blocked while the field is corrected.

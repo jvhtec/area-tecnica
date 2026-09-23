@@ -94,29 +94,65 @@ const renderTourCard = (tourOverrides: Record<string, unknown> = {}) => {
   );
 };
 
-describe("TourCard Estructura recovery", () => {
+describe("TourCard Flex root reconciliation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.createTourRootFolders.mockResolvedValue({ success: true });
   });
 
-  it("offers and runs a targeted Estructura root backfill for a legacy tour", async () => {
+  it("runs canonical reconciliation for an existing tour with missing root structure", async () => {
     renderTourCard();
 
-    fireEvent.click(screen.getByRole("button", { name: "Crear carpeta Estructura" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar estructura Flex" }));
 
     await waitFor(() => {
-      expect(mocks.createTourRootFolders).toHaveBeenCalledWith("tour-1");
+      expect(mocks.createTourRootFolders).toHaveBeenCalledWith("tour-1", { reconcile: true });
     });
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
-      title: "Carpeta Estructura creada",
+      title: "Estructura Flex sincronizada",
     }));
   });
 
-  it("does not offer the recovery action when the Estructura root is already tracked", () => {
+  it("keeps the reconciliation action available for complete tours so new canonical nodes can be added", async () => {
     renderTourCard({ flex_estructura_folder_id: "estructura-folder-1" });
 
-    expect(screen.queryByRole("button", { name: "Crear carpeta Estructura" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar estructura Flex" }));
+
+    await waitFor(() => {
+      expect(mocks.createTourRootFolders).toHaveBeenCalledWith("tour-1", { reconcile: true });
+    });
+  });
+
+  it("reports how many folders a sync actually added", async () => {
+    mocks.createTourRootFolders.mockResolvedValue({
+      success: true,
+      data: { success: true, status: "complete", data: { created: 3, adopted: 0, skipped: 8 } },
+    });
+    renderTourCard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar estructura Flex" }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+        description: "Se han añadido 3 carpetas nuevas a la estructura de la gira.",
+      }));
+    });
+  });
+
+  it("does not claim a sync completed the structure when nothing was created", async () => {
+    mocks.createTourRootFolders.mockResolvedValue({
+      success: true,
+      data: { success: true, status: "complete", data: { created: 0, adopted: 0, skipped: 11 } },
+    });
+    renderTourCard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar estructura Flex" }));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+        description: "La estructura de la gira ya estaba al día. No se ha añadido ninguna carpeta nueva.",
+      }));
+    });
   });
 
   it("uses the canonical root operation for tours that have no Flex root yet", async () => {
