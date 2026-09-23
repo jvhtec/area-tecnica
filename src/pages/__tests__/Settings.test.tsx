@@ -88,6 +88,7 @@ vi.mock("@/components/settings/PushNotificationMatrix", () => ({
 
 vi.mock("@/components/settings/PushNotificationSchedule", () => ({
   PushNotificationSchedule: () => <div>Push schedule</div>,
+  ShiftReminderSchedule: () => <div>Shift reminder schedule</div>,
 }));
 
 vi.mock("@/components/settings/MorningSummarySubscription", () => ({

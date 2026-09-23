@@ -118,13 +118,16 @@ export async function sendPayloadToTargets(
   client: BroadcastClient,
   subscriptions: PushSubscriptionTarget[],
   nativeTokens: NativePushTokenRow[],
-  payload: PushPayload,
+  // Either one payload for every target, or a per-recipient resolver when the
+  // audience needs different content (e.g. role-specific deep links).
+  payload: PushPayload | ((userId: string | undefined) => PushPayload),
   // Invoked as each target's delivery attempt finishes (success or exhausted
   // retries), before the whole batch resolves. Callers that persist results
   // per-target here avoid losing that forensic detail if the surrounding
   // request later times out mid-batch under high fan-out.
   onResult?: (result: DeliveryResult) => void | Promise<void>,
 ): Promise<DeliveryResult[]> {
+  const payloadFor = typeof payload === "function" ? payload : () => payload;
   const tasks: Array<() => Promise<DeliveryResult>> = [
     ...subscriptions.map((sub) => async () => {
       const targetId = await pushTargetFingerprint("webpush", sub.endpoint);
@@ -132,7 +135,7 @@ export async function sendPayloadToTargets(
       while (attempts < MAX_DELIVERY_ATTEMPTS) {
         attempts += 1;
         try {
-          const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
+          const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payloadFor(sub.user_id ?? undefined));
           if (result.ok || "skipped" in result || !isTransientDeliveryStatus(result.status) || attempts >= MAX_DELIVERY_ATTEMPTS) {
             if (!("skipped" in result)) {
               await recordTargetHealth(client, "webpush", sub.endpoint, result.ok);
@@ -180,7 +183,7 @@ export async function sendPayloadToTargets(
       while (attempts < MAX_DELIVERY_ATTEMPTS) {
         attempts += 1;
         try {
-          const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
+          const result = await sendNativePushNotification(client, tokenRow.device_token, payloadFor(tokenRow.user_id));
           if (result.ok || "skipped" in result || !isTransientDeliveryStatus(result.status) || attempts >= MAX_DELIVERY_ATTEMPTS) {
             if (!("skipped" in result)) {
               await recordTargetHealth(client, "apns", tokenRow.device_token, result.ok);

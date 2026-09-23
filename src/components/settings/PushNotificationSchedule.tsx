@@ -7,9 +7,64 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePushNotificationSchedule } from '@/hooks/usePushNotificationSchedule';
 import { Clock, Calendar, Info } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-export function PushNotificationSchedule() {
-  const { schedule, isLoading, updateSchedule, isUpdating } = usePushNotificationSchedule('daily.morning.summary');
+type ScheduleCardConfig = {
+  eventType: string;
+  title: string;
+  description: string;
+  toggleLabel: string;
+  /** Selectable send hours, inclusive; must match the DB valid_schedule_time window. */
+  firstHour: number;
+  lastHour: number;
+  info: ReactNode;
+};
+
+const MORNING_SUMMARY: ScheduleCardConfig = {
+  eventType: 'daily.morning.summary',
+  title: 'Notificación Diaria Matutina',
+  description: 'Envía un resumen automático cada mañana con el estado del personal del día (trabajos, almacén, vacaciones, etc.)',
+  toggleLabel: 'Activar notificación diaria',
+  firstHour: 6,
+  lastHour: 12,
+  info: (
+    <>
+      <p>
+        Los usuarios (management, admin, house tech) pueden suscribirse individualmente en la sección <strong>"Mi Suscripción al Resumen Diario"</strong> más abajo.
+      </p>
+      <p>
+        Cada usuario elige qué departamentos quiere recibir y puede ver múltiples departamentos en un solo resumen.
+      </p>
+    </>
+  ),
+};
+
+const SHIFT_REMINDER: ScheduleCardConfig = {
+  eventType: 'job.shift.reminder',
+  title: 'Recordatorio de turno',
+  description: 'La tarde anterior, cada técnico con parte de horas para el día siguiente recibe su trabajo, hora de citación y lugar.',
+  toggleLabel: 'Activar recordatorio de turno',
+  firstHour: 17,
+  lastHour: 23,
+  info: (
+    <>
+      <p>
+        Los días seleccionados son los días de <strong>envío</strong>: marcar el domingo recuerda los turnos del lunes.
+      </p>
+      <p>
+        Cada técnico puede desactivarlo desactivando la categoría <strong>"Trabajos"</strong> en sus preferencias de notificación.
+      </p>
+    </>
+  ),
+};
+
+/** Evening-before reminder of tomorrow's job, call time and venue (job.shift.reminder). */
+export function ShiftReminderSchedule() {
+  return <PushNotificationSchedule config={SHIFT_REMINDER} />;
+}
+
+export function PushNotificationSchedule({ config = MORNING_SUMMARY }: { config?: ScheduleCardConfig }) {
+  const { schedule, isLoading, updateSchedule, isUpdating } = usePushNotificationSchedule(config.eventType);
 
   const [enabled, setEnabled] = useState(false);
   const [scheduleTime, setScheduleTime] = useState('08:00');
@@ -51,8 +106,8 @@ export function PushNotificationSchedule() {
     { value: 7, label: 'Dom' },
   ];
 
-  const timeOptions = Array.from({ length: 7 }, (_, i) => {
-    const hour = i + 6; // 6 AM to 12 PM
+  const timeOptions = Array.from({ length: config.lastHour - config.firstHour + 1 }, (_, i) => {
+    const hour = i + config.firstHour;
     return {
       value: `${hour.toString().padStart(2, '0')}:00`,
       label: `${hour}:00`,
@@ -97,7 +152,7 @@ export function PushNotificationSchedule() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Notificación Diaria Matutina
+            {config.title}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -112,20 +167,20 @@ export function PushNotificationSchedule() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
-          Notificación Diaria Matutina
+          {config.title}
         </CardTitle>
         <CardDescription>
-          Envía un resumen automático cada mañana con el estado del personal del día (trabajos, almacén, vacaciones, etc.)
+          {config.description}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Enable/Disable Toggle */}
         <div className="flex items-center justify-between">
-          <Label htmlFor="schedule-enabled" className="text-base">
-            Activar notificación diaria
+          <Label htmlFor={`${config.eventType}-enabled`} className="text-base">
+            {config.toggleLabel}
           </Label>
           <Switch
-            id="schedule-enabled"
+            id={`${config.eventType}-enabled`}
             checked={enabled}
             onCheckedChange={setEnabled}
           />
@@ -133,11 +188,11 @@ export function PushNotificationSchedule() {
 
         {/* Time Selector */}
         <div className="space-y-2">
-          <Label htmlFor="schedule-time" className="text-sm font-medium">
+          <Label htmlFor={`${config.eventType}-time`} className="text-sm font-medium">
             Hora de envío
           </Label>
           <Select value={scheduleTime} onValueChange={setScheduleTime} disabled={!enabled}>
-            <SelectTrigger id="schedule-time" className="w-full">
+            <SelectTrigger id={`${config.eventType}-time`} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -163,13 +218,13 @@ export function PushNotificationSchedule() {
             {weekDays.map(day => (
               <div key={day.value} className="flex items-center space-x-2">
                 <Checkbox
-                  id={`day-${day.value}`}
+                  id={`${config.eventType}-day-${day.value}`}
                   checked={daysOfWeek.includes(day.value)}
                   onCheckedChange={() => toggleDay(day.value)}
                   disabled={!enabled}
                 />
                 <Label
-                  htmlFor={`day-${day.value}`}
+                  htmlFor={`${config.eventType}-day-${day.value}`}
                   className="text-sm font-normal cursor-pointer"
                 >
                   {day.label}
@@ -198,12 +253,7 @@ export function PushNotificationSchedule() {
         <div className="flex items-start gap-2 p-3 bg-muted rounded-md">
           <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
           <div className="text-sm text-muted-foreground space-y-1">
-            <p>
-              Los usuarios (management, admin, house tech) pueden suscribirse individualmente en la sección <strong>"Mi Suscripción al Resumen Diario"</strong> más abajo.
-            </p>
-            <p>
-              Cada usuario elige qué departamentos quiere recibir y puede ver múltiples departamentos en un solo resumen.
-            </p>
+            {config.info}
           </div>
         </div>
 

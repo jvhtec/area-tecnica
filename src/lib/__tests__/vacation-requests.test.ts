@@ -56,6 +56,16 @@ describe("vacationRequestsApi", () => {
     expect(result).toEqual({ id: "vac-1", technician_id: "tech-1" });
     expect(insertBuilder.select).toHaveBeenCalledTimes(1);
     expect(insertBuilder.single).toHaveBeenCalledTimes(1);
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("push", {
+      body: {
+        action: "broadcast",
+        type: "vacation.request.submitted",
+        technician_id: "tech-1",
+        vacation_request_id: "vac-1",
+        start_date: "2026-06-01",
+        end_date: "2026-06-03",
+      },
+    });
   });
 
   it("loads the current user's requests with descending create order", async () => {

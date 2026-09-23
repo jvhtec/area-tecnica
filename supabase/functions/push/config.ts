@@ -128,6 +128,8 @@ export const EVENT_TYPES = {
 
   // Scheduled notifications
   DAILY_MORNING_SUMMARY: 'daily.morning.summary',
+  // Evening-before reminder to every technician working the next day.
+  JOB_SHIFT_REMINDER: 'job.shift.reminder',
   FESTIVAL_FEED_TICK: 'festival.feed.tick',
   PROGRAMA_FEED_TICK: 'programa.feed.tick',
 } as const;

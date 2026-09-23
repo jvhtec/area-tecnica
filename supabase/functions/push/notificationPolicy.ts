@@ -38,6 +38,7 @@ type PreferenceRow = {
 
 const SCHEDULE_OCCURRENCE_EVENT_TYPES = new Set([
   "daily.morning.summary",
+  "job.shift.reminder",
   "festival.feed.tick",
   "programa.feed.tick",
 ]);

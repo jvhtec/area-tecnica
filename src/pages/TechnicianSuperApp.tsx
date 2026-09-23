@@ -5,6 +5,7 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMyTours } from '@/hooks/useMyTours';
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSubscriptions';
+import { useTechAppJobDeepLink } from '@/hooks/useTechAppJobDeepLink';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
@@ -373,6 +374,18 @@ export default function TechnicianSuperApp() {
     setSelectedJob(jobData || null);
     setActiveModal(action);
   };
+
+  // Push notifications about a job link freelancers to ?open=details&jobId=.
+  useTechAppJobDeepLink<TechnicianJobData>({
+    isReady: Boolean(user?.id) && !isLoading,
+    resolveJob: (jobId) => (assignments as TechnicianAssignment[]).find(
+      (assignment) => assignment.job_id === jobId || assignment.jobs?.id === jobId,
+    )?.jobs,
+    onOpenDetails: (job) => {
+      setSelectedJob(job);
+      setActiveModal('details');
+    },
+  });
 
   useEffect(() => {
     const openTarget = searchParams.get('open');

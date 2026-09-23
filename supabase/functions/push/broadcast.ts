@@ -9,6 +9,7 @@ import {
   getManagementByDepartmentUserIds,
   getManagementUserIds,
   getProfileDisplayName,
+  getProfileRoles,
   getSoundDepartmentUserIds,
   getTourName,
 } from "./data.ts";
@@ -16,6 +17,7 @@ import { channelEs } from "./format.ts";
 import { jsonResponse } from "./http.ts";
 import { applyRoutingOverrides, getPushNotificationRoutes } from "./routing.ts";
 import { resolveNotificationUrl, validateInternalUrl } from "./urls.ts";
+import { destinationForRole } from "./recipientDestinations.ts";
 import {
   loadNativeTokens,
   loadPushSubscriptions,
@@ -278,9 +280,26 @@ export async function handleBroadcast(
     },
   } satisfies PushPayload, body, eventKey, urgency);
 
+  // One event, several audiences: tailor the deep link to what each recipient's
+  // role can open, so a freelancer tapping a job push lands on that job in the
+  // tech app instead of being bounced off a management-only page.
+  const recipientRoles = await getProfileRoles(client, recipientIds);
+  const jobUrl = jobId ? resolveNotificationUrl('job.updated', jobId, tourId, jobType) : null;
+  const payloadCache = new Map<string, PushPayload>();
+  const payloadFor = (recipientId: string | undefined): PushPayload => {
+    if (!recipientId || !recipientRoles.has(recipientId)) return payload;
+    const recipientUrl = destinationForRole(payload.url ?? "/", recipientRoles.get(recipientId), { jobId, jobUrl });
+    if (recipientUrl === payload.url) return payload;
+    const cached = payloadCache.get(recipientUrl);
+    if (cached) return cached;
+    const tailored = { ...payload, url: recipientUrl };
+    payloadCache.set(recipientUrl, tailored);
+    return tailored;
+  };
+
   let inboxIds: Map<string, string>;
   try {
-    inboxIds = await claimInboxItems(client, recipientIds, eventKey, body, payload, urgency);
+    inboxIds = await claimInboxItems(client, recipientIds, eventKey, body, payloadFor, urgency);
   } catch (error) {
     logEvent("error", "notification_inbox_claim_failed", {
       errorCode: error instanceof Error ? error.name : "unknown",
@@ -350,7 +369,7 @@ export async function handleBroadcast(
     }));
   }
 
-  const results = await sendPayloadToTargets(client, subscriptions, nativeResult.tokens, payload, async (result) => {
+  const results = await sendPayloadToTargets(client, subscriptions, nativeResult.tokens, payloadFor, async (result) => {
     const inboxId = result.userId ? inboxIds.get(result.userId) : undefined;
     if (inboxId) await recordAttemptResult(client, inboxId, result);
   });

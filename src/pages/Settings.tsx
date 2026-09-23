@@ -20,7 +20,7 @@ import { getDashboardPath } from '@/utils/roleBasedRouting'
 import { isManagementRole } from '@/utils/permissions'
 import type { UserRole } from '@/types/user'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
-import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
+import { PushNotificationSchedule, ShiftReminderSchedule } from '@/components/settings/PushNotificationSchedule'
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager'
@@ -194,7 +194,10 @@ const Settings = () => {
                 isOpen={collapsibleStates['push-schedule']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-schedule': open }))}
               >
-                <PushNotificationSchedule />
+                <div className="space-y-4">
+                  <PushNotificationSchedule />
+                  <ShiftReminderSchedule />
+                </div>
               </CollapsibleCard>
             )}
 

@@ -4,23 +4,19 @@ import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
 import { handleFestivalFeedTick } from "./festivalFeed.ts";
 import { handleProgramaFeedTick } from "./programaFeed.ts";
-import { loadNativeTokens, sendPayloadToTargets } from "./broadcast/delivery.ts";
-import { claimInboxItems, recordDeliveryResults } from "./inbox.ts";
 import {
-  buildEventKey,
-  decoratePayloadPolicy,
-  loadRecipientPreferences,
-  type RecipientPreference,
-  urgencyForEvent,
-} from "./notificationPolicy.ts";
+  addOutcome,
+  deliverScheduledToUser,
+  emptyTally,
+  finishScheduledRun,
+} from "./scheduledDelivery.ts";
+import { handleShiftReminderOccurrence } from "./shiftReminder.ts";
 import { isScheduleDue, occurrenceDate } from "./schedulePolicy.ts";
 import { formatMorningSummary, formatMultiDepartmentSummary } from "./morningSummaryFormat.ts";
 import type { MorningSummaryData } from "./morningSummaryTypes.ts";
 import type {
   BroadcastBody,
   CheckScheduledBody,
-  PushPayload,
-  PushSubscriptionRow,
 } from "./types.ts";
 
 type MorningSummaryAssignment = MorningSummaryData["assignments"][number];
@@ -262,6 +258,7 @@ export async function handleCheckScheduled(
   const type = body.type;
   const supportedTypes = new Set<string>([
     EVENT_TYPES.DAILY_MORNING_SUMMARY,
+    EVENT_TYPES.JOB_SHIFT_REMINDER,
     EVENT_TYPES.FESTIVAL_FEED_TICK,
     EVENT_TYPES.PROGRAMA_FEED_TICK,
   ]);
@@ -335,6 +332,10 @@ export async function handleCheckScheduled(
   const targetDate = (resumed ? occurrenceDate(occurrenceKey) : null)
     ?? currentDateInTimezone(timezone);
 
+  if (type === EVENT_TYPES.JOB_SHIFT_REMINDER) {
+    return handleShiftReminderOccurrence(client, occurrenceKey, targetDate, timezone);
+  }
+
   // For daily morning summary, use granular user subscriptions
   if (type === EVENT_TYPES.DAILY_MORNING_SUMMARY) {
     // Query user subscriptions
@@ -373,8 +374,7 @@ export async function handleCheckScheduled(
 
     // Process each user
     const allResults: PushDeliveryResult[] = [];
-    let successfulUsers = 0;
-    let hadOperationalFailure = false;
+    const tally = emptyTally();
 
     for (const subscription of subscriptions) {
       const userId = subscription.user_id;
@@ -424,121 +424,29 @@ export async function handleCheckScheduled(
         recipient_id: userId,
         target_date: targetDate,
       };
-      const eventKey = await buildEventKey(notificationBody);
-      const urgency = urgencyForEvent(type);
-      const payload = decoratePayloadPolicy({
+      const outcome = await deliverScheduledToUser(client, userId, notificationBody, {
         title,
         body: text,
         url: summaryUrl,
-        type,
-        meta: {
-          departments,
-          targetDate,
-        },
-      } satisfies PushPayload, notificationBody, eventKey, urgency);
-
-      const inboxIds = await claimInboxItems(
-        client,
-        [userId],
-        eventKey,
-        notificationBody,
-        payload,
-        urgency,
-        true,
-      );
-      if (inboxIds.size === 0) continue;
-
-      let preference: RecipientPreference | undefined;
-      try {
-        preference = (await loadRecipientPreferences(client, [userId], notificationBody, urgency)).get(userId);
-      } catch (error) {
-        hadOperationalFailure = true;
-        logEvent("error", "scheduled_push_preference_lookup_failed", {
-          errorCode: error instanceof Error ? error.name : "unknown",
-        });
-        await recordDeliveryResults(client, inboxIds, [], [], [userId]);
-        continue;
-      }
-      if (
-        preference?.accountEnabled === false
-        || preference?.categoryEnabled === false
-        || preference?.quietNow === true
-        || preference?.muted === true
-      ) {
-        await recordDeliveryResults(client, inboxIds, [], [userId]);
-        continue;
-      }
-
-      // Load push subscriptions only after the durable inbox item is claimed.
-      const { data: pushSubs, error: pushSubsErr } = await client
-        .from('push_subscriptions')
-        .select('endpoint, p256dh, auth')
-        .eq('user_id', userId)
-        .eq('enabled', true)
-        .returns<PushSubscriptionRow[]>();
-
-      if (pushSubsErr) {
-        hadOperationalFailure = true;
-        logEvent("error", "scheduled_push_subscription_lookup_failed", {
-          errorCode: pushSubsErr.code ?? "unknown",
-        });
-        await recordDeliveryResults(client, inboxIds, [], [], [userId]);
-        continue;
-      }
-
-      const nativeResult = await loadNativeTokens(client, [userId]);
-      if (nativeResult.error) {
-        hadOperationalFailure = true;
-        await recordDeliveryResults(client, inboxIds, [], [], [userId]);
-        continue;
-      }
-      const nativeTokens = nativeResult.tokens;
-      if ((!pushSubs || pushSubs.length === 0) && nativeTokens.length === 0) {
-        console.log(`  ⚠️ User ${userId} has no push subscriptions`);
-        await recordDeliveryResults(client, inboxIds, [], [userId]);
-        continue;
-      }
-
-      // Send with the shared bounded-concurrency and transient-retry policy.
-      const deliveryResults = await sendPayloadToTargets(
-        client,
-        (pushSubs || []).map((subscription) => ({ ...subscription, user_id: userId })),
-        nativeTokens,
-        payload,
-      );
-      await recordDeliveryResults(client, inboxIds, deliveryResults, []);
-      const userSent = deliveryResults.some((result) => result.ok);
-      allResults.push(...deliveryResults.map((result) => ({
-        endpoint: result.endpoint,
-        ok: result.ok,
-        status: result.status,
-        skipped: result.skipped,
-        user_id: userId,
-      })));
-
-      if (userSent) {
-        successfulUsers++;
-        console.log(`  ✅ Sent to ${(pushSubs?.length || 0) + nativeTokens.length} device(s) for user ${userId}`);
+        meta: { departments, targetDate },
+      });
+      addOutcome(tally, outcome);
+      if (outcome.status === 'delivered') {
+        allResults.push(...outcome.results.map((result) => ({
+          endpoint: result.endpoint,
+          ok: result.ok,
+          status: result.status,
+          skipped: result.skipped,
+          user_id: userId,
+        })));
+        if (outcome.sent) console.log(`  ✅ Sent ${outcome.results.length} notification(s) for user ${userId}`);
+      } else if (outcome.status === 'skipped') {
+        console.log(`  ⚠️ User ${userId} skipped (preferences or no devices)`);
       }
     }
 
-    const hadProviderAttempts = allResults.length > 0;
-    const scheduleSucceeded = !hadOperationalFailure && (successfulUsers > 0 || !hadProviderAttempts);
-    const { error: finishError } = await client.rpc('finish_push_schedule', {
-      p_event_type: type,
-      p_occurrence_key: occurrenceKey,
-      p_success: scheduleSucceeded,
-      p_error: scheduleSucceeded ? null : 'no_provider_acceptance',
-    });
-    if (finishError) console.error('❌ Failed to finalize scheduled occurrence:', finishError);
-
-    if (successfulUsers > 0) {
-      const { error: updateScheduleError } = await client
-        .from('push_notification_schedules')
-        .update({ last_sent_at: new Date().toISOString() })
-        .eq('event_type', type);
-      if (updateScheduleError) console.error('❌ Failed to update last_sent_at:', updateScheduleError);
-    }
+    const scheduleSucceeded = await finishScheduledRun(client, type, occurrenceKey, tally);
+    const successfulUsers = tally.successfulUsers;
 
     console.log(`\n✅ Summary: Sent to ${successfulUsers}/${subscriptions.length} users, ${allResults.length} total notifications`);
 

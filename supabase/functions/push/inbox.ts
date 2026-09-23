@@ -11,24 +11,28 @@ export async function claimInboxItems(
   recipientIds: string[],
   eventKey: string,
   body: BroadcastBody,
-  payload: PushPayload,
+  payload: PushPayload | ((userId: string) => PushPayload),
   urgency: NotificationUrgency,
   includeRetryable = false,
 ): Promise<Map<string, string>> {
-  const rows = recipientIds.map((userId) => ({
-    user_id: userId,
-    event_key: eventKey,
-    event_type: body.type,
-    category: categoryForEvent(body.type),
-    urgency,
-    title: payload.title,
-    body: payload.body ?? null,
-    url: payload.url ?? "/",
-    meta: payload.meta ?? {},
-    expires_at: payload.ttlSeconds
-      ? new Date(Date.now() + payload.ttlSeconds * 1000).toISOString()
-      : null,
-  }));
+  const payloadFor = typeof payload === "function" ? payload : () => payload;
+  const rows = recipientIds.map((userId) => {
+    const recipientPayload = payloadFor(userId);
+    return {
+      user_id: userId,
+      event_key: eventKey,
+      event_type: body.type,
+      category: categoryForEvent(body.type),
+      urgency,
+      title: recipientPayload.title,
+      body: recipientPayload.body ?? null,
+      url: recipientPayload.url ?? "/",
+      meta: recipientPayload.meta ?? {},
+      expires_at: recipientPayload.ttlSeconds
+        ? new Date(Date.now() + recipientPayload.ttlSeconds * 1000).toISOString()
+        : null,
+    };
+  });
   const { data, error } = await client
     .from("notification_inbox")
     .upsert(rows, { onConflict: "user_id,event_key", ignoreDuplicates: true })

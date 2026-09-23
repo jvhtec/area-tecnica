@@ -390,7 +390,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               job_id: job.id,
               old_type: job.job_type,
               new_type: jobType,
-              url: `/jobs/${job.id}`
             }
           });
         }
