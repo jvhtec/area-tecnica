@@ -10,6 +10,7 @@ import {
   downloadFestivalSnapshotWithFiles,
   getFestivalSnapshot,
   isBrowserOnline,
+  requestPersistentStorage,
   subscribeOfflineFestivalChanged,
   syncFestivalPendingChanges,
   type OfflineSyncResult,
@@ -99,6 +100,8 @@ export const useOfflineFestival = (jobId?: string) => {
       return;
     }
     setIsDownloading(true);
+    // Ask while the tap still counts as a user gesture; never blocks the download.
+    void requestPersistentStorage();
     try {
       const { snapshot, files } = await downloadFestivalSnapshotWithFiles(jobId);
       scope.assertCurrent();

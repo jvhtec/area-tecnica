@@ -26,3 +26,4 @@ export {
   generateOfflineId,
 } from "./festival-offline-queue";
 export { syncFestivalPendingChanges, type SyncOptions } from "./festival-sync";
+export { requestPersistentStorage } from "./persistent-storage";

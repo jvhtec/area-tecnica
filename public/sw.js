@@ -7,6 +7,17 @@ const BUILD_VERSION = '__BUILD_TIMESTAMP__' // Will be replaced at build time
 const CACHE_VERSION = 'v3-' + BUILD_VERSION + '-' + self.registration.scope
 const APP_SHELL_CACHE = `app-shell-${CACHE_VERSION}`
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`
+// Hashed build assets (/assets/*) are immutable: the same URL always holds the
+// same bytes. They live in an unversioned cache that survives deploys, so a
+// chunk downloaded before an update still loads offline afterwards.
+const ASSET_CACHE = `assets-v1-${self.registration.scope}`
+const ASSET_CACHE_MAX_ENTRIES = 400
+
+// Code needed to open the app shell, festival management, artist management and
+// the tech app with no connection. Filled in at build time from the Vite manifest
+// by scripts/inject-sw-version.mjs; empty in development.
+const PRECACHE_ASSETS = [] /* __PRECACHE_ASSETS__ */
+const PRECACHE_CONCURRENCY = 6
 
 const APP_SHELL_FILES = [
   '/',
@@ -26,26 +37,49 @@ const isDevHost =
 const HTML_TIMEOUT_MS = 3000
 const RUNTIME_CACHE_MAX_ENTRIES = 180
 
-self.fetchWithTimeout = async (request, timeoutMs) => {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(request, { signal: controller.signal })
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-self.trimRuntimeCache = async (cache) => {
+self.trimRuntimeCache = async (cache, maxEntries = RUNTIME_CACHE_MAX_ENTRIES) => {
   try {
     const keys = await cache.keys()
-    if (keys.length <= RUNTIME_CACHE_MAX_ENTRIES) return
+    if (keys.length <= maxEntries) return
 
-    const staleKeys = keys.slice(0, keys.length - RUNTIME_CACHE_MAX_ENTRIES)
+    const staleKeys = keys.slice(0, keys.length - maxEntries)
     await Promise.all(staleKeys.map((key) => cache.delete(key)))
   } catch (e) {
     console.warn('[sw] Failed to trim runtime cache:', e)
   }
+}
+
+self.isHashedAsset = (url) => url.origin === self.location.origin && url.pathname.startsWith('/assets/')
+
+// Best effort: an asset that fails to download must not block the update, it is
+// fetched again on demand. Assets already cached (unchanged since the previous
+// deploy) are not downloaded again.
+self.precacheAssets = async () => {
+  if (PRECACHE_ASSETS.length === 0) return
+  const cache = await caches.open(ASSET_CACHE)
+  const queue = [...PRECACHE_ASSETS]
+  const worker = async () => {
+    while (queue.length > 0) {
+      const path = queue.shift()
+      try {
+        const existing = await cache.match(path)
+        if (existing) {
+          // Re-insert so trimming (oldest first) never evicts code the current
+          // build still needs ahead of leftovers from older deploys.
+          await cache.put(path, existing)
+          continue
+        }
+        const response = await fetch(path, { cache: 'no-cache' })
+        const contentType = response.headers.get('content-type') || ''
+        if (response.ok && response.type === 'basic' && !contentType.includes('text/html')) {
+          await cache.put(path, response)
+        }
+      } catch (e) {
+        console.warn('[sw] Failed to precache asset:', path, e)
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: PRECACHE_CONCURRENCY }, worker))
 }
 
 self.addEventListener('install', (event) => {
@@ -54,6 +88,7 @@ self.addEventListener('install', (event) => {
       if (!isDevHost) {
         const cache = await caches.open(APP_SHELL_CACHE)
         await cache.addAll(APP_SHELL_FILES)
+        await self.precacheAssets()
       }
 
       await self.skipWaiting()
@@ -85,7 +120,7 @@ self.addEventListener('activate', (event) => {
       if (!isDevHost) {
         // Clear ALL old caches to prevent stale asset issues after deployment
         const keys = await caches.keys()
-        const currentCaches = [APP_SHELL_CACHE, RUNTIME_CACHE]
+        const currentCaches = [APP_SHELL_CACHE, RUNTIME_CACHE, ASSET_CACHE]
         await Promise.all(
           keys
             .filter((key) => !currentCaches.includes(key))
@@ -127,40 +162,44 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       (async () => {
         const cache = await caches.open(RUNTIME_CACHE)
-
-        try {
-          const response = await self.fetchWithTimeout(request, HTML_TIMEOUT_MS)
+        const storeHtml = (response) => {
           if (response && response.ok) {
             cache.put(request, response.clone()).catch((e) => {
               console.warn('[sw] Failed to cache HTML response:', e)
             })
           }
           return response
-        } catch {
-          // Network timed out — attempt one untimed fetch to get fresh HTML
-          // Only fall back to cache if that also fails
-          try {
-            const untimedResponse = await fetch(request)
-            if (untimedResponse && untimedResponse.ok) {
-              cache.put(request, untimedResponse.clone()).catch((e) => {
-                console.warn('[sw] Failed to cache HTML response from untimed fetch:', e)
-              })
-              return untimedResponse
-            }
-          } catch {
-            // Untimed fetch also failed — serve cached shell to stay usable offline
-          }
+        }
+        const cachedShell = async () =>
+          (await cache.match(request)) || (await caches.match('/'))
 
-          const cached = await cache.match(request)
+        // One network request, raced against a timeout. On a connection that
+        // reports "online" but cannot move data (venues, one signal bar) the
+        // request can hang for minutes, so after the timeout the cached shell is
+        // served and the request keeps running in the background to refresh it.
+        const networkPromise = fetch(request).then(storeHtml)
+        event.waitUntil(networkPromise.catch(() => undefined))
+
+        let timeoutId
+        const timedOut = new Promise((resolve) => {
+          timeoutId = setTimeout(() => resolve('timeout'), HTML_TIMEOUT_MS)
+        })
+        try {
+          const first = await Promise.race([networkPromise, timedOut])
+          if (first !== 'timeout') return first
+          const cached = await cachedShell()
           if (cached) return cached
-
-          return caches.match('/').then((shell) => {
-            return shell || new Response('Offline', {
-              status: 503,
-              statusText: 'Service Unavailable',
-              headers: { 'Content-Type': 'text/plain' }
-            })
+          // Nothing cached yet (first visit): keep waiting for the network.
+          return await networkPromise
+        } catch {
+          const cached = await cachedShell()
+          return cached || new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
           })
+        } finally {
+          clearTimeout(timeoutId)
         }
       })()
     )
@@ -198,9 +237,10 @@ self.addEventListener('fetch', (event) => {
 
           // Clone the response to cache it
           const responseToCache = response.clone()
-          caches.open(RUNTIME_CACHE).then((cache) => {
+          const targetCache = self.isHashedAsset(url) ? ASSET_CACHE : RUNTIME_CACHE
+          caches.open(targetCache).then((cache) => {
             cache.put(request, responseToCache).then(() => {
-              self.trimRuntimeCache(cache)
+              self.trimRuntimeCache(cache, targetCache === ASSET_CACHE ? ASSET_CACHE_MAX_ENTRIES : RUNTIME_CACHE_MAX_ENTRIES)
             }).catch((e) => {
               console.warn('[sw] Failed to cache asset response:', e)
             })
