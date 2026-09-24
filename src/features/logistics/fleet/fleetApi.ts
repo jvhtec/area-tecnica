@@ -197,7 +197,7 @@ export async function fetchLogisticsMatrix(startKey: string, endKey: string): Pr
 
 export type AssignmentConflict = {
   assignment_id: string;
-  kind: "driver" | "vehicle";
+  kind: "driver" | "vehicle" | "availability";
   starts_at: string;
   ends_at: string;
   title: string | null;
@@ -245,7 +245,7 @@ export async function saveDriverAssignment(input: SaveDriverAssignmentInput): Pr
         const row = asRecord(value);
         return {
           assignment_id: str(row.assignment_id),
-          kind: row.kind === "vehicle" ? "vehicle" : "driver",
+          kind: row.kind === "availability" ? "availability" : row.kind === "vehicle" ? "vehicle" : "driver",
           starts_at: str(row.starts_at),
           ends_at: str(row.ends_at),
           title: strOrNull(row.title),
@@ -299,7 +299,10 @@ export async function notifyDriverAssignmentsForEvent(eventId: string): Promise<
   throwIfError(error, "No se pudieron resolver los conductores del transporte");
   for (const value of asArray(data)) {
     const assignmentId = strOrNull(value);
-    if (assignmentId) notifyDriverEvent("logistics.driver.updated", { assignment_id: assignmentId });
+    if (assignmentId) {
+      notifyDriverEvent("logistics.driver.updated", { assignment_id: assignmentId });
+      notifyDriverAssignmentChannels(assignmentId, "updated");
+    }
   }
 }
 
@@ -542,6 +545,14 @@ function notifyDriverEvent(type: DriverPushEvent, body: Record<string, string | 
     .catch(() => undefined);
 }
 
+function notifyDriverAssignmentChannels(assignmentId: string, kind: "assigned" | "updated") {
+  void dataLayerClient.functions
+    .invoke("send-driver-assignment-notification", {
+      body: { assignment_id: assignmentId, kind },
+    })
+    .catch(() => undefined);
+}
+
 function notifyAfterSave(result: Extract<SaveDriverAssignmentResult, { status: "saved" }>) {
   if (result.previousDriverId && result.previousDriverId !== result.driverId) {
     notifyDriverEvent("logistics.driver.removed", {
@@ -553,8 +564,10 @@ function notifyAfterSave(result: Extract<SaveDriverAssignmentResult, { status: "
   if (result.previousDriverId === result.driverId) {
     if (result.materialChange) {
       notifyDriverEvent("logistics.driver.updated", { assignment_id: result.assignmentId });
+      notifyDriverAssignmentChannels(result.assignmentId, "updated");
     }
     return;
   }
   notifyDriverEvent("logistics.driver.assigned", { assignment_id: result.assignmentId });
+  notifyDriverAssignmentChannels(result.assignmentId, "assigned");
 }
