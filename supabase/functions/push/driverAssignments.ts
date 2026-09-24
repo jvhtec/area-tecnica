@@ -12,6 +12,7 @@ export type DriverAssignmentFacts = {
   status: string;
   startsAt: string;
   endsAt: string;
+  timezone: string;
   eventType: string | null;
   eventTitle: string | null;
   vehicleName: string | null;
@@ -22,6 +23,7 @@ type JobRow = { title?: string | null };
 type EventRow = {
   event_type?: string | null;
   title?: string | null;
+  timezone?: string | null;
   job?: JobRow | JobRow[] | null;
 };
 type VehicleRow = { name?: string | null; license_plate?: string | null };
@@ -45,7 +47,7 @@ export async function loadDriverAssignmentFacts(
     .from("transport_driver_assignments")
     .select(
       "id, driver_id, assigned_by, status, starts_at, ends_at, " +
-        "logistics_event:logistics_events(event_type, title, job:jobs(title)), " +
+        "logistics_event:logistics_events(event_type, title, timezone, job:jobs(title)), " +
         "vehicle:fleet_vehicles(name, license_plate)",
     )
     .eq("id", assignmentId)
@@ -63,6 +65,7 @@ export async function loadDriverAssignmentFacts(
     status: data.status ?? "assigned",
     startsAt: data.starts_at,
     endsAt: data.ends_at,
+    timezone: event?.timezone?.trim() || "Europe/Madrid",
     eventType: event?.event_type ?? null,
     eventTitle: event?.title?.trim() || job?.title?.trim() || null,
     vehicleName: vehicle?.name ?? null,
