@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(37);
+SELECT plan(43);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -66,12 +66,14 @@ SELECT set_config('request.jwt.claim.role', 'service_role', false);
 DELETE FROM public.transport_driver_assignments WHERE logistics_event_id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
-  'e5300000-0000-0000-0000-000000000003'::uuid
+  'e5300000-0000-0000-0000-000000000003'::uuid,
+  'e5300000-0000-0000-0000-000000000004'::uuid
 );
 DELETE FROM public.logistics_events WHERE id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
-  'e5300000-0000-0000-0000-000000000003'::uuid
+  'e5300000-0000-0000-0000-000000000003'::uuid,
+  'e5300000-0000-0000-0000-000000000004'::uuid
 );
 DELETE FROM public.driver_details WHERE profile_id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
@@ -86,14 +88,16 @@ DELETE FROM public.profiles WHERE id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
   'e5100000-0000-0000-0000-000000000003'::uuid,
   'e5100000-0000-0000-0000-000000000004'::uuid,
-  'e5100000-0000-0000-0000-000000000005'::uuid
+  'e5100000-0000-0000-0000-000000000005'::uuid,
+  'e5100000-0000-0000-0000-000000000006'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'e5100000-0000-0000-0000-000000000001'::uuid,
   'e5100000-0000-0000-0000-000000000002'::uuid,
   'e5100000-0000-0000-0000-000000000003'::uuid,
   'e5100000-0000-0000-0000-000000000004'::uuid,
-  'e5100000-0000-0000-0000-000000000005'::uuid
+  'e5100000-0000-0000-0000-000000000005'::uuid,
+  'e5100000-0000-0000-0000-000000000006'::uuid
 );
 
 INSERT INTO auth.users (
@@ -108,7 +112,8 @@ FROM (VALUES
   ('e5100000-0000-0000-0000-000000000002'::uuid, 'fleet-driver-ana@test.local'),
   ('e5100000-0000-0000-0000-000000000003'::uuid, 'fleet-driver-beto@test.local'),
   ('e5100000-0000-0000-0000-000000000004'::uuid, 'fleet-tech@test.local'),
-  ('e5100000-0000-0000-0000-000000000005'::uuid, 'fleet-house@test.local')
+  ('e5100000-0000-0000-0000-000000000005'::uuid, 'fleet-house@test.local'),
+  ('e5100000-0000-0000-0000-000000000006'::uuid, 'fleet-logistics-role@test.local')
 ) AS u(id, email)
 ON CONFLICT (id) DO NOTHING;
 
@@ -118,7 +123,8 @@ VALUES
   ('e5100000-0000-0000-0000-000000000002'::uuid, 'fleet-driver-ana@test.local', 'Ana', 'Conductora', 'conductor', 'logistics'),
   ('e5100000-0000-0000-0000-000000000003'::uuid, 'fleet-driver-beto@test.local', 'Beto', 'Conductor', 'conductor', 'logistics'),
   ('e5100000-0000-0000-0000-000000000004'::uuid, 'fleet-tech@test.local', 'Tomás', 'Técnico', 'technician', 'sound'),
-  ('e5100000-0000-0000-0000-000000000005'::uuid, 'fleet-house@test.local', 'Hugo', 'Plantilla', 'house_tech', 'sound')
+  ('e5100000-0000-0000-0000-000000000005'::uuid, 'fleet-house@test.local', 'Hugo', 'Plantilla', 'house_tech', 'sound'),
+  ('e5100000-0000-0000-0000-000000000006'::uuid, 'fleet-logistics-role@test.local', 'Lola', 'Almacén', 'logistics', 'logistics')
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
     first_name = excluded.first_name,
@@ -131,7 +137,9 @@ INSERT INTO public.logistics_events (id, event_type, transport_type, event_date,
 VALUES
   ('e5300000-0000-0000-0000-000000000001'::uuid, 'load', 'trailer', '2031-03-10', '08:00', 'Carga almacén', 'Europe/Madrid'),
   ('e5300000-0000-0000-0000-000000000002'::uuid, 'unload', 'trailer', '2031-03-10', '09:00', 'Descarga recinto', 'Europe/Madrid'),
-  ('e5300000-0000-0000-0000-000000000003'::uuid, 'load', 'furgoneta', '2031-03-10', '15:00', 'Recogida tarde', 'Europe/Madrid');
+  ('e5300000-0000-0000-0000-000000000003'::uuid, 'load', 'furgoneta', '2031-03-10', '15:00', 'Recogida tarde', 'Europe/Madrid'),
+  -- A long haul that starts before the ranges queried below and is still running in them.
+  ('e5300000-0000-0000-0000-000000000004'::uuid, 'load', 'trailer', '2031-03-08', '20:00', 'Ruta larga', 'Europe/Madrid');
 
 -- ---------------------------------------------------------------------------
 -- Management: fleet and assignments
@@ -376,10 +384,74 @@ SELECT is(
   'a declined assignment releases its vehicle for a replacement driver'
 );
 
+-- Ana's refusal was re-covered with the same van; taking it back would double-book it.
+SELECT set_config(
+  'test.ana_declined',
+  (SELECT id::text FROM public.transport_driver_assignments
+   WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000003'::uuid
+     AND driver_id = 'e5100000-0000-0000-0000-000000000002'::uuid),
+  false
+);
+
+SELECT is(
+  public.assign_transport_driver(
+    'e5300000-0000-0000-0000-000000000004'::uuid,
+    'e5100000-0000-0000-0000-000000000003'::uuid,
+    NULL,
+    '2031-03-08 20:00 Europe/Madrid'::timestamptz,
+    '2031-03-10 10:00 Europe/Madrid'::timestamptz
+  ) ->> 'status',
+  'saved',
+  'a multi-day haul can be assigned with an explicit window'
+);
+
+SELECT ok(
+  (SELECT bool_or(e ->> 'id' = 'e5300000-0000-0000-0000-000000000004')
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-09', '2031-03-11') -> 'events') e),
+  'the matrix returns the transport of every assignment overlapping the range'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000002', false);
+
+SELECT throws_ok(
+  $$ SELECT public.respond_transport_assignment(current_setting('test.ana_declined')::uuid, 'confirmed') $$,
+  '23P01',
+  NULL,
+  'a driver cannot re-accept a refused slot that would double-book the vehicle'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000003', false);
+
+SELECT ok(
+  (SELECT bool_or(e ->> 'event_id' = 'e5300000-0000-0000-0000-000000000004')
+   FROM jsonb_array_elements(public.get_my_transport_assignments('2031-03-10', '2031-03-10')) e),
+  'a driver still sees a run that started before the range and has not ended'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000006', false);
+
+SELECT throws_ok(
+  $$ SELECT public.get_logistics_matrix('2031-03-09', '2031-03-11') $$,
+  '42501',
+  NULL,
+  'the logistics role cannot read the driver matrix it has no page for'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.fleet_vehicles)
+    + (SELECT count(*)::integer FROM public.driver_details)
+    + (SELECT count(*)::integer FROM public.transport_driver_assignments),
+  0,
+  'the logistics role cannot read fleet, driver or assignment rows directly'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001', false);
+
 SELECT is(
   public.remove_transport_driver_assignment(
     (SELECT id FROM public.transport_driver_assignments
-     WHERE driver_id = 'e5100000-0000-0000-0000-000000000003'::uuid)
+     WHERE driver_id = 'e5100000-0000-0000-0000-000000000003'::uuid
+       AND logistics_event_id = 'e5300000-0000-0000-0000-000000000003'::uuid)
   ) ->> 'driver_id',
   'e5100000-0000-0000-0000-000000000003',
   'removal returns the driver to notify'
@@ -411,12 +483,14 @@ SELECT throws_ok(
 DELETE FROM public.transport_driver_assignments WHERE logistics_event_id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
-  'e5300000-0000-0000-0000-000000000003'::uuid
+  'e5300000-0000-0000-0000-000000000003'::uuid,
+  'e5300000-0000-0000-0000-000000000004'::uuid
 );
 DELETE FROM public.logistics_events WHERE id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
-  'e5300000-0000-0000-0000-000000000003'::uuid
+  'e5300000-0000-0000-0000-000000000003'::uuid,
+  'e5300000-0000-0000-0000-000000000004'::uuid
 );
 DELETE FROM public.driver_details WHERE profile_id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
@@ -431,14 +505,16 @@ DELETE FROM public.profiles WHERE id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
   'e5100000-0000-0000-0000-000000000003'::uuid,
   'e5100000-0000-0000-0000-000000000004'::uuid,
-  'e5100000-0000-0000-0000-000000000005'::uuid
+  'e5100000-0000-0000-0000-000000000005'::uuid,
+  'e5100000-0000-0000-0000-000000000006'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'e5100000-0000-0000-0000-000000000001'::uuid,
   'e5100000-0000-0000-0000-000000000002'::uuid,
   'e5100000-0000-0000-0000-000000000003'::uuid,
   'e5100000-0000-0000-0000-000000000004'::uuid,
-  'e5100000-0000-0000-0000-000000000005'::uuid
+  'e5100000-0000-0000-0000-000000000005'::uuid,
+  'e5100000-0000-0000-0000-000000000006'::uuid
 );
 
 SELECT * FROM finish();

@@ -133,18 +133,25 @@ const DRIVER_RESPONSE_EVENTS = new Set([
   "logistics.driver.declined",
 ]);
 
-async function isOwnDriverAssignment(
+/**
+ * A driver may announce only a response they have actually recorded: the
+ * assignment must be theirs and already carry the matching status, so the push
+ * cannot tell logistics something respond_transport_assignment did not store.
+ */
+async function isRecordedDriverResponse(
   client: SupabaseClient,
+  type: string,
   assignmentId: string | undefined,
   userId: string,
 ): Promise<boolean> {
   if (!assignmentId) return false;
   const { data, error } = await client
     .from("transport_driver_assignments")
-    .select("driver_id")
+    .select("driver_id, status")
     .eq("id", assignmentId)
     .maybeSingle();
-  return !error && data?.driver_id === userId;
+  const expected = type === "logistics.driver.confirmed" ? "confirmed" : "declined";
+  return !error && data?.driver_id === userId && data?.status === expected;
 }
 
 async function isAuthorizedMessageProducer(
@@ -207,7 +214,7 @@ export async function authorizeBroadcast(
   const profile = await loadCallerProfile(client, caller.userId);
 
   if (DRIVER_RESPONSE_EVENTS.has(type)) {
-    if (await isOwnDriverAssignment(client, body.assignment_id, caller.userId)) return;
+    if (await isRecordedDriverResponse(client, type, body.assignment_id, caller.userId)) return;
     throw new HttpError(403, "La notificación no corresponde al usuario actual");
   }
   if (DRIVER_MANAGEMENT_EVENTS.has(type)) {

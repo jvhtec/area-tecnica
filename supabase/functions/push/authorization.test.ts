@@ -127,13 +127,13 @@ describe('push broadcast authorization', () => {
 })
 
 describe('logistics driver events', () => {
-  function clientFor(role: string, assignmentDriverId: string | null) {
+  function clientFor(role: string, assignmentDriverId: string | null, status = 'confirmed') {
     return {
       from: (table: string) => ({
         select: () => ({
           eq: () => ({
             maybeSingle: async () => table === 'transport_driver_assignments'
-              ? { data: assignmentDriverId ? { driver_id: assignmentDriverId } : null, error: null }
+              ? { data: assignmentDriverId ? { driver_id: assignmentDriverId, status } : null, error: null }
               : { data: { role, department: 'logistics' }, error: null },
           }),
         }),
@@ -141,20 +141,32 @@ describe('logistics driver events', () => {
     } as never
   }
 
-  it('lets a driver confirm or decline only their own assignment', async () => {
-    for (const type of ['logistics.driver.confirmed', 'logistics.driver.declined']) {
+  it('lets a driver announce only the response stored on their own assignment', async () => {
+    for (const [type, status] of [['logistics.driver.confirmed', 'confirmed'], ['logistics.driver.declined', 'declined']]) {
       await expect(authorizeBroadcast(
-        clientFor('conductor', 'driver-1'),
+        clientFor('conductor', 'driver-1', status),
         { userId: 'driver-1', isService: false },
         body(type, { assignment_id: 'a-1' }),
       )).resolves.toBeUndefined()
 
       await expect(authorizeBroadcast(
-        clientFor('conductor', 'driver-2'),
+        clientFor('conductor', 'driver-2', status),
         { userId: 'driver-1', isService: false },
         body(type, { assignment_id: 'a-1' }),
       )).rejects.toMatchObject({ status: 403 })
     }
+
+    // An untouched assignment cannot be announced as declined, nor a refusal as a confirmation.
+    await expect(authorizeBroadcast(
+      clientFor('conductor', 'driver-1', 'assigned'),
+      { userId: 'driver-1', isService: false },
+      body('logistics.driver.declined', { assignment_id: 'a-1' }),
+    )).rejects.toMatchObject({ status: 403 })
+    await expect(authorizeBroadcast(
+      clientFor('conductor', 'driver-1', 'declined'),
+      { userId: 'driver-1', isService: false },
+      body('logistics.driver.confirmed', { assignment_id: 'a-1' }),
+    )).rejects.toMatchObject({ status: 403 })
   })
 
   it('keeps assignment announcements to admin and management', async () => {

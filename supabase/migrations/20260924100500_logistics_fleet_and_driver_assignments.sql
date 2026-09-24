@@ -9,7 +9,7 @@
 -- Access model:
 --   * admin/management (the logistics department works as management) manage the fleet,
 --     driver details and assignments;
---   * logistics/house_tech read the matrix, matching the logistics_events read audience;
+--   * house_tech read the matrix, matching who can open the /logistics page;
 --   * conductors see only their own assignments, the vehicles on them and their own
 --     driver details, through RLS and get_my_transport_assignments().
 -- Assignment writes go exclusively through the RPCs below so conflict checks, role
@@ -43,7 +43,7 @@ security definer
 set search_path = public, pg_temp
 as $$
   select coalesce(public.get_current_user_role(), '') = any (
-    array['admin', 'management', 'logistics', 'house_tech']
+    array['admin', 'management', 'house_tech']
   );
 $$;
 
@@ -345,6 +345,14 @@ begin
     left join public.locations loc on loc.id = j.location_id
     left join public.transport_requests tr on tr.id = le.transport_request_id
     where le.event_date between p_start and p_end
+       -- A run that overlaps the range from an out-of-range transport date (a Sunday-night
+       -- haul in a Monday-first week) still needs its transport to be labelled and editable.
+       or le.id in (
+         select a.logistics_event_id
+         from public.transport_driver_assignments a
+         where a.starts_at < ((p_end + 1)::timestamp at time zone 'Europe/Madrid')
+           and a.ends_at > (p_start::timestamp at time zone 'Europe/Madrid')
+       )
   ) events;
 
   -- Assignments are selected by their own window as well as their event date, so a
@@ -450,6 +458,20 @@ begin
   if v_ends - v_starts > interval '72 hours' then
     raise exception 'Una asignación no puede superar las 72 horas' using errcode = '22023';
   end if;
+
+  -- Serialize every save that touches this driver or vehicle, so two concurrent saves
+  -- cannot both pass the overlap check below before either row is visible. Keys are
+  -- taken in a fixed order to avoid deadlocks between saves that share both resources.
+  perform pg_advisory_xact_lock(k)
+  from (
+    select hashtextextended('transport_driver_assignments:' || r, 0) as k
+    from unnest(array[
+      case when p_driver_id is not null then 'driver:' || p_driver_id::text end,
+      case when p_vehicle_id is not null then 'vehicle:' || p_vehicle_id::text end
+    ]) as r
+    where r is not null
+    order by 1
+  ) keys;
 
   -- Double-booking: the same driver or vehicle on an overlapping window. Declined rows
   -- no longer hold the slot.
@@ -622,7 +644,9 @@ begin
     left join public.transport_requests tr on tr.id = le.transport_request_id
     left join public.fleet_vehicles v on v.id = a.vehicle_id
     where a.driver_id = v_uid
-      and (a.starts_at at time zone 'Europe/Madrid')::date between v_from and v_to
+      -- Any window overlapping the range, so a multi-day run stays listed until it ends.
+      and a.starts_at < ((v_to + 1)::timestamp at time zone 'Europe/Madrid')
+      and a.ends_at > (v_from::timestamp at time zone 'Europe/Madrid')
   ) rows;
 
   return v_result;
@@ -646,6 +670,42 @@ begin
   end if;
   if p_response is null or p_response not in ('confirmed', 'declined') then
     raise exception 'Respuesta no válida' using errcode = '22023';
+  end if;
+
+  select * into v_row
+  from public.transport_driver_assignments
+  where id = p_assignment_id
+    and driver_id = auth.uid()
+  for update;
+  if not found then
+    raise exception 'Asignación no encontrada' using errcode = 'P0002';
+  end if;
+
+  -- A declined row released its slot; taking it back must not double-book the driver or
+  -- the vehicle, which assign_transport_driver would have refused without p_force.
+  if v_row.status = 'declined' and p_response = 'confirmed' then
+    perform pg_advisory_xact_lock(k)
+    from (
+      select hashtextextended('transport_driver_assignments:' || r, 0) as k
+      from unnest(array[
+        'driver:' || v_row.driver_id::text,
+        case when v_row.vehicle_id is not null then 'vehicle:' || v_row.vehicle_id::text end
+      ]) as r
+      where r is not null
+      order by 1
+    ) keys;
+
+    if exists (
+      select 1
+      from public.transport_driver_assignments other
+      where other.id <> v_row.id
+        and other.status <> 'declined'
+        and tstzrange(other.starts_at, other.ends_at, '[)') && tstzrange(v_row.starts_at, v_row.ends_at, '[)')
+        and (other.driver_id = v_row.driver_id
+             or (v_row.vehicle_id is not null and other.vehicle_id = v_row.vehicle_id))
+    ) then
+      raise exception 'Ya tienes otro transporte a esa hora; habla con logística' using errcode = '23P01';
+    end if;
   end if;
 
   begin

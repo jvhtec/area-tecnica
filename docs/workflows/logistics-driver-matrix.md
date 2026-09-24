@@ -51,6 +51,10 @@ the vehicle:
 - **Writes only through RPCs.** `authenticated` has `SELECT` on assignments but no
   `INSERT/UPDATE/DELETE`; use `assign_transport_driver`,
   `remove_transport_driver_assignment` and `respond_transport_assignment`.
+- **Concurrent saves are serialized** per driver and per vehicle with transaction-scoped
+  advisory locks, so two managers cannot both pass the overlap check at once.
+- **The `logistics` role has no access**: the matrix read set is admin/management/house_tech,
+  the same as who can open `/logistics`.
 - **Drivers see only their own transports**, through RLS and
   `get_my_transport_assignments()` (deliberately narrow: time, place, route, vehicle,
   notes — no rates, crew or other jobs). They cannot read the matrix RPC.
@@ -69,7 +73,7 @@ Fire-and-forget pushes from `fleetApi.ts`, resolved server-side in
 | --- | --- | --- | --- |
 | `logistics.driver.assigned` / `.updated` | admin/management | the stored driver | `/conductor` |
 | `logistics.driver.removed` | admin/management | the driver (verified `conductor` role) | `/conductor` |
-| `logistics.driver.confirmed` / `.declined` | the driver, own assignment only | logistics management + whoever assigned it | `/logistics?tab=drivers` |
+| `logistics.driver.confirmed` / `.declined` | the driver, own assignment, only once that status is stored | logistics management + whoever assigned it | `/logistics?tab=drivers` |
 
 Drivers enable push on their profile like crew do (`canViewProfilePushControls`).
 

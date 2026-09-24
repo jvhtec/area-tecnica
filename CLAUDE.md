@@ -663,7 +663,7 @@ Logistics' own matrix: drivers (`conductor` role) and fleet vehicles × days, as
 
 - **Tables**: `fleet_vehicles`, `driver_details`, `transport_driver_assignments` (event × driver/vehicle with its own `starts_at`/`ends_at` window — a driver can do several transports a day).
 - **Writes only via RPCs** (`assign_transport_driver`, `remove_transport_driver_assignment`, `respond_transport_assignment`); conflict checks are per time window, per driver and per vehicle. Declined rows release their slot.
-- **Drivers read only their own rows** via `get_my_transport_assignments()`; the matrix read model `get_logistics_matrix()` is admin/management/logistics/house_tech.
+- **Drivers read only their own rows** via `get_my_transport_assignments()`; the matrix read model `get_logistics_matrix()` is admin/management/house_tech (not the `logistics` role, which has no `/logistics` page).
 - **Surfaces**: `/logistics?tab=drivers` and `?tab=fleet`, `/conductor`, driver licence card on `/profile`. Push events `logistics.driver.*`.
 
 ### Timesheet Calculation
