@@ -167,7 +167,7 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
               <Input
                 id="vehicle-berths"
                 inputMode="numeric"
-                placeholder="16, o 12, 14, 16 si se puede reconfigurar"
+                placeholder="20, o 16, 18, 20 si se puede reconfigurar"
                 value={berthsText}
                 onChange={(e) => setBerthsText(e.target.value)}
               />

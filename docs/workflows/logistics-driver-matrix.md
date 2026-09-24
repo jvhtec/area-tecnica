@@ -74,7 +74,7 @@ the vehicle:
     `features/logistics/fleet/sleeperBusPlanning.ts`): headcount = job crew + "personas
     extra", minus berths the job's other bus runs that day and direction already
     provide. It ranks combinations of own buses (tightest layout, buses busy that day
-    excluded) and hired 12/14/16-berth buses: fewest hires, then fewest buses, then
+    excluded) and hired 12–20-berth buses (`SLEEPER_BUS_HIRE_SIZES`): fewest hires, then fewest buses, then
     fewest empty berths. One run is one bus, so a multi-bus plan means one transport
     per bus; applying a plan sets this run's berths and, for a hire, the company.
   - The assignment form warns when the chosen bus cannot seat the run even in its

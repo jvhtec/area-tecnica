@@ -15,8 +15,8 @@ import {
   type MatrixTransportEvent,
 } from "./fleetModel";
 
-/** Berth layouts hired nightliners usually come in. */
-export const SLEEPER_BUS_HIRE_SIZES = [12, 14, 16] as const;
+/** Berth counts hired nightliners come in, up to the 20-bed double-deckers. */
+export const SLEEPER_BUS_HIRE_SIZES = [12, 14, 16, 18, 20] as const;
 
 /** Companies sleeper buses are hired from. */
 export const SLEEPER_BUS_HIRE_PROVIDERS = ["the_wild_tour", "montoya"] as const satisfies readonly TransportProvider[];
