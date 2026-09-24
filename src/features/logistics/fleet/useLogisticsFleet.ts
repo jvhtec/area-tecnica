@@ -3,8 +3,8 @@ import { useCallback } from "react";
 
 import { fetchLogisticsMatrix, fetchMyTransportAssignments, fetchOwnDriverDetails } from "./fleetApi";
 
-// Prefixed with the table name so the route realtime subscription on
-// transport_driver_assignments (app-route-manifest) invalidates them.
+// Shared aggregate key. Route realtime subscriptions for assignments, events,
+// fleet, licences and their upstream labels all invalidate this root.
 export const LOGISTICS_FLEET_QUERY_ROOT = "transport_driver_assignments";
 
 export const logisticsFleetKeys = {
