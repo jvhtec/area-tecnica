@@ -65,6 +65,9 @@ describe("driver licences", () => {
     expect(driverCoversLicense(["C+E"], "C1+E")).toBe(true);
     expect(driverCoversLicense(["D1+E"], "B+E")).toBe(true);
     expect(driverCoversLicense(["D+E"], "D1+E")).toBe(true);
+    expect(driverCoversLicense(["C+E", "D"], "D+E")).toBe(true);
+    expect(driverCoversLicense(["C+E", "D"], "D1+E")).toBe(true);
+    expect(driverCoversLicense(["C+E", "D1"], "D+E")).toBe(false);
   });
 
   it("rejects a vehicle beyond the driver's licence", () => {
