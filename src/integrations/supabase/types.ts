@@ -12884,6 +12884,7 @@ export type Database = {
         | "house_tech"
         | "wallboard"
         | "oscar"
+        | "conductor"
     }
     CompositeTypes: {
       equipment_details: {
@@ -13170,6 +13171,7 @@ export const Constants = {
         "house_tech",
         "wallboard",
         "oscar",
+        "conductor",
       ],
     },
   },

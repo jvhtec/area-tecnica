@@ -62,6 +62,11 @@ export const EVENT_TYPES = {
   LOGISTICS_EVENT_CREATED: 'logistics.event.created',
   LOGISTICS_EVENT_UPDATED: 'logistics.event.updated',
   LOGISTICS_EVENT_CANCELLED: 'logistics.event.cancelled',
+  LOGISTICS_DRIVER_ASSIGNED: 'logistics.driver.assigned',
+  LOGISTICS_DRIVER_UPDATED: 'logistics.driver.updated',
+  LOGISTICS_DRIVER_REMOVED: 'logistics.driver.removed',
+  LOGISTICS_DRIVER_CONFIRMED: 'logistics.driver.confirmed',
+  LOGISTICS_DRIVER_DECLINED: 'logistics.driver.declined',
 
   // Tour events
   TOURDATE_CREATED: 'tourdate.created',

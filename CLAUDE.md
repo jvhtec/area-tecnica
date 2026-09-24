@@ -328,6 +328,7 @@ The database is extensive with 170+ migrations. Key tables:
 - `user` - Basic user
 - `logistics` - Logistics role
 - `wallboard` - Digital signage display
+- `conductor` - Driver; only sees `/conductor` (own transports), profile and notifications
 
 ### Flex Rental Solutions Integration
 
@@ -655,6 +656,15 @@ Who in the production department is carrying a job — the person crew asks abou
 - **Two read RPCs, and the difference matters**: `get_job_producer_claims()` returns names only and is open to any authenticated caller; `get_job_producer_contacts()` also returns `phone`/`email` and releases each row only to `admin`/`management`/`logistics`, the producer themselves, or a technician assigned to that job. `profiles.phone`/`email` are private — never reach for the `profiles` table to get them.
 - **Assigning a peer is `management` + production only**, not `admin`. Use `canAssignJobProducerClaims` / `isProductionDepartment` from `@/utils/permissions`; the department column holds `production`, `produccion` and `producción` interchangeably.
 - **Surfaces**: job cards and the job details dialog (`JobProducerClaims`), the tech super app job details modal Info tab (`ProducerContactPanel`, with WhatsApp/`tel:`/`mailto:` shortcuts), and Hoja de Ruta exports via `mergeProducerClaimsIntoContacts`. Add the producer to any new job-facing document or surface you build.
+
+### Logistics Driver Matrix (Conductores y Flota)
+
+Logistics' own matrix: drivers (`conductor` role) and fleet vehicles × days, assigning **scheduled transports** (`logistics_events`) instead of jobs. Full reference: `docs/workflows/logistics-driver-matrix.md`.
+
+- **Tables**: `fleet_vehicles`, `driver_details`, `transport_driver_assignments` (event × driver/vehicle with its own `starts_at`/`ends_at` window — a driver can do several transports a day).
+- **Writes only via RPCs** (`assign_transport_driver`, `remove_transport_driver_assignment`, `respond_transport_assignment`); conflict checks are per time window, per driver and per vehicle. Declined rows release their slot.
+- **Drivers read only their own rows** via `get_my_transport_assignments()`; the matrix read model `get_logistics_matrix()` is admin/management/logistics/house_tech.
+- **Surfaces**: `/logistics?tab=drivers` and `?tab=fleet`, `/conductor`, driver licence card on `/profile`. Push events `logistics.driver.*`.
 
 ### Timesheet Calculation
 Handled server-side via `compute_timesheet_hours()` RPC function:
@@ -1061,6 +1071,7 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Options for `createHttpHandler` go inside its call** — `serve(createHttpHandler(handler, { onError }))`. Writing `serve(createHttpHandler(handler), { onError })` passes them to std's `serve`, whose `onError` must return a `Response`.
 - **Never commit .env files** — all dotenv files are gitignored; secrets go in Cloudflare Pages dashboard or Supabase secrets
 - **Staging uses a separate Supabase project** — don't point staging at production; use `.env.staging.local` and `npm run dev:staging`
+- **Driver assignments never touch staffing either** — `transport_driver_assignments` hangs off `logistics_events` and cascades with them (re-planning a transport request drops its driver assignments); never create job assignments or timesheets for conductors
 - **Producer claims never touch staffing** — `job_producer_claims` records who in production owns a job; claiming or releasing must not create or delete `job_assignments`, timesheets or rates
 - **Producer contact details come from `get_job_producer_contacts()`** — never read `profiles.phone`/`profiles.email` to show a producer's contact info; the RPC applies the per-job entitlement check and returning no rows is a normal denial, not an error
 - **Normalize phone numbers through `@/utils/phoneLinks`** — `buildWhatsAppHref` / `buildTelHref` / `normalizePhoneToE164` mirror the Spain-default E.164 rules of the `send-job-whatsapp-message` edge function; don't hand-build `wa.me` links

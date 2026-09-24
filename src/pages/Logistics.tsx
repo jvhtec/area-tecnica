@@ -4,6 +4,8 @@ import { useSearchParams } from "react-router-dom";
 import { LogisticsCalendar } from "@/components/logistics/LogisticsCalendar";
 import { MobileLogisticsCalendar } from "@/components/logistics/MobileLogisticsCalendar";
 import { TodayLogistics } from "@/components/logistics/TodayLogistics";
+import { FleetManagementPanel } from "@/components/logistics/fleet/FleetManagementPanel";
+import { LogisticsDriverMatrix } from "@/components/logistics/fleet/LogisticsDriverMatrix";
 import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
 import { TransportRequestsInbox } from "@/components/logistics/TransportRequestsInbox";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +14,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { ACTIVE_DEPARTMENTS, type ActiveDepartment } from "@/types/department";
-import { isManagementRole } from "@/utils/permissions";
+import { canManageLogisticsMatrix, canViewLogisticsMatrix, isManagementRole } from "@/utils/permissions";
+
+const LOGISTICS_TABS = ["requests", "calendar", "drivers", "fleet"] as const;
+type LogisticsTab = (typeof LOGISTICS_TABS)[number];
+const isLogisticsTab = (value: string | null): value is LogisticsTab =>
+  LOGISTICS_TABS.includes(value as LogisticsTab);
 
 const Logistics = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -22,6 +29,17 @@ const Logistics = () => {
   const canManageTransport = isManagementRole(userRole);
   const canViewTransport = canManageTransport || userRole === "house_tech";
   const readOnly = !canManageTransport;
+  const showDriverMatrix = canViewLogisticsMatrix(userRole);
+  const driverMatrixReadOnly = !canManageLogisticsMatrix(userRole);
+  const requestedTab = searchParams.get("tab");
+  const activeTab: LogisticsTab = isLogisticsTab(requestedTab) ? requestedTab : "requests";
+
+  const changeTab = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === "requests") next.delete("tab");
+    else next.set("tab", value);
+    setSearchParams(next, { replace: true });
+  };
 
   const requestJobId = searchParams.get("jobId");
   const requestedDepartment = searchParams.get("department");
@@ -76,10 +94,12 @@ const Logistics = () => {
         {readOnly && <Badge variant="outline">Solo lectura</Badge>}
       </div>
 
-      <Tabs defaultValue="requests" className="min-w-0 space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:w-[360px]">
+      <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0 space-y-4">
+        <TabsList className={showDriverMatrix ? "grid h-auto w-full grid-cols-2 sm:w-[560px] sm:grid-cols-4" : "grid w-full grid-cols-2 sm:w-[360px]"}>
           <TabsTrigger value="requests">Solicitudes</TabsTrigger>
           <TabsTrigger value="calendar">Calendario</TabsTrigger>
+          {showDriverMatrix && <TabsTrigger value="drivers">Conductores</TabsTrigger>}
+          {showDriverMatrix && <TabsTrigger value="fleet">Flota</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="requests" className="min-w-0 mt-0">
@@ -100,6 +120,18 @@ const Logistics = () => {
             </div>
           )}
         </TabsContent>
+
+        {showDriverMatrix && (
+          <TabsContent value="drivers" className="min-w-0 mt-0">
+            <LogisticsDriverMatrix readOnly={driverMatrixReadOnly} />
+          </TabsContent>
+        )}
+
+        {showDriverMatrix && (
+          <TabsContent value="fleet" className="min-w-0 mt-0">
+            <FleetManagementPanel readOnly={driverMatrixReadOnly} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {requestJobId && requestDepartment && canManageTransport && (

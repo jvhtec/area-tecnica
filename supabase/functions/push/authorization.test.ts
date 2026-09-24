@@ -125,3 +125,55 @@ describe('push broadcast authorization', () => {
     )).rejects.toMatchObject({ status: 403 })
   })
 })
+
+describe('logistics driver events', () => {
+  function clientFor(role: string, assignmentDriverId: string | null) {
+    return {
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => table === 'transport_driver_assignments'
+              ? { data: assignmentDriverId ? { driver_id: assignmentDriverId } : null, error: null }
+              : { data: { role, department: 'logistics' }, error: null },
+          }),
+        }),
+      }),
+    } as never
+  }
+
+  it('lets a driver confirm or decline only their own assignment', async () => {
+    for (const type of ['logistics.driver.confirmed', 'logistics.driver.declined']) {
+      await expect(authorizeBroadcast(
+        clientFor('conductor', 'driver-1'),
+        { userId: 'driver-1', isService: false },
+        body(type, { assignment_id: 'a-1' }),
+      )).resolves.toBeUndefined()
+
+      await expect(authorizeBroadcast(
+        clientFor('conductor', 'driver-2'),
+        { userId: 'driver-1', isService: false },
+        body(type, { assignment_id: 'a-1' }),
+      )).rejects.toMatchObject({ status: 403 })
+    }
+  })
+
+  it('keeps assignment announcements to admin and management', async () => {
+    for (const type of ['logistics.driver.assigned', 'logistics.driver.updated', 'logistics.driver.removed']) {
+      await expect(authorizeBroadcast(
+        clientFor('management', null),
+        { userId: 'manager', isService: false },
+        body(type, { assignment_id: 'a-1' }),
+      )).resolves.toBeUndefined()
+
+      // The logistics role may emit other logistics.* events, but cannot pick a
+      // driver to tell that their transport was removed.
+      for (const role of ['logistics', 'conductor', 'house_tech']) {
+        await expect(authorizeBroadcast(
+          clientFor(role, 'caller'),
+          { userId: 'caller', isService: false },
+          body(type, { assignment_id: 'a-1', recipient_id: 'driver-9' }),
+        )).rejects.toMatchObject({ status: 403 })
+      }
+    }
+  })
+})

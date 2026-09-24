@@ -9,6 +9,9 @@ export const getDashboardPath = (userRole: UserRole | null): string => {
   switch (userRole) {
     case 'wallboard':
       return '/wallboard';
+    case 'conductor':
+      // Drivers only see their own transports.
+      return '/conductor';
     case 'technician':
       // Route technician users to the new TechnicianSuperApp interface
       return '/tech-app';

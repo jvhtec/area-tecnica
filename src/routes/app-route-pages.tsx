@@ -18,6 +18,7 @@ export const ProjectManagement = lazyPage(() => import("@/pages/ProjectManagemen
 export const JobSetup = lazyPage(() => import("@/pages/JobSetup"));
 export const NewJobSetup = lazyPage(() => import("@/pages/NewJobSetup"));
 export const TechnicianDashboard = lazyPage(() => import("@/pages/TechnicianDashboard"));
+export const ConductorDashboard = lazyPage(() => import("@/pages/ConductorDashboard"));
 export const TechnicianUnavailability = lazyPage(() => import("@/pages/TechnicianUnavailability"));
 export const TechnicianSuperApp = lazyPage(() => import("@/pages/TechnicianSuperApp"));
 export const Personal = lazyPage(() => import("@/pages/Personal"));

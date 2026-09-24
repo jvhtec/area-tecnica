@@ -174,6 +174,7 @@ export const accessPolicies = {
   tasks: withRoleAccess(TASKS_ALLOWED_ROLES),
   technicianApp: withRoleAccess(["technician"], { allowAssignableTech: true }),
   technicianDashboard: withRoleAccess(["house_tech"], { allowAssignableTech: true }),
+  conductor: withRoleAccess(["conductor"]),
   technicianUnavailability: withRoleAccess(UNAVAILABILITY_ALLOWED_ROLES, {
     guard: TechnicianSelfServiceGuard,
   }),
@@ -210,6 +211,10 @@ export const subscriptionProfiles = {
   logistics: [
     { table: "jobs", priority: "high" },
     { table: "logistics_events", priority: "high" },
+    { table: "transport_driver_assignments", priority: "medium" },
+  ],
+  conductor: [
+    { table: "transport_driver_assignments", priority: "high" },
   ],
   tours: [
     { table: "tours", priority: "high" },

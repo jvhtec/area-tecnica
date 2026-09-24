@@ -101,6 +101,7 @@ export const VALID_USER_ROLES = new Set<UserRole>([
   "house_tech",
   "wallboard",
   "oscar",
+  "conductor",
 ]);
 
 export const getErrorMessage = (error: unknown, fallback = "Unknown error"): string =>

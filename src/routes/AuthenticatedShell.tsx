@@ -68,6 +68,25 @@ function OscarRouteGuard(): null {
   return null;
 }
 
+// Drivers only get their transports, profile and notification inbox for now.
+const CONDUCTOR_ALLOWED_PATHS = new Set(["/conductor", "/profile", "/notifications"]);
+
+function ConductorRouteGuard(): null {
+  const { userRole, isLoading, isProfileLoading } = useOptimizedAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (isLoading || isProfileLoading) return;
+    if (userRole !== "conductor") return;
+    if (CONDUCTOR_ALLOWED_PATHS.has(location.pathname) || location.pathname.startsWith("/auth")) return;
+
+    navigate("/conductor", { replace: true });
+  }, [userRole, isLoading, isProfileLoading, location.pathname, navigate]);
+
+  return null;
+}
+
 export default function AuthenticatedShell() {
   const location = useLocation();
   const { user } = useOptimizedAuth();
@@ -85,6 +104,7 @@ export default function AuthenticatedShell() {
         </ErrorBoundary>
         <TechnicianRouteGuard />
         <OscarRouteGuard />
+        <ConductorRouteGuard />
         <ErrorBoundary boundaryName="achievement-banner" silent resetKeys={recoveryKeys}>
           <AchievementBanner />
         </ErrorBoundary>

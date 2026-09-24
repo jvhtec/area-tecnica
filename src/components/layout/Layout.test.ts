@@ -215,3 +215,15 @@ describe("buildNavigationItems - admin visibility", () => {
     expect(managerItems.map((item) => item.id)).not.toContain("guarded-route")
   })
 })
+
+describe("buildNavigationItems - conductor navigation", () => {
+  it("limits drivers to their transports and profile, whatever their department", () => {
+    for (const userDepartment of ["logistics", "sound", null]) {
+      const context = buildContext({ userRole: "conductor", userDepartment, hasSoundVisionAccess: false })
+      const items = buildNavigationItems(context)
+
+      expect(items.map((item) => item.id)).toEqual(["conductor-dashboard", "profile"])
+      expect(items.find((item) => item.id === "conductor-dashboard")?.to).toBe("/conductor")
+    }
+  })
+})

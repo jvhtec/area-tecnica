@@ -133,6 +133,10 @@ export type BroadcastBody = {
   // Producer claims
   producer_id?: string;
   producer_name?: string;
+  // Logistics matrix driver assignments
+  assignment_id?: string;
+  logistics_event_id?: string;
+  starts_at?: string;
 };
 
 export type CheckScheduledBody = {
