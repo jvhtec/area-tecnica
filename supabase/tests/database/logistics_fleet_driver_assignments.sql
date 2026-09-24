@@ -186,18 +186,8 @@ VALUES
 -- Management: fleet and assignments
 -- ---------------------------------------------------------------------------
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
-SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000002', false);
-SET ROLE authenticated;
-
-SELECT is(
-  (SELECT r ->> 'location_name'
-   FROM jsonb_array_elements(public.get_my_transport_assignments('2031-03-10', '2031-03-10')) r
-   WHERE r ->> 'event_id' = 'e5300000-0000-0000-0000-000000000002'),
-  'Recinto destino, Madrid',
-  'an unload without an explicit event place navigates to the request destination'
-);
-
 SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001', false);
+SET ROLE authenticated;
 
 SELECT lives_ok(
   $$
@@ -845,6 +835,22 @@ UPDATE public.logistics_events
 SET job_id = 'e5200000-0000-0000-0000-000000000001'::uuid,
     transport_request_id = 'e5600000-0000-0000-0000-000000000001'::uuid
 WHERE id = 'e5300000-0000-0000-0000-000000000002'::uuid;
+
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000002', false);
+SET ROLE authenticated;
+
+SELECT is(
+  (SELECT r ->> 'location_name'
+   FROM jsonb_array_elements(public.get_my_transport_assignments('2031-03-10', '2031-03-10')) r
+   WHERE r ->> 'event_id' = 'e5300000-0000-0000-0000-000000000002'),
+  'Recinto destino, Madrid',
+  'an unload without an explicit event place navigates to the request destination'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT set_config('request.jwt.claim.sub', '', false);
 
 UPDATE public.transport_driver_assignments
 SET status = 'confirmed', responded_at = now()
