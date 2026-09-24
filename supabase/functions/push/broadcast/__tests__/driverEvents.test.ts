@@ -20,6 +20,7 @@ import { handleDriverEvents } from "../families/driverEvents.ts";
 import {
   buildDriverAssignedMessage,
   buildDriverRemovedMessage,
+  formatDriverWindow,
   formatMadridDriverWindow,
 } from "../messages/driverMessages.ts";
 import type { BroadcastEventContext } from "../eventContext.ts";
@@ -34,6 +35,7 @@ const facts: DriverAssignmentFacts = {
   // 08:00 Madrid (CEST).
   startsAt: "2026-10-01T06:00:00Z",
   endsAt: "2026-10-01T08:00:00Z",
+  timezone: "Europe/Madrid",
   eventType: "load",
   eventTitle: "Gala Liceu",
   vehicleName: "Tráiler 1",
@@ -65,6 +67,11 @@ describe("driver push messages", () => {
   it("formats the window in Madrid time", () => {
     expect(formatMadridDriverWindow("2026-10-01T06:00:00Z")).toMatch(/08:00$/);
     expect(formatMadridDriverWindow("not a date")).toBe("");
+  });
+
+  it("formats non-Madrid transports in their event timezone", () => {
+    expect(formatDriverWindow("2026-10-01T22:30:00Z", "Europe/London")).toMatch(/23:30$/);
+    expect(formatDriverWindow("2026-10-01T22:30:00Z", "Europe/Madrid")).toMatch(/00:30$/);
   });
 
   it("describes what, when and which vehicle", () => {
