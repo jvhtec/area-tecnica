@@ -134,6 +134,7 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     transport_type: str(row.transport_type),
     event_date: str(row.event_date),
     event_time: str(row.event_time),
+    timezone: str(row.timezone) || "Europe/Madrid",
     title: strOrNull(row.title),
     job_title: strOrNull(row.job_title),
     loading_bay: strOrNull(row.loading_bay),
@@ -175,6 +176,7 @@ export type AssignmentConflict = {
   starts_at: string;
   ends_at: string;
   title: string | null;
+  timezone: string;
 };
 
 export type SaveDriverAssignmentInput = {
@@ -222,6 +224,7 @@ export async function saveDriverAssignment(input: SaveDriverAssignmentInput): Pr
           starts_at: str(row.starts_at),
           ends_at: str(row.ends_at),
           title: strOrNull(row.title),
+          timezone: str(row.timezone) || "Europe/Madrid",
         };
       }),
     };
