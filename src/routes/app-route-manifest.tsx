@@ -228,6 +228,7 @@ export const subscriptionProfiles = {
     { table: "transport_requests", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
     // A driver's days off (per-day rows and approved vacations) grey out matrix cells.
     { table: "technician_availability", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "availability_schedules", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
     { table: "vacation_requests", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
     // Live positions have their own key so a fix every few seconds never refetches the matrix.
     { table: "driver_locations", priority: "high", queryKey: DRIVER_LOCATIONS_QUERY_KEY },
