@@ -4,24 +4,36 @@ type Message = { title: string; text: string };
 
 const MADRID = "Europe/Madrid";
 
-/** "jue, 1 oct, 08:00" in Madrid time, whatever the runtime's timezone. */
-export function formatMadridDriverWindow(iso: string | null | undefined): string {
+export function formatDriverWindow(
+  iso: string | null | undefined,
+  timezone: string | null | undefined = MADRID,
+): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  const day = new Intl.DateTimeFormat("es-ES", {
-    timeZone: MADRID,
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(date);
-  const time = new Intl.DateTimeFormat("es-ES", {
-    timeZone: MADRID,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-  return `${day}, ${time}`;
+  const timeZone = timezone?.trim() || MADRID;
+  try {
+    const day = new Intl.DateTimeFormat("es-ES", {
+      timeZone,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    }).format(date);
+    const time = new Intl.DateTimeFormat("es-ES", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+    return `${day}, ${time}`;
+  } catch {
+    return "";
+  }
+}
+
+/** Compatibility helper for callers/tests that explicitly need Madrid time. */
+export function formatMadridDriverWindow(iso: string | null | undefined): string {
+  return formatDriverWindow(iso, MADRID);
 }
 
 const movementLabel = (eventType: string | null): string =>
@@ -31,7 +43,7 @@ function describeTransport(facts: DriverAssignmentFacts): string {
   const what = facts.eventTitle
     ? `${movementLabel(facts.eventType)} · ${facts.eventTitle}`
     : movementLabel(facts.eventType);
-  const when = formatMadridDriverWindow(facts.startsAt);
+  const when = formatDriverWindow(facts.startsAt, facts.timezone);
   const vehicle = facts.vehicleName
     ? ` Vehículo: ${facts.vehicleName}${facts.vehiclePlate ? ` (${facts.vehiclePlate})` : ""}.`
     : "";
@@ -45,8 +57,11 @@ export function buildDriverAssignedMessage(facts: DriverAssignmentFacts, updated
   };
 }
 
-export function buildDriverRemovedMessage(startsAt: string | null | undefined): Message {
-  const when = formatMadridDriverWindow(startsAt);
+export function buildDriverRemovedMessage(
+  startsAt: string | null | undefined,
+  timezone?: string | null,
+): Message {
+  const when = formatDriverWindow(startsAt, timezone);
   return {
     title: "Transporte retirado",
     text: when
