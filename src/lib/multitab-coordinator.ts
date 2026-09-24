@@ -429,11 +429,21 @@ export class MultiTabCoordinator {
     const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
 
     requestedSubscriptions.forEach(({ table, queryKey, filter, priority }) => {
+      const delegatedToAnotherTab = Boolean(requesterTabId && requesterTabId !== this.tabId);
+      const normalizedQueryKey: QueryKey = Array.isArray(queryKey) ? [...queryKey] : [queryKey];
       const subscription = manager.subscribeToTable(
         table,
         queryKey,
         filter,
         priority ?? 'medium',
+        delegatedToAnotherTab
+          ? {
+              ownerRoute,
+              // Realtime arrives in the leader tab. Broadcast the invalidation so the
+              // follower that requested this subscription refetches its active query.
+              onPayload: () => this.invalidateQueries(normalizedQueryKey),
+            }
+          : undefined,
       );
 
       if (subscription?.key) {
