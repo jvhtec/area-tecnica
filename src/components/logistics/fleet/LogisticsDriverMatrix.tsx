@@ -15,7 +15,7 @@ import {
   countUncoveredTransportsByDay,
   driverDisplayName,
   findDoubleBookedAssignmentIds,
-  formatMadridTime,
+  formatTransportTime,
   groupAssignmentsByRowAndDay,
   startOfMadridWeek,
   transportEventTitle,
@@ -206,7 +206,7 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
                                   doubleBooked.has(assignment.id) && "ring-2 ring-red-500",
                                 )}
                               >
-                                <span className="font-semibold">{formatMadridTime(assignment.starts_at)}</span>{" "}
+                                <span className="font-semibold">{formatTransportTime(assignment.starts_at, event?.timezone)}</span>{" "}
                                 {event ? transportEventTitle(event) : "Transporte"}
                                 {subtitle && <span className="block opacity-80">{subtitle}</span>}
                               </span>
