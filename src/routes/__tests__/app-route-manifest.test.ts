@@ -100,6 +100,9 @@ describe("app route manifest", () => {
     expect(subscriptionProfiles.conductor).toContainEqual(
       expect.objectContaining({ table: "logistics_events", queryKey: aggregateKey }),
     );
+    expect(subscriptionProfiles.profile).toContainEqual(
+      expect.objectContaining({ table: "driver_details", queryKey: aggregateKey }),
+    );
   });
 
   it("keeps navigation shortcuts pointed at manifest routes", () => {
