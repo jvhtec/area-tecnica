@@ -9,6 +9,8 @@ export type SubscriptionPriority = "high" | "medium" | "low";
 export type SubscriptionTableRequirement = {
   table: string;
   priority: SubscriptionPriority;
+  /** Optional React Query key invalidated by this table instead of the table-name default. */
+  queryKey?: string | readonly unknown[];
 };
 
 export type SubscriptionProfile = readonly SubscriptionTableRequirement[];
