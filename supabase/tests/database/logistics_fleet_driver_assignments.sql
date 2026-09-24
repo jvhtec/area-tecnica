@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(49);
+SELECT plan(58);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -149,13 +149,28 @@ SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001
 SET ROLE authenticated;
 
 SELECT lives_ok(
-  $$
+  $
     INSERT INTO public.fleet_vehicles (id, name, license_plate, vehicle_type, required_license)
     VALUES
       ('e5400000-0000-0000-0000-000000000001'::uuid, 'Tráiler 1', '1234 ABC', 'trailer', 'C+E'),
       ('e5400000-0000-0000-0000-000000000002'::uuid, 'Furgoneta 1', '5678-DEF', 'furgoneta', 'B')
-  $$,
+  $,
   'logistics management can register fleet vehicles'
+);
+
+SELECT is(
+  (SELECT created_by FROM public.fleet_vehicles WHERE id = 'e5400000-0000-0000-0000-000000000001'::uuid),
+  'e5100000-0000-0000-0000-000000000001'::uuid,
+  'fleet created_by is set from the authenticated actor'
+);
+
+SELECT lives_ok(
+  $
+    UPDATE public.fleet_vehicles
+    SET required_license = 'B+E'
+    WHERE id = 'e5400000-0000-0000-0000-000000000002'::uuid
+  $,
+  'fleet accepts the B+E Spanish licence category'
 );
 
 SELECT throws_ok(
@@ -166,11 +181,26 @@ SELECT throws_ok(
 );
 
 SELECT lives_ok(
-  $$
+  $
     INSERT INTO public.driver_details (profile_id, license_categories)
     VALUES ('e5100000-0000-0000-0000-000000000002'::uuid, ARRAY['B', 'C', 'C+E'])
-  $$,
+  $,
   'logistics management can record a driver''s licences'
+);
+
+SELECT is(
+  (SELECT updated_by FROM public.driver_details WHERE profile_id = 'e5100000-0000-0000-0000-000000000002'::uuid),
+  'e5100000-0000-0000-0000-000000000001'::uuid,
+  'driver_details updated_by is set from the authenticated actor'
+);
+
+SELECT lives_ok(
+  $
+    UPDATE public.driver_details
+    SET license_categories = ARRAY['B', 'B+E', 'C', 'C+E', 'D+E']
+    WHERE profile_id = 'e5100000-0000-0000-0000-000000000002'::uuid
+  $,
+  'driver details accept the complete trailer licence categories'
 );
 
 SELECT is(
@@ -188,6 +218,16 @@ SELECT is(
    WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000001'::uuid),
   '2031-03-10 08:00:00 Europe/Madrid'::timestamptz,
   'the window defaults to the transport''s local date and time'
+);
+
+UPDATE public.logistics_events
+SET timezone = NULL
+WHERE id = 'e5300000-0000-0000-0000-000000000004'::uuid;
+
+SELECT is(
+  (SELECT timezone FROM public.logistics_events WHERE id = 'e5300000-0000-0000-0000-000000000004'::uuid),
+  'Europe/Madrid',
+  'a logistics event with no explicit or job timezone falls back to Madrid'
 );
 
 SELECT is(
@@ -511,13 +551,49 @@ SELECT lives_ok(
   'other profile edits on a busy conductor are unaffected'
 );
 
+SELECT throws_ok(
+  $ DELETE FROM public.logistics_events WHERE id = 'e5300000-0000-0000-0000-000000000001'::uuid $,
+  '23514',
+  NULL,
+  'a live driver assignment blocks destructive transport deletion and replanning'
+);
+
+SELECT lives_ok(
+  $
+    DELETE FROM public.transport_driver_assignments
+    WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000001'::uuid
+  $,
+  'the assignment can be removed explicitly before deleting the transport'
+);
+
 DELETE FROM public.logistics_events WHERE id = 'e5300000-0000-0000-0000-000000000001'::uuid;
 
 SELECT is(
   (SELECT count(*)::integer FROM public.transport_driver_assignments
    WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000001'::uuid),
   0,
-  'deleting a transport removes its driver assignments'
+  'transport deletion succeeds after its assignment is explicitly removed'
+);
+
+SELECT throws_ok(
+  $ DELETE FROM public.profiles WHERE id = 'e5100000-0000-0000-0000-000000000003'::uuid $,
+  '23514',
+  NULL,
+  'a conductor with upcoming transports cannot be deleted'
+);
+
+SELECT ok(
+  (SELECT count(*) = 4
+   FROM pg_publication_tables
+   WHERE pubname = 'supabase_realtime'
+     AND schemaname = 'public'
+     AND tablename = ANY (ARRAY[
+       'transport_driver_assignments',
+       'fleet_vehicles',
+       'driver_details',
+       'transport_requests'
+     ])),
+  'realtime publication includes the aggregate logistics sources added by this feature'
 );
 
 SELECT throws_ok(
