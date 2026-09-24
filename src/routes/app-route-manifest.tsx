@@ -193,6 +193,8 @@ export const accessPolicies = {
 } as const satisfies Record<AccessPolicyId, RouteAccessPolicy>;
 
 
+const LOGISTICS_FLEET_QUERY_KEY = ["transport_driver_assignments"] as const;
+
 export const subscriptionProfiles = {
   dashboard: [
     { table: "jobs", priority: "high" },
@@ -209,12 +211,29 @@ export const subscriptionProfiles = {
     { table: "job_assignments", priority: "high" },
   ],
   logistics: [
+    // Keep the normal logistics/calendar invalidations.
     { table: "jobs", priority: "high" },
     { table: "logistics_events", priority: "high" },
-    { table: "transport_driver_assignments", priority: "medium" },
+    // get_logistics_matrix is an aggregate read model. Every source also invalidates
+    // its shared fleet query key so another manager's open matrix cannot go stale.
+    { table: "jobs", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "logistics_events", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "logistics_event_departments", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "transport_driver_assignments", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "fleet_vehicles", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "driver_details", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "profiles", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "locations", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "transport_requests", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
   ],
   conductor: [
-    { table: "transport_driver_assignments", priority: "high" },
+    { table: "transport_driver_assignments", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "logistics_events", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "fleet_vehicles", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "driver_details", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "jobs", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "locations", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "transport_requests", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
   ],
   tours: [
     { table: "tours", priority: "high" },
