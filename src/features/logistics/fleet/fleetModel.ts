@@ -201,9 +201,22 @@ const isLicenseCategory = (value: string): value is LicenseCategory =>
 
 export const driverCoversLicense = (categories: readonly string[], required: string): boolean => {
   if (!isLicenseCategory(required)) return true;
-  return categories.some(
-    (held) => held === required || (isLicenseCategory(held) && LICENSE_IMPLIES[held].includes(required)),
-  );
+
+  const granted = new Set<LicenseCategory>();
+  for (const held of categories) {
+    if (!isLicenseCategory(held)) continue;
+    granted.add(held);
+    for (const implied of LICENSE_IMPLIES[held]) granted.add(implied);
+  }
+
+  // Art. 5.2.f: C+E also grants D+E when the holder already has D.
+  // D+E then carries its ordinary D1+E/B+E implications.
+  if (granted.has("C+E") && granted.has("D")) {
+    granted.add("D+E");
+    for (const implied of LICENSE_IMPLIES["D+E"]) granted.add(implied);
+  }
+
+  return granted.has(required);
 };
 
 export type DriverVehicleWarning = "license_missing" | "license_expired" | "cap_expired";
