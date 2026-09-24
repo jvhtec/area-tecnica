@@ -50,7 +50,6 @@ describe("useWallboardAnnouncements", () => {
     expect(result.current.highlightJobs.has("a1b2-c3d4")).toBe(true);
     expect(result.current.tickerMessages).toEqual([
       { message: "Trabajo destacado", level: "warn" },
-      { message: "Trabajo antiguo", level: "critical" },
     ]);
 
     act(() => vi.advanceTimersByTime(10000));

@@ -1,60 +1,50 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
 import SplashScreen from '@/components/SplashScreen';
-import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
-import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
 import { WakeLockVideo } from '@/components/WakeLockVideo';
+import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
+import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
 
-import { buildCalendarFromJobsList } from './calendar';
-import {
-  addMadridCalendarDays,
-  formatMadridDateKey,
-  fromMadridDateKey,
-  getMadridMonthGrid,
-} from '@/utils/timezoneUtils';
+import { WallboardActivePanel } from './components/WallboardActivePanel';
+import { WallboardHeader } from './components/WallboardHeader';
+import { Ticker } from './components/Ticker';
 import {
   DEFAULT_HIGHLIGHT_TTL_SECONDS,
   DEFAULT_PANEL_DURATIONS,
   DEFAULT_PANEL_ORDER,
   DEFAULT_ROTATION_FALLBACK_SECONDS,
   DEFAULT_TICKER_SECONDS,
+  PANEL_TITLES,
 } from './config';
+import { formatDateKeyRange } from './format';
+import { getDocJobs, getPanelPageCount } from './model';
 import { useWallboardPreset } from './hooks/useWallboardPreset';
 import type {
   CalendarFeed,
   CrewAssignmentsFeed,
-  Dept,
-  DeptCounts,
-  DocProgressFeed,
   JobsOverviewFeed,
-  JobsOverviewJob,
   LogisticsItem,
   PanelKey,
   PendingActionsFeed,
   TickerMessage,
-  TimesheetStatus,
 } from './types';
-import { Ticker } from './components/Ticker';
-import { FooterLogo } from './components/FooterLogo';
-import { WallboardActivePanel } from './components/WallboardActivePanel';
-import {
-  isDept,
-  type AssignmentRow,
-  type CrewDraft,
-  type CrewJobDraft,
-  type DepartmentRow,
-  type DocCountRow,
-  type DocRequirementRow,
-  type LocationRow,
-  type LogisticsEventRow,
-  type ProfileRow,
-  type RequiredRoleRow,
-  type TourMetaRow,
-  type WallboardJobRow,
-} from './wallboardDisplayModel';
 import { useWallboardAnnouncements } from './useWallboardAnnouncements';
 import { useWallboardRotation } from './useWallboardRotation';
+import { formatMadridDateKey } from '@/utils/timezoneUtils';
+import './wallboard.css';
+
+const MIN_REFRESH_INTERVAL_MS = 10_000;
+const MAX_REFRESH_INTERVAL_MS = 60_000;
+const CLOCK_TICK_MS = 30_000;
+
+const EMPTY_PAGES: Record<PanelKey, number> = {
+  overview: 0,
+  docs: 0,
+  crew: 0,
+  logistics: 0,
+  pending: 0,
+  calendar: 0,
+};
 
 export function WallboardDisplay({
   presetSlug: propPresetSlug,
@@ -75,35 +65,24 @@ export function WallboardDisplay({
 
   useLgScreensaverBlock();
 
-  const [isLoading, setIsLoading] = useState(!skipSplash); // Skip loading splash if already shown
-  const [isAlien, setIsAlien] = useState(false);
-  const [theme] = useState<'light' | 'dark'>('light'); // Default to light mode
+  const [isLoading, setIsLoading] = useState(!skipSplash);
   const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_PANEL_ORDER]);
   const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({ ...DEFAULT_PANEL_DURATIONS });
-  const [rotationFallbackSeconds, setRotationFallbackSeconds] = useState<number>(DEFAULT_ROTATION_FALLBACK_SECONDS);
-  const [highlightTtlMs, setHighlightTtlMs] = useState<number>(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
-  const [tickerIntervalMs, setTickerIntervalMs] = useState<number>(DEFAULT_TICKER_SECONDS * 1000);
+  const [rotationFallbackSeconds, setRotationFallbackSeconds] = useState(DEFAULT_ROTATION_FALLBACK_SECONDS);
+  const [highlightTtlMs, setHighlightTtlMs] = useState(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
+  const [tickerIntervalMs, setTickerIntervalMs] = useState(DEFAULT_TICKER_SECONDS * 1000);
   const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
-
-  // Data polling state - declared here to avoid temporal dead zone in useEffect below
   const [overview, setOverview] = useState<JobsOverviewFeed | null>(null);
   const [calendarData, setCalendarData] = useState<CalendarFeed | null>(null);
   const [crew, setCrew] = useState<CrewAssignmentsFeed | null>(null);
-  const [, setDocs] = useState<DocProgressFeed | null>(null);
-  const [pending, setPending] = useState<PendingActionsFeed | null>(null);
+  const [pendingActions, setPendingActions] = useState<PendingActionsFeed | null>(null);
   const [logistics, setLogistics] = useState<LogisticsItem[] | null>(null);
-  const [tickerMsgs, setTickerMsgs] = useState<TickerMessage[]>([]);
+  const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>([]);
   const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
-  const [footerH, setFooterH] = useState<number>(72);
-  const [tickerH, setTickerH] = useState<number>(32);
-  const [panelPages, setPanelPages] = useState<Record<PanelKey, number>>({
-    overview: 0,
-    crew: 0,
-    logistics: 0,
-    pending: 0,
-    calendar: 0,
-  });
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  const [panelPages, setPanelPages] = useState<Record<PanelKey, number>>({ ...EMPTY_PAGES });
 
   useWallboardPreset({
     effectiveSlug,
@@ -120,12 +99,14 @@ export function WallboardDisplay({
     setIdx,
   });
 
-  const processAnnouncements = useWallboardAnnouncements(highlightTtlMs, setHighlightJobs, setTickerMsgs);
+  const processAnnouncements = useWallboardAnnouncements(highlightTtlMs, setHighlightJobs, setTickerMessages);
+
   useWallboardRotation({
     crew,
     idx,
     logistics,
     overview,
+    pending: pendingActions,
     panelDurations,
     panelOrder,
     panelPages,
@@ -134,655 +115,128 @@ export function WallboardDisplay({
     setPanelPages,
   });
 
-  // Data polling (client-side via RLS-safe views)
-  // Note: State declarations moved earlier to avoid temporal dead zone issues
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), CLOCK_TICK_MS);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const pollIntervalMs = Math.min(MAX_REFRESH_INTERVAL_MS, Math.max(MIN_REFRESH_INTERVAL_MS, tickerIntervalMs));
 
   useEffect(() => {
-    if (isApiMode) {
-      return;
-    }
-    const MIN_REFRESH_INTERVAL_MS = 30000;
-    const REALTIME_DEBOUNCE_MS = 1000;
-    const POLL_INTERVAL_MS = 30000;
     let cancelled = false;
     let inFlight = false;
-    let pending = false;
-    let lastFetchStartedAt = 0;
-    let isFirstLoad = true;
-    const fetchAll = async () => {
-      const now = new Date();
-      const todayKey = formatMadridDateKey(now);
-      const todayStart = fromMadridDateKey(todayKey);
-      const weekEndKey = addMadridCalendarDays(todayKey, 6);
-      const weekEnd = fromMadridDateKey(weekEndKey, '23:59:59.999');
-      const calendarGrid = getMadridMonthGrid(now);
-      const calendarStartISO = calendarGrid.gridStart.toISOString();
-      const calendarEndISO = calendarGrid.gridEnd.toISOString();
-      const calendarRange = `[${calendarStartISO},${calendarEndISO}]`;
-      const weekStartMs = todayStart.getTime();
-      const weekEndMs = weekEnd.getTime();
-      const calendarStartMs = calendarGrid.gridStart.getTime();
-      const calendarEndMs = calendarGrid.gridEnd.getTime();
+    let refreshQueued = false;
+    const api = new WallboardApi(wallboardApiToken, effectiveSlug);
 
-      const jobOverlapsWeek = (j: WallboardJobRow) => {
-        const startTime = new Date(j.start_time).getTime();
-        const endTime = new Date(j.end_time).getTime();
-        return endTime >= weekStartMs && startTime <= weekEndMs;
-      };
-      const jobWithinCalendarWindow = (j: WallboardJobRow) => {
-        const startTime = new Date(j.start_time).getTime();
-        const endTime = new Date(j.end_time).getTime();
-        return endTime >= calendarStartMs && startTime <= calendarEndMs;
-      };
-
-      // 1) Fetch jobs (base fields only)
-      const { data: jobs, error: jobsError } = await supabase
-        .from('jobs')
-        .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone,color')
-        .in('job_type', ['single', 'festival', 'ciclo', 'tourdate', 'dryhire', 'evento'])
-        .in('status', ['Confirmado', 'Tentativa', 'Completado'])
-        .filter('time_range', 'ov', calendarRange)
-        .order('start_time', { ascending: true });
-      if (jobsError)
-        console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { calendarStartISO, calendarEndISO });
-      let jobArr: WallboardJobRow[] = jobs || [];
-
-      // Exclude jobs whose parent tour is cancelled (some entries may still be Confirmado)
-      const tourIds = Array.from(new Set(jobArr.map((j) => j.tour_id).filter((id): id is string => Boolean(id))));
-      if (tourIds.length) {
-        const { data: toursMeta, error: toursErr } = await supabase.from('tours').select('id,status').in('id', tourIds);
-        if (toursErr) {
-          console.warn('Wallboard tours meta error:', toursErr);
-        } else if (toursMeta && toursMeta.length) {
-          const cancelledTours = new Set((toursMeta as TourMetaRow[]).filter((t) => t.status === 'cancelled').map((t) => t.id));
-          if (cancelledTours.size) {
-            jobArr = jobArr.filter((j) => !j.tour_id || !cancelledTours.has(j.tour_id));
-          }
-        }
-      }
-      const jobIds = jobArr.map((j) => j.id);
-      const detailJobSet = new Set(jobArr.filter(jobOverlapsWeek).map((j) => j.id));
-      const detailJobIds = Array.from(detailJobSet);
-      const dryhireIds = new Set<string>(jobArr.filter((j) => j.job_type === 'dryhire').map((j) => j.id));
-      const locationIds = Array.from(new Set(jobArr.map((j) => j.location_id).filter((id): id is string => Boolean(id))));
-
-      // 2) Fetch departments for these jobs
-      const { data: deptRows, error: deptErr } = jobIds.length
-        ? await supabase.from('job_departments').select('job_id,department').in('job_id', jobIds)
-        : { data: [] as DepartmentRow[], error: null };
-      if (deptErr) console.error('Wallboard job_departments error:', deptErr);
-      const deptsByJob = new Map<string, Dept[]>();
-      ((deptRows || []) as DepartmentRow[]).forEach((r) => {
-        if (!isDept(r.department)) return;
-        const list = deptsByJob.get(r.job_id) ?? [];
-        list.push(r.department);
-        deptsByJob.set(r.job_id, list);
-      });
-
-      // 3) Fetch assignments for crew counts (restrict to detail window)
-      const { data: assignRows, error: assignErr } = detailJobIds.length
-        ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
-        : { data: [] as AssignmentRow[], error: null };
-      if (assignErr) console.error('Wallboard job_assignments error:', assignErr);
-      const assignsByJob = new Map<string, AssignmentRow[]>();
-      ((assignRows || []) as AssignmentRow[]).forEach((a) => {
-        const list = assignsByJob.get(a.job_id) ?? [];
-        list.push(a);
-        assignsByJob.set(a.job_id, list);
-      });
-
-      // Fetch required-role summaries for these jobs
-      const { data: reqRows, error: reqErr } = detailJobIds.length
-        ? await supabase.from('job_required_roles_summary').select('job_id, department, total_required').in('job_id', detailJobIds)
-        : { data: [] as RequiredRoleRow[], error: null };
-      if (reqErr) console.error('Wallboard job_required_roles_summary error:', reqErr);
-      const needByJobDept = new Map<string, number>();
-      ((reqRows || []) as RequiredRoleRow[]).forEach((r) => {
-        if (r.department) needByJobDept.set(`${r.job_id}:${r.department}`, Number(r.total_required || 0));
-      });
-
-      // 4) Fetch locations for names
-      const { data: locRows, error: locErr } = locationIds.length
-        ? await supabase.from('locations').select('id,name').in('id', locationIds)
-        : { data: [] as LocationRow[], error: null };
-      if (locErr) console.error('Wallboard locations error:', locErr);
-      const locById = new Map<string, string>();
-      ((locRows || []) as LocationRow[]).forEach((l) => locById.set(l.id, l.name || ''));
-
-      // Timesheet statuses via view
-      const tsByJobTech = new Map<string, Map<string, string>>();
-      if (detailJobIds.length) {
-        const { data: ts } = await supabase.from('wallboard_timesheet_status').select('job_id, technician_id, status').in('job_id', detailJobIds);
-        ts?.forEach((row) => {
-          const m = tsByJobTech.get(row.job_id) ?? new Map();
-          m.set(row.technician_id, row.status as string);
-          tsByJobTech.set(row.job_id, m);
-        });
-      }
-
-      // Doc counts and requirements
-      const [{ data: counts }, { data: reqs }] = await Promise.all([
-        detailJobIds.length ? supabase.from('wallboard_doc_counts').select('job_id,department,have').in('job_id', detailJobIds) : Promise.resolve({ data: [] as DocCountRow[] }),
-        supabase.from('wallboard_doc_requirements').select('department,need'),
-      ]);
-
-      const needByDept = new Map<string, number>(((reqs || []) as DocRequirementRow[]).filter((r) => Boolean(r.department)).map((r) => [r.department as string, Number(r.need ?? 0)]));
-      const haveByJobDept = new Map<string, number>();
-      ((counts || []) as DocCountRow[]).forEach((c) => {
-        if (c.department) haveByJobDept.set(`${c.job_id}:${c.department}`, Number(c.have ?? 0));
-      });
-
-      const mapJob = (j: WallboardJobRow): JobsOverviewJob => {
-        const deptsAll: Dept[] = deptsByJob.get(j.id) ?? [];
-        const depts: Dept[] = deptsAll.filter((d) => d !== 'video');
-        const crewAssigned: DeptCounts = { sound: 0, lights: 0, video: 0 };
-        const assignmentRows = detailJobSet.has(j.id) ? assignsByJob.get(j.id) ?? [] : [];
-        assignmentRows.forEach((a) => {
-          if (a.sound_role) crewAssigned.sound++;
-          if (a.lights_role) crewAssigned.lights++;
-          if (a.video_role) crewAssigned.video++;
-        });
-        const crewNeeded: DeptCounts = { sound: 0, lights: 0, video: 0 };
-        depts.forEach((d) => {
-          crewNeeded[d] = detailJobSet.has(j.id) ? needByJobDept.get(`${j.id}:${d}`) || 0 : 0;
-        });
-        let status: 'green' | 'yellow' | 'red';
-        if (detailJobSet.has(j.id)) {
-          const hasReq = depts.some((d) => (crewNeeded[d] || 0) > 0);
-          if (hasReq) {
-            const perDept = depts.map((d) => {
-              const need = crewNeeded[d] || 0;
-              const have = crewAssigned[d] || 0;
-              if (need <= 0) return 1;
-              if (have >= need) return 1;
-              if (have > 0) return 0.5;
-              return 0;
-            });
-            const minCov = Math.min(...perDept);
-            status = minCov >= 1 ? 'green' : minCov > 0 ? 'yellow' : 'red';
-          } else {
-            const present = depts.map((d) => crewAssigned[d]);
-            const hasAny = present.some((n) => n > 0);
-            const allHave = depts.length > 0 && present.every((n) => n > 0);
-            status = allHave ? 'green' : hasAny ? 'yellow' : 'red';
-          }
-        } else {
-          status = j.status === 'Confirmado' ? 'green' : 'yellow';
-        }
-        const docs: Record<string, { have: number; need: number }> = {};
-        depts.forEach((d) => {
-          const have = detailJobSet.has(j.id) ? haveByJobDept.get(`${j.id}:${d}`) ?? 0 : 0;
-          const need = needByDept.get(d) ?? 0;
-          docs[d] = { have, need };
-        });
-        return {
-          id: j.id,
-          title: j.title,
-          start_time: j.start_time,
-          end_time: j.end_time,
-          location: { name: j.location_id ? locById.get(j.location_id) ?? null : null },
-          departments: depts,
-          crewAssigned: { ...crewAssigned, total: crewAssigned.sound + crewAssigned.lights + crewAssigned.video },
-          crewNeeded: { ...crewNeeded, total: crewNeeded.sound + crewNeeded.lights + crewNeeded.video },
-          docs,
-          status,
-          color: j.color ?? null,
-          job_type: j.job_type ?? null,
-        };
-      };
-
-      const calendarJobs: JobsOverviewJob[] = jobArr
-        .filter((j) => !dryhireIds.has(j.id))
-        .filter(jobWithinCalendarWindow)
-        .map(mapJob)
-        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-      const jobsForWeek: JobsOverviewJob[] = jobArr
-        .filter((j) => !dryhireIds.has(j.id))
-        .filter(jobOverlapsWeek)
-        .map(mapJob)
-        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-      const jobsByDate: Record<string, JobsOverviewJob[]> = {};
-      const jobDateLookup: Record<string, string> = {};
-      calendarJobs.forEach((job) => {
-        const startTs = new Date(job.start_time).getTime();
-        const endTs = new Date(job.end_time).getTime();
-        if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) return;
-
-        // Primary date for lookups/highlights – keep as start date
-        const primaryKey = formatMadridDateKey(new Date(job.start_time));
-        jobDateLookup[job.id] = primaryKey;
-
-        // Add the job to every calendar day it spans within the visible window
-        const spanStart = Math.max(startTs, calendarStartMs);
-        const spanEnd = Math.min(endTs, calendarEndMs);
-        if (spanEnd < spanStart) return;
-
-        let dayKey = formatMadridDateKey(new Date(spanStart));
-        const lastDayKey = formatMadridDateKey(new Date(spanEnd));
-
-        while (dayKey <= lastDayKey) {
-          const bucket = jobsByDate[dayKey] ?? (jobsByDate[dayKey] = []);
-          bucket.push(job);
-          const nextDayKey = addMadridCalendarDays(dayKey, 1);
-          if (nextDayKey === dayKey) break;
-          dayKey = nextDayKey;
-        }
-      });
-
-      const overviewPayload: JobsOverviewFeed = {
-        jobs: jobsForWeek,
-      };
-
-      // Crew assignments
-      const assignedTechsByJob = new Map<string, string[]>();
-      const crewDraftJobs: CrewJobDraft[] = jobArr
-        .filter((j) => !dryhireIds.has(j.id))
-        .filter(jobOverlapsWeek)
-        .map((j) => {
-          const crew = (assignsByJob.get(j.id) ?? [])
-            // Hide video crew
-            .filter((a) => a.video_role == null && typeof a.technician_id === 'string')
-            .map((a): CrewDraft => {
-              const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
-              const role = a.sound_role || a.lights_role || 'assigned';
-              const technicianId = a.technician_id || '';
-              const list = assignedTechsByJob.get(j.id) ?? [];
-              list.push(technicianId);
-              assignedTechsByJob.set(j.id, list);
-              return { name: '', role, dept, timesheetStatus: 'missing' as TimesheetStatus, technician_id: technicianId };
-            });
-          return { id: j.id, title: j.title, jobType: j.job_type, job_type: j.job_type, start_time: j.start_time, end_time: j.end_time, color: j.color ?? null, crew };
-        });
-
-      // Fill names in one request
-      const techIds = Array.from(new Set(crewDraftJobs.flatMap((j) => j.crew.map((c) => c.technician_id))));
-      const profileById = new Map<string, ProfileRow>();
-      if (techIds.length) {
-        const { data: profs } = await supabase.rpc('get_profile_directory', {
-          p_profile_ids: techIds,
-        });
-        ((profs || []) as ProfileRow[]).forEach((profile) => profileById.set(profile.id, profile));
-      }
-
-      const crewPayload: CrewAssignmentsFeed = {
-        jobs: crewDraftJobs.map((job) => ({
-          ...job,
-          crew: job.crew.map((crewMember) => {
-            const profile = profileById.get(crewMember.technician_id);
-            const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || '';
-            const status = tsByJobTech.get(job.id)?.get(crewMember.technician_id);
-            const inPast = new Date(jobArr.find((x) => x.id === job.id)?.end_time || Date.now()) < new Date();
-            const normalizedStatus: TimesheetStatus =
-              status === 'approved' || status === 'submitted' || status === 'draft' || status === 'rejected'
-                ? status
-                : 'missing';
-            return {
-              name,
-              role: crewMember.role,
-              dept: crewMember.dept,
-              timesheetStatus: inPast && normalizedStatus === 'approved' ? 'approved' : normalizedStatus,
-            };
-          }),
-        })),
-      };
-
-      // Doc progress
-      const docPayload: DocProgressFeed = {
-        jobs: jobArr
-          .filter((j) => !dryhireIds.has(j.id))
-          .filter(jobOverlapsWeek)
-          .map((j) => {
-            const deptsAll: Dept[] = deptsByJob.get(j.id) ?? [];
-            return {
-              id: j.id,
-              title: j.title,
-              color: j.color ?? null,
-              jobType: j.job_type,
-              job_type: j.job_type,
-              start_time: j.start_time,
-              end_time: j.end_time,
-              departments: deptsAll.map((d: Dept) => ({
-                dept: d,
-                have: haveByJobDept.get(`${j.id}:${d}`) ?? 0,
-                need: needByDept.get(d) ?? 0,
-                missing: [] as string[],
-              })),
-            };
-          }),
-      };
-
-      // Pending actions
-      const items: PendingActionsFeed['items'] = [];
-      overviewPayload.jobs.forEach((j) => {
-        if (dryhireIds.has(j.id)) return; // skip dryhire for pending
-        // Under-staffed alerts based on requirements where present (sound/lights only)
-        j.departments
-          .filter((d) => d !== 'video')
-          .forEach((d: Dept) => {
-            const need = j.crewNeeded[d] || 0;
-            const have = j.crewAssigned[d] || 0;
-            if (need > 0 && have < need) {
-              const startsInMs = new Date(j.start_time).getTime() - Date.now();
-              const within24h = startsInMs <= 24 * 3600 * 1000;
-              items.push({ severity: within24h ? 'red' : 'yellow', text: `${j.title} – ${need - have} open ${d} slot(s)` });
-            }
-          });
-        const ended24h = new Date(j.end_time).getTime() < Date.now() - 24 * 3600 * 1000;
-        if (ended24h) {
-          // count missing statuses for this job (assigned techs without submitted/approved)
-          const m = tsByJobTech.get(j.id) ?? new Map<string, string>();
-          const techList = assignedTechsByJob.get(j.id) ?? [];
-          const missingCount = techList.filter((tid) => {
-            const s = m.get(tid);
-            return !(s === 'approved' || s === 'submitted');
-          }).length;
-          if (missingCount > 0) items.push({ severity: 'red', text: `${j.title} – ${missingCount} missing timesheets` });
-        }
-      });
-
-      if (!cancelled) {
-        setOverview(overviewPayload);
-        setCalendarData({
-          jobs: calendarJobs,
-          jobsByDate,
-          jobDateLookup,
-          range: { start: calendarStartISO, end: calendarEndISO },
-          focusMonth: calendarGrid.focusMonth,
-          focusYear: calendarGrid.focusYear,
-        });
-        setCrew(crewPayload);
-        setDocs(docPayload);
-        setPending({ items });
-      }
-
-      // 5) Logistics calendar (next 7 days)
-      const { data: le, error: leErr } = await supabase
-        .from('logistics_events')
-        .select('id,event_date,event_time,title,transport_type,license_plate,job_id,event_type,loading_bay,color,logistics_event_departments(department)')
-        .gte('event_date', todayKey)
-        .lte('event_date', weekEndKey)
-        .order('event_date', { ascending: true })
-        .order('event_time', { ascending: true });
-      if (leErr) {
-        console.error('Wallboard logistics_events error:', leErr);
-      }
-      const evts = (le || []) as LogisticsEventRow[];
-      const evtJobIds = Array.from(new Set(evts.map((e) => e.job_id).filter((id): id is string => Boolean(id))));
-      const titlesByJob = new Map<string, string>();
-      if (evtJobIds.length) {
-        const { data: trows } = await supabase.from('jobs').select('id,title').in('id', evtJobIds);
-        ((trows || []) as Array<{ id: string; title: string }>).forEach((r) => titlesByJob.set(r.id, r.title));
-      }
-      const logisticsItemsBase: LogisticsItem[] = evts.map((e) => {
-        const departments: string[] = Array.isArray(e.logistics_event_departments)
-          ? e.logistics_event_departments.map((dep) => dep?.department).filter((department): department is string => Boolean(department))
-          : [];
-        return {
-          id: e.id,
-          date: e.event_date,
-          time: e.event_time,
-          title: e.title || (e.job_id ? titlesByJob.get(e.job_id) : undefined) || 'Logistics',
-          transport_type: e.transport_type ?? null,
-          plate: e.license_plate ?? null,
-          job_title: (e.job_id ? titlesByJob.get(e.job_id) : undefined) || null,
-          procedure: e.event_type ?? null,
-          loadingBay: e.loading_bay ?? null,
-          departments,
-          color: e.color ?? null,
-        };
-      });
-      // Filter to only show logistics items that have been explicitly configured
-      // (removed auto-generation of dry-hire pickup/return events to prevent showing unconfigured logistics)
-      const logisticsItems: LogisticsItem[] = logisticsItemsBase.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      if (!cancelled) {
-        setLogistics(logisticsItems);
-        if (isFirstLoad) {
-          setIsLoading(false);
-          isFirstLoad = false;
-        }
-      }
-    };
-
-    let refreshTimer: number | null = null;
-    const scheduleRefresh = (delayMs: number = REALTIME_DEBOUNCE_MS) => {
-      if (cancelled) return;
-      if (refreshTimer) return;
-      refreshTimer = window.setTimeout(() => {
-        refreshTimer = null;
-        void runFetch();
-      }, delayMs);
-    };
-
-    const runFetch = async () => {
-      if (cancelled) return;
-
-      const now = Date.now();
-      const elapsed = now - lastFetchStartedAt;
-      if (elapsed < MIN_REFRESH_INTERVAL_MS) {
-        scheduleRefresh(MIN_REFRESH_INTERVAL_MS - elapsed);
-        return;
-      }
-
-      if (inFlight) {
-        pending = true;
-        return;
-      }
-
-      inFlight = true;
-      lastFetchStartedAt = now;
+    const fetchSnapshot = async () => {
       try {
-        await fetchAll();
-      } finally {
-        inFlight = false;
-        if (pending && !cancelled) {
-          pending = false;
-          scheduleRefresh();
-        }
-      }
-    };
-
-    void runFetch();
-    const pollId = window.setInterval(() => {
-      scheduleRefresh(0);
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      cancelled = true;
-      if (refreshTimer) {
-        window.clearTimeout(refreshTimer);
-      }
-      window.clearInterval(pollId);
-    };
-  }, [isApiMode]);
-
-  useEffect(() => {
-    if (!wallboardApiToken) {
-      return;
-    }
-    const MIN_REFRESH_INTERVAL_MS = 30000;
-    const REALTIME_DEBOUNCE_MS = 1500;
-    const POLL_INTERVAL_MS = 30000;
-    let cancelled = false;
-    let inFlight = false;
-    let pending = false;
-    let lastFetchStartedAt = 0;
-    const api = new WallboardApi(wallboardApiToken);
-
-    const fetchAll = async () => {
-      try {
-        const [overviewData, crewData, docData, pendingData, logisticsData, calendarData] = await Promise.all([
-          api.jobsOverview(),
-          api.crewAssignments(),
-          api.docProgress(),
-          api.pendingActions(),
-          api.logistics(),
-          api.calendar(),
-        ]);
+        const snapshot = await api.snapshot();
         if (cancelled) return;
-        setOverview(overviewData);
-        setCalendarData(buildCalendarFromJobsList(calendarData.jobs));
-        setCrew(crewData);
-        setDocs(docData);
-        setPending(pendingData);
-        setLogistics(logisticsData.items);
+        setOverview(snapshot.overview);
+        setCalendarData(snapshot.calendar);
+        setCrew(snapshot.crew);
+        setPendingActions(snapshot.pending);
+        setLogistics(snapshot.logistics.items);
+        processAnnouncements(snapshot.announcements.announcements);
+        const generatedAt = new Date(snapshot.generatedAt).getTime();
+        setLastUpdatedAt(Number.isFinite(generatedAt) ? Math.min(generatedAt, Date.now()) : Date.now());
         setIsLoading(false);
-      } catch (err) {
+      } catch (error) {
         if (cancelled) return;
-        console.error('Wallboard API fetch error:', err);
-        if (err instanceof WallboardApiError && (err.status === 401 || err.status === 403)) {
-          onFatalError?.('Access token expired or invalid. Please request a new wallboard link.');
+        console.error('Wallboard snapshot fetch failed', error);
+        if (error instanceof WallboardApiError && (error.status === 401 || error.status === 403)) {
+          onFatalError?.('El token de acceso no es válido o ha caducado.');
         }
       }
     };
 
-    let refreshTimer: number | null = null;
-    const scheduleRefresh = (delayMs: number = REALTIME_DEBOUNCE_MS) => {
-      if (cancelled) return;
-      if (refreshTimer) return;
-      refreshTimer = window.setTimeout(() => {
-        refreshTimer = null;
-        void runFetch();
-      }, delayMs);
-    };
-
     const runFetch = async () => {
       if (cancelled) return;
-
-      const now = Date.now();
-      const elapsed = now - lastFetchStartedAt;
-      if (elapsed < MIN_REFRESH_INTERVAL_MS) {
-        scheduleRefresh(MIN_REFRESH_INTERVAL_MS - elapsed);
-        return;
-      }
-
       if (inFlight) {
-        pending = true;
+        refreshQueued = true;
         return;
       }
 
       inFlight = true;
-      lastFetchStartedAt = now;
       try {
-        await fetchAll();
+        await fetchSnapshot();
       } finally {
         inFlight = false;
-        if (pending && !cancelled) {
-          pending = false;
-          scheduleRefresh();
+        if (refreshQueued && !cancelled) {
+          refreshQueued = false;
+          void runFetch();
         }
       }
     };
 
     void runFetch();
-    const pollId = window.setInterval(() => {
-      scheduleRefresh(0);
-    }, POLL_INTERVAL_MS);
+    const pollId = window.setInterval(() => void runFetch(), pollIntervalMs);
 
     return () => {
       cancelled = true;
-      if (refreshTimer) {
-        window.clearTimeout(refreshTimer);
-      }
       window.clearInterval(pollId);
     };
-  }, [wallboardApiToken, onFatalError]);
-
-  useEffect(() => {
-    if (wallboardApiToken) return;
-    let cancelled = false;
-    const fetchAnns = async () => {
-      const { data } = await supabase
-        .from('announcements')
-        .select('id, message, level, active, created_at')
-        .eq('active', true)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (cancelled) return;
-      const staleIds = processAnnouncements(data || []);
-
-      if (staleIds.length) {
-        try {
-          await supabase.from('announcements').update({ active: false }).in('id', staleIds);
-        } catch {
-          // ignore cleanup errors to avoid UI disruption
-        }
-      }
-    };
-    fetchAnns();
-    const interval = Math.max(5000, tickerIntervalMs);
-    const id = setInterval(fetchAnns, interval); // ticker polling
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [tickerIntervalMs, wallboardApiToken, processAnnouncements]);
-
-  useEffect(() => {
-    if (!wallboardApiToken) return;
-    let cancelled = false;
-    const api = new WallboardApi(wallboardApiToken);
-    const fetchAnns = async () => {
-      try {
-        const { announcements } = await api.announcements();
-        if (cancelled) return;
-        processAnnouncements(announcements || []);
-      } catch (err) {
-        if (cancelled) return;
-        console.error('Wallboard API announcements error:', err);
-        if (err instanceof WallboardApiError && (err.status === 401 || err.status === 403)) {
-          onFatalError?.('Access token expired or invalid. Please request a new wallboard link.');
-        }
-      }
-    };
-    fetchAnns();
-    const interval = Math.max(5000, tickerIntervalMs);
-    const id = window.setInterval(fetchAnns, interval);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [wallboardApiToken, tickerIntervalMs, processAnnouncements, onFatalError]);
+  }, [effectiveSlug, onFatalError, pollIntervalMs, processAnnouncements, wallboardApiToken]);
 
   const activePanels = panelOrder.length ? panelOrder : DEFAULT_PANEL_ORDER;
-  const safeIdx = activePanels.length ? idx % activePanels.length : 0;
-  const current = activePanels[safeIdx] ?? 'overview';
+  const safeIndex = activePanels.length ? idx % activePanels.length : 0;
+  const currentPanel = activePanels[safeIndex] ?? 'overview';
 
   if (isLoading) {
     return <SplashScreen onComplete={() => setIsLoading(false)} />;
   }
 
+  const pages = getPanelPageCount(currentPanel, { overview, crew, logistics, pending: pendingActions });
+  const pageLabel = pages > 1 ? `página ${(panelPages[currentPanel] ?? 0) + 1} de ${pages}` : null;
+  const subtitle = (() => {
+    switch (currentPanel) {
+      case 'overview': {
+        const count = overview?.jobs.length ?? 0;
+        return [`${count} ${count === 1 ? 'trabajo' : 'trabajos'}`, pageLabel].filter(Boolean).join(' · ');
+      }
+      case 'docs':
+        return [`${getDocJobs(overview).length} trabajos · próximos 7 días`, pageLabel].filter(Boolean).join(' · ');
+      case 'pending':
+        return (pendingActions?.items.length ?? 0) > 0 ? ['Requiere acción', pageLabel].filter(Boolean).join(' · ') : 'Todo en orden';
+      case 'calendar':
+        return calendarData
+          ? formatDateKeyRange(
+            formatMadridDateKey(new Date(calendarData.range.start)),
+            formatMadridDateKey(new Date(calendarData.range.end)),
+          )
+          : null;
+      default:
+        return pageLabel;
+    }
+  })();
+
   return (
-    <div
-      className={`min-h-screen ${
-        isAlien
-          ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette'
-          : theme === 'light'
-            ? 'bg-zinc-100 text-zinc-900'
-            : 'bg-black text-white'
-      }`}
-    >
-      {presetMessage && (
-        <div className="bg-amber-500/20 text-amber-200 text-sm text-center py-2">{presetMessage}</div>
-      )}
-      <div className="overflow-hidden" style={{ height: `calc(100vh - ${footerH + tickerH}px)` }}>
+    <div className="wb-root">
+      <div>
+        <WallboardHeader
+          title={PANEL_TITLES[currentPanel]}
+          subtitle={subtitle}
+          panelCount={activePanels.length}
+          panelIndex={safeIndex}
+          lastUpdatedAt={lastUpdatedAt}
+          staleAfterMs={pollIntervalMs * 2 + 5_000}
+        />
+        {presetMessage ? <div className="wb-banner">{presetMessage}</div> : null}
+      </div>
+      <main className="wb-main">
         <WallboardActivePanel
           calendarData={calendarData}
           crew={crew}
-          current={current}
+          current={currentPanel}
           highlightJobs={highlightJobs}
-          isAlien={isAlien}
-          isProduccionPreset={isProduccionPreset}
           logistics={logistics}
+          now={now}
           overview={overview}
           panelPages={panelPages}
-          pending={pending}
-          theme={theme}
+          pending={pendingActions}
         />
-      </div>
-      <Ticker messages={tickerMsgs} bottomOffset={footerH} theme={theme} onMeasureHeight={setTickerH} />
-      <FooterLogo onToggle={() => setIsAlien((v) => !v)} onMeasure={setFooterH} theme={theme} />
+      </main>
+      <Ticker messages={tickerMessages} />
       <WakeLockVideo />
     </div>
   );

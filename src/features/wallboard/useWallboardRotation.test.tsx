@@ -3,11 +3,12 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 
-import { useWallboardRotation } from "./useWallboardRotation";
-import type { JobsOverviewFeed, PanelKey } from "./types";
+import { getNextPanelIndex, useWallboardRotation } from "./useWallboardRotation";
+import type { JobsOverviewFeed, PanelKey, PendingActionsFeed } from "./types";
 
 const PANEL_DURATIONS: Record<PanelKey, number> = {
   overview: 1,
+  docs: 1,
   crew: 1,
   logistics: 1,
   pending: 1,
@@ -37,6 +38,7 @@ const renderRotation = (panelOrder: PanelKey[], overview: JobsOverviewFeed) =>
     const [idx, setIdx] = useState(0);
     const [panelPages, setPanelPages] = useState<Record<PanelKey, number>>({
       overview: 0,
+      docs: 0,
       crew: 0,
       logistics: 0,
       pending: 0,
@@ -48,6 +50,7 @@ const renderRotation = (panelOrder: PanelKey[], overview: JobsOverviewFeed) =>
       idx,
       logistics: null,
       overview,
+      pending: null,
       panelDurations: PANEL_DURATIONS,
       panelOrder,
       panelPages,
@@ -64,7 +67,7 @@ describe("useWallboardRotation", () => {
   afterEach(() => vi.useRealTimers());
 
   it("increments the current panel page before advancing panels", () => {
-    const { result } = renderRotation(["overview"], makeOverview(7));
+    const { result } = renderRotation(["overview"], makeOverview(5));
 
     act(() => vi.advanceTimersByTime(1000));
 
@@ -88,5 +91,14 @@ describe("useWallboardRotation", () => {
 
     expect(result.current.panelPages.overview).toBe(0);
     expect(result.current.idx).toBe(0);
+  });
+
+  it("skips the Atención panel while there is nothing to act on", () => {
+    const order: PanelKey[] = ["overview", "pending", "calendar"];
+    const alerts: PendingActionsFeed = { items: [{ severity: "red", text: "Falta 1 parte" }] };
+
+    expect(getNextPanelIndex(0, order, { items: [] })).toBe(2);
+    expect(getNextPanelIndex(0, order, alerts)).toBe(1);
+    expect(getNextPanelIndex(0, ["pending"], null)).toBe(0);
   });
 });

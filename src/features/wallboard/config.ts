@@ -1,9 +1,10 @@
 import type { PanelKey } from './types';
 
-export const PANEL_KEYS: PanelKey[] = ['overview', 'crew', 'logistics', 'pending', 'calendar'];
+export const PANEL_KEYS: PanelKey[] = ['overview', 'docs', 'crew', 'logistics', 'pending', 'calendar'];
 export const DEFAULT_PANEL_ORDER: PanelKey[] = [...PANEL_KEYS];
 export const DEFAULT_PANEL_DURATIONS: Record<PanelKey, number> = {
   overview: 12,
+  docs: 12,
   crew: 12,
   logistics: 12,
   pending: 12,
@@ -12,6 +13,15 @@ export const DEFAULT_PANEL_DURATIONS: Record<PanelKey, number> = {
 export const DEFAULT_ROTATION_FALLBACK_SECONDS = 12;
 export const DEFAULT_HIGHLIGHT_TTL_SECONDS = 300;
 export const DEFAULT_TICKER_SECONDS = 20;
+
+export const PANEL_TITLES: Record<PanelKey, string> = {
+  overview: 'Próximos trabajos',
+  docs: 'Documentación',
+  crew: 'Equipo asignado',
+  logistics: 'Logística',
+  pending: 'Atención',
+  calendar: 'Calendario',
+};
 
 export function normalisePanelOrder(order?: string[] | null): PanelKey[] {
   if (!Array.isArray(order)) return [...DEFAULT_PANEL_ORDER];
@@ -25,12 +35,6 @@ export function normalisePanelOrder(order?: string[] | null): PanelKey[] {
     }
   }
   if (!filtered.length) return [...DEFAULT_PANEL_ORDER];
-  PANEL_KEYS.forEach((key) => {
-    if (!seen.has(key)) {
-      filtered.push(key);
-      seen.add(key);
-    }
-  });
   return filtered;
 }
 
@@ -40,4 +44,3 @@ export function coerceSeconds(value: unknown, fallback: number, min = 1, max = 6
   const clamped = Math.min(Math.max(num, min), max);
   return Math.round(clamped);
 }
-

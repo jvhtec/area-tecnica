@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { joinedMany } from "../_shared/joins.ts";
+import { authenticate, HttpError } from "./auth.ts";
+import { loadWallboardSnapshot } from "./snapshot.ts";
 
 function readPositiveIntEnv(name: string, fallback: number) {
   const raw = Deno.env.get(name);
@@ -12,16 +13,9 @@ function readPositiveIntEnv(name: string, fallback: number) {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
-const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? "";
 const DEFAULT_FEED_CACHE_TTL_MS = readPositiveIntEnv("WALLBOARD_FEED_CACHE_TTL_MS", 15000);
 const PRESET_CONFIG_CACHE_TTL_MS = readPositiveIntEnv("WALLBOARD_PRESET_CONFIG_CACHE_TTL_MS", 120000);
 const MAX_CACHE_ENTRIES = readPositiveIntEnv("WALLBOARD_FEED_CACHE_MAX_ENTRIES", 500);
-
-type AuthResult = {
-  method: "jwt" | "shared";
-  presetSlug?: string | null;
-};
 
 type Dept = "sound" | "lights" | "video";
 
@@ -86,87 +80,6 @@ function writeCache(cacheKey: string, body: string, ttlMs: number) {
   });
 }
 
-class HttpError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-let jwtKeyPromise: Promise<CryptoKey> | null = null;
-async function getJwtKey() {
-  if (!WALLBOARD_JWT_SECRET) {
-    throw new HttpError(500, "WALLBOARD_JWT_SECRET is not configured");
-  }
-  if (!jwtKeyPromise) {
-    jwtKeyPromise = crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(WALLBOARD_JWT_SECRET),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"],
-    );
-  }
-  return await jwtKeyPromise;
-}
-
-async function authenticate(req: Request, url: URL): Promise<AuthResult> {
-  const headerJwt = req.headers.get("x-wallboard-jwt")?.trim();
-  if (headerJwt) {
-    try {
-      const key = await getJwtKey();
-      const payload: Record<string, unknown> = await verify(headerJwt, key);
-      if (payload.scope !== "wallboard") {
-        throw new HttpError(403, "Invalid wallboard scope");
-      }
-      const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
-      return { method: "jwt", presetSlug };
-    } catch (err) {
-      if (err instanceof HttpError) throw err;
-      throw new HttpError(401, "Invalid token");
-    }
-  }
-
-  const headerToken = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
-  if (headerToken.startsWith("Bearer ")) {
-    const token = headerToken.slice(7).trim();
-    if (!token) {
-      throw new HttpError(401, "Missing bearer token");
-    }
-    try {
-      const key = await getJwtKey();
-      const payload: Record<string, unknown> = await verify(token, key);
-      if (payload.scope !== "wallboard") {
-        throw new HttpError(403, "Invalid wallboard scope");
-      }
-      const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
-      return { method: "jwt", presetSlug };
-    } catch (err) {
-      if (err instanceof HttpError) throw err;
-      throw new HttpError(401, "Invalid token");
-    }
-  }
-
-  const sharedHeader =
-    req.headers.get("x-wallboard-token") ??
-    req.headers.get("x-wallboard-shared-token") ??
-    req.headers.get("x-wallboard-shared") ??
-    url.searchParams.get("wallboardToken");
-  if (sharedHeader) {
-    if (!WALLBOARD_SHARED_TOKEN) {
-      throw new HttpError(500, "WALLBOARD_SHARED_TOKEN is not configured");
-    }
-    if (sharedHeader !== WALLBOARD_SHARED_TOKEN) {
-      throw new HttpError(403, "Forbidden");
-    }
-    const presetSlug = url.searchParams.get("preset")?.trim().toLowerCase() ?? undefined;
-    return { method: "shared", presetSlug };
-  }
-
-  throw new HttpError(401, "Unauthorized");
-}
-
 function startOfDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -215,22 +128,29 @@ serve(async (req) => {
   // Read path from request body (Supabase client sends it this way)
   // Clone the request first so we don't consume the body
   let path = "";
+  let requestedPresetSlug: string | undefined;
   try {
     const clonedReq = req.clone();
     const body = await clonedReq.json();
     path = body.path || "";
+    requestedPresetSlug = typeof body.presetSlug === "string" ? body.presetSlug.trim().toLowerCase() : undefined;
   } catch {
     // Fallback to URL pathname if body parsing fails (for direct HTTP calls)
     path = url.pathname.replace(/\/+$/, "");
   }
+  requestedPresetSlug ??= url.searchParams.get("presetSlug")?.trim().toLowerCase() || undefined;
 
   try {
-    const auth = await authenticate(req, url);
+    const auth = await authenticate(req, url, {
+      allowSupabaseUser: path.endsWith("/snapshot"),
+      requestedPresetSlug,
+    });
     const presetSlug = auth.presetSlug?.trim().toLowerCase() ?? undefined;
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     const isCacheablePath =
       path.endsWith("/jobs-overview") ||
+      path.endsWith("/snapshot") ||
       path.endsWith("/calendar") ||
       path.endsWith("/crew-assignments") ||
       path.endsWith("/doc-progress") ||
@@ -259,6 +179,10 @@ serve(async (req) => {
     };
 
     const handlePathRequest = async (): Promise<Response> => {
+    if (path.endsWith("/snapshot")) {
+      return respondJson(await loadWallboardSnapshot(sb, presetSlug));
+    }
+
     if (path.endsWith("/jobs-overview")) {
       // Next 7 days window (inclusive of the 7th day)
       const now = new Date();

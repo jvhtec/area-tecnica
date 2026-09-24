@@ -1,13 +1,14 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 
-import { WALLBOARD_PANEL_PAGE_SIZES } from "./panelPageSizes";
-import type { CrewAssignmentsFeed, JobsOverviewFeed, LogisticsItem, PanelKey } from "./types";
+import { getPanelPageCount } from "./model";
+import type { CrewAssignmentsFeed, JobsOverviewFeed, LogisticsItem, PanelKey, PendingActionsFeed } from "./types";
 
 type RotationOptions = {
   crew: CrewAssignmentsFeed | null;
   idx: number;
   logistics: LogisticsItem[] | null;
   overview: JobsOverviewFeed | null;
+  pending: PendingActionsFeed | null;
   panelDurations: Record<PanelKey, number>;
   panelOrder: PanelKey[];
   panelPages: Record<PanelKey, number>;
@@ -16,11 +17,30 @@ type RotationOptions = {
   setPanelPages: Dispatch<SetStateAction<Record<PanelKey, number>>>;
 };
 
+/**
+ * Next panel index. The Atención panel is skipped while there is nothing to act
+ * on, unless it is the only panel left to show.
+ */
+export function getNextPanelIndex(
+  current: number,
+  panelOrder: PanelKey[],
+  pending: PendingActionsFeed | null,
+): number {
+  if (!panelOrder.length) return 0;
+  const hasAlerts = (pending?.items.length ?? 0) > 0;
+  for (let step = 1; step <= panelOrder.length; step += 1) {
+    const candidate = (current + step) % panelOrder.length;
+    if (panelOrder[candidate] !== "pending" || hasAlerts) return candidate;
+  }
+  return (current + 1) % panelOrder.length;
+}
+
 export const useWallboardRotation = ({
   crew,
   idx,
   logistics,
   overview,
+  pending,
   panelDurations,
   panelOrder,
   panelPages,
@@ -35,13 +55,7 @@ export const useWallboardRotation = ({
     const currentPanel = panelOrder[idx % panelOrder.length];
     const durationMs = Math.max(1, panelDurations[currentPanel] ?? rotationFallbackSeconds) * 1000;
     const timer = window.setTimeout(() => {
-      const pageCount = currentPanel === "overview"
-        ? Math.ceil((overview?.jobs.length ?? 0) / WALLBOARD_PANEL_PAGE_SIZES.overview)
-        : currentPanel === "crew"
-          ? Math.ceil((crew?.jobs.length ?? 0) / WALLBOARD_PANEL_PAGE_SIZES.crew)
-          : currentPanel === "logistics"
-            ? Math.ceil((logistics?.length ?? 0) / WALLBOARD_PANEL_PAGE_SIZES.logistics)
-            : 1;
+      const pageCount = getPanelPageCount(currentPanel, { overview, crew, logistics, pending });
       if (panelOrder.length === 1 && pageCount <= 1) return;
 
       const currentPage = panelPages[currentPanel] ?? 0;
@@ -49,9 +63,9 @@ export const useWallboardRotation = ({
         setPanelPages((previous) => ({ ...previous, [currentPanel]: currentPage + 1 }));
       } else {
         setPanelPages((previous) => ({ ...previous, [currentPanel]: 0 }));
-        setIdx((current) => panelOrder.length > 0 ? (current + 1) % panelOrder.length : 0);
+        setIdx((current) => getNextPanelIndex(current, panelOrder, pending));
       }
     }, durationMs);
     return () => clearTimeout(timer);
-  }, [crew, idx, logistics, overview, panelDurations, panelOrder, panelPages, rotationFallbackSeconds, setIdx, setPanelPages]);
+  }, [crew, idx, logistics, overview, pending, panelDurations, panelOrder, panelPages, rotationFallbackSeconds, setIdx, setPanelPages]);
 };

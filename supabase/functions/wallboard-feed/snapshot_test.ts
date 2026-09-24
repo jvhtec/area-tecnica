@@ -1,0 +1,255 @@
+import {
+  buildWallboardSnapshot,
+  getSnapshotWindows,
+  selectSnapshotAnnouncements,
+  type SnapshotInputs,
+  type SnapshotJobRow,
+} from "./snapshotModel.ts";
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(message);
+}
+
+function assertEquals(actual: unknown, expected: unknown, message: string) {
+  const actualJson = JSON.stringify(actual);
+  const expectedJson = JSON.stringify(expected);
+  if (actualJson !== expectedJson) {
+    throw new Error(`${message}\nExpected: ${expectedJson}\nActual:   ${actualJson}`);
+  }
+}
+
+const assignment = (
+  technicianId: string,
+  roles: Partial<SnapshotJobRow["assignments"][number]> = {},
+): SnapshotJobRow["assignments"][number] => ({
+  technician_id: technicianId,
+  sound_role: null,
+  lights_role: null,
+  video_role: null,
+  ...roles,
+});
+
+const job = (overrides: Partial<SnapshotJobRow>): SnapshotJobRow => ({
+  id: "job-1",
+  title: "Montaje principal",
+  start_time: "2026-09-23T08:00:00.000Z",
+  end_time: "2026-09-23T18:00:00.000Z",
+  status: "Confirmado",
+  job_type: "festival",
+  tour_id: null,
+  color: "#123456",
+  locationName: "Nave 1",
+  departments: ["sound", "lights", "video"],
+  assignments: [
+    assignment("tech-sound", { sound_role: "responsable" }),
+    assignment("tech-video", { video_role: "operador" }),
+    assignment("tech-fallback"),
+  ],
+  ...overrides,
+});
+
+Deno.test("Madrid snapshot windows remain calendar-safe across spring DST", () => {
+  const windows = getSnapshotWindows(new Date("2026-03-29T00:30:00.000Z"));
+
+  assertEquals(windows.todayKey, "2026-03-29", "uses the Madrid calendar day");
+  assertEquals(windows.weekStartISO, "2026-03-28T23:00:00.000Z", "starts at Madrid midnight before DST");
+  assertEquals(windows.weekEndISO, "2026-04-04T21:59:59.999Z", "ends at Madrid midnight after DST");
+  assertEquals(windows.gridStartKey, "2026-03-23", "starts the rolling calendar on the current Madrid Monday");
+  assertEquals(windows.gridEndKey, "2026-04-19", "keeps exactly 28 Madrid date keys");
+});
+
+Deno.test("Madrid snapshot windows remain calendar-safe across autumn DST", () => {
+  const windows = getSnapshotWindows(new Date("2026-10-25T01:30:00.000Z"));
+
+  assertEquals(windows.todayKey, "2026-10-25", "uses the Madrid calendar day");
+  assertEquals(windows.weekStartISO, "2026-10-24T22:00:00.000Z", "starts at Madrid midnight before the clock change");
+  assertEquals(windows.weekEndISO, "2026-10-31T22:59:59.999Z", "ends at Madrid midnight after the clock change");
+  assertEquals(windows.gridStartKey, "2026-10-19", "starts the rolling calendar on the current Madrid Monday");
+  assertEquals(windows.gridEndKey, "2026-11-15", "keeps exactly 28 Madrid date keys");
+});
+
+Deno.test("canonical snapshot maps staffing, docs, overdue alerts and display-safe fields", () => {
+  const generatedAt = new Date("2026-09-22T10:00:00.000Z");
+  const windows = getSnapshotWindows(generatedAt);
+  const overdue = job({
+    id: "job-overdue",
+    title: "Evento finalizado",
+    start_time: "2026-09-19T08:00:00.000Z",
+    end_time: "2026-09-20T08:00:00.000Z",
+    departments: ["lights"],
+    assignments: [
+      assignment("tech-overdue", { lights_role: "técnico" }),
+      assignment("tech-overdue", { lights_role: "técnico" }),
+    ],
+  });
+  const inputs: SnapshotInputs = {
+    generatedAt,
+    presetSlug: "produccion",
+    highlightTtlSeconds: 300,
+    visibleJobs: [
+      job({}),
+      overdue,
+      job({ id: "dryhire", title: "Dry hire", job_type: "dryhire" }),
+      job({ id: "cancelled", title: "Gira cancelada", tour_id: "tour-cancelled" }),
+      job({
+        id: "multi-day",
+        title: "Evento de varios días",
+        start_time: "2026-09-30T10:00:00.000Z",
+        end_time: "2026-10-02T10:00:00.000Z",
+        departments: ["sound"],
+        assignments: [],
+      }),
+    ],
+    overdueJobs: [overdue],
+    cancelledTourIds: new Set(["tour-cancelled"]),
+    requiredRoles: [
+      { job_id: "job-1", department: "sound", total_required: 2 },
+      { job_id: "job-1", department: "lights", total_required: 1 },
+      { job_id: "multi-day", department: "sound", total_required: 1 },
+    ],
+    docRequirements: [
+      { department: "sound", key: "pesos", label: "Pesos" },
+      { department: "sound", key: "consumos", label: "Consumos" },
+      { department: "sound", key: "memoria", label: "Memoria técnica de sonido" },
+      { department: "lights", key: "consumos", label: "Consumos" },
+      { department: "video", key: "consumos", label: "Consumos" },
+      { department: "unknown", key: "ignored", label: "Ignorado" },
+    ],
+    deliveredDocs: new Map([
+      ["job-1", new Set(["sound:pesos", "video:consumos"])],
+      ["multi-day", new Set(["sound:pesos", "sound:consumos", "sound:memoria"])],
+    ]),
+    timesheets: [
+      { job_id: "job-1", technician_id: "tech-sound", status: "submitted" },
+      { job_id: "job-overdue", technician_id: "tech-overdue", status: "draft" },
+    ],
+    profiles: [
+      { id: "tech-sound", first_name: "Ana", last_name: "Luz", email: "private@example.com" },
+      { id: "tech-fallback", first_name: "Pau", last_name: "Mar" },
+    ] as SnapshotInputs["profiles"],
+    logistics: [{
+      id: "log-1",
+      event_date: "2026-09-22",
+      event_time: "09:00:00",
+      title: null,
+      transport_type: "furgoneta",
+      transport_provider: null,
+      license_plate: null,
+      job_id: null,
+      jobTitle: null,
+      event_type: "load",
+      loading_bay: null,
+      color: null,
+      notes: null,
+      departments: ["sound"],
+    }],
+    announcements: [{
+      id: "announcement-1",
+      message: "Reunión a las 12:00",
+      level: "info",
+      active: true,
+      created_at: "2026-09-22T08:00:00.000Z",
+    }],
+    windows,
+  };
+
+  const snapshot = buildWallboardSnapshot(inputs);
+
+  assertEquals(Object.keys(snapshot), [
+    "schemaVersion",
+    "generatedAt",
+    "presetSlug",
+    "overview",
+    "calendar",
+    "crew",
+    "pending",
+    "logistics",
+    "announcements",
+  ], "keeps the versioned top-level contract exact");
+  assertEquals(snapshot.overview.jobs.map((item) => item.id), ["job-1"], "excludes dry hire and cancelled tours");
+  const overview = snapshot.overview.jobs[0];
+  assertEquals(overview.departments, ["sound", "lights", "video"], "includes video so its Consumos can be checked");
+  assertEquals(overview.crewAssigned, { sound: 1, lights: 0, video: 1, total: 2 }, "counts assigned roles");
+  assertEquals(overview.crewNeeded, { sound: 2, lights: 1, video: 0, total: 3 }, "uses required-role totals");
+  assertEquals(overview.docs, {
+    sound: { have: 1, need: 3 },
+    lights: { have: 0, need: 1 },
+    video: { have: 1, need: 1 },
+  }, "counts only the specific required documents that were delivered");
+  assertEquals(overview.docChecklist.map((item) => `${item.dept}:${item.key}:${item.state}`), [
+    "sound:pesos:delivered",
+    "sound:consumos:missing",
+    "sound:memoria:missing",
+    "lights:consumos:missing",
+    "video:consumos:delivered",
+  ], "marks undelivered documents as missing inside the 72 h window");
+  assertEquals(overview.status, "red", "derives readiness from required versus assigned crew");
+  assertEquals(snapshot.crew.jobs[0].crew.map((member) => member.role), ["responsable", "operador", "asignado"], "localizes fallback roles");
+  assertEquals(snapshot.crew.jobs[0].crewNeeded, overview.crewNeeded, "gives the crew panel the required totals for vacancies");
+  assertEquals(snapshot.pending.items.map((item) => [item.kind, item.severity, item.count, item.text]), [
+    ["staffing", "red", 1, "Montaje principal – falta 1 puesto de sonido"],
+    ["staffing", "red", 1, "Montaje principal – falta 1 puesto de luces"],
+    ["docs", "red", 3, "Montaje principal – faltan 3 documentos (Sonido: consumos, memoria técnica de sonido · Luces: consumos)"],
+    ["timesheet", "red", 1, "Evento finalizado – falta 1 parte de horas"],
+  ], "includes structured open-slot, document and ended-job timesheet alerts");
+  assertEquals(snapshot.pending.items[0].jobId, "job-1", "links each alert to its job");
+  assertEquals(snapshot.pending.items[2].detail, "Sonido: consumos, memoria técnica de sonido · Luces: consumos", "groups missing documents by department");
+  assertEquals(snapshot.logistics.items[0].title, "Logística", "localizes the logistics fallback");
+  assertEquals(Object.keys(snapshot.calendar.jobsByDate).filter((key) => key >= "2026-09-30"), [
+    "2026-09-30",
+    "2026-10-01",
+    "2026-10-02",
+  ], "expands multi-day jobs with Madrid date keys");
+  const futureCalendarJob = snapshot.calendar.jobs.find((item) => item.id === "multi-day");
+  assertEquals(futureCalendarJob?.crewNeeded.sound, 1, "keeps real readiness data outside the seven-day overview");
+  assertEquals(futureCalendarJob?.status, "red", "derives calendar readiness instead of zeroing future jobs");
+  assertEquals(futureCalendarJob?.docChecklist, [], "does not report documents for jobs whose documents were not loaded");
+  const serialized = JSON.stringify(snapshot);
+  assert(!serialized.includes("private@example.com"), "does not expose non-display profile fields");
+  assert(!serialized.includes("technician_id"), "does not expose technician identifiers");
+});
+
+Deno.test("documents still missing more than 72 h before the start are pending, not missing", () => {
+  const generatedAt = new Date("2026-09-22T10:00:00.000Z");
+  const snapshot = buildWallboardSnapshot({
+    generatedAt,
+    highlightTtlSeconds: 300,
+    visibleJobs: [job({ id: "later", start_time: "2026-09-26T10:00:00.000Z", end_time: "2026-09-26T20:00:00.000Z", departments: ["lights"], assignments: [] })],
+    overdueJobs: [],
+    cancelledTourIds: new Set(),
+    requiredRoles: [],
+    docRequirements: [{ department: "lights", key: "memoria", label: "Memoria técnica de iluminación" }],
+    deliveredDocs: new Map(),
+    timesheets: [],
+    profiles: [],
+    logistics: [],
+    announcements: [],
+    windows: getSnapshotWindows(generatedAt),
+  });
+
+  assertEquals(snapshot.overview.jobs[0].docChecklist[0].state, "pending", "four days out is a warning");
+  const docsAlert = snapshot.pending.items.find((item) => item.kind === "docs");
+  assertEquals(docsAlert?.severity, "yellow", "pending documents raise a yellow alert");
+});
+
+Deno.test("expired highlights cannot crowd valid ticker announcements out of the snapshot", () => {
+  const generatedAt = new Date("2026-09-22T10:00:00.000Z");
+  const staleHighlights = Array.from({ length: 25 }, (_, index) => ({
+    id: `stale-${index}`,
+    message: `[HIGHLIGHT_JOB:dead-beef-${index.toString(16)}] Antiguo`,
+    level: "warn",
+    active: true,
+    created_at: `2026-09-22T09:${String(40 + (index % 10)).padStart(2, "0")}:00.000Z`,
+  }));
+  const ticker = {
+    id: "ticker-valid",
+    message: "Reunión a las 12:00",
+    level: "info",
+    active: true,
+    created_at: "2026-09-22T08:00:00.000Z",
+  };
+
+  const selected = selectSnapshotAnnouncements([...staleHighlights, ticker], generatedAt, 300);
+
+  assertEquals(selected, [ticker], "filters expired highlights before applying the feed limit");
+});

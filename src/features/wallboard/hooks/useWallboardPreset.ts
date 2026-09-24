@@ -61,66 +61,9 @@ export function useWallboardPreset({
       });
 
       if (isApiMode) {
-        if (effectiveSlug === 'produccion') {
-          console.log('🎯 [Wallboard] Using hardcoded produccion config (calendar-only)');
-          setPanelOrder(['calendar']);
-          setPanelDurations({
-            overview: 12,
-            crew: 12,
-            logistics: 12,
-            pending: 12,
-            calendar: 600,
-          });
-          setRotationFallbackSeconds(600);
-          setHighlightTtlMs(300 * 1000);
-          setTickerIntervalMs(20 * 1000);
-          setPresetMessage(null);
-          setHighlightJobs(new Map());
-          setIdx(0);
-          return;
-        }
-        if (effectiveSlug === 'almacen') {
-          console.log('🎯 [Wallboard] Using hardcoded almacen config');
-          setPanelOrder(['logistics', 'overview', 'calendar']);
-          setPanelDurations({
-            overview: 15,
-            crew: 12,
-            logistics: 15,
-            pending: 12,
-            calendar: 30,
-          });
-          setRotationFallbackSeconds(15);
-          setHighlightTtlMs(300 * 1000);
-          setTickerIntervalMs(20 * 1000);
-          setPresetMessage(null);
-          setHighlightJobs(new Map());
-          setIdx(0);
-          return;
-        }
-        if (effectiveSlug === 'oficinas') {
-          console.log('🎯 [Wallboard] Using hardcoded oficinas config');
-          setPanelOrder(['overview', 'crew', 'logistics', 'pending', 'calendar']);
-          setPanelDurations({
-            overview: 15,
-            crew: 15,
-            logistics: 15,
-            pending: 10,
-            calendar: 30,
-          });
-          setRotationFallbackSeconds(15);
-          setHighlightTtlMs(300 * 1000);
-          setTickerIntervalMs(20 * 1000);
-          setPresetMessage(null);
-          setHighlightJobs(new Map());
-          setIdx(0);
-          return;
-        }
-      }
-
-      if (isApiMode) {
         try {
           console.log('🌐 [Wallboard] Fetching preset via API...', { effectiveSlug });
-          const api = new WallboardApi(wallboardApiToken as string);
+          const api = new WallboardApi(wallboardApiToken as string, effectiveSlug);
           const response = await api.presetConfig();
           data = response.config;
           console.log('✅ [Wallboard] Preset fetched via API:', {
@@ -158,13 +101,7 @@ export function useWallboardPreset({
       if (error || !data) {
         if (isProduccionPreset) {
           setPanelOrder(['calendar']);
-          setPanelDurations({
-            overview: DEFAULT_PANEL_DURATIONS.overview,
-            crew: DEFAULT_PANEL_DURATIONS.crew,
-            logistics: DEFAULT_PANEL_DURATIONS.logistics,
-            pending: DEFAULT_PANEL_DURATIONS.pending,
-            calendar: 30,
-          });
+          setPanelDurations({ ...DEFAULT_PANEL_DURATIONS, calendar: 30 });
           setRotationFallbackSeconds(30);
           setHighlightTtlMs(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
           setTickerIntervalMs(DEFAULT_TICKER_SECONDS * 1000);
@@ -178,7 +115,7 @@ export function useWallboardPreset({
           setHighlightTtlMs(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
           setTickerIntervalMs(DEFAULT_TICKER_SECONDS * 1000);
           setPresetMessage(
-            `Using default wallboard preset${effectiveSlug !== 'default' ? ` (missing \"${effectiveSlug}\")` : ''}.`
+            `Usando la configuración predeterminada del wallboard${effectiveSlug !== 'default' ? ` (no existe "${effectiveSlug}")` : ''}.`
           );
           setHighlightJobs(new Map());
           setIdx(0);
@@ -217,6 +154,18 @@ export function useWallboardPreset({
     return () => {
       cancelled = true;
     };
-  }, [effectiveSlug, isApiMode, isProduccionPreset, wallboardApiToken]);
+  }, [
+    effectiveSlug,
+    isApiMode,
+    isProduccionPreset,
+    setHighlightJobs,
+    setHighlightTtlMs,
+    setIdx,
+    setPanelDurations,
+    setPanelOrder,
+    setPresetMessage,
+    setRotationFallbackSeconds,
+    setTickerIntervalMs,
+    wallboardApiToken,
+  ]);
 }
-

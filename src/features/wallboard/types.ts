@@ -4,6 +4,16 @@ import type { Dept, DeptCounts } from '@/types/wallboard';
 
 export type { Dept, DeptCounts } from '@/types/wallboard';
 
+export type DocState = 'delivered' | 'pending' | 'missing';
+
+/** One required document for one department of a job (see supabase wallboard-feed docRules). */
+export interface DocChecklistItem {
+  dept: Dept;
+  key: string;
+  label: string;
+  state: DocState;
+}
+
 export interface JobsOverviewFeed {
   jobs: Array<{
     id: string;
@@ -15,6 +25,8 @@ export interface JobsOverviewFeed {
     crewAssigned: DeptCounts;
     crewNeeded: DeptCounts;
     docs: Partial<Record<Dept, { have: number; need: number }>>;
+    /** Per-document status. Absent on feeds served before document requirements shipped. */
+    docChecklist?: DocChecklistItem[];
     status: 'green' | 'yellow' | 'red';
     color?: string | null;
     job_type?: string | null;
@@ -43,6 +55,8 @@ export interface CrewAssignmentsFeed {
     start_time?: string;
     end_time?: string;
     color?: string | null;
+    departments?: Dept[];
+    crewNeeded?: DeptCounts;
     crew: Array<{
       name: string;
       role: string;
@@ -65,8 +79,34 @@ export interface DocProgressFeed {
   }>;
 }
 
+export type PendingKind = 'staffing' | 'docs' | 'timesheet';
+
+export interface PendingItem {
+  severity: 'red' | 'yellow';
+  /** Full sentence, kept for older clients. */
+  text: string;
+  kind?: PendingKind;
+  jobId?: string;
+  jobTitle?: string;
+  color?: string | null;
+  startTime?: string;
+  dept?: Dept | null;
+  count?: number;
+  detail?: string | null;
+}
+
 export interface PendingActionsFeed {
-  items: Array<{ severity: 'red' | 'yellow'; text: string }>;
+  items: PendingItem[];
+}
+
+export interface AnnouncementsFeed {
+  announcements: Array<{
+    id: string;
+    message: string;
+    level: string;
+    created_at: string;
+    active: boolean;
+  }>;
 }
 
 export interface LogisticsItem {
@@ -85,10 +125,26 @@ export interface LogisticsItem {
   notes?: string | null;
 }
 
+export interface LogisticsFeed {
+  items: LogisticsItem[];
+}
+
+export interface WallboardSnapshotFeed {
+  schemaVersion: 1;
+  generatedAt: string;
+  presetSlug?: string | null;
+  overview: JobsOverviewFeed;
+  calendar: CalendarFeed;
+  crew: CrewAssignmentsFeed;
+  pending: PendingActionsFeed;
+  logistics: LogisticsFeed;
+  announcements: AnnouncementsFeed;
+}
+
 export type JobDateType = DateType;
 export type LogisticsTransportType = 'trailer' | '9m' | '8m' | '6m' | '4m' | 'furgoneta' | 'rv' | string;
 export type LogisticsEventType = 'load' | 'unload' | string;
 
 export type TickerMessage = { message: string; level: AnnouncementLevel };
 
-export type PanelKey = 'overview' | 'crew' | 'logistics' | 'pending' | 'calendar';
+export type PanelKey = 'overview' | 'docs' | 'crew' | 'logistics' | 'pending' | 'calendar';

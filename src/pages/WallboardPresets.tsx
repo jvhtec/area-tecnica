@@ -10,20 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowDown, ArrowUp, Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { DEFAULT_PANEL_DURATIONS, DEFAULT_PANEL_ORDER, PANEL_TITLES } from '@/features/wallboard/config';
+import type { PanelKey } from '@/features/wallboard/types';
 
 const DEFAULT_WALLBOARD_TOKEN = 'f3c98b2df1a4e7650fbd44c9ce19ab73c6d7a0e49b3f25ea18fd6740a2ce9b1d';
 
-type PanelKey = 'overview' | 'crew' | 'logistics' | 'calendar' | 'pending';
+const PANEL_LABELS: Record<PanelKey, string> = PANEL_TITLES;
 
-const PANEL_LABELS: Record<PanelKey, string> = {
-  overview: 'Resumen de Trabajos',
-  crew: 'Asignaciones de Equipo',
-  logistics: 'Logística',
-  calendar: 'Calendario',
-  pending: 'Acciones Pendientes',
-};
-
-const DEFAULT_ORDER: PanelKey[] = ['overview', 'crew', 'logistics', 'calendar', 'pending'];
+const DEFAULT_ORDER: PanelKey[] = [...DEFAULT_PANEL_ORDER];
 
 interface WallboardPresetRow {
   id: string;
@@ -100,13 +94,7 @@ export default function WallboardPresets() {
   const [newPresetUrl, setNewPresetUrl] = useState('');
 
   const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_ORDER]);
-  const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({
-    overview: 12,
-    crew: 12,
-    logistics: 12,
-    calendar: 12,
-    pending: 12,
-  });
+  const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({ ...DEFAULT_PANEL_DURATIONS });
   const [fallbackSeconds, setFallbackSeconds] = useState(12);
   const [highlightSeconds, setHighlightSeconds] = useState(300);
   const [tickerSeconds, setTickerSeconds] = useState(20);
@@ -626,7 +614,7 @@ export default function WallboardPresets() {
                           size="icon"
                           onClick={() => movePanel(index, -1)}
                           disabled={index === 0 || saving}
-                          aria-label={`Move ${PANEL_LABELS[panel]} up`}
+                          aria-label={`Subir ${PANEL_LABELS[panel]}`}
                         >
                           <ArrowUp className="h-4 w-4" />
                         </Button>
@@ -636,7 +624,7 @@ export default function WallboardPresets() {
                           size="icon"
                           onClick={() => movePanel(index, 1)}
                           disabled={index === panelOrder.length - 1 || saving}
-                          aria-label={`Move ${PANEL_LABELS[panel]} down`}
+                          aria-label={`Bajar ${PANEL_LABELS[panel]}`}
                         >
                           <ArrowDown className="h-4 w-4" />
                         </Button>
