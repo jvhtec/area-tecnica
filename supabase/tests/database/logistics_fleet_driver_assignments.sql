@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(83);
+SELECT plan(90);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -97,6 +97,10 @@ DELETE FROM public.technician_availability WHERE technician_id IN (
   'e5100000-0000-0000-0000-000000000003'
 );
 DELETE FROM public.vacation_requests WHERE technician_id IN (
+  'e5100000-0000-0000-0000-000000000002'::uuid,
+  'e5100000-0000-0000-0000-000000000003'::uuid
+);
+DELETE FROM public.availability_schedules WHERE user_id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
   'e5100000-0000-0000-0000-000000000003'::uuid
 );
@@ -792,6 +796,111 @@ SELECT throws_ok(
   NULL,
   'a vehicle with assignment history cannot be deleted, only deactivated'
 );
+
+-- ---------------------------------------------------------------------------
+-- Calendar edits keep the driver state machine coherent.
+-- ---------------------------------------------------------------------------
+UPDATE public.transport_driver_assignments
+SET status = 'confirmed', responded_at = now()
+WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid;
+
+INSERT INTO public.logistics_event_departments (event_id, department)
+VALUES ('e5300000-0000-0000-0000-000000000002'::uuid, 'sound')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.technician_availability (technician_id, date, status)
+VALUES ('e5100000-0000-0000-0000-000000000002', '2031-03-14', 'unavailable')
+ON CONFLICT (technician_id, date) DO UPDATE SET status = excluded.status;
+
+DELETE FROM public.availability_schedules
+WHERE user_id = 'e5100000-0000-0000-0000-000000000003'::uuid
+  AND date = '2031-03-14';
+INSERT INTO public.availability_schedules (user_id, date, department, status, source)
+VALUES (
+  'e5100000-0000-0000-0000-000000000003'::uuid,
+  '2031-03-14',
+  'logistics',
+  'unavailable',
+  'warehouse'
+);
+
+SELECT set_config(
+  'test.event2_start',
+  (SELECT starts_at::text
+   FROM public.transport_driver_assignments
+   WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid),
+  false
+);
+
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001', false);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $ UPDATE public.logistics_events
+     SET event_time = '10:00'
+     WHERE id = 'e5300000-0000-0000-0000-000000000002'::uuid $,
+  'a material calendar time edit updates an assigned transport atomically'
+);
+
+SELECT is(
+  (SELECT status
+   FROM public.transport_driver_assignments
+   WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid),
+  'assigned',
+  'a calendar plan change clears the driver confirmation'
+);
+
+SELECT ok(
+  (SELECT starts_at
+   FROM public.transport_driver_assignments
+   WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid)
+    = current_setting('test.event2_start')::timestamptz + interval '1 hour',
+  'changing the event time shifts the assignment window by the same delta'
+);
+
+SELECT is(
+  cardinality(public.get_event_driver_assignment_ids(
+    'e5300000-0000-0000-0000-000000000002'::uuid
+  )),
+  1,
+  'driver notification recipients are derived from the event assignments'
+);
+
+SELECT throws_ok(
+  $ SELECT public.delete_logistics_event(
+       'e5300000-0000-0000-0000-000000000002'::uuid
+     ) $,
+  '23514',
+  NULL,
+  'transactional deletion is refused while the event still has a live assignment'
+);
+
+SELECT is(
+  (SELECT count(*)::integer
+   FROM public.logistics_event_departments
+   WHERE event_id = 'e5300000-0000-0000-0000-000000000002'::uuid
+     AND department = 'sound'),
+  1,
+  'a refused event delete rolls its department deletion back'
+);
+
+SELECT ok(
+  (SELECT d -> 'unavailable_days'
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-14') -> 'drivers') d
+   WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000002')
+  @> '[{"date":"2031-03-14","status":"unavailable"}]'::jsonb
+  AND
+  (SELECT d -> 'unavailable_days'
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-14') -> 'drivers') d
+   WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000003')
+  @> '[{"date":"2031-03-14","status":"warehouse"}]'::jsonb,
+  'the matrix preserves canonical unavailable/warehouse states from both availability stores'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT set_config('request.jwt.claim.sub', '', false);
 
 -- ---------------------------------------------------------------------------
 -- Cleanup
