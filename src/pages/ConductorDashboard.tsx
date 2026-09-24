@@ -9,13 +9,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { respondToTransportAssignment } from "@/features/logistics/fleet/fleetApi";
-import type { MyTransportAssignment } from "@/features/logistics/fleet/fleetModel";
+import { formatTransportDateKey, type MyTransportAssignment } from "@/features/logistics/fleet/fleetModel";
 import { useInvalidateLogisticsFleet, useMyTransportAssignments } from "@/features/logistics/fleet/useLogisticsFleet";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { formatMadridDayKey } from "@/utils/timezoneUtils";
-import { formatTransportDateKey } from "@/features/logistics/fleet/fleetModel";
 
-/** Upcoming (not yet finished) assignments grouped by Madrid start day. */
+/** Upcoming (not yet finished) assignments grouped by their transport-local start day. */
 const groupUpcomingByDay = (assignments: MyTransportAssignment[], nowIso: string) => {
   const groups = new Map<string, MyTransportAssignment[]>();
   for (const assignment of assignments) {
