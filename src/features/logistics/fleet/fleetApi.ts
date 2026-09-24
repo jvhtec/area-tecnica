@@ -284,6 +284,26 @@ export async function removeDriverAssignment(assignmentId: string): Promise<void
   }
 }
 
+/** Transactional event deletion: department rows roll back if an assignment guard refuses the delete. */
+export async function deleteLogisticsEvent(eventId: string): Promise<void> {
+  const { error } = await rpc("delete_logistics_event", { p_event_id: eventId });
+  throwIfError(error, "No se pudo eliminar el evento de logística");
+}
+
+/**
+ * After a material calendar edit, the DB trigger resets confirmed assignments.
+ * Fan the corresponding driver-update pushes out from server-derived assignment ids.
+ */
+export async function notifyDriverAssignmentsForEvent(eventId: string): Promise<void> {
+  const { data, error } = await rpc("get_event_driver_assignment_ids", { p_event_id: eventId });
+  throwIfError(error, "No se pudieron resolver los conductores del transporte");
+  for (const value of asArray(data)) {
+    const assignmentId = strOrNull(value);
+    if (assignmentId) notifyDriverEvent("logistics.driver.updated", { assignment_id: assignmentId });
+  }
+}
+
+
 // ---------------------------------------------------------------------------
 // Driver self-service
 // ---------------------------------------------------------------------------
