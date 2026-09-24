@@ -9,6 +9,8 @@ import {
   driverDisplayName,
   driverVehicleWarnings,
   findDoubleBookedAssignmentIds,
+  formatTransportDateKey,
+  formatTransportTime,
   groupAssignmentsByRowAndDay,
   startOfMadridWeek,
   type DriverAssignment,
@@ -58,6 +60,11 @@ describe("driver licences", () => {
     expect(driverCoversLicense(["C+E"], "C1")).toBe(true);
     expect(driverCoversLicense(["C"], "B")).toBe(true);
     expect(driverCoversLicense(["D"], "D1")).toBe(true);
+    expect(driverCoversLicense(["B+E"], "B")).toBe(true);
+    expect(driverCoversLicense(["C1+E"], "B+E")).toBe(true);
+    expect(driverCoversLicense(["C+E"], "C1+E")).toBe(true);
+    expect(driverCoversLicense(["D1+E"], "B+E")).toBe(true);
+    expect(driverCoversLicense(["D+E"], "D1+E")).toBe(true);
   });
 
   it("rejects a vehicle beyond the driver's licence", () => {
@@ -76,6 +83,11 @@ describe("driver licences", () => {
     // A van needs no CAP, and a driver with no licence data yet is not flagged.
     expect(driverVehicleWarnings({ license_categories: [], license_expiry: null, cap_expiry: "2020-01-01" }, { required_license: "B" }, "2026-10-01"))
       .toEqual([]);
+    expect(driverVehicleWarnings(
+      { license_categories: ["B+E"], license_expiry: null, cap_expiry: "2020-01-01" },
+      { required_license: "B+E" },
+      "2026-10-01",
+    )).toEqual([]);
   });
 });
 
@@ -100,6 +112,24 @@ describe("matrix layout", () => {
       .toEqual(["2026-10-01", "2026-10-02"]);
     expect(assignmentDayKeys({ starts_at: "2026-10-01T20:00:00.000Z", ends_at: "2026-10-01T22:00:00.000Z" }))
       .toEqual(["2026-10-01"]);
+  });
+
+  it("formats and groups assignment time in the transport event timezone", () => {
+    const item = assignment({
+      starts_at: "2026-10-01T22:30:00.000Z",
+      ends_at: "2026-10-02T00:30:00.000Z",
+    });
+    expect(formatTransportTime(item.starts_at, "Europe/London")).toBe("23:30");
+    expect(formatTransportDateKey(item.starts_at, "Europe/London")).toBe("2026-10-01");
+    expect(formatTransportDateKey(item.starts_at, "Europe/Madrid")).toBe("2026-10-02");
+    expect(assignmentDayKeys(item, "Europe/London")).toEqual(["2026-10-01", "2026-10-02"]);
+
+    const grouped = groupAssignmentsByRowAndDay(
+      [item],
+      "driver_id",
+      new Map([["e", "Europe/London"]]),
+    );
+    expect(grouped.get("d1")?.has("2026-10-01")).toBe(true);
   });
 
   it("groups several same-day transports into one cell in start order", () => {
