@@ -149,12 +149,12 @@ SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001
 SET ROLE authenticated;
 
 SELECT lives_ok(
-  $
+  $$
     INSERT INTO public.fleet_vehicles (id, name, license_plate, vehicle_type, required_license)
     VALUES
       ('e5400000-0000-0000-0000-000000000001'::uuid, 'Tráiler 1', '1234 ABC', 'trailer', 'C+E'),
       ('e5400000-0000-0000-0000-000000000002'::uuid, 'Furgoneta 1', '5678-DEF', 'furgoneta', 'B')
-  $,
+  $$,
   'logistics management can register fleet vehicles'
 );
 
@@ -165,11 +165,11 @@ SELECT is(
 );
 
 SELECT lives_ok(
-  $
+  $$
     UPDATE public.fleet_vehicles
     SET required_license = 'B+E'
     WHERE id = 'e5400000-0000-0000-0000-000000000002'::uuid
-  $,
+  $$,
   'fleet accepts the B+E Spanish licence category'
 );
 
@@ -181,10 +181,10 @@ SELECT throws_ok(
 );
 
 SELECT lives_ok(
-  $
+  $$
     INSERT INTO public.driver_details (profile_id, license_categories)
     VALUES ('e5100000-0000-0000-0000-000000000002'::uuid, ARRAY['B', 'C', 'C+E'])
-  $,
+  $$,
   'logistics management can record a driver''s licences'
 );
 
@@ -195,11 +195,11 @@ SELECT is(
 );
 
 SELECT lives_ok(
-  $
+  $$
     UPDATE public.driver_details
     SET license_categories = ARRAY['B', 'B+E', 'C', 'C+E', 'D+E']
     WHERE profile_id = 'e5100000-0000-0000-0000-000000000002'::uuid
-  $,
+  $$,
   'driver details accept the complete trailer licence categories'
 );
 
@@ -552,17 +552,17 @@ SELECT lives_ok(
 );
 
 SELECT throws_ok(
-  $ DELETE FROM public.logistics_events WHERE id = 'e5300000-0000-0000-0000-000000000001'::uuid $,
+  $$ DELETE FROM public.logistics_events WHERE id = 'e5300000-0000-0000-0000-000000000001'::uuid $$,
   '23514',
   NULL,
   'a live driver assignment blocks destructive transport deletion and replanning'
 );
 
 SELECT lives_ok(
-  $
+  $$
     DELETE FROM public.transport_driver_assignments
     WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000001'::uuid
-  $,
+  $$,
   'the assignment can be removed explicitly before deleting the transport'
 );
 
@@ -576,7 +576,7 @@ SELECT is(
 );
 
 SELECT throws_ok(
-  $ DELETE FROM public.profiles WHERE id = 'e5100000-0000-0000-0000-000000000003'::uuid $,
+  $$ DELETE FROM public.profiles WHERE id = 'e5100000-0000-0000-0000-000000000003'::uuid $$,
   '23514',
   NULL,
   'a conductor with upcoming transports cannot be deleted'
