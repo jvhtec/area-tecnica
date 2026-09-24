@@ -10,6 +10,7 @@ import { useDriverLocationSharing } from "@/features/logistics/fleet/useDriverLo
 type ConductorLocationSharingCardProps = {
   assignments: readonly MyTransportAssignment[];
   nowIso: string;
+  userId: string;
 };
 
 /**
@@ -17,8 +18,8 @@ type ConductorLocationSharingCardProps = {
  * when, and with whom: only the current position, only while a transport is
  * running or about to start, only to logistics.
  */
-export function ConductorLocationSharingCard({ assignments, nowIso }: ConductorLocationSharingCardProps) {
-  const sharing = useDriverLocationSharing(assignments, nowIso);
+export function ConductorLocationSharingCard({ assignments, nowIso, userId }: ConductorLocationSharingCardProps) {
+  const sharing = useDriverLocationSharing(assignments, nowIso, userId);
   const leadHours = Math.round(SHARING_LEAD_MINUTES / 60);
 
   const statusLine = (() => {
