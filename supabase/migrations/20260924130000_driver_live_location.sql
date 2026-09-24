@@ -113,7 +113,7 @@ begin
   ) values (
     v_uid, p_latitude, p_longitude,
     case when p_accuracy_m is null then null else greatest(p_accuracy_m, 0) end,
-    case when p_heading_deg is null or p_heading_deg < 0 then null else p_heading_deg % 360 end,
+    case when p_heading_deg is null or p_heading_deg < 0 then null else mod(p_heading_deg::numeric, 360) end,
     case when p_speed_mps is null then null else greatest(p_speed_mps, 0) end,
     p_assignment_id, now()
   )
