@@ -58,12 +58,15 @@ the vehicle:
 - **Drivers see only their own transports**, through RLS and
   `get_my_transport_assignments()` (deliberately narrow: time, place, route, vehicle,
   notes — no rates, crew or other jobs). They cannot read the matrix RPC.
-- **Replanning deletes assignments.** Assignments cascade from `logistics_events`, and
-  `schedule_transport_request` replaces a request's events when it is re-planned, so
-  re-planning a request drops its driver assignments. Reassign after replanning.
-- **A busy conductor keeps the role.** A trigger on `profiles` refuses changing a
-  conductor's role while they have upcoming, non-declined assignments; reassign or
-  remove them in the matrix first, so no staffed-looking assignment is left orphaned.
+- **Replanning/cancelling cannot silently drop a live assignment.** A `BEFORE DELETE`
+  guard on `logistics_events` refuses deleting an event while it has an upcoming,
+  non-declined driver/vehicle assignment. Remove or reassign it in the matrix first;
+  that explicit path owns the driver notification. Declined or finished history may
+  still cascade with an event.
+- **A busy conductor keeps the role and account.** Triggers on `profiles` refuse both
+  changing a conductor's role and deleting a profile while upcoming, non-declined
+  assignments exist. The `delete-user` edge function performs the same check early
+  so the admin gets a useful conflict instead of a failed auth cascade.
 - **Any change a driver must act on resets confirmation**: driver, vehicle, window or
   the instructions (`notes`).
 - **Nothing here touches staffing.** No `job_assignments`, timesheets or rates are
