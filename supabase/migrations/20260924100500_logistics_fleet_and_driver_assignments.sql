@@ -558,6 +558,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_row public.transport_driver_assignments%rowtype;
+  v_timezone text;
 begin
   if auth.uid() is null or not public.logistics_matrix_can_manage() then
     raise exception 'Solo administración o gestión pueden quitar asignaciones' using errcode = '42501';
@@ -571,11 +572,17 @@ begin
     raise exception 'Asignación no encontrada' using errcode = 'P0002';
   end if;
 
+  select coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+  into v_timezone
+  from public.logistics_events le
+  where le.id = v_row.logistics_event_id;
+
   return jsonb_build_object(
     'assignment_id', v_row.id,
     'driver_id', v_row.driver_id,
     'logistics_event_id', v_row.logistics_event_id,
-    'starts_at', v_row.starts_at
+    'starts_at', v_row.starts_at,
+    'timezone', coalesce(v_timezone, 'Europe/Madrid')
   );
 end;
 $$;
