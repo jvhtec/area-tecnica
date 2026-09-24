@@ -36,7 +36,7 @@ export async function handleDriverEvents(context: BroadcastEventContext): Promis
 
   if (type === "logistics.driver.removed") {
     if (!(await isConductorProfile(client, body.recipient_id))) return true;
-    const message = buildDriverRemovedMessage(body.starts_at);
+    const message = buildDriverRemovedMessage(body.starts_at, body.timezone);
     setBroadcastMessage(state, message.title, message.text);
     state.url = DRIVER_HOME;
     state.metaExtras.targetUrl = DRIVER_HOME;
