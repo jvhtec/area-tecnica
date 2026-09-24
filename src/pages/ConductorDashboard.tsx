@@ -101,11 +101,19 @@ const ConductorDashboard = () => {
         </Button>
       </div>
 
-      {!isLoading && !error && user?.id && (
+      {/* A failed background refetch (a tunnel, no coverage) keeps the last list on screen
+          and, crucially, keeps location sharing mounted so its offline re-send can work. */}
+      {error && data && (
+        <p className="text-sm text-amber-700 dark:text-amber-400" role="status">
+          Sin conexión: mostrando la última información disponible.
+        </p>
+      )}
+
+      {data && user?.id && (
         <ConductorLocationSharingCard assignments={upcoming} nowIso={nowIso} userId={user.id} />
       )}
 
-      {error ? (
+      {error && !data ? (
         <Card><CardContent className="py-8 text-center text-sm text-destructive">{getErrorMessage(error)}</CardContent></Card>
       ) : isLoading ? (
         <Card><CardContent className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></CardContent></Card>
@@ -141,7 +149,7 @@ const ConductorDashboard = () => {
         ))
       )}
 
-      {!isLoading && !error && past.length > 0 && (
+      {data && past.length > 0 && (
         <section className="space-y-3" aria-label="Transportes anteriores">
           <Button
             variant="ghost"

@@ -159,9 +159,14 @@ Opt-in, foreground-only position sharing from the driver's phone to the logistic
   which checks the caller is a conductor and that the attached assignment is their own.
   Turning the switch off calls `stop_sharing_driver_location()`, which deletes the row.
 - **Storage**: `driver_locations` holds **one row per driver — the latest position, no
-  trail**. Rows older than 24 h are purged opportunistically; the read model ignores
-  anything older than 12 h and the UI greys positions past `STALE_AFTER_MINUTES` (10).
-  RLS: matrix viewers and the driver themselves can read; nobody writes directly.
+  trail**. A row is deleted as soon as its assignment is declined, reassigned, moved
+  out of the sharing window or removed (`cleanup_driver_location_for_assignment`
+  trigger), and `cleanup_driver_locations()` sweeps leftovers hourly **when `pg_cron`
+  is installed** (without it, rows past their window stay hidden but are not deleted).
+  The read model ignores anything older than 12 h or outside the assignment window,
+  and the UI greys positions past `STALE_AFTER_MINUTES` (10). RLS: the driver reads
+  their own row; matrix viewers read only rows inside an active assignment window;
+  nobody writes directly.
 - **Logistics side**: `get_driver_locations()` (matrix viewers only) feeds the tab: a
   Mapbox GL map (`DriverTrackingMap`, lazy-loaded, marker per driver + pin for the
   destination of their current transport) and a list that works without a token. Route

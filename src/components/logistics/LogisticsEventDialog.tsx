@@ -45,6 +45,7 @@ import { queryKeys } from "@/lib/react-query";
 import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
 import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
 import { deleteLogisticsEvent, notifyDriverAssignmentsForEvent } from "@/features/logistics/fleet/fleetApi";
+import { isDriverRelevantEventChange } from "@/features/logistics/events/driverRelevantEventChange";
 import { getErrorMessage } from '@/utils/errorMessage';
 import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
@@ -403,11 +404,13 @@ export const LogisticsEventDialog = ({
           departmentsOverride: selectedDepartments,
           changes: Object.keys(changes).length > 0 ? changes : undefined,
         });
-        // The DB trigger has already reset any confirmed driver assignment.
-        // Notify those drivers from assignment ids resolved server-side.
-        void notifyDriverAssignmentsForEvent(selectedEvent.id).catch((notificationError) => {
-          console.error("Failed to notify drivers after logistics event update", notificationError);
-        });
+        // Only edits the DB trigger treats as material reset a driver's confirmation;
+        // cosmetic ones (colour, departments, plate) must not push "confírmalo".
+        if (isDriverRelevantEventChange(selectedEvent, eventData)) {
+          void notifyDriverAssignmentsForEvent(selectedEvent.id).catch((notificationError) => {
+            console.error("Failed to notify drivers after logistics event update", notificationError);
+          });
+        }
 
         toast({
           title: "Success",
