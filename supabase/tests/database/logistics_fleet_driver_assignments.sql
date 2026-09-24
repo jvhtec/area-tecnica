@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(58);
+SELECT plan(59);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -306,6 +306,12 @@ SELECT is(
   jsonb_array_length(public.get_my_transport_assignments('2031-03-01', '2031-03-31')),
   3,
   'a driver lists their own transports'
+);
+
+SELECT is(
+  public.get_my_transport_assignments('2031-03-01', '2031-03-31')->0->>'timezone',
+  'Europe/Madrid',
+  'a driver assignment exposes the transport timezone'
 );
 
 SELECT is(
