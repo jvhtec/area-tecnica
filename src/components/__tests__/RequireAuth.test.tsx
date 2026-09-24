@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { screen } from "@testing-library/react";
 
 import { createRouteShellAuthState } from "@/test/fixtures";
@@ -18,6 +18,11 @@ vi.mock("@/hooks/useOptimizedAuth", () => ({
 
 import { RequireAuth } from "../RequireAuth";
 
+const AuthScreen = () => {
+  const location = useLocation();
+  return <div>Auth Screen {location.search}</div>;
+};
+
 const renderRequireAuth = (route = "/secure") =>
   renderWithProviders(
     <Routes>
@@ -29,7 +34,7 @@ const renderRequireAuth = (route = "/secure") =>
           </RequireAuth>
         }
       />
-      <Route path="/auth" element={<div>Auth Screen</div>} />
+      <Route path="/auth" element={<AuthScreen />} />
     </Routes>,
     { route },
   );
@@ -54,7 +59,9 @@ describe("RequireAuth", () => {
 
     renderRequireAuth();
 
-    expect(await screen.findByText("Auth Screen")).toBeInTheDocument();
+    expect(await screen.findByText("Auth Screen", { exact: false })).toHaveTextContent(
+      "returnTo=%2Fsecure",
+    );
   });
 
   it("renders children when a session exists", () => {

@@ -16,7 +16,6 @@ import { Loading } from "@/components/ui/loading";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 import type { Json } from "@/integrations/supabase/types";
@@ -52,28 +51,6 @@ export const Profile = () => {
     newPassword: '',
     confirmPassword: ''
   });
-  const {
-    isSupported,
-    permission,
-    subscription,
-    isInitializing,
-    isEnabling,
-    isDisabling,
-    error: pushError,
-    enable,
-    disable,
-    canEnable,
-  } = usePushNotifications();
-
-  const permissionLabel =
-    permission === 'granted'
-      ? 'Concedido'
-      : permission === 'denied'
-        ? 'Bloqueado'
-        : 'No solicitado';
-  const hasSubscription = Boolean(subscription);
-  const showEnableButton = canEnable && !isInitializing;
-  const isBlocked = permission === 'denied';
   const showPushControls = canViewProfilePushControls(profile?.role);
   const showIcsCard = canUseProfileCalendarSubscription(profile?.role);
   const showTechnicianSelfTools = canUseTechnicianSelfTools(
@@ -559,80 +536,13 @@ export const Profile = () => {
               <CardHeader>
                 <CardTitle>Notificaciones push</CardTitle>
                 <CardDescription>
-                  Gestiona las notificaciones push para este dispositivo.
+                  Gestiona la bandeja, tus preferencias y todos tus dispositivos.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>⚠️ Recordatorio importante</AlertTitle>
-                  <AlertDescription>
-                    Después de actualizar la aplicación, recuerda volver a activar las notificaciones en esta página para seguir recibiendo alertas de cambios y actualizaciones.
-                  </AlertDescription>
-                </Alert>
-
-                {!isSupported ? (
-                  <Alert variant="info">
-                    <AlertTitle>Navegador no compatible</AlertTitle>
-                    <AlertDescription>
-                      Tu navegador actual no admite notificaciones web push. Prueba con la última versión de Chrome, Edge o Safari.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <>
-                    <div className="space-y-1 text-sm">
-                      <p>
-                        <span className="font-medium">Permiso:</span> {permissionLabel}
-                      </p>
-                      <p>
-                        <span className="font-medium">Suscripción:</span>{' '}
-                        {hasSubscription ? 'Activa en este dispositivo' : 'Aún no activa'}
-                      </p>
-                    </div>
-
-                    {isInitializing && (
-                      <p className="text-sm text-muted-foreground">
-                        Comprobando si este dispositivo ya tiene una suscripción…
-                      </p>
-                    )}
-
-                    {pushError && (
-                      <Alert variant="destructive">
-                        <AlertTitle>Error de notificaciones</AlertTitle>
-                        <AlertDescription>{pushError}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    {isBlocked && (
-                      <Alert variant="info">
-                        <AlertTitle>Notificaciones bloqueadas</AlertTitle>
-                        <AlertDescription>
-                          Activa las notificaciones en la configuración de tu navegador y recarga la página para suscribirte.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => {
-                          void enable().catch((): undefined => undefined);
-                        }}
-                        disabled={!showEnableButton || isEnabling}
-                      >
-                        {isEnabling ? 'Activando…' : 'Activar notificaciones'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          void disable().catch((): undefined => undefined);
-                        }}
-                        disabled={!hasSubscription || isDisabling || isInitializing}
-                      >
-                        {isDisabling ? 'Desactivando…' : 'Desactivar notificaciones'}
-                      </Button>
-                    </div>
-                  </>
-                )}
+              <CardContent>
+                <Button asChild>
+                  <Link to="/notifications">Abrir centro de notificaciones</Link>
+                </Button>
               </CardContent>
             </Card>
           )}

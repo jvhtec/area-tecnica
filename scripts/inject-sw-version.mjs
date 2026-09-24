@@ -1,10 +1,14 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { minify } from "terser";
+import { collectPrecacheAssets } from "./lib/sw-precache.mjs";
 
 const buildTimestamp = `${Math.floor(Date.now() / 1000)}`;
 const swFile = "dist/sw.js";
 const indexFile = "dist/index.html";
 const placeholder = "__BUILD_TIMESTAMP__";
+const precachePlaceholder = "[] /* __PRECACHE_ASSETS__ */";
+const viteManifestFile = "dist/.vite/manifest.json";
+
 const supabasePreconnectPlaceholder = "<!-- __SUPABASE_PRECONNECT__ -->";
 
 const isMissingFileError = (error) =>
@@ -45,7 +49,17 @@ if (!currentContents.includes(placeholder)) {
   process.exit(1);
 }
 
-const nextContents = currentContents.replaceAll(placeholder, buildTimestamp);
+if (!currentContents.includes(precachePlaceholder)) {
+  console.error(`Warning: placeholder ${precachePlaceholder} not found in ${swFile}`);
+  process.exit(1);
+}
+
+const viteManifest = JSON.parse(await readFile(viteManifestFile, "utf8"));
+const precacheAssets = collectPrecacheAssets(viteManifest);
+
+const nextContents = currentContents
+  .replaceAll(placeholder, buildTimestamp)
+  .replace(precachePlaceholder, JSON.stringify(precacheAssets));
 
 if (process.argv.includes('--minify-service-worker')) {
   const result = await minify(nextContents, { ecma: 2020, compress: { passes: 2 }, mangle: true });
@@ -56,6 +70,7 @@ if (process.argv.includes('--minify-service-worker')) {
 }
 
 console.log(`Injected build timestamp into service worker: ${buildTimestamp}`);
+console.log(`Service worker precaches ${precacheAssets.length} offline assets`);
 
 try {
   const indexContents = await readFile(indexFile, "utf8");

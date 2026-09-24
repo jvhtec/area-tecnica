@@ -13,7 +13,7 @@ export async function handleLogisticsEvents(context: BroadcastEventContext): Pro
     const message = buildLogisticsTransportRequestedMessage(context.actor, jobTitle, body);
     setBroadcastMessage(state, message.title, message.text);
 
-    const logisticsUrl = jobId ? `/jobs/${jobId}` : '/logistics';
+    const logisticsUrl = jobId ? `/logistics?jobId=${encodeURIComponent(jobId)}` : '/logistics';
     const targetUrl = body.url || logisticsUrl;
     state.url = targetUrl;
     audience.clearAllRecipients();
@@ -36,7 +36,7 @@ export async function handleLogisticsEvents(context: BroadcastEventContext): Pro
     audience.clearAllRecipients();
     audience.addNaturalRecipients(await getManagementOnlyUserIds(context.client));
 
-    const logisticsUrl = body.url || (jobId ? `/jobs/${jobId}` : '/logistics/calendar');
+    const logisticsUrl = body.url || (jobId ? `/logistics?jobId=${encodeURIComponent(jobId)}` : '/logistics');
     state.url = logisticsUrl;
     state.metaExtras.view = 'logistics-calendar';
     state.metaExtras.targetUrl = logisticsUrl;

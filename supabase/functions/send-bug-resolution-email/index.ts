@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { broadcastPush } from "../_shared/pushBroadcast.ts";
 import { wrapInCorporateTemplate, escapeHtml } from "../_shared/corporateEmailTemplate.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 
@@ -246,6 +247,19 @@ serve(async (req) => {
 
       const brevoResponse = await response.json();
       console.log("[send-bug-resolution-email] Email sent successfully:", brevoResponse);
+
+      // Mirror the resolution to the reporter's devices when we can tie the
+      // report back to an account. Reports submitted by email alone have no
+      // created_by, and there is nobody to push to.
+      if (bugReport.created_by) {
+        await broadcastPush({
+          type: "bug.report.resolved",
+          bug_report_id: bugReport.id,
+          recipient_id: bugReport.created_by,
+          actor_id: bugReport.resolved_by ?? undefined,
+          title: bugReport.title,
+        }, { supabaseUrl: SUPABASE_URL, serviceRoleKey: SERVICE_ROLE_KEY });
+      }
 
       return new Response(
         JSON.stringify({

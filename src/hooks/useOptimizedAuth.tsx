@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Session } from "@supabase/supabase-js";
 import { TokenManager } from "@/lib/token-manager";
+import { isNetworkFailure, sessionOrPersisted } from "@/lib/offline-session";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import type { UserRole } from "@/types/user";
@@ -14,7 +15,7 @@ import { logAuthEvent, logSecurityEvent } from "@/lib/security-audit";
 import { canAccessSoundVision } from "@/utils/permissions";
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from "@/runtime/app-runtime-events";
 import {
-  PROFILE_CACHE_DURATION,
+  readCachedProfile,
   PROFILE_CACHE_KEY,
   VALID_USER_ROLES,
   getErrorCode,
@@ -76,22 +77,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   }, [boundary]);
 
   // Cache profile data in localStorage
-  const getCachedProfile = useCallback((userId: string): CachedProfile | null => {
-    try {
-      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
-      if (cached) {
-        const profile = JSON.parse(cached) as CachedProfile;
-        const isExpired = Date.now() - profile.timestamp > PROFILE_CACHE_DURATION;
-        if (!isExpired && profile.userId === userId) {
-          console.log('✅ Using cached profile data');
-          return profile;
-        }
-      }
-    } catch (error) {
-      console.error('Error reading profile cache:', error);
-    }
-    return null;
-  }, []);
+  // `allowStale`: see readCachedProfile.
+  const getCachedProfile = useCallback(
+    (userId: string, allowStale = false): CachedProfile | null => readCachedProfile(userId, allowStale),
+    [],
+  );
 
   const setCachedProfile = useCallback((userId: string, role: string | null, department: string | null, soundVisionAccess: boolean, assignableAsTech: boolean) => {
     try {
@@ -124,23 +114,29 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const fetchUserProfile = useCallback(async (userId: string, useCache = true): Promise<ProfileData | null> => {
     const request = boundary.beginProfile(userId);
     if (!request) return null;
+    const applyCachedProfile = (cached: CachedProfile): ProfileData | null => {
+      if (!request.apply(cached.role, cached.department, Boolean(cached.soundVisionAccess), Boolean(cached.assignableAsTech))) return null;
+      setUserRole(cached.role);
+      setUserDepartment(cached.department);
+      setSoundVisionAccessFlag(Boolean(cached.soundVisionAccess));
+      setAssignableAsTechFlag(Boolean(cached.assignableAsTech));
+      return {
+        role: cached.role,
+        department: cached.department,
+        soundvision_access: Boolean(cached.soundVisionAccess),
+        assignable_as_tech: Boolean(cached.assignableAsTech)
+      };
+    };
+    const applyStaleProfileIfOffline = (failure: unknown): ProfileData | null => {
+      if (!isNetworkFailure(failure)) return null;
+      const stale = getCachedProfile(userId, true);
+      return stale ? applyCachedProfile(stale) : null;
+    };
     try {
       // Try cache first if enabled
       if (useCache) {
         const cached = getCachedProfile(userId);
-        if (cached) {
-          if (!request.apply(cached.role, cached.department, Boolean(cached.soundVisionAccess), Boolean(cached.assignableAsTech))) return null;
-          setUserRole(cached.role);
-          setUserDepartment(cached.department);
-          setSoundVisionAccessFlag(Boolean(cached.soundVisionAccess));
-          setAssignableAsTechFlag(Boolean(cached.assignableAsTech));
-          return {
-            role: cached.role,
-            department: cached.department,
-            soundvision_access: Boolean(cached.soundVisionAccess),
-            assignable_as_tech: Boolean(cached.assignableAsTech)
-          };
-        }
+        if (cached) return applyCachedProfile(cached);
       }
 
       console.log('🔄 Fetching fresh profile data...');
@@ -232,7 +228,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
       if (error) {
         console.error("Error fetching user profile:", error);
-        return null;
+        return applyStaleProfileIfOffline(error);
       }
 
       if (data) {
@@ -255,8 +251,9 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
       return data ?? null;
     } catch (error) {
-      if (request.isCurrent()) console.error("Exception in fetchUserProfile:", error);
-      return null;
+      if (!request.isCurrent()) return null;
+      console.error("Exception in fetchUserProfile:", error);
+      return applyStaleProfileIfOffline(error);
     } finally {
       if (request.isCurrent()) setIsProfileLoading(false);
     }
@@ -367,8 +364,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
+      (event, rawSession) => {
         console.log("Auth state changed:", event);
+        // Offline with an expired token supabase-js reports INITIAL_SESSION with
+        // no session while keeping it stored; that is not a sign-out.
+        const newSession = event === 'INITIAL_SESSION' ? sessionOrPersisted(rawSession) : rawSession;
         applySession(newSession);
 
         if (newSession?.user?.id) {

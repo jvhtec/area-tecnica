@@ -92,7 +92,6 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
             // Helpful metadata for clients and templates
             target_date: formattedDate,
             single_day: true,
-            url: `/jobs/${jobId}`
           }
         });
       } catch (_) { /* ignore push errors */ }

@@ -1,173 +1,87 @@
-import { useEffect, useState, useCallback, useRef } from "react"
-import { Bell, BellDot } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Bell, BellDot } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
-import { Button } from "@/components/ui/button"
-import { useAppBadgeSource } from "@/hooks/useAppBadgeSource"
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { cn } from "@/lib/utils"
-import { isDepartmentManagementRole } from "@/utils/permissions"
+import { Button } from '@/components/ui/button'
+import { getUnreadNotificationCount } from '@/features/notifications/api'
+import { useAppBadgeSource } from '@/hooks/useAppBadgeSource'
+import { cn } from '@/lib/utils'
 
 interface NotificationBadgeProps {
   userId: string
   userRole: string
   userDepartment: string | null
-  display?: "sidebar" | "icon"
+  display?: 'sidebar' | 'icon'
   className?: string
 }
-
 export const NotificationBadge = ({
   userId,
-  userRole,
-  userDepartment,
-  display = "sidebar",
+  display = 'sidebar',
   className,
 }: NotificationBadgeProps) => {
-  const [hasUnreadMessages, setHasUnreadMessages] = useState(false)
+  const navigate = useNavigate()
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  const isLoadingRef = useRef(false)
-  const refreshQueuedRef = useRef(false)
-  const debounceTimerRef = useRef<number | null>(null)
-  const navigate = useNavigate()
+  const refreshSeq = useRef(0)
 
-  const fetchUnreadMessages = useCallback(async () => {
-    if (isLoadingRef.current) {
-      refreshQueuedRef.current = true
-      return
-    }
-
+  const refresh = useCallback(async () => {
+    const seq = ++refreshSeq.current
+    setIsLoading(true)
     try {
-      isLoadingRef.current = true
-      setIsLoading(true)
-
-      let deptQuery = dataLayerClient.from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "unread")
-
-      // Mirrors useMessagesQuery: anyone without a scoped department — including a
-      // management profile whose department is null — falls back to their own sent
-      // messages. Leaving both filters off would count every department's unread
-      // messages (the messages SELECT policy shows management all rows), lighting the
-      // badge for messages the list will never show.
-      if (isDepartmentManagementRole(userRole) && userDepartment) {
-        deptQuery = deptQuery.eq("department", userDepartment)
-      } else {
-        deptQuery = deptQuery.eq("sender_id", userId)
-      }
-
-      const directQuery = dataLayerClient.from("direct_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("recipient_id", userId)
-        .eq("status", "unread")
-
-      const [deptMessages, directMessages] = await Promise.all([
-        deptQuery,
-        directQuery,
-      ])
-
-      if (deptMessages.error) {
-        console.error("Error fetching department messages:", deptMessages.error)
-        return
-      }
-
-      if (directMessages.error) {
-        console.error("Error fetching direct messages:", directMessages.error)
-        return
-      }
-
-      const departmentCount = deptMessages.count ?? 0
-      const directCount = directMessages.count ?? 0
-      const totalUnread = departmentCount + directCount
-
-      setUnreadCount(totalUnread)
-      setHasUnreadMessages(totalUnread > 0)
+      const count = await getUnreadNotificationCount(userId)
+      // Overlapping refreshes (the 30s interval and invalidate events) can
+      // resolve out of order; only the most recently started call may apply.
+      if (seq === refreshSeq.current) setUnreadCount(count)
     } catch (error) {
-      console.error("Error checking unread messages:", error)
+      console.error('No se pudo comprobar la bandeja de notificaciones:', error)
     } finally {
-      isLoadingRef.current = false
-      setIsLoading(false)
-      if (refreshQueuedRef.current) {
-        refreshQueuedRef.current = false
-        Promise.resolve().then(() => fetchUnreadMessages())
-      }
+      if (seq === refreshSeq.current) setIsLoading(false)
     }
-  }, [userId, userRole, userDepartment])
+  }, [userId])
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      fetchUnreadMessages()
-    }, 500)
-    const intervalId = window.setInterval(() => {
-      fetchUnreadMessages()
-    }, 30000)
-
-    const handleInvalidate = () => {
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current)
+    void refresh()
+    const intervalId = window.setInterval(() => void refresh(), 30_000)
+    const handleInvalidate = () => void refresh()
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const message = event.data as { source?: string; type?: string } | undefined
+      if (message?.source !== 'sw') return
+      if (message.type === 'notification-shown' || message.type === 'notification-click') {
+        void refresh()
       }
-      debounceTimerRef.current = window.setTimeout(() => {
-        fetchUnreadMessages()
-      }, 50)
     }
-
-    window.addEventListener("messages_invalidated", handleInvalidate)
-    window.addEventListener("direct_messages_invalidated", handleInvalidate)
-
+    window.addEventListener('notifications_invalidated', handleInvalidate)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
+    }
     return () => {
-      window.clearTimeout(timeoutId)
       window.clearInterval(intervalId)
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current)
-        debounceTimerRef.current = null
+      window.removeEventListener('notifications_invalidated', handleInvalidate)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
       }
-      window.removeEventListener("messages_invalidated", handleInvalidate)
-      window.removeEventListener("direct_messages_invalidated", handleInvalidate)
     }
-  }, [fetchUnreadMessages])
+  }, [refresh])
 
-  const handleMessageNotificationClick = () => {
-    if (isDepartmentManagementRole(userRole)) {
-      navigate("/dashboard?showMessages=true")
-    } else if (userRole === "technician") {
-      navigate("/technician-dashboard?showMessages=true")
-    }
-  }
+  useAppBadgeSource('notifications', unreadCount > 0 ? { count: unreadCount } : null)
+  const hasUnread = unreadCount > 0
+  const readableCount = unreadCount > 99 ? '99+' : String(unreadCount)
 
-  useAppBadgeSource(
-    "messages",
-    hasUnreadMessages ? { count: unreadCount } : null,
-  )
-
-  if (display === "sidebar" && !hasUnreadMessages) {
-    return null
-  }
-
-  if (display === "icon") {
-    const Icon = hasUnreadMessages ? BellDot : Bell
-    const readableCount = unreadCount > 9 ? "9+" : unreadCount.toString()
-
+  if (display === 'icon') {
+    const Icon = hasUnread ? BellDot : Bell
     return (
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        onClick={handleMessageNotificationClick}
-        disabled={isLoading}
-        className={cn(
-          "relative h-9 w-9 rounded-full border border-border/60 bg-background/70 text-muted-foreground shadow-sm transition-colors hover:bg-accent/30 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-          hasUnreadMessages && "text-amber-500",
-          className,
-        )}
-        aria-label={
-          hasUnreadMessages
-            ? `${unreadCount} mensajes nuevos`
-            : "Abrir mensajes"
-        }
+        onClick={() => navigate('/notifications')}
+        className={cn('relative h-9 w-9 rounded-full border border-border/60 bg-background/70 text-muted-foreground shadow-sm hover:bg-accent/30 hover:text-foreground', hasUnread && 'text-amber-500', className)}
+        aria-busy={isLoading}
+        aria-label={hasUnread ? `${unreadCount} notificaciones sin leer` : 'Abrir notificaciones'}
       >
         <Icon className="h-5 w-5" aria-hidden="true" />
-        {hasUnreadMessages && (
-          <span className="pointer-events-none absolute -top-1 -right-1 inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[0.7rem] font-semibold text-white shadow">
+        {hasUnread && (
+          <span aria-hidden="true" className="pointer-events-none absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[0.7rem] font-semibold text-white shadow">
             {readableCount}
           </span>
         )}
@@ -176,18 +90,10 @@ export const NotificationBadge = ({
   }
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      className={cn(
-        "w-full justify-start gap-2 text-yellow-500",
-        className,
-      )}
-      onClick={handleMessageNotificationClick}
-      disabled={isLoading}
-    >
-      <BellDot className="h-4 w-4" aria-hidden="true" />
-      <span>New Messages</span>
+    <Button type="button" variant="ghost" className={cn('w-full justify-start gap-2', hasUnread && 'text-amber-500', className)} onClick={() => navigate('/notifications')} aria-busy={isLoading}>
+      {hasUnread ? <BellDot className="h-4 w-4" aria-hidden="true" /> : <Bell className="h-4 w-4" aria-hidden="true" />}
+      <span>Notificaciones</span>
+      {hasUnread && <span className="ml-auto text-xs font-semibold">{readableCount}</span>}
     </Button>
   )
 }

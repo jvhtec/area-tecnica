@@ -16,6 +16,7 @@ vi.mock("../data.ts", () => ({
   getManagementByDepartmentUserIds: async () => [],
   getJobTitle: async () => "Auditorio", getJobDepartment: async () => "sound",
   getJobType: async () => "single", getProfileDisplayName: async () => "Solicitante",
+  getProfileRoles: async () => new Map(),
   getTourName: async () => null,
 }));
 vi.mock("../routing.ts", () => ({
@@ -34,6 +35,25 @@ vi.mock("../broadcast/delivery.ts", () => ({
   loadPushSubscriptions: mocks.subscriptions, loadNativeTokens: mocks.native,
   sendPayloadToTargets: mocks.push,
 }));
+vi.mock("../inbox.ts", () => ({
+  claimInboxItems: async (_client: unknown, recipientIds: string[]) =>
+    new Map(recipientIds.map((userId) => [userId, `inbox-${userId}`])),
+  recordAttemptResult: async () => undefined,
+  recordDeliveryOutcomes: async () => undefined,
+}));
+vi.mock("../notificationPolicy.ts", () => ({
+  buildEventKey: async () => "event-key",
+  urgencyForEvent: () => "normal",
+  decoratePayloadPolicy: (payload: unknown) => payload,
+  loadRecipientPreferences: async (_client: unknown, userIds: string[]) => new Map(
+    userIds.map((userId) => [userId, {
+      accountEnabled: true,
+      categoryEnabled: true,
+      quietNow: false,
+      muted: false,
+    }]),
+  ),
+}));
 
 import { handleBroadcast } from "../broadcast.ts";
 
@@ -46,7 +66,7 @@ describe("transport email alongside push", () => {
     mocks.email.mockResolvedValue({ status: "sent", sent: 1, failed: 0, skipped: 0 });
     mocks.routes.mockResolvedValue(true);
     mocks.subscriptions.mockResolvedValue({ subscriptions: [], error: null });
-    mocks.native.mockResolvedValue([]);
+    mocks.native.mockResolvedValue({ tokens: [], error: null });
     mocks.push.mockResolvedValue([{ ok: true }]);
   });
 
@@ -60,17 +80,17 @@ describe("transport email alongside push", () => {
 
   it("emails even when users have no web or native subscriptions", async () => {
     const response = await handleBroadcast(client, "creator-id", body);
-    expect(await response.json()).toMatchObject({ reason: "No subscriptions for recipients", email: { sent: 1 } });
+    expect(await response.json()).toMatchObject({ reason: "no_registered_devices", email: { sent: 1 } });
     expect(mocks.email).toHaveBeenCalledOnce();
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it("preserves push delivery when the email provider fails", async () => {
     mocks.email.mockResolvedValue({ status: "failed", sent: 0, failed: 1, skipped: 0 });
-    mocks.native.mockResolvedValue([{ token: "native-token" }]);
+    mocks.native.mockResolvedValue({ tokens: [{ device_token: "native-token", user_id: "creator-id" }], error: null });
     const response = await handleBroadcast(client, "creator-id", body);
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ status: "sent", count: 1, email: { status: "failed" } });
+    expect(await response.json()).toMatchObject({ status: "accepted", outcomes: { accepted: 1 }, email: { status: "failed" } });
     expect(mocks.push).toHaveBeenCalledOnce();
   });
 
@@ -80,18 +100,18 @@ describe("transport email alongside push", () => {
     mocks.email.mockImplementation(() => new Promise((resolve) => {
       releaseEmail = () => resolve({ status: "sent", sent: 1, failed: 0, skipped: 0 });
     }));
-    mocks.native.mockResolvedValue([{ token: "native-token" }]);
+    mocks.native.mockResolvedValue({ tokens: [{ device_token: "native-token", user_id: "creator-id" }], error: null });
     mocks.push.mockImplementation(async () => { releaseEmail(); return [{ ok: true }]; });
     const response = await handleBroadcast(client, "creator-id", body);
-    expect(await response.json()).toMatchObject({ status: "sent", email: { sent: 1 } });
+    expect(await response.json()).toMatchObject({ status: "accepted", email: { sent: 1 } });
   });
 
   it("keeps push delivery when the email path rejects outright", async () => {
     mocks.email.mockRejectedValue(new Error("provider exploded"));
-    mocks.native.mockResolvedValue([{ token: "native-token" }]);
+    mocks.native.mockResolvedValue({ tokens: [{ device_token: "native-token", user_id: "creator-id" }], error: null });
     const response = await handleBroadcast(client, "creator-id", body);
     expect(await response.json()).toMatchObject({
-      status: "sent", count: 1, email: { status: "skipped", reason: "unexpected_error" },
+      status: "accepted", outcomes: { accepted: 1 }, email: { status: "skipped", reason: "unexpected_error" },
     });
     expect(mocks.push).toHaveBeenCalledOnce();
   });

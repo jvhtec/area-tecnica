@@ -285,7 +285,6 @@ export const useTourDateMutations = ({ tourId, newLocationDetails, editLocationD
               location_name: newLocation || (updatedDate?.location as any)?.name || '',
               old_type: editingTourDate.tour_date_type,
               new_type: tourDateType,
-              url: `/tours/${tourId}`
             }
           });
         } catch (err) {

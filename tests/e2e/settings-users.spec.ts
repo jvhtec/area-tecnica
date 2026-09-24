@@ -38,7 +38,7 @@ test.describe("settings and users smoke", () => {
     await page.goto("/settings");
 
     await expect(page.getByRole("heading", { name: "Ajustes", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: /expandir sección/i }).nth(6).click();
+    await page.getByRole("button", { name: /expandir sección: usuarios/i }).click();
     await expect(page.getByText("Alex Manager")).toBeVisible();
     await page.getByRole("button", { name: /añadir usuario/i }).click();
     await expect(page.getByRole("heading", { name: /crear nuevo usuario/i })).toBeVisible();

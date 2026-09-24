@@ -350,6 +350,10 @@ jobs:
 
   migration_apply:
     name: Supabase migration apply
+    permissions:
+      contents: read
+      # Pull the Supabase images from ghcr.io as an authenticated client.
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -365,7 +369,10 @@ jobs:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Start local database
-        run: supabase start -x "$SUPABASE_START_EXCLUDES"
+        env:
+          # Authenticated ghcr.io pulls; see scripts/ci/supabase-start.sh.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci/supabase-start.sh
 
       - name: Apply migrations to ephemeral database
         run: supabase db reset --local --no-seed
@@ -391,6 +398,10 @@ jobs:
 
   db_lint:
     name: Supabase db lint
+    permissions:
+      contents: read
+      # Pull the Supabase images from ghcr.io as an authenticated client.
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -406,7 +417,10 @@ jobs:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Start local database
-        run: supabase start -x "$SUPABASE_START_EXCLUDES"
+        env:
+          # Authenticated ghcr.io pulls; see scripts/ci/supabase-start.sh.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci/supabase-start.sh
 
       - name: Apply migrations
         run: supabase db reset --local --no-seed
@@ -420,6 +434,10 @@ jobs:
 
   rls_rpc_security_tests:
     name: RLS/RPC security tests
+    permissions:
+      contents: read
+      # Pull the Supabase images from ghcr.io as an authenticated client.
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -435,7 +453,10 @@ jobs:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Start local database
-        run: supabase start -x "$SUPABASE_START_EXCLUDES"
+        env:
+          # Authenticated ghcr.io pulls; see scripts/ci/supabase-start.sh.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci/supabase-start.sh
 
       - name: Apply migrations
         run: supabase db reset --local --no-seed

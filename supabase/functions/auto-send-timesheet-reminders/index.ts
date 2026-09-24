@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { sendBrevoEmail } from '../_shared/brevo.ts'
 import { escapeHtml } from '../_shared/corporateEmailTemplate.ts'
 import { logEvent } from '../_shared/structuredLogger.ts'
+import { broadcastPush } from "../_shared/pushBroadcast.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -521,6 +522,15 @@ serve(async (req) => {
 
       if (groupUpdateOk) {
         sentCount++
+        // The email has gone out and the cooldown is stamped; mirror the reminder
+        // to the technician's devices so it is not lost in an inbox they only
+        // check occasionally. Best-effort — never counted as a send failure.
+        await broadcastPush({
+          type: 'timesheet.reminder.due',
+          job_id: ts.job_id,
+          technician_id: ts.technician_id,
+          recipient_id: ts.technician_id,
+        })
       } else {
         failCount++
       }

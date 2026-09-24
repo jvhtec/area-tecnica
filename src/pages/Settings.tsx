@@ -14,19 +14,13 @@ import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
 import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 import { DEPARTMENT_LABELS } from "@/types/department";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { toast } from "@/hooks/use-toast";
-import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDashboardPath } from '@/utils/roleBasedRouting'
 import { isManagementRole } from '@/utils/permissions'
 import type { UserRole } from '@/types/user'
-import { usePushDebug } from '@/hooks/usePushDebug'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
-import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
+import { PushNotificationSchedule, ShiftReminderSchedule } from '@/components/settings/PushNotificationSchedule'
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager'
@@ -77,7 +71,7 @@ const CollapsibleCard = ({
               <CollapsibleTrigger asChild>
                 <button
                   className="shrink-0 rounded-md border px-2 py-1 text-xs md:text-sm text-muted-foreground hover:bg-muted flex items-center gap-1 [&[data-state=open]>svg]:rotate-180"
-                  aria-label={open ? "Contraer sección" : "Expandir sección"}
+                  aria-label={`${open ? "Contraer" : "Expandir"} sección: ${title}`}
                 >
                   <ChevronDown className="h-3.5 w-3.5 md:h-4 md:w-4 transition-transform duration-200" />
                   <span className="hidden sm:inline">Alternar</span>
@@ -119,109 +113,14 @@ const Settings = () => {
       navigate(redirectPath, { replace: true });
     }
   }, [userRole, authLoading, isManagementUser, navigate]);
-  const {
-    isSupported,
-    permission,
-    subscription,
-    isInitializing,
-    isEnabling,
-    isDisabling,
-    error,
-    enable,
-    disable,
-    canEnable
-  } = usePushNotifications();
-
-  const permissionLabel =
-    permission === 'granted'
-      ? 'Concedido'
-      : permission === 'denied'
-        ? 'Bloqueado'
-        : 'No solicitado';
-  const hasSubscription = Boolean(subscription);
-  const showEnableButton = canEnable && !isInitializing;
-  const isBlocked = permission === 'denied';
-
   const handleClearFilters = () => {
     setSearchQuery("");
     setSelectedRole("all");
     setSelectedDepartment("all");
   };
 
-  const handleTestNotification = async () => {
-    try {
-      const { data, error } = await dataLayerClient.functions.invoke('push', {
-        body: { action: 'test', url: '/settings' }
-      });
-
-      if (error) throw error;
-
-      const result = data as { status: string; results?: Array<{ ok: boolean; skipped?: boolean }> };
-
-      if (result.status === 'sent') {
-        const allSkipped = result.results?.every(r => r.skipped);
-        if (allSkipped) {
-          toast({
-            title: "Notificación de prueba omitida",
-            description: "Las notificaciones están configuradas, pero el servidor todavía no dispone de claves VAPID.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Notificación de prueba enviada",
-            description: "Comprueba la notificación en tu dispositivo."
-          });
-        }
-      } else {
-        toast({
-          title: "No hay suscripciones",
-          description: "Activa primero las notificaciones push para poder probarlas.",
-          variant: "destructive"
-        });
-      }
-    } catch (err) {
-      console.error('Test notification error:', err);
-      toast({
-        title: "No se pudo enviar la prueba",
-        description: err instanceof Error ? err.message : "Error desconocido",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleBackgroundTest = async () => {
-    try {
-      toast({
-        title: 'Prueba en segundo plano programada',
-        description: 'Pulsa Inicio ahora. Se enviará una notificación de prueba en 5 segundos.',
-      })
-      setTimeout(async () => {
-        try {
-          const { error } = await dataLayerClient.functions.invoke('push', {
-            body: { action: 'test', url: '/settings' },
-          })
-          if (error) throw error
-        } catch (err) {
-          console.error('Background test error:', err)
-        }
-      }, 5000)
-    } catch (err) {
-      // no-op
-    }
-  }
-
-  // Debug: surface SW messages and quick local test (helps on iOS without a Mac)
-  const { events, showLocalTest, getSubscriptionInfo } = usePushDebug()
-  const [subInfo, setSubInfo] = useState<any | null>(null)
-  useEffect(() => {
-    void (async () => {
-      setSubInfo(await getSubscriptionInfo())
-    })()
-  }, [subscription])
-
   const [collapsibleStates, setCollapsibleStates] = useState<Record<string, boolean>>({
     'push-notifications': false,
-    'push-diagnostics': false,
     'push-matrix': false,
     'push-schedule': false,
     'waha-endpoint': false,
@@ -267,149 +166,15 @@ const Settings = () => {
           <div className="space-y-4 md:space-y-6 w-full min-w-0">
             <CollapsibleCard
               id="push-notifications"
-              title="Notificaciones push"
-              description="Recibe en tu dispositivo actualizaciones de trabajos, asignaciones y documentos en tiempo real."
+              title="Centro de notificaciones"
+              description="Gestiona tu bandeja, preferencias, dispositivos y diagnóstico desde un único lugar."
               isOpen={collapsibleStates['push-notifications']}
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-notifications': open }))}
             >
-              {!isSupported ? (
-                <Alert variant="info">
-                  <AlertTitle>Navegador no compatible</AlertTitle>
-                  <AlertDescription>
-                    Tu navegador no admite notificaciones web push. Prueba la última versión de Chrome, Edge o Safari.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <>
-                  <div className="space-y-1 text-sm">
-                    <p>
-                      <span className="font-medium">Permiso:</span> {permissionLabel}
-                    </p>
-                    <p>
-                      <span className="font-medium">Suscripción:</span>{" "}
-                      {hasSubscription ? 'Activa en este dispositivo' : 'Aún no activa'}
-                    </p>
-                  </div>
-
-                  {isInitializing && (
-                    <p className="text-sm text-muted-foreground">
-                      Comprobando si este dispositivo ya tiene una suscripción…
-                    </p>
-                  )}
-
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertTitle>Error de notificaciones</AlertTitle>
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  {isBlocked && (
-                    <Alert variant="info">
-                      <AlertTitle>Notificaciones bloqueadas</AlertTitle>
-                      <AlertDescription>
-                        Activa las notificaciones en los ajustes del navegador y recarga la página para suscribirte.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      onClick={() => {
-                        void enable().catch((): undefined => undefined);
-                      }}
-                      disabled={!showEnableButton || isEnabling}
-                      className="w-full text-xs sm:text-sm"
-                      size="sm"
-                    >
-                      {isEnabling ? 'Activando…' : 'Activar'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        void disable().catch((): undefined => undefined);
-                      }}
-                      disabled={!hasSubscription || isDisabling || isInitializing}
-                      className="w-full text-xs sm:text-sm"
-                      size="sm"
-                    >
-                      {isDisabling ? 'Desactivando…' : 'Desactivar'}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={handleTestNotification}
-                      disabled={!hasSubscription || isInitializing}
-                      className="w-full text-xs sm:text-sm"
-                      size="sm"
-                    >
-                      <Bell className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="hidden xs:inline">Enviar </span>prueba
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={handleBackgroundTest}
-                      disabled={!hasSubscription || isInitializing}
-                      title="Programa una notificación en 5 segundos para probar la aplicación en segundo plano"
-                      className="w-full text-xs sm:text-sm"
-                      size="sm"
-                    >
-                      Prueba 2.º plano (5 s)
-                    </Button>
-                  </div>
-                </>
-              )}
+              <Button onClick={() => navigate('/notifications?section=devices')}>
+                Abrir centro de notificaciones
+              </Button>
             </CollapsibleCard>
-
-            {isSupported && (
-              <CollapsibleCard
-                id="push-diagnostics"
-                title="Diagnóstico push"
-                description="Útil cuando no puedes acceder al inspector web de Safari."
-                isOpen={collapsibleStates['push-diagnostics']}
-                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-diagnostics': open }))}
-              >
-                <div className="text-sm space-y-1">
-                  <p><span className="font-medium">Permiso:</span> {permissionLabel}</p>
-                  <p><span className="font-medium">Tiene suscripción:</span> {hasSubscription ? 'Sí' : 'No'}</p>
-                  {subInfo?.endpoint && (
-                    <p className="break-words"><span className="font-medium">Punto de conexión:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <Button
-                    variant="secondary"
-                    onClick={() => void showLocalTest()}
-                    disabled={permission !== 'granted'}
-                    className="w-full text-xs sm:text-sm"
-                    size="sm"
-                  >
-                    <span className="hidden xs:inline">Mostrar </span>prueba local
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={async () => setSubInfo(await getSubscriptionInfo())}
-                    className="w-full text-xs sm:text-sm"
-                    size="sm"
-                  >
-                    Actualizar<span className="hidden xs:inline"> información</span>
-                  </Button>
-                </div>
-                <div className="text-xs text-muted-foreground mt-3">
-                  <p className="font-medium mb-1">Eventos recientes del service worker</p>
-                  {events.length === 0 ? (
-                    <p>Aún no hay eventos. Prueba el envío o la prueba local.</p>
-                  ) : (
-                    <ul className="space-y-1 max-h-40 overflow-auto border rounded p-2 bg-muted/30">
-                      {events.slice().reverse().map((e, idx) => (
-                        <li key={idx} className="font-mono">
-                          {new Date(e.ts).toLocaleTimeString()} — {e.type}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </CollapsibleCard>
-            )}
 
             {isManagementUser && (
               <CollapsibleCard
@@ -429,7 +194,10 @@ const Settings = () => {
                 isOpen={collapsibleStates['push-schedule']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-schedule': open }))}
               >
-                <PushNotificationSchedule />
+                <div className="space-y-4">
+                  <PushNotificationSchedule />
+                  <ShiftReminderSchedule />
+                </div>
               </CollapsibleCard>
             )}
 

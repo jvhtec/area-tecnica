@@ -5711,45 +5711,129 @@ export type Database = {
           },
         ]
       }
+      notification_inbox: {
+        Row: {
+          accepted_count: number
+          body: string | null
+          category: string
+          created_at: string
+          event_key: string
+          event_type: string
+          expires_at: string | null
+          failed_count: number
+          id: string
+          meta: Json
+          provider_status: string
+          read_at: string | null
+          title: string
+          updated_at: string
+          urgency: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          accepted_count?: number
+          body?: string | null
+          category: string
+          created_at?: string
+          event_key: string
+          event_type: string
+          expires_at?: string | null
+          failed_count?: number
+          id?: string
+          meta?: Json
+          provider_status?: string
+          read_at?: string | null
+          title: string
+          updated_at?: string
+          urgency?: string
+          url?: string
+          user_id: string
+        }
+        Update: {
+          accepted_count?: number
+          body?: string | null
+          category?: string
+          created_at?: string
+          event_key?: string
+          event_type?: string
+          expires_at?: string | null
+          failed_count?: number
+          id?: string
+          meta?: Json
+          provider_status?: string
+          read_at?: string | null
+          title?: string
+          updated_at?: string
+          urgency?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
+          account_enabled: boolean
           assignments: boolean | null
+          category_preferences: Json
           created_at: string | null
           form_submissions: boolean | null
           gear_movements: boolean | null
           id: string
           messages: boolean | null
+          muted_entities: Json
+          quiet_hours_enabled: boolean
+          quiet_hours_end: string
+          quiet_hours_start: string
+          quiet_hours_timezone: string
           staffing_scope:
             | Database["public"]["Enums"]["staffing_notification_scope"]
             | null
           updated_at: string | null
-          user_id: string | null
+          urgent_bypass: boolean
+          user_id: string
         }
         Insert: {
+          account_enabled?: boolean
           assignments?: boolean | null
+          category_preferences?: Json
           created_at?: string | null
           form_submissions?: boolean | null
           gear_movements?: boolean | null
           id?: string
           messages?: boolean | null
+          muted_entities?: Json
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          quiet_hours_timezone?: string
           staffing_scope?:
             | Database["public"]["Enums"]["staffing_notification_scope"]
             | null
           updated_at?: string | null
-          user_id?: string | null
+          urgent_bypass?: boolean
+          user_id: string
         }
         Update: {
+          account_enabled?: boolean
           assignments?: boolean | null
+          category_preferences?: Json
           created_at?: string | null
           form_submissions?: boolean | null
           gear_movements?: boolean | null
           id?: string
           messages?: boolean | null
+          muted_entities?: Json
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          quiet_hours_timezone?: string
           staffing_scope?:
             | Database["public"]["Enums"]["staffing_notification_scope"]
             | null
           updated_at?: string | null
-          user_id?: string | null
+          urgent_bypass?: boolean
+          user_id?: string
         }
         Relationships: [
           {
@@ -6483,15 +6567,77 @@ export type Database = {
         }
         Relationships: []
       }
+      push_delivery_attempts: {
+        Row: {
+          accepted_at: string | null
+          attempt_count: number
+          attempted_at: string
+          channel: string
+          created_at: string
+          id: string
+          inbox_id: string
+          last_error_code: string | null
+          status: string
+          status_code: number | null
+          target_fingerprint: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          attempt_count?: number
+          attempted_at?: string
+          channel: string
+          created_at?: string
+          id?: string
+          inbox_id: string
+          last_error_code?: string | null
+          status: string
+          status_code?: number | null
+          target_fingerprint: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          attempt_count?: number
+          attempted_at?: string
+          channel?: string
+          created_at?: string
+          id?: string
+          inbox_id?: string
+          last_error_code?: string | null
+          status?: string
+          status_code?: number | null
+          target_fingerprint?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_delivery_attempts_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "notification_inbox"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_device_tokens: {
         Row: {
           created_at: string | null
           device_id: string | null
           device_name: string | null
           device_token: string
+          disabled_at: string | null
+          enabled: boolean
+          failure_count: number
           id: string
           last_seen_at: string | null
+          last_failure_at: string | null
+          last_verified_at: string | null
           platform: string
+          sync_status: string
           updated_at: string | null
           user_id: string
         }
@@ -6500,9 +6646,15 @@ export type Database = {
           device_id?: string | null
           device_name?: string | null
           device_token: string
+          disabled_at?: string | null
+          enabled?: boolean
+          failure_count?: number
           id?: string
           last_seen_at?: string | null
+          last_failure_at?: string | null
+          last_verified_at?: string | null
           platform: string
+          sync_status?: string
           updated_at?: string | null
           user_id: string
         }
@@ -6511,9 +6663,15 @@ export type Database = {
           device_id?: string | null
           device_name?: string | null
           device_token?: string
+          disabled_at?: string | null
+          enabled?: boolean
+          failure_count?: number
           id?: string
           last_seen_at?: string | null
+          last_failure_at?: string | null
+          last_verified_at?: string | null
           platform?: string
+          sync_status?: string
           updated_at?: string | null
           user_id?: string
         }
@@ -6586,33 +6744,57 @@ export type Database = {
         Row: {
           auth: string | null
           created_at: string
+          device_id: string | null
+          device_name: string | null
+          disabled_at: string | null
+          enabled: boolean
           endpoint: string
           expiration_time: number | null
           id: string
+          failure_count: number
+          last_failure_at: string | null
           last_seen_at: string
+          last_verified_at: string | null
           p256dh: string | null
+          sync_status: string
           user_agent: string | null
           user_id: string
         }
         Insert: {
           auth?: string | null
           created_at?: string
+          device_id?: string | null
+          device_name?: string | null
+          disabled_at?: string | null
+          enabled?: boolean
           endpoint: string
           expiration_time?: number | null
           id?: string
+          failure_count?: number
+          last_failure_at?: string | null
           last_seen_at?: string
+          last_verified_at?: string | null
           p256dh?: string | null
+          sync_status?: string
           user_agent?: string | null
           user_id: string
         }
         Update: {
           auth?: string | null
           created_at?: string
+          device_id?: string | null
+          device_name?: string | null
+          disabled_at?: string | null
+          enabled?: boolean
           endpoint?: string
           expiration_time?: number | null
           id?: string
+          failure_count?: number
+          last_failure_at?: string | null
           last_seen_at?: string
+          last_verified_at?: string | null
           p256dh?: string | null
+          sync_status?: string
           user_agent?: string | null
           user_id?: string
         }

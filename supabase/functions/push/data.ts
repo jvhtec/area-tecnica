@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "./deps.ts";
 import type { BroadcastBody, DepartmentRoleSummary } from "./types.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 
 type IdRow = { id?: string | null };
 type ProfileDepartmentRow = { department?: string | null };
@@ -27,6 +28,20 @@ export async function getManagementUserIds(client: SupabaseClient): Promise<stri
     .from('profiles')
     .select('id')
     .in('role', ['admin','management','logistics'])
+    .returns<IdRow[]>();
+  if (error || !data) return [];
+  return getStringIds(data);
+}
+
+/**
+ * Every account, for the one family that is genuinely company-wide. Recipients
+ * without a registered device still get a durable inbox item; the delivery layer
+ * and the recipient's own preferences decide whether a push is attempted.
+ */
+export async function getAllUserIds(client: SupabaseClient): Promise<string[]> {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
     .returns<IdRow[]>();
   if (error || !data) return [];
   return getStringIds(data);
@@ -506,6 +521,30 @@ export async function getProfileDisplayName(client: SupabaseClient, userId?: str
     console.error('⚠️ Exception fetching profile display name:', { userId, err });
     return null;
   }
+}
+
+/**
+ * Role per recipient, used to tailor each recipient's deep link. A failed
+ * lookup returns an empty map: every recipient then keeps the shared URL, which
+ * is exactly the pre-existing behaviour, so a lookup error never drops a push.
+ */
+export async function getProfileRoles(
+  client: SupabaseClient,
+  userIds: string[],
+): Promise<Map<string, string | null>> {
+  const roles = new Map<string, string | null>();
+  if (userIds.length === 0) return roles;
+  const { data, error } = await client
+    .from('profiles')
+    .select('id, role')
+    .in('id', userIds)
+    .returns<Array<{ id: string; role: string | null }>>();
+  if (error) {
+    logEvent('warn', 'push_recipient_role_lookup_failed', { errorCode: error.code ?? 'unknown' });
+    return roles;
+  }
+  for (const row of data ?? []) roles.set(row.id, row.role);
+  return roles;
 }
 
 export async function resolveSoundVisionVenueName(

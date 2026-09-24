@@ -7,6 +7,7 @@ import {
 } from '@capacitor/push-notifications'
 
 import { supabase } from '@/lib/supabase'
+import { getPushDeviceId, getPushDeviceName } from '@/lib/pushDevice'
 
 const NATIVE_PUSH_TOKEN_KEY = 'native_push_token'
 const NATIVE_PUSH_PLATFORM = 'ios'
@@ -46,18 +47,6 @@ export const getStoredNativePushToken = (): string | null => {
   } catch {
     return null
   }
-}
-
-const updatePushPreference = async (enabled: boolean) => {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return
-  }
-
-  await supabase
-    .from('profiles')
-    .update({ push_notifications_enabled: enabled })
-    .eq('id', user.id)
 }
 
 const waitForRegistrationToken = async (): Promise<string> => {
@@ -101,7 +90,7 @@ const waitForRegistrationToken = async (): Promise<string> => {
             return
           }
           resolved = true
-          const message = error.error || 'Unable to register for native push notifications.'
+          const message = error.error || 'No se pudo registrar el dispositivo para las notificaciones.'
           void cleanup().then(() => reject(new Error(message)))
         })
 
@@ -110,7 +99,7 @@ const waitForRegistrationToken = async (): Promise<string> => {
             return
           }
           resolved = true
-          void cleanup().then(() => reject(new Error('Timed out waiting for native push registration.')))
+          void cleanup().then(() => reject(new Error('Se agotó el tiempo de espera al registrar las notificaciones.')))
         }, REGISTRATION_TIMEOUT_MS)
       } catch (err) {
         if (resolved) {
@@ -118,7 +107,7 @@ const waitForRegistrationToken = async (): Promise<string> => {
         }
         resolved = true
         void cleanup().then(() =>
-          reject(err instanceof Error ? err : new Error('Failed to set up native push registration listeners.'))
+          reject(err instanceof Error ? err : new Error('No se pudo preparar el registro de notificaciones del dispositivo.'))
         )
       }
     })()
@@ -150,9 +139,11 @@ export const getNativePushPermissionStatus = async (): Promise<NotificationPermi
   }
 }
 
-export const enableNativePush = async (): Promise<string | null> => {
+export const enableNativePush = async (
+  options: { sendWelcome?: boolean } = {},
+): Promise<string | null> => {
   if (!isNativePushSupported()) {
-    throw new Error('Native push notifications are not supported on this device.')
+    throw new Error('Este dispositivo no admite notificaciones push nativas.')
   }
 
   let status = await PushNotifications.checkPermissions()
@@ -172,17 +163,36 @@ export const enableNativePush = async (): Promise<string | null> => {
     body: {
       action: 'subscribe_native',
       platform: NATIVE_PUSH_PLATFORM,
-      token
+      token,
+      device_id: getPushDeviceId(),
+      device_name: getPushDeviceName(),
+      send_welcome: options.sendWelcome ?? true,
     }
   })
 
   if (error) {
-    throw new Error(error.message || 'Failed to register native push token.')
+    throw new Error(error.message || 'No se pudo registrar el dispositivo para las notificaciones.')
   }
 
   storeNativeToken(token)
-  await updatePushPreference(true)
   return token
+}
+
+export const synchronizeNativePush = async (): Promise<boolean> => {
+  const token = getStoredNativePushToken()
+  if (!token) return false
+  const { error } = await supabase.functions.invoke('push', {
+    body: {
+      action: 'subscribe_native',
+      platform: NATIVE_PUSH_PLATFORM,
+      token,
+      device_id: getPushDeviceId(),
+      device_name: getPushDeviceName(),
+      send_welcome: false,
+    },
+  })
+  if (error) throw new Error(error.message || 'No se pudo sincronizar el dispositivo con el servidor.')
+  return true
 }
 
 export const disableNativePush = async (): Promise<void> => {
@@ -196,15 +206,15 @@ export const disableNativePush = async (): Promise<void> => {
     body: {
       action: 'unsubscribe_native',
       platform: NATIVE_PUSH_PLATFORM,
-      token: token || undefined
+      token: token || undefined,
+      device_id: getPushDeviceId(),
     }
   })
 
   if (error) {
-    throw new Error(error.message || 'Failed to unregister native push token.')
+    throw new Error(error.message || 'No se pudo eliminar el registro de notificaciones del dispositivo.')
   }
 
   await PushNotifications.unregister()
   storeNativeToken(null)
-  await updatePushPreference(false)
 }

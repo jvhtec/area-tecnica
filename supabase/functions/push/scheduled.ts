@@ -1,17 +1,22 @@
 import type { SupabaseClient } from "./deps.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
-import { sendNativePushNotification } from "./apns.ts";
-import { sendPushNotification } from "./webpush.ts";
 import { handleFestivalFeedTick } from "./festivalFeed.ts";
 import { handleProgramaFeedTick } from "./programaFeed.ts";
-import { pushTargetFingerprint } from "./targetId.ts";
+import {
+  addOutcome,
+  deliverScheduledToUser,
+  emptyTally,
+  finishScheduledRun,
+} from "./scheduledDelivery.ts";
+import { handleShiftReminderOccurrence } from "./shiftReminder.ts";
+import { isScheduleDue, occurrenceDate } from "./schedulePolicy.ts";
+import { formatMorningSummary, formatMultiDepartmentSummary } from "./morningSummaryFormat.ts";
+import type { MorningSummaryData } from "./morningSummaryTypes.ts";
 import type {
+  BroadcastBody,
   CheckScheduledBody,
-  NativePushTokenRow,
-  PushPayload,
-  PushSendResult,
-  PushSubscriptionRow,
 } from "./types.ts";
 
 type MorningSummaryAssignment = MorningSummaryData["assignments"][number];
@@ -59,68 +64,10 @@ function getErrorMessage(value: unknown): string | unknown {
   return value;
 }
 
-function getPushSendMetadata(result: PushSendResult): Pick<PushDeliveryResult, 'status' | 'skipped'> {
-  return {
-    status: 'status' in result ? result.status : undefined,
-    skipped: 'skipped' in result ? result.skipped : undefined,
-  };
-}
-
-const loadNativeTokens = async (
-  client: SupabaseClient,
-  userIds: string[],
-): Promise<NativePushTokenRow[]> => {
-  if (userIds.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await client
-    .from("push_device_tokens")
-    .select("user_id, device_token, platform")
-    .in("user_id", userIds)
-    .returns<NativePushTokenRow[]>();
-
-  if (error) {
-    console.error("scheduled push fetch native tokens error", error);
-    return [];
-  }
-
-  return data ?? [];
-};
-
 // ============================================================================
 // DAILY MORNING SUMMARY HELPERS
 // ============================================================================
 
-type MorningSummaryData = {
-  assignments: Array<{
-    technician_id: string;
-    job: {
-      title: string;
-      start_time: string;
-    };
-    profile: {
-      first_name: string;
-      last_name: string;
-      nickname: string | null;
-    };
-  }>;
-  unavailable: Array<{
-    user_id: string;
-    source: string;
-    profile: {
-      first_name: string;
-      last_name: string;
-      nickname: string | null;
-    };
-  }>;
-  allTechs: Array<{
-    id: string;
-    first_name: string;
-    last_name: string;
-    nickname: string | null;
-  }>;
-};
 
 async function getMorningSummaryDataForDepartment(
   client: SupabaseClient,
@@ -228,256 +175,6 @@ async function getMorningSummaryDataForDepartment(
   };
 }
 
-function formatMorningSummary(
-  department: string,
-  data: MorningSummaryData,
-  targetDate: string,
-): { title: string; body: string } {
-  // Format date in Spanish
-  const dateObj = new Date(targetDate + 'T00:00:00Z');
-  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const dayName = dayNames[dateObj.getUTCDay()];
-  const dayNum = dateObj.getUTCDate();
-  const monthName = monthNames[dateObj.getUTCMonth()];
-  const formattedDate = `${dayName} ${dayNum} de ${monthName}`;
-
-  // Department names in Spanish (capitalize)
-  const deptMap: Record<string, string> = {
-    sound: 'Sonido',
-    lights: 'Iluminación',
-    video: 'Vídeo',
-    logistics: 'Logística',
-    production: 'Producción',
-  };
-  const deptName = deptMap[department] || department.toUpperCase();
-
-  let message = `📅 Resumen ${deptName} - ${formattedDate}\n\n`;
-
-  // Group assignments by job
-  const jobGroups: Record<string, typeof data.assignments> = {};
-  for (const assignment of data.assignments) {
-    const jobTitle = assignment.job.title;
-    if (!jobGroups[jobTitle]) {
-      jobGroups[jobTitle] = [];
-    }
-    jobGroups[jobTitle].push(assignment);
-  }
-
-  // Format jobs section
-  if (Object.keys(jobGroups).length > 0) {
-    message += `🎤 EN TRABAJOS:\n`;
-    for (const [jobTitle, assignments] of Object.entries(jobGroups)) {
-      const techNames = assignments
-        .map(a => a.profile.nickname || a.profile.first_name)
-        .join(', ');
-      message += `  • ${jobTitle}: ${techNames}\n`;
-    }
-    message += '\n';
-  }
-
-  // Calculate warehouse techs (available, not on jobs, not unavailable)
-  const assignedTechIds = new Set(data.assignments.map(a => a.technician_id));
-  const unavailableTechIds = new Set(data.unavailable.map(a => a.user_id));
-  const warehouseTechs = data.allTechs.filter(
-    t => !assignedTechIds.has(t.id) && !unavailableTechIds.has(t.id)
-  );
-
-  if (warehouseTechs.length > 0) {
-    const names = warehouseTechs
-      .map(t => t.nickname || t.first_name)
-      .join(', ');
-    message += `🏢 EN ALMACÉN: ${names}\n\n`;
-  }
-
-  // Group unavailable by source
-  const bySource: Record<string, typeof data.unavailable> = {};
-  for (const avail of data.unavailable) {
-    const source = avail.source || 'other';
-    if (!bySource[source]) {
-      bySource[source] = [];
-    }
-    bySource[source].push(avail);
-  }
-
-  // Vacation
-  if (bySource.vacation?.length) {
-    const names = bySource.vacation
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `🏖️ DE VACACIONES: ${names}\n`;
-  }
-
-  // Travel
-  if (bySource.travel?.length) {
-    const names = bySource.travel
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `✈️ DE VIAJE: ${names}\n`;
-  }
-
-  // Sick
-  if (bySource.sick?.length) {
-    const names = bySource.sick
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `🤒 ENFERMOS: ${names}\n`;
-  }
-
-  // Day off
-  if (bySource.day_off?.length) {
-    const names = bySource.day_off
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `📅 DÍA LIBRE: ${names}\n`;
-  }
-
-  // Warehouse (manual)
-  if (bySource.warehouse?.length) {
-    const names = bySource.warehouse
-      .map(a => a.profile.nickname || a.profile.first_name)
-      .join(', ');
-    message += `🏢 MARCADOS EN ALMACÉN: ${names}\n`;
-  }
-
-  // Summary stats
-  const totalTechs = data.allTechs.length;
-  const availableCount = warehouseTechs.length;
-  message += `\n📊 ${availableCount}/${totalTechs} técnicos disponibles`;
-
-  return {
-    title: `Resumen del día - ${deptName}`,
-    body: message,
-  };
-}
-
-function formatMultiDepartmentSummary(
-  departments: string[],
-  dataByDept: Map<string, MorningSummaryData>,
-  targetDate: string,
-): { title: string; body: string } {
-  // Format date in Spanish
-  const dateObj = new Date(targetDate + 'T00:00:00Z');
-  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const dayName = dayNames[dateObj.getUTCDay()];
-  const dayNum = dateObj.getUTCDate();
-  const monthName = monthNames[dateObj.getUTCMonth()];
-  const formattedDate = `${dayName} ${dayNum} de ${monthName}`;
-
-  // Department names in Spanish
-  const deptMap: Record<string, string> = {
-    sound: 'Sonido',
-    lights: 'Iluminación',
-    video: 'Vídeo',
-    logistics: 'Logística',
-    production: 'Producción',
-  };
-
-  let fullMessage = `📅 Resumen del día - ${formattedDate}\n\n`;
-
-  // Process each department
-  for (let i = 0; i < departments.length; i++) {
-    const department = departments[i];
-    const data = dataByDept.get(department);
-
-    if (!data) continue;
-
-    const deptName = deptMap[department] || department.toUpperCase();
-    fullMessage += `━━━ ${deptName.toUpperCase()} ━━━\n\n`;
-
-    // Group assignments by job
-    const jobGroups: Record<string, typeof data.assignments> = {};
-    for (const assignment of data.assignments) {
-      const jobTitle = assignment.job.title;
-      if (!jobGroups[jobTitle]) {
-        jobGroups[jobTitle] = [];
-      }
-      jobGroups[jobTitle].push(assignment);
-    }
-
-    // Format jobs section
-    if (Object.keys(jobGroups).length > 0) {
-      fullMessage += `🎤 EN TRABAJOS:\n`;
-      for (const [jobTitle, assignments] of Object.entries(jobGroups)) {
-        const techNames = assignments
-          .map(a => a.profile.nickname || a.profile.first_name)
-          .join(', ');
-        fullMessage += `  • ${jobTitle}: ${techNames}\n`;
-      }
-      fullMessage += '\n';
-    }
-
-    // Calculate warehouse techs
-    const assignedTechIds = new Set(data.assignments.map(a => a.technician_id));
-    const unavailableTechIds = new Set(data.unavailable.map(a => a.user_id));
-    const warehouseTechs = data.allTechs.filter(
-      t => !assignedTechIds.has(t.id) && !unavailableTechIds.has(t.id)
-    );
-
-    if (warehouseTechs.length > 0) {
-      const names = warehouseTechs
-        .map(t => t.nickname || t.first_name)
-        .join(', ');
-      fullMessage += `🏢 EN ALMACÉN: ${names}\n\n`;
-    }
-
-    // Group unavailable by source
-    const bySource: Record<string, typeof data.unavailable> = {};
-    for (const avail of data.unavailable) {
-      const source = avail.source || 'other';
-      if (!bySource[source]) {
-        bySource[source] = [];
-      }
-      bySource[source].push(avail);
-    }
-
-    // Format unavailability
-    let hasUnavailable = false;
-    if (bySource.vacation?.length) {
-      const names = bySource.vacation.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `🏖️ DE VACACIONES: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.travel?.length) {
-      const names = bySource.travel.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `✈️ DE VIAJE: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.sick?.length) {
-      const names = bySource.sick.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `🤒 ENFERMOS: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.day_off?.length) {
-      const names = bySource.day_off.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `📅 DÍA LIBRE: ${names}\n`;
-      hasUnavailable = true;
-    }
-    if (bySource.warehouse?.length) {
-      const names = bySource.warehouse.map(a => a.profile.nickname || a.profile.first_name).join(', ');
-      fullMessage += `🏢 MARCADOS EN ALMACÉN: ${names}\n`;
-      hasUnavailable = true;
-    }
-
-    // Summary stats
-    const totalTechs = data.allTechs.length;
-    const availableCount = warehouseTechs.length;
-    fullMessage += `\n📊 ${availableCount}/${totalTechs} técnicos disponibles\n`;
-
-    // Add separator between departments (except last one)
-    if (i < departments.length - 1) {
-      fullMessage += '\n';
-    }
-  }
-
-  const deptNames = departments.map(d => deptMap[d] || d).join(', ');
-  return {
-    title: `Resumen del día - ${deptNames}`,
-    body: fullMessage,
-  };
-}
-
 async function checkAndGetScheduleConfig(
   client: SupabaseClient,
   eventType: string,
@@ -511,6 +208,11 @@ async function checkAndGetScheduleConfig(
   const timezone = config.timezone || 'Europe/Madrid';
   const now = new Date();
 
+  if (!isScheduleDue(config, now)) {
+    console.log(`⏰ Fuera del minuto programado para ${config.schedule_time} (${timezone})`);
+    return { shouldSend: false, config };
+  }
+
   // Convert to target timezone using Intl API
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
@@ -529,66 +231,24 @@ async function checkAndGetScheduleConfig(
   const currentMinute = parseInt(minutePart?.value || '0');
   const currentWeekday = weekdayPart?.value;
 
-  // Map weekday to number (1=Monday, 7=Sunday)
-  const weekdayMap: Record<string, number> = {
-    'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7
-  };
-  const currentDayNum = weekdayMap[currentWeekday || ''] || 1;
-
-  // Parse schedule time (HH:MM:SS)
-  const [scheduleHour, scheduleMinute] = config.schedule_time.split(':').map((s: string) => parseInt(s));
-
-  // Check if current day is in allowed days
-  const daysOfWeek = config.days_of_week || [1, 2, 3, 4, 5];
-  if (!daysOfWeek.includes(currentDayNum)) {
-    console.log(`📅 Not scheduled for this day: ${currentWeekday} (${currentDayNum}), allowed: ${daysOfWeek}`);
-    return { shouldSend: false, config };
-  }
-
-  // Check if current hour matches schedule hour
-  if (currentHour !== scheduleHour) {
-    console.log(`⏰ Not scheduled time: ${currentHour}:${currentMinute}, scheduled: ${scheduleHour}:${scheduleMinute}`);
-    return { shouldSend: false, config };
-  }
-
-  // Check if already sent this hour (to avoid duplicate sends)
-  if (config.last_sent_at) {
-    const lastSent = new Date(config.last_sent_at);
-    const lastSentFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      hour12: false,
-    });
-
-    const lastSentParts = lastSentFormatter.formatToParts(lastSent);
-    const lastSentYear = lastSentParts.find(p => p.type === 'year')?.value;
-    const lastSentMonth = lastSentParts.find(p => p.type === 'month')?.value;
-    const lastSentDay = lastSentParts.find(p => p.type === 'day')?.value;
-    const lastSentHour = parseInt(lastSentParts.find(p => p.type === 'hour')?.value || '0');
-
-    const nowParts = formatter.formatToParts(now);
-    const nowFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const nowDateParts = nowFormatter.formatToParts(now);
-    const nowYear = nowDateParts.find(p => p.type === 'year')?.value;
-    const nowMonth = nowDateParts.find(p => p.type === 'month')?.value;
-    const nowDay = nowDateParts.find(p => p.type === 'day')?.value;
-
-    if (lastSentYear === nowYear && lastSentMonth === nowMonth && lastSentDay === nowDay && lastSentHour === currentHour) {
-      console.log(`✅ Already sent this hour: ${config.last_sent_at}`);
-      return { shouldSend: false, config };
-    }
-  }
-
   console.log(`✅ Time check passed! Sending at ${currentHour}:${currentMinute} on ${currentWeekday}`);
   return { shouldSend: true, config };
+}
+
+/**
+ * Current calendar date in the schedule's timezone, as YYYY-MM-DD.
+ */
+function currentDateInTimezone(timezone: string, now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
 }
 
 export async function handleCheckScheduled(
@@ -596,6 +256,15 @@ export async function handleCheckScheduled(
   body: CheckScheduledBody,
 ) {
   const type = body.type;
+  const supportedTypes = new Set<string>([
+    EVENT_TYPES.DAILY_MORNING_SUMMARY,
+    EVENT_TYPES.JOB_SHIFT_REMINDER,
+    EVENT_TYPES.FESTIVAL_FEED_TICK,
+    EVENT_TYPES.PROGRAMA_FEED_TICK,
+  ]);
+  if (!supportedTypes.has(type)) {
+    return jsonResponse({ status: 'error', reason: 'Unsupported scheduled notification type' }, 400);
+  }
   console.log(`🔍 Checking scheduled notification: ${type}`);
 
   if (type === EVENT_TYPES.FESTIVAL_FEED_TICK) {
@@ -609,25 +278,63 @@ export async function handleCheckScheduled(
   // Check if it's time to send
   const { shouldSend, config } = await checkAndGetScheduleConfig(client, type, body.force);
 
-  if (!shouldSend || !config) {
+  if (!config) {
+    return jsonResponse({ status: 'skipped', reason: 'Not scheduled time or already sent' });
+  }
+
+  const timezone = config.timezone || 'Europe/Madrid';
+  let occurrenceKey: string | null = null;
+  let resumed = false;
+
+  if (shouldSend) {
+    const freshKey = body.force
+      ? `manual:${currentDateInTimezone(timezone)}:${Date.now()}`
+      : `${currentDateInTimezone(timezone)}:${config.schedule_time}`;
+    const { data: claimed, error: claimError } = await client.rpc('claim_push_schedule', {
+      p_event_type: type,
+      p_occurrence_key: freshKey,
+    });
+    if (claimError) {
+      console.error('❌ Failed to claim scheduled occurrence:', claimError);
+      return jsonResponse({ status: 'error', reason: 'Failed to claim scheduled occurrence' }, 500);
+    }
+    if (claimed) occurrenceKey = freshKey;
+  }
+
+  // The minute gate above opens once a day, so an occurrence left 'retryable' by
+  // a partial send would never be revisited under its own key. Resume it on any
+  // tick instead, independently of the gate. A forced run always starts a fresh
+  // occurrence, so it never adopts an interrupted one.
+  if (!occurrenceKey && !body.force) {
+    const { data: retryKey, error: retryError } = await client.rpc('claim_push_schedule_retry', {
+      p_event_type: type,
+    });
+    if (retryError) {
+      logEvent('error', 'push_schedule_retry_claim_failed', {
+        errorCode: retryError.code ?? 'unknown',
+      });
+    } else if (typeof retryKey === 'string' && retryKey.length > 0) {
+      occurrenceKey = retryKey;
+      resumed = true;
+      console.log(`🔁 Resuming interrupted scheduled occurrence: ${retryKey}`);
+    }
+  }
+
+  if (!occurrenceKey) {
     return jsonResponse({ status: 'skipped', reason: 'Not scheduled time or already sent' });
   }
 
   console.log(`✅ Proceeding to send scheduled notification: ${type}`);
 
-  // Get current date in configured timezone
-  const timezone = config.timezone || 'Europe/Madrid';
-  const dateFormatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = dateFormatter.formatToParts(new Date());
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  const targetDate = `${year}-${month}-${day}`;
+  // A resumed occurrence must keep reporting against the day it was created for,
+  // not the day the retry happens to run, or its inbox rows and summary would
+  // silently target the wrong date.
+  const targetDate = (resumed ? occurrenceDate(occurrenceKey) : null)
+    ?? currentDateInTimezone(timezone);
+
+  if (type === EVENT_TYPES.JOB_SHIFT_REMINDER) {
+    return handleShiftReminderOccurrence(client, occurrenceKey, targetDate, timezone);
+  }
 
   // For daily morning summary, use granular user subscriptions
   if (type === EVENT_TYPES.DAILY_MORNING_SUMMARY) {
@@ -640,11 +347,23 @@ export async function handleCheckScheduled(
 
     if (subsError) {
       console.error('❌ Failed to load subscriptions:', subsError);
+      await client.rpc('finish_push_schedule', {
+        p_event_type: type,
+        p_occurrence_key: occurrenceKey,
+        p_success: false,
+        p_error: 'subscription_lookup_failed',
+      });
       return jsonResponse({ error: 'Failed to load user subscriptions' }, 500);
     }
 
     if (!subscriptions || subscriptions.length === 0) {
       console.log('⚠️ No users subscribed to morning summary');
+      await client.rpc('finish_push_schedule', {
+        p_event_type: type,
+        p_occurrence_key: occurrenceKey,
+        p_success: true,
+        p_error: null,
+      });
       return jsonResponse({ status: 'skipped', reason: 'No users subscribed' });
     }
 
@@ -655,7 +374,7 @@ export async function handleCheckScheduled(
 
     // Process each user
     const allResults: PushDeliveryResult[] = [];
-    let successfulUsers = 0;
+    const tally = emptyTally();
 
     for (const subscription of subscriptions) {
       const userId = subscription.user_id;
@@ -694,94 +413,49 @@ export async function handleCheckScheduled(
 
       console.log(`  📝 Message: ${title}`);
 
-      // Load push subscriptions for this user
-      const { data: pushSubs, error: pushSubsErr } = await client
-        .from('push_subscriptions')
-        .select('endpoint, p256dh, auth')
-        .eq('user_id', userId)
-        .returns<PushSubscriptionRow[]>();
-
-      if (pushSubsErr) {
-        console.error(`  ❌ Failed to load push subscriptions for user ${userId}:`, pushSubsErr);
-        continue;
-      }
-
-      const nativeTokens = await loadNativeTokens(client, [userId]);
-      if ((!pushSubs || pushSubs.length === 0) && nativeTokens.length === 0) {
-        console.log(`  ⚠️ User ${userId} has no push subscriptions`);
-        continue;
-      }
-
       // Build URL with query parameters for in-app viewing
       const deptParam = departments.join(',');
       const summaryUrl = `/morning-summary?date=${targetDate}&departments=${deptParam}`;
 
-      const payload: PushPayload = {
+      const notificationBody: BroadcastBody = {
+        action: 'broadcast',
+        type,
+        event_id: occurrenceKey,
+        recipient_id: userId,
+        target_date: targetDate,
+      };
+      const outcome = await deliverScheduledToUser(client, userId, notificationBody, {
         title,
         body: text,
         url: summaryUrl,
-        type,
-        meta: {
-          departments,
-          targetDate,
-        },
-      };
-
-      // Send to all devices for this user
-      let userSent = false;
-      const sendPromises: Promise<void>[] = [];
-      for (const pushSub of pushSubs || []) {
-        sendPromises.push((async () => {
-          const result = await sendPushNotification(
-            client,
-            { endpoint: pushSub.endpoint, p256dh: pushSub.p256dh, auth: pushSub.auth },
-            payload
-          );
-          allResults.push({
-            endpoint: await pushTargetFingerprint("webpush", pushSub.endpoint),
-            ok: result.ok,
-            ...getPushSendMetadata(result),
-            user_id: userId,
-          });
-          if (result.ok) userSent = true;
-        })());
-      }
-
-      for (const tokenRow of nativeTokens) {
-        sendPromises.push((async () => {
-          const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
-          allResults.push({
-            endpoint: await pushTargetFingerprint("apns", tokenRow.device_token),
-            ok: result.ok,
-            ...getPushSendMetadata(result),
-            user_id: userId,
-          });
-          if (result.ok) userSent = true;
-        })());
-      }
-
-      await Promise.all(sendPromises);
-
-      if (userSent) {
-        successfulUsers++;
-        console.log(`  ✅ Sent to ${(pushSubs?.length || 0) + nativeTokens.length} device(s) for user ${userId}`);
+        meta: { departments, targetDate },
+      });
+      addOutcome(tally, outcome);
+      if (outcome.status === 'delivered') {
+        allResults.push(...outcome.results.map((result) => ({
+          endpoint: result.endpoint,
+          ok: result.ok,
+          status: result.status,
+          skipped: result.skipped,
+          user_id: userId,
+        })));
+        if (outcome.sent) console.log(`  ✅ Sent ${outcome.results.length} notification(s) for user ${userId}`);
+      } else if (outcome.status === 'skipped') {
+        console.log(`  ⚠️ User ${userId} skipped (preferences or no devices)`);
       }
     }
 
-    // Update last_sent_at timestamp
-    await client
-      .from('push_notification_schedules')
-      .update({ last_sent_at: new Date().toISOString() })
-      .eq('event_type', type);
+    const scheduleSucceeded = await finishScheduledRun(client, type, occurrenceKey, tally);
+    const successfulUsers = tally.successfulUsers;
 
     console.log(`\n✅ Summary: Sent to ${successfulUsers}/${subscriptions.length} users, ${allResults.length} total notifications`);
 
     return jsonResponse({
-      status: 'sent',
+      status: scheduleSucceeded ? (successfulUsers > 0 ? 'accepted' : 'skipped') : 'failed',
       results: allResults,
       count: allResults.length,
       users: successfulUsers,
-    });
+    }, scheduleSucceeded ? 200 : 502);
   }
 
   // For other scheduled notification types (future expansion)

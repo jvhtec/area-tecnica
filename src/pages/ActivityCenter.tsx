@@ -48,11 +48,11 @@ export default function ActivityCenter() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Activity</h1>
-        <button className="text-sm underline" onClick={() => refetch()}>Refresh</button>
+        <h1 className="text-xl font-semibold">Registro de actividad</h1>
+        <button className="text-sm underline" onClick={() => refetch()}>Actualizar</button>
       </div>
-      {isLoading && <div className="text-muted-foreground">Loading…</div>}
-      {error && <div className="text-red-600 text-sm">Failed to load activity</div>}
+      {isLoading && <div className="text-muted-foreground">Cargando…</div>}
+      {error && <div className="text-red-600 text-sm">No se pudo cargar la actividad.</div>}
       <div className="space-y-2">
         {data.map((row: any) => {
           const meta = getActivityMeta(row.code);
@@ -67,7 +67,7 @@ export default function ActivityCenter() {
           );
         })}
         {data.length === 0 && !isLoading && (
-          <div className="text-muted-foreground">No recent activity.</div>
+          <div className="text-muted-foreground">No hay actividad reciente.</div>
         )}
       </div>
     </div>

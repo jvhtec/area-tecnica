@@ -57,10 +57,14 @@ type JobDateType = {
 const supabaseForDocuments = dataLayerClient as SupabaseClient;
 const madridTimeZone = "Europe/Madrid";
 
-export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
+export const useDetailsModalData = ({ theme, isDark, job, onClose, initialTab, onTabChange }: DetailsModalProps) => {
   const { user, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabId>("Info");
+  const [activeTab, setActiveTabState] = useState<TabId>(initialTab ?? "Info");
+  const setActiveTab = useCallback((tab: TabId) => {
+    setActiveTabState(tab);
+    onTabChange?.(tab);
+  }, [onTabChange]);
   const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
   const [isUploadingTourDocument, setIsUploadingTourDocument] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
