@@ -54,7 +54,7 @@ feed from many browser-side database queries.
 ## Document requirements
 
 `required_docs` lists what each department owes per job (seeded by
-`20260922190000_seed_wallboard_required_docs.sql`; `is_required` and `label`
+`20260924120000_seed_wallboard_required_docs.sql`; `is_required` and `label`
 stay editable per row):
 
 | Department | Keys |
