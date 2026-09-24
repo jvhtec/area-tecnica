@@ -253,6 +253,7 @@ export async function removeDriverAssignment(assignmentId: string): Promise<void
       assignment_id: strOrNull(payload.assignment_id) ?? assignmentId,
       recipient_id: driverId,
       starts_at: strOrNull(payload.starts_at) ?? undefined,
+      timezone: strOrNull(payload.timezone) ?? "Europe/Madrid",
       logistics_event_id: strOrNull(payload.logistics_event_id) ?? undefined,
     });
   }
