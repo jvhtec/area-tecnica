@@ -34,11 +34,14 @@ const emptyVehicle = (): FleetVehicleInput => ({
   is_active: true,
 });
 
-const toNumberOrNull = (value: string): number | null => {
+/** Blank → null, a valid non-negative number → the number, anything else → undefined (invalid). */
+const parseOptionalNumber = (value: string): number | null | undefined => {
   if (value.trim() === "") return null;
-  const parsed = Number(value.replace(",", "."));
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  const parsed = Number(value.trim().replace(",", "."));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 };
+
+const numberText = (value: number | null) => (value === null ? "" : String(value));
 
 type VehicleFormDialogProps = {
   open: boolean;
@@ -51,9 +54,17 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
   const { toast } = useToast();
   const [form, setForm] = useState<FleetVehicleInput>(emptyVehicle);
   const [saving, setSaving] = useState(false);
+  // Numeric inputs keep their raw text so intermediate values like "13." stay editable;
+  // they are parsed only on submit.
+  const [payloadText, setPayloadText] = useState("");
+  const [lengthText, setLengthText] = useState("");
 
   useEffect(() => {
-    if (open) setForm(vehicle ? { ...vehicle } : emptyVehicle());
+    if (!open) return;
+    const initial = vehicle ? { ...vehicle } : emptyVehicle();
+    setForm(initial);
+    setPayloadText(numberText(initial.payload_kg));
+    setLengthText(numberText(initial.cargo_length_m));
   }, [open, vehicle]);
 
   const update = <K extends keyof FleetVehicleInput>(key: K, value: FleetVehicleInput[K]) =>
@@ -64,9 +75,19 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
       toast({ title: "Nombre y matrícula son obligatorios", variant: "destructive" });
       return;
     }
+    const payloadKg = parseOptionalNumber(payloadText);
+    if (payloadKg === undefined || (payloadKg !== null && !Number.isInteger(payloadKg))) {
+      toast({ title: "La carga útil debe ser un número entero de kilos", variant: "destructive" });
+      return;
+    }
+    const cargoLengthM = parseOptionalNumber(lengthText);
+    if (cargoLengthM === undefined) {
+      toast({ title: "La longitud de caja debe ser un número", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      await saveFleetVehicle(form);
+      await saveFleetVehicle({ ...form, payload_kg: payloadKg, cargo_length_m: cargoLengthM });
       toast({ title: form.id ? "Vehículo actualizado" : "Vehículo añadido a la flota" });
       onSaved();
       onOpenChange(false);
@@ -127,11 +148,11 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="vehicle-payload">Carga útil (kg)</Label>
-            <Input id="vehicle-payload" inputMode="numeric" value={form.payload_kg ?? ""} onChange={(e) => update("payload_kg", toNumberOrNull(e.target.value))} />
+            <Input id="vehicle-payload" inputMode="numeric" value={payloadText} onChange={(e) => setPayloadText(e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="vehicle-length">Longitud de caja (m)</Label>
-            <Input id="vehicle-length" inputMode="decimal" value={form.cargo_length_m ?? ""} onChange={(e) => update("cargo_length_m", toNumberOrNull(e.target.value))} />
+            <Input id="vehicle-length" inputMode="decimal" value={lengthText} onChange={(e) => setLengthText(e.target.value)} />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="vehicle-notes">Notas</Label>

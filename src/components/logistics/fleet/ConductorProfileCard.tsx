@@ -12,7 +12,7 @@ const formatDay = (dateKey: string | null) => (dateKey ? formatMadridDayKey(date
  * the driver only needs to see what is on record and when it expires.
  */
 export function ConductorProfileCard({ profileId, className }: { profileId: string; className?: string }) {
-  const { data, isLoading } = useOwnDriverDetails(profileId);
+  const { data, isLoading, error } = useOwnDriverDetails(profileId);
   const todayKey = formatMadridDateKey(new Date());
 
   return (
@@ -27,6 +27,9 @@ export function ConductorProfileCard({ profileId, className }: { profileId: stri
       <CardContent>
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        ) : error ? (
+          // Don't fall through to "Sin registrar": a failed read is not missing data.
+          <p className="text-sm text-destructive">No se pudieron cargar tus datos de conductor. Inténtalo de nuevo más tarde.</p>
         ) : (
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>

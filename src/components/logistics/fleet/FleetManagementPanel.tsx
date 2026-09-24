@@ -29,7 +29,7 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
   const todayKey = formatMadridDateKey(new Date());
   // A one-day window is enough: the matrix read model always carries the whole
   // fleet and every driver alongside the day's assignments.
-  const { data, isLoading } = useLogisticsMatrix(todayKey, todayKey);
+  const { data, isLoading, error } = useLogisticsMatrix(todayKey, todayKey);
   const [vehicleDialog, setVehicleDialog] = useState<{ vehicle: FleetVehicle | null } | null>(null);
   const [editingDriver, setEditingDriver] = useState<MatrixDriver | null>(null);
   const confirm = useConfirm();
@@ -58,6 +58,13 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
   if (isLoading) {
     return (
       <Card><CardContent className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></CardContent></Card>
+    );
+  }
+
+  // A failed read must not look like an empty fleet.
+  if (error) {
+    return (
+      <Card><CardContent className="py-8 text-center text-sm text-destructive">{getErrorMessage(error)}</CardContent></Card>
     );
   }
 

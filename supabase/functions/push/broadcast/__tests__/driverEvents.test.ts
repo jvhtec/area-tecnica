@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   facts: vi.fn(),
   isConductor: vi.fn(),
   logisticsManagers: vi.fn(),
+  roles: vi.fn(),
 }));
 
 vi.mock("../../driverAssignments.ts", () => ({
@@ -12,6 +13,7 @@ vi.mock("../../driverAssignments.ts", () => ({
 }));
 vi.mock("../../data.ts", () => ({
   getLogisticsManagementRecipients: mocks.logisticsManagers,
+  getProfileRoles: mocks.roles,
 }));
 
 import { handleDriverEvents } from "../families/driverEvents.ts";
@@ -81,6 +83,7 @@ describe("handleDriverEvents", () => {
     mocks.facts.mockReset().mockResolvedValue(facts);
     mocks.isConductor.mockReset().mockResolvedValue(true);
     mocks.logisticsManagers.mockReset().mockResolvedValue(["logistics-1"]);
+    mocks.roles.mockReset().mockResolvedValue(new Map([["manager-1", "management"]]));
   });
 
   it("ignores other event families", async () => {
@@ -121,5 +124,12 @@ describe("handleDriverEvents", () => {
     expect(context.state.title).toBe("Transporte rechazado");
     expect(context.state.text).toContain("Ana Conductora rechazó");
     expect(context.state.url).toBe("/logistics?tab=drivers");
+  });
+
+  it("leaves out an assigner who no longer manages the matrix", async () => {
+    mocks.roles.mockResolvedValue(new Map([["manager-1", "technician"]]));
+    const { context, recipients } = contextFor("logistics.driver.confirmed", { assignment_id: "assignment-1" });
+    await handleDriverEvents(context);
+    expect([...recipients]).toEqual(["logistics-1"]);
   });
 });

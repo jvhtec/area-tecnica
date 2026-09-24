@@ -246,6 +246,8 @@ export async function removeDriverAssignment(assignmentId: string): Promise<void
   const driverId = strOrNull(payload.driver_id);
   if (driverId) {
     notifyDriverEvent("logistics.driver.removed", {
+      // Part of the dedupe key: two removals for one driver must not collapse into one push.
+      assignment_id: strOrNull(payload.assignment_id) ?? assignmentId,
       recipient_id: driverId,
       starts_at: strOrNull(payload.starts_at) ?? undefined,
       logistics_event_id: strOrNull(payload.logistics_event_id) ?? undefined,
@@ -379,7 +381,10 @@ function notifyDriverEvent(type: DriverPushEvent, body: Record<string, string | 
 
 function notifyAfterSave(result: Extract<SaveDriverAssignmentResult, { status: "saved" }>) {
   if (result.previousDriverId && result.previousDriverId !== result.driverId) {
-    notifyDriverEvent("logistics.driver.removed", { recipient_id: result.previousDriverId });
+    notifyDriverEvent("logistics.driver.removed", {
+      assignment_id: result.assignmentId,
+      recipient_id: result.previousDriverId,
+    });
   }
   if (!result.driverId) return;
   if (result.previousDriverId === result.driverId) {

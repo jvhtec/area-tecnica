@@ -512,7 +512,9 @@ begin
       v_material_change := v_existing.driver_id is distinct from p_driver_id
         or v_existing.vehicle_id is distinct from p_vehicle_id
         or v_existing.starts_at is distinct from v_starts
-        or v_existing.ends_at is distinct from v_ends;
+        or v_existing.ends_at is distinct from v_ends
+        -- Instructions for the driver are part of the plan they confirm.
+        or v_existing.notes is distinct from nullif(btrim(p_notes), '');
 
       update public.transport_driver_assignments
       set driver_id = p_driver_id,
@@ -595,13 +597,15 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_from date := coalesce(p_from, (now() at time zone 'Europe/Madrid')::date - 1);
-  v_to date := coalesce(p_to, (now() at time zone 'Europe/Madrid')::date + 60);
+  -- No upper bound by default: a driver notified of a transport months ahead must be
+  -- able to see and confirm it.
+  v_to date := p_to;
   v_result jsonb;
 begin
   if v_uid is null then
     raise exception 'Sesión no válida' using errcode = '42501';
   end if;
-  if v_to < v_from or v_to - v_from > 366 then
+  if v_to is not null and (v_to < v_from or v_to - v_from > 366) then
     raise exception 'Rango de fechas no válido' using errcode = '22023';
   end if;
 
@@ -645,7 +649,7 @@ begin
     left join public.fleet_vehicles v on v.id = a.vehicle_id
     where a.driver_id = v_uid
       -- Any window overlapping the range, so a multi-day run stays listed until it ends.
-      and a.starts_at < ((v_to + 1)::timestamp at time zone 'Europe/Madrid')
+      and (v_to is null or a.starts_at < ((v_to + 1)::timestamp at time zone 'Europe/Madrid'))
       and a.ends_at > (v_from::timestamp at time zone 'Europe/Madrid')
   ) rows;
 
@@ -734,6 +738,45 @@ $$;
 
 revoke all on function public.respond_transport_assignment(uuid, text) from public, anon;
 grant execute on function public.respond_transport_assignment(uuid, text) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- A driver's upcoming assignments only make sense while they are a conductor: the
+-- matrix lists conductors only and the driver loses /conductor with the role. Block
+-- the role change until those transports are reassigned or removed, rather than
+-- leave staffed-looking assignments nobody can see.
+-- ---------------------------------------------------------------------------
+create or replace function public.guard_conductor_role_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if old.role::text = 'conductor'
+     and new.role::text is distinct from 'conductor'
+     and exists (
+       select 1
+       from public.transport_driver_assignments a
+       where a.driver_id = old.id
+         and a.status <> 'declined'
+         and a.ends_at > now()
+     ) then
+    raise exception 'Este conductor tiene transportes pendientes. Reasígnalos o quítalos en la matriz de logística antes de cambiar su rol.'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_conductor_role_change() from public, anon, authenticated;
+grant execute on function public.guard_conductor_role_change() to service_role;
+
+drop trigger if exists guard_conductor_role_change on public.profiles;
+create trigger guard_conductor_role_change
+before update of role on public.profiles
+for each row
+when (old.role is distinct from new.role)
+execute function public.guard_conductor_role_change();
 
 -- ---------------------------------------------------------------------------
 -- Realtime: the matrix and the driver dashboard refresh on assignment changes.

@@ -61,6 +61,11 @@ the vehicle:
 - **Replanning deletes assignments.** Assignments cascade from `logistics_events`, and
   `schedule_transport_request` replaces a request's events when it is re-planned, so
   re-planning a request drops its driver assignments. Reassign after replanning.
+- **A busy conductor keeps the role.** A trigger on `profiles` refuses changing a
+  conductor's role while they have upcoming, non-declined assignments; reassign or
+  remove them in the matrix first, so no staffed-looking assignment is left orphaned.
+- **Any change a driver must act on resets confirmation**: driver, vehicle, window or
+  the instructions (`notes`).
 - **Nothing here touches staffing.** No `job_assignments`, timesheets or rates are
   created for drivers.
 

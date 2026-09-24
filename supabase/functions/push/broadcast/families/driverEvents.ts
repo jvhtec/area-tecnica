@@ -1,4 +1,4 @@
-import { getLogisticsManagementRecipients } from "../../data.ts";
+import { getLogisticsManagementRecipients, getProfileRoles } from "../../data.ts";
 import { isConductorProfile, loadDriverAssignmentFacts } from "../../driverAssignments.ts";
 import type { BroadcastEventContext, BroadcastHandlerResult } from "../eventContext.ts";
 import { setBroadcastMessage } from "../eventContext.ts";
@@ -52,9 +52,15 @@ export async function handleDriverEvents(context: BroadcastEventContext): Promis
     state.url = LOGISTICS_DRIVERS_VIEW;
     state.metaExtras.targetUrl = LOGISTICS_DRIVERS_VIEW;
     state.metaExtras.department = "logistics";
+    // Whoever assigned it hears back only while they still manage the matrix: the
+    // stored assigned_by may belong to someone who has since changed role.
+    const assignerRole = facts.assignedBy
+      ? (await getProfileRoles(client, [facts.assignedBy])).get(facts.assignedBy)
+      : null;
+    const assignerStillManages = assignerRole === "admin" || assignerRole === "management";
     audience.addNaturalRecipients([
       ...(await getLogisticsManagementRecipients(client)),
-      facts.assignedBy,
+      assignerStillManages ? facts.assignedBy : null,
     ]);
     return true;
   }

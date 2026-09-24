@@ -64,7 +64,7 @@ const ConductorDashboard = () => {
           </p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link to="/profile">
+          <Link to="/notifications">
             <Bell className="mr-1 h-4 w-4" /> Notificaciones
           </Link>
         </Button>

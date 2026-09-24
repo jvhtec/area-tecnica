@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(43);
+SELECT plan(49);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -298,6 +298,21 @@ SELECT is(
   'a driver can decline their own assignment'
 );
 
+SELECT is(
+  public.respond_transport_assignment(
+    (SELECT id FROM public.transport_driver_assignments
+     WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid),
+    'confirmed'
+  ) ->> 'status',
+  'confirmed',
+  'a driver can confirm their own assignment'
+);
+
+SELECT ok(
+  jsonb_array_length(public.get_my_transport_assignments()) >= 3,
+  'by default a driver sees every upcoming transport, however far ahead'
+);
+
 -- Captured while Ana can still see the row, so Beto's attempt targets a real assignment.
 SELECT set_config(
   'test.ana_assignment',
@@ -448,6 +463,28 @@ SELECT is(
 SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001', false);
 
 SELECT is(
+  public.assign_transport_driver(
+    'e5300000-0000-0000-0000-000000000002'::uuid,
+    'e5100000-0000-0000-0000-000000000002'::uuid,
+    NULL,
+    p_notes => 'Llaves en portería',
+    p_assignment_id => (SELECT id FROM public.transport_driver_assignments
+                        WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid),
+    p_force => true
+  ) ->> 'material_change',
+  'true',
+  'changing only the driver instructions counts as a material change'
+);
+
+-- Separate statement: the update above is not visible inside its own statement.
+SELECT is(
+  (SELECT status FROM public.transport_driver_assignments
+   WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid),
+  'assigned',
+  'new instructions ask the driver to confirm again'
+);
+
+SELECT is(
   public.remove_transport_driver_assignment(
     (SELECT id FROM public.transport_driver_assignments
      WHERE driver_id = 'e5100000-0000-0000-0000-000000000003'::uuid
@@ -460,6 +497,19 @@ SELECT is(
 RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
+
+-- Beto still has the long haul ahead of him.
+SELECT throws_ok(
+  $$ UPDATE public.profiles SET role = 'technician' WHERE id = 'e5100000-0000-0000-0000-000000000003'::uuid $$,
+  '23514',
+  NULL,
+  'a conductor with upcoming transports cannot lose the role until they are reassigned'
+);
+
+SELECT lives_ok(
+  $$ UPDATE public.profiles SET department = 'logistics' WHERE id = 'e5100000-0000-0000-0000-000000000003'::uuid $$,
+  'other profile edits on a busy conductor are unaffected'
+);
 
 DELETE FROM public.logistics_events WHERE id = 'e5300000-0000-0000-0000-000000000001'::uuid;
 
