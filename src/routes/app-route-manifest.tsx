@@ -225,6 +225,9 @@ export const subscriptionProfiles = {
     { table: "profiles", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
     { table: "locations", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
     { table: "transport_requests", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    // A driver's days off (per-day rows and approved vacations) grey out matrix cells.
+    { table: "technician_availability", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "vacation_requests", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
   ],
   conductor: [
     { table: "transport_driver_assignments", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },

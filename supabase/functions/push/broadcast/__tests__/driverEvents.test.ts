@@ -32,6 +32,7 @@ const facts: DriverAssignmentFacts = {
   driverId: "driver-1",
   assignedBy: "manager-1",
   status: "assigned",
+  declineReason: null,
   // 08:00 Madrid (CEST).
   startsAt: "2026-10-01T06:00:00Z",
   endsAt: "2026-10-01T08:00:00Z",
@@ -131,6 +132,17 @@ describe("handleDriverEvents", () => {
     expect(context.state.title).toBe("Transporte rechazado");
     expect(context.state.text).toContain("Ana Conductora rechazó");
     expect(context.state.url).toBe("/logistics?tab=drivers");
+  });
+
+  it("passes the driver's reason along with a refusal", async () => {
+    mocks.facts.mockResolvedValue({ ...facts, status: "declined", declineReason: "Estoy de baja" });
+    const { context } = contextFor("logistics.driver.declined", { assignment_id: "assignment-1" });
+    await handleDriverEvents(context);
+    expect(context.state.text).toContain("Motivo: Estoy de baja");
+
+    const confirmed = contextFor("logistics.driver.confirmed", { assignment_id: "assignment-1" });
+    await handleDriverEvents(confirmed.context);
+    expect(confirmed.context.state.text).not.toContain("Motivo");
   });
 
   it("leaves out an assigner who no longer manages the matrix", async () => {

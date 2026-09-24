@@ -661,10 +661,10 @@ Who in the production department is carrying a job — the person crew asks abou
 
 Logistics' own matrix: drivers (`conductor` role) and fleet vehicles × days, assigning **scheduled transports** (`logistics_events`) instead of jobs. Full reference: `docs/workflows/logistics-driver-matrix.md`.
 
-- **Tables**: `fleet_vehicles`, `driver_details`, `transport_driver_assignments` (event × driver/vehicle with its own `starts_at`/`ends_at` window — a driver can do several transports a day).
-- **Writes only via RPCs** (`assign_transport_driver`, `remove_transport_driver_assignment`, `respond_transport_assignment`); conflict checks are per time window, per driver and per vehicle. Declined rows release their slot.
-- **Drivers read only their own rows** via `get_my_transport_assignments()`; the matrix read model `get_logistics_matrix()` is admin/management/house_tech (not the `logistics` role, which has no `/logistics` page).
-- **Surfaces**: `/logistics?tab=drivers` and `?tab=fleet`, `/conductor`, driver licence card on `/profile`. Push events `logistics.driver.*`.
+- **Tables**: `fleet_vehicles` (incl. `itv_expiry`, `insurance_expiry`, `has_tail_lift`), `driver_details` (licence, CAP and tachograph-card expiry), `transport_driver_assignments` (event × driver/vehicle with its own `starts_at`/`ends_at` window — a driver can do several transports a day — plus an optional `decline_reason`).
+- **Writes only via RPCs** (`assign_transport_driver`, `remove_transport_driver_assignment`, `respond_transport_assignment(id, response, reason)`); conflict checks are per time window, per driver and per vehicle. Declined rows release their slot. Document expiry, days off and licence mismatches are **soft warnings** (`driverVehicleWarnings`), never server-enforced.
+- **Drivers read only their own rows** via `get_my_transport_assignments()`; the matrix read model `get_logistics_matrix()` is admin/management/house_tech (not the `logistics` role, which has no `/logistics` page). It also returns each driver's `unavailable_days` (from `technician_availability` + approved `vacation_requests`) and, **for admin/management only**, their `phone` — never read `profiles.phone` for drivers directly.
+- **Surfaces**: `/logistics?tab=drivers` and `?tab=fleet`, `/conductor`, driver licence card on `/profile`, and driver/vehicle lines on the logistics calendar cards (`useEventDriverSummaries`). Push events `logistics.driver.*`.
 
 ### Timesheet Calculation
 Handled server-side via `compute_timesheet_hours()` RPC function:

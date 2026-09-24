@@ -1,16 +1,19 @@
 import { dataLayerClient } from "@/services/dataLayerClient";
 
-import type {
-  DriverAssignment,
-  DriverAssignmentStatus,
-  DriverDetails,
-  FleetVehicle,
-  LicenseCategory,
-  LogisticsMatrixData,
-  MatrixDriver,
-  MatrixTransportEvent,
-  MyTransportAssignment,
-  VehicleType,
+import {
+  UNAVAILABILITY_STATUSES,
+  type DriverAssignment,
+  type DriverAssignmentStatus,
+  type DriverDetails,
+  type DriverUnavailableDay,
+  type FleetVehicle,
+  type LicenseCategory,
+  type LogisticsMatrixData,
+  type MatrixDriver,
+  type MatrixTransportEvent,
+  type MyTransportAssignment,
+  type UnavailabilityStatus,
+  type VehicleType,
 } from "./fleetModel";
 
 // The fleet tables and RPCs postdate the generated Supabase types, so calls go
@@ -44,6 +47,14 @@ const numOrNull = (value: unknown): number | null => {
 const strings = (value: unknown): string[] => asArray(value).filter((item): item is string => typeof item === "string");
 const status = (value: unknown): DriverAssignmentStatus =>
   value === "confirmed" || value === "declined" ? value : "assigned";
+const isUnavailabilityStatus = (value: unknown): value is UnavailabilityStatus =>
+  typeof value === "string" && (UNAVAILABILITY_STATUSES as readonly string[]).includes(value);
+const unavailableDays = (value: unknown): DriverUnavailableDay[] =>
+  asArray(value).flatMap((item) => {
+    const row = asRecord(item);
+    const date = strOrNull(row.date);
+    return date && isUnavailabilityStatus(row.status) ? [{ date, status: row.status }] : [];
+  });
 
 const toVehicle = (value: unknown): FleetVehicle => {
   const row = asRecord(value);
@@ -57,6 +68,9 @@ const toVehicle = (value: unknown): FleetVehicle => {
     model: strOrNull(row.model),
     payload_kg: numOrNull(row.payload_kg),
     cargo_length_m: numOrNull(row.cargo_length_m),
+    has_tail_lift: row.has_tail_lift === true,
+    itv_expiry: strOrNull(row.itv_expiry),
+    insurance_expiry: strOrNull(row.insurance_expiry),
     notes: strOrNull(row.notes),
     is_active: row.is_active !== false,
   };
@@ -70,12 +84,15 @@ const toDriver = (value: unknown): MatrixDriver => {
     last_name: strOrNull(row.last_name),
     nickname: strOrNull(row.nickname),
     department: strOrNull(row.department),
+    phone: strOrNull(row.phone),
     license_categories: strings(row.license_categories),
     license_expiry: strOrNull(row.license_expiry),
     cap_expiry: strOrNull(row.cap_expiry),
+    tachograph_card_expiry: strOrNull(row.tachograph_card_expiry),
     adr_certified: row.adr_certified === true,
     default_vehicle_id: strOrNull(row.default_vehicle_id),
     notes: strOrNull(row.notes),
+    unavailable_days: unavailableDays(row.unavailable_days),
   };
 };
 
@@ -116,6 +133,7 @@ const toAssignment = (value: unknown): DriverAssignment => {
     status: status(row.status),
     notes: strOrNull(row.notes),
     responded_at: strOrNull(row.responded_at),
+    decline_reason: strOrNull(row.decline_reason),
   };
 };
 
@@ -275,10 +293,13 @@ export async function fetchMyTransportAssignments(fromKey?: string, toKey?: stri
 export async function respondToTransportAssignment(
   assignmentId: string,
   response: "confirmed" | "declined",
+  reason?: string | null,
 ): Promise<void> {
   const { error } = await rpc("respond_transport_assignment", {
     p_assignment_id: assignmentId,
     p_response: response,
+    // Only meaningful on a refusal; the server clears it on confirm anyway.
+    p_reason: response === "declined" ? reason?.trim() || null : null,
   });
   throwIfError(error, "No se pudo registrar tu respuesta");
   notifyDriverEvent(response === "confirmed" ? "logistics.driver.confirmed" : "logistics.driver.declined", {
@@ -289,7 +310,7 @@ export async function respondToTransportAssignment(
 export async function fetchOwnDriverDetails(profileId: string): Promise<DriverDetails | null> {
   const { data, error } = await dataLayerClient
     .from(driverDetailsTable)
-    .select("profile_id, license_categories, license_expiry, cap_expiry, adr_certified, default_vehicle_id, notes")
+    .select("profile_id, license_categories, license_expiry, cap_expiry, tachograph_card_expiry, adr_certified, default_vehicle_id, notes")
     .eq("profile_id", profileId)
     .maybeSingle();
   throwIfError(error, "No se pudieron cargar tus datos de conductor");
@@ -300,6 +321,7 @@ export async function fetchOwnDriverDetails(profileId: string): Promise<DriverDe
     license_categories: strings(row.license_categories),
     license_expiry: strOrNull(row.license_expiry),
     cap_expiry: strOrNull(row.cap_expiry),
+    tachograph_card_expiry: strOrNull(row.tachograph_card_expiry),
     adr_certified: row.adr_certified === true,
     default_vehicle_id: strOrNull(row.default_vehicle_id),
     notes: strOrNull(row.notes),
@@ -322,6 +344,9 @@ export async function saveFleetVehicle(input: FleetVehicleInput): Promise<void> 
     model: input.model?.trim() || null,
     payload_kg: input.payload_kg,
     cargo_length_m: input.cargo_length_m,
+    has_tail_lift: input.has_tail_lift,
+    itv_expiry: input.itv_expiry || null,
+    insurance_expiry: input.insurance_expiry || null,
     notes: input.notes?.trim() || null,
     is_active: input.is_active,
   };
@@ -351,6 +376,7 @@ export async function saveDriverDetails(input: DriverDetailsInput): Promise<void
       license_categories: input.license_categories,
       license_expiry: input.license_expiry || null,
       cap_expiry: input.cap_expiry || null,
+      tachograph_card_expiry: input.tachograph_card_expiry || null,
       adr_certified: input.adr_certified,
       default_vehicle_id: input.default_vehicle_id || null,
       notes: input.notes?.trim() || null,

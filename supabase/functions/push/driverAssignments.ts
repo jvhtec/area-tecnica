@@ -10,6 +10,7 @@ export type DriverAssignmentFacts = {
   driverId: string | null;
   assignedBy: string | null;
   status: string;
+  declineReason: string | null;
   startsAt: string;
   endsAt: string;
   timezone: string;
@@ -32,6 +33,7 @@ type AssignmentRow = {
   driver_id?: string | null;
   assigned_by?: string | null;
   status?: string | null;
+  decline_reason?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
   logistics_event?: EventRow | EventRow[] | null;
@@ -46,7 +48,7 @@ export async function loadDriverAssignmentFacts(
   const { data, error } = await client
     .from("transport_driver_assignments")
     .select(
-      "id, driver_id, assigned_by, status, starts_at, ends_at, " +
+      "id, driver_id, assigned_by, status, decline_reason, starts_at, ends_at, " +
         "logistics_event:logistics_events(event_type, title, timezone, job:jobs(title)), " +
         "vehicle:fleet_vehicles(name, license_plate)",
     )
@@ -63,6 +65,7 @@ export async function loadDriverAssignmentFacts(
     driverId: data.driver_id ?? null,
     assignedBy: data.assigned_by ?? null,
     status: data.status ?? "assigned",
+    declineReason: data.decline_reason?.trim() || null,
     startsAt: data.starts_at,
     endsAt: data.ends_at,
     timezone: event?.timezone?.trim() || "Europe/Madrid",

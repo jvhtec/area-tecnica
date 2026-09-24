@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   assignmentDayKeys,
   buildDayKeys,
+  countPendingConfirmations,
   countUncoveredTransportsByDay,
   defaultAssignmentWindow,
+  documentStatus,
   driverCoversLicense,
   driverDisplayName,
   driverVehicleWarnings,
@@ -13,7 +15,10 @@ import {
   formatTransportTime,
   groupAssignmentsByRowAndDay,
   startOfMadridWeek,
+  summarizeDriversByEvent,
+  unavailabilityByDay,
   type DriverAssignment,
+  type MatrixDriver,
   type MatrixTransportEvent,
 } from "../fleetModel";
 
@@ -28,6 +33,25 @@ const assignment = (overrides: Partial<DriverAssignment>): DriverAssignment => (
   status: "assigned",
   notes: null,
   responded_at: null,
+  decline_reason: null,
+  ...overrides,
+});
+
+const driver = (overrides: Partial<MatrixDriver>): MatrixDriver => ({
+  id: "d1",
+  first_name: "Ana",
+  last_name: "Conductora",
+  nickname: null,
+  department: "logistics",
+  phone: null,
+  license_categories: ["C+E"],
+  license_expiry: null,
+  cap_expiry: null,
+  tachograph_card_expiry: null,
+  adr_certified: false,
+  default_vehicle_id: null,
+  notes: null,
+  unavailable_days: [],
   ...overrides,
 });
 
@@ -91,6 +115,32 @@ describe("driver licences", () => {
       { required_license: "B+E" },
       "2026-10-01",
     )).toEqual([]);
+  });
+
+  it("warns about expired vehicle documents, an expired tachograph card and days off", () => {
+    const offDriver = driver({
+      tachograph_card_expiry: "2026-09-30",
+      unavailable_days: [{ date: "2026-10-01", status: "vacation" }],
+    });
+    const vehicle = { required_license: "C" as const, itv_expiry: "2026-09-15", insurance_expiry: "2026-12-31" };
+    expect(driverVehicleWarnings(offDriver, vehicle, "2026-10-01")).toEqual([
+      "tachograph_expired",
+      "driver_unavailable",
+      "vehicle_itv_expired",
+    ]);
+    // The tachograph only matters on professional vehicles, and the day off only on that day.
+    expect(driverVehicleWarnings(offDriver, { required_license: "B" }, "2026-10-02")).toEqual([]);
+    // A vehicle alone (no driver picked yet) still reports its own documents.
+    expect(driverVehicleWarnings(null, { required_license: "B", insurance_expiry: "2026-01-01" }, "2026-10-01"))
+      .toEqual(["vehicle_insurance_expired"]);
+  });
+
+  it("classifies document expiry as expired, expiring within 30 days, or valid", () => {
+    expect(documentStatus(null, "2026-10-01")).toBeNull();
+    expect(documentStatus("2026-09-30", "2026-10-01")).toBe("expired");
+    expect(documentStatus("2026-10-01", "2026-10-01")).toBe("expiring");
+    expect(documentStatus("2026-10-31", "2026-10-01")).toBe("expiring");
+    expect(documentStatus("2026-11-01", "2026-10-01")).toBe("valid");
   });
 });
 
@@ -187,6 +237,39 @@ describe("coverage and defaults", () => {
       start: "2026-10-01T23:15",
       end: "2026-10-02T01:15",
     });
+  });
+
+  it("counts assignments still awaiting the driver's answer in the next 48 hours", () => {
+    const now = "2026-10-01T06:00:00.000Z";
+    const soon = assignment({ id: "soon", starts_at: "2026-10-02T06:00:00.000Z", ends_at: "2026-10-02T08:00:00.000Z" });
+    const later = assignment({ id: "later", starts_at: "2026-10-04T06:00:00.000Z", ends_at: "2026-10-04T08:00:00.000Z" });
+    const confirmed = assignment({ id: "ok", status: "confirmed" });
+    const finished = assignment({ id: "done", starts_at: "2026-09-30T06:00:00.000Z", ends_at: "2026-09-30T08:00:00.000Z" });
+    const vehicleOnly = assignment({ id: "van", driver_id: null, vehicle_id: "v1" });
+    expect(countPendingConfirmations([soon, later, confirmed, finished, vehicleOnly], now)).toBe(1);
+    expect(countPendingConfirmations([soon, later], now, 24 * 7)).toBe(2);
+  });
+
+  it("indexes a driver's days off by day and summarises who drives each transport", () => {
+    const ana = driver({ unavailable_days: [{ date: "2026-10-03", status: "sick" }] });
+    expect(unavailabilityByDay(ana).get("2026-10-03")).toBe("sick");
+    expect(unavailabilityByDay(null).size).toBe(0);
+
+    const summaries = summarizeDriversByEvent({
+      drivers: [ana],
+      vehicles: [{
+        id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer", required_license: "C+E",
+        brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false,
+        itv_expiry: null, insurance_expiry: null, notes: null, is_active: true,
+      }],
+      assignments: [
+        assignment({ id: "a1", logistics_event_id: "e1", vehicle_id: "v1", status: "confirmed" }),
+        assignment({ id: "a2", logistics_event_id: "e1", driver_id: "ghost", status: "declined" }),
+        assignment({ id: "a3", logistics_event_id: "e2", driver_id: null, vehicle_id: "v1" }),
+      ],
+    });
+    expect(summaries.get("e1")).toEqual([{ assignmentId: "a1", label: "Ana Conductora · Tráiler 1", status: "confirmed" }]);
+    expect(summaries.get("e2")).toEqual([{ assignmentId: "a3", label: "Tráiler 1", status: "assigned" }]);
   });
 
   it("names drivers by first name or nickname", () => {

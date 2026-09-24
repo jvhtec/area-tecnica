@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { deleteFleetVehicle } from "@/features/logistics/fleet/fleetApi";
 import {
+  documentStatus,
   driverDisplayName,
   vehicleLabel,
   vehicleTypeLabel,
@@ -21,7 +22,19 @@ import { formatMadridDateKey } from "@/utils/timezoneUtils";
 import { DriverDetailsDialog } from "./DriverDetailsDialog";
 import { VehicleFormDialog } from "./VehicleFormDialog";
 
-const isExpired = (dateKey: string | null, todayKey: string) => Boolean(dateKey && dateKey < todayKey);
+/** "X caducada" in red, "X caduca pronto" in amber, nothing otherwise. */
+function DocumentBadge({ label, expiry, todayKey }: { label: string; expiry: string | null; todayKey: string }) {
+  const state = documentStatus(expiry, todayKey);
+  if (state === "expired") return <Badge variant="destructive">{label} caducado</Badge>;
+  if (state === "expiring") {
+    return (
+      <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
+        {label} caduca pronto
+      </Badge>
+    );
+  }
+  return null;
+}
 
 export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
   const { toast } = useToast();
@@ -96,7 +109,12 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
                     <p className="text-muted-foreground">
                       {vehicleTypeLabel(vehicle.vehicle_type)} · Permiso {vehicle.required_license}
                       {vehicle.brand || vehicle.model ? ` · ${[vehicle.brand, vehicle.model].filter(Boolean).join(" ")}` : ""}
+                      {vehicle.has_tail_lift ? " · Plataforma" : ""}
                     </p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <DocumentBadge label="ITV" expiry={vehicle.itv_expiry} todayKey={todayKey} />
+                      <DocumentBadge label="Seguro" expiry={vehicle.insurance_expiry} todayKey={todayKey} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     {!vehicle.is_active && <Badge variant="secondary">Inactivo</Badge>}
@@ -144,8 +162,9 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
                         {defaultVehicle ? ` · ${vehicleLabel(defaultVehicle)}` : ""}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {isExpired(driver.license_expiry, todayKey) && <Badge variant="destructive">Permiso caducado</Badge>}
-                        {isExpired(driver.cap_expiry, todayKey) && <Badge variant="destructive">CAP caducado</Badge>}
+                        <DocumentBadge label="Permiso" expiry={driver.license_expiry} todayKey={todayKey} />
+                        <DocumentBadge label="CAP" expiry={driver.cap_expiry} todayKey={todayKey} />
+                        <DocumentBadge label="Tacógrafo" expiry={driver.tachograph_card_expiry} todayKey={todayKey} />
                       </div>
                     </div>
                     {!readOnly && (

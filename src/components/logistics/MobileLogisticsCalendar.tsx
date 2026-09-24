@@ -13,6 +13,7 @@ import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
 import { queryKeys } from "@/lib/react-query";
+import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface MobileLogisticsCalendarProps {
@@ -72,6 +73,8 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   }, [events]);
 
   const currentDateEvents = getEventsForDate(currentDate);
+  const currentDateKey = format(currentDate, "yyyy-MM-dd");
+  const driversByEvent = useEventDriverSummaries(currentDateKey, currentDateKey);
   const visibleEvents = React.useMemo(
     () => currentDateEvents.slice(0, visibleEventsCount),
     [currentDateEvents, visibleEventsCount],
@@ -191,6 +194,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
                 onClick={(e) => handleEventClick(e, event)}
                 interactive={!readOnly}
                 className="w-full min-w-0 rounded-2xl"
+                drivers={driversByEvent.get(event.id)}
               />
             ))}
             {currentDateEvents.length > visibleEventsCount ? (

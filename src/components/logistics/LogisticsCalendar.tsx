@@ -15,6 +15,7 @@ import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
 import { queryKeys } from "@/lib/react-query";
+import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface LogisticsCalendarProps {
@@ -73,6 +74,10 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
   });
 
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
+  const driversByEvent = useEventDriverSummaries(
+    format(allDays[0], "yyyy-MM-dd"),
+    format(allDays[allDays.length - 1], "yyyy-MM-dd"),
+  );
 
   const getDayEvents = (date: Date) => {
     if (!events) return [];
@@ -216,6 +221,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
                             onClick={(e) => handleEventClick(e, event)}
                             interactive={!readOnly}
                             className="border-0 p-0 shadow-none"
+                            drivers={driversByEvent.get(event.id)}
                           />
                         </TooltipContent>
                       </Tooltip>

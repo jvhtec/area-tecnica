@@ -86,6 +86,8 @@ describe("app route manifest", () => {
       "profiles",
       "locations",
       "transport_requests",
+      "technician_availability",
+      "vacation_requests",
     ]) {
       expect(logistics).toContainEqual(
         expect.objectContaining({ table, queryKey: aggregateKey }),

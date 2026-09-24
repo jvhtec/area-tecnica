@@ -16,9 +16,14 @@ logistics calendar), not jobs.
 | Driver licence card | `/profile` (`ConductorProfileCard`) | the driver, read-only |
 
 Code: `src/features/logistics/fleet/` (model, RPC wrappers, hooks) and
-`src/components/logistics/fleet/`. Schema: `supabase/migrations/20260924100000_add_conductor_role.sql`
-and `20260924100500_logistics_fleet_and_driver_assignments.sql`; pgTAP in
+`src/components/logistics/fleet/`. Schema: `supabase/migrations/20260924100000_add_conductor_role.sql`,
+`20260924100500_logistics_fleet_and_driver_assignments.sql`,
+`20260924110000_harden_logistics_driver_matrix.sql` and
+`20260924120000_logistics_matrix_operational_fields.sql`; pgTAP in
 `supabase/tests/database/logistics_fleet_driver_assignments.sql`.
+
+The calendar tab and the day panel (`LogisticsEventCard` via `useEventDriverSummaries`)
+also show who is driving each transport, reusing the matrix query for the visible range.
 
 ## Granularity: time windows, not day cells
 
@@ -33,18 +38,33 @@ the vehicle:
   when a window overlaps another non-declined assignment for the same driver or
   vehicle; the UI shows the clash and can resend with `p_force => true`.
 - The matrix rings overlapping chips in red (`findDoubleBookedAssignmentIds`).
-- Licence/CAP checks (`driverVehicleWarnings`) are soft warnings only — licence data
-  may simply not be entered yet.
+- Licence/CAP/tachograph checks, vehicle ITV/insurance expiry and the driver's days off
+  (`driverVehicleWarnings`) are soft warnings only — document data may simply not be
+  entered yet. The Flota tab flags each document as *caducado* (red) or *caduca pronto*
+  (amber, within `DOCUMENT_EXPIRY_WARNING_DAYS` = 30 days).
+- The matrix header counts assignments still waiting for the driver's answer that start
+  within 48 h (`countPendingConfirmations`), so dispatch knows whom to chase.
 
 ## Data model
 
-- `fleet_vehicles` — own fleet. Plate uniqueness ignores spaces/dashes/case. A vehicle
+- `fleet_vehicles` — own fleet. Plate uniqueness ignores spaces/dashes/case. Carries
+  `itv_expiry`, `insurance_expiry` and `has_tail_lift` (plataforma elevadora). A vehicle
   with assignment history cannot be deleted (FK `restrict`); deactivate it instead.
-- `driver_details` — one row per conductor: licence categories (`B…D`), licence and
-  CAP expiry, ADR, usual vehicle, notes. **Notes are visible to the driver.**
+- `driver_details` — one row per conductor: licence categories (`B…D+E`), licence, CAP
+  and tachograph-card expiry, ADR, usual vehicle, notes. **Notes are visible to the driver.**
 - `transport_driver_assignments` — event × driver and/or vehicle, window, status
-  `assigned → confirmed | declined`. A declined row is kept as history but releases
-  its driver/vehicle slot (the unique indexes and conflict checks skip it).
+  `assigned → confirmed | declined`, and an optional `decline_reason` (≤ 500 chars) the
+  driver gave. A declined row is kept as history but releases its driver/vehicle slot
+  (the unique indexes and conflict checks skip it). A material change or a confirmation
+  clears the reason.
+- **Days off** are not stored here: `get_logistics_matrix()` returns each driver's
+  `unavailable_days` in the range from `technician_availability` (per-day rows, as the
+  crew matrix writes them) plus approved `vacation_requests`. The matrix greys those
+  cells out and the assignment form warns.
+- **Dispatch contact**: `get_logistics_matrix()` returns a driver's `phone` only when the
+  caller is admin/management (null for house_tech). The day dialog turns it into
+  WhatsApp / `tel:` shortcuts through `@/utils/phoneLinks`. Never read `profiles.phone`
+  directly for this.
 
 ## Invariants
 
@@ -68,7 +88,7 @@ the vehicle:
   assignments exist. The `delete-user` edge function performs the same check early
   so the admin gets a useful conflict instead of a failed auth cascade.
 - **Any change a driver must act on resets confirmation**: driver, vehicle, window or
-  the instructions (`notes`).
+  the instructions (`notes`). It also clears a stale `decline_reason`.
 - **Nothing here touches staffing.** No `job_assignments`, timesheets or rates are
   created for drivers.
 
@@ -82,6 +102,10 @@ Fire-and-forget pushes from `fleetApi.ts`, resolved server-side in
 | `logistics.driver.assigned` / `.updated` | admin/management | the stored driver | `/conductor` |
 | `logistics.driver.removed` | admin/management | the driver (verified `conductor` role) | `/conductor` |
 | `logistics.driver.confirmed` / `.declined` | the driver, own assignment, only once that status is stored | logistics management + whoever assigned it | `/logistics?tab=drivers` |
+
+A `.declined` push appends the driver's reason (`Motivo: …`) when they gave one. On
+`/conductor`, **No puedo** opens `DeclineTransportDialog` to ask for it (optional, so a
+driver on the road is never blocked) before `respond_transport_assignment(id, 'declined', reason)`.
 
 Drivers enable push on their profile like crew do (`canViewProfilePushControls`).
 

@@ -54,6 +54,13 @@ export function ConductorProfileCard({ profileId, className }: { profileId: stri
                 {data?.cap_expiry && data.cap_expiry < todayKey && <Badge variant="destructive">Caducado</Badge>}
               </dd>
             </div>
+            <div>
+              <dt className="text-muted-foreground">Caducidad de la tarjeta de tacógrafo</dt>
+              <dd className="flex items-center gap-2">
+                {formatDay(data?.tachograph_card_expiry ?? null)}
+                {data?.tachograph_card_expiry && data.tachograph_card_expiry < todayKey && <Badge variant="destructive">Caducada</Badge>}
+              </dd>
+            </div>
             {data?.notes && (
               <div className="sm:col-span-2">
                 <dt className="text-muted-foreground">Notas</dt>

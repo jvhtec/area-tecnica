@@ -50,9 +50,26 @@ export type FleetVehicle = {
   model: string | null;
   payload_kg: number | null;
   cargo_length_m: number | null;
+  has_tail_lift: boolean;
+  /** ISO date (yyyy-MM-dd). Inspección Técnica de Vehículos. */
+  itv_expiry: string | null;
+  /** ISO date (yyyy-MM-dd). */
+  insurance_expiry: string | null;
   notes: string | null;
   is_active: boolean;
 };
+
+export const UNAVAILABILITY_STATUSES = ["vacation", "travel", "sick", "day_off"] as const;
+export type UnavailabilityStatus = (typeof UNAVAILABILITY_STATUSES)[number];
+
+export const UNAVAILABILITY_LABELS: Record<UnavailabilityStatus, string> = {
+  vacation: "Vacaciones",
+  travel: "Viaje",
+  sick: "Baja",
+  day_off: "Día libre",
+};
+
+export type DriverUnavailableDay = { date: string; status: UnavailabilityStatus };
 
 export type MatrixDriver = {
   id: string;
@@ -60,12 +77,17 @@ export type MatrixDriver = {
   last_name: string | null;
   nickname: string | null;
   department: string | null;
+  /** Only present for admin/management (the RPC returns null to read-only viewers). */
+  phone: string | null;
   license_categories: string[];
   license_expiry: string | null;
   cap_expiry: string | null;
+  tachograph_card_expiry: string | null;
   adr_certified: boolean;
   default_vehicle_id: string | null;
   notes: string | null;
+  /** Days in the queried range the driver cannot work (availability rows + approved vacations). */
+  unavailable_days: DriverUnavailableDay[];
 };
 
 export type MatrixTransportEvent = {
@@ -100,6 +122,8 @@ export type DriverAssignment = {
   status: DriverAssignmentStatus;
   notes: string | null;
   responded_at: string | null;
+  /** What the driver said when declining, if anything. */
+  decline_reason: string | null;
 };
 
 export type LogisticsMatrixData = {
@@ -139,6 +163,7 @@ export type DriverDetails = {
   license_categories: string[];
   license_expiry: string | null;
   cap_expiry: string | null;
+  tachograph_card_expiry: string | null;
   adr_certified: boolean;
   default_vehicle_id: string | null;
   notes: string | null;
@@ -219,35 +244,82 @@ export const driverCoversLicense = (categories: readonly string[], required: str
   return granted.has(required);
 };
 
-export type DriverVehicleWarning = "license_missing" | "license_expired" | "cap_expired";
+export type DriverVehicleWarning =
+  | "license_missing"
+  | "license_expired"
+  | "cap_expired"
+  | "tachograph_expired"
+  | "vehicle_itv_expired"
+  | "vehicle_insurance_expired"
+  | "driver_unavailable";
 
 export const DRIVER_WARNING_LABELS: Record<DriverVehicleWarning, string> = {
   license_missing: "El conductor no tiene el permiso requerido por el vehículo",
   license_expired: "El permiso de conducir estará caducado ese día",
   cap_expired: "El CAP estará caducado ese día",
+  tachograph_expired: "La tarjeta de tacógrafo estará caducada ese día",
+  vehicle_itv_expired: "La ITV del vehículo estará caducada ese día",
+  vehicle_insurance_expired: "El seguro del vehículo estará caducado ese día",
+  driver_unavailable: "El conductor no está disponible ese día",
 };
+
+const PROFESSIONAL_LICENSES: readonly string[] = ["C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"];
+
+type WarningDriver = Pick<MatrixDriver, "license_categories" | "license_expiry" | "cap_expiry"> &
+  Partial<Pick<MatrixDriver, "tachograph_card_expiry" | "unavailable_days">>;
+type WarningVehicle = Pick<FleetVehicle, "required_license"> &
+  Partial<Pick<FleetVehicle, "itv_expiry" | "insurance_expiry">>;
 
 /**
  * Soft checks shown before assigning — the server does not enforce them, since
- * licence data may simply not have been entered yet.
+ * licence and document data may simply not have been entered yet.
  */
 export const driverVehicleWarnings = (
-  driver: Pick<MatrixDriver, "license_categories" | "license_expiry" | "cap_expiry"> | null | undefined,
-  vehicle: Pick<FleetVehicle, "required_license"> | null | undefined,
+  driver: WarningDriver | null | undefined,
+  vehicle: WarningVehicle | null | undefined,
   dayKey: string,
 ): DriverVehicleWarning[] => {
-  if (!driver) return [];
   const warnings: DriverVehicleWarning[] = [];
-  if (vehicle && driver.license_categories.length > 0 && !driverCoversLicense(driver.license_categories, vehicle.required_license)) {
-    warnings.push("license_missing");
+  if (driver) {
+    if (vehicle && driver.license_categories.length > 0 && !driverCoversLicense(driver.license_categories, vehicle.required_license)) {
+      warnings.push("license_missing");
+    }
+    if (driver.license_expiry && driver.license_expiry < dayKey) warnings.push("license_expired");
+    const professional = vehicle ? PROFESSIONAL_LICENSES.includes(vehicle.required_license) : false;
+    if (professional && driver.cap_expiry && driver.cap_expiry < dayKey) warnings.push("cap_expired");
+    if (professional && driver.tachograph_card_expiry && driver.tachograph_card_expiry < dayKey) {
+      warnings.push("tachograph_expired");
+    }
+    if (driver.unavailable_days?.some((day) => day.date === dayKey)) warnings.push("driver_unavailable");
   }
-  if (driver.license_expiry && driver.license_expiry < dayKey) warnings.push("license_expired");
-  const professional = vehicle
-    ? ["C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"].includes(vehicle.required_license)
-    : false;
-  if (professional && driver.cap_expiry && driver.cap_expiry < dayKey) warnings.push("cap_expired");
+  if (vehicle) {
+    if (vehicle.itv_expiry && vehicle.itv_expiry < dayKey) warnings.push("vehicle_itv_expired");
+    if (vehicle.insurance_expiry && vehicle.insurance_expiry < dayKey) warnings.push("vehicle_insurance_expired");
+  }
   return warnings;
 };
+
+// ---------------------------------------------------------------------------
+// Document expiry
+// ---------------------------------------------------------------------------
+
+export type DocumentStatus = "expired" | "expiring" | "valid";
+
+/** Days ahead within which a document counts as "expiring soon". */
+export const DOCUMENT_EXPIRY_WARNING_DAYS = 30;
+
+/** Null when there is no date on record. */
+export const documentStatus = (expiryKey: string | null | undefined, todayKey: string): DocumentStatus | null => {
+  if (!expiryKey) return null;
+  if (expiryKey < todayKey) return "expired";
+  return expiryKey <= addMadridCalendarDays(todayKey, DOCUMENT_EXPIRY_WARNING_DAYS) ? "expiring" : "valid";
+};
+
+/** dayKey → status for quick cell lookups. */
+export const unavailabilityByDay = (
+  driver: Pick<MatrixDriver, "unavailable_days"> | null | undefined,
+): Map<string, UnavailabilityStatus> =>
+  new Map((driver?.unavailable_days ?? []).map((day) => [day.date, day.status]));
 
 // ---------------------------------------------------------------------------
 // Matrix layout
@@ -360,6 +432,50 @@ export const countUncoveredTransportsByDay = (
     counts.set(event.event_date, (counts.get(event.event_date) ?? 0) + 1);
   }
   return counts;
+};
+
+/** One line per non-declined assignment: "Ana Conductora · Tráiler 1", with its status. */
+export type EventDriverSummary = { assignmentId: string; label: string; status: DriverAssignmentStatus };
+
+/** eventId → who is driving it (and with what), for calendar cards outside the matrix. */
+export const summarizeDriversByEvent = (
+  data: Pick<LogisticsMatrixData, "drivers" | "vehicles" | "assignments">,
+): Map<string, EventDriverSummary[]> => {
+  const driversById = new Map(data.drivers.map((driver) => [driver.id, driver]));
+  const vehiclesById = new Map(data.vehicles.map((vehicle) => [vehicle.id, vehicle]));
+  const summaries = new Map<string, EventDriverSummary[]>();
+  for (const assignment of [...data.assignments].sort((a, b) => a.starts_at.localeCompare(b.starts_at))) {
+    if (assignment.status === "declined") continue;
+    const driver = assignment.driver_id ? driversById.get(assignment.driver_id) : null;
+    const vehicle = assignment.vehicle_id ? vehiclesById.get(assignment.vehicle_id) : null;
+    const label = [driver ? driverDisplayName(driver) : null, vehicle ? vehicle.name : null]
+      .filter((part): part is string => Boolean(part))
+      .join(" · ");
+    if (!label) continue;
+    const list = summaries.get(assignment.logistics_event_id) ?? [];
+    list.push({ assignmentId: assignment.id, label, status: assignment.status });
+    summaries.set(assignment.logistics_event_id, list);
+  }
+  return summaries;
+};
+
+/**
+ * Driver assignments still waiting for the driver's answer whose window starts
+ * within `horizonHours` of `nowIso` — the ones dispatch should chase.
+ */
+export const countPendingConfirmations = (
+  assignments: readonly DriverAssignment[],
+  nowIso: string,
+  horizonHours = 48,
+): number => {
+  const horizon = new Date(new Date(nowIso).getTime() + horizonHours * 60 * 60 * 1000).toISOString();
+  return assignments.filter(
+    (assignment) =>
+      assignment.driver_id !== null
+      && assignment.status === "assigned"
+      && assignment.ends_at > nowIso
+      && assignment.starts_at <= horizon,
+  ).length;
 };
 
 /** Default window for a new assignment: the transport's local time, two hours long. */

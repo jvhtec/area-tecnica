@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 import { Bell, Loader2, Truck } from "lucide-react";
 
 import { ConductorAssignmentCard } from "@/components/logistics/fleet/ConductorAssignmentCard";
+import { DeclineTransportDialog } from "@/components/logistics/fleet/DeclineTransportDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +32,7 @@ const ConductorDashboard = () => {
   const invalidate = useInvalidateLogisticsFleet();
   const { data, isLoading, error } = useMyTransportAssignments();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [declining, setDeclining] = useState<MyTransportAssignment | null>(null);
 
   // Evaluated on every render (list refreshes, realtime, responses) so finished runs drop off.
   const nowIso = new Date().toISOString();
@@ -38,10 +40,10 @@ const ConductorDashboard = () => {
   const pendingCount = (data ?? []).filter((assignment) => assignment.status === "assigned" && assignment.ends_at >= nowIso).length;
   const firstName = typeof user?.user_metadata?.first_name === "string" ? user.user_metadata.first_name : null;
 
-  const respond = async (assignment: MyTransportAssignment, response: "confirmed" | "declined") => {
+  const respond = async (assignment: MyTransportAssignment, response: "confirmed" | "declined", reason?: string) => {
     setBusyId(assignment.id);
     try {
-      await respondToTransportAssignment(assignment.id, response);
+      await respondToTransportAssignment(assignment.id, response, reason);
       toast({ title: response === "confirmed" ? "Transporte confirmado" : "Has indicado que no puedes hacerlo" });
       await invalidate();
     } catch (respondError) {
@@ -95,12 +97,24 @@ const ConductorDashboard = () => {
                 key={assignment.id}
                 assignment={assignment}
                 busy={busyId === assignment.id}
-                onRespond={(response) => void respond(assignment, response)}
+                // Declining asks for a reason first; confirming goes straight through.
+                onRespond={(response) => (response === "declined" ? setDeclining(assignment) : void respond(assignment, response))}
               />
             ))}
           </section>
         ))
       )}
+
+      <DeclineTransportDialog
+        assignment={declining}
+        busy={Boolean(declining && busyId === declining.id)}
+        onOpenChange={(open) => { if (!open) setDeclining(null); }}
+        onDecline={async (reason) => {
+          if (!declining) return;
+          await respond(declining, "declined", reason);
+          setDeclining(null);
+        }}
+      />
     </div>
   );
 };

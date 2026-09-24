@@ -30,6 +30,9 @@ const emptyVehicle = (): FleetVehicleInput => ({
   model: null,
   payload_kg: null,
   cargo_length_m: null,
+  has_tail_lift: false,
+  itv_expiry: null,
+  insurance_expiry: null,
   notes: null,
   is_active: true,
 });
@@ -153,6 +156,18 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
           <div className="space-y-1.5">
             <Label htmlFor="vehicle-length">Longitud de caja (m)</Label>
             <Input id="vehicle-length" inputMode="decimal" value={lengthText} onChange={(e) => setLengthText(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vehicle-itv">Caducidad de la ITV</Label>
+            <Input id="vehicle-itv" type="date" value={form.itv_expiry ?? ""} onChange={(e) => update("itv_expiry", e.target.value || null)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vehicle-insurance">Caducidad del seguro</Label>
+            <Input id="vehicle-insurance" type="date" value={form.insurance_expiry ?? ""} onChange={(e) => update("insurance_expiry", e.target.value || null)} />
+          </div>
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <Switch id="vehicle-tail-lift" checked={form.has_tail_lift} onCheckedChange={(checked) => update("has_tail_lift", checked)} />
+            <Label htmlFor="vehicle-tail-lift">Plataforma elevadora</Label>
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="vehicle-notes">Notas</Label>

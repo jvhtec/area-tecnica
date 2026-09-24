@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { queryKeys } from "@/lib/react-query";
+import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface TodayLogisticsProps {
@@ -21,6 +22,7 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
+  const driversByEvent = useEventDriverSummaries(formattedDate, formattedDate);
 
   const { data: events, isLoading } = useQuery({
     queryKey: queryKeys.scope("today-logistics", formattedDate),
@@ -72,6 +74,7 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
               event={event}
               onClick={() => handleEventClick(event)}
               interactive={!readOnly}
+              drivers={driversByEvent.get(event.id)}
             />
           ))}
           {!isLoading && events?.length === 0 && (

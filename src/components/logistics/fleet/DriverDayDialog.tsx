@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, MessageCircle, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { removeDriverAssignment } from "@/features/logistics/fleet/fleetApi";
 import {
   DRIVER_ASSIGNMENT_STATUS_LABELS,
   TRANSPORT_EVENT_TYPE_LABELS,
+  UNAVAILABILITY_LABELS,
   driverDisplayName,
   formatTransportTime,
   transportEventTitle,
@@ -22,6 +23,7 @@ import {
 } from "@/features/logistics/fleet/fleetModel";
 import { useInvalidateLogisticsFleet } from "@/features/logistics/fleet/useLogisticsFleet";
 import { getErrorMessage } from "@/utils/errorMessage";
+import { buildTelHref, buildWhatsAppHref } from "@/utils/phoneLinks";
 import { formatMadridDayKey } from "@/utils/timezoneUtils";
 import { es } from "date-fns/locale";
 
@@ -64,6 +66,11 @@ export function DriverDayDialog({ open, onOpenChange, dayKey, row, data, rowAssi
 
   const rowName = row.kind === "driver" ? driverDisplayName(row.driver) : vehicleLabel(row.vehicle);
   const dayLabel = formatMadridDayKey(dayKey, "EEEE d 'de' MMMM", { locale: es });
+  const offStatus = row.kind === "driver" ? row.driver.unavailable_days.find((day) => day.date === dayKey)?.status : undefined;
+  // The RPC only returns a phone to admin/management, so read-only viewers never get these links.
+  const phone = row.kind === "driver" ? row.driver.phone : null;
+  const telHref = buildTelHref(phone);
+  const whatsAppHref = buildWhatsAppHref(phone, `Hola ${rowName}, te escribo desde logística por el transporte del ${dayLabel}.`);
 
   const close = (next: boolean) => {
     if (!next) setEditing(null);
@@ -96,8 +103,30 @@ export function DriverDayDialog({ open, onOpenChange, dayKey, row, data, rowAssi
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="break-words">{rowName}</DialogTitle>
-          <DialogDescription className="first-letter:uppercase">{dayLabel}</DialogDescription>
+          <DialogDescription className="first-letter:uppercase">
+            {dayLabel}
+            {offStatus ? ` · ${UNAVAILABILITY_LABELS[offStatus]}` : ""}
+          </DialogDescription>
         </DialogHeader>
+
+        {(telHref || whatsAppHref) && !editing && (
+          <div className="flex flex-wrap gap-2">
+            {whatsAppHref && (
+              <Button asChild size="sm" variant="outline">
+                <a href={whatsAppHref} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle className="mr-1 h-4 w-4" /> WhatsApp
+                </a>
+              </Button>
+            )}
+            {telHref && (
+              <Button asChild size="sm" variant="outline">
+                <a href={telHref}>
+                  <Phone className="mr-1 h-4 w-4" /> Llamar
+                </a>
+              </Button>
+            )}
+          </div>
+        )}
 
         {editing ? (
           <DriverAssignmentForm
@@ -131,6 +160,9 @@ export function DriverDayDialog({ open, onOpenChange, dayKey, row, data, rowAssi
                           </p>
                           <p className="text-muted-foreground">{describeAssignee(assignment)}</p>
                           {assignment.notes && <p className="text-muted-foreground">{assignment.notes}</p>}
+                          {assignment.status === "declined" && assignment.decline_reason && (
+                            <p className="break-words text-red-700 dark:text-red-300">Motivo: {assignment.decline_reason}</p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={assignmentStatusClass(assignment.status)}>

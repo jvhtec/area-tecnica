@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { es } from "date-fns/locale";
-import { AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   DRIVER_ASSIGNMENT_STATUS_LABELS,
+  UNAVAILABILITY_LABELS,
   buildDayKeys,
+  countPendingConfirmations,
   countUncoveredTransportsByDay,
   driverDisplayName,
   findDoubleBookedAssignmentIds,
@@ -19,9 +21,11 @@ import {
   groupAssignmentsByRowAndDay,
   startOfMadridWeek,
   transportEventTitle,
+  unavailabilityByDay,
   vehicleTypeLabel,
   type DriverAssignment,
   type LogisticsMatrixData,
+  type UnavailabilityStatus,
 } from "@/features/logistics/fleet/fleetModel";
 import { useLogisticsMatrix } from "@/features/logistics/fleet/useLogisticsFleet";
 import { getErrorMessage } from "@/utils/errorMessage";
@@ -32,7 +36,14 @@ import { assignmentStatusClass } from "./matrixStyles";
 
 type MatrixMode = "drivers" | "vehicles";
 
-type MatrixRow = { id: string; label: string; detail: string; target: MatrixRowTarget };
+type MatrixRow = {
+  id: string;
+  label: string;
+  detail: string;
+  target: MatrixRowTarget;
+  /** dayKey → why the driver is off that day. Empty for vehicles. */
+  unavailable: Map<string, UnavailabilityStatus>;
+};
 
 const buildRows = (data: LogisticsMatrixData, mode: MatrixMode, assignments: DriverAssignment[]): MatrixRow[] => {
   if (mode === "drivers") {
@@ -41,6 +52,7 @@ const buildRows = (data: LogisticsMatrixData, mode: MatrixMode, assignments: Dri
       label: driverDisplayName(driver),
       detail: driver.license_categories.length > 0 ? `Permisos: ${driver.license_categories.join(", ")}` : "Sin permisos registrados",
       target: { kind: "driver", driver },
+      unavailable: unavailabilityByDay(driver),
     }));
   }
   const inUse = new Set(assignments.map((assignment) => assignment.vehicle_id));
@@ -51,6 +63,7 @@ const buildRows = (data: LogisticsMatrixData, mode: MatrixMode, assignments: Dri
       label: vehicle.name,
       detail: `${vehicle.license_plate} · ${vehicleTypeLabel(vehicle.vehicle_type)}${vehicle.is_active ? "" : " · inactivo"}`,
       target: { kind: "vehicle", vehicle },
+      unavailable: new Map(),
     }));
 };
 
@@ -84,6 +97,8 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
   );
   const doubleBooked = useMemo(() => findDoubleBookedAssignmentIds(assignments), [assignments]);
   const uncovered = useMemo(() => countUncoveredTransportsByDay(data?.events ?? [], assignments), [data?.events, assignments]);
+  // Evaluated per render so the count moves as the clock does.
+  const pendingSoon = countPendingConfirmations(assignments, new Date().toISOString());
   const rows = useMemo(() => (data ? buildRows(data, mode, assignments) : []), [data, mode, assignments]);
   const driversById = useMemo(() => new Map((data?.drivers ?? []).map((driver) => [driver.id, driver])), [data?.drivers]);
   const vehiclesById = useMemo(() => new Map((data?.vehicles ?? []).map((vehicle) => [vehicle.id, vehicle])), [data?.vehicles]);
@@ -140,6 +155,13 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
         <Badge variant="outline" className="border-red-500 text-red-700 dark:text-red-300">
           <AlertTriangle className="mr-1 h-3 w-3" /> Solapado
         </Badge>
+        <Badge variant="outline" className="bg-muted text-muted-foreground">No disponible</Badge>
+        {pendingSoon > 0 && (
+          <Badge variant="outline" className="ml-auto border-amber-500 text-amber-700 dark:text-amber-400">
+            <Clock className="mr-1 h-3 w-3" />
+            {pendingSoon} sin confirmar en 48 h
+          </Badge>
+        )}
       </div>
 
       {error ? (
@@ -194,14 +216,26 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
                   </th>
                   {dayKeys.map((dayKey) => {
                     const cellAssignments = grouped.get(row.id)?.get(dayKey) ?? [];
+                    const offStatus = row.unavailable.get(dayKey);
+                    const offLabel = offStatus ? UNAVAILABILITY_LABELS[offStatus] : null;
                     return (
-                      <td key={dayKey} className={cn("border-b border-r p-1 align-top", isMadridWeekend(dayKey) && "bg-muted/40")}>
+                      <td
+                        key={dayKey}
+                        className={cn(
+                          "border-b border-r p-1 align-top",
+                          isMadridWeekend(dayKey) && "bg-muted/40",
+                          offLabel && "bg-muted",
+                        )}
+                      >
                         <button
                           type="button"
                           className="flex min-h-14 w-full flex-col gap-1 rounded p-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          aria-label={`${row.label}, ${formatMadridDayKey(dayKey, "EEEE d 'de' MMMM", { locale: es })}: ${cellAssignments.length} asignaciones`}
+                          aria-label={`${row.label}, ${formatMadridDayKey(dayKey, "EEEE d 'de' MMMM", { locale: es })}: ${cellAssignments.length} asignaciones${offLabel ? `, ${offLabel.toLowerCase()}` : ""}`}
                           onClick={() => setSelected({ row, dayKey })}
                         >
+                          {offLabel && (
+                            <span className="block text-xs italic text-muted-foreground">{offLabel}</span>
+                          )}
                           {cellAssignments.map((assignment) => {
                             const event = eventsById.get(assignment.logistics_event_id);
                             const subtitle = chipSubtitle(assignment);

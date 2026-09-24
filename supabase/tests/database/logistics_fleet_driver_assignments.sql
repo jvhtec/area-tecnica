@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(62);
+SELECT plan(80);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -46,7 +46,7 @@ SELECT ok(
     AND NOT has_function_privilege('anon', 'public.assign_transport_driver(uuid, uuid, uuid, timestamptz, timestamptz, text, uuid, boolean)', 'EXECUTE')
     AND NOT has_function_privilege('anon', 'public.remove_transport_driver_assignment(uuid)', 'EXECUTE')
     AND NOT has_function_privilege('anon', 'public.get_my_transport_assignments(date, date)', 'EXECUTE')
-    AND NOT has_function_privilege('anon', 'public.respond_transport_assignment(uuid, text)', 'EXECUTE'),
+    AND NOT has_function_privilege('anon', 'public.respond_transport_assignment(uuid, text, text)', 'EXECUTE'),
   'logistics matrix RPCs are closed to anonymous callers'
 );
 
@@ -54,8 +54,18 @@ SELECT ok(
   has_function_privilege('authenticated', 'public.get_logistics_matrix(date, date)', 'EXECUTE')
     AND has_function_privilege('authenticated', 'public.assign_transport_driver(uuid, uuid, uuid, timestamptz, timestamptz, text, uuid, boolean)', 'EXECUTE')
     AND has_function_privilege('authenticated', 'public.get_my_transport_assignments(date, date)', 'EXECUTE')
-    AND has_function_privilege('authenticated', 'public.respond_transport_assignment(uuid, text)', 'EXECUTE'),
+    AND has_function_privilege('authenticated', 'public.respond_transport_assignment(uuid, text, text)', 'EXECUTE'),
   'signed-in users can call the RPCs, which authorize internally'
+);
+
+SELECT has_column('public', 'fleet_vehicles', 'itv_expiry', 'fleet_vehicles.itv_expiry exists');
+SELECT has_column('public', 'fleet_vehicles', 'insurance_expiry', 'fleet_vehicles.insurance_expiry exists');
+SELECT has_column('public', 'fleet_vehicles', 'has_tail_lift', 'fleet_vehicles.has_tail_lift exists');
+SELECT has_column('public', 'driver_details', 'tachograph_card_expiry', 'driver_details.tachograph_card_expiry exists');
+SELECT has_column('public', 'transport_driver_assignments', 'decline_reason', 'transport_driver_assignments.decline_reason exists');
+SELECT hasnt_function(
+  'public', 'respond_transport_assignment', ARRAY['uuid', 'text'],
+  'the two-argument respond overload is gone, so PostgREST calls are unambiguous'
 );
 
 -- ---------------------------------------------------------------------------
@@ -78,6 +88,14 @@ DELETE FROM public.logistics_events WHERE id IN (
   'e5300000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM public.driver_details WHERE profile_id IN (
+  'e5100000-0000-0000-0000-000000000002'::uuid,
+  'e5100000-0000-0000-0000-000000000003'::uuid
+);
+DELETE FROM public.technician_availability WHERE technician_id IN (
+  'e5100000-0000-0000-0000-000000000002',
+  'e5100000-0000-0000-0000-000000000003'
+);
+DELETE FROM public.vacation_requests WHERE technician_id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
   'e5100000-0000-0000-0000-000000000003'::uuid
 );
@@ -119,20 +137,27 @@ FROM (VALUES
 ) AS u(id, email)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.profiles (id, email, first_name, last_name, role, department)
+INSERT INTO public.profiles (id, email, first_name, last_name, role, department, phone)
 VALUES
-  ('e5100000-0000-0000-0000-000000000001'::uuid, 'fleet-manager@test.local', 'Marta', 'Logística', 'management', 'logistics'),
-  ('e5100000-0000-0000-0000-000000000002'::uuid, 'fleet-driver-ana@test.local', 'Ana', 'Conductora', 'conductor', 'logistics'),
-  ('e5100000-0000-0000-0000-000000000003'::uuid, 'fleet-driver-beto@test.local', 'Beto', 'Conductor', 'conductor', 'logistics'),
-  ('e5100000-0000-0000-0000-000000000004'::uuid, 'fleet-tech@test.local', 'Tomás', 'Técnico', 'technician', 'sound'),
-  ('e5100000-0000-0000-0000-000000000005'::uuid, 'fleet-house@test.local', 'Hugo', 'Plantilla', 'house_tech', 'sound'),
-  ('e5100000-0000-0000-0000-000000000006'::uuid, 'fleet-logistics-role@test.local', 'Lola', 'Almacén', 'logistics', 'logistics')
+  ('e5100000-0000-0000-0000-000000000001'::uuid, 'fleet-manager@test.local', 'Marta', 'Logística', 'management', 'logistics', NULL),
+  ('e5100000-0000-0000-0000-000000000002'::uuid, 'fleet-driver-ana@test.local', 'Ana', 'Conductora', 'conductor', 'logistics', '600 111 222'),
+  ('e5100000-0000-0000-0000-000000000003'::uuid, 'fleet-driver-beto@test.local', 'Beto', 'Conductor', 'conductor', 'logistics', NULL),
+  ('e5100000-0000-0000-0000-000000000004'::uuid, 'fleet-tech@test.local', 'Tomás', 'Técnico', 'technician', 'sound', NULL),
+  ('e5100000-0000-0000-0000-000000000005'::uuid, 'fleet-house@test.local', 'Hugo', 'Plantilla', 'house_tech', 'sound', NULL),
+  ('e5100000-0000-0000-0000-000000000006'::uuid, 'fleet-logistics-role@test.local', 'Lola', 'Almacén', 'logistics', 'logistics', NULL)
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
     first_name = excluded.first_name,
     last_name = excluded.last_name,
     role = excluded.role,
-    department = excluded.department;
+    department = excluded.department,
+    phone = excluded.phone;
+
+-- Beto is off on the 11th (explicit day) and on approved holiday the 12th–13th.
+INSERT INTO public.technician_availability (technician_id, date, status)
+VALUES ('e5100000-0000-0000-0000-000000000003', '2031-03-11', 'sick');
+INSERT INTO public.vacation_requests (technician_id, start_date, end_date, status)
+VALUES ('e5100000-0000-0000-0000-000000000003'::uuid, '2031-03-12', '2031-03-13', 'approved');
 
 -- Calendar-only transports (no job) keep the fixture independent of job triggers.
 INSERT INTO public.logistics_events (id, event_type, transport_type, event_date, event_time, title, timezone)
@@ -177,6 +202,15 @@ SELECT lives_ok(
   'fleet accepts the B+E Spanish licence category'
 );
 
+SELECT lives_ok(
+  $$
+    UPDATE public.fleet_vehicles
+    SET itv_expiry = '2031-01-31', insurance_expiry = '2031-06-30', has_tail_lift = true
+    WHERE id = 'e5400000-0000-0000-0000-000000000002'::uuid
+  $$,
+  'fleet records ITV and insurance expiry and a tail lift'
+);
+
 SELECT throws_ok(
   $$ INSERT INTO public.fleet_vehicles (name, license_plate, vehicle_type) VALUES ('Duplicada', '1234abc', 'trailer') $$,
   '23505',
@@ -196,6 +230,54 @@ SELECT is(
   (SELECT updated_by FROM public.driver_details WHERE profile_id = 'e5100000-0000-0000-0000-000000000002'::uuid),
   'e5100000-0000-0000-0000-000000000001'::uuid,
   'driver_details updated_by is set from the authenticated actor'
+);
+
+SELECT lives_ok(
+  $$
+    UPDATE public.driver_details
+    SET tachograph_card_expiry = '2032-01-01'
+    WHERE profile_id = 'e5100000-0000-0000-0000-000000000002'::uuid
+  $$,
+  'driver details record the tachograph card expiry'
+);
+
+-- Matrix read model: availability, compliance and the manager-only phone.
+SELECT is(
+  (SELECT d -> 'unavailable_days'
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-10', '2031-03-13') -> 'drivers') d
+   WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000003'),
+  '[{"date": "2031-03-11", "status": "sick"}, {"date": "2031-03-12", "status": "vacation"}, {"date": "2031-03-13", "status": "vacation"}]'::jsonb,
+  'the matrix lists a driver''s days off from availability rows and approved vacations'
+);
+
+SELECT is(
+  (SELECT d -> 'unavailable_days'
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-09', '2031-03-10') -> 'drivers') d
+   WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000003'),
+  '[]'::jsonb,
+  'days off outside the queried range are not returned'
+);
+
+SELECT is(
+  (SELECT d ->> 'phone'
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-10', '2031-03-10') -> 'drivers') d
+   WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000002'),
+  '600 111 222',
+  'management gets a driver''s phone for dispatch'
+);
+
+SELECT is(
+  (SELECT d ->> 'tachograph_card_expiry'
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-10', '2031-03-10') -> 'drivers') d
+   WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000002'),
+  '2032-01-01',
+  'the matrix exposes the tachograph card expiry'
+);
+
+SELECT ok(
+  (SELECT bool_and(v ? 'itv_expiry' AND v ? 'insurance_expiry' AND v ? 'has_tail_lift')
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-10', '2031-03-10') -> 'vehicles') v),
+  'the matrix exposes vehicle compliance fields'
 );
 
 SELECT lives_ok(
@@ -342,20 +424,43 @@ SELECT is(
   public.respond_transport_assignment(
     (SELECT id FROM public.transport_driver_assignments
      WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000003'::uuid),
-    'declined'
+    'declined',
+    '  Tengo otro servicio  '
   ) ->> 'status',
   'declined',
   'a driver can decline their own assignment'
 );
 
 SELECT is(
+  (SELECT decline_reason FROM public.transport_driver_assignments
+   WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000003'::uuid),
+  'Tengo otro servicio',
+  'the decline reason is stored, trimmed'
+);
+
+SELECT throws_ok(
+  $$
+    SELECT public.respond_transport_assignment(
+      (SELECT id FROM public.transport_driver_assignments
+       WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000003'::uuid),
+      'declined',
+      repeat('x', 501)
+    )
+  $$,
+  '22023',
+  NULL,
+  'a decline reason longer than 500 characters is refused'
+);
+
+SELECT is(
   public.respond_transport_assignment(
     (SELECT id FROM public.transport_driver_assignments
      WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid),
-    'confirmed'
-  ) ->> 'status',
-  'confirmed',
-  'a driver can confirm their own assignment'
+    'confirmed',
+    'ignored on a confirmation'
+  ) ->> 'decline_reason',
+  NULL::text,
+  'a driver can confirm their own assignment, and a confirmation carries no reason'
 );
 
 SELECT ok(
@@ -419,6 +524,14 @@ SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000005
 SELECT ok(
   (SELECT jsonb_array_length(public.get_logistics_matrix('2031-03-09', '2031-03-11') -> 'drivers')) >= 2,
   'house techs can read the logistics matrix'
+);
+
+SELECT is(
+  (SELECT d ->> 'phone'
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-10', '2031-03-10') -> 'drivers') d
+   WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000002'),
+  NULL::text,
+  'read-only viewers never receive a driver''s phone'
 );
 
 SELECT throws_ok(
@@ -569,6 +682,28 @@ SELECT is(
   'removal returns the driver to notify'
 );
 
+-- With the van free again, Ana's refused slot can be re-planned (later that day, same van).
+SELECT is(
+  public.assign_transport_driver(
+    'e5300000-0000-0000-0000-000000000003'::uuid,
+    'e5100000-0000-0000-0000-000000000002'::uuid,
+    'e5400000-0000-0000-0000-000000000002'::uuid,
+    '2031-03-10 17:00 Europe/Madrid'::timestamptz,
+    '2031-03-10 19:00 Europe/Madrid'::timestamptz,
+    p_assignment_id => current_setting('test.ana_declined')::uuid,
+    p_force => true
+  ) ->> 'status',
+  'saved',
+  'a refused transport can be re-planned for the same driver'
+);
+
+SELECT is(
+  (SELECT decline_reason FROM public.transport_driver_assignments
+   WHERE id = current_setting('test.ana_declined')::uuid),
+  NULL::text,
+  'a material change clears the stale decline reason along with the refusal'
+);
+
 RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
@@ -656,6 +791,14 @@ DELETE FROM public.logistics_events WHERE id IN (
   'e5300000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM public.driver_details WHERE profile_id IN (
+  'e5100000-0000-0000-0000-000000000002'::uuid,
+  'e5100000-0000-0000-0000-000000000003'::uuid
+);
+DELETE FROM public.technician_availability WHERE technician_id IN (
+  'e5100000-0000-0000-0000-000000000002',
+  'e5100000-0000-0000-0000-000000000003'
+);
+DELETE FROM public.vacation_requests WHERE technician_id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
   'e5100000-0000-0000-0000-000000000003'::uuid
 );

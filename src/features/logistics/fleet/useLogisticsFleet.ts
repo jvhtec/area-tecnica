@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { fetchLogisticsMatrix, fetchMyTransportAssignments, fetchOwnDriverDetails } from "./fleetApi";
+import { summarizeDriversByEvent, type EventDriverSummary } from "./fleetModel";
 
 // Shared aggregate key. Route realtime subscriptions for assignments, events,
 // fleet, licences and their upstream labels all invalidate this root.
@@ -20,6 +21,18 @@ export function useLogisticsMatrix(startKey: string, endKey: string, enabled = t
     enabled,
     staleTime: 30_000,
   });
+}
+
+const NO_SUMMARIES: ReadonlyMap<string, EventDriverSummary[]> = new Map();
+
+/**
+ * Who is driving each transport in a date range, for the logistics calendar and
+ * the day panel. Shares the matrix query, so the calendar and the Conductores tab
+ * never fetch the same range twice. Read-only viewers get it too (same RPC).
+ */
+export function useEventDriverSummaries(startKey: string, endKey: string, enabled = true) {
+  const { data } = useLogisticsMatrix(startKey, endKey, enabled);
+  return useMemo(() => (data ? summarizeDriversByEvent(data) : NO_SUMMARIES), [data]);
 }
 
 export function useMyTransportAssignments(fromKey?: string, toKey?: string) {

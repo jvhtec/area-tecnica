@@ -75,8 +75,9 @@ export function buildDriverResponseMessage(
   driverName: string,
   confirmed: boolean,
 ): Message {
+  const reason = !confirmed && facts.declineReason ? ` Motivo: ${facts.declineReason}` : "";
   return {
     title: confirmed ? "Transporte confirmado" : "Transporte rechazado",
-    text: `${driverName} ${confirmed ? "confirmó" : "rechazó"}: ${describeTransport(facts)}`,
+    text: `${driverName} ${confirmed ? "confirmó" : "rechazó"}: ${describeTransport(facts)}${reason}`,
   };
 }

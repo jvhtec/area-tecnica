@@ -33,6 +33,7 @@ export function DriverDetailsDialog({ driver, vehicles, onOpenChange, onSaved }:
   const [categories, setCategories] = useState<string[]>([]);
   const [licenseExpiry, setLicenseExpiry] = useState("");
   const [capExpiry, setCapExpiry] = useState("");
+  const [tachographExpiry, setTachographExpiry] = useState("");
   const [adr, setAdr] = useState(false);
   const [defaultVehicleId, setDefaultVehicleId] = useState(NONE);
   const [notes, setNotes] = useState("");
@@ -43,6 +44,7 @@ export function DriverDetailsDialog({ driver, vehicles, onOpenChange, onSaved }:
     setCategories(driver.license_categories);
     setLicenseExpiry(driver.license_expiry ?? "");
     setCapExpiry(driver.cap_expiry ?? "");
+    setTachographExpiry(driver.tachograph_card_expiry ?? "");
     setAdr(driver.adr_certified);
     setDefaultVehicleId(driver.default_vehicle_id ?? NONE);
     setNotes(driver.notes ?? "");
@@ -61,6 +63,7 @@ export function DriverDetailsDialog({ driver, vehicles, onOpenChange, onSaved }:
         license_categories: LICENSE_CATEGORIES.filter((category) => categories.includes(category)),
         license_expiry: licenseExpiry || null,
         cap_expiry: capExpiry || null,
+        tachograph_card_expiry: tachographExpiry || null,
         adr_certified: adr,
         default_vehicle_id: defaultVehicleId === NONE ? null : defaultVehicleId,
         notes,
@@ -112,6 +115,10 @@ export function DriverDetailsDialog({ driver, vehicles, onOpenChange, onSaved }:
             <div className="space-y-1.5">
               <Label htmlFor="driver-cap-expiry">Caducidad del CAP</Label>
               <Input id="driver-cap-expiry" type="date" value={capExpiry} onChange={(e) => setCapExpiry(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="driver-tachograph-expiry">Caducidad de la tarjeta de tacógrafo</Label>
+              <Input id="driver-tachograph-expiry" type="date" value={tachographExpiry} onChange={(e) => setTachographExpiry(e.target.value)} />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm">
