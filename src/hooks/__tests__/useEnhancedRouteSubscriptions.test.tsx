@@ -149,7 +149,12 @@ describe("useEnhancedRouteSubscriptions", () => {
 
   it("keeps both calendar and aggregate invalidations for logistics events", async () => {
     mocks.coordinator.getIsLeader.mockReturnValue(false);
-    mocks.manager.getSubscriptionsByTable.mockReturnValue({});
+    mocks.manager.getSubscriptionsByTable.mockReturnValue({
+      profiles: [],
+      jobs: [],
+      job_assignments: [],
+      job_date_types: [],
+    });
 
     renderHookHarness("/logistics");
 
