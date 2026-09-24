@@ -69,14 +69,22 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
   const { data, isLoading, error } = useLogisticsMatrix(startKey, endKey);
 
   const assignments = useMemo(() => data?.assignments ?? [], [data?.assignments]);
+  const eventsById = useMemo(() => new Map((data?.events ?? []).map((event) => [event.id, event])), [data?.events]);
+  const eventTimezones = useMemo(
+    () => new Map((data?.events ?? []).map((event) => [event.id, event.timezone])),
+    [data?.events],
+  );
   const grouped = useMemo(
-    () => groupAssignmentsByRowAndDay(assignments, mode === "drivers" ? "driver_id" : "vehicle_id"),
-    [assignments, mode],
+    () => groupAssignmentsByRowAndDay(
+      assignments,
+      mode === "drivers" ? "driver_id" : "vehicle_id",
+      eventTimezones,
+    ),
+    [assignments, eventTimezones, mode],
   );
   const doubleBooked = useMemo(() => findDoubleBookedAssignmentIds(assignments), [assignments]);
   const uncovered = useMemo(() => countUncoveredTransportsByDay(data?.events ?? [], assignments), [data?.events, assignments]);
   const rows = useMemo(() => (data ? buildRows(data, mode, assignments) : []), [data, mode, assignments]);
-  const eventsById = useMemo(() => new Map((data?.events ?? []).map((event) => [event.id, event])), [data?.events]);
   const driversById = useMemo(() => new Map((data?.drivers ?? []).map((driver) => [driver.id, driver])), [data?.drivers]);
   const vehiclesById = useMemo(() => new Map((data?.vehicles ?? []).map((vehicle) => [vehicle.id, vehicle])), [data?.vehicles]);
 
