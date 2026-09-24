@@ -157,10 +157,13 @@ Opt-in, foreground-only position sharing from the driver's phone to the logistic
   destination of their current transport) and a list that works without a token. Route
   subscriptions invalidate the `driver_locations` query key on every change, with a
   30 s poll as fallback; positions deliberately do **not** share the matrix key.
-- **Native**: `NSLocationWhenInUseUsageDescription` (iOS) and
-  `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` (Android) are declared. There is no
-  background-location plugin: the phone stops sending when the app is in the background
-  or the screen is off, and the card says so.
+- **PWA, not native**: drivers use the installed web app, so there is no background
+  location. While sharing is active the hook holds a Screen Wake Lock
+  (`useScreenWakeLock`, re-acquired on every return to the foreground), sends a fresh
+  fix on `visibilitychange`, and keeps a fix that failed to upload (tunnel, no coverage)
+  to re-send on `online`. The card tells the driver to keep the app on screen. On iOS
+  Safari the site must be allowed to use location in Settings → Safari → Location, and
+  the wake lock needs iOS 16.4+.
 
 ## Giving someone the role
 

@@ -68,8 +68,12 @@ export function ConductorLocationSharingCard({ assignments, nowIso }: ConductorL
         )}
         {sharing.enabled && sharing.status !== "unsupported" && (
           <p className="text-xs text-muted-foreground">
-            Solo se guarda tu última posición, nunca el recorrido. Mantén la app abierta: en segundo plano el
-            teléfono deja de enviarla.
+            Solo se guarda tu última posición, nunca el recorrido. Mantén la app abierta en pantalla:{" "}
+            {sharing.status === "active" && sharing.wakeLockHeld
+              ? "mantendremos la pantalla encendida mientras compartes."
+              : sharing.wakeLockSupported
+                ? "en segundo plano el teléfono deja de enviarla."
+                : "con la pantalla apagada o en segundo plano el teléfono deja de enviarla."}
           </p>
         )}
       </CardContent>
