@@ -54,6 +54,7 @@ import type {
 } from "@/features/jobs/job-card-new/jobCardNewTypes";
 import { queryKeys } from "@/lib/react-query";
 import { buildJobDateTypeMap } from "@/utils/jobDateTypes";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
 
 export interface JobCardNewViewProps {
   job: JobCardJob;
@@ -685,7 +686,7 @@ export function JobCardNewView({
                               {(req.items || []).map((it) => (
                                 <div key={it.id} className="flex items-center justify-between pl-2">
                                   <div className="text-sm text-muted-foreground">
-                                    {it.transport_type.replace("_", " ")}
+                                    {getLogisticsTransportTypeLabel(it.transport_type)}
                                     {typeof it.leftover_space_meters === "number" && (
                                       <span className="ml-2">· Leftover: {it.leftover_space_meters} m</span>
                                     )}

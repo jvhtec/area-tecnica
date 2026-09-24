@@ -147,12 +147,12 @@ SELECT is(
 );
 
 -- ---------------------------------------------------------------------------
--- Truck planner upsert
+-- Truck planner upsert (the planner only covers sound and lights)
 -- ---------------------------------------------------------------------------
 INSERT INTO sleeper_bus_request_ids(kind, request_id)
 SELECT 'truck', public.tp_upsert_department_transport_request(
   'c9200000-0000-0000-0000-000000000001'::uuid,
-  'video',
+  'sound',
   'sleeper_bus',
   'Truck planner bus',
   NULL,

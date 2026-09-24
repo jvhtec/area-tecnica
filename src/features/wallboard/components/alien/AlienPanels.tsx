@@ -8,6 +8,7 @@ import type {
   LogisticsItem,
   PendingActionsFeed,
 } from '../../types';
+import { getLogisticsTransportTypeLabel } from '@/components/technician/details-modal/formatters';
 import { buildCalendarModel } from '../../calendar';
 import { AlienShell } from './AlienShell';
 
@@ -205,7 +206,7 @@ export const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }> = (
               <div className="uppercase text-amber-100">{ev.title}</div>
               <div className="flex flex-wrap gap-2 text-[10px] text-amber-200 mt-1">
                 {ev.procedure ? <span className="border border-[var(--alien-border-dim)] px-1 py-0.5 uppercase">{ev.procedure.replace(/_/g, ' ')}</span> : null}
-                <span className="uppercase">{ev.transport_type || 'transport'}</span>
+                <span className="uppercase">{getLogisticsTransportTypeLabel(ev.transport_type)}</span>
                 {ev.loadingBay && <span className="uppercase">Bay {ev.loadingBay}</span>}
                 {ev.plate && <span className="uppercase text-amber-300">Plate {ev.plate}</span>}
               </div>

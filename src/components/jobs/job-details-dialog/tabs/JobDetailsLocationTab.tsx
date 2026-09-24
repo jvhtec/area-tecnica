@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import { useJobDistance } from "@/hooks/useJobDistance";
 import { getErrorMessage } from '@/utils/errorMessage';
+import { getLogisticsTransportTypeLabel } from '@/components/technician/details-modal/formatters';
 
 interface JobDetailsLocationTabProps {
   open: boolean;
@@ -147,7 +148,7 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
                     <div key={event.id} className="flex items-center justify-between p-2 bg-muted rounded">
                       <div>
                         <span className="capitalize font-medium">{event.event_type}</span>
-                        <span className="text-muted-foreground ml-2">({event.transport_type})</span>
+                        <span className="text-muted-foreground ml-2">({getLogisticsTransportTypeLabel(event.transport_type)})</span>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {event.event_date ? format(new Date(event.event_date), "PPP", { locale: es }) : "Sin fecha"} a las{" "}
