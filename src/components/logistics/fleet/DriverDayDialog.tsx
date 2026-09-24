@@ -10,7 +10,7 @@ import {
   DRIVER_ASSIGNMENT_STATUS_LABELS,
   TRANSPORT_EVENT_TYPE_LABELS,
   driverDisplayName,
-  formatMadridTime,
+  formatTransportTime,
   transportEventTitle,
   vehicleLabel,
   vehicleTypeLabel,
@@ -126,7 +126,7 @@ export function DriverDayDialog({ open, onOpenChange, dayKey, row, data, rowAssi
                       <li key={assignment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm">
                         <div className="min-w-0">
                           <p className="font-medium">
-                            {formatMadridTime(assignment.starts_at)}–{formatMadridTime(assignment.ends_at)} ·{" "}
+                            {formatTransportTime(assignment.starts_at, event?.timezone)}–{formatTransportTime(assignment.ends_at, event?.timezone)} ·{" "}
                             {event ? transportEventTitle(event) : "Transporte"}
                           </p>
                           <p className="text-muted-foreground">{describeAssignee(assignment)}</p>
