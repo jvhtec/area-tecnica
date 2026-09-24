@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(90);
+SELECT plan(91);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -108,6 +108,8 @@ DELETE FROM public.fleet_vehicles WHERE id IN (
   'e5400000-0000-0000-0000-000000000001'::uuid,
   'e5400000-0000-0000-0000-000000000002'::uuid
 );
+DELETE FROM public.transport_requests WHERE id = 'e5600000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.jobs WHERE id = 'e5200000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.locations WHERE id = 'e5500000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.profiles WHERE id IN (
   'e5100000-0000-0000-0000-000000000001'::uuid,
@@ -184,8 +186,18 @@ VALUES
 -- Management: fleet and assignments
 -- ---------------------------------------------------------------------------
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
-SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001', false);
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000002', false);
 SET ROLE authenticated;
+
+SELECT is(
+  (SELECT r ->> 'location_name'
+   FROM jsonb_array_elements(public.get_my_transport_assignments('2031-03-10', '2031-03-10')) r
+   WHERE r ->> 'event_id' = 'e5300000-0000-0000-0000-000000000002'),
+  'Recinto destino, Madrid',
+  'an unload without an explicit event place navigates to the request destination'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001', false);
 
 SELECT lives_ok(
   $$
@@ -800,6 +812,40 @@ SELECT throws_ok(
 -- ---------------------------------------------------------------------------
 -- Calendar edits keep the driver state machine coherent.
 -- ---------------------------------------------------------------------------
+INSERT INTO public.jobs (id, title, start_time, end_time, job_type)
+VALUES (
+  'e5200000-0000-0000-0000-000000000001'::uuid,
+  'Destino navegación',
+  '2031-03-10 08:00 Europe/Madrid'::timestamptz,
+  '2031-03-10 23:00 Europe/Madrid'::timestamptz,
+  'single'
+)
+ON CONFLICT (id) DO UPDATE SET title = excluded.title;
+
+INSERT INTO public.transport_requests (
+  id, job_id, department, created_by, description, status, planning_status,
+  movement_type, priority, source_type, is_hoja_relevant, origin, destination
+) VALUES (
+  'e5600000-0000-0000-0000-000000000001'::uuid,
+  'e5200000-0000-0000-0000-000000000001'::uuid,
+  'sound',
+  'e5100000-0000-0000-0000-000000000001'::uuid,
+  'Ruta navegación',
+  'requested', 'planned', 'transfer', 'normal', 'manual', true,
+  'Nave Sector-Pro, Madrid',
+  'Recinto destino, Madrid'
+)
+ON CONFLICT (id) DO UPDATE
+SET origin = excluded.origin,
+    destination = excluded.destination,
+    planning_status = excluded.planning_status,
+    status = excluded.status;
+
+UPDATE public.logistics_events
+SET job_id = 'e5200000-0000-0000-0000-000000000001'::uuid,
+    transport_request_id = 'e5600000-0000-0000-0000-000000000001'::uuid
+WHERE id = 'e5300000-0000-0000-0000-000000000002'::uuid;
+
 UPDATE public.transport_driver_assignments
 SET status = 'confirmed', responded_at = now()
 WHERE logistics_event_id = 'e5300000-0000-0000-0000-000000000002'::uuid;
