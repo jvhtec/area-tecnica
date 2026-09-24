@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { Package, PackageCheck, Truck, MessageSquare } from "lucide-react";
+import { Package, PackageCheck, Truck, MessageSquare, UserRound } from "lucide-react";
+import { assignmentStatusClass } from "@/components/logistics/fleet/matrixStyles";
+import { DRIVER_ASSIGNMENT_STATUS_LABELS, type EventDriverSummary } from "@/features/logistics/fleet/fleetModel";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
@@ -17,6 +19,8 @@ interface LogisticsEventCardProps {
   compact?: boolean;
   interactive?: boolean;
   className?: string;
+  /** Drivers/vehicles assigned in the matrix; omitted when the caller does not load them. */
+  drivers?: EventDriverSummary[];
 }
 
 export const LogisticsEventCard = memo(function LogisticsEventCard({
@@ -26,6 +30,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
   compact = false,
   interactive = true,
   className,
+  drivers,
 }: LogisticsEventCardProps) {
   const defaultColor = event.event_type === "load" ? "rgb(191, 219, 254)" : "rgb(187, 247, 208)";
   const borderColor = event.color || defaultColor;
@@ -151,6 +156,20 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
               <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
               <span className="min-w-0 break-words line-clamp-2">{event.notes}</span>
             </div>
+          )}
+
+          {drivers && drivers.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm">
+              {drivers.map((driver) => (
+                <li key={driver.assignmentId} className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 break-words">{driver.label}</span>
+                  <Badge variant="outline" className={cn("text-xs", assignmentStatusClass(driver.status))}>
+                    {DRIVER_ASSIGNMENT_STATUS_LABELS[driver.status]}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )}

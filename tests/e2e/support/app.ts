@@ -6,7 +6,8 @@ type TestRole =
   | "logistics"
   | "technician"
   | "house_tech"
-  | "oscar";
+  | "oscar"
+  | "conductor";
 
 type MockValue = unknown;
 type MockResponder = MockValue | ((context: MockRequestContext) => MockValue | Promise<MockValue>);

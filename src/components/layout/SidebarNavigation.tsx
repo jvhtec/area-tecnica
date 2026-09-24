@@ -36,6 +36,7 @@ import {
   canManagePayouts,
   hasTechnicianSelfServiceAccess,
   isAdminRole,
+  isConductorRole,
   isDepartmentManagementRole,
   isManagementRole,
 } from "@/utils/permissions"
@@ -125,6 +126,16 @@ const baseNavigationConfig: NavigationItemConfig[] = [
       hasTechnicianSelfServiceAccess(userRole, assignableAsTech),
   },
   {
+    id: "conductor-dashboard",
+    label: navLabel("conductor-dashboard", "Mis transportes"),
+    mobileLabel: navMobileLabel("conductor-dashboard", "Transportes"),
+    icon: Truck,
+    mobilePriority: 1,
+    mobileSlot: "primary",
+    getPath: () => navPath("conductor-dashboard", "/conductor"),
+    isVisible: ({ userRole }) => isConductorRole(userRole),
+  },
+  {
     id: "technician-jobs",
     label: "Mis trabajos",
     mobileLabel: "Trabajos",
@@ -181,7 +192,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 2,
     mobileSlot: "secondary",
     getPath: () => navPath("personal", "/personal"),
-    isVisible: ({ userRole }) => userRole !== "technician" && userRole !== "oscar",
+    isVisible: ({ userRole }) =>
+      userRole !== "technician" && userRole !== "oscar" && !isConductorRole(userRole),
   },
   {
     id: "job-assignment-matrix",
@@ -324,7 +336,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobileSlot: "secondary",
     getPath: () => navPath("festivals", "/festivals"),
     isVisible: ({ userDepartment, userRole }) =>
-      userRole !== "oscar" && userDepartment?.toLowerCase() === "sound",
+      userRole !== "oscar" && !isConductorRole(userRole) && userDepartment?.toLowerCase() === "sound",
   },
   {
     id: "disponibilidad",
@@ -430,7 +442,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 16,
     mobileSlot: "secondary",
     getPath: () => "/feedback",
-    isVisible: ({ userRole }) => userRole !== "technician" && userRole !== "oscar",
+    isVisible: ({ userRole }) =>
+      userRole !== "technician" && userRole !== "oscar" && !isConductorRole(userRole),
   },
   {
     id: "settings",

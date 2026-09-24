@@ -29,11 +29,11 @@ Ownership is recorded as a *claim*: a row in `job_producer_claims` linking a job
 |--------|---------|
 | `job_producer_claims` | `(job_id, producer_id)` primary key, `claimed_at`. No `UPDATE` privilege — a claim is immutable, you release and re-claim. |
 | `get_job_producer_claims(uuid[])` | Name-only projection (`job_id`, `producer_id`, `display_name`) for any authenticated caller. Used by job lists and cards. |
-| `get_job_producer_contacts(uuid[])` | Same rows **plus `phone` and `email`**, released per row only to operational roles (`admin`/`management`/`logistics`), the producer themselves, and technicians assigned to that job. |
+| `get_job_producer_contacts(uuid[])` | Same rows **plus `phone` and `email`**, released per row only to operational roles (`admin`/`management`/`logistics`), the producer themselves, technicians assigned to that job, and drivers with a live (non-declined) `transport_driver_assignments` row on one of the job's `logistics_events`. |
 | `enforce_job_producer_claim_department()` | `BEFORE INSERT/UPDATE` trigger. Rejects non-production profiles and dry-hire jobs, and takes `FOR NO KEY UPDATE` on the job row so a claim and a dry-hire conversion serialize. |
 | `remove_job_producer_claims_for_dryhire()` | `AFTER UPDATE OF job_type ON jobs` trigger. Drops every claim when a job becomes dry-hire. |
 
-Migrations: `20260914095450_add_job_producer_claims.sql`, `20260915092603_harden_job_producer_claims.sql`, `20260915154500_add_job_producer_contact_directory.sql`.
+Migrations: `20260914095450_add_job_producer_claims.sql`, `20260915092603_harden_job_producer_claims.sql`, `20260915154500_add_job_producer_contact_directory.sql`, `20260924123000_conductor_dashboard_navigation.sql` (driver entitlement).
 pgTAP coverage: `supabase/tests/database/job_producer_claims.sql`.
 
 ### Why two RPCs
@@ -47,7 +47,7 @@ pgTAP coverage: `supabase/tests/database/job_producer_claims.sql`.
 | Action | Who |
 |--------|-----|
 | Read claim names | Any authenticated user |
-| Read producer phone/email | `admin` / `management` / `logistics`, the producer, or a technician assigned to that job |
+| Read producer phone/email | `admin` / `management` / `logistics`, the producer, a technician assigned to that job, or a driver with a live transport assignment on it |
 | Claim a job for yourself | Any production-department user |
 | Assign a production peer | Production-department users with role `management` only — **not** `admin` |
 | Release a claim | Only the claimant |

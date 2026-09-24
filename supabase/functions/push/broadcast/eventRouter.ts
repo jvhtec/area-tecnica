@@ -3,6 +3,7 @@ import { handleAbsenceEvents } from "./families/absenceEvents.ts";
 import { handleAssignmentEvents } from "./families/assignmentEvents.ts";
 import { handleChangelogEvents } from "./families/changelogEvents.ts";
 import { handleDocumentEvents } from "./families/documentEvents.ts";
+import { handleDriverEvents } from "./families/driverEvents.ts";
 import { handleFallbackEvent } from "./families/fallbackEvent.ts";
 import { handleFestivalEvents } from "./families/festivalEvents.ts";
 import { handleFinanceEvents } from "./families/financeEvents.ts";
@@ -35,6 +36,7 @@ const eventHandlers: BroadcastEventHandler[] = [
   handleStaffingEvents,
   handleAssignmentEvents,
   handleTaskEvents,
+  handleDriverEvents,
   handleLogisticsEvents,
   handleFlexEvents,
   handleMessageEvents,

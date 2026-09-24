@@ -37,6 +37,14 @@ describe('notification policy', () => {
     expect(groupingTag(first.type, first)).toBe('jobs:job:job-1')
   })
 
+  it('keeps two rapid driver-assignment removals for one driver as separate events', async () => {
+    const now = Date.parse('2026-09-17T10:02:00Z')
+    const first = body('logistics.driver.removed', { recipient_id: 'driver-1', assignment_id: 'assignment-1' })
+    const second = body('logistics.driver.removed', { recipient_id: 'driver-1', assignment_id: 'assignment-2' })
+    expect(await buildEventKey(first, now)).not.toBe(await buildEventKey(second, now + 1000))
+    expect(groupingTag(first.type, first)).toBe('logistics:driver_assignment:assignment-1')
+  })
+
   it('does not treat a domain event id as a permanent dedupe key', async () => {
     const now = Date.parse('2026-09-17T10:02:00Z')
     const firstUpdate = body('logistics.event.updated', {

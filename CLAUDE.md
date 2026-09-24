@@ -328,6 +328,7 @@ The database is extensive with 170+ migrations. Key tables:
 - `user` - Basic user
 - `logistics` - Logistics role
 - `wallboard` - Digital signage display
+- `conductor` - Driver; only sees `/conductor` (own transports), profile and notifications
 
 ### Flex Rental Solutions Integration
 
@@ -481,9 +482,9 @@ All checks across all three workflows are enumerated in `docs/release/production
 
 ### Supabase Edge Functions
 
-67 Deno/TypeScript edge functions in `supabase/functions/` (plus `_shared/`). Key categories:
+68 Deno/TypeScript edge functions in `supabase/functions/` (plus `_shared/`). Key categories:
 
-**Email Services** (15+ functions): `send-corporate-email`, `send-onboarding-email`, `send-staffing-email`, `send-timesheet-reminder`, `send-bug-resolution-email`, `send-expense-notification`, `send-job-payout-email`, `send-job-whatsapp-message`, `send-password-reset`, `send-payout-override-notification`, `send-tour-availability`, `send-vacation-decision`, `send-warehouse-message`, `auto-send-timesheet-reminders`, `cleanup-corporate-email-images`
+**Email Services** (15+ functions): `send-corporate-email`, `send-onboarding-email`, `send-staffing-email`, `send-driver-assignment-notification`, `send-timesheet-reminder`, `send-bug-resolution-email`, `send-expense-notification`, `send-job-payout-email`, `send-job-whatsapp-message`, `send-password-reset`, `send-payout-override-notification`, `send-tour-availability`, `send-vacation-decision`, `send-warehouse-message`, `auto-send-timesheet-reminders`, `cleanup-corporate-email-images`
 
 **Flex Integration**: `create-flex-folders`, `apply-flex-status`, `archive-to-flex`, `backfill-flex-doc-tecnica`, `sync-flex-crew-for-job`, `manage-flex-crew-assignments`, `persist-flex-elements`, `secure-flex-api`, `fetch-flex-*` (contact-info, image, inventory-model)
 
@@ -652,9 +653,20 @@ Who in the production department is carrying a job — the person crew asks abou
 
 - **Table**: `job_producer_claims` (`job_id` + `producer_id` PK, `claimed_at`). Additive (several producers per job), immutable (no `UPDATE` grant — release and re-claim), and **completely independent from staffing** — a claim never creates a `job_assignment`, timesheet, rate row, or staffing side effect.
 - **Never on `dry-hire` jobs**: a trigger rejects the claim, and converting a job to dry-hire drops every existing claim.
-- **Two read RPCs, and the difference matters**: `get_job_producer_claims()` returns names only and is open to any authenticated caller; `get_job_producer_contacts()` also returns `phone`/`email` and releases each row only to `admin`/`management`/`logistics`, the producer themselves, or a technician assigned to that job. `profiles.phone`/`email` are private — never reach for the `profiles` table to get them.
+- **Two read RPCs, and the difference matters**: `get_job_producer_claims()` returns names only and is open to any authenticated caller; `get_job_producer_contacts()` also returns `phone`/`email` and releases each row only to `admin`/`management`/`logistics`, the producer themselves, a technician assigned to that job, or a `conductor` with a live transport assignment on it. `profiles.phone`/`email` are private — never reach for the `profiles` table to get them.
 - **Assigning a peer is `management` + production only**, not `admin`. Use `canAssignJobProducerClaims` / `isProductionDepartment` from `@/utils/permissions`; the department column holds `production`, `produccion` and `producción` interchangeably.
-- **Surfaces**: job cards and the job details dialog (`JobProducerClaims`), the tech super app job details modal Info tab (`ProducerContactPanel`, with WhatsApp/`tel:`/`mailto:` shortcuts), and Hoja de Ruta exports via `mergeProducerClaimsIntoContacts`. Add the producer to any new job-facing document or surface you build.
+- **Surfaces**: job cards and the job details dialog (`JobProducerClaims`), the tech super app job details modal Info tab (`ProducerContactPanel`, with WhatsApp/`tel:`/`mailto:` shortcuts), the driver's transport card on `/conductor`, and Hoja de Ruta exports via `mergeProducerClaimsIntoContacts`. Add the producer to any new job-facing document or surface you build.
+
+### Logistics Driver Matrix (Conductores y Flota)
+
+Logistics' own matrix: drivers (`conductor` role) and fleet vehicles × days, assigning **scheduled transports** (`logistics_events`) instead of jobs. Full reference: `docs/workflows/logistics-driver-matrix.md`.
+
+- **Tables**: `fleet_vehicles` (incl. `itv_expiry`, `insurance_expiry`, `has_tail_lift`), `driver_details` (licence, CAP and tachograph-card expiry), `transport_driver_assignments` (event × driver/vehicle with its own `starts_at`/`ends_at` window — a driver can do several transports a day — plus an optional `decline_reason`).
+- **Writes only via RPCs** (`assign_transport_driver`, `remove_transport_driver_assignment`, `respond_transport_assignment(id, response, reason)`); conflicts cover overlapping driver/vehicle windows plus canonical employee unavailability. Declined rows release their slot. Licence/CAP/tachograph and vehicle-document warnings remain soft; employee unavailability requires an explicit manager override.
+- **Drivers read only their own rows** via `get_my_transport_assignments()`; the matrix read model `get_logistics_matrix()` is admin/management/house_tech (not the `logistics` role, which has no `/logistics` page). It also returns each driver's `unavailable_days` (from `technician_availability` + approved `vacation_requests`) and, **for admin/management only**, their `phone` — never read `profiles.phone` for drivers directly.
+- **Surfaces**: `/logistics?tab=drivers` and `?tab=fleet`, `/conductor` (next run with static map, Google/Waze/Apple navigation links from `locations` coordinates, producer contact, 30-day history), driver licence card on `/profile`, and driver/vehicle lines on the logistics calendar cards (`useEventDriverSummaries`). Push events `logistics.driver.*`.
+- **Live tracking is opt-in and latest-position-only**: `driver_locations` keeps one row per conductor (no trail), written only by `report_driver_location()` while a transport is running or within 2 h, deleted by `stop_sharing_driver_location()`. Read with `get_driver_locations()` on `/logistics?tab=tracking`; its query key (`driver_locations`) is separate from the matrix so frequent fixes never refetch the matrix. Drivers use the **PWA**, not the Capacitor app: sharing is foreground-only, kept alive with a Screen Wake Lock and a fresh fix on `visibilitychange`. Don't add history tables or background tracking without a privacy review.
+- **A transport's place is a `locations` row**: `logistics_events.location_id` (picked with `PlaceAutocomplete` in the event dialog) falls back to `jobs.location_id`; the driver RPCs `coalesce` the two. Don't add free-text address columns to logistics events — use `useLocationManagement().getOrCreateLocationWithDetails` like jobs do. Transport request `origin`/`destination` stay text but are captured with `AddressAutocomplete`.
 
 ### Timesheet Calculation
 Handled server-side via `compute_timesheet_hours()` RPC function:
@@ -1061,6 +1073,7 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Options for `createHttpHandler` go inside its call** — `serve(createHttpHandler(handler, { onError }))`. Writing `serve(createHttpHandler(handler), { onError })` passes them to std's `serve`, whose `onError` must return a `Response`.
 - **Never commit .env files** — all dotenv files are gitignored; secrets go in Cloudflare Pages dashboard or Supabase secrets
 - **Staging uses a separate Supabase project** — don't point staging at production; use `.env.staging.local` and `npm run dev:staging`
+- **Driver assignments never touch staffing either** — conductors are employees and are assigned directly (`assigned → confirmed|declined`), with push + email + WhatsApp delivery; never create `staffing_requests`, availability/offer campaigns, job assignments or timesheets for conductors. Known leave/unavailability is an overrideable assignment conflict, not a staffing phase. Upcoming non-declined assignments block event deletion/replanning/cancellation until explicitly removed or reassigned.
 - **Producer claims never touch staffing** — `job_producer_claims` records who in production owns a job; claiming or releasing must not create or delete `job_assignments`, timesheets or rates
 - **Producer contact details come from `get_job_producer_contacts()`** — never read `profiles.phone`/`profiles.email` to show a producer's contact info; the RPC applies the per-job entitlement check and returning no rows is a normal denial, not an error
 - **Normalize phone numbers through `@/utils/phoneLinks`** — `buildWhatsAppHref` / `buildTelHref` / `normalizePhoneToE164` mirror the Spain-default E.164 rules of the `send-job-whatsapp-message` edge function; don't hand-build `wa.me` links

@@ -123,8 +123,20 @@ export const canViewAchievements = (role: UserRole): boolean =>
 export const canReceiveMorningSummary = (role: UserRole): boolean =>
   role === 'house_tech' || isManagementRole(role);
 
+export const isConductorRole = (role: UserRole): boolean => role === 'conductor';
+
+// Drivers are notified of every transport they are given, so they need the push
+// controls as much as crew do.
 export const canViewProfilePushControls = (role: UserRole): boolean =>
-  isTechnicianRole(role) || role === 'oscar';
+  isTechnicianRole(role) || role === 'oscar' || isConductorRole(role);
+
+// Logistics matrix (drivers x scheduled transports) and fleet. Mirrors
+// logistics_matrix_can_view()/logistics_matrix_can_manage(): the logistics
+// department works as management; house techs follow the Logistics page read-only.
+export const canViewLogisticsMatrix = (role: UserRole): boolean =>
+  isManagementRole(role) || role === 'house_tech';
+
+export const canManageLogisticsMatrix = (role: UserRole): boolean => isManagementRole(role);
 
 export const canSubmitTechnicianIncidentReports = (role: UserRole): boolean =>
   role === 'technician';

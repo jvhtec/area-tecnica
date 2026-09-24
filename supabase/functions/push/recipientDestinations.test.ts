@@ -25,6 +25,12 @@ describe("destinationForRole", () => {
       .toBe(`/tech-app?tab=jobs&jobId=${JOB}&open=artists&date=2026-09-24`);
   });
 
+  it("keeps drivers on their own dashboard", () => {
+    expect(destinationForRole("/conductor", "conductor")).toBe("/conductor");
+    expect(destinationForRole("/logistics?tab=drivers", "conductor")).toBe("/conductor");
+    expect(destinationForRole("/conductor", "management")).toBe("/dashboard");
+  });
+
   it("falls back to a home each role can open", () => {
     expect(destinationForRole("/announcements", "technician")).toBe("/tech-app");
     expect(destinationForRole("/announcements", "management")).toBe("/dashboard");

@@ -48,6 +48,7 @@ const renderShell = (route: string) =>
         <Route path="/settings" element={<div>Settings Shell Route</div>} />
         <Route path="/tasks" element={<div>Tasks Shell Route</div>} />
         <Route path="/profile" element={<div>Profile Shell Route</div>} />
+        <Route path="/conductor" element={<div>Conductor Shell Route</div>} />
       </Route>
       <Route path="/auth" element={<div>Auth Screen</div>} />
       <Route path="/tech-app" element={<div>Tech App Screen</div>} />
@@ -112,5 +113,21 @@ describe("AuthenticatedShell", () => {
     renderShell("/settings");
 
     expect(await screen.findByText("Dashboard Shell Route")).toBeInTheDocument();
+  });
+
+  it("keeps conductors on their profile", async () => {
+    mockOptimizedAuthRole("conductor");
+
+    renderShell("/profile");
+
+    expect(await screen.findByText("Profile Shell Route")).toBeInTheDocument();
+  });
+
+  it("redirects conductors from every other route to /conductor", async () => {
+    mockOptimizedAuthRole("conductor");
+
+    renderShell("/dashboard");
+
+    expect(await screen.findByText("Conductor Shell Route")).toBeInTheDocument();
   });
 });

@@ -31,6 +31,7 @@ export const DESTINATION_ACCESS: readonly DestinationAccess[] = [
   { path: "/", roles: null },
   { path: "/tech-app", roles: ["technician"] },
   { path: "/technician-dashboard", roles: ["house_tech"] },
+  { path: "/conductor", roles: ["conductor"] },
   { path: "/dashboard", roles: DASHBOARD },
   { path: "/festival-management/:jobId", roles: MANAGEMENT_AND_HOUSE_TECH },
   { path: "/festival-management/:jobId/artists", roles: MANAGEMENT_AND_HOUSE_TECH },
@@ -80,6 +81,7 @@ export function canRoleOpenDestination(url: string, role: string | null | undefi
 function homeForRole(role: string | null | undefined): string {
   if (role === "technician") return "/tech-app";
   if (role === "house_tech") return "/technician-dashboard";
+  if (role === "conductor") return "/conductor";
   return "/dashboard";
 }
 

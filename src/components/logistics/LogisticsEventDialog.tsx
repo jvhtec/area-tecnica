@@ -42,6 +42,10 @@ import type { Database } from "@/integrations/supabase/types";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
+import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
+import { deleteLogisticsEvent, notifyDriverAssignmentsForEvent } from "@/features/logistics/fleet/fleetApi";
+import { isDriverRelevantEventChange } from "@/features/logistics/events/driverRelevantEventChange";
 import { getErrorMessage } from '@/utils/errorMessage';
 import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
@@ -95,6 +99,7 @@ export const LogisticsEventDialog = ({
   const [alsoCreateUnload, setAlsoCreateUnload] = useState(false);
   const [isHojaRelevant, setIsHojaRelevant] = useState(true);
   const [hojaCategories, setHojaCategories] = useState<LogisticsHojaCategory[]>([]);
+  const location = useLogisticsEventLocation(open);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -152,6 +157,7 @@ export const LogisticsEventDialog = ({
       setColor(selectedEvent.color || "#7E69AB");
       setIsHojaRelevant(selectedEvent.is_hoja_relevant ?? true);
       setHojaCategories(normalizeCategories(selectedEvent.hoja_categories));
+      location.reset(selectedEvent.location_id ?? null);
     } else {
       setEventType(initialEventType || "load");
       setTransportType(initialTransportType || "trailer");
@@ -168,6 +174,7 @@ export const LogisticsEventDialog = ({
       setAlsoCreateUnload(false);
       setIsHojaRelevant(true);
       setHojaCategories([]);
+      location.reset(null);
       // Ensure job selection is cleared if no initial job is provided
       if (!initialJobId) {
         setSelectedJob(null);
@@ -200,19 +207,9 @@ export const LogisticsEventDialog = ({
     try {
       if (!selectedEvent) return;
 
-      // First delete any referencing rows in logistics_event_departments
-      const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
-        .delete()
-        .eq("event_id", selectedEvent.id);
-
-      if (deptError) throw deptError;
-
-      // Then delete the main record from logistics_events
-      const { error: eventError } = await dataLayerClient.from("logistics_events")
-        .delete()
-        .eq("id", selectedEvent.id);
-
-      if (eventError) throw eventError;
+      // One DB transaction: if the assignment guard rejects the event delete,
+      // its department links are restored automatically.
+      await deleteLogisticsEvent(selectedEvent.id);
 
       toast({
         title: "Éxito",
@@ -318,7 +315,8 @@ export const LogisticsEventDialog = ({
         }
       };
 
-      const eventData: LogisticsEventPayload = {
+      const resolvedLocationId = await location.resolve();
+      const eventData = {
         event_type: eventType,
         transport_type: transportType,
         transport_provider: transportProvider || null,
@@ -332,7 +330,9 @@ export const LogisticsEventDialog = ({
         color: color,
         is_hoja_relevant: isHojaRelevant,
         hoja_categories: hojaCategories,
-      };
+        // Postdates the generated types (see logisticsEventTypes.ts).
+        location_id: resolvedLocationId,
+      } as LogisticsEventPayload;
 
       if (selectedEvent) {
         const { error: updateError } = await dataLayerClient.from("logistics_events")
@@ -404,6 +404,13 @@ export const LogisticsEventDialog = ({
           departmentsOverride: selectedDepartments,
           changes: Object.keys(changes).length > 0 ? changes : undefined,
         });
+        // Only edits the DB trigger treats as material reset a driver's confirmation;
+        // cosmetic ones (colour, departments, plate) must not push "confírmalo".
+        if (isDriverRelevantEventChange(selectedEvent, eventData)) {
+          void notifyDriverAssignmentsForEvent(selectedEvent.id).catch((notificationError) => {
+            console.error("Failed to notify drivers after logistics event update", notificationError);
+          });
+        }
 
         toast({
           title: "Success",
@@ -668,6 +675,8 @@ export const LogisticsEventDialog = ({
                 ))}
               </div>
             </div>
+
+            <LogisticsEventPlaceField location={location} hasJob={Boolean(selectedJob)} />
 
             {/* Loading Bay */}
             <div className="space-y-2">

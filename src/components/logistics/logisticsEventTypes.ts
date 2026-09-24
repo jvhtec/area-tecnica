@@ -5,6 +5,8 @@ type LogisticsEventRow = Database["public"]["Tables"]["logistics_events"]["Row"]
 export type LogisticsCalendarEvent = LogisticsEventRow & {
   departments: Array<{ department: string }>;
   job?: { id?: string; title: string } | null;
+  /** The transport's own place (locations.id); postdates the generated types. */
+  location_id?: string | null;
 };
 
 export type BroadcastLogisticsEvent = Pick<

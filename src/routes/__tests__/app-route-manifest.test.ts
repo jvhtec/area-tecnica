@@ -8,6 +8,7 @@ import {
   matchAppRoute,
   navigationShortcuts,
   publicRoutes,
+  subscriptionProfiles,
 } from "@/routes/app-route-manifest";
 
 describe("app route manifest", () => {
@@ -69,6 +70,46 @@ describe("app route manifest", () => {
         expect.objectContaining({ table: "tour_dates", priority: "high" }),
       ]),
     });
+  });
+
+  it("fans logistics source tables into the aggregate fleet query key", () => {
+    const aggregateKey = ["transport_driver_assignments"];
+    const logistics = subscriptionProfiles.logistics;
+
+    for (const table of [
+      "jobs",
+      "logistics_events",
+      "logistics_event_departments",
+      "transport_driver_assignments",
+      "fleet_vehicles",
+      "driver_details",
+      "profiles",
+      "locations",
+      "transport_requests",
+      "technician_availability",
+      "vacation_requests",
+    ]) {
+      expect(logistics).toContainEqual(
+        expect.objectContaining({ table, queryKey: aggregateKey }),
+      );
+    }
+
+    // Live positions must not fan into the matrix key.
+    expect(logistics).toContainEqual(
+      expect.objectContaining({ table: "driver_locations", queryKey: ["driver_locations"] }),
+    );
+
+    // logistics_events still keeps its normal invalidation for the calendar.
+    expect(logistics).toContainEqual(
+      expect.objectContaining({ table: "logistics_events", priority: "high" }),
+    );
+
+    expect(subscriptionProfiles.conductor).toContainEqual(
+      expect.objectContaining({ table: "logistics_events", queryKey: aggregateKey }),
+    );
+    expect(subscriptionProfiles.profile).toContainEqual(
+      expect.objectContaining({ table: "driver_details", queryKey: aggregateKey }),
+    );
   });
 
   it("keeps navigation shortcuts pointed at manifest routes", () => {

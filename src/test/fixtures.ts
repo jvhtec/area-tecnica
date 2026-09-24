@@ -34,7 +34,8 @@ export type RouteShellRole =
   | "house_tech"
   | "technician"
   | "oscar"
-  | "logistics";
+  | "logistics"
+  | "conductor";
 
 export const createRouteShellAuthState = (
   role: RouteShellRole,
@@ -59,6 +60,7 @@ export const createRouteShellAuthState = (
     technician: "sound",
     oscar: null,
     logistics: "logistics",
+    conductor: "logistics",
   };
 
   return createAuthState({

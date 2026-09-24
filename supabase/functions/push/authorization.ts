@@ -68,6 +68,7 @@ const KNOWN_EVENT_PATTERNS = [
   /^timesheet\.reminder\.due$/,
   /^bug\.report\.resolved$/,
   /^logistics\.transport\.status\.changed$/,
+  /^logistics\.driver\.(assigned|updated|removed|confirmed|declined)$/,
   /^job\.producer\.(claimed|released)$/,
   /^soundvision\.access\.(requested|approved|rejected)$/,
   /^announcement\.published$/,
@@ -118,6 +119,39 @@ async function isTaskParticipant(
     }
   }
   return false;
+}
+
+// Assignment changes come from the matrix, which only admin/management can edit;
+// the driver's own confirm/decline is the only self-service driver event.
+const DRIVER_MANAGEMENT_EVENTS = new Set([
+  "logistics.driver.assigned",
+  "logistics.driver.updated",
+  "logistics.driver.removed",
+]);
+const DRIVER_RESPONSE_EVENTS = new Set([
+  "logistics.driver.confirmed",
+  "logistics.driver.declined",
+]);
+
+/**
+ * A driver may announce only a response they have actually recorded: the
+ * assignment must be theirs and already carry the matching status, so the push
+ * cannot tell logistics something respond_transport_assignment did not store.
+ */
+async function isRecordedDriverResponse(
+  client: SupabaseClient,
+  type: string,
+  assignmentId: string | undefined,
+  userId: string,
+): Promise<boolean> {
+  if (!assignmentId) return false;
+  const { data, error } = await client
+    .from("transport_driver_assignments")
+    .select("driver_id, status")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  const expected = type === "logistics.driver.confirmed" ? "confirmed" : "declined";
+  return !error && data?.driver_id === userId && data?.status === expected;
 }
 
 async function isAuthorizedMessageProducer(
@@ -178,6 +212,16 @@ export async function authorizeBroadcast(
   body.actor_name = undefined;
 
   const profile = await loadCallerProfile(client, caller.userId);
+
+  if (DRIVER_RESPONSE_EVENTS.has(type)) {
+    if (await isRecordedDriverResponse(client, type, body.assignment_id, caller.userId)) return;
+    throw new HttpError(403, "La notificación no corresponde al usuario actual");
+  }
+  if (DRIVER_MANAGEMENT_EVENTS.has(type)) {
+    if (PRIVILEGED_ROLES.has(profile.role ?? "")) return;
+    throw new HttpError(403, "No tienes permiso para emitir esta notificación");
+  }
+
   if (PRIVILEGED_ROLES.has(profile.role ?? "")) return;
   if (
     profile.role === "logistics"

@@ -18,6 +18,7 @@ import { FolderStructureEditor, type FolderStructure } from "@/components/profil
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import { ConductorProfileCard } from "@/components/logistics/fleet/ConductorProfileCard";
 import type { Json } from "@/integrations/supabase/types";
 import {
   canReceiveMorningSummary,
@@ -26,6 +27,7 @@ import {
   canUseTechnicianSelfTools,
   canViewAchievements,
   canViewProfilePushControls,
+  isConductorRole,
 } from "@/utils/permissions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -421,6 +423,13 @@ export const Profile = () => {
               </CardContent>
             </Card>
           </div>
+
+          {isConductorRole(profile.role) && (
+            <ConductorProfileCard
+              profileId={profile.id}
+              className={cn(isMobile && activeSection !== "profile" && "hidden")}
+            />
+          )}
 
           {/* Folder structure */}
           {canUseCustomFolderStructure(profile.role) && (!isMobile || activeSection === "folders") && (

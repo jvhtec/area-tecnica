@@ -6,7 +6,8 @@ export type UserRole =
   | 'technician'
   | 'house_tech'
   | 'wallboard'
-  | 'oscar';
+  | 'oscar'
+  | 'conductor';
 
 export interface User {
   id: string;

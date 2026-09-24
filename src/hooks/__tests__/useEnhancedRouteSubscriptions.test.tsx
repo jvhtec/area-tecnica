@@ -147,6 +147,46 @@ describe("useEnhancedRouteSubscriptions", () => {
     expect(mocks.manager.subscribeToTable).not.toHaveBeenCalled();
   });
 
+  it("keeps both calendar and aggregate invalidations for logistics events", async () => {
+    mocks.coordinator.getIsLeader.mockReturnValue(false);
+    mocks.manager.getSubscriptionsByTable.mockReturnValue({
+      profiles: [],
+      jobs: [],
+      job_assignments: [],
+      job_date_types: [],
+    });
+
+    renderHookHarness("/logistics");
+
+    await waitFor(() => {
+      expect(mocks.coordinator.requestSubscriptions).toHaveBeenCalled();
+    });
+
+    const request = mocks.coordinator.requestSubscriptions.mock.calls.at(-1)?.[0];
+    const logisticsEventKeys = request.subscriptions
+      .filter((subscription: { table: string }) => subscription.table === "logistics_events")
+      .map((subscription: { queryKey: unknown }) => subscription.queryKey);
+
+    expect(logisticsEventKeys).toEqual(
+      expect.arrayContaining([
+        ["logistics_events"],
+        ["transport_driver_assignments"],
+      ]),
+    );
+    expect(request.subscriptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "fleet_vehicles",
+          queryKey: ["transport_driver_assignments"],
+        }),
+        expect.objectContaining({
+          table: "driver_details",
+          queryKey: ["transport_driver_assignments"],
+        }),
+      ]),
+    );
+  });
+
   it("releases delegated subscriptions from the leader when a follower unmounts", async () => {
     mocks.coordinator.getIsLeader.mockReturnValue(false);
     mocks.manager.getSubscriptionsByTable.mockReturnValue({

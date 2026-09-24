@@ -174,6 +174,7 @@ export const accessPolicies = {
   tasks: withRoleAccess(TASKS_ALLOWED_ROLES),
   technicianApp: withRoleAccess(["technician"], { allowAssignableTech: true }),
   technicianDashboard: withRoleAccess(["house_tech"], { allowAssignableTech: true }),
+  conductor: withRoleAccess(["conductor"]),
   technicianUnavailability: withRoleAccess(UNAVAILABILITY_ALLOWED_ROLES, {
     guard: TechnicianSelfServiceGuard,
   }),
@@ -192,6 +193,9 @@ export const accessPolicies = {
 } as const satisfies Record<AccessPolicyId, RouteAccessPolicy>;
 
 
+const LOGISTICS_FLEET_QUERY_KEY = ["transport_driver_assignments"] as const;
+const DRIVER_LOCATIONS_QUERY_KEY = ["driver_locations"] as const;
+
 export const subscriptionProfiles = {
   dashboard: [
     { table: "jobs", priority: "high" },
@@ -208,8 +212,35 @@ export const subscriptionProfiles = {
     { table: "job_assignments", priority: "high" },
   ],
   logistics: [
+    // Keep the normal logistics/calendar invalidations.
     { table: "jobs", priority: "high" },
     { table: "logistics_events", priority: "high" },
+    // get_logistics_matrix is an aggregate read model. Every source also invalidates
+    // its shared fleet query key so another manager's open matrix cannot go stale.
+    { table: "jobs", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "logistics_events", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "logistics_event_departments", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "transport_driver_assignments", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "fleet_vehicles", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "driver_details", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "profiles", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "locations", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "transport_requests", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    // A driver's days off (per-day rows and approved vacations) grey out matrix cells.
+    { table: "technician_availability", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "availability_schedules", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "vacation_requests", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    // Live positions have their own key so a fix every few seconds never refetches the matrix.
+    { table: "driver_locations", priority: "high", queryKey: DRIVER_LOCATIONS_QUERY_KEY },
+  ],
+  conductor: [
+    { table: "transport_driver_assignments", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "logistics_events", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "fleet_vehicles", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "driver_details", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "jobs", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "locations", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    { table: "transport_requests", priority: "medium", queryKey: LOGISTICS_FLEET_QUERY_KEY },
   ],
   tours: [
     { table: "tours", priority: "high" },
@@ -288,7 +319,10 @@ export const subscriptionProfiles = {
     { table: "power_requirement_tables", priority: "high" },
   ],
   settings: [{ table: "profiles", priority: "medium" }],
-  profile: [{ table: "profiles", priority: "high" }],
+  profile: [
+    { table: "profiles", priority: "high" },
+    { table: "driver_details", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+  ],
   hojaDeRuta: [
     { table: "jobs", priority: "high" },
     { table: "job_departments", priority: "medium" },

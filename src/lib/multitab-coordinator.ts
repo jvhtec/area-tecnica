@@ -36,6 +36,8 @@ interface TabMessage {
   tables?: string[];
   routeKey?: string;
   subscriptions?: DelegatedRouteSubscription[];
+  targetTabId?: string;
+  refetch?: boolean;
 }
 
 interface TabState {
@@ -109,10 +111,22 @@ export class MultiTabCoordinator {
     const channel = this.broadcastChannel;
     channel.addEventListener('message', (event: MessageEvent<TabMessage>) => {
       if (this.destroyed || channel !== this.broadcastChannel || !this.scopeKey || event.data.scopeKey !== this.scopeKey) return;
-      const { type, queryKey, data, tabId, timestamp, tables, routeKey, subscriptions } = event.data;
+      const {
+        type,
+        queryKey,
+        data,
+        tabId,
+        timestamp,
+        tables,
+        routeKey,
+        subscriptions,
+        targetTabId,
+        refetch,
+      } = event.data;
       
-      // Ignore messages from ourselves
+      // Ignore messages from ourselves and targeted messages for another tab.
       if (tabId === this.tabId) return;
+      if (targetTabId && targetTabId !== this.tabId) return;
       
       switch (type) {
         case 'cache-update':
@@ -122,7 +136,11 @@ export class MultiTabCoordinator {
           break;
           
         case 'invalidate': {
-          const refetchType = this.isLeader ? 'active' : 'none';
+          // Normal leader broadcasts let followers consume the leader's cache update
+          // without duplicating network work. A delegated realtime subscription is
+          // different: the active query may exist only in the requesting follower, so
+          // that targeted invalidation explicitly asks it to refetch.
+          const refetchType = refetch === true ? 'active' : this.isLeader ? 'active' : 'none';
           if (queryKey) {
             this.queryClient.invalidateQueries({ queryKey, refetchType });
           } else {
@@ -425,15 +443,38 @@ export class MultiTabCoordinator {
     }
 
     const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
-    this.delegatedOwners.add(ownerRoute);
     const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
 
+    // Re-requesting the same follower route (token refresh, reconnect, visibility
+    // recovery) must replace its handlers rather than stack another copy.
+    if (this.delegatedOwners.has(ownerRoute)) {
+      manager.cleanupRouteDependentSubscriptions(ownerRoute);
+    }
+    this.delegatedOwners.add(ownerRoute);
+
     requestedSubscriptions.forEach(({ table, queryKey, filter, priority }) => {
+      const delegatedToAnotherTab = Boolean(requesterTabId && requesterTabId !== this.tabId);
+      const normalizedQueryKey: QueryKey = Array.isArray(queryKey) ? [...queryKey] : [queryKey];
       const subscription = manager.subscribeToTable(
         table,
         queryKey,
         filter,
         priority ?? 'medium',
+        delegatedToAnotherTab
+          ? {
+              ownerRoute,
+              // Realtime arrives in the leader tab. Target the follower that owns the
+              // route and explicitly refetch there; the leader may not have this query
+              // mounted, so its normal cache-broadcast path cannot refresh it.
+              onPayload: () => this.broadcast({
+                type: 'invalidate',
+                queryKey: normalizedQueryKey,
+                targetTabId: requesterTabId,
+                refetch: true,
+                tabId: this.tabId,
+              }),
+            }
+          : undefined,
       );
 
       if (subscription?.key) {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { getDashboardPath } from '@/utils/roleBasedRouting';
 import {
+  canManageLogisticsMatrix,
+  canViewLogisticsMatrix,
+  isConductorRole,
   canAccessDashboard,
   canAccessDisponibilidad,
   canAccessExpenses,
@@ -221,5 +225,31 @@ describe('job producer claim assignment', () => {
   it('rejects non-management production users', () => {
     expect(canAssignJobProducerClaims('technician', 'production')).toBe(false);
     expect(canAssignJobProducerClaims(null, 'production')).toBe(false);
+  });
+});
+
+describe('logistics matrix and conductors', () => {
+  it('lets management edit the driver matrix and house techs read it', () => {
+    expect(canManageLogisticsMatrix('management')).toBe(true);
+    expect(canManageLogisticsMatrix('admin')).toBe(true);
+    expect(canManageLogisticsMatrix('house_tech')).toBe(false);
+    expect(canViewLogisticsMatrix('house_tech')).toBe(true);
+  });
+
+  it('keeps drivers and freelancers out of the matrix', () => {
+    for (const role of ['conductor', 'technician', 'logistics', null]) {
+      expect(canViewLogisticsMatrix(role)).toBe(false);
+    }
+  });
+
+  it('gives drivers the push controls on their profile', () => {
+    expect(isConductorRole('conductor')).toBe(true);
+    expect(canViewProfilePushControls('conductor')).toBe(true);
+  });
+});
+
+describe('dashboard routing for conductors', () => {
+  it('sends drivers to their transports', () => {
+    expect(getDashboardPath('conductor')).toBe('/conductor');
   });
 });

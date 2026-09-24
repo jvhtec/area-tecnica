@@ -75,9 +75,12 @@ export function urgencyForEvent(type: string): NotificationUrgency {
     // A transport that has been cancelled or re-planned strands a crew, so it
     // bypasses quiet hours the same way an assignment removal does.
     || type === "logistics.transport.status.changed"
+    // Losing a transport strands the driver's day just like a crew removal.
+    || type === "logistics.driver.removed"
   ) return "urgent";
   if (
     type.includes("assignment")
+    || type.startsWith("logistics.driver.")
     || type.includes("calltime")
     || type.startsWith("staffing.offer.")
     || type === "timesheet.approved"
@@ -116,6 +119,7 @@ function entityKey(body: BroadcastBody): string | null {
     ["vacation", body.vacation_request_id],
     ["announcement", body.announcement_id],
     ["report", body.bug_report_id],
+    ["driver_assignment", body.assignment_id],
     ["job", body.job_id],
     ["tour", body.tour_id],
     ["task", body.task_id],
