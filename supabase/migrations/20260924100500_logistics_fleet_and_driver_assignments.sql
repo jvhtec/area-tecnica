@@ -16,8 +16,9 @@
 -- checks and the response state machine cannot be bypassed from the client.
 --
 -- Invariants: nothing here creates or touches job_assignments, timesheets, rates or
--- staffing rows. Deleting a logistics event (including a replan through
--- schedule_transport_request) cascades to the driver assignments on it.
+-- staffing rows. The follow-up hardening migration blocks deletion/replanning while
+-- an upcoming non-declined assignment exists; finished or declined history can still
+-- cascade with its logistics event.
 
 -- ---------------------------------------------------------------------------
 -- Access helpers
