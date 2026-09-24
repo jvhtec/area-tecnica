@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(39);
+SELECT plan(40);
 
 SELECT has_table('public', 'job_producer_claims', 'job_producer_claims table exists');
 
@@ -640,13 +640,33 @@ SELECT results_eq(
 );
 
 SELECT is_empty(
-  $$
+  $
     SELECT producer_id
     FROM public.get_job_producer_contacts(
       ARRAY['d9200000-0000-0000-0000-000000000001'::uuid]
     )
-  $$,
+  $,
   'a driver gets no producer contact details for jobs they do not drive for'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+UPDATE public.transport_driver_assignments
+SET starts_at = now() - interval '2 hours',
+    ends_at = now() - interval '1 hour'
+WHERE logistics_event_id = 'd9300000-0000-0000-0000-000000000001'::uuid;
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000009', false);
+SET ROLE authenticated;
+
+SELECT is_empty(
+  $
+    SELECT producer_id
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $,
+  'producer contact access expires when the driver transport ends'
 );
 
 SELECT results_eq(
