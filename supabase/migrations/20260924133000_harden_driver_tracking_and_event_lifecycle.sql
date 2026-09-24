@@ -143,6 +143,28 @@ after update of event_type, transport_type, event_date, event_time, timezone, jo
 on public.logistics_events
 for each row execute function public.sync_driver_assignments_after_logistics_event_change();
 
+-- Direct table reads obey the same active-window rule as get_driver_locations().
+-- A driver may still inspect their own row, but matrix viewers cannot bypass the
+-- RPC to see an ended/declined assignment's retained position.
+drop policy if exists driver_locations_select_scoped on public.driver_locations;
+create policy driver_locations_select_scoped
+  on public.driver_locations for select to authenticated
+  using (
+    driver_id = (select auth.uid())
+    or (
+      public.logistics_matrix_can_view()
+      and exists (
+        select 1
+        from public.transport_driver_assignments a
+        where a.id = driver_locations.assignment_id
+          and a.driver_id = driver_locations.driver_id
+          and a.status <> 'declined'
+          and now() >= a.starts_at - interval '2 hours'
+          and now() < a.ends_at
+      )
+    )
+  );
+
 -- ---------------------------------------------------------------------------
 -- Driver live location: an assignment is mandatory and the server owns the
 -- two-hour lead/end-time boundary. Invalid/out-of-window reports are refused.
