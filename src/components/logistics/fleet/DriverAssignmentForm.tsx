@@ -210,14 +210,20 @@ export function DriverAssignmentForm({
       {conflicts && conflicts.length > 0 && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Se solapa con otras asignaciones</AlertTitle>
+          <AlertTitle>Hay conflictos con esta asignación</AlertTitle>
           <AlertDescription>
             <ul className="list-disc pl-4">
               {conflicts.map((conflict) => (
                 <li key={`${conflict.kind}-${conflict.assignment_id}`}>
-                  {conflict.kind === "driver" ? "Conductor" : "Vehículo"} ocupado de{" "}
-                  {formatTransportTime(conflict.starts_at, conflict.timezone)} a {formatTransportTime(conflict.ends_at, conflict.timezone)}
-                  {conflict.title ? ` (${conflict.title})` : ""}
+                  {conflict.kind === "availability" ? (
+                    <>Conductor no disponible{conflict.title ? `: ${conflict.title}` : ""}</>
+                  ) : (
+                    <>
+                      {conflict.kind === "driver" ? "Conductor" : "Vehículo"} ocupado de{" "}
+                      {formatTransportTime(conflict.starts_at, conflict.timezone)} a {formatTransportTime(conflict.ends_at, conflict.timezone)}
+                      {conflict.title ? ` (${conflict.title})` : ""}
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
