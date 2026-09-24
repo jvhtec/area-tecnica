@@ -180,28 +180,44 @@ export function useEnhancedRouteSubscriptions() {
       console.log(`No subscription config found for route ${routeKey}, using global tables only`);
     }
     
-    // Combine with global tables, ensuring no duplicates
-    const allTables = GLOBAL_SUBSCRIPTION_TABLES.map((tableInfo) => ({ ...tableInfo }));
-    
+    // Combine route + global requirements by (table, query key), not just table.
+    // One Postgres table may feed several React Query read models. In particular,
+    // logistics_events must refresh both its calendar queries and the aggregate
+    // driver/fleet matrix.
+    const allTables: Array<{
+      table: string;
+      priority: 'high' | 'medium' | 'low';
+      queryKey?: SubscriptionQueryKey;
+    }> = GLOBAL_SUBSCRIPTION_TABLES.map((tableInfo) => ({ ...tableInfo }));
+
+    const configuredQueryKey = (tableInfo: { table: string; queryKey?: SubscriptionQueryKey }) =>
+      tableInfo.queryKey ?? getRouteQueryKeyForTable(tableInfo.table);
+    const queryKeySignature = (queryKey: SubscriptionQueryKey) =>
+      JSON.stringify(Array.isArray(queryKey) ? [...queryKey] : [queryKey]);
+
     routeTables.forEach(tableInfo => {
-      if (!allTables.some(t => t.table === tableInfo.table)) {
+      const nextQueryKey = configuredQueryKey(tableInfo);
+      const existingIndex = allTables.findIndex(
+        (existing) =>
+          existing.table === tableInfo.table
+          && queryKeySignature(configuredQueryKey(existing)) === queryKeySignature(nextQueryKey),
+      );
+
+      if (existingIndex < 0) {
         allTables.push({ ...tableInfo });
-      } else {
-        // If the table exists but with a lower priority, update it to the higher priority
-        const existingIndex = allTables.findIndex(t => t.table === tableInfo.table);
-        if (existingIndex >= 0) {
-          const existingPriority = allTables[existingIndex].priority;
-          if (getPriorityValue(tableInfo.priority) > getPriorityValue(existingPriority)) {
-            allTables[existingIndex].priority = tableInfo.priority;
-          }
-        }
+        return;
+      }
+
+      const existingPriority = allTables[existingIndex].priority;
+      if (getPriorityValue(tableInfo.priority) > getPriorityValue(existingPriority)) {
+        allTables[existingIndex].priority = tableInfo.priority;
       }
     });
     
-    const subscriptionRequirements: RouteSubscriptionRequirement[] = allTables.map(({ table, priority }) => ({
-      table,
-      queryKey: getRouteQueryKeyForTable(table),
-      priority,
+    const subscriptionRequirements: RouteSubscriptionRequirement[] = allTables.map((tableInfo) => ({
+      table: tableInfo.table,
+      queryKey: configuredQueryKey(tableInfo),
+      priority: tableInfo.priority,
     }));
 
     // Subscribe to all tables (only if we're the leader)
@@ -220,7 +236,7 @@ export function useEnhancedRouteSubscriptions() {
     }
     
     // Update the local state with table information
-    const tableNames = allTables.map(t => t.table);
+    const tableNames = Array.from(new Set(allTables.map(t => t.table)));
     
     const subscriptionsByTable = manager.getSubscriptionsByTable();
     const subscribedTables = tableNames.filter(
