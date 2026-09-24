@@ -91,7 +91,7 @@ serve(createHttpHandler(async (req) => {
   const caller = await requireAdminOrManagement(supabase, req, {
     logContext: "send-driver-assignment-notification",
   });
-  const body = await readBoundedJsonObject<RequestBody>(req, { maxBytes: 8 * 1024 });
+  const body = await readBoundedJsonObject<Record<string, unknown>>(req, { maxBytes: 8 * 1024 }) as RequestBody;
   const assignmentId = typeof body.assignment_id === "string" ? body.assignment_id.trim() : "";
   const kind: NotificationKind = body.kind === "updated" ? "updated" : "assigned";
   if (!assignmentId) throw new HttpError(400, "Falta assignment_id");
@@ -246,7 +246,8 @@ serve(createHttpHandler(async (req) => {
       } else {
         const base = normalizeBase(wahaEndpoint);
         const { data: config } = await supabase.rpc("get_waha_config", { base_url: base });
-        const row = Array.isArray(config) ? config[0] : null;
+        type WahaConfigRow = { session?: string; api_key?: string };
+        const row = (config as WahaConfigRow[] | null)?.[0];
         const session = row?.session || Deno.env.get("WAHA_SESSION") || "default";
         const apiKey = row?.api_key || Deno.env.get("WAHA_API_KEY") || "";
         const chatId = `${phone.replace(/^\+/, "")}@c.us`;
