@@ -46,6 +46,9 @@ verify_jwt = true
 [functions.send-staffing-email]
 verify_jwt = false
 
+[functions.send-driver-assignment-notification]
+verify_jwt = true
+
 [functions.send-timesheet-reminder]
 verify_jwt = true
 
