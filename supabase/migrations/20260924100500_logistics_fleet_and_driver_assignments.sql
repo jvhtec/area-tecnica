@@ -481,6 +481,7 @@ begin
     'logistics_event_id', a.logistics_event_id,
     'starts_at', a.starts_at,
     'ends_at', a.ends_at,
+    'timezone', coalesce(le.timezone, 'Europe/Madrid'),
     'title', coalesce(nullif(le.title, ''), j.title)
   ) order by a.starts_at), '[]'::jsonb)
   into v_conflicts
@@ -626,6 +627,7 @@ begin
       'transport_type', le.transport_type,
       'event_date', le.event_date,
       'event_time', le.event_time,
+      'timezone', coalesce(le.timezone, 'Europe/Madrid'),
       'title', le.title,
       'job_title', j.title,
       'loading_bay', le.loading_bay,
