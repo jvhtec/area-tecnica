@@ -74,6 +74,7 @@ export const formatCompanyLabel = (company?: string | null): string => {
     sector_pro: "Sector Pro",
     other: "Otra",
     "wild tour": "Wild Tour",
+    montoya: "Montoya",
   };
   return labels[company] || formatTransportCategory(company);
 };

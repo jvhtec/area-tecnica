@@ -14,7 +14,8 @@ const matrix = {
     { id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer", required_license: "C+E", brand: "Volvo", model: "FH", payload_kg: 24000, cargo_length_m: 13.6, has_tail_lift: true, itv_expiry: "2030-01-01", insurance_expiry: "2030-01-01", notes: null, is_active: true },
     // The van's ITV ran out before the fixed clock below.
     { id: "v2", name: "Furgoneta 1", license_plate: "5678 DEF", vehicle_type: "furgoneta", required_license: "B", brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false, itv_expiry: "2026-09-01", insurance_expiry: null, notes: null, is_active: true },
-    { id: "v3", name: "Nightliner 1", license_plate: "9999 BUS", vehicle_type: "sleeper_bus", required_license: "D", brand: "Setra", model: "S 516 HD", payload_kg: null, cargo_length_m: null, has_tail_lift: false, itv_expiry: "2030-01-01", insurance_expiry: "2030-01-01", notes: null, is_active: true },
+    { id: "v3", name: "Nightliner 1", license_plate: "9999 BUS", vehicle_type: "sleeper_bus", required_license: "D", brand: "Setra", model: "S 516 HD", payload_kg: null, cargo_length_m: null, has_tail_lift: false, itv_expiry: "2030-01-01", insurance_expiry: "2030-01-01", notes: null, is_active: true, berth_layouts: [12, 16] },
+    { id: "v4", name: "Nightliner 2", license_plate: "8888 BUS", vehicle_type: "sleeper_bus", required_license: "D", brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false, itv_expiry: "2030-01-01", insurance_expiry: "2030-01-01", notes: null, is_active: true, berth_layouts: [14] },
   ],
   events: [
     { id: "e1", event_type: "load", transport_type: "trailer", event_date: "2026-09-30", event_time: "08:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j1", job_title: "Gala Liceu", license_plate: null, transport_provider: null, loading_bay: "Muelle 2", notes: null, transport_request_id: null, origin: "Almacén", destination: "Liceu", location_name: "Liceu", location_address: "La Rambla 51, Barcelona", departments: ["sound"] },
@@ -121,13 +122,65 @@ test.describe("Logistics driver matrix", () => {
     await expect(dialog).toBeHidden();
 
     // The company's sleeper buses are fleet vehicles too, and need a D licence.
-    await expect(page.getByText("Autobús cama · Permiso D")).toBeVisible();
+    await expect(page.getByText("Autobús cama · Permiso D · Setra S 516 HD · 12 / 16 literas")).toBeVisible();
     await page.getByRole("button", { name: "Añadir vehículo" }).click();
     const form = page.getByRole("dialog");
     await expect(form.getByLabel("Permiso necesario")).toHaveText("B");
     await form.getByLabel("Tipo").click();
     await page.getByRole("option", { name: "Autobús cama" }).click();
     await expect(form.getByLabel("Permiso necesario")).toHaveText("D");
+    await expect(form.getByLabel("Literas")).toBeVisible();
+  });
+
+  test("suggests sleeper buses for the job crew and records a hired one", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
+    // 20 people on the job: 17 confirmed, 2 invited and one who declined.
+    const crew = Array.from({ length: 20 }, (_, index) => ({
+      technician_id: `t${index}`,
+      external_technician_name: null,
+      status: index < 17 ? "confirmed" : index < 19 ? "invited" : "declined",
+    }));
+    const busRun = {
+      id: "bus-run", event_type: "load", transport_type: "sleeper_bus", event_date: "2026-09-30", event_time: "23:00:00",
+      timezone: "Europe/Madrid", title: null, color: null, job_id: "j9", license_plate: null, transport_provider: null,
+      berth_count: null, loading_bay: null, notes: null, is_hoja_relevant: true, hoja_categories: [], location_id: null,
+      job: { title: "Gira Norte" }, departments: [],
+    };
+    const calls = await bootstrapApp(page, {
+      auth: { userId: "mgr", role: "management", department: "logistics" },
+      tables: {
+        profiles: [{ id: "mgr", first_name: "Marta", last_name: "Log", role: "management", department: "logistics" }],
+        logistics_events: [busRun],
+        jobs: [{ id: "j9", title: "Gira Norte", start_time: "2026-09-30T18:00:00Z", status: "Confirmado", job_type: "single" }],
+        job_assignments: crew,
+      },
+      rpc: { get_logistics_matrix: matrix, list_transport_requests: [] },
+    });
+    await page.goto("/logistics?tab=calendar");
+
+    await page.getByText("Gira Norte").first().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Personal asignado:")).toContainText("19");
+    await expect(dialog.getByText("(17 confirmados)")).toBeVisible();
+
+    const suggestions = dialog.getByRole("list", { name: "Sugerencias de autobuses" }).getByRole("listitem");
+    await expect(suggestions.first()).toContainText("Nightliner 1 (12) + Nightliner 2 (14)");
+    await expect(suggestions.nth(1)).toContainText("Nightliner 1 (12) + Alquiler 12 literas");
+
+    await suggestions.first().getByRole("button", { name: "Usar Nightliner 1 (12)" }).click();
+    await expect(dialog.getByLabel("Literas de este autobús")).toHaveValue("12");
+    await expect(dialog.getByText("Faltan 7 literas", { exact: false })).toBeVisible();
+
+    // Hire the whole run from Montoya instead: a 16-berth bus leaves three short.
+    await dialog.getByLabel("Personas extra (artistas, invitados…)").fill("0");
+    await dialog.getByLabel("Literas de este autobús").fill("16");
+    await dialog.getByLabel("Empresa de transporte").click();
+    await page.getByRole("option", { name: "Montoya" }).click();
+    await expect(dialog.getByText("Faltan 3 literas", { exact: false })).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Actualizar evento" }).click();
+    await expect.poll(() => calls.tableMutations.find((mutation) => mutation.table === "logistics_events")?.body)
+      .toMatchObject({ transport_type: "sleeper_bus", berth_count: 16, transport_provider: "montoya" });
   });
 
   test("keeps house technicians read-only", async ({ page }) => {

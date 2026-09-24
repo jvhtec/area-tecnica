@@ -94,6 +94,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       'montabi_dorado': 'montabi_dorado',
       'grupo_sese': 'grupo_sese',
       'nacex': 'nacex',
+      'montoya': 'montoya',
       'recogida_cliente': 'recogida_cliente',
     };
     return provider ? mapping[provider] || 'other' : undefined;
@@ -298,6 +299,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                         <SelectItem value="montabi_dorado">Montabi Dorado</SelectItem>
                         <SelectItem value="grupo_sese">Grupo Sese</SelectItem>
                         <SelectItem value="nacex">Nacex</SelectItem>
+                        <SelectItem value="montoya">Montoya</SelectItem>
                         <SelectItem value="recogida_cliente">Recogida Cliente</SelectItem>
                         <SelectItem value="other">Otro</SelectItem>
                       </SelectContent>

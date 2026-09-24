@@ -14,6 +14,7 @@ import {
   LICENSE_CATEGORIES,
   VEHICLE_TYPES,
   VEHICLE_TYPE_LABELS,
+  parseBerthLayouts,
   type FleetVehicle,
   suggestedLicenseForVehicleType,
   type LicenseCategory,
@@ -36,6 +37,7 @@ const emptyVehicle = (): FleetVehicleInput => ({
   insurance_expiry: null,
   notes: null,
   is_active: true,
+  berth_layouts: [],
 });
 
 /** Blank → null, a valid non-negative number → the number, anything else → undefined (invalid). */
@@ -62,6 +64,7 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
   // they are parsed only on submit.
   const [payloadText, setPayloadText] = useState("");
   const [lengthText, setLengthText] = useState("");
+  const [berthsText, setBerthsText] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -69,6 +72,7 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
     setForm(initial);
     setPayloadText(numberText(initial.payload_kg));
     setLengthText(numberText(initial.cargo_length_m));
+    setBerthsText(initial.berth_layouts.join(", "));
   }, [open, vehicle]);
 
   const update = <K extends keyof FleetVehicleInput>(key: K, value: FleetVehicleInput[K]) =>
@@ -89,9 +93,14 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
       toast({ title: "La longitud de caja debe ser un número", variant: "destructive" });
       return;
     }
+    const berths = form.vehicle_type === "sleeper_bus" ? parseBerthLayouts(berthsText) : { layouts: [] };
+    if ("error" in berths) {
+      toast({ title: "Literas no válidas", description: berths.error, variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      await saveFleetVehicle({ ...form, payload_kg: payloadKg, cargo_length_m: cargoLengthM });
+      await saveFleetVehicle({ ...form, payload_kg: payloadKg, cargo_length_m: cargoLengthM, berth_layouts: berths.layouts });
       toast({ title: form.id ? "Vehículo actualizado" : "Vehículo añadido a la flota" });
       onSaved();
       onOpenChange(false);
@@ -152,6 +161,21 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
               </SelectContent>
             </Select>
           </div>
+          {form.vehicle_type === "sleeper_bus" && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="vehicle-berths">Literas</Label>
+              <Input
+                id="vehicle-berths"
+                inputMode="numeric"
+                placeholder="16, o 12, 14, 16 si se puede reconfigurar"
+                value={berthsText}
+                onChange={(e) => setBerthsText(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Una cifra por configuración de literas. Se usa para sugerir el autobús según el personal del trabajo.
+              </p>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="vehicle-brand">Marca</Label>
             <Input id="vehicle-brand" value={form.brand ?? ""} onChange={(e) => update("brand", e.target.value || null)} />

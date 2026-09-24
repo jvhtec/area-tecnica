@@ -11,9 +11,13 @@ import {
   driverDisplayName,
   driverVehicleWarnings,
   findDoubleBookedAssignmentIds,
+  formatBerthLayouts,
   formatTransportDateKey,
   formatTransportTime,
   groupAssignmentsByRowAndDay,
+  isExternallyHandledTransport,
+  maxBerths,
+  parseBerthLayouts,
   startOfMadridWeek,
   suggestedLicenseForVehicleType,
   summarizeDriversByEvent,
@@ -70,6 +74,8 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   job_title: null,
   license_plate: null,
   transport_provider: null,
+  berth_count: null,
+  job_crew_count: null,
   loading_bay: null,
   notes: null,
   transport_request_id: null,
@@ -250,6 +256,22 @@ describe("coverage and defaults", () => {
     expect(counts.get("2026-10-02")).toBe(1);
   });
 
+  it("does not ask for a driver on runs an outside company handles", () => {
+    const counts = countUncoveredTransportsByDay(
+      [
+        event({ id: "hired", transport_type: "sleeper_bus", transport_provider: "montoya" }),
+        event({ id: "carrier", transport_provider: "pantoja" }),
+        event({ id: "own", transport_provider: "sector_pro" }),
+        event({ id: "unset" }),
+      ],
+      [],
+    );
+    expect(counts.get("2026-10-01")).toBe(2);
+    expect(isExternallyHandledTransport({ transport_provider: "the_wild_tour" })).toBe(true);
+    expect(isExternallyHandledTransport({ transport_provider: "sector_pro" })).toBe(false);
+    expect(isExternallyHandledTransport({ transport_provider: null })).toBe(false);
+  });
+
   it("defaults to a two-hour window from the transport time, crossing midnight when needed", () => {
     expect(defaultAssignmentWindow(event({ event_time: "08:30:00" }))).toEqual({
       start: "2026-10-01T08:30",
@@ -282,7 +304,7 @@ describe("coverage and defaults", () => {
       vehicles: [{
         id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer", required_license: "C+E",
         brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false,
-        itv_expiry: null, insurance_expiry: null, notes: null, is_active: true,
+        itv_expiry: null, insurance_expiry: null, notes: null, is_active: true, berth_layouts: [],
       }],
       assignments: [
         assignment({ id: "a1", logistics_event_id: "e1", vehicle_id: "v1", status: "confirmed" }),
@@ -298,5 +320,24 @@ describe("coverage and defaults", () => {
     expect(driverDisplayName({ first_name: "Ana", last_name: "Ruiz", nickname: null })).toBe("Ana Ruiz");
     expect(driverDisplayName({ first_name: " ", last_name: null, nickname: "Pepe" })).toBe("Pepe");
     expect(driverDisplayName({ first_name: null, last_name: null, nickname: null })).toBe("Sin nombre");
+  });
+});
+
+describe("sleeper-bus berths", () => {
+  it("parses the berth layouts typed in the vehicle form", () => {
+    expect(parseBerthLayouts("16")).toEqual({ layouts: [16] });
+    expect(parseBerthLayouts(" 16, 12 / 14 12 ")).toEqual({ layouts: [12, 14, 16] });
+    expect(parseBerthLayouts("")).toEqual({ layouts: [] });
+    expect(parseBerthLayouts("12, doce")).toEqual({ error: '"doce" no es un número de literas válido (1–40)' });
+    expect(parseBerthLayouts("0")).toHaveProperty("error");
+    expect(parseBerthLayouts("41")).toHaveProperty("error");
+    expect(parseBerthLayouts("1 2 3 4 5 6 7")).toEqual({ error: "Como máximo 6 configuraciones de literas" });
+  });
+
+  it("formats layouts and finds the largest", () => {
+    expect(formatBerthLayouts([16, 12])).toBe("12 / 16 literas");
+    expect(formatBerthLayouts([])).toBeNull();
+    expect(maxBerths({ berth_layouts: [12, 16, 14] })).toBe(16);
+    expect(maxBerths({ berth_layouts: [] })).toBe(0);
   });
 });

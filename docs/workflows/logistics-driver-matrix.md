@@ -60,6 +60,28 @@ the vehicle:
   Plate uniqueness ignores spaces/dashes/case. Carries
   `itv_expiry`, `insurance_expiry` and `has_tail_lift` (plataforma elevadora). A vehicle
   with assignment history cannot be deleted (FK `restrict`); deactivate it instead.
+- **Sleeper-bus berths** (migration `20260924201000`):
+  - `fleet_vehicles.berth_layouts smallint[]` — the berth counts a bus can be set up
+    with (`{16}` for a fixed layout, `{12,14,16}` when bunks can be swapped for lounge).
+    Entered in the vehicle form ("Literas"); a trigger sorts/deduplicates them and
+    clears them on any non-bus vehicle.
+  - `logistics_events.berth_count` — berths one bus run provides, whether it is a
+    fleet bus or one hired from The Wild Tour / Montoya (`transport_provider`). Cleared
+    by the same trigger if the run stops being a `sleeper_bus`.
+  - `get_logistics_matrix()` returns both, plus each event's `job_crew_count`
+    (distinct people on the job who have not declined — invited ones count).
+  - **Planner** (`SleeperBusBerthPlanner` in the event dialog, logic in
+    `features/logistics/fleet/sleeperBusPlanning.ts`): headcount = job crew + "personas
+    extra", minus berths the job's other bus runs that day and direction already
+    provide. It ranks combinations of own buses (tightest layout, buses busy that day
+    excluded) and hired 12/14/16-berth buses: fewest hires, then fewest buses, then
+    fewest empty berths. One run is one bus, so a multi-bus plan means one transport
+    per bus; applying a plan sets this run's berths and, for a hire, the company.
+  - The assignment form warns when the chosen bus cannot seat the run even in its
+    largest layout (`berthShortfall`: the run's own berths, else the whole crew).
+- **Hired transports need no driver of ours.** A run whose `transport_provider` is set
+  to anything but `sector_pro` (a carrier, a hired bus, a client pick-up) is not counted
+  as "sin conductor" and shows "Contratado a …" in the day dialog.
 - `driver_details` — one row per conductor: licence categories (`B…D+E`), licence, CAP
   and tachograph-card expiry, ADR, usual vehicle, notes. **Notes are visible to the driver.**
 - `transport_driver_assignments` — event × driver and/or vehicle, window, status

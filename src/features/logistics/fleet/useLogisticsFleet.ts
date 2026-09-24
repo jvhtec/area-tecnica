@@ -5,6 +5,7 @@ import { fetchJobProducerContacts, type JobProducerContact } from "@/features/jo
 
 import {
   fetchDriverLocations,
+  fetchJobCrewCount,
   fetchLogisticsMatrix,
   fetchMyTransportAssignments,
   fetchOwnDriverDetails,
@@ -27,6 +28,7 @@ export const logisticsFleetKeys = {
   driverDetails: (profileId: string) => [LOGISTICS_FLEET_QUERY_ROOT, "driver-details", profileId] as const,
   producerContacts: (jobIds: readonly string[]) => [LOGISTICS_FLEET_QUERY_ROOT, "producer-contacts", ...jobIds] as const,
   // Deliberately outside the fleet root: a map tile never changes with an assignment.
+  jobCrew: (jobId: string) => ["job_assignments", "crew-count", jobId] as const,
   staticMap: (input: StaticMapInput) => ["static-map", input.lat ?? "", input.lng ?? "", input.address ?? ""] as const,
 };
 
@@ -35,6 +37,16 @@ export function useLogisticsMatrix(startKey: string, endKey: string, enabled = t
     queryKey: logisticsFleetKeys.matrix(startKey, endKey),
     queryFn: () => fetchLogisticsMatrix(startKey, endKey),
     enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** How many people are on a job (not declined), for sleeper-bus berth planning. */
+export function useJobCrewCount(jobId: string | null | undefined) {
+  return useQuery({
+    queryKey: logisticsFleetKeys.jobCrew(jobId ?? ""),
+    queryFn: () => (jobId ? fetchJobCrewCount(jobId) : Promise.resolve({ total: 0, confirmed: 0 })),
+    enabled: Boolean(jobId),
     staleTime: 30_000,
   });
 }

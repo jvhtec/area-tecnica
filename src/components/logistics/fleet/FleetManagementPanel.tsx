@@ -10,6 +10,7 @@ import { deleteFleetVehicle } from "@/features/logistics/fleet/fleetApi";
 import {
   documentStatus,
   driverDisplayName,
+  formatBerthLayouts,
   vehicleLabel,
   vehicleTypeLabel,
   type FleetVehicle,
@@ -110,6 +111,9 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
                       {vehicleTypeLabel(vehicle.vehicle_type)} · Permiso {vehicle.required_license}
                       {vehicle.brand || vehicle.model ? ` · ${[vehicle.brand, vehicle.model].filter(Boolean).join(" ")}` : ""}
                       {vehicle.has_tail_lift ? " · Plataforma" : ""}
+                      {vehicle.vehicle_type === "sleeper_bus"
+                        ? ` · ${formatBerthLayouts(vehicle.berth_layouts) ?? "Literas sin configurar"}`
+                        : ""}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-1">
                       <DocumentBadge label="ITV" expiry={vehicle.itv_expiry} todayKey={todayKey} />

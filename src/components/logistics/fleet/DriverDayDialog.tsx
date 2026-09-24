@@ -4,6 +4,7 @@ import { Loader2, MessageCircle, Pencil, Phone, Plus, Trash2 } from "lucide-reac
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { transportProviderLabel } from "@/constants/transportProviders";
 import { useToast } from "@/hooks/use-toast";
 import { removeDriverAssignment } from "@/features/logistics/fleet/fleetApi";
 import {
@@ -12,6 +13,7 @@ import {
   UNAVAILABILITY_LABELS,
   driverDisplayName,
   formatTransportTime,
+  isExternallyHandledTransport,
   transportEventTitle,
   vehicleLabel,
   vehicleTypeLabel,
@@ -200,6 +202,9 @@ export function DriverDayDialog({ open, onOpenChange, dayKey, row, data, rowAssi
                 <ul className="space-y-2">
                   {dayEvents.map((event) => {
                     const eventAssignments = (assignmentsByEvent.get(event.id) ?? []).filter((a) => a.status !== "declined");
+                    const hiredFrom = isExternallyHandledTransport(event)
+                      ? transportProviderLabel(event.transport_provider)
+                      : null;
                     return (
                       <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm">
                         <div className="min-w-0">
@@ -209,13 +214,16 @@ export function DriverDayDialog({ open, onOpenChange, dayKey, row, data, rowAssi
                           </p>
                           <p className="text-muted-foreground">
                             {vehicleTypeLabel(event.transport_type)}
+                            {event.berth_count ? ` · ${event.berth_count} literas` : ""}
                             {event.departments.length > 0 ? ` · ${event.departments.join(", ")}` : ""}
                             {event.location_name ? ` · ${event.location_name}` : ""}
                           </p>
-                          <p className={eventAssignments.length === 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}>
-                            {eventAssignments.length === 0
-                              ? "Sin conductor ni vehículo"
-                              : eventAssignments.map(describeAssignee).join(" / ")}
+                          <p className={eventAssignments.length === 0 && !hiredFrom ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}>
+                            {eventAssignments.length > 0
+                              ? eventAssignments.map(describeAssignee).join(" / ")
+                              : hiredFrom
+                                ? `Contratado a ${hiredFrom}`
+                                : "Sin conductor ni vehículo"}
                           </p>
                         </div>
                         {!readOnly && (

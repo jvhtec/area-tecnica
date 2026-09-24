@@ -371,6 +371,7 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
         "montabi_dorado": "Montabi Dorado",
         "grupo_sese": "Grupo Sesé",
         "nacex": "Nacex",
+        "montoya": "Montoya",
         "recogida_cliente": "Recogida Cliente",
         "other": "Otro",
       };

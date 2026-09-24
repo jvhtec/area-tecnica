@@ -32,7 +32,7 @@ import { endOfMonth, format, startOfMonth } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
-import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
+import type { TransportProvider } from "@/constants/transportProviders";
 import {
   LOGISTICS_HOJA_CATEGORY_LABELS,
   LOGISTICS_HOJA_CATEGORY_MAX_SELECTION,
@@ -44,6 +44,8 @@ import type { Database } from "@/integrations/supabase/types";
 
 import { queryKeys } from "@/lib/react-query";
 import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
+import { LogisticsProviderSelect } from "./LogisticsProviderSelect";
+import { SleeperBusBerthPlanner } from "./fleet/SleeperBusBerthPlanner";
 import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
 import { deleteLogisticsEvent, notifyDriverAssignmentsForEvent } from "@/features/logistics/fleet/fleetApi";
 import { isDriverRelevantEventChange } from "@/features/logistics/events/driverRelevantEventChange";
@@ -93,6 +95,7 @@ export const LogisticsEventDialog = ({
   const [customTitle, setCustomTitle] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
   const [transportProvider, setTransportProvider] = useState<TransportProvider | null>(null);
+  const [berthCount, setBerthCount] = useState<number | null>(null);
   const [notes, setNotes] = useState<string>("");
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -149,6 +152,7 @@ export const LogisticsEventDialog = ({
       setCustomTitle(selectedEvent.title || "");
       setLicensePlate(selectedEvent.license_plate || "");
       setTransportProvider(selectedEvent.transport_provider || null);
+      setBerthCount(selectedEvent.berth_count ?? null);
       setNotes(selectedEvent.notes || "");
       setSelectedDepartments(
         (selectedEvent.departments || [])
@@ -169,6 +173,7 @@ export const LogisticsEventDialog = ({
       setCustomTitle("");
       setLicensePlate("");
       setTransportProvider(null);
+      setBerthCount(null);
       setNotes("");
       setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
@@ -321,6 +326,8 @@ export const LogisticsEventDialog = ({
         event_type: eventType,
         transport_type: transportType,
         transport_provider: transportProvider || null,
+        // Sleeper buses only (the database clears it on any other type).
+        berth_count: transportType === "sleeper_bus" ? berthCount : null,
         notes: notes || null,
         event_date: date,
         event_time: time,
@@ -634,25 +641,20 @@ export const LogisticsEventDialog = ({
               />
             </div>
 
-            {/* Transport Provider */}
-            <div className="space-y-2">
-              <Label>Transport Provider</Label>
-              <Select
-                value={transportProvider || ""}
-                onValueChange={(value) => setTransportProvider((value || null) as TransportProvider | null)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TRANSPORT_PROVIDERS).map(([key, { label }]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <LogisticsProviderSelect value={transportProvider} onChange={setTransportProvider} />
+
+            {transportType === "sleeper_bus" && (
+              <SleeperBusBerthPlanner
+                jobId={selectedJob}
+                dateKey={date}
+                eventType={eventType}
+                eventId={selectedEvent?.id ?? null}
+                berthCount={berthCount}
+                onBerthCountChange={setBerthCount}
+                provider={transportProvider}
+                onProviderChange={setTransportProvider}
+              />
+            )}
 
             {/* Departments */}
             <div className="space-y-2">
@@ -736,16 +738,16 @@ export const LogisticsEventDialog = ({
 
             {/* Notes */}
             <div className="space-y-2">
-              <Label>Notes</Label>
+              <Label>Notas</Label>
               <Textarea
-                placeholder="Additional notes or instructions..."
+                placeholder="Notas o instrucciones adicionales…"
                 className="resize-none"
                 maxLength={500}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
               <div className="text-xs text-muted-foreground">
-                {notes.length} / 500 characters
+                {notes.length} / 500 caracteres
               </div>
             </div>
 

@@ -67,6 +67,8 @@ export type FleetVehicle = {
   insurance_expiry: string | null;
   notes: string | null;
   is_active: boolean;
+  /** Sleeper buses only: berth counts the bus can be set up with, ascending. */
+  berth_layouts: number[];
 };
 
 export const UNAVAILABILITY_STATUSES = ["vacation", "travel", "sick", "day_off", "unavailable", "warehouse"] as const;
@@ -115,6 +117,10 @@ export type MatrixTransportEvent = {
   job_title: string | null;
   license_plate: string | null;
   transport_provider: string | null;
+  /** Sleeper buses only: berths this run provides. */
+  berth_count: number | null;
+  /** People assigned to the event's job who have not declined (null without a job). */
+  job_crew_count: number | null;
   loading_bay: string | null;
   notes: string | null;
   transport_request_id: string | null;
@@ -201,6 +207,46 @@ export const vehicleTypeLabel = (type: string | null | undefined): string =>
 
 export const vehicleLabel = (vehicle: Pick<FleetVehicle, "name" | "license_plate">): string =>
   `${vehicle.name} · ${vehicle.license_plate}`;
+
+/**
+ * A transport handled by an outside company (a hired truck or sleeper bus, a client
+ * pick-up) needs no driver from our own staff. Sector-Pro is the company itself.
+ */
+export const isExternallyHandledTransport = (event: Pick<MatrixTransportEvent, "transport_provider">): boolean =>
+  Boolean(event.transport_provider) && event.transport_provider !== "sector_pro";
+
+/** Most berths the vehicle can be set up with (0 when none are configured). */
+export const maxBerths = (vehicle: Pick<FleetVehicle, "berth_layouts">): number =>
+  vehicle.berth_layouts.length > 0 ? Math.max(...vehicle.berth_layouts) : 0;
+
+/** "16 literas" or "12 / 14 / 16 literas"; null when none are configured. */
+export const formatBerthLayouts = (layouts: readonly number[]): string | null =>
+  layouts.length > 0 ? `${[...layouts].sort((a, b) => a - b).join(" / ")} literas` : null;
+
+export const MAX_BERTH_LAYOUTS = 6;
+export const MAX_BERTHS_PER_BUS = 40;
+
+/**
+ * Parses what the vehicle form accepts for berth layouts: numbers separated by
+ * commas, slashes or spaces ("16", "12, 14, 16"). Returns the sorted distinct
+ * values, or an error message in Spanish.
+ */
+export const parseBerthLayouts = (input: string): { layouts: number[] } | { error: string } => {
+  const parts = input.split(/[\s,;/]+/).filter((part) => part.length > 0);
+  const values: number[] = [];
+  for (const part of parts) {
+    const value = Number(part);
+    if (!Number.isInteger(value) || value < 1 || value > MAX_BERTHS_PER_BUS) {
+      return { error: `"${part}" no es un número de literas válido (1–${MAX_BERTHS_PER_BUS})` };
+    }
+    values.push(value);
+  }
+  const layouts = [...new Set(values)].sort((a, b) => a - b);
+  if (layouts.length > MAX_BERTH_LAYOUTS) {
+    return { error: `Como máximo ${MAX_BERTH_LAYOUTS} configuraciones de literas` };
+  }
+  return { layouts };
+};
 
 export const transportEventTitle = (event: Pick<MatrixTransportEvent, "title" | "job_title" | "event_type">): string =>
   event.title?.trim() || event.job_title?.trim() || TRANSPORT_EVENT_TYPE_LABELS[event.event_type] || "Transporte";
@@ -433,7 +479,10 @@ export const findDoubleBookedAssignmentIds = (assignments: readonly DriverAssign
   return conflicted;
 };
 
-/** Transports on each day that still have no driver who has not declined. */
+/**
+ * Transports on each day that still have no driver who has not declined. Runs an
+ * outside company handles (a hired bus, a carrier) are not ours to cover.
+ */
 export const countUncoveredTransportsByDay = (
   events: readonly MatrixTransportEvent[],
   assignments: readonly DriverAssignment[],
@@ -445,7 +494,7 @@ export const countUncoveredTransportsByDay = (
   );
   const counts = new Map<string, number>();
   for (const event of events) {
-    if (covered.has(event.id)) continue;
+    if (covered.has(event.id) || isExternallyHandledTransport(event)) continue;
     counts.set(event.event_date, (counts.get(event.event_date) ?? 0) + 1);
   }
   return counts;

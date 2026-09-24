@@ -7,6 +7,8 @@ export type LogisticsCalendarEvent = LogisticsEventRow & {
   job?: { id?: string; title: string } | null;
   /** The transport's own place (locations.id); postdates the generated types. */
   location_id?: string | null;
+  /** Sleeper buses only: berths this run provides; postdates the generated types. */
+  berth_count?: number | null;
 };
 
 export type BroadcastLogisticsEvent = Pick<

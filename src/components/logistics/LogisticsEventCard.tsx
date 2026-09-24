@@ -103,7 +103,10 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
                 </Badge>
                 <Badge variant="outline" className="flex max-w-full items-center gap-1">
                   <Truck className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{getLogisticsTransportTypeLabel(event.transport_type)}</span>
+                  <span className="truncate">
+                    {getLogisticsTransportTypeLabel(event.transport_type)}
+                    {event.transport_type === "sleeper_bus" && event.berth_count ? ` · ${event.berth_count} literas` : ""}
+                  </span>
                 </Badge>
               </div>
             </div>
