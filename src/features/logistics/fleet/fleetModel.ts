@@ -122,6 +122,7 @@ export type MyTransportAssignment = {
   transport_type: string;
   event_date: string;
   event_time: string;
+  timezone: string;
   title: string | null;
   job_title: string | null;
   loading_bay: string | null;
