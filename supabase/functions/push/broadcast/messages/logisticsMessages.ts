@@ -1,6 +1,7 @@
 import type { BroadcastBody } from "../../types.ts";
 import { fmtFieldEs } from "../../format.ts";
 import { formatSpanishDateTime } from "../date.ts";
+import { transportTypeLabel } from "../../transportRequestEmailFormat.ts";
 
 export function buildLogisticsTransportRequestedMessage(
   actor: string,
@@ -49,7 +50,10 @@ export function buildLogisticsEventMessage(
   const eventLabel = eventType === 'unload' ? 'Descarga' : 'Carga';
   const pairedLabel = pairedType === 'unload' ? 'descarga' : pairedType === 'load' ? 'carga' : undefined;
   const whenLabel = formatSpanishDateTime(eventDate, eventTime);
-  const transportLabel = transportType ? transportType.charAt(0).toUpperCase() + transportType.slice(1) : undefined;
+  // Known types get their Spanish label ("Autobús cama", "Camión 9m"); anything else keeps the capitalised raw value.
+  const transportLabel = transportType
+    ? transportTypeLabel(transportType) ?? transportType.charAt(0).toUpperCase() + transportType.slice(1)
+    : undefined;
   const deptText = departmentsList.length ? ` (${departmentsList.join(', ')})` : '';
 
   let title = '';

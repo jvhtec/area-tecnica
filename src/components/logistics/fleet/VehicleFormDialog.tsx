@@ -15,6 +15,7 @@ import {
   VEHICLE_TYPES,
   VEHICLE_TYPE_LABELS,
   type FleetVehicle,
+  suggestedLicenseForVehicleType,
   type LicenseCategory,
   type VehicleType,
 } from "@/features/logistics/fleet/fleetModel";
@@ -125,7 +126,17 @@ export function VehicleFormDialog({ open, onOpenChange, vehicle, onSaved }: Vehi
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="vehicle-type">Tipo</Label>
-            <Select value={form.vehicle_type} onValueChange={(value) => update("vehicle_type", value as VehicleType)}>
+            <Select
+              value={form.vehicle_type}
+              onValueChange={(value) => {
+                const type = value as VehicleType;
+                setForm((current) => ({
+                  ...current,
+                  vehicle_type: type,
+                  required_license: suggestedLicenseForVehicleType(type, current.required_license),
+                }));
+              }}
+            >
               <SelectTrigger id="vehicle-type"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {VEHICLE_TYPES.map((type) => <SelectItem key={type} value={type}>{VEHICLE_TYPE_LABELS[type]}</SelectItem>)}

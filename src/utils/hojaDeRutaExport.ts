@@ -357,6 +357,7 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
         "6m": "Camión 6m",
         "4m": "Camión 4m",
         "furgoneta": "Furgoneta",
+        "sleeper_bus": "Autobús cama",
       };
 
       const companyLabels: Record<string, string> = {

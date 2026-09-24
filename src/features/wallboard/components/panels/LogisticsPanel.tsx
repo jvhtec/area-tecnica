@@ -2,6 +2,7 @@ import React from 'react';
 import { TRANSPORT_PROVIDERS } from '@/constants/transportProviders';
 import type { LogisticsItem } from '../../types';
 import { SPANISH_DAY_NAMES } from '../../calendar';
+import { getLogisticsTransportTypeLabel } from '@/components/technician/details-modal/formatters';
 import { getJobCardBackground, getTransportIcon } from '../../utils';
 import { WALLBOARD_PANEL_PAGE_SIZES } from '../../panelPageSizes';
 import { AutoScrollWrapper, PanelContainer } from '../shared';
@@ -52,7 +53,7 @@ export const LogisticsPanel: React.FC<{
                         {ev.procedure.replace(/_/g, ' ')}
                       </span>
                     ) : null}
-                    <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>{ev.transport_type || 'transport'}</span>
+                    <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>{getLogisticsTransportTypeLabel(ev.transport_type)}</span>
                     {ev.transport_provider &&
                       TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS] && (
                         <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>

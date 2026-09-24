@@ -86,7 +86,7 @@ export interface LogisticsItem {
 }
 
 export type JobDateType = DateType;
-export type LogisticsTransportType = 'trailer' | '9m' | '8m' | '6m' | '4m' | 'furgoneta' | 'rv' | string;
+export type LogisticsTransportType = 'trailer' | '9m' | '8m' | '6m' | '4m' | 'furgoneta' | 'rv' | 'sleeper_bus' | string;
 export type LogisticsEventType = 'load' | 'unload' | string;
 
 export type TickerMessage = { message: string; level: AnnouncementLevel };

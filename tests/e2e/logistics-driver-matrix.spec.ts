@@ -14,6 +14,7 @@ const matrix = {
     { id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer", required_license: "C+E", brand: "Volvo", model: "FH", payload_kg: 24000, cargo_length_m: 13.6, has_tail_lift: true, itv_expiry: "2030-01-01", insurance_expiry: "2030-01-01", notes: null, is_active: true },
     // The van's ITV ran out before the fixed clock below.
     { id: "v2", name: "Furgoneta 1", license_plate: "5678 DEF", vehicle_type: "furgoneta", required_license: "B", brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false, itv_expiry: "2026-09-01", insurance_expiry: null, notes: null, is_active: true },
+    { id: "v3", name: "Nightliner 1", license_plate: "9999 BUS", vehicle_type: "sleeper_bus", required_license: "D", brand: "Setra", model: "S 516 HD", payload_kg: null, cargo_length_m: null, has_tail_lift: false, itv_expiry: "2030-01-01", insurance_expiry: "2030-01-01", notes: null, is_active: true },
   ],
   events: [
     { id: "e1", event_type: "load", transport_type: "trailer", event_date: "2026-09-30", event_time: "08:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j1", job_title: "Gala Liceu", license_plate: null, transport_provider: null, loading_bay: "Muelle 2", notes: null, transport_request_id: null, origin: "Almacén", destination: "Liceu", location_name: "Liceu", location_address: "La Rambla 51, Barcelona", departments: ["sound"] },
@@ -116,6 +117,17 @@ test.describe("Logistics driver matrix", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByLabel("Caducidad de la ITV")).toHaveValue("2026-09-01");
     await expect(dialog.getByLabel("Plataforma elevadora")).not.toBeChecked();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+
+    // The company's sleeper buses are fleet vehicles too, and need a D licence.
+    await expect(page.getByText("Autobús cama · Permiso D")).toBeVisible();
+    await page.getByRole("button", { name: "Añadir vehículo" }).click();
+    const form = page.getByRole("dialog");
+    await expect(form.getByLabel("Permiso necesario")).toHaveText("B");
+    await form.getByLabel("Tipo").click();
+    await page.getByRole("option", { name: "Autobús cama" }).click();
+    await expect(form.getByLabel("Permiso necesario")).toHaveText("D");
   });
 
   test("keeps house technicians read-only", async ({ page }) => {

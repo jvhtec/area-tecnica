@@ -12,7 +12,8 @@ import {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_DEPARTMENTS = new Set(["sound", "lights", "video"]);
-const VALID_TRANSPORT_TYPES = new Set(["trailer", "9m", "8m", "6m", "4m", "furgoneta"]);
+// Mirrors REQUEST_TRANSPORT_OPTIONS and the transport_request_items check.
+const VALID_TRANSPORT_TYPES = new Set(["trailer", "9m", "8m", "6m", "4m", "furgoneta", "sleeper_bus"]);
 
 interface CreateTransportRequestBody extends Record<string, unknown> {
   job_id?: unknown;

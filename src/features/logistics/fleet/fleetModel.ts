@@ -14,7 +14,7 @@ import { MADRID_TIMEZONE, addMadridCalendarDays } from "@/utils/timezoneUtils";
 export const LICENSE_CATEGORIES = ["B", "B+E", "C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"] as const;
 export type LicenseCategory = (typeof LICENSE_CATEGORIES)[number];
 
-export const VEHICLE_TYPES = ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"] as const;
+export const VEHICLE_TYPES = ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv", "sleeper_bus"] as const;
 export type VehicleType = (typeof VEHICLE_TYPES)[number];
 
 export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
@@ -25,7 +25,17 @@ export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
   "4m": "Camión 4 m",
   furgoneta: "Furgoneta",
   rv: "Autocaravana",
+  sleeper_bus: "Autobús cama",
 };
+
+/**
+ * Licence the vehicle form pre-selects when a type is chosen. Only the
+ * unambiguous case: a sleeper bus carries far more than 16 passengers, so it
+ * needs a D licence (D+E when it tows a trailer). A D-family licence the user
+ * already picked is kept, and other types keep whatever was selected.
+ */
+export const suggestedLicenseForVehicleType = (type: VehicleType, current: LicenseCategory): LicenseCategory =>
+  type === "sleeper_bus" && !current.startsWith("D") ? "D" : current;
 
 export type DriverAssignmentStatus = "assigned" | "confirmed" | "declined";
 

@@ -106,6 +106,7 @@ export function getTransportIcon(
 
   let vehicle = '🚚';
   if (base === 'rv') vehicle = '🏕️';
+  else if (base === 'sleeper_bus' || base === 'bus' || base === 'autobus') vehicle = '🚌';
   else if (base === 'furgoneta' || base === 'van') vehicle = '🚐';
   else if (base === 'plane' || base === 'avion') vehicle = '✈️';
   else if (base === 'train') vehicle = '🚆';

@@ -1,0 +1,12 @@
+-- The company fleet includes sleeper buses (autobús cama, the crew nightliners).
+--
+-- This migration only adds the enum value (logistics_events.transport_type and
+-- fleet_vehicles.vehicle_type). 20260924191000 then lets transport requests,
+-- Hoja de Ruta transport rows, truck-planner mappings and the request RPCs accept
+-- it, in a separate transaction as Postgres requires for a new enum value.
+-- Crew travel on a sleeper bus stays modelled in Hoja de Ruta travel
+-- arrangements (public.transportation_type 'sleeper_bus').
+--
+-- The value name matches public.transportation_type's existing 'sleeper_bus'.
+-- It is only added here; nothing in this transaction uses it.
+alter type public.transport_type add value if not exists 'sleeper_bus';

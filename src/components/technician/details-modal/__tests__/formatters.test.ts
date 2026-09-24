@@ -22,6 +22,7 @@ describe("technician details modal formatters", () => {
     expect(formatRoomTypeLabel("double")).toBe("Doble");
     expect(getTravelTransportTypeLabel("sleeper_bus")).toBe("Autobús cama");
     expect(getLogisticsTransportTypeLabel("9m")).toBe("Camión 9m");
+    expect(getLogisticsTransportTypeLabel("sleeper_bus")).toBe("Autobús cama");
     expect(formatCompanyLabel("sector_pro")).toBe("Sector Pro");
   });
 
