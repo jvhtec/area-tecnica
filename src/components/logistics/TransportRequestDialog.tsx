@@ -25,6 +25,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { Input } from "@/components/ui/input";
+import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -349,14 +350,27 @@ export function TransportRequestDialog({
                       </SelectContent>
                     </Select>
                   </div>
+                  {/* Free text is still allowed ("Almacén"); a picked suggestion stores the full address so drivers can navigate to it. */}
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="transport-origin">Origen</Label>
-                    <Input id="transport-origin" {...form.register("origin")} placeholder="Almacén, proveedor, recinto…" />
+                    <AddressAutocomplete
+                      id="transport-origin"
+                      label="Origen"
+                      value={form.watch("origin") ?? ""}
+                      onChange={(address) => form.setValue("origin", address, { shouldDirty: true })}
+                      placeholder="Almacén, proveedor, recinto…"
+                      className="space-y-2"
+                    />
                     {form.formState.errors.origin && <p className="text-xs text-destructive">{form.formState.errors.origin.message}</p>}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="transport-destination">Destino</Label>
-                    <Input id="transport-destination" {...form.register("destination")} placeholder="Recinto, almacén, proveedor…" />
+                    <AddressAutocomplete
+                      id="transport-destination"
+                      label="Destino"
+                      value={form.watch("destination") ?? ""}
+                      onChange={(address) => form.setValue("destination", address, { shouldDirty: true })}
+                      placeholder="Recinto, almacén, proveedor…"
+                      className="space-y-2"
+                    />
                     {form.formState.errors.destination && <p className="text-xs text-destructive">{form.formState.errors.destination.message}</p>}
                   </div>
                   <div className="min-w-0 space-y-2">

@@ -117,6 +117,7 @@ const toEvent = (value: unknown): MatrixTransportEvent => {
     origin: strOrNull(row.origin),
     destination: strOrNull(row.destination),
     location_name: strOrNull(row.location_name),
+    location_address: strOrNull(row.location_address),
     departments: strings(row.departments),
   };
 };
@@ -147,6 +148,7 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     ends_at: str(row.ends_at),
     notes: strOrNull(row.notes),
     responded_at: strOrNull(row.responded_at),
+    decline_reason: strOrNull(row.decline_reason),
     event_id: str(row.event_id),
     event_type: str(row.event_type),
     transport_type: str(row.transport_type),
@@ -154,6 +156,7 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     event_time: str(row.event_time),
     timezone: str(row.timezone) || "Europe/Madrid",
     title: strOrNull(row.title),
+    job_id: strOrNull(row.job_id),
     job_title: strOrNull(row.job_title),
     loading_bay: strOrNull(row.loading_bay),
     event_notes: strOrNull(row.event_notes),
@@ -161,12 +164,15 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     destination: strOrNull(row.destination),
     location_name: strOrNull(row.location_name),
     location_address: strOrNull(row.location_address),
+    location_lat: numOrNull(row.location_lat),
+    location_lng: numOrNull(row.location_lng),
     vehicle: vehicle
       ? {
           id: str(vehicle.id),
           name: str(vehicle.name),
           license_plate: str(vehicle.license_plate),
           vehicle_type: str(vehicle.vehicle_type) as VehicleType,
+          has_tail_lift: vehicle.has_tail_lift === true,
         }
       : null,
   };
@@ -384,6 +390,29 @@ export async function saveDriverDetails(input: DriverDetailsInput): Promise<void
     { onConflict: "profile_id" },
   );
   throwIfError(error, "No se pudieron guardar los datos del conductor");
+}
+
+// ---------------------------------------------------------------------------
+// Map preview (static-map edge function, any authenticated user)
+// ---------------------------------------------------------------------------
+
+export type StaticMapInput = { lat: number | null; lng: number | null; address: string | null };
+
+/** A data URL for a small map centred on the venue, or null when it cannot be drawn. */
+export async function fetchStaticMap(input: StaticMapInput): Promise<string | null> {
+  const hasPoint = input.lat !== null && input.lng !== null;
+  if (!hasPoint && !input.address) return null;
+  const { data, error } = await dataLayerClient.functions.invoke("static-map", {
+    body: {
+      ...(hasPoint ? { lat: input.lat, lng: input.lng } : { address: input.address }),
+      width: 640,
+      height: 280,
+      zoom: 14,
+    },
+  });
+  if (error) throw new Error(error.message || "No se pudo cargar el mapa");
+  const dataUrl = asRecord(data).dataUrl;
+  return typeof dataUrl === "string" && dataUrl.startsWith("data:image/") ? dataUrl : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { es } from "date-fns/locale";
-import { Bell, Loader2, Truck } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, Loader2, Truck } from "lucide-react";
 
 import { ConductorAssignmentCard } from "@/components/logistics/fleet/ConductorAssignmentCard";
 import { DeclineTransportDialog } from "@/components/logistics/fleet/DeclineTransportDialog";
@@ -11,33 +11,56 @@ import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { respondToTransportAssignment } from "@/features/logistics/fleet/fleetApi";
 import { formatTransportDateKey, type MyTransportAssignment } from "@/features/logistics/fleet/fleetModel";
-import { useInvalidateLogisticsFleet, useMyTransportAssignments } from "@/features/logistics/fleet/useLogisticsFleet";
+import {
+  useInvalidateLogisticsFleet,
+  useMyTransportAssignments,
+  useTransportProducerContacts,
+} from "@/features/logistics/fleet/useLogisticsFleet";
 import { getErrorMessage } from "@/utils/errorMessage";
-import { formatMadridDayKey } from "@/utils/timezoneUtils";
+import { addMadridCalendarDays, formatMadridDateKey, formatMadridDayKey } from "@/utils/timezoneUtils";
 
-/** Upcoming (not yet finished) assignments grouped by their transport-local start day. */
-const groupUpcomingByDay = (assignments: MyTransportAssignment[], nowIso: string) => {
+/** How far back the history section reaches. */
+const HISTORY_DAYS = 30;
+
+/** Assignments grouped by their transport-local start day, in day order. */
+const groupByDay = (assignments: MyTransportAssignment[]) => {
   const groups = new Map<string, MyTransportAssignment[]>();
   for (const assignment of assignments) {
-    if (assignment.ends_at < nowIso) continue;
     const dayKey = formatTransportDateKey(assignment.starts_at, assignment.timezone);
     groups.set(dayKey, [...(groups.get(dayKey) ?? []), assignment]);
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 };
 
+const dayLabel = (dayKey: string) => formatMadridDayKey(dayKey, "EEEE d 'de' MMMM", { locale: es });
+
 const ConductorDashboard = () => {
   const { toast } = useToast();
   const { user } = useOptimizedAuth();
   const invalidate = useInvalidateLogisticsFleet();
-  const { data, isLoading, error } = useMyTransportAssignments();
+  // One query covers recent history and everything ahead (no upper bound).
+  const fromKey = addMadridCalendarDays(formatMadridDateKey(new Date()), -HISTORY_DAYS);
+  const { data, isLoading, error } = useMyTransportAssignments(fromKey);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [declining, setDeclining] = useState<MyTransportAssignment | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
-  // Evaluated on every render (list refreshes, realtime, responses) so finished runs drop off.
+  // Evaluated on every render (list refreshes, realtime, responses) so finished runs move to history.
   const nowIso = new Date().toISOString();
-  const days = groupUpcomingByDay(data ?? [], nowIso);
-  const pendingCount = (data ?? []).filter((assignment) => assignment.status === "assigned" && assignment.ends_at >= nowIso).length;
+  const assignments = useMemo(() => data ?? [], [data]);
+  const upcoming = assignments.filter((assignment) => assignment.ends_at > nowIso);
+  const past = assignments
+    .filter((assignment) => assignment.ends_at <= nowIso)
+    .sort((a, b) => b.starts_at.localeCompare(a.starts_at));
+  const days = groupByDay(upcoming);
+  // The next run the driver has not refused: it gets the map and the countdown.
+  const nextId = upcoming.find((assignment) => assignment.status !== "declined")?.id ?? null;
+  const pendingCount = upcoming.filter((assignment) => assignment.status === "assigned").length;
+  const jobIds = useMemo(
+    () => upcoming.flatMap((assignment) => (assignment.job_id ? [assignment.job_id] : [])),
+    [upcoming],
+  );
+  const producersByJob = useTransportProducerContacts(jobIds);
   const firstName = typeof user?.user_metadata?.first_name === "string" ? user.user_metadata.first_name : null;
 
   const respond = async (assignment: MyTransportAssignment, response: "confirmed" | "declined", reason?: string) => {
@@ -87,22 +110,49 @@ const ConductorDashboard = () => {
           </CardContent>
         </Card>
       ) : (
-        days.map(([dayKey, assignments]) => (
-          <section key={dayKey} className="space-y-3" aria-label={formatMadridDayKey(dayKey, "EEEE d 'de' MMMM", { locale: es })}>
+        days.map(([dayKey, dayAssignments]) => (
+          <section key={dayKey} className="space-y-3" aria-label={dayLabel(dayKey)}>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              {formatMadridDayKey(dayKey, "EEEE d 'de' MMMM", { locale: es })}
+              {dayLabel(dayKey)}
             </h2>
-            {assignments.map((assignment) => (
+            {dayAssignments.map((assignment) => (
               <ConductorAssignmentCard
                 key={assignment.id}
                 assignment={assignment}
                 busy={busyId === assignment.id}
+                highlight={assignment.id === nextId}
+                nowIso={nowIso}
+                producers={assignment.job_id ? producersByJob.get(assignment.job_id) : undefined}
                 // Declining asks for a reason first; confirming goes straight through.
                 onRespond={(response) => (response === "declined" ? setDeclining(assignment) : void respond(assignment, response))}
               />
             ))}
           </section>
         ))
+      )}
+
+      {!isLoading && !error && past.length > 0 && (
+        <section className="space-y-3" aria-label="Transportes anteriores">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-0 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:bg-transparent"
+            aria-expanded={showHistory}
+            onClick={() => setShowHistory((current) => !current)}
+          >
+            {showHistory ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
+            Transportes anteriores ({past.length})
+          </Button>
+          {showHistory && past.map((assignment) => (
+            <ConductorAssignmentCard
+              key={assignment.id}
+              assignment={assignment}
+              busy={false}
+              nowIso={nowIso}
+              onRespond={() => undefined}
+            />
+          ))}
+        </section>
       )}
 
       <DeclineTransportDialog

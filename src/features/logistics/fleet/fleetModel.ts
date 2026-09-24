@@ -109,6 +109,7 @@ export type MatrixTransportEvent = {
   origin: string | null;
   destination: string | null;
   location_name: string | null;
+  location_address: string | null;
   departments: string[];
 };
 
@@ -141,6 +142,7 @@ export type MyTransportAssignment = {
   ends_at: string;
   notes: string | null;
   responded_at: string | null;
+  decline_reason: string | null;
   event_id: string;
   event_type: string;
   transport_type: string;
@@ -148,6 +150,7 @@ export type MyTransportAssignment = {
   event_time: string;
   timezone: string;
   title: string | null;
+  job_id: string | null;
   job_title: string | null;
   loading_bay: string | null;
   event_notes: string | null;
@@ -155,7 +158,9 @@ export type MyTransportAssignment = {
   destination: string | null;
   location_name: string | null;
   location_address: string | null;
-  vehicle: Pick<FleetVehicle, "id" | "name" | "license_plate" | "vehicle_type"> | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  vehicle: Pick<FleetVehicle, "id" | "name" | "license_plate" | "vehicle_type" | "has_tail_lift"> | null;
 };
 
 export type DriverDetails = {

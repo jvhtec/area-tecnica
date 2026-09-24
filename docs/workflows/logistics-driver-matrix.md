@@ -15,7 +15,7 @@ logistics calendar), not jobs.
 | Driver dashboard | `/conductor` (`ConductorDashboard`) | `conductor` only |
 | Driver licence card | `/profile` (`ConductorProfileCard`) | the driver, read-only |
 
-Code: `src/features/logistics/fleet/` (model, RPC wrappers, hooks) and
+Code: `src/features/logistics/fleet/` (model, RPC wrappers, hooks), `src/features/logistics/events/` (event place hook) and
 `src/components/logistics/fleet/`. Schema: `supabase/migrations/20260924100000_add_conductor_role.sql`,
 `20260924100500_logistics_fleet_and_driver_assignments.sql`,
 `20260924110000_harden_logistics_driver_matrix.sql` and
@@ -108,6 +108,33 @@ A `.declined` push appends the driver's reason (`Motivo: …`) when they gave on
 driver on the road is never blocked) before `respond_transport_assignment(id, 'declined', reason)`.
 
 Drivers enable push on their profile like crew do (`canViewProfilePushControls`).
+
+## Driver dashboard (`/conductor`)
+
+What a driver gets per transport (`ConductorAssignmentCard`), all from
+`get_my_transport_assignments()`:
+
+- **Next run first**: the first upcoming non-declined assignment is highlighted with a
+  static map tile (`static-map` edge function, fetched once per venue) and a countdown
+  (`describeTimeUntil`: "Empieza en 2 h 15 min", "En curso"…).
+- **Navigation** (`src/features/logistics/fleet/navigation.ts`): *Cómo llegar* (Google
+  Maps, driving), *Waze*, *Apple Maps* on Apple devices, and *Ruta completa* from the
+  transport request's origin when there is one. Links use the venue coordinates from
+  `locations` and fall back to name + address. *Copiar* puts the address on the
+  clipboard for a truck's own sat-nav.
+- **Responsable de producción** for job-backed transports, with WhatsApp / call
+  shortcuts. `get_job_producer_contacts()` releases the rows to a driver who holds a
+  live (non-declined) assignment on one of the job's transports — see
+  `docs/workflows/job-producer-claims.md`.
+- **Where "the place" comes from**: `logistics_events.location_id` when the transport
+  names its own place (picked with `PlaceAutocomplete` in the event dialog: a supplier,
+  a pickup point, the warehouse), otherwise the job's `jobs.location_id`. Both are
+  `locations` rows, so coordinates come for free. Transport requests' *Origen* /
+  *Destino* use `AddressAutocomplete`, so a picked suggestion stores a full address the
+  route link can resolve.
+- Vehicle line shows *Plataforma* when the vehicle has a tail lift; a declined card shows
+  the driver's own reason.
+- **Transportes anteriores**: the last 30 days, collapsed by default.
 
 ## Giving someone the role
 

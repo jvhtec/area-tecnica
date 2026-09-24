@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(37);
+SELECT plan(39);
 
 SELECT has_table('public', 'job_producer_claims', 'job_producer_claims table exists');
 
@@ -137,6 +137,10 @@ VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- Keep the focused test rerunnable after a prior assertion or fixture failure.
+DELETE FROM public.transport_driver_assignments
+WHERE logistics_event_id = 'd9300000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.logistics_events
+WHERE id = 'd9300000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.job_producer_claims
 WHERE job_id IN (
   'd9200000-0000-0000-0000-000000000001'::uuid,
@@ -170,7 +174,8 @@ DELETE FROM public.profiles WHERE id IN (
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
   'd9100000-0000-0000-0000-000000000007'::uuid,
-  'd9100000-0000-0000-0000-000000000008'::uuid
+  'd9100000-0000-0000-0000-000000000008'::uuid,
+  'd9100000-0000-0000-0000-000000000009'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000001'::uuid,
@@ -180,7 +185,8 @@ DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
   'd9100000-0000-0000-0000-000000000007'::uuid,
-  'd9100000-0000-0000-0000-000000000008'::uuid
+  'd9100000-0000-0000-0000-000000000008'::uuid,
+  'd9100000-0000-0000-0000-000000000009'::uuid
 );
 
 INSERT INTO auth.users (
@@ -242,6 +248,13 @@ INSERT INTO auth.users (
     'claim-logistics@test.local', 'test', now(), now(), now(),
     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
     'authenticated', 'authenticated'
+  ),
+  (
+    'd9100000-0000-0000-0000-000000000009'::uuid,
+    '00000000-0000-0000-0000-000000000000'::uuid,
+    'claim-driver@test.local', 'test', now(), now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+    'authenticated', 'authenticated'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -254,7 +267,8 @@ VALUES
   ('d9100000-0000-0000-0000-000000000005'::uuid, 'claim-sound-manager@test.local', 'Mario', 'Sonido', NULL, 'management', 'sound', NULL),
   ('d9100000-0000-0000-0000-000000000006'::uuid, 'claim-production-admin@test.local', 'Adela', 'Admin', NULL, 'admin', 'production', NULL),
   ('d9100000-0000-0000-0000-000000000007'::uuid, 'claim-unrelated-tech@test.local', 'Nuria', 'Nadie', NULL, 'technician', 'sound', NULL),
-  ('d9100000-0000-0000-0000-000000000008'::uuid, 'claim-logistics@test.local', 'Lola', 'Logística', NULL, 'logistics', 'logistics', NULL)
+  ('d9100000-0000-0000-0000-000000000008'::uuid, 'claim-logistics@test.local', 'Lola', 'Logística', NULL, 'logistics', 'logistics', NULL),
+  ('d9100000-0000-0000-0000-000000000009'::uuid, 'claim-driver@test.local', 'Dani', 'Conductor', NULL, 'conductor', 'logistics', NULL)
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
     first_name = excluded.first_name,
@@ -306,6 +320,22 @@ VALUES (
   'd9100000-0000-0000-0000-000000000003'::uuid
 )
 ON CONFLICT DO NOTHING;
+
+-- Dani drives a transport of the authorization job (no job_assignment, no
+-- timesheet), which is enough to reach its producer on site.
+INSERT INTO public.logistics_events (id, job_id, event_type, transport_type, event_date, event_time, timezone)
+VALUES (
+  'd9300000-0000-0000-0000-000000000001'::uuid,
+  'd9200000-0000-0000-0000-000000000004'::uuid,
+  'load', 'trailer', '2031-09-23', '07:00', 'Europe/Madrid'
+);
+INSERT INTO public.transport_driver_assignments (logistics_event_id, driver_id, starts_at, ends_at)
+VALUES (
+  'd9300000-0000-0000-0000-000000000001'::uuid,
+  'd9100000-0000-0000-0000-000000000009'::uuid,
+  '2031-09-23 07:00 Europe/Madrid'::timestamptz,
+  '2031-09-23 09:00 Europe/Madrid'::timestamptz
+);
 
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000001', false);
@@ -594,6 +624,31 @@ SELECT is_empty(
   'a technician who does not work the job gets no producer contact details'
 );
 
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000009', false);
+SET ROLE authenticated;
+
+SELECT results_eq(
+  $$
+    SELECT display_name, phone
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
+    )
+  $$,
+  $$VALUES ('Olga Producción'::text, '+34 600 33 34 44'::text)$$,
+  'a driver with a live transport on the job can reach its producer'
+);
+
+SELECT is_empty(
+  $$
+    SELECT producer_id
+    FROM public.get_job_producer_contacts(
+      ARRAY['d9200000-0000-0000-0000-000000000001'::uuid]
+    )
+  $$,
+  'a driver gets no producer contact details for jobs they do not drive for'
+);
+
 SELECT results_eq(
   $$
     SELECT display_name
@@ -654,6 +709,10 @@ RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
 
+DELETE FROM public.transport_driver_assignments
+WHERE logistics_event_id = 'd9300000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.logistics_events
+WHERE id = 'd9300000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.job_producer_claims
 WHERE job_id IN (
   'd9200000-0000-0000-0000-000000000001'::uuid,
@@ -687,7 +746,8 @@ DELETE FROM public.profiles WHERE id IN (
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
   'd9100000-0000-0000-0000-000000000007'::uuid,
-  'd9100000-0000-0000-0000-000000000008'::uuid
+  'd9100000-0000-0000-0000-000000000008'::uuid,
+  'd9100000-0000-0000-0000-000000000009'::uuid
 );
 DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000001'::uuid,
@@ -697,7 +757,8 @@ DELETE FROM auth.users WHERE id IN (
   'd9100000-0000-0000-0000-000000000005'::uuid,
   'd9100000-0000-0000-0000-000000000006'::uuid,
   'd9100000-0000-0000-0000-000000000007'::uuid,
-  'd9100000-0000-0000-0000-000000000008'::uuid
+  'd9100000-0000-0000-0000-000000000008'::uuid,
+  'd9100000-0000-0000-0000-000000000009'::uuid
 );
 
 SELECT * FROM finish();

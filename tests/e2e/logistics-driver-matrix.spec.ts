@@ -16,10 +16,10 @@ const matrix = {
     { id: "v2", name: "Furgoneta 1", license_plate: "5678 DEF", vehicle_type: "furgoneta", required_license: "B", brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false, itv_expiry: "2026-09-01", insurance_expiry: null, notes: null, is_active: true },
   ],
   events: [
-    { id: "e1", event_type: "load", transport_type: "trailer", event_date: "2026-09-30", event_time: "08:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j1", job_title: "Gala Liceu", license_plate: null, transport_provider: null, loading_bay: "Muelle 2", notes: null, transport_request_id: null, origin: "Almacén", destination: "Liceu", location_name: "Liceu", departments: ["sound"] },
-    { id: "e2", event_type: "unload", transport_type: "trailer", event_date: "2026-09-30", event_time: "09:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j1", job_title: "Gala Liceu", license_plate: null, transport_provider: null, loading_bay: null, notes: null, transport_request_id: null, origin: null, destination: null, location_name: "Liceu", departments: ["sound"] },
-    { id: "e3", event_type: "load", transport_type: "furgoneta", event_date: "2026-09-30", event_time: "16:00:00", timezone: "Europe/Madrid", title: "Recogida subalquiler", color: null, job_id: null, job_title: null, license_plate: null, transport_provider: null, loading_bay: null, notes: null, transport_request_id: null, origin: null, destination: null, location_name: null, departments: ["lights"] },
-    { id: "e4", event_type: "load", transport_type: "trailer", event_date: "2026-10-02", event_time: "07:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j2", job_title: "Festival Norte", license_plate: null, transport_provider: null, loading_bay: null, notes: null, transport_request_id: null, origin: null, destination: null, location_name: null, departments: [] },
+    { id: "e1", event_type: "load", transport_type: "trailer", event_date: "2026-09-30", event_time: "08:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j1", job_title: "Gala Liceu", license_plate: null, transport_provider: null, loading_bay: "Muelle 2", notes: null, transport_request_id: null, origin: "Almacén", destination: "Liceu", location_name: "Liceu", location_address: "La Rambla 51, Barcelona", departments: ["sound"] },
+    { id: "e2", event_type: "unload", transport_type: "trailer", event_date: "2026-09-30", event_time: "09:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j1", job_title: "Gala Liceu", license_plate: null, transport_provider: null, loading_bay: null, notes: null, transport_request_id: null, origin: null, destination: null, location_name: "Liceu", location_address: "La Rambla 51, Barcelona", departments: ["sound"] },
+    { id: "e3", event_type: "load", transport_type: "furgoneta", event_date: "2026-09-30", event_time: "16:00:00", timezone: "Europe/Madrid", title: "Recogida subalquiler", color: null, job_id: null, job_title: null, license_plate: null, transport_provider: null, loading_bay: null, notes: null, transport_request_id: null, origin: null, destination: null, location_name: null, location_address: null, departments: ["lights"] },
+    { id: "e4", event_type: "load", transport_type: "trailer", event_date: "2026-10-02", event_time: "07:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j2", job_title: "Festival Norte", license_plate: null, transport_provider: null, loading_bay: null, notes: null, transport_request_id: null, origin: null, destination: null, location_name: null, location_address: null, departments: [] },
   ],
   assignments: [
     { id: "a1", logistics_event_id: "e1", driver_id: "d1", vehicle_id: "v1", starts_at: "2026-09-30T06:00:00Z", ends_at: "2026-09-30T08:00:00Z", status: "confirmed", notes: null, responded_at: null, decline_reason: null },
@@ -29,9 +29,15 @@ const matrix = {
 };
 
 const mine = [
-  { id: "a2", status: "assigned", starts_at: "2026-09-30T13:00:00Z", ends_at: "2026-09-30T15:00:00Z", notes: "Llaves en recepción", responded_at: null, event_id: "e2", event_type: "unload", transport_type: "trailer", event_date: "2026-09-30", event_time: "15:00:00", title: null, job_title: "Gala Liceu", loading_bay: "Muelle 2", event_notes: "Acceso por puerta norte", origin: "Almacén Sector Pro", destination: "Gran Teatre del Liceu", location_name: "Liceu", location_address: "La Rambla 51, Barcelona", vehicle: { id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer" } },
-  { id: "a4", status: "confirmed", starts_at: "2026-10-02T05:00:00Z", ends_at: "2026-10-02T09:00:00Z", notes: null, responded_at: null, event_id: "e4", event_type: "load", transport_type: "trailer", event_date: "2026-10-02", event_time: "07:00:00", title: null, job_title: "Festival Norte", loading_bay: null, event_notes: null, origin: null, destination: null, location_name: null, location_address: null, vehicle: null },
+  { id: "a2", status: "assigned", starts_at: "2026-09-30T13:00:00Z", ends_at: "2026-09-30T15:00:00Z", notes: "Llaves en recepción", responded_at: null, decline_reason: null, event_id: "e2", event_type: "unload", transport_type: "trailer", event_date: "2026-09-30", event_time: "15:00:00", title: null, job_id: "j1", job_title: "Gala Liceu", loading_bay: "Muelle 2", event_notes: "Acceso por puerta norte", origin: "Almacén Sector Pro", destination: "Gran Teatre del Liceu", location_name: "Liceu", location_address: "La Rambla 51, Barcelona", location_lat: 41.38, location_lng: 2.17, vehicle: { id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer", has_tail_lift: true } },
+  { id: "a4", status: "confirmed", starts_at: "2026-10-02T05:00:00Z", ends_at: "2026-10-02T09:00:00Z", notes: null, responded_at: null, decline_reason: null, event_id: "e4", event_type: "load", transport_type: "trailer", event_date: "2026-10-02", event_time: "07:00:00", title: null, job_id: null, job_title: "Festival Norte", loading_bay: null, event_notes: null, origin: null, destination: null, location_name: null, location_address: null, location_lat: null, location_lng: null, vehicle: null },
+  // Finished yesterday: only shown under "Transportes anteriores".
+  { id: "a0", status: "confirmed", starts_at: "2026-09-29T06:00:00Z", ends_at: "2026-09-29T08:00:00Z", notes: null, responded_at: null, decline_reason: null, event_id: "e0", event_type: "load", transport_type: "furgoneta", event_date: "2026-09-29", event_time: "08:00:00", title: "Recogida ayer", job_id: null, job_title: null, loading_bay: null, event_notes: null, origin: null, destination: null, location_name: null, location_address: null, location_lat: null, location_lng: null, vehicle: null },
 ];
+
+// A 1×1 PNG standing in for the Mapbox tile the static-map function returns.
+const mapTile = { dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" };
+const producers = [{ job_id: "j1", producer_id: "p1", display_name: "Olga Producción", phone: "600 333 444", email: null }];
 
 
 async function bootstrapManagement(page: Page) {
@@ -131,14 +137,31 @@ test.describe("Conductor dashboard", () => {
       rpc: {
         get_my_transport_assignments: mine,
         respond_transport_assignment: { assignment_id: "a2", status: "confirmed", logistics_event_id: "e2" },
+        get_job_producer_contacts: producers,
       },
+      functions: { "static-map": mapTile },
     });
     // Any other page sends a driver back to their transports.
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/conductor$/);
     await expect(page.getByRole("heading", { name: "Mis transportes" })).toBeVisible();
     await expect(page.getByText("Descarga · Gala Liceu")).toBeVisible();
-    await expect(page.getByText("Tráiler 1 · 1234 ABC")).toBeVisible();
+    await expect(page.getByText("Tráiler 1 · 1234 ABC · Plataforma")).toBeVisible();
+
+    // The next run: countdown from the fixed clock (08:00Z → 13:00Z), map tile, and
+    // turn-by-turn links built from the venue coordinates.
+    await expect(page.getByText("Empieza en 5 h")).toBeVisible();
+    await expect(page.getByRole("img", { name: "Mapa de Liceu" })).toHaveAttribute("src", /^data:image\/png/);
+    await expect(page.getByRole("link", { name: "Cómo llegar" })).toHaveAttribute("href", /destination=41\.38%2C2\.17&travelmode=driving/);
+    await expect(page.getByRole("link", { name: "Waze" })).toHaveAttribute("href", /waze\.com\/ul\?ll=41\.38%2C2\.17/);
+    await expect(page.getByRole("link", { name: "Ruta completa" })).toHaveAttribute("href", /origin=Almac%C3%A9n%20Sector%20Pro/);
+    // Job-backed transports show who to call on site.
+    await expect(page.getByText("Responsable de producción")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Llamar a Olga Producción" })).toHaveAttribute("href", "tel:+34600333444");
+    // Finished runs are tucked away until asked for.
+    await expect(page.getByText("Recogida ayer")).toHaveCount(0);
+    await page.getByRole("button", { name: /Transportes anteriores \(1\)/ }).click();
+    await expect(page.getByText("Recogida ayer")).toBeVisible();
 
     await page.getByRole("button", { name: "Confirmar" }).click();
     await expect.poll(() => calls.rpcCalls.filter((call) => call.name === "respond_transport_assignment").length).toBe(1);

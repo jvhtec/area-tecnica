@@ -74,6 +74,7 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   origin: null,
   destination: null,
   location_name: null,
+  location_address: null,
   departments: [],
   ...overrides,
 });

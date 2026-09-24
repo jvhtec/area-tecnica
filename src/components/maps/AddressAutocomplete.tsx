@@ -128,8 +128,8 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     }
 
     hasShownAutocompleteErrorRef.current = true;
-    toast.error('Autocomplete unavailable', {
-      description: `${getErrorMessage(error)}. You can keep typing manually.`,
+    toast.error('Autocompletado no disponible', {
+      description: `${getErrorMessage(error)}. Puedes seguir escribiendo la dirección a mano.`,
     });
   };
 

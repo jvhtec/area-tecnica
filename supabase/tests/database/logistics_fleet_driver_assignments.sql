@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(80);
+SELECT plan(83);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -63,6 +63,7 @@ SELECT has_column('public', 'fleet_vehicles', 'insurance_expiry', 'fleet_vehicle
 SELECT has_column('public', 'fleet_vehicles', 'has_tail_lift', 'fleet_vehicles.has_tail_lift exists');
 SELECT has_column('public', 'driver_details', 'tachograph_card_expiry', 'driver_details.tachograph_card_expiry exists');
 SELECT has_column('public', 'transport_driver_assignments', 'decline_reason', 'transport_driver_assignments.decline_reason exists');
+SELECT has_column('public', 'logistics_events', 'location_id', 'logistics_events.location_id exists');
 SELECT hasnt_function(
   'public', 'respond_transport_assignment', ARRAY['uuid', 'text'],
   'the two-argument respond overload is gone, so PostgREST calls are unambiguous'
@@ -103,6 +104,7 @@ DELETE FROM public.fleet_vehicles WHERE id IN (
   'e5400000-0000-0000-0000-000000000001'::uuid,
   'e5400000-0000-0000-0000-000000000002'::uuid
 );
+DELETE FROM public.locations WHERE id = 'e5500000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.profiles WHERE id IN (
   'e5100000-0000-0000-0000-000000000001'::uuid,
   'e5100000-0000-0000-0000-000000000002'::uuid,
@@ -159,16 +161,20 @@ VALUES ('e5100000-0000-0000-0000-000000000003', '2031-03-11', 'sick');
 INSERT INTO public.vacation_requests (technician_id, start_date, end_date, status)
 VALUES ('e5100000-0000-0000-0000-000000000003'::uuid, '2031-03-12', '2031-03-13', 'approved');
 
+INSERT INTO public.locations (id, name, formatted_address, latitude, longitude)
+VALUES ('e5500000-0000-0000-0000-000000000001'::uuid, 'Nave proveedor', 'Calle Industria 4, Getafe', 40.30571000, -3.73295000);
+
 -- Calendar-only transports (no job) keep the fixture independent of job triggers.
-INSERT INTO public.logistics_events (id, event_type, transport_type, event_date, event_time, title, timezone)
+-- The afternoon pickup names its own place; the others have none.
+INSERT INTO public.logistics_events (id, event_type, transport_type, event_date, event_time, title, timezone, location_id)
 VALUES
-  ('e5300000-0000-0000-0000-000000000001'::uuid, 'load', 'trailer', '2031-03-10', '08:00', 'Carga almacén', 'Europe/Madrid'),
-  ('e5300000-0000-0000-0000-000000000002'::uuid, 'unload', 'trailer', '2031-03-10', '09:00', 'Descarga recinto', 'Europe/Madrid'),
-  ('e5300000-0000-0000-0000-000000000003'::uuid, 'load', 'furgoneta', '2031-03-10', '15:00', 'Recogida tarde', 'Europe/Madrid'),
+  ('e5300000-0000-0000-0000-000000000001'::uuid, 'load', 'trailer', '2031-03-10', '08:00', 'Carga almacén', 'Europe/Madrid', NULL),
+  ('e5300000-0000-0000-0000-000000000002'::uuid, 'unload', 'trailer', '2031-03-10', '09:00', 'Descarga recinto', 'Europe/Madrid', NULL),
+  ('e5300000-0000-0000-0000-000000000003'::uuid, 'load', 'furgoneta', '2031-03-10', '15:00', 'Recogida tarde', 'Europe/Madrid', 'e5500000-0000-0000-0000-000000000001'::uuid),
   -- A long haul that starts before the ranges queried below and is still running in them.
-  ('e5300000-0000-0000-0000-000000000004'::uuid, 'load', 'trailer', '2031-03-08', '20:00', 'Ruta larga', 'Europe/Madrid'),
+  ('e5300000-0000-0000-0000-000000000004'::uuid, 'load', 'trailer', '2031-03-08', '20:00', 'Ruta larga', 'Europe/Madrid', NULL),
   -- This run reaches Monday in Helsinki while Madrid is still on Sunday.
-  ('e5300000-0000-0000-0000-000000000005'::uuid, 'load', 'trailer', '2031-03-09', '23:30', 'Cruce Helsinki', 'Europe/Helsinki');
+  ('e5300000-0000-0000-0000-000000000005'::uuid, 'load', 'trailer', '2031-03-09', '23:30', 'Cruce Helsinki', 'Europe/Helsinki', NULL);
 
 -- ---------------------------------------------------------------------------
 -- Management: fleet and assignments
@@ -398,6 +404,20 @@ SELECT is(
   public.get_my_transport_assignments('2031-03-01', '2031-03-31')->0->>'timezone',
   'Europe/Madrid',
   'a driver assignment exposes the transport timezone'
+);
+
+SELECT ok(
+  public.get_my_transport_assignments('2031-03-01', '2031-03-31')->0
+    ?& ARRAY['job_id', 'location_lat', 'location_lng', 'decline_reason'],
+  'a driver assignment carries the job id, venue coordinates and their own decline reason'
+);
+
+SELECT is(
+  (SELECT r ->> 'location_name' || ' @ ' || (r ->> 'location_lat')
+   FROM jsonb_array_elements(public.get_my_transport_assignments('2031-03-01', '2031-03-31')) r
+   WHERE r ->> 'event_id' = 'e5300000-0000-0000-0000-000000000003'),
+  'Nave proveedor @ 40.30571000',
+  'a transport with its own place gives the driver that place and its coordinates'
 );
 
 SELECT is(
@@ -806,6 +826,7 @@ DELETE FROM public.fleet_vehicles WHERE id IN (
   'e5400000-0000-0000-0000-000000000001'::uuid,
   'e5400000-0000-0000-0000-000000000002'::uuid
 );
+DELETE FROM public.locations WHERE id = 'e5500000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.profiles WHERE id IN (
   'e5100000-0000-0000-0000-000000000001'::uuid,
   'e5100000-0000-0000-0000-000000000002'::uuid,

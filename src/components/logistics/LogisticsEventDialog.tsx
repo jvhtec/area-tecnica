@@ -42,6 +42,8 @@ import type { Database } from "@/integrations/supabase/types";
 
 
 import { queryKeys } from "@/lib/react-query";
+import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
+import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
 import { getErrorMessage } from '@/utils/errorMessage';
 import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
@@ -95,6 +97,7 @@ export const LogisticsEventDialog = ({
   const [alsoCreateUnload, setAlsoCreateUnload] = useState(false);
   const [isHojaRelevant, setIsHojaRelevant] = useState(true);
   const [hojaCategories, setHojaCategories] = useState<LogisticsHojaCategory[]>([]);
+  const location = useLogisticsEventLocation(open);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -152,6 +155,7 @@ export const LogisticsEventDialog = ({
       setColor(selectedEvent.color || "#7E69AB");
       setIsHojaRelevant(selectedEvent.is_hoja_relevant ?? true);
       setHojaCategories(normalizeCategories(selectedEvent.hoja_categories));
+      location.reset(selectedEvent.location_id ?? null);
     } else {
       setEventType(initialEventType || "load");
       setTransportType(initialTransportType || "trailer");
@@ -168,6 +172,7 @@ export const LogisticsEventDialog = ({
       setAlsoCreateUnload(false);
       setIsHojaRelevant(true);
       setHojaCategories([]);
+      location.reset(null);
       // Ensure job selection is cleared if no initial job is provided
       if (!initialJobId) {
         setSelectedJob(null);
@@ -318,7 +323,8 @@ export const LogisticsEventDialog = ({
         }
       };
 
-      const eventData: LogisticsEventPayload = {
+      const resolvedLocationId = await location.resolve();
+      const eventData = {
         event_type: eventType,
         transport_type: transportType,
         transport_provider: transportProvider || null,
@@ -332,7 +338,9 @@ export const LogisticsEventDialog = ({
         color: color,
         is_hoja_relevant: isHojaRelevant,
         hoja_categories: hojaCategories,
-      };
+        // Postdates the generated types (see logisticsEventTypes.ts).
+        location_id: resolvedLocationId,
+      } as LogisticsEventPayload;
 
       if (selectedEvent) {
         const { error: updateError } = await dataLayerClient.from("logistics_events")
@@ -668,6 +676,8 @@ export const LogisticsEventDialog = ({
                 ))}
               </div>
             </div>
+
+            <LogisticsEventPlaceField location={location} hasJob={Boolean(selectedJob)} />
 
             {/* Loading Bay */}
             <div className="space-y-2">
