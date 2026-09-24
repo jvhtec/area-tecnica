@@ -5,7 +5,7 @@ import type { MyTransportAssignment } from "./fleetModel";
 import { currentSharingAssignment, shouldReportPosition, type GeoPoint } from "./tracking";
 import { useScreenWakeLock } from "./useScreenWakeLock";
 
-const STORAGE_KEY = "conductor.shareLocation";
+const storageKey = (userId: string) => `conductor.shareLocation:${userId}`;
 
 export type SharingStatus =
   /** Switch off. */
@@ -27,17 +27,17 @@ type SharingState = {
   assignment: MyTransportAssignment | null;
 };
 
-const readStoredPreference = (): boolean => {
+const readStoredPreference = (userId: string): boolean => {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "on";
+    return localStorage.getItem(storageKey(userId)) === "on";
   } catch {
     return false;
   }
 };
 
-const writeStoredPreference = (enabled: boolean) => {
+const writeStoredPreference = (userId: string, enabled: boolean) => {
   try {
-    localStorage.setItem(STORAGE_KEY, enabled ? "on" : "off");
+    localStorage.setItem(storageKey(userId), enabled ? "on" : "off");
   } catch {
     // Private mode or blocked storage: the switch just does not survive a reload.
   }
@@ -73,11 +73,18 @@ const toReport = (position: GeolocationPosition, assignmentId: string): ReportDr
  * - a fix that fails to upload (tunnel, no coverage) is kept and re-sent when
  *   the connection is back or on the next fix, whichever comes first.
  */
-export function useDriverLocationSharing(assignments: readonly MyTransportAssignment[], nowIso: string) {
-  const [enabled, setEnabled] = useState<boolean>(readStoredPreference);
+export function useDriverLocationSharing(
+  assignments: readonly MyTransportAssignment[],
+  nowIso: string,
+  userId: string,
+) {
+  const [enabled, setEnabled] = useState<boolean>(() => readStoredPreference(userId));
   const [state, setState] = useState<SharingState>({ status: "off", error: null, lastReportedAt: null, assignment: null });
   const lastReportRef = useRef<(GeoPoint & { reportedAt: number }) | null>(null);
   const pendingRef = useRef<ReportDriverLocationInput | null>(null);
+  const waitingClearedRef = useRef(false);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   const assignment = currentSharingAssignment(assignments, nowIso);
   const assignmentId = assignment?.id ?? null;
@@ -87,12 +94,29 @@ export function useDriverLocationSharing(assignments: readonly MyTransportAssign
 
   const toggle = useCallback((next: boolean) => {
     setEnabled(next);
-    writeStoredPreference(next);
+    writeStoredPreference(userId, next);
     if (!next) {
       lastReportRef.current = null;
       pendingRef.current = null;
+      waitingClearedRef.current = true;
       void stopSharingDriverLocation().catch(() => undefined);
+    } else {
+      waitingClearedRef.current = false;
     }
+  }, [userId]);
+
+  // Consent belongs to the signed-in identity, never to the browser/device.
+  useEffect(() => {
+    setEnabled(readStoredPreference(userId));
+    lastReportRef.current = null;
+    pendingRef.current = null;
+    waitingClearedRef.current = false;
+  }, [userId]);
+
+  // Leaving /conductor or logging out stops the server-visible position as well
+  // as the browser watch. The server additionally enforces the transport window.
+  useEffect(() => () => {
+    if (enabledRef.current) void stopSharingDriverLocation().catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -106,9 +130,16 @@ export function useDriverLocationSharing(assignments: readonly MyTransportAssign
     }
     if (!assignmentId) {
       setState((current) => ({ ...current, status: "waiting", error: null, assignment: null }));
+      lastReportRef.current = null;
+      pendingRef.current = null;
+      if (!waitingClearedRef.current) {
+        waitingClearedRef.current = true;
+        void stopSharingDriverLocation().catch(() => undefined);
+      }
       return;
     }
 
+    waitingClearedRef.current = false;
     setState((current) => ({ ...current, status: "active", error: null, assignment }));
 
     const send = (report: ReportDriverLocationInput) => {
