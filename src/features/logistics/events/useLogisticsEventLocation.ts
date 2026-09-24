@@ -45,11 +45,15 @@ export function useLogisticsEventLocation(open: boolean) {
 
   const onInputChange = useCallback((value: string) => {
     setInput(value);
-    if (!value.trim()) {
-      setPicked(null);
+    // Typing after either a stored value or an autocomplete pick invalidates the
+    // old selection. Keeping the old id here made the UI display one place while
+    // resolve() silently saved another.
+    setPicked(null);
+    const storedName = stored?.name?.trim() ?? "";
+    if (!value.trim() || value.trim() !== storedName) {
       setLocationId(null);
     }
-  }, []);
+  }, [stored?.name]);
 
   const onSelect = useCallback((result: PlacePick) => {
     setInput(result.name);
