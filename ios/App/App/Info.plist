@@ -8,6 +8,8 @@
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>Area Tecnica - Sector Pro</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Si eres conductor y lo activas, logística verá tu posición mientras tengas un transporte en marcha.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

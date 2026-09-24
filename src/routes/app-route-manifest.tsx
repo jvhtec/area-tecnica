@@ -194,6 +194,7 @@ export const accessPolicies = {
 
 
 const LOGISTICS_FLEET_QUERY_KEY = ["transport_driver_assignments"] as const;
+const DRIVER_LOCATIONS_QUERY_KEY = ["driver_locations"] as const;
 
 export const subscriptionProfiles = {
   dashboard: [
@@ -228,6 +229,8 @@ export const subscriptionProfiles = {
     // A driver's days off (per-day rows and approved vacations) grey out matrix cells.
     { table: "technician_availability", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
     { table: "vacation_requests", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+    // Live positions have their own key so a fix every few seconds never refetches the matrix.
+    { table: "driver_locations", priority: "high", queryKey: DRIVER_LOCATIONS_QUERY_KEY },
   ],
   conductor: [
     { table: "transport_driver_assignments", priority: "high", queryKey: LOGISTICS_FLEET_QUERY_KEY },

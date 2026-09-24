@@ -13,6 +13,7 @@ logistics calendar), not jobs.
 | Matrix | `/logistics?tab=drivers` (`LogisticsDriverMatrix`) | admin/management edit, house_tech read-only |
 | Fleet + driver licences | `/logistics?tab=fleet` (`FleetManagementPanel`) | admin/management edit, house_tech read-only |
 | Driver dashboard | `/conductor` (`ConductorDashboard`) | `conductor` only |
+| Live tracking | `/logistics?tab=tracking` (`DriverTrackingPanel`) | admin/management/house_tech |
 | Driver licence card | `/profile` (`ConductorProfileCard`) | the driver, read-only |
 
 Code: `src/features/logistics/fleet/` (model, RPC wrappers, hooks), `src/features/logistics/events/` (event place hook) and
@@ -135,6 +136,31 @@ What a driver gets per transport (`ConductorAssignmentCard`), all from
 - Vehicle line shows *Plataforma* when the vehicle has a tail lift; a declined card shows
   the driver's own reason.
 - **Transportes anteriores**: the last 30 days, collapsed by default.
+
+## Live tracking (`Seguimiento`)
+
+Opt-in, foreground-only position sharing from the driver's phone to the logistics map.
+
+- **Driver side**: the switch on `/conductor` (`ConductorLocationSharingCard` →
+  `useDriverLocationSharing`). Positions are sent only while `currentSharingAssignment`
+  finds a non-declined transport that is running or starts within
+  `SHARING_LEAD_MINUTES` (2 h); otherwise the switch waits. Fixes are throttled
+  (`shouldReportPosition`: 30 s or 50 m) and go through `report_driver_location()`,
+  which checks the caller is a conductor and that the attached assignment is their own.
+  Turning the switch off calls `stop_sharing_driver_location()`, which deletes the row.
+- **Storage**: `driver_locations` holds **one row per driver — the latest position, no
+  trail**. Rows older than 24 h are purged opportunistically; the read model ignores
+  anything older than 12 h and the UI greys positions past `STALE_AFTER_MINUTES` (10).
+  RLS: matrix viewers and the driver themselves can read; nobody writes directly.
+- **Logistics side**: `get_driver_locations()` (matrix viewers only) feeds the tab: a
+  Mapbox GL map (`DriverTrackingMap`, lazy-loaded, marker per driver + pin for the
+  destination of their current transport) and a list that works without a token. Route
+  subscriptions invalidate the `driver_locations` query key on every change, with a
+  30 s poll as fallback; positions deliberately do **not** share the matrix key.
+- **Native**: `NSLocationWhenInUseUsageDescription` (iOS) and
+  `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` (Android) are declared. There is no
+  background-location plugin: the phone stops sending when the app is in the background
+  or the screen is off, and the card says so.
 
 ## Giving someone the role
 

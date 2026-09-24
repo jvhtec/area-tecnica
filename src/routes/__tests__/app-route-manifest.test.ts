@@ -94,6 +94,11 @@ describe("app route manifest", () => {
       );
     }
 
+    // Live positions must not fan into the matrix key.
+    expect(logistics).toContainEqual(
+      expect.objectContaining({ table: "driver_locations", queryKey: ["driver_locations"] }),
+    );
+
     // logistics_events still keeps its normal invalidation for the calendar.
     expect(logistics).toContainEqual(
       expect.objectContaining({ table: "logistics_events", priority: "high" }),

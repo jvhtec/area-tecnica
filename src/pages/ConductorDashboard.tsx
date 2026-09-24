@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 import { Bell, ChevronDown, ChevronUp, Loader2, Truck } from "lucide-react";
 
 import { ConductorAssignmentCard } from "@/components/logistics/fleet/ConductorAssignmentCard";
+import { ConductorLocationSharingCard } from "@/components/logistics/fleet/ConductorLocationSharingCard";
 import { DeclineTransportDialog } from "@/components/logistics/fleet/DeclineTransportDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -94,6 +95,8 @@ const ConductorDashboard = () => {
           </Link>
         </Button>
       </div>
+
+      {!isLoading && !error && <ConductorLocationSharingCard assignments={upcoming} nowIso={nowIso} />}
 
       {error ? (
         <Card><CardContent className="py-8 text-center text-sm text-destructive">{getErrorMessage(error)}</CardContent></Card>

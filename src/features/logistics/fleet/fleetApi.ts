@@ -15,6 +15,7 @@ import {
   type UnavailabilityStatus,
   type VehicleType,
 } from "./fleetModel";
+import type { DriverLiveLocation } from "./tracking";
 
 // The fleet tables and RPCs postdate the generated Supabase types, so calls go
 // through these untyped seams and every payload is normalised field by field.
@@ -390,6 +391,89 @@ export async function saveDriverDetails(input: DriverDetailsInput): Promise<void
     { onConflict: "profile_id" },
   );
   throwIfError(error, "No se pudieron guardar los datos del conductor");
+}
+
+// ---------------------------------------------------------------------------
+// Live location
+// ---------------------------------------------------------------------------
+
+export type ReportDriverLocationInput = {
+  latitude: number;
+  longitude: number;
+  accuracyM?: number | null;
+  headingDeg?: number | null;
+  speedMps?: number | null;
+  assignmentId?: string | null;
+};
+
+const finiteOrNull = (value: number | null | undefined): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+/** Sends one fix; resolves to the server timestamp it was recorded at. */
+export async function reportDriverLocation(input: ReportDriverLocationInput): Promise<string> {
+  const { data, error } = await rpc("report_driver_location", {
+    p_latitude: input.latitude,
+    p_longitude: input.longitude,
+    p_accuracy_m: finiteOrNull(input.accuracyM),
+    p_heading_deg: finiteOrNull(input.headingDeg),
+    p_speed_mps: finiteOrNull(input.speedMps),
+    p_assignment_id: input.assignmentId ?? null,
+  });
+  throwIfError(error, "No se pudo enviar la posición");
+  return strOrNull(asRecord(data).recorded_at) ?? new Date().toISOString();
+}
+
+/** Deletes the driver's stored position. */
+export async function stopSharingDriverLocation(): Promise<void> {
+  const { error } = await rpc("stop_sharing_driver_location");
+  throwIfError(error, "No se pudo dejar de compartir la ubicación");
+}
+
+const toLiveLocation = (value: unknown): DriverLiveLocation | null => {
+  const row = asRecord(value);
+  const latitude = numOrNull(row.latitude);
+  const longitude = numOrNull(row.longitude);
+  const driverId = strOrNull(row.driver_id);
+  const recordedAt = strOrNull(row.recorded_at);
+  if (!driverId || !recordedAt || latitude === null || longitude === null) return null;
+  const assignment = row.assignment ? asRecord(row.assignment) : null;
+  return {
+    driver_id: driverId,
+    first_name: strOrNull(row.first_name),
+    last_name: strOrNull(row.last_name),
+    nickname: strOrNull(row.nickname),
+    latitude,
+    longitude,
+    accuracy_m: numOrNull(row.accuracy_m),
+    heading_deg: numOrNull(row.heading_deg),
+    speed_mps: numOrNull(row.speed_mps),
+    recorded_at: recordedAt,
+    assignment: assignment && strOrNull(assignment.id)
+      ? {
+          id: str(assignment.id),
+          status: status(assignment.status),
+          starts_at: str(assignment.starts_at),
+          ends_at: str(assignment.ends_at),
+          event_type: strOrNull(assignment.event_type),
+          title: strOrNull(assignment.title),
+          timezone: str(assignment.timezone) || "Europe/Madrid",
+          vehicle_name: strOrNull(assignment.vehicle_name),
+          vehicle_plate: strOrNull(assignment.vehicle_plate),
+          destination_name: strOrNull(assignment.destination_name),
+          destination_lat: numOrNull(assignment.destination_lat),
+          destination_lng: numOrNull(assignment.destination_lng),
+        }
+      : null,
+  };
+};
+
+export async function fetchDriverLocations(): Promise<DriverLiveLocation[]> {
+  const { data, error } = await rpc("get_driver_locations");
+  throwIfError(error, "No se pudo cargar la ubicación de los conductores");
+  return asArray(data).flatMap((row) => {
+    const location = toLiveLocation(row);
+    return location ? [location] : [];
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { LogisticsCalendar } from "@/components/logistics/LogisticsCalendar";
 import { MobileLogisticsCalendar } from "@/components/logistics/MobileLogisticsCalendar";
 import { TodayLogistics } from "@/components/logistics/TodayLogistics";
+import { DriverTrackingPanel } from "@/components/logistics/fleet/DriverTrackingPanel";
 import { FleetManagementPanel } from "@/components/logistics/fleet/FleetManagementPanel";
 import { LogisticsDriverMatrix } from "@/components/logistics/fleet/LogisticsDriverMatrix";
 import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
@@ -16,7 +17,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { ACTIVE_DEPARTMENTS, type ActiveDepartment } from "@/types/department";
 import { canManageLogisticsMatrix, canViewLogisticsMatrix, isManagementRole } from "@/utils/permissions";
 
-const LOGISTICS_TABS = ["requests", "calendar", "drivers", "fleet"] as const;
+const LOGISTICS_TABS = ["requests", "calendar", "drivers", "fleet", "tracking"] as const;
 type LogisticsTab = (typeof LOGISTICS_TABS)[number];
 const isLogisticsTab = (value: string | null): value is LogisticsTab =>
   LOGISTICS_TABS.includes(value as LogisticsTab);
@@ -95,11 +96,12 @@ const Logistics = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0 space-y-4">
-        <TabsList className={showDriverMatrix ? "grid h-auto w-full grid-cols-2 sm:w-[560px] sm:grid-cols-4" : "grid w-full grid-cols-2 sm:w-[360px]"}>
+        <TabsList className={showDriverMatrix ? "grid h-auto w-full grid-cols-2 sm:w-[700px] sm:grid-cols-5" : "grid w-full grid-cols-2 sm:w-[360px]"}>
           <TabsTrigger value="requests">Solicitudes</TabsTrigger>
           <TabsTrigger value="calendar">Calendario</TabsTrigger>
           {showDriverMatrix && <TabsTrigger value="drivers">Conductores</TabsTrigger>}
           {showDriverMatrix && <TabsTrigger value="fleet">Flota</TabsTrigger>}
+          {showDriverMatrix && <TabsTrigger value="tracking">Seguimiento</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="requests" className="min-w-0 mt-0">
@@ -130,6 +132,12 @@ const Logistics = () => {
         {showDriverMatrix && (
           <TabsContent value="fleet" className="min-w-0 mt-0">
             <FleetManagementPanel readOnly={driverMatrixReadOnly} />
+          </TabsContent>
+        )}
+
+        {showDriverMatrix && activeTab === "tracking" && (
+          <TabsContent value="tracking" className="min-w-0 mt-0">
+            <DriverTrackingPanel />
           </TabsContent>
         )}
       </Tabs>

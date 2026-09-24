@@ -39,6 +39,12 @@ const mine = [
 const mapTile = { dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" };
 const producers = [{ job_id: "j1", producer_id: "p1", display_name: "Olga Producción", phone: "600 333 444", email: null }];
 
+// Two shared positions at the fixed clock (08:00Z): Ana live, Beto silent for an hour.
+const liveLocations = [
+  { driver_id: "d1", first_name: "Ana", last_name: "Conductora", nickname: null, latitude: 41.39, longitude: 2.16, accuracy_m: 12, heading_deg: 90, speed_mps: 13.9, recorded_at: "2026-09-30T07:59:30Z", assignment: { id: "a2", status: "confirmed", starts_at: "2026-09-30T13:00:00Z", ends_at: "2026-09-30T15:00:00Z", event_type: "unload", title: "Gala Liceu", timezone: "Europe/Madrid", vehicle_name: "Tráiler 1", vehicle_plate: "1234 ABC", destination_name: "Liceu", destination_lat: 41.38, destination_lng: 2.17 } },
+  { driver_id: "d2", first_name: "Beto", last_name: "Ruedas", nickname: null, latitude: 40.42, longitude: -3.7, accuracy_m: 30, heading_deg: null, speed_mps: null, recorded_at: "2026-09-30T07:00:00Z", assignment: null },
+];
+
 
 async function bootstrapManagement(page: Page) {
   await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
@@ -125,6 +131,33 @@ test.describe("Logistics driver matrix", () => {
   });
 });
 
+test.describe("Driver tracking", () => {
+  test("lists shared positions with their age and flags silent drivers", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
+    await bootstrapApp(page, {
+      auth: { userId: "mgr", role: "management", department: "logistics" },
+      tables: {
+        profiles: [{ id: "mgr", first_name: "Marta", last_name: "Log", role: "management", department: "logistics" }],
+        logistics_events: [],
+      },
+      rpc: { get_logistics_matrix: matrix, list_transport_requests: [], get_driver_locations: liveLocations },
+      // No Mapbox token in the harness: the list must stand on its own.
+      functions: { "get-mapbox-token": { token: null } },
+    });
+    await page.goto("/logistics?tab=tracking");
+
+    await expect(page.getByRole("tab", { name: "Seguimiento" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("1 en directo")).toBeVisible();
+    await expect(page.getByText("1 sin señal")).toBeVisible();
+    const list = page.getByRole("list", { name: "Conductores compartiendo ubicación" });
+    await expect(list.getByText("Ana Conductora")).toBeVisible();
+    await expect(list.getByText(/Gala Liceu · 15:00–17:00 · Tráiler 1/)).toBeVisible();
+    await expect(list.getByText(/ahora mismo · 50 km\/h/)).toBeVisible();
+    await expect(list.getByText(/Sin señal · hace 1 h/)).toBeVisible();
+    await expect(page.getByText("El mapa no está disponible ahora mismo", { exact: false })).toBeVisible();
+  });
+});
+
 test.describe("Conductor dashboard", () => {
   test("lands drivers on their own transports and lets them confirm", async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
@@ -169,6 +202,42 @@ test.describe("Conductor dashboard", () => {
     if (!isMobileViewport(page)) {
       await expect(page.getByRole("link", { name: "Matriz de asignaciones" })).toHaveCount(0);
     }
+  });
+
+  test("shares the driver's position only while a transport is close", async ({ page, context }) => {
+    // 12:00Z: Ana's 13:00Z unload starts within the two-hour lead, so sharing kicks in.
+    await page.clock.setFixedTime(new Date("2026-09-30T12:00:00Z"));
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: 41.39, longitude: 2.16, accuracy: 12 });
+    const calls = await bootstrapApp(page, {
+      auth: { userId: "d1", role: "conductor", department: "logistics" },
+      tables: {
+        profiles: [{ id: "d1", first_name: "Ana", last_name: "Conductora", role: "conductor", department: "logistics" }],
+        driver_details: [],
+      },
+      rpc: {
+        get_my_transport_assignments: mine,
+        get_job_producer_contacts: producers,
+        report_driver_location: { driver_id: "d1", recorded_at: "2026-09-30T12:00:05Z" },
+        stop_sharing_driver_location: { driver_id: "d1", stopped: true },
+      },
+      functions: { "static-map": mapTile },
+    });
+    await page.goto("/conductor");
+
+    const toggle = page.getByRole("switch", { name: "Compartir mi ubicación con logística" });
+    await expect(toggle).not.toBeChecked();
+    await expect(page.getByText("Desactivado. Logística no ve tu posición.")).toBeVisible();
+
+    await toggle.click();
+    await expect.poll(() => calls.rpcCalls.filter((call) => call.name === "report_driver_location").length).toBeGreaterThan(0);
+    const report = calls.rpcCalls.find((call) => call.name === "report_driver_location");
+    expect(report?.body).toMatchObject({ p_latitude: 41.39, p_longitude: 2.16, p_assignment_id: "a2" });
+    await expect(page.getByText(/Compartiendo · última posición enviada/)).toBeVisible();
+
+    await toggle.click();
+    await expect.poll(() => calls.rpcCalls.filter((call) => call.name === "stop_sharing_driver_location").length).toBe(1);
+    await expect(page.getByText("Desactivado. Logística no ve tu posición.")).toBeVisible();
   });
 
   test("asks why before recording a refusal and sends the reason", async ({ page }) => {

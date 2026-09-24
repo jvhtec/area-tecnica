@@ -3,14 +3,25 @@ import { useCallback, useMemo } from "react";
 
 import { fetchJobProducerContacts, type JobProducerContact } from "@/features/jobs/producer-claims/producerClaims";
 
-import { fetchLogisticsMatrix, fetchMyTransportAssignments, fetchOwnDriverDetails, fetchStaticMap, type StaticMapInput } from "./fleetApi";
+import {
+  fetchDriverLocations,
+  fetchLogisticsMatrix,
+  fetchMyTransportAssignments,
+  fetchOwnDriverDetails,
+  fetchStaticMap,
+  type StaticMapInput,
+} from "./fleetApi";
 import { summarizeDriversByEvent, type EventDriverSummary } from "./fleetModel";
 
 // Shared aggregate key. Route realtime subscriptions for assignments, events,
 // fleet, licences and their upstream labels all invalidate this root.
 export const LOGISTICS_FLEET_QUERY_ROOT = "transport_driver_assignments";
 
+/** Separate root: positions change every few seconds and must not refetch the matrix. */
+export const DRIVER_LOCATIONS_QUERY_ROOT = "driver_locations";
+
 export const logisticsFleetKeys = {
+  driverLocations: () => [DRIVER_LOCATIONS_QUERY_ROOT, "live"] as const,
   matrix: (startKey: string, endKey: string) => [LOGISTICS_FLEET_QUERY_ROOT, "logistics-matrix", startKey, endKey] as const,
   mine: (fromKey?: string, toKey?: string) => [LOGISTICS_FLEET_QUERY_ROOT, "mine", fromKey ?? "", toKey ?? ""] as const,
   driverDetails: (profileId: string) => [LOGISTICS_FLEET_QUERY_ROOT, "driver-details", profileId] as const,
@@ -89,6 +100,17 @@ export function useStaticMap(input: StaticMapInput, enabled = true) {
     staleTime: Infinity,
     gcTime: 60 * 60_000,
     retry: false,
+  });
+}
+
+/** Every shared driver position, realtime-invalidated and polled as a fallback. */
+export function useDriverLocations(enabled = true) {
+  return useQuery({
+    queryKey: logisticsFleetKeys.driverLocations(),
+    queryFn: fetchDriverLocations,
+    enabled,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
   });
 }
 
