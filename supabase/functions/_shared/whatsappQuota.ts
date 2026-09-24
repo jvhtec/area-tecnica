@@ -19,7 +19,7 @@ export interface WhatsappQuotaClient {
   ): PromiseLike<{ data: RpcRow[] | RpcRow | null; error: { message?: string } | null }>;
 }
 
-export type WhatsappQuotaKind = "job_message" | "group_creation";
+export type WhatsappQuotaKind = "job_message" | "group_creation" | "driver_assignment";
 
 export interface WhatsappQuotaArgs {
   supabase: WhatsappQuotaClient;
@@ -40,7 +40,7 @@ export interface WhatsappQuotaResult {
 export async function checkAndRecordWhatsappQuota(args: WhatsappQuotaArgs): Promise<WhatsappQuotaResult> {
   const { supabase, actorId, kind, jobId = null, dailyLimit } = args;
   const recipientCount = Math.max(0, args.recipientCount ?? 0);
-  const unitsRequested = kind === "job_message" ? recipientCount : 1;
+  const unitsRequested = kind === "job_message" || kind === "driver_assignment" ? recipientCount : 1;
 
   try {
     const { data, error } = await supabase.rpc("attempt_whatsapp_send", {
