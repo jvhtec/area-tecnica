@@ -821,7 +821,7 @@ INSERT INTO public.transport_requests (
   'sound',
   'e5100000-0000-0000-0000-000000000001'::uuid,
   'Ruta navegación',
-  'requested', 'planned', 'transfer', 'normal', 'manual', true,
+  'requested', 'requested', 'transfer', 'normal', 'manual', true,
   'Nave Sector-Pro, Madrid',
   'Recinto destino, Madrid'
 )
@@ -868,13 +868,21 @@ DELETE FROM public.availability_schedules
 WHERE user_id = 'e5100000-0000-0000-0000-000000000003'::uuid
   AND date = '2031-03-14';
 INSERT INTO public.availability_schedules (user_id, date, department, status, source)
-VALUES (
-  'e5100000-0000-0000-0000-000000000003'::uuid,
-  '2031-03-14',
-  'logistics',
-  'unavailable',
-  'warehouse'
-);
+VALUES
+  (
+    'e5100000-0000-0000-0000-000000000003'::uuid,
+    '2031-03-14',
+    'logistics',
+    'unavailable',
+    'warehouse'
+  ),
+  (
+    'e5100000-0000-0000-0000-000000000002'::uuid,
+    '2031-03-15',
+    'logistics',
+    'unavailable',
+    'manual'
+  );
 
 SELECT set_config(
   'test.event2_start',
@@ -939,15 +947,15 @@ SELECT is(
 
 SELECT ok(
   (SELECT d -> 'unavailable_days'
-   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-14') -> 'drivers') d
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-15') -> 'drivers') d
    WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000002')
-  @> '[{"date":"2031-03-14","status":"day_off"}]'::jsonb
+  @> '[{"date":"2031-03-14","status":"day_off"},{"date":"2031-03-15","status":"unavailable"}]'::jsonb
   AND
   (SELECT d -> 'unavailable_days'
-   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-14') -> 'drivers') d
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-15') -> 'drivers') d
    WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000003')
   @> '[{"date":"2031-03-14","status":"warehouse"}]'::jsonb,
-  'the matrix preserves canonical unavailable/warehouse states from both availability stores'
+  'the matrix preserves canonical day-off/unavailable/warehouse states from both availability stores'
 );
 
 RESET ROLE;
