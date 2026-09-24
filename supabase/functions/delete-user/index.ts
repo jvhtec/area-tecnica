@@ -67,6 +67,31 @@ serve(createHttpHandler(async (req) => {
     throw new HttpError(404, "User not found", { code: "user_not_found" });
   }
 
+  // Keep the same invariant as the database trigger, but fail with a useful
+  // conflict before auth.admin.deleteUser reaches the cascading profile delete.
+  const { data: activeAssignments, error: assignmentLookupError } = await supabaseAdmin
+    .from("transport_driver_assignments")
+    .select("id")
+    .eq("driver_id", userId)
+    .neq("status", "declined")
+    .gt("ends_at", new Date().toISOString())
+    .limit(1);
+
+  if (assignmentLookupError) {
+    throw new HttpError(502, "No se pudieron comprobar los transportes pendientes", {
+      code: "driver_assignment_check_failed",
+      exposeDetails: false,
+    });
+  }
+
+  if ((activeAssignments ?? []).length > 0) {
+    throw new HttpError(
+      409,
+      "Este conductor tiene transportes pendientes. Reasígnalos o quítalos en la matriz de logística antes de eliminar el usuario.",
+      { code: "conductor_has_assignments" },
+    );
+  }
+
   console.log("Deleting user:", redactSensitiveValues({ correlationId, userId, requestedBy: caller.userId }));
 
   // Deleting from auth.users cascades to profiles and, via the normalized
