@@ -358,6 +358,39 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Event -> driver assignment ids for post-commit notification fan-out.
+-- The caller never supplies recipient ids; the server derives the assignments.
+-- ---------------------------------------------------------------------------
+create or replace function public.get_event_driver_assignment_ids(p_event_id uuid)
+returns uuid[]
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_ids uuid[];
+begin
+  if auth.uid() is null or not public.logistics_matrix_can_manage() then
+    raise exception 'Solo administración o gestión pueden consultar estas asignaciones'
+      using errcode = '42501';
+  end if;
+
+  select coalesce(array_agg(a.id order by a.id), '{}'::uuid[])
+  into v_ids
+  from public.transport_driver_assignments a
+  where a.logistics_event_id = p_event_id
+    and a.driver_id is not null
+    and a.status <> 'declined';
+
+  return v_ids;
+end;
+$;
+
+revoke all on function public.get_event_driver_assignment_ids(uuid) from public, anon;
+grant execute on function public.get_event_driver_assignment_ids(uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
 -- Driver dashboard/navigation/contact projections.
 -- ---------------------------------------------------------------------------
 create or replace function public.get_my_transport_assignments(
