@@ -9,7 +9,7 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
 
-import { MADRID_TIMEZONE, addMadridCalendarDays, formatMadridDateKey } from "@/utils/timezoneUtils";
+import { MADRID_TIMEZONE, addMadridCalendarDays } from "@/utils/timezoneUtils";
 
 export const LICENSE_CATEGORIES = ["B", "B+E", "C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"] as const;
 export type LicenseCategory = (typeof LICENSE_CATEGORIES)[number];
