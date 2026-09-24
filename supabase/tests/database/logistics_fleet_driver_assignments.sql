@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(94);
+SELECT plan(95);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -108,7 +108,8 @@ DELETE FROM public.availability_schedules WHERE user_id IN (
 );
 DELETE FROM public.fleet_vehicles WHERE id IN (
   'e5400000-0000-0000-0000-000000000001'::uuid,
-  'e5400000-0000-0000-0000-000000000002'::uuid
+  'e5400000-0000-0000-0000-000000000002'::uuid,
+  'e5400000-0000-0000-0000-000000000003'::uuid
 );
 DELETE FROM public.transport_requests WHERE id = 'e5600000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.jobs WHERE id = 'e5200000-0000-0000-0000-000000000001'::uuid;
@@ -214,6 +215,14 @@ SELECT lives_ok(
     WHERE id = 'e5400000-0000-0000-0000-000000000002'::uuid
   $$,
   'fleet accepts the B+E Spanish licence category'
+);
+
+SELECT lives_ok(
+  $$
+    INSERT INTO public.fleet_vehicles (id, name, license_plate, vehicle_type, required_license)
+    VALUES ('e5400000-0000-0000-0000-000000000003'::uuid, 'Autobús cama 1', '9999 BUS', 'sleeper_bus', 'D')
+  $$,
+  'the fleet accepts sleeper buses'
 );
 
 SELECT lives_ok(
@@ -1047,7 +1056,8 @@ DELETE FROM public.vacation_requests WHERE technician_id IN (
 );
 DELETE FROM public.fleet_vehicles WHERE id IN (
   'e5400000-0000-0000-0000-000000000001'::uuid,
-  'e5400000-0000-0000-0000-000000000002'::uuid
+  'e5400000-0000-0000-0000-000000000002'::uuid,
+  'e5400000-0000-0000-0000-000000000003'::uuid
 );
 DELETE FROM public.locations WHERE id = 'e5500000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.profiles WHERE id IN (

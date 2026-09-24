@@ -15,8 +15,10 @@ import {
   formatTransportTime,
   groupAssignmentsByRowAndDay,
   startOfMadridWeek,
+  suggestedLicenseForVehicleType,
   summarizeDriversByEvent,
   unavailabilityByDay,
+  vehicleTypeLabel,
   type DriverAssignment,
   type MatrixDriver,
   type MatrixTransportEvent,
@@ -212,6 +214,25 @@ describe("double booking", () => {
       assignment({ id: "b", starts_at: "2026-10-01T08:00:00.000Z", ends_at: "2026-10-01T09:00:00.000Z" }),
       assignment({ id: "c", status: "declined", starts_at: "2026-10-01T07:00:00.000Z" }),
     ]).size).toBe(0);
+  });
+});
+
+describe("sleeper buses", () => {
+  it("label as autobús cama and pre-select a D licence", () => {
+    expect(vehicleTypeLabel("sleeper_bus")).toBe("Autobús cama");
+    expect(suggestedLicenseForVehicleType("sleeper_bus", "B")).toBe("D");
+    expect(suggestedLicenseForVehicleType("sleeper_bus", "C+E")).toBe("D");
+    // A D-family choice (a nightliner towing a trailer needs D+E) is respected.
+    expect(suggestedLicenseForVehicleType("sleeper_bus", "D+E")).toBe("D+E");
+    // Other types never have their licence changed behind the user's back.
+    expect(suggestedLicenseForVehicleType("trailer", "B")).toBe("B");
+  });
+
+  it("need a CAP and tachograph card like any professional vehicle", () => {
+    const driver = { license_categories: ["D"], license_expiry: null, cap_expiry: "2026-09-01", tachograph_card_expiry: "2026-09-01" };
+    expect(driverVehicleWarnings(driver, { required_license: "D" }, "2026-10-01")).toEqual(["cap_expired", "tachograph_expired"]);
+    expect(driverVehicleWarnings({ ...driver, license_categories: ["C+E"] }, { required_license: "D" }, "2026-10-01"))
+      .toContain("license_missing");
   });
 });
 

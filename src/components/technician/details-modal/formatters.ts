@@ -58,6 +58,7 @@ export const getLogisticsTransportTypeLabel = (type?: string | null): string => 
     "4m": "Camión 4m",
     furgoneta: "Furgoneta",
     rv: "Autocaravana",
+    sleeper_bus: "Autobús cama",
   };
   if (!type) return "Transporte";
   return labels[type] || formatTransportCategory(type);

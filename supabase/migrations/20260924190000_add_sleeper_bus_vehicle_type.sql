@@ -1,0 +1,13 @@
+-- The company fleet includes sleeper buses (autobús cama, the crew nightliners).
+--
+-- They are fleet vehicles for the logistics driver matrix, exactly like 'rv':
+-- selectable in fleet_vehicles.vehicle_type and assignable to any scheduled
+-- transport, but not offered as a transport type for logistics events or
+-- technical transport requests. Those stay cargo sizes because Hoja de Ruta
+-- transport rows (hoja_de_ruta_transport_transport_type_check) and truck-planner
+-- mappings only accept trailer/9m/8m/6m/4m/furgoneta. Crew travel on a sleeper bus
+-- is modelled separately, in Hoja de Ruta travel arrangements ('sleeper_bus').
+--
+-- The value name matches public.transportation_type's existing 'sleeper_bus'.
+-- It is only added here; nothing in this transaction uses it.
+alter type public.transport_type add value if not exists 'sleeper_bus';

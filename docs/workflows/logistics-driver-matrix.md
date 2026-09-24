@@ -50,7 +50,12 @@ the vehicle:
 
 ## Data model
 
-- `fleet_vehicles` — own fleet. Plate uniqueness ignores spaces/dashes/case. Carries
+- `fleet_vehicles` — own fleet. `vehicle_type` is the shared `transport_type` enum; the
+  fleet also uses `rv` and `sleeper_bus` (*Autobús cama*, the crew nightliners, licence D
+  pre-selected). Those two are fleet-only: logistics events and transport requests keep
+  offering cargo sizes, because Hoja de Ruta transport rows and truck-planner mappings only
+  accept trailer/9m/8m/6m/4m/furgoneta. Assign a bus to any transport from the matrix.
+  Plate uniqueness ignores spaces/dashes/case. Carries
   `itv_expiry`, `insurance_expiry` and `has_tail_lift` (plataforma elevadora). A vehicle
   with assignment history cannot be deleted (FK `restrict`); deactivate it instead.
 - `driver_details` — one row per conductor: licence categories (`B…D+E`), licence, CAP
