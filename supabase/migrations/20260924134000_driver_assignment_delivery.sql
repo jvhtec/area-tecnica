@@ -302,9 +302,10 @@ begin
           notes = nullif(btrim(p_notes), ''),
           assigned_by = auth.uid(),
           -- A driver confirms a concrete plan: any change to who, what or when needs a
-          -- fresh confirmation.
+          -- fresh confirmation, and an old refusal no longer describes this plan.
           status = case when v_material_change then 'assigned' else status end,
-          responded_at = case when v_material_change then null else responded_at end
+          responded_at = case when v_material_change then null else responded_at end,
+          decline_reason = case when v_material_change then null else decline_reason end
       where id = p_assignment_id
       returning id into v_id;
     end if;
