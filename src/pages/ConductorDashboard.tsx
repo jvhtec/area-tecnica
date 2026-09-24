@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { es } from "date-fns/locale";
 import { Bell, ChevronDown, ChevronUp, Loader2, Truck } from "lucide-react";
@@ -46,8 +46,13 @@ const ConductorDashboard = () => {
   const [declining, setDeclining] = useState<MyTransportAssignment | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Evaluated on every render (list refreshes, realtime, responses) so finished runs move to history.
-  const nowIso = new Date().toISOString();
+  // A real clock drives countdowns and, critically, the server-backed sharing
+  // eligibility boundary even when no query/realtime event causes a rerender.
+  const [nowIso, setNowIso] = useState(() => new Date().toISOString());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowIso(new Date().toISOString()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const assignments = useMemo(() => data ?? [], [data]);
   const upcoming = assignments.filter((assignment) => assignment.ends_at > nowIso);
   const past = assignments
@@ -96,7 +101,9 @@ const ConductorDashboard = () => {
         </Button>
       </div>
 
-      {!isLoading && !error && <ConductorLocationSharingCard assignments={upcoming} nowIso={nowIso} />}
+      {!isLoading && !error && user?.id && (
+        <ConductorLocationSharingCard assignments={upcoming} nowIso={nowIso} userId={user.id} />
+      )}
 
       {error ? (
         <Card><CardContent className="py-8 text-center text-sm text-destructive">{getErrorMessage(error)}</CardContent></Card>
