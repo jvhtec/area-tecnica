@@ -12,14 +12,15 @@ import { respondToTransportAssignment } from "@/features/logistics/fleet/fleetAp
 import type { MyTransportAssignment } from "@/features/logistics/fleet/fleetModel";
 import { useInvalidateLogisticsFleet, useMyTransportAssignments } from "@/features/logistics/fleet/useLogisticsFleet";
 import { getErrorMessage } from "@/utils/errorMessage";
-import { formatMadridDateKey, formatMadridDayKey } from "@/utils/timezoneUtils";
+import { formatMadridDayKey } from "@/utils/timezoneUtils";
+import { formatTransportDateKey } from "@/features/logistics/fleet/fleetModel";
 
 /** Upcoming (not yet finished) assignments grouped by Madrid start day. */
 const groupUpcomingByDay = (assignments: MyTransportAssignment[], nowIso: string) => {
   const groups = new Map<string, MyTransportAssignment[]>();
   for (const assignment of assignments) {
     if (assignment.ends_at < nowIso) continue;
-    const dayKey = formatMadridDateKey(assignment.starts_at);
+    const dayKey = formatTransportDateKey(assignment.starts_at, assignment.timezone);
     groups.set(dayKey, [...(groups.get(dayKey) ?? []), assignment]);
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
