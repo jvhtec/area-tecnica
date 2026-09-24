@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(23);
+SELECT plan(24);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -104,8 +104,8 @@ VALUES (
   'e5800000-0000-0000-0000-000000000001'::uuid,
   'e5700000-0000-0000-0000-000000000001'::uuid,
   'e5600000-0000-0000-0000-000000000002'::uuid,
-  '2031-04-01 08:00 Europe/Madrid'::timestamptz,
-  '2031-04-01 10:00 Europe/Madrid'::timestamptz
+  now() - interval '30 minutes',
+  now() + interval '2 hours'
 );
 
 -- ---------------------------------------------------------------------------
@@ -138,10 +138,17 @@ SELECT is(
 );
 
 SELECT throws_ok(
-  $$ SELECT public.report_driver_location(95, 2.16) $$,
+  $ SELECT public.report_driver_location(95, 2.16) $,
   '22023',
   NULL,
   'an impossible coordinate is refused'
+);
+
+SELECT throws_ok(
+  $ SELECT public.report_driver_location(40.42, -3.70, 10, NULL, NULL, NULL) $,
+  '22023',
+  NULL,
+  'a position report requires an eligible transport assignment'
 );
 
 SELECT throws_ok(
@@ -161,24 +168,20 @@ SELECT throws_ok(
   'a driver cannot read the tracking map'
 );
 
--- Beto names Ana's transport: recorded, but without the assignment.
+-- Beto names Ana's transport: the server refuses the report entirely.
 SELECT set_config('request.jwt.claim.sub', 'e5600000-0000-0000-0000-000000000003', false);
 
-SELECT lives_ok(
-  $$ SELECT public.report_driver_location(40.42, -3.70, 30, NULL, NULL, 'e5800000-0000-0000-0000-000000000001'::uuid) $$,
-  'a driver can report without a transport of their own'
-);
-
-SELECT is(
-  (SELECT assignment_id FROM public.driver_locations WHERE driver_id = 'e5600000-0000-0000-0000-000000000003'::uuid),
-  NULL::uuid,
-  'someone else''s transport is never attached to a position'
+SELECT throws_ok(
+  $ SELECT public.report_driver_location(40.42, -3.70, 30, NULL, NULL, 'e5800000-0000-0000-0000-000000000001'::uuid) $,
+  '22023',
+  NULL,
+  'a driver cannot report against someone else''s transport'
 );
 
 SELECT is(
   (SELECT count(*)::integer FROM public.driver_locations),
-  1,
-  'a driver sees only their own position row'
+  0,
+  'a refused report leaves no position row visible to that driver'
 );
 
 -- ---------------------------------------------------------------------------
@@ -188,8 +191,8 @@ SELECT set_config('request.jwt.claim.sub', 'e5600000-0000-0000-0000-000000000001
 
 SELECT is(
   jsonb_array_length(public.get_driver_locations()),
-  2,
-  'logistics management sees every shared position'
+  1,
+  'logistics management sees only eligible shared positions'
 );
 
 SELECT is(
@@ -204,8 +207,8 @@ SELECT set_config('request.jwt.claim.sub', 'e5600000-0000-0000-0000-000000000004
 
 SELECT is(
   jsonb_array_length(public.get_driver_locations()),
-  2,
-  'house techs can watch the tracking map'
+  1,
+  'house techs can watch the eligible tracking map'
 );
 
 SELECT set_config('request.jwt.claim.sub', 'e5600000-0000-0000-0000-000000000005', false);
