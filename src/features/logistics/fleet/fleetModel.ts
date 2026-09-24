@@ -257,12 +257,15 @@ export const buildDayKeys = (startKey: string, endKey: string): string[] => {
   return keys;
 };
 
-/** Every Madrid day an assignment window touches (a long haul spans several). */
-export const assignmentDayKeys = (assignment: Pick<DriverAssignment, "starts_at" | "ends_at">): string[] => {
-  const first = formatMadridDateKey(assignment.starts_at);
-  // The window is half-open: a run ending exactly at midnight does not occupy the next day.
+/** Every local transport day an assignment window touches (a long haul spans several). */
+export const assignmentDayKeys = (
+  assignment: Pick<DriverAssignment, "starts_at" | "ends_at">,
+  timezone: string = MADRID_TIMEZONE,
+): string[] => {
+  const first = formatTransportDateKey(assignment.starts_at, timezone);
+  // The window is half-open: a run ending exactly at local midnight does not occupy the next day.
   const lastInstant = new Date(new Date(assignment.ends_at).getTime() - 1).toISOString();
-  const last = formatMadridDateKey(lastInstant);
+  const last = formatTransportDateKey(lastInstant, timezone);
   return buildDayKeys(first, last < first ? first : last);
 };
 
@@ -272,6 +275,7 @@ export type MatrixRowKey = "driver_id" | "vehicle_id";
 export const groupAssignmentsByRowAndDay = (
   assignments: readonly DriverAssignment[],
   rowKey: MatrixRowKey,
+  timezoneByEvent: ReadonlyMap<string, string> = new Map(),
 ): Map<string, Map<string, DriverAssignment[]>> => {
   const grouped = new Map<string, Map<string, DriverAssignment[]>>();
   const ordered = [...assignments].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
@@ -283,7 +287,10 @@ export const groupAssignmentsByRowAndDay = (
       byDay = new Map();
       grouped.set(rowId, byDay);
     }
-    for (const dayKey of assignmentDayKeys(assignment)) {
+    for (const dayKey of assignmentDayKeys(
+      assignment,
+      timezoneByEvent.get(assignment.logistics_event_id) ?? MADRID_TIMEZONE,
+    )) {
       const list = byDay.get(dayKey) ?? [];
       list.push(assignment);
       byDay.set(dayKey, list);
