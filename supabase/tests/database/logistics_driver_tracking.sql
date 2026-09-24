@@ -138,14 +138,14 @@ SELECT is(
 );
 
 SELECT throws_ok(
-  $ SELECT public.report_driver_location(95, 2.16) $,
+  $$ SELECT public.report_driver_location(95, 2.16) $$,
   '22023',
   NULL,
   'an impossible coordinate is refused'
 );
 
 SELECT throws_ok(
-  $ SELECT public.report_driver_location(40.42, -3.70, 10, NULL, NULL, NULL) $,
+  $$ SELECT public.report_driver_location(40.42, -3.70, 10, NULL, NULL, NULL) $$,
   '22023',
   NULL,
   'a position report requires an eligible transport assignment'
@@ -172,7 +172,7 @@ SELECT throws_ok(
 SELECT set_config('request.jwt.claim.sub', 'e5600000-0000-0000-0000-000000000003', false);
 
 SELECT throws_ok(
-  $ SELECT public.report_driver_location(40.42, -3.70, 30, NULL, NULL, 'e5800000-0000-0000-0000-000000000001'::uuid) $,
+  $$ SELECT public.report_driver_location(40.42, -3.70, 30, NULL, NULL, 'e5800000-0000-0000-0000-000000000001'::uuid) $$,
   '22023',
   NULL,
   'a driver cannot report against someone else''s transport'

@@ -861,7 +861,7 @@ VALUES ('e5300000-0000-0000-0000-000000000002'::uuid, 'sound')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.technician_availability (technician_id, date, status)
-VALUES ('e5100000-0000-0000-0000-000000000002', '2031-03-14', 'unavailable')
+VALUES ('e5100000-0000-0000-0000-000000000002', '2031-03-14', 'day_off')
 ON CONFLICT (technician_id, date) DO UPDATE SET status = excluded.status;
 
 DELETE FROM public.availability_schedules
@@ -889,9 +889,9 @@ SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001
 SET ROLE authenticated;
 
 SELECT lives_ok(
-  $ UPDATE public.logistics_events
+  $$ UPDATE public.logistics_events
      SET event_time = '10:00'
-     WHERE id = 'e5300000-0000-0000-0000-000000000002'::uuid $,
+     WHERE id = 'e5300000-0000-0000-0000-000000000002'::uuid $$,
   'a material calendar time edit updates an assigned transport atomically'
 );
 
@@ -920,9 +920,9 @@ SELECT is(
 );
 
 SELECT throws_ok(
-  $ SELECT public.delete_logistics_event(
+  $$ SELECT public.delete_logistics_event(
        'e5300000-0000-0000-0000-000000000002'::uuid
-     ) $,
+     ) $$,
   '23514',
   NULL,
   'transactional deletion is refused while the event still has a live assignment'
@@ -941,7 +941,7 @@ SELECT ok(
   (SELECT d -> 'unavailable_days'
    FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-14') -> 'drivers') d
    WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000002')
-  @> '[{"date":"2031-03-14","status":"unavailable"}]'::jsonb
+  @> '[{"date":"2031-03-14","status":"day_off"}]'::jsonb
   AND
   (SELECT d -> 'unavailable_days'
    FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-14', '2031-03-14') -> 'drivers') d

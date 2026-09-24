@@ -640,12 +640,12 @@ SELECT results_eq(
 );
 
 SELECT is_empty(
-  $
+  $$
     SELECT producer_id
     FROM public.get_job_producer_contacts(
       ARRAY['d9200000-0000-0000-0000-000000000001'::uuid]
     )
-  $,
+  $$,
   'a driver gets no producer contact details for jobs they do not drive for'
 );
 
@@ -660,12 +660,12 @@ SELECT set_config('request.jwt.claim.sub', 'd9100000-0000-0000-0000-000000000009
 SET ROLE authenticated;
 
 SELECT is_empty(
-  $
+  $$
     SELECT producer_id
     FROM public.get_job_producer_contacts(
       ARRAY['d9200000-0000-0000-0000-000000000004'::uuid]
     )
-  $,
+  $$,
   'producer contact access expires when the driver transport ends'
 );
 

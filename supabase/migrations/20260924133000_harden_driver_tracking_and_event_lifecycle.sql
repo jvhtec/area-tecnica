@@ -367,7 +367,7 @@ language plpgsql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_ids uuid[];
 begin
@@ -385,7 +385,7 @@ begin
 
   return v_ids;
 end;
-$;
+$$;
 
 revoke all on function public.get_event_driver_assignment_ids(uuid) from public, anon;
 grant execute on function public.get_event_driver_assignment_ids(uuid) to authenticated, service_role;
