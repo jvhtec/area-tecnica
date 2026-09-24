@@ -312,7 +312,10 @@ export const subscriptionProfiles = {
     { table: "power_requirement_tables", priority: "high" },
   ],
   settings: [{ table: "profiles", priority: "medium" }],
-  profile: [{ table: "profiles", priority: "high" }],
+  profile: [
+    { table: "profiles", priority: "high" },
+    { table: "driver_details", priority: "low", queryKey: LOGISTICS_FLEET_QUERY_KEY },
+  ],
   hojaDeRuta: [
     { table: "jobs", priority: "high" },
     { table: "job_departments", priority: "medium" },
