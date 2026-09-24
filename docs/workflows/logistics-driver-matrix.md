@@ -39,10 +39,12 @@ the vehicle:
   when a window overlaps another non-declined assignment for the same driver or
   vehicle; the UI shows the clash and can resend with `p_force => true`.
 - The matrix rings overlapping chips in red (`findDoubleBookedAssignmentIds`).
-- Licence/CAP/tachograph checks, vehicle ITV/insurance expiry and the driver's days off
-  (`driverVehicleWarnings`) are soft warnings only — document data may simply not be
-  entered yet. The Flota tab flags each document as *caducado* (red) or *caduca pronto*
-  (amber, within `DOCUMENT_EXPIRY_WARNING_DAYS` = 30 days).
+- Licence/CAP/tachograph checks and vehicle ITV/insurance expiry remain soft warnings
+  because document data may simply not be entered yet. Known employee unavailability
+  (vacation/travel/sick/day off/warehouse/unavailable) is a real assignment conflict:
+  `assign_transport_driver` returns `kind: "availability"` and management must use
+  the explicit `p_force` / *Guardar igualmente* override to schedule it anyway. There
+  is deliberately no staffing availability-request phase for conductors.
 - The matrix header counts assignments still waiting for the driver's answer that start
   within 48 h (`countPendingConfirmations`), so dispatch knows whom to chase.
 
@@ -58,10 +60,10 @@ the vehicle:
   driver gave. A declined row is kept as history but releases its driver/vehicle slot
   (the unique indexes and conflict checks skip it). A material change or a confirmation
   clears the reason.
-- **Days off** are not stored here: `get_logistics_matrix()` returns each driver's
-  `unavailable_days` in the range from `technician_availability` (per-day rows, as the
-  crew matrix writes them) plus approved `vacation_requests`. The matrix greys those
-  cells out and the assignment form warns.
+- **Days off** are not stored here: `get_logistics_matrix()` projects the canonical
+  availability sources (`technician_availability`, `availability_schedules`, approved
+  `vacation_requests`). The matrix greys those cells out, and the assignment RPC itself
+  refuses an accidental save unless management explicitly overrides the conflict.
 - **Dispatch contact**: `get_logistics_matrix()` returns a driver's `phone` only when the
   caller is admin/management (null for house_tech). The day dialog turns it into
   WhatsApp / `tel:` shortcuts through `@/utils/phoneLinks`. Never read `profiles.phone`
@@ -90,13 +92,21 @@ the vehicle:
   so the admin gets a useful conflict instead of a failed auth cascade.
 - **Any change a driver must act on resets confirmation**: driver, vehicle, window or
   the instructions (`notes`). It also clears a stale `decline_reason`.
-- **Nothing here touches staffing.** No `job_assignments`, timesheets or rates are
-  created for drivers.
+- **Nothing here touches staffing.** Drivers are employees receiving direct work
+  assignments: no `staffing_requests`, availability campaigns, offers, `job_assignments`,
+  timesheets or rates are created. The state machine is simply
+  `assigned → confirmed | declined`.
 
 ## Notifications
 
-Fire-and-forget pushes from `fleetApi.ts`, resolved server-side in
-`supabase/functions/push/broadcast/families/driverEvents.ts`:
+Assignments and material updates use three delivery channels. Push is fire-and-forget
+from `fleetApi.ts` and resolved server-side in
+`supabase/functions/push/broadcast/families/driverEvents.ts`. In parallel,
+`send-driver-assignment-notification` sends Brevo email + WAHA WhatsApp (when the
+driver has those contact details and the assigning manager has WAHA configured).
+Successful channel sends are deduped per `assignment_id + updated_at + channel` in
+`driver_assignment_delivery_log`. Email/WhatsApp link straight to `/conductor`;
+they do not create staffing requests or action tokens.
 
 | Event | Sent by | Recipient | Opens |
 | --- | --- | --- | --- |
