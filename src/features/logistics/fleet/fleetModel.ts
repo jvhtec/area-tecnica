@@ -59,7 +59,7 @@ export type FleetVehicle = {
   is_active: boolean;
 };
 
-export const UNAVAILABILITY_STATUSES = ["vacation", "travel", "sick", "day_off"] as const;
+export const UNAVAILABILITY_STATUSES = ["vacation", "travel", "sick", "day_off", "unavailable", "warehouse"] as const;
 export type UnavailabilityStatus = (typeof UNAVAILABILITY_STATUSES)[number];
 
 export const UNAVAILABILITY_LABELS: Record<UnavailabilityStatus, string> = {
@@ -67,6 +67,8 @@ export const UNAVAILABILITY_LABELS: Record<UnavailabilityStatus, string> = {
   travel: "Viaje",
   sick: "Baja",
   day_off: "Día libre",
+  unavailable: "No disponible",
+  warehouse: "Almacén",
 };
 
 export type DriverUnavailableDay = { date: string; status: UnavailabilityStatus };
