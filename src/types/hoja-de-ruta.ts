@@ -42,7 +42,7 @@ export interface TravelArrangement {
 
 export interface Transport {
   id: string;
-  transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta";
+  transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "sleeper_bus";
   driver_name?: string;
   driver_phone?: string;
   license_plate?: string;

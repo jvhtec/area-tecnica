@@ -31,6 +31,7 @@ import { Trash2 } from "lucide-react";
 import { endOfMonth, format, startOfMonth } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
 import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
 import {
   LOGISTICS_HOJA_CATEGORY_LABELS,
@@ -616,7 +617,7 @@ export const LogisticsEventDialog = ({
                 <SelectContent>
                   {REQUEST_TRANSPORT_OPTIONS.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt.replace('_', ' ')}
+                      {getLogisticsTransportTypeLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>

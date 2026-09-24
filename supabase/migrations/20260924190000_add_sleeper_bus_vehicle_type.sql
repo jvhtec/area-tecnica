@@ -1,12 +1,11 @@
 -- The company fleet includes sleeper buses (autobús cama, the crew nightliners).
 --
--- They are fleet vehicles for the logistics driver matrix, exactly like 'rv':
--- selectable in fleet_vehicles.vehicle_type and assignable to any scheduled
--- transport, but not offered as a transport type for logistics events or
--- technical transport requests. Those stay cargo sizes because Hoja de Ruta
--- transport rows (hoja_de_ruta_transport_transport_type_check) and truck-planner
--- mappings only accept trailer/9m/8m/6m/4m/furgoneta. Crew travel on a sleeper bus
--- is modelled separately, in Hoja de Ruta travel arrangements ('sleeper_bus').
+-- This migration only adds the enum value (logistics_events.transport_type and
+-- fleet_vehicles.vehicle_type). 20260924191000 then lets transport requests,
+-- Hoja de Ruta transport rows, truck-planner mappings and the request RPCs accept
+-- it, in a separate transaction as Postgres requires for a new enum value.
+-- Crew travel on a sleeper bus stays modelled in Hoja de Ruta travel
+-- arrangements (public.transportation_type 'sleeper_bus').
 --
 -- The value name matches public.transportation_type's existing 'sleeper_bus'.
 -- It is only added here; nothing in this transaction uses it.

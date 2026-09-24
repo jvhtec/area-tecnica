@@ -45,6 +45,7 @@ interface LogisticsExportData {
 
 const TRANSPORT_TYPE_LABELS: Record<string, string> = {
   trailer: "Tráiler",
+  sleeper_bus: "Autobús cama",
   van: "Furgoneta",
   truck: "Camión",
   car: "Coche",

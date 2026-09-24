@@ -57,6 +57,11 @@ const VEHICLES: Record<string, string> = {
   trailer: "Tráiler", "9m": "Camión 9m", "8m": "Camión 8m", "6m": "Camión 6m",
   "4m": "Camión 4m", furgoneta: "Furgoneta", rv: "Autocaravana", sleeper_bus: "Autobús cama",
 };
+
+/** Spanish label for a known transport type, or null so callers keep their own fallback. */
+export function transportTypeLabel(type: string | null | undefined): string | null {
+  return type ? VEHICLES[type] ?? null : null;
+}
 // High-priority requests are flagged in the header instead of only in the detail table.
 const PRIORITY_COLORS: Record<string, string> = { urgent: "#b91c1c", high: "#b45309" };
 

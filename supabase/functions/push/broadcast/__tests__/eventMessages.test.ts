@@ -271,6 +271,20 @@ describe("push broadcast event message builders", () => {
     expect(event.text).toContain("(sound, lights)");
   });
 
+  it("labels known transport types in Spanish, including the company sleeper buses", () => {
+    const base = {
+      action: "broadcast" as const,
+      type: "logistics.event.created",
+      event_type: "load",
+      event_date: "2026-10-05",
+      event_time: "23:00",
+    };
+    expect(buildLogisticsEventMessage("logistics.event.created", "Gira", { ...base, transport_type: "sleeper_bus" }).text)
+      .toContain("Transporte: Autobús cama.");
+    expect(buildLogisticsEventMessage("logistics.event.created", "Gira", { ...base, transport_type: "9m" }).text)
+      .toContain("Transporte: Camión 9m.");
+  });
+
   it("builds festival public submission messages with optional dates and rider filenames", () => {
     const body: BroadcastBody = {
       action: "broadcast",

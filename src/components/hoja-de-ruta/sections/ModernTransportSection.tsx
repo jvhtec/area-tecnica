@@ -43,7 +43,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   const validTransport = Array.isArray(transport) ? transport : [];
 
   // Valid transport type values
-  const VALID_TRANSPORT_TYPES = ['trailer', '9m', '8m', '6m', '4m', 'furgoneta'] as const;
+  const VALID_TRANSPORT_TYPES = ['trailer', '9m', '8m', '6m', '4m', 'furgoneta', 'sleeper_bus'] as const;
 
   const isValidTransportType = (type: any): type is Transport['transport_type'] => {
     return VALID_TRANSPORT_TYPES.includes(type);
@@ -253,6 +253,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                         <SelectItem value="6m">6m</SelectItem>
                         <SelectItem value="4m">4m</SelectItem>
                         <SelectItem value="furgoneta">Furgoneta</SelectItem>
+                        <SelectItem value="sleeper_bus">Autobús cama</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

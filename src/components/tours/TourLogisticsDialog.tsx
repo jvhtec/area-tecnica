@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { REQUEST_TRANSPORT_OPTIONS } from '@/constants/transportOptions'
+import { getLogisticsTransportTypeLabel } from '@/components/technician/details-modal/formatters'
 import { useQuery } from '@tanstack/react-query'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns'
@@ -257,7 +258,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                   <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {REQUEST_TRANSPORT_OPTIONS.map(opt => (
-                      <SelectItem key={opt} value={opt}>{opt.replace('_',' ')}</SelectItem>
+                      <SelectItem key={opt} value={opt}>{getLogisticsTransportTypeLabel(opt)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -338,7 +339,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                             <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {REQUEST_TRANSPORT_OPTIONS.map(opt => (
-                                <SelectItem key={opt} value={opt}>{opt.replace('_',' ')}</SelectItem>
+                                <SelectItem key={opt} value={opt}>{getLogisticsTransportTypeLabel(opt)}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>

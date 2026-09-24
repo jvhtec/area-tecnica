@@ -14,7 +14,10 @@ export const LOGISTICS_TRANSPORT_OPTIONS = [
   'plane',
 ];
 
-// Transport options allowed for technical transport requests (sizes only)
+// Transport types for technical transport requests, logistics events, tour logistics
+// and Hoja de Ruta transport rows: the cargo sizes plus the company's sleeper buses.
+// Must match the DB checks (transport_request_items / hoja_de_ruta_transport /
+// truck_planner_transport_mappings) and create-transport-request's VALID_TRANSPORT_TYPES.
 export const REQUEST_TRANSPORT_OPTIONS = [
   'trailer',
   '9m',
@@ -22,4 +25,5 @@ export const REQUEST_TRANSPORT_OPTIONS = [
   '6m',
   '4m',
   'furgoneta',
+  'sleeper_bus',
 ];

@@ -24,7 +24,7 @@ const toDateTimeLocalInMadrid = (value: string | null | undefined): string => {
 const normalizeTransportType = (value: string | null | undefined): Transport['transport_type'] => {
   const normalized = (value || '').trim().toLowerCase();
 
-  if (normalized === 'trailer' || normalized === '9m' || normalized === '8m' || normalized === '6m' || normalized === '4m' || normalized === 'furgoneta') {
+  if (normalized === 'trailer' || normalized === '9m' || normalized === '8m' || normalized === '6m' || normalized === '4m' || normalized === 'furgoneta' || normalized === 'sleeper_bus') {
     return normalized;
   }
 
