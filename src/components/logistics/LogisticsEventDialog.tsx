@@ -44,6 +44,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { queryKeys } from "@/lib/react-query";
 import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
 import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
+import { deleteLogisticsEvent, notifyDriverAssignmentsForEvent } from "@/features/logistics/fleet/fleetApi";
 import { getErrorMessage } from '@/utils/errorMessage';
 import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
@@ -205,19 +206,9 @@ export const LogisticsEventDialog = ({
     try {
       if (!selectedEvent) return;
 
-      // First delete any referencing rows in logistics_event_departments
-      const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
-        .delete()
-        .eq("event_id", selectedEvent.id);
-
-      if (deptError) throw deptError;
-
-      // Then delete the main record from logistics_events
-      const { error: eventError } = await dataLayerClient.from("logistics_events")
-        .delete()
-        .eq("id", selectedEvent.id);
-
-      if (eventError) throw eventError;
+      // One DB transaction: if the assignment guard rejects the event delete,
+      // its department links are restored automatically.
+      await deleteLogisticsEvent(selectedEvent.id);
 
       toast({
         title: "Éxito",
@@ -411,6 +402,11 @@ export const LogisticsEventDialog = ({
           type: "logistics.event.updated",
           departmentsOverride: selectedDepartments,
           changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
+        // The DB trigger has already reset any confirmed driver assignment.
+        // Notify those drivers from assignment ids resolved server-side.
+        void notifyDriverAssignmentsForEvent(selectedEvent.id).catch((notificationError) => {
+          console.error("Failed to notify drivers after logistics event update", notificationError);
         });
 
         toast({
