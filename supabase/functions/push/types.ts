@@ -137,6 +137,7 @@ export type BroadcastBody = {
   assignment_id?: string;
   logistics_event_id?: string;
   starts_at?: string;
+  timezone?: string;
 };
 
 export type CheckScheduledBody = {
