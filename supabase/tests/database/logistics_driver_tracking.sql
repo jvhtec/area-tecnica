@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(24);
+SELECT plan(23);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
