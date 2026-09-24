@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
       achievement_progress: {
@@ -1246,6 +1251,183 @@ export type Database = {
           },
         ]
       }
+      driver_assignment_delivery_log: {
+        Row: {
+          assignment_id: string
+          assignment_updated_at: string
+          channel: string
+          id: string
+          notification_kind: string
+          recipient: string | null
+          sent_at: string
+        }
+        Insert: {
+          assignment_id: string
+          assignment_updated_at: string
+          channel: string
+          id?: string
+          notification_kind: string
+          recipient?: string | null
+          sent_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          assignment_updated_at?: string
+          channel?: string
+          id?: string
+          notification_kind?: string
+          recipient?: string | null
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_assignment_delivery_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transport_driver_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_details: {
+        Row: {
+          adr_certified: boolean
+          cap_expiry: string | null
+          created_at: string
+          default_vehicle_id: string | null
+          license_categories: string[]
+          license_expiry: string | null
+          notes: string | null
+          profile_id: string
+          tachograph_card_expiry: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          adr_certified?: boolean
+          cap_expiry?: string | null
+          created_at?: string
+          default_vehicle_id?: string | null
+          license_categories?: string[]
+          license_expiry?: string | null
+          notes?: string | null
+          profile_id: string
+          tachograph_card_expiry?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          adr_certified?: boolean
+          cap_expiry?: string | null
+          created_at?: string
+          default_vehicle_id?: string | null
+          license_categories?: string[]
+          license_expiry?: string | null
+          notes?: string | null
+          profile_id?: string
+          tachograph_card_expiry?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_details_default_vehicle_id_fkey"
+            columns: ["default_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_details_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_details_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_details_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_details_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_locations: {
+        Row: {
+          accuracy_m: number | null
+          assignment_id: string | null
+          created_at: string
+          driver_id: string
+          heading_deg: number | null
+          latitude: number
+          longitude: number
+          recorded_at: string
+          speed_mps: number | null
+          updated_at: string
+        }
+        Insert: {
+          accuracy_m?: number | null
+          assignment_id?: string | null
+          created_at?: string
+          driver_id: string
+          heading_deg?: number | null
+          latitude: number
+          longitude: number
+          recorded_at?: string
+          speed_mps?: number | null
+          updated_at?: string
+        }
+        Update: {
+          accuracy_m?: number | null
+          assignment_id?: string | null
+          created_at?: string
+          driver_id?: string
+          heading_deg?: number | null
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+          speed_mps?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_locations_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transport_driver_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_locations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_locations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dryhire_parent_folders: {
         Row: {
           created_at: string | null
@@ -1836,6 +2018,7 @@ export type Database = {
           show_end: string | null
           show_start: string | null
           soundcheck: boolean | null
+          soundcheck_date: string | null
           soundcheck_end: string | null
           soundcheck_start: string | null
           stage: number | null
@@ -1919,6 +2102,7 @@ export type Database = {
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null
+          soundcheck_date?: string | null
           soundcheck_end?: string | null
           soundcheck_start?: string | null
           stage?: number | null
@@ -2002,6 +2186,7 @@ export type Database = {
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null
+          soundcheck_date?: string | null
           soundcheck_end?: string | null
           soundcheck_start?: string | null
           stage?: number | null
@@ -2610,6 +2795,81 @@ export type Database = {
           },
         ]
       }
+      fleet_vehicles: {
+        Row: {
+          brand: string | null
+          cargo_length_m: number | null
+          created_at: string
+          created_by: string | null
+          has_tail_lift: boolean
+          id: string
+          insurance_expiry: string | null
+          is_active: boolean
+          itv_expiry: string | null
+          license_plate: string
+          model: string | null
+          name: string
+          notes: string | null
+          payload_kg: number | null
+          required_license: string
+          updated_at: string
+          vehicle_type: Database["public"]["Enums"]["transport_type"]
+        }
+        Insert: {
+          brand?: string | null
+          cargo_length_m?: number | null
+          created_at?: string
+          created_by?: string | null
+          has_tail_lift?: boolean
+          id?: string
+          insurance_expiry?: string | null
+          is_active?: boolean
+          itv_expiry?: string | null
+          license_plate: string
+          model?: string | null
+          name: string
+          notes?: string | null
+          payload_kg?: number | null
+          required_license?: string
+          updated_at?: string
+          vehicle_type: Database["public"]["Enums"]["transport_type"]
+        }
+        Update: {
+          brand?: string | null
+          cargo_length_m?: number | null
+          created_at?: string
+          created_by?: string | null
+          has_tail_lift?: boolean
+          id?: string
+          insurance_expiry?: string | null
+          is_active?: boolean
+          itv_expiry?: string | null
+          license_plate?: string
+          model?: string | null
+          name?: string
+          notes?: string | null
+          payload_kg?: number | null
+          required_license?: string
+          updated_at?: string
+          vehicle_type?: Database["public"]["Enums"]["transport_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_vehicles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_vehicles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_crew_assignments: {
         Row: {
           created_at: string | null
@@ -2758,6 +3018,114 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      flex_provisioning_nodes: {
+        Row: {
+          created_at: string
+          element_id: string | null
+          id: string
+          operation_id: string
+          parent_key: string | null
+          payload: Json
+          safe_error: Json | null
+          semantic_key: string
+          state: string
+          tracking_row_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          element_id?: string | null
+          id?: string
+          operation_id: string
+          parent_key?: string | null
+          payload?: Json
+          safe_error?: Json | null
+          semantic_key: string
+          state?: string
+          tracking_row_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          element_id?: string | null
+          id?: string
+          operation_id?: string
+          parent_key?: string | null
+          payload?: Json
+          safe_error?: Json | null
+          semantic_key?: string
+          state?: string
+          tracking_row_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_provisioning_nodes_operation_id_fkey"
+            columns: ["operation_id"]
+            isOneToOne: false
+            referencedRelation: "flex_provisioning_operations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_provisioning_nodes_tracking_row_id_fkey"
+            columns: ["tracking_row_id"]
+            isOneToOne: false
+            referencedRelation: "flex_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flex_provisioning_operations: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          last_error: Json | null
+          lease_expires_at: string | null
+          lease_token: string | null
+          operation_type: string
+          requested_by: string | null
+          scope_id: string
+          scope_key: string
+          sequence_group: string | null
+          sequence_number: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: Json | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          operation_type: string
+          requested_by?: string | null
+          scope_id: string
+          scope_key: string
+          sequence_group?: string | null
+          sequence_number?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: Json | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          operation_type?: string
+          requested_by?: string | null
+          scope_id?: string
+          scope_key?: string
+          sequence_group?: string | null
+          sequence_number?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       flex_status_log: {
         Row: {
@@ -4423,6 +4791,53 @@ export type Database = {
           },
         ]
       }
+      job_producer_claims: {
+        Row: {
+          claimed_at: string
+          job_id: string
+          producer_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          job_id: string
+          producer_id: string
+        }
+        Update: {
+          claimed_at?: string
+          job_id?: string
+          producer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_producer_claims_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_producer_claims_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_producer_claims_producer_id_fkey"
+            columns: ["producer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_producer_claims_producer_id_fkey"
+            columns: ["producer_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_project_notes: {
         Row: {
           created_at: string
@@ -5424,12 +5839,14 @@ export type Database = {
           job_id: string | null
           license_plate: string | null
           loading_bay: string | null
+          location_id: string | null
           notes: string | null
           timezone: string | null
           title: string | null
           transport_provider:
             | Database["public"]["Enums"]["transport_provider_enum"]
             | null
+          transport_request_id: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at: string | null
         }
@@ -5445,12 +5862,14 @@ export type Database = {
           job_id?: string | null
           license_plate?: string | null
           loading_bay?: string | null
+          location_id?: string | null
           notes?: string | null
           timezone?: string | null
           title?: string | null
           transport_provider?:
             | Database["public"]["Enums"]["transport_provider_enum"]
             | null
+          transport_request_id?: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
         }
@@ -5466,12 +5885,14 @@ export type Database = {
           job_id?: string | null
           license_plate?: string | null
           loading_bay?: string | null
+          location_id?: string | null
           notes?: string | null
           timezone?: string | null
           title?: string | null
           transport_provider?:
             | Database["public"]["Enums"]["transport_provider_enum"]
             | null
+          transport_request_id?: string | null
           transport_type?: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
         }
@@ -5489,6 +5910,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_job_staffing_summary"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "logistics_events_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_events_transport_request_id_fkey"
+            columns: ["transport_request_id"]
+            isOneToOne: false
+            referencedRelation: "transport_requests"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5839,14 +6274,14 @@ export type Database = {
           {
             foreignKeyName: "notification_preferences_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "notification_preferences_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
@@ -6633,8 +7068,8 @@ export type Database = {
           enabled: boolean
           failure_count: number
           id: string
-          last_seen_at: string | null
           last_failure_at: string | null
+          last_seen_at: string | null
           last_verified_at: string | null
           platform: string
           sync_status: string
@@ -6650,8 +7085,8 @@ export type Database = {
           enabled?: boolean
           failure_count?: number
           id?: string
-          last_seen_at?: string | null
           last_failure_at?: string | null
+          last_seen_at?: string | null
           last_verified_at?: string | null
           platform: string
           sync_status?: string
@@ -6667,8 +7102,8 @@ export type Database = {
           enabled?: boolean
           failure_count?: number
           id?: string
-          last_seen_at?: string | null
           last_failure_at?: string | null
+          last_seen_at?: string | null
           last_verified_at?: string | null
           platform?: string
           sync_status?: string
@@ -6740,6 +7175,42 @@ export type Database = {
         }
         Relationships: []
       }
+      push_schedule_claims: {
+        Row: {
+          attempts: number
+          created_at: string
+          event_type: string
+          last_error: string | null
+          lease_expires_at: string
+          next_attempt_at: string | null
+          occurrence_key: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          event_type: string
+          last_error?: string | null
+          lease_expires_at?: string
+          next_attempt_at?: string | null
+          occurrence_key: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          event_type?: string
+          last_error?: string | null
+          lease_expires_at?: string
+          next_attempt_at?: string | null
+          occurrence_key?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string | null
@@ -6750,8 +7221,8 @@ export type Database = {
           enabled: boolean
           endpoint: string
           expiration_time: number | null
-          id: string
           failure_count: number
+          id: string
           last_failure_at: string | null
           last_seen_at: string
           last_verified_at: string | null
@@ -6769,8 +7240,8 @@ export type Database = {
           enabled?: boolean
           endpoint: string
           expiration_time?: number | null
-          id?: string
           failure_count?: number
+          id?: string
           last_failure_at?: string | null
           last_seen_at?: string
           last_verified_at?: string | null
@@ -6788,8 +7259,8 @@ export type Database = {
           enabled?: boolean
           endpoint?: string
           expiration_time?: number | null
-          id?: string
           failure_count?: number
+          id?: string
           last_failure_at?: string | null
           last_seen_at?: string
           last_verified_at?: string | null
@@ -10168,6 +10639,97 @@ export type Database = {
           },
         ]
       }
+      transport_driver_assignments: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          decline_reason: string | null
+          driver_id: string | null
+          ends_at: string
+          id: string
+          logistics_event_id: string
+          notes: string | null
+          responded_at: string | null
+          starts_at: string
+          status: string
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          decline_reason?: string | null
+          driver_id?: string | null
+          ends_at: string
+          id?: string
+          logistics_event_id: string
+          notes?: string | null
+          responded_at?: string | null
+          starts_at: string
+          status?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          decline_reason?: string | null
+          driver_id?: string | null
+          ends_at?: string
+          id?: string
+          logistics_event_id?: string
+          notes?: string | null
+          responded_at?: string | null
+          starts_at?: string
+          status?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transport_driver_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_driver_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_driver_assignments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_driver_assignments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_driver_assignments_logistics_event_id_fkey"
+            columns: ["logistics_event_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_driver_assignments_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transport_request_items: {
         Row: {
           created_at: string
@@ -10206,10 +10768,19 @@ export type Database = {
           created_by: string | null
           department: string
           description: string | null
+          destination: string | null
           fulfilled_by: string | null
           id: string
+          is_hoja_relevant: boolean
           job_id: string
+          movement_type: string
+          needed_at: string | null
           note: string | null
+          origin: string | null
+          planning_status: string
+          priority: string
+          source_ref: string | null
+          source_type: string
           status: string
           subrental_id: string | null
           transport_type: string | null
@@ -10220,10 +10791,19 @@ export type Database = {
           created_by?: string | null
           department: string
           description?: string | null
+          destination?: string | null
           fulfilled_by?: string | null
           id?: string
+          is_hoja_relevant?: boolean
           job_id: string
+          movement_type?: string
+          needed_at?: string | null
           note?: string | null
+          origin?: string | null
+          planning_status?: string
+          priority?: string
+          source_ref?: string | null
+          source_type?: string
           status?: string
           subrental_id?: string | null
           transport_type?: string | null
@@ -10234,10 +10814,19 @@ export type Database = {
           created_by?: string | null
           department?: string
           description?: string | null
+          destination?: string | null
           fulfilled_by?: string | null
           id?: string
+          is_hoja_relevant?: boolean
           job_id?: string
+          movement_type?: string
+          needed_at?: string | null
           note?: string | null
+          origin?: string | null
+          planning_status?: string
+          priority?: string
+          source_ref?: string | null
+          source_type?: string
           status?: string
           subrental_id?: string | null
           transport_type?: string | null
@@ -11669,6 +12258,30 @@ export type Database = {
         Args: { p_date: string; p_technician_id: string }
         Returns: boolean
       }
+      acquire_flex_provisioning_lease: {
+        Args: {
+          p_lease_seconds?: number
+          p_operation_type: string
+          p_reconcile?: boolean
+          p_requested_by?: string
+          p_scope_id: string
+          p_scope_key: string
+        }
+        Returns: {
+          acquired: boolean
+          lease_token: string
+          operation_id: string
+          status: string
+        }[]
+      }
+      allocate_flex_provisioning_sequence: {
+        Args: {
+          p_minimum?: number
+          p_operation_id: string
+          p_sequence_group: string
+        }
+        Returns: number
+      }
       approve_job_expense: {
         Args: {
           p_approved: boolean
@@ -11710,6 +12323,19 @@ export type Database = {
         }
       }
       assert_soundvision_access: { Args: never; Returns: boolean }
+      assign_transport_driver: {
+        Args: {
+          p_assignment_id?: string
+          p_driver_id: string
+          p_ends_at?: string
+          p_event_id: string
+          p_force?: boolean
+          p_notes?: string
+          p_starts_at?: string
+          p_vehicle_id: string
+        }
+        Returns: Json
+      }
       attempt_whatsapp_send: {
         Args: {
           _actor_id: string
@@ -11778,7 +12404,16 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_push_schedule: {
+        Args: { p_event_type: string; p_occurrence_key: string }
+        Returns: boolean
+      }
+      claim_push_schedule_retry: {
+        Args: { p_event_type: string; p_max_attempts?: number }
+        Returns: string
+      }
       cleanup_anonymous_security_audit_log: { Args: never; Returns: number }
+      cleanup_driver_locations: { Args: never; Returns: number }
       clear_tour_preset_assignments: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
@@ -11876,6 +12511,7 @@ export type Database = {
           should_delete_storage: boolean
         }[]
       }
+      delete_logistics_event: { Args: { p_event_id: string }; Returns: Json }
       department_for_role_prefix: {
         Args: { p_role_prefix: string }
         Returns: string
@@ -11942,6 +12578,24 @@ export type Database = {
           table_name: string
         }[]
       }
+      finish_flex_provisioning_lease: {
+        Args: {
+          p_last_error?: Json
+          p_lease_token: string
+          p_operation_id: string
+          p_status: string
+        }
+        Returns: boolean
+      }
+      finish_push_schedule: {
+        Args: {
+          p_error?: string
+          p_event_type: string
+          p_occurrence_key: string
+          p_success: boolean
+        }
+        Returns: undefined
+      }
       get_active_timesheet_counts_by_technician: {
         Args: { p_end_date: string; p_start_date: string }
         Returns: {
@@ -11991,6 +12645,11 @@ export type Database = {
         }[]
       }
       get_current_user_role: { Args: never; Returns: string }
+      get_driver_locations: { Args: never; Returns: Json }
+      get_event_driver_assignment_ids: {
+        Args: { p_event_id: string }
+        Returns: string[]
+      }
       get_festival_assigned_stages: {
         Args: { p_job_id: string; p_user_id: string }
         Returns: number[]
@@ -12001,6 +12660,24 @@ export type Database = {
           date: string
           job_id: string
           technician_id: string
+        }[]
+      }
+      get_job_producer_claims: {
+        Args: { p_job_ids?: string[] }
+        Returns: {
+          display_name: string
+          job_id: string
+          producer_id: string
+        }[]
+      }
+      get_job_producer_contacts: {
+        Args: { p_job_ids?: string[] }
+        Returns: {
+          display_name: string
+          email: string
+          job_id: string
+          phone: string
+          producer_id: string
         }[]
       }
       get_job_staffing_summary: {
@@ -12028,6 +12705,10 @@ export type Database = {
           user_can_see_all: boolean
         }[]
       }
+      get_logistics_matrix: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
       get_madrid_holidays: {
         Args: { holiday_year?: number }
         Returns: {
@@ -12037,8 +12718,12 @@ export type Database = {
         }[]
       }
       get_my_calendar_ics_token: { Args: never; Returns: string }
+      get_my_transport_assignments: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: Json
+      }
       get_profile_directory: {
-        Args: { p_profile_ids?: string[] | null }
+        Args: { p_profile_ids?: string[] }
         Returns: {
           assignable_as_tech: boolean
           department: string
@@ -12258,6 +12943,14 @@ export type Database = {
         Args: { _new: Json; _old: Json; allowed: string[] }
         Returns: Json
       }
+      list_transport_requests: {
+        Args: {
+          p_department?: string
+          p_include_closed?: boolean
+          p_job_id?: string
+        }
+        Returns: Json
+      }
       log_activity: {
         Args: {
           _code: string
@@ -12281,6 +12974,8 @@ export type Database = {
         }
         Returns: string
       }
+      logistics_matrix_can_manage: { Args: never; Returns: boolean }
+      logistics_matrix_can_view: { Args: never; Returns: boolean }
       manage_assignment_lifecycle: {
         Args: {
           p_action: string
@@ -12328,6 +13023,18 @@ export type Database = {
       }
       normalize_text_for_match: { Args: { input: string }; Returns: string }
       prune_place_api_cache: { Args: never; Returns: undefined }
+      purge_push_history: {
+        Args: {
+          p_attempt_retention?: string
+          p_claim_retention?: string
+          p_inbox_retention?: string
+        }
+        Returns: {
+          attempts_deleted: number
+          claims_deleted: number
+          inbox_deleted: number
+        }[]
+      }
       rack_builder_can_access_department: {
         Args: { p_department: string }
         Returns: boolean
@@ -12447,6 +13154,10 @@ export type Database = {
           soft_conflict: boolean
         }[]
       }
+      record_push_target_health: {
+        Args: { p_channel: string; p_success: boolean; p_target: string }
+        Returns: undefined
+      }
       refresh_timesheet_amounts_for_job_date: {
         Args: { _date: string; _job_id: string }
         Returns: undefined
@@ -12461,6 +13172,10 @@ export type Database = {
       }
       remove_technician_payout_override: {
         Args: { _job_id: string; _technician_id: string }
+        Returns: Json
+      }
+      remove_transport_driver_assignment: {
+        Args: { p_assignment_id: string }
         Returns: Json
       }
       replace_hoja_de_ruta_all: {
@@ -12540,6 +13255,17 @@ export type Database = {
         }
         Returns: string
       }
+      report_driver_location: {
+        Args: {
+          p_accuracy_m?: number
+          p_assignment_id?: string
+          p_heading_deg?: number
+          p_latitude: number
+          p_longitude: number
+          p_speed_mps?: number
+        }
+        Returns: Json
+      }
       resolve_category_for_timesheet: {
         Args: { _job_id: string; _tech_id: string }
         Returns: string
@@ -12548,11 +13274,48 @@ export type Database = {
         Args: { _actor_id: string; _code: string; _job_id: string }
         Returns: Database["public"]["Enums"]["activity_visibility"]
       }
+      respond_transport_assignment: {
+        Args: { p_assignment_id: string; p_reason?: string; p_response: string }
+        Returns: Json
+      }
       revoke_tour_guest_link: {
         Args: { p_link_id: string }
         Returns: undefined
       }
       rotate_my_calendar_ics_token: { Args: never; Returns: string }
+      save_transport_request: {
+        Args: {
+          p_department: string
+          p_description?: string
+          p_destination?: string
+          p_is_hoja_relevant?: boolean
+          p_items?: Json
+          p_job_id: string
+          p_movement_type?: string
+          p_needed_at?: string
+          p_note?: string
+          p_origin?: string
+          p_priority?: string
+          p_request_id: string
+          p_source_ref?: string
+          p_source_type?: string
+        }
+        Returns: string
+      }
+      schedule_transport_request: {
+        Args: {
+          p_license_plate?: string
+          p_load_date: string
+          p_load_time: string
+          p_loading_bay?: string
+          p_notes?: string
+          p_provider?: string
+          p_request_id: string
+          p_unload_date: string
+          p_unload_time: string
+        }
+        Returns: Json
+      }
       set_expense_permission: {
         Args: {
           p_category_slug: string
@@ -12594,7 +13357,12 @@ export type Database = {
         Args: { p_access_level: string; p_link_id: string }
         Returns: undefined
       }
+      set_transport_request_stage: {
+        Args: { p_request_id: string; p_stage: string }
+        Returns: undefined
+      }
       staffing_role_prefix: { Args: { p_role_code: string }; Returns: string }
+      stop_sharing_driver_location: { Args: never; Returns: Json }
       submit_job_expense: {
         Args: {
           p_amount_original: number
@@ -12713,6 +13481,12 @@ export type Database = {
         }
         Returns: string
       }
+      transport_request_is_privileged: { Args: never; Returns: boolean }
+      transport_stage_transition_allowed: {
+        Args: { p_from: string; p_to: string }
+        Returns: boolean
+      }
+      transport_write_actor_is_trusted: { Args: never; Returns: boolean }
       update_tour_dates: { Args: never; Returns: undefined }
       upsert_job_prep_days: {
         Args: { p_dates: string[]; p_job_id: string }
@@ -12867,7 +13641,15 @@ export type Database = {
         | "nacex"
         | "sector_pro"
         | "recogida_cliente"
-      transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"
+      transport_type:
+        | "trailer"
+        | "9m"
+        | "8m"
+        | "6m"
+        | "4m"
+        | "furgoneta"
+        | "rv"
+        | "sleeper_bus"
       transportation_type:
         | "van"
         | "sleeper_bus"
@@ -12904,12 +13686,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -12933,11 +13715,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -12958,11 +13740,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -12983,11 +13765,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -13000,11 +13782,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -13153,7 +13935,16 @@ export const Constants = {
         "sector_pro",
         "recogida_cliente",
       ],
-      transport_type: ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"],
+      transport_type: [
+        "trailer",
+        "9m",
+        "8m",
+        "6m",
+        "4m",
+        "furgoneta",
+        "rv",
+        "sleeper_bus",
+      ],
       transportation_type: [
         "van",
         "sleeper_bus",

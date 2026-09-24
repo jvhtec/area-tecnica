@@ -58,7 +58,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
         const { data: directoryData, error: techsError } = await dataLayerClient.rpc(
           'get_profile_directory',
-          { p_profile_ids: null },
+          // Defaults to null (the whole directory); undefined sends the default.
+          { p_profile_ids: undefined },
         );
 
         if (techsError) {
