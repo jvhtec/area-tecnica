@@ -17,7 +17,7 @@ import {
   defaultAssignmentWindow,
   driverDisplayName,
   driverVehicleWarnings,
-  formatMadridTime,
+  formatTransportTime,
   transportEventTitle,
   vehicleLabel,
   vehicleTypeLabel,
@@ -52,7 +52,10 @@ export function DriverAssignmentForm({
 }: DriverAssignmentFormProps) {
   const { toast } = useToast();
   const initialWindow = existing
-    ? { start: utcToLocalInput(existing.starts_at), end: utcToLocalInput(existing.ends_at) }
+    ? {
+        start: utcToLocalInput(existing.starts_at, event.timezone),
+        end: utcToLocalInput(existing.ends_at, event.timezone),
+      }
     : defaultAssignmentWindow(event);
   const initialDriverId = existing ? existing.driver_id : defaultDriverId ?? null;
   const initialDriver = data.drivers.find((driver) => driver.id === initialDriverId);
@@ -92,8 +95,8 @@ export function DriverAssignmentForm({
         eventId: event.id,
         driverId: driverId === NONE ? null : driverId,
         vehicleId: vehicleId === NONE ? null : vehicleId,
-        startsAt: localInputToUTC(start).toISOString(),
-        endsAt: localInputToUTC(end).toISOString(),
+        startsAt: localInputToUTC(start, event.timezone).toISOString(),
+        endsAt: localInputToUTC(end, event.timezone).toISOString(),
         notes,
         assignmentId: existing?.id ?? null,
         force,
@@ -213,7 +216,7 @@ export function DriverAssignmentForm({
               {conflicts.map((conflict) => (
                 <li key={`${conflict.kind}-${conflict.assignment_id}`}>
                   {conflict.kind === "driver" ? "Conductor" : "Vehículo"} ocupado de{" "}
-                  {formatMadridTime(conflict.starts_at)} a {formatMadridTime(conflict.ends_at)}
+                  {formatTransportTime(conflict.starts_at, conflict.timezone)} a {formatTransportTime(conflict.ends_at, conflict.timezone)}
                   {conflict.title ? ` (${conflict.title})` : ""}
                 </li>
               ))}
