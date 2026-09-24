@@ -11,7 +11,7 @@ import { es } from "date-fns/locale";
 
 import { MADRID_TIMEZONE, addMadridCalendarDays, formatMadridDateKey } from "@/utils/timezoneUtils";
 
-export const LICENSE_CATEGORIES = ["B", "C1", "C1+E", "C", "C+E", "D1", "D"] as const;
+export const LICENSE_CATEGORIES = ["B", "B+E", "C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"] as const;
 export type LicenseCategory = (typeof LICENSE_CATEGORIES)[number];
 
 export const VEHICLE_TYPES = ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"] as const;
@@ -162,7 +162,16 @@ export const vehicleLabel = (vehicle: Pick<FleetVehicle, "name" | "license_plate
 export const transportEventTitle = (event: Pick<MatrixTransportEvent, "title" | "job_title" | "event_type">): string =>
   event.title?.trim() || event.job_title?.trim() || TRANSPORT_EVENT_TYPE_LABELS[event.event_type] || "Transporte";
 
-export const formatMadridTime = (iso: string): string => formatInTimeZone(iso, MADRID_TIMEZONE, "HH:mm");
+export const normalizeTransportTimezone = (timezone: string | null | undefined): string =>
+  timezone?.trim() || MADRID_TIMEZONE;
+
+export const formatTransportTime = (iso: string, timezone?: string | null): string =>
+  formatInTimeZone(iso, normalizeTransportTimezone(timezone), "HH:mm");
+
+export const formatTransportDateKey = (iso: string, timezone?: string | null): string =>
+  formatInTimeZone(iso, normalizeTransportTimezone(timezone), "yyyy-MM-dd");
+
+export const formatMadridTime = (iso: string): string => formatTransportTime(iso, MADRID_TIMEZONE);
 
 export const formatMadridDayLabel = (iso: string): string =>
   formatInTimeZone(iso, MADRID_TIMEZONE, "EEEE d 'de' MMMM", { locale: es });
@@ -175,12 +184,15 @@ export const formatMadridDayLabel = (iso: string): string =>
 // de Conductores). Any professional category presupposes a B licence.
 const LICENSE_IMPLIES: Record<LicenseCategory, readonly LicenseCategory[]> = {
   B: [],
+  "B+E": ["B"],
   C1: ["B"],
-  "C1+E": ["C1", "B"],
+  "C1+E": ["C1", "B+E", "B"],
   C: ["C1", "B"],
-  "C+E": ["C", "C1", "C1+E", "B"],
+  "C+E": ["C", "C1", "C1+E", "B+E", "B"],
   D1: ["B"],
+  "D1+E": ["D1", "B+E", "B"],
   D: ["D1", "B"],
+  "D+E": ["D", "D1", "D1+E", "B+E", "B"],
 };
 
 const isLicenseCategory = (value: string): value is LicenseCategory =>
@@ -216,7 +228,9 @@ export const driverVehicleWarnings = (
     warnings.push("license_missing");
   }
   if (driver.license_expiry && driver.license_expiry < dayKey) warnings.push("license_expired");
-  const professional = vehicle ? vehicle.required_license !== "B" : false;
+  const professional = vehicle
+    ? ["C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"].includes(vehicle.required_license)
+    : false;
   if (professional && driver.cap_expiry && driver.cap_expiry < dayKey) warnings.push("cap_expired");
   return warnings;
 };
