@@ -443,8 +443,14 @@ export class MultiTabCoordinator {
     }
 
     const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
-    this.delegatedOwners.add(ownerRoute);
     const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
+
+    // Re-requesting the same follower route (token refresh, reconnect, visibility
+    // recovery) must replace its handlers rather than stack another copy.
+    if (this.delegatedOwners.has(ownerRoute)) {
+      manager.cleanupRouteDependentSubscriptions(ownerRoute);
+    }
+    this.delegatedOwners.add(ownerRoute);
 
     requestedSubscriptions.forEach(({ table, queryKey, filter, priority }) => {
       const delegatedToAnotherTab = Boolean(requesterTabId && requesterTabId !== this.tabId);
