@@ -351,8 +351,14 @@ begin
        or le.id in (
          select a.logistics_event_id
          from public.transport_driver_assignments a
-         where a.starts_at < ((p_end + 1)::timestamp at time zone 'Europe/Madrid')
-           and a.ends_at > (p_start::timestamp at time zone 'Europe/Madrid')
+         where a.starts_at < (
+                 (p_end + 1)::timestamp
+                 at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+               )
+           and a.ends_at > (
+                 p_start::timestamp
+                 at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+               )
        )
   ) events;
 
@@ -364,8 +370,14 @@ begin
   join public.logistics_events le on le.id = a.logistics_event_id
   where le.event_date between p_start and p_end
      or (
-       a.starts_at < ((p_end + 1)::timestamp at time zone 'Europe/Madrid')
-       and a.ends_at > (p_start::timestamp at time zone 'Europe/Madrid')
+       a.starts_at < (
+         (p_end + 1)::timestamp
+         at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+       )
+       and a.ends_at > (
+         p_start::timestamp
+         at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+       )
      );
 
   return jsonb_build_object(
@@ -659,8 +671,17 @@ begin
     left join public.fleet_vehicles v on v.id = a.vehicle_id
     where a.driver_id = v_uid
       -- Any window overlapping the range, so a multi-day run stays listed until it ends.
-      and (v_to is null or a.starts_at < ((v_to + 1)::timestamp at time zone 'Europe/Madrid'))
-      and a.ends_at > (v_from::timestamp at time zone 'Europe/Madrid')
+      and (
+        v_to is null
+        or a.starts_at < (
+          (v_to + 1)::timestamp
+          at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+        )
+      )
+      and a.ends_at > (
+        v_from::timestamp
+        at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+      )
   ) rows;
 
   return v_result;
