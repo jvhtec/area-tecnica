@@ -50,6 +50,36 @@ describe("cross-tab private cache isolation", () => {
     expect(client.getQueryData(["private"])).toBe("A data");
   });
 
+  it("refetches a delegated query only in the targeted follower tab", async () => {
+    const channel = TestChannel.instances.at(-1)!;
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    invalidateSpy.mockClear();
+    const scopeKey = JSON.stringify(["account-a", "management:sound"]);
+
+    channel.receive({
+      type: "invalidate",
+      scopeKey,
+      queryKey: ["transport_driver_assignments"],
+      tabId: "leader-tab",
+      targetTabId: "some-other-tab",
+      refetch: true,
+    });
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    channel.receive({
+      type: "invalidate",
+      scopeKey,
+      queryKey: ["transport_driver_assignments"],
+      tabId: "leader-tab",
+      targetTabId: coordinator.getTabId(),
+      refetch: true,
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["transport_driver_assignments"],
+      refetchType: "active",
+    });
+  });
+
   it("drops buffered broadcasts and late messages from the old account's channel", async () => {
     const oldChannel = TestChannel.instances.at(-1)!;
     client.setQueryData(["private"], "A data");
