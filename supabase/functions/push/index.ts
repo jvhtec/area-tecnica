@@ -2,6 +2,7 @@ import { createClient, serve } from "./deps.ts";
 import { SERVICE_ROLE_KEY, SUPABASE_URL } from "./config.ts";
 import { createHttpHandler, HttpError, readJsonBody } from "../_shared/http.ts";
 import { resolveCaller } from "./auth.ts";
+import { authorizeBroadcast } from "./authorization.ts";
 import { handleBroadcast } from "./broadcast.ts";
 import { handleCheckScheduled } from "./scheduled.ts";
 import { ensureAuthHeader, jsonResponse } from "./http.ts";
@@ -34,7 +35,8 @@ serve(createHttpHandler(async (req) => {
   const client = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   // Allow service callers for broadcast and check_scheduled; user token for others
   const allowService = (body.action as Action) === 'broadcast' || (body.action as Action) === 'check_scheduled';
-  const { userId } = await resolveCaller(client, token, allowService);
+  const caller = await resolveCaller(client, token, allowService);
+  const { userId } = caller;
 
   switch (body.action as Action) {
     case "subscribe":
@@ -48,8 +50,12 @@ serve(createHttpHandler(async (req) => {
     case "test":
       return await handleTest(client, userId, body as TestBody);
     case "broadcast":
+      await authorizeBroadcast(client, caller, body as BroadcastBody);
       return await handleBroadcast(client, userId, body as BroadcastBody);
     case "check_scheduled":
+      if (!caller.isService) {
+        throw new HttpError(403, "La ejecución programada requiere autenticación de servicio");
+      }
       return await handleCheckScheduled(client, body as CheckScheduledBody);
     default:
       return jsonResponse({ error: "Unsupported action" }, 400);

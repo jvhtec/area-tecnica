@@ -6,6 +6,15 @@ import {
   isPublicArtistFormPath,
 } from "@/routes/app-route-manifest";
 
+const NativePushNavigationInitializer = lazy(() =>
+  import("@/hooks/useNativePushNavigation").then((module) => ({
+    default: function NativePushNavigationInitializer(): null {
+      module.useNativePushNavigation();
+      return null;
+    },
+  })),
+);
+
 const ServiceWorkerUpdateInitializer = lazy(() =>
   import("@/hooks/useServiceWorkerUpdate").then((module) => ({
     default: function ServiceWorkerUpdateInitializer(): null {
@@ -86,6 +95,7 @@ export function RouteAwareGlobalInitializers() {
 
   return (
     <Suspense fallback={null}>
+      {isPrivateRoute && <NativePushNavigationInitializer />}
       <ServiceWorkerUpdateInitializer />
       {isPrivateRoute && <PushSubscriptionRecoveryInitializer />}
       {isPrivateRoute && <ShortcutSystemInitializer />}

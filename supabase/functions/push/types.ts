@@ -14,11 +14,15 @@ export type SubscribeBody = {
     expirationTime?: number | null;
     keys?: { p256dh?: string; auth?: string };
   };
+  device_id?: string;
+  device_name?: string;
+  send_welcome?: boolean;
 };
 
 export type UnsubscribeBody = {
   action: "unsubscribe";
-  endpoint: string;
+  endpoint?: string;
+  device_id?: string;
 };
 
 export type SubscribeNativeBody = {
@@ -27,17 +31,20 @@ export type SubscribeNativeBody = {
   platform?: string;
   device_id?: string;
   device_name?: string;
+  send_welcome?: boolean;
 };
 
 export type UnsubscribeNativeBody = {
   action: "unsubscribe_native";
   token?: string;
+  device_id?: string;
   platform?: string;
 };
 
 export type TestBody = {
   action: "test";
   url?: string;
+  device_id?: string;
 };
 
 export type BroadcastBody = {
@@ -107,6 +114,25 @@ export type BroadcastBody = {
   // Changelog optional hints
   version?: string;
   content?: string;
+  // Vacation / absence requests
+  vacation_request_id?: string;
+  start_date?: string;
+  end_date?: string;
+  // Expenses and payouts
+  expense_id?: string;
+  amount_eur?: number;
+  category_slug?: string;
+  // Bug reports
+  bug_report_id?: string;
+  // Announcements
+  announcement_id?: string;
+  announcement_level?: string;
+  // Transport lifecycle
+  planning_status?: string;
+  previous_planning_status?: string;
+  // Producer claims
+  producer_id?: string;
+  producer_name?: string;
 };
 
 export type CheckScheduledBody = {
@@ -142,12 +168,15 @@ export type PushPayload = {
   url?: string;
   type?: string;
   meta?: Record<string, unknown>;
+  eventKey?: string;
+  urgency?: "low" | "normal" | "high" | "urgent";
+  ttlSeconds?: number;
 };
 
 export type PushSendResult =
   | { ok: true }
-  | { ok: false; skipped: true }
-  | { ok: false; status: number };
+  | { ok: false; skipped: true; reason?: string }
+  | { ok: false; status: number; retryAfterMs?: number; reason?: string };
 
 export type PushNotificationRoute = {
   event_code: string;

@@ -41,6 +41,24 @@ export const vacationRequestsApi = {
       .single();
 
     if (error) throw error;
+
+    // Best-effort: reviewers (the requester's department management plus
+    // admins) are resolved server-side; a push failure never fails the request.
+    try {
+      await supabase.functions.invoke('push', {
+        body: {
+          action: 'broadcast',
+          type: 'vacation.request.submitted',
+          technician_id: user.id,
+          vacation_request_id: data.id,
+          start_date: request.start_date,
+          end_date: request.end_date,
+        },
+      });
+    } catch (pushError) {
+      console.warn('Failed to send vacation request push notification:', pushError);
+    }
+
     return data;
   },
 

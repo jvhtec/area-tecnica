@@ -43,7 +43,7 @@ export const usePushDebug = () => {
     const reg = (await navigator.serviceWorker.getRegistration('/')) || (await navigator.serviceWorker.ready)
     // try via SW message (works even if page context has quirks)
     const target = navigator.serviceWorker.controller || reg?.active
-    target?.postMessage({ type: 'sw:show-test', data: { title: 'Local SW test', body: 'Testing notification display' } })
+    target?.postMessage({ type: 'sw:show-test', data: { title: 'Prueba local', body: 'Comprobando la visualización de notificaciones' } })
   }
 
   const getSubscriptionInfo = async (): Promise<any | null> => {

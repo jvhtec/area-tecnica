@@ -54,11 +54,29 @@ export const fetchJobProducerContacts = async (jobIds: string[]): Promise<JobPro
   return Array.isArray(data) ? data as unknown as JobProducerContact[] : [];
 };
 
+/**
+ * Announces a claim change. Deliberately fire-and-forget and never awaited by
+ * the caller: a claim is production bookkeeping that must succeed or fail on its
+ * own, and it never creates a job_assignment, timesheet or rate row.
+ */
+const notifyProducerClaimChange = (
+  type: "job.producer.claimed" | "job.producer.released",
+  jobId: string,
+  producerId: string,
+) => {
+  void dataLayerClient.functions
+    .invoke("push", {
+      body: { action: "broadcast", type, job_id: jobId, producer_id: producerId },
+    })
+    .catch(() => undefined);
+};
+
 export const claimJobForProducer = async (jobId: string, producerId: string) => {
   const { error } = await dataLayerClient
     .from(claimsTable)
     .insert({ job_id: jobId, producer_id: producerId } as never);
   if (error) throw error;
+  notifyProducerClaimChange("job.producer.claimed", jobId, producerId);
 };
 
 export const releaseJobForProducer = async (jobId: string, producerId: string) => {
@@ -68,6 +86,7 @@ export const releaseJobForProducer = async (jobId: string, producerId: string) =
     .eq("job_id", jobId)
     .eq("producer_id", producerId);
   if (error) throw error;
+  notifyProducerClaimChange("job.producer.released", jobId, producerId);
 };
 
 // Module-level cache so every card/dialog on a page shares one profile

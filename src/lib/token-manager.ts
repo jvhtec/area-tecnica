@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { AuthError, Session } from '@supabase/supabase-js';
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
+import { sessionOrPersisted } from '@/lib/offline-session';
 
 export type TokenRefreshResult = {
   session: Session | null;
@@ -43,16 +44,22 @@ export class TokenManager {
   
   private constructor() {
     // Set up auth state change listener
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange((event, rawSession) => {
       console.log(`Auth state changed: ${event}`);
-      
+      // Offline with an expired token, INITIAL_SESSION arrives empty although
+      // the session is still stored for a retry (see offline-session.ts).
+      const session = event === 'INITIAL_SESSION' ? sessionOrPersisted(rawSession) : rawSession;
+      const offlineOnly = session !== rawSession;
+
       // Update cached session whenever auth state changes
       this.updateCachedSession(session);
       
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         this.lastRefresh = Date.now();
         this.notifySubscribers();
-        this.scheduleNextRefresh(session);
+        // supabase-js's own auto-refresh renews an offline-only session once
+        // the network is back; scheduling ours would just retry into the void.
+        if (!offlineOnly) this.scheduleNextRefresh(session);
       } else if (event === 'SIGNED_OUT') {
         if (this.refreshTimeout) {
           clearTimeout(this.refreshTimeout);
@@ -123,10 +130,10 @@ export class TokenManager {
     // Cache is invalid or empty, fetch fresh session
     console.log('🔄 Fetching fresh session (cache miss or expired)');
     const { data } = await supabase.auth.getSession();
-    const session = data.session;
+    const session = sessionOrPersisted(data.session);
     this.updateCachedSession(session);
 
-    if (session) {
+    if (session && session === data.session) {
       this.scheduleNextRefresh(session);
     }
 

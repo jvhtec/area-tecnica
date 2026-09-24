@@ -4,6 +4,7 @@ import type { TourDocument } from "@/hooks/useTourDocuments";
 import type { JobDocument } from "@/types/job";
 import { createSignedUrl, resolveJobDocLocation } from "@/utils/jobDocuments";
 import type { RiderFile } from "@/components/technician/details-modal/types";
+import { rememberDocumentReturn } from "@/lib/techAppReturn";
 
 /**
  * `link.click()` only *starts* the download; the browser fetches the resource
@@ -13,6 +14,15 @@ import type { RiderFile } from "@/components/technician/details-modal/types";
  * event that says the download has begun, so cleanup is deferred instead.
  */
 const DOWNLOAD_CLEANUP_DELAY_MS = 1000;
+
+/**
+ * Opens a signed document URL. The return point is saved first because the
+ * document may replace the app (see techAppReturn.ts).
+ */
+const openDocumentUrl = (url: string) => {
+  rememberDocumentReturn();
+  window.open(url, "_blank", "noopener,noreferrer");
+};
 
 const appendAndClickDownload = (href: string, fileName: string, onCleanup?: () => void) => {
   const link = document.createElement("a");
@@ -39,7 +49,7 @@ const downloadBlob = async (supabase: SupabaseClient, bucket: string, path: stri
 
 export const openJobDocument = async (supabase: SupabaseClient, doc: JobDocument) => {
   const url = await createSignedUrl(supabase, doc.file_path, 60);
-  window.open(url, "_blank", "noopener,noreferrer");
+  openDocumentUrl(url);
 };
 
 export const downloadJobDocument = async (supabase: SupabaseClient, doc: JobDocument) => {
@@ -59,7 +69,7 @@ export const openTourDocument = async (supabase: SupabaseClient, doc: TourDocume
     throw error || new Error("No se pudo generar la URL");
   }
 
-  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  openDocumentUrl(data.signedUrl);
 };
 
 export const downloadTourDocument = async (supabase: SupabaseClient, doc: TourDocument) => {
@@ -75,7 +85,7 @@ export const openRider = async (supabase: SupabaseClient, file: RiderFile) => {
     throw error || new Error("No se pudo generar la URL");
   }
 
-  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  openDocumentUrl(data.signedUrl);
 };
 
 export const downloadRider = async (supabase: SupabaseClient, file: RiderFile) => {

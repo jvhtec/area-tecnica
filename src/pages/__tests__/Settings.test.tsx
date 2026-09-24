@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
@@ -88,6 +88,7 @@ vi.mock("@/components/settings/PushNotificationMatrix", () => ({
 
 vi.mock("@/components/settings/PushNotificationSchedule", () => ({
   PushNotificationSchedule: () => <div>Push schedule</div>,
+  ShiftReminderSchedule: () => <div>Shift reminder schedule</div>,
 }));
 
 vi.mock("@/components/settings/MorningSummarySubscription", () => ({
@@ -195,64 +196,12 @@ describe("Settings", () => {
     expect(within(usersCard).getByText("Users list /all/all")).toBeInTheDocument();
   });
 
-  it("shows push status labels and handles sent, skipped, and failed test notifications", async () => {
+  it("opens the centralized notification center", async () => {
     const user = userEvent.setup();
 
     renderWithProviders(<Settings />);
-    const pushCard = await openSection("Notificaciones push", user);
-
-    expect(within(pushCard).getByText((_, element) => element?.textContent === "Permiso: Concedido")).toBeInTheDocument();
-    expect(within(pushCard).getByText((_, element) => element?.textContent === "Suscripción: Activa en este dispositivo")).toBeInTheDocument();
-
-    await user.click(within(pushCard).getByRole("button", { name: /enviar\s*prueba/i }));
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Notificación de prueba enviada",
-      }),
-    );
-
-    mockSupabase.functions.invoke.mockResolvedValueOnce({
-      data: { status: "sent", results: [{ ok: false, skipped: true }] },
-      error: null,
-    });
-
-    await user.click(within(pushCard).getByRole("button", { name: /enviar\s*prueba/i }));
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Notificación de prueba omitida",
-      }),
-    );
-
-    mockSupabase.functions.invoke.mockRejectedValueOnce(new Error("push failed"));
-
-    await user.click(within(pushCard).getByRole("button", { name: /enviar\s*prueba/i }));
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "No se pudo enviar la prueba",
-        variant: "destructive",
-      }),
-    );
-  });
-
-  it("schedules the background push test through the edge function", async () => {
-    const user = userEvent.setup();
-
-    renderWithProviders(<Settings />);
-    const pushCard = await openSection("Notificaciones push", user);
-
-    vi.useFakeTimers();
-    fireEvent.click(within(pushCard).getByRole("button", { name: /prueba 2.º plano/i }));
-
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Prueba en segundo plano programada",
-      }),
-    );
-
-    await vi.advanceTimersByTimeAsync(5000);
-
-    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("push", {
-      body: { action: "test", url: "/settings" },
-    });
+    const pushCard = await openSection("Centro de notificaciones", user);
+    await user.click(within(pushCard).getByRole("button", { name: /abrir centro de notificaciones/i }));
+    expect(navigateMock).toHaveBeenCalledWith('/notifications?section=devices');
   });
 });

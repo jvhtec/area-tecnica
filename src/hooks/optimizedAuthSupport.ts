@@ -73,6 +73,26 @@ export interface SupabaseErrorLike {
 export const PROFILE_CACHE_KEY = "supabase_user_profile";
 export const PROFILE_CACHE_DURATION = 30 * 60 * 1000;
 
+/**
+ * The cached profile for `userId`, if it is younger than PROFILE_CACHE_DURATION.
+ * `allowStale` drops the age limit and is only for when the server cannot be
+ * reached: the last profile the server returned for this same user beats having
+ * no role at all, which the route guards turn into a redirect away from the
+ * offline festival. The next online fetch replaces it.
+ */
+export function readCachedProfile(userId: string, allowStale = false, now: number = Date.now()): CachedProfile | null {
+  try {
+    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!cached) return null;
+    const profile = JSON.parse(cached) as CachedProfile;
+    const isExpired = now - profile.timestamp > PROFILE_CACHE_DURATION;
+    return profile.userId === userId && (allowStale || !isExpired) ? profile : null;
+  } catch (error) {
+    console.error('Error reading profile cache:', error);
+    return null;
+  }
+}
+
 export const VALID_USER_ROLES = new Set<UserRole>([
   "admin",
   "management",

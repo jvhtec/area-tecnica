@@ -1,4 +1,5 @@
 import { APNS_AUTH_KEY, APNS_BUNDLE_ID, APNS_ENV, APNS_KEY_ID, APNS_TEAM_ID } from "./config.ts";
+import { PUSH_CONFIG } from "./config.ts";
 import type { PushPayload, PushSendResult } from "./types.ts";
 
 const APNS_HOST = APNS_ENV === "sandbox" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
@@ -7,7 +8,7 @@ const JWT_TTL_SECONDS = 50 * 60;
 type TokenCleanupClient = {
   from: (table: string) => {
     delete: () => {
-      eq: (column: string, value: string) => Promise<unknown> | unknown;
+      eq: (column: string, value: string) => Promise<{ error?: unknown } | unknown> | { error?: unknown } | unknown;
     };
   };
 };
@@ -128,9 +129,11 @@ export async function sendNativePushNotification(
       authorization: `bearer ${jwt}`,
       "apns-topic": APNS_BUNDLE_ID,
       "apns-push-type": "alert",
-      "apns-priority": "10",
+      "apns-priority": payload.urgency === "low" || payload.urgency === "normal" ? "5" : "10",
+      "apns-expiration": String(Math.floor(Date.now() / 1000) + (payload.ttlSeconds ?? PUSH_CONFIG.TTL_SECONDS)),
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(PUSH_CONFIG.REQUEST_TIMEOUT_MS),
   });
 
   if (response.ok) {
@@ -148,11 +151,21 @@ export async function sendNativePushNotification(
 
   if (status === 410 || reason === "BadDeviceToken" || reason === "Unregistered") {
     try {
-      await client.from("push_device_tokens").delete().eq("device_token", deviceToken);
+      const cleanupResult = await client.from("push_device_tokens").delete().eq("device_token", deviceToken);
+      if (cleanupResult && typeof cleanupResult === "object" && "error" in cleanupResult && cleanupResult.error) {
+        throw cleanupResult.error;
+      }
     } catch (cleanupErr) {
       console.error("⚠️ Failed to cleanup invalid APNs token:", cleanupErr);
     }
   }
 
-  return { ok: false, status };
+  const retryAfterHeader = response.headers.get("retry-after");
+  const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : Number.NaN;
+  return {
+    ok: false,
+    status,
+    retryAfterMs: Number.isFinite(retryAfterSeconds) ? Math.max(0, retryAfterSeconds * 1000) : undefined,
+    reason: reason || "provider_rejected",
+  };
 }
