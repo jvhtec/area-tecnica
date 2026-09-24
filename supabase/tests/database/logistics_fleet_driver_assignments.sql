@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(59);
+SELECT plan(62);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -67,13 +67,15 @@ DELETE FROM public.transport_driver_assignments WHERE logistics_event_id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
   'e5300000-0000-0000-0000-000000000003'::uuid,
-  'e5300000-0000-0000-0000-000000000004'::uuid
+  'e5300000-0000-0000-0000-000000000004'::uuid,
+  'e5300000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM public.logistics_events WHERE id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
   'e5300000-0000-0000-0000-000000000003'::uuid,
-  'e5300000-0000-0000-0000-000000000004'::uuid
+  'e5300000-0000-0000-0000-000000000004'::uuid,
+  'e5300000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM public.driver_details WHERE profile_id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
@@ -139,7 +141,9 @@ VALUES
   ('e5300000-0000-0000-0000-000000000002'::uuid, 'unload', 'trailer', '2031-03-10', '09:00', 'Descarga recinto', 'Europe/Madrid'),
   ('e5300000-0000-0000-0000-000000000003'::uuid, 'load', 'furgoneta', '2031-03-10', '15:00', 'Recogida tarde', 'Europe/Madrid'),
   -- A long haul that starts before the ranges queried below and is still running in them.
-  ('e5300000-0000-0000-0000-000000000004'::uuid, 'load', 'trailer', '2031-03-08', '20:00', 'Ruta larga', 'Europe/Madrid');
+  ('e5300000-0000-0000-0000-000000000004'::uuid, 'load', 'trailer', '2031-03-08', '20:00', 'Ruta larga', 'Europe/Madrid'),
+  -- This run reaches Monday in Helsinki while Madrid is still on Sunday.
+  ('e5300000-0000-0000-0000-000000000005'::uuid, 'load', 'trailer', '2031-03-09', '23:30', 'Cruce Helsinki', 'Europe/Helsinki');
 
 -- ---------------------------------------------------------------------------
 -- Management: fleet and assignments
@@ -472,6 +476,25 @@ SELECT ok(
   'the matrix returns the transport of every assignment overlapping the range'
 );
 
+SELECT is(
+  public.assign_transport_driver(
+    'e5300000-0000-0000-0000-000000000005'::uuid,
+    'e5100000-0000-0000-0000-000000000003'::uuid,
+    NULL,
+    '2031-03-09 23:30 Europe/Helsinki'::timestamptz,
+    '2031-03-10 00:15 Europe/Helsinki'::timestamptz,
+    p_force => true
+  ) ->> 'status',
+  'saved',
+  'a forced fixture can cross a local midnight ahead of Madrid'
+);
+
+SELECT ok(
+  (SELECT bool_or(e ->> 'id' = 'e5300000-0000-0000-0000-000000000005')
+   FROM jsonb_array_elements(public.get_logistics_matrix('2031-03-10', '2031-03-10') -> 'events') e),
+  'the matrix includes an out-of-date event whose assignment overlaps the day in its own timezone'
+);
+
 SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000002', false);
 
 SELECT throws_ok(
@@ -487,6 +510,12 @@ SELECT ok(
   (SELECT bool_or(e ->> 'event_id' = 'e5300000-0000-0000-0000-000000000004')
    FROM jsonb_array_elements(public.get_my_transport_assignments('2031-03-10', '2031-03-10')) e),
   'a driver still sees a run that started before the range and has not ended'
+);
+
+SELECT ok(
+  (SELECT bool_or(e ->> 'event_id' = 'e5300000-0000-0000-0000-000000000005')
+   FROM jsonb_array_elements(public.get_my_transport_assignments('2031-03-10', '2031-03-10')) e),
+  'a driver date range uses the transport timezone at a local-midnight boundary'
 );
 
 SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000006', false);
@@ -616,13 +645,15 @@ DELETE FROM public.transport_driver_assignments WHERE logistics_event_id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
   'e5300000-0000-0000-0000-000000000003'::uuid,
-  'e5300000-0000-0000-0000-000000000004'::uuid
+  'e5300000-0000-0000-0000-000000000004'::uuid,
+  'e5300000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM public.logistics_events WHERE id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
   'e5300000-0000-0000-0000-000000000002'::uuid,
   'e5300000-0000-0000-0000-000000000003'::uuid,
-  'e5300000-0000-0000-0000-000000000004'::uuid
+  'e5300000-0000-0000-0000-000000000004'::uuid,
+  'e5300000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM public.driver_details WHERE profile_id IN (
   'e5100000-0000-0000-0000-000000000002'::uuid,
