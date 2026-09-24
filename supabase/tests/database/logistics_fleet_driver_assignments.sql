@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(91);
+SELECT plan(94);
 
 -- ---------------------------------------------------------------------------
 -- Structure and grants
@@ -79,7 +79,8 @@ DELETE FROM public.transport_driver_assignments WHERE logistics_event_id IN (
   'e5300000-0000-0000-0000-000000000002'::uuid,
   'e5300000-0000-0000-0000-000000000003'::uuid,
   'e5300000-0000-0000-0000-000000000004'::uuid,
-  'e5300000-0000-0000-0000-000000000005'::uuid
+  'e5300000-0000-0000-0000-000000000005'::uuid,
+  'e5300000-0000-0000-0000-000000000006'::uuid
 );
 DELETE FROM public.logistics_events WHERE id IN (
   'e5300000-0000-0000-0000-000000000001'::uuid,
@@ -884,6 +885,19 @@ VALUES
     'manual'
   );
 
+INSERT INTO public.logistics_events (
+  id, event_type, transport_type, event_date, event_time, title, timezone, location_id
+) VALUES (
+  'e5300000-0000-0000-0000-000000000006'::uuid,
+  'load',
+  'furgoneta',
+  '2031-03-15',
+  '10:00',
+  'Asignación en día no disponible',
+  'Europe/Madrid',
+  NULL
+);
+
 SELECT set_config(
   'test.event2_start',
   (SELECT starts_at::text
@@ -956,6 +970,43 @@ SELECT ok(
    WHERE d ->> 'id' = 'e5100000-0000-0000-0000-000000000003')
   @> '[{"date":"2031-03-14","status":"warehouse"}]'::jsonb,
   'the matrix preserves canonical day-off/unavailable/warehouse states from both availability stores'
+);
+
+SELECT set_config(
+  'test.driver_availability_conflict',
+  public.assign_transport_driver(
+    'e5300000-0000-0000-0000-000000000006'::uuid,
+    'e5100000-0000-0000-0000-000000000002'::uuid,
+    NULL,
+    '2031-03-15 10:00 Europe/Madrid'::timestamptz,
+    '2031-03-15 12:00 Europe/Madrid'::timestamptz
+  )::text,
+  false
+);
+
+SELECT is(
+  current_setting('test.driver_availability_conflict')::jsonb ->> 'status',
+  'conflict',
+  'known employee unavailability blocks an accidental direct driver assignment'
+);
+
+SELECT is(
+  current_setting('test.driver_availability_conflict')::jsonb -> 'conflicts' -> 0 ->> 'kind',
+  'availability',
+  'employee absence is returned as an explicit availability conflict, not a staffing request'
+);
+
+SELECT is(
+  public.assign_transport_driver(
+    'e5300000-0000-0000-0000-000000000006'::uuid,
+    'e5100000-0000-0000-0000-000000000002'::uuid,
+    NULL,
+    '2031-03-15 10:00 Europe/Madrid'::timestamptz,
+    '2031-03-15 12:00 Europe/Madrid'::timestamptz,
+    p_force => true
+  ) ->> 'status',
+  'saved',
+  'management can explicitly override known unavailability without an offer/availability phase'
 );
 
 RESET ROLE;
