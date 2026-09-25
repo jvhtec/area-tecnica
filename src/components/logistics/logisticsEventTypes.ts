@@ -22,12 +22,19 @@ export const logisticsEventTypeLabel = (eventType: string | null | undefined): s
  * day up to its end when it has one. Plain date-key comparison, as event_date is
  * a DATE column.
  */
+export const logisticsEventOverlapsRange = (
+  event: { event_date: string; end_date?: string | null },
+  startKey: string,
+  endKey: string,
+): boolean => {
+  const eventEnd = event.end_date ?? event.event_date;
+  return event.event_date <= endKey && eventEnd >= startKey;
+};
+
 export const isLogisticsEventOnDay = (
   event: { event_date: string; end_date?: string | null },
   dateKey: string,
-): boolean =>
-  event.event_date === dateKey
-  || Boolean(event.end_date && event.event_date <= dateKey && dateKey <= event.end_date);
+): boolean => logisticsEventOverlapsRange(event, dateKey, dateKey);
 
 export type LogisticsCalendarEvent = Omit<LogisticsEventRow, "event_type"> & {
   event_type: LogisticsEventType;
