@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isLogisticsEventOnDay, logisticsEventTypeLabel } from "../logisticsEventTypes";
+import { isLogisticsEventOnDay, logisticsEventOverlapsRange, logisticsEventTypeLabel } from "../logisticsEventTypes";
 
 describe("logistics event types", () => {
   it("labels every event type in Spanish", () => {
@@ -16,5 +16,18 @@ describe("logistics event types", () => {
       .toEqual([false, true, true, true, false]);
     expect(isLogisticsEventOnDay({ event_date: "2026-10-01", end_date: null }, "2026-10-02")).toBe(false);
     expect(isLogisticsEventOnDay({ event_date: "2026-10-01" }, "2026-10-01")).toBe(true);
+  });
+
+  it("includes a spanning transport when only its tail overlaps the requested range", () => {
+    expect(logisticsEventOverlapsRange(
+      { event_date: "2026-09-27", end_date: "2026-09-30" },
+      "2026-09-28",
+      "2026-10-04",
+    )).toBe(true);
+    expect(logisticsEventOverlapsRange(
+      { event_date: "2026-09-20", end_date: "2026-09-27" },
+      "2026-09-28",
+      "2026-10-04",
+    )).toBe(false);
   });
 });
