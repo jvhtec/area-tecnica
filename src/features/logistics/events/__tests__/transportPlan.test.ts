@@ -4,6 +4,7 @@ import { buildReturnTrip, validateTransportPlan, type TransportPlanInput } from 
 
 const plan = (overrides: Partial<TransportPlanInput> = {}): TransportPlanInput => ({
   eventType: "crew_transfer",
+  transportType: "furgoneta",
   date: "2026-10-01",
   time: "08:00",
   endDate: "",
@@ -21,7 +22,7 @@ const plan = (overrides: Partial<TransportPlanInput> = {}): TransportPlanInput =
 describe("validateTransportPlan", () => {
   it("accepts a complete crew transfer and a plain load", () => {
     expect(validateTransportPlan(plan())).toBeNull();
-    expect(validateTransportPlan(plan({ eventType: "load", originInput: "", passengerCount: null }))).toBeNull();
+    expect(validateTransportPlan(plan({ eventType: "load", transportType: "trailer", originInput: "", passengerCount: null }))).toBeNull();
   });
 
   it("checks the end of any transport", () => {
@@ -29,6 +30,12 @@ describe("validateTransportPlan", () => {
     expect(validateTransportPlan(plan({ endDate: "2026-10-01", endTime: "07:59" }))).toMatch(/posterior a la salida/);
     expect(validateTransportPlan(plan({ endDate: "2026-10-22", endTime: "08:00" }))).toBeNull();
     expect(validateTransportPlan(plan({ endDate: "2026-10-23", endTime: "08:00" }))).toMatch(/21 días/);
+  });
+
+  it("only allows people-carrying vehicle types for crew transfers", () => {
+    expect(validateTransportPlan(plan({ transportType: "trailer" }))).toMatch(/solo pueden usar/);
+    expect(validateTransportPlan(plan({ transportType: "rv" }))).toBeNull();
+    expect(validateTransportPlan(plan({ transportType: "sleeper_bus" }))).toBeNull();
   });
 
   it("needs a pick-up point, a destination without a job, and passengers", () => {
