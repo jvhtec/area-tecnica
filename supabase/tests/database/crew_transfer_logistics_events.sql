@@ -100,6 +100,15 @@ SELECT throws_ok(
 -- ---------------------------------------------------------------------------
 -- Movement type: a planned load inherits its request's, crew transfers have none.
 -- ---------------------------------------------------------------------------
+-- Inserting a job logs job.created; seed the catalog as the other job fixtures do,
+-- since this file can run before any of them.
+INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
+VALUES
+  ('job.created', 'Job created', 'management', 'info', false),
+  ('job.updated', 'Job updated', 'management', 'info', false),
+  ('job.deleted', 'Job deleted', 'management', 'info', false)
+ON CONFLICT (code) DO NOTHING;
+
 INSERT INTO public.jobs (id, title, start_time, end_time, job_type)
 VALUES (
   'cc500000-0000-0000-0000-000000000001'::uuid, 'Crew Transfer Movement Fixture',
