@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { LogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
+import type { JobTimeSpan } from "@/features/logistics/events/useJobTimeSpan";
 
 import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
 
@@ -14,6 +15,8 @@ export function TransportEndFields({
   endTime,
   onEndDateChange,
   onEndTimeChange,
+  jobSpan,
+  onUseJobSpan,
 }: {
   crewTransfer: boolean;
   startDate: string;
@@ -21,9 +24,26 @@ export function TransportEndFields({
   endTime: string;
   onEndDateChange: (value: string) => void;
   onEndTimeChange: (value: string) => void;
+  /** The selected job's span, when the transport belongs to a job that has one. */
+  jobSpan?: JobTimeSpan | null;
+  onUseJobSpan?: (span: JobTimeSpan) => void;
 }) {
+  const day = (key: string) => `${key.slice(8, 10)}/${key.slice(5, 7)}`;
+  const usingJobSpan = Boolean(jobSpan && endDate === jobSpan.endDate && endTime.slice(0, 5) === jobSpan.endTime);
   return (
     <div className="space-y-2">
+      {jobSpan && onUseJobSpan && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-auto whitespace-normal text-left"
+          disabled={usingJobSpan}
+          onClick={() => onUseJobSpan(jobSpan)}
+        >
+          Usar las fechas del trabajo ({day(jobSpan.startDate)} {jobSpan.startTime} → {day(jobSpan.endDate)} {jobSpan.endTime})
+        </Button>
+      )}
       <Label htmlFor="logistics-event-end-date">
         {crewTransfer ? "Vehículo ocupado hasta" : "Fin (opcional)"}
       </Label>

@@ -205,7 +205,7 @@ test.describe("Logistics driver matrix", () => {
           { id: "loc-nave", name: "Nave Sector Pro", formatted_address: "Calle Nave 1, Madrid" },
           { id: "loc-venue", name: "Recinto Norte", formatted_address: "Avenida Norte 2, Bilbao" },
         ].filter((row) => url.searchParams.get("id") === `eq.${row.id}`),
-        jobs: [{ id: "j9", title: "Gira Norte", start_time: "2026-09-30T18:00:00Z", status: "Confirmado", job_type: "single", location_id: "loc-venue" }],
+        jobs: [{ id: "j9", title: "Gira Norte", start_time: "2026-09-30T18:00:00Z", end_time: "2026-10-02T21:00:00Z", timezone: "Europe/Madrid", status: "Confirmado", job_type: "single", location_id: "loc-venue" }],
         job_assignments: crew,
       },
       rpc: { get_logistics_matrix: matrix, list_transport_requests: [] },
@@ -225,9 +225,12 @@ test.describe("Logistics driver matrix", () => {
     await expect(dialog.getByLabel("Destino (si no es el recinto del trabajo)")).toHaveValue("Recinto Norte");
     await expect(dialog.getByLabel("Muelle de carga")).toHaveCount(0);
 
-    // Everyone on the job travels, and the van stays out one more day.
+    // Everyone on the job travels, and the van is taken for the job's span, plus a day.
     await dialog.getByRole("button", { name: "Todo el personal del trabajo (7)" }).click();
     await expect(dialog.getByLabel("Personas que viajan")).toHaveValue("7");
+    await dialog.getByRole("button", { name: "Usar las fechas del trabajo (30/09 20:00 → 02/10 23:00)" }).click();
+    await expect(dialog.getByLabel("Fecha de fin")).toHaveValue("2026-10-02");
+    await expect(dialog.getByLabel("Hora de fin")).toHaveValue("23:00");
     await dialog.getByLabel("Fecha de fin").fill("2026-10-03");
 
     await dialog.getByRole("button", { name: "Actualizar evento" }).click();
@@ -235,8 +238,10 @@ test.describe("Logistics driver matrix", () => {
       .toMatchObject({
         event_type: "crew_transfer",
         passenger_count: 7,
+        event_date: "2026-09-30",
+        event_time: "20:00",
         end_date: "2026-10-03",
-        end_time: "20:00",
+        end_time: "23:00",
         origin_location_id: "loc-nave",
         location_id: "loc-venue",
       });

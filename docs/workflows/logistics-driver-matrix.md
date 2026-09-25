@@ -87,9 +87,13 @@ the vehicle:
     span instead of two hours, and may last longer than the usual 72 h cap up to the
     transport plus a day. The matrix and all three calendars list the transport on
     every day it spans (`isLogisticsEventOnDay`), assigned or not.
+    When the transport belongs to a job, *Usar las fechas del trabajo* fills the
+    departure and end from the job's `start_time`/`end_time` in the job's timezone
+    (`useJobTimeSpan`); both stay editable.
   - `logistics_events.origin_location_id` — the pick-up point (*punto de encuentro*), a
     `locations` row like `location_id`, which stays the destination (falling back to
     the job venue). They cannot be the same place.
+  - Created by admin/management on `/logistics`, like every logistics event.
   - `logistics_events.passenger_count` — people travelling. The event dialog offers
     the job crew count as a one-click fill.
   - Origin and passengers are crew-transfer-only: `trg_logistics_events_clear_crew_fields`

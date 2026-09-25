@@ -40,12 +40,11 @@ import {
   type LogisticsHojaCategory,
 } from "@/constants/logisticsHojaCategories";
 import type { Database } from "@/integrations/supabase/types";
-
-
 import { queryKeys } from "@/lib/react-query";
 import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
 import { CrewTransferFields, CrewTransferReturnFields, TransportEndFields } from "./LogisticsEventTransportFields";
 import { buildReturnTrip, validateTransportPlan } from "@/features/logistics/events/transportPlan";
+import { useJobTimeSpan } from "@/features/logistics/events/useJobTimeSpan";
 import { LogisticsProviderSelect } from "./LogisticsProviderSelect";
 import { SleeperBusBerthPlanner } from "./fleet/SleeperBusBerthPlanner";
 import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
@@ -54,11 +53,7 @@ import { broadcastLogisticsEvent, diffLogisticsEventChanges } from "@/features/l
 import { isDriverRelevantEventChange } from "@/features/logistics/events/driverRelevantEventChange";
 import { getErrorMessage } from '@/utils/errorMessage';
 import { useJobCrewCount } from "@/features/logistics/fleet/useLogisticsFleet";
-import {
-  LOGISTICS_EVENT_TYPE_OPTIONS,
-  type LogisticsCalendarEvent,
-  type LogisticsEventType,
-} from "@/components/logistics/logisticsEventTypes";
+import { LOGISTICS_EVENT_TYPE_OPTIONS, type LogisticsCalendarEvent, type LogisticsEventType } from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
 type LogisticsEventInsert = Database["public"]["Tables"]["logistics_events"]["Insert"];
 // Columns and the crew_transfer type added after the generated types were last
@@ -252,6 +247,7 @@ export const LogisticsEventDialog = ({
   });
 
   const jobCrew = useJobCrewCount(isCrewTransfer ? selectedJob : null);
+  const jobSpan = useJobTimeSpan(selectedJob, open);
 
   const handleDelete = async () => {
     try {
@@ -585,6 +581,8 @@ export const LogisticsEventDialog = ({
               endTime={endTime}
               onEndDateChange={setEndDate}
               onEndTimeChange={setEndTime}
+              jobSpan={jobSpan.data}
+              onUseJobSpan={(span) => { setDate(span.startDate); setTime(span.startTime); setEndDate(span.endDate); setEndTime(span.endTime); }}
             />
 
             {/* Transport Type */}
