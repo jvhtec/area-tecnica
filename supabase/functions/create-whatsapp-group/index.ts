@@ -484,7 +484,7 @@ serve(async (req: Request) => {
       }
     }
 
-    // Buddy system (see resolveBuddyIds): e.g. groups created by Carlos or Bastián include Javier.
+    // Buddy system (see resolveBuddyIds): e.g. Javier and Bastián are added to each other's groups.
     const buddyIds = resolveBuddyIds(department, actorId);
     if (buddyIds.length > 0) {
       const { data: buddies } = await supabaseAdmin
