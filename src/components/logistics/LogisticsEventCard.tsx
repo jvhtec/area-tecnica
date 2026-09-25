@@ -18,8 +18,14 @@ import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEve
 const isTransportProvider = (value: unknown): value is TransportProvider =>
   typeof value === "string" && value in TRANSPORT_PROVIDERS;
 
+type LogisticsEventCardEvent = LogisticsCalendarEvent & {
+  custom_title?: string | null;
+  manual_title?: string | null;
+  request_title?: string | null;
+};
+
 interface LogisticsEventCardProps {
-  event: LogisticsCalendarEvent;
+  event: LogisticsEventCardEvent;
   onClick: (e: React.MouseEvent) => void;
   variant?: "calendar" | "detailed";
   compact?: boolean;
