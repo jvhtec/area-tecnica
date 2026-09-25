@@ -249,9 +249,38 @@ export function useJobCardTransport({
     };
   }, [hasAssignedTechnicians, job.id, job.job_type, queryClient]);
 
+  // Re-adds the current crew, the requesting manager and their buddies to an existing
+  // group through the WAHA session that owns it.
+  const syncWhatsappGroup = async () => {
+    const { data, error } = await dataLayerClient.functions.invoke(
+      "create-whatsapp-group",
+      { body: { job_id: job.id, department, stage_number: 0, sync: true } },
+    );
+    if (error) {
+      toast({
+        title: "Error al sincronizar grupo",
+        description: await extractFunctionErrorMessage(error),
+        variant: "destructive",
+      });
+      return;
+    }
+    const warnings = (data as CreateWhatsappGroupResult | null)?.warnings;
+    toast({
+      title: "Grupo sincronizado",
+      description:
+        warnings && (warnings.missing?.length || warnings.invalid?.length)
+          ? `Avisos: sin teléfono ${warnings.missing?.length ?? 0}, inválidos ${warnings.invalid?.length ?? 0}`
+          : "Se han añadido al grupo el equipo asignado y los responsables.",
+    });
+  };
+
   const createWhatsappGroupCore = async () => {
     if (!isManagementUser) return;
     try {
+      if (waGroup?.wa_group_id) {
+        await syncWhatsappGroup();
+        return;
+      }
       const { data: rows } = await dataLayerClient
         .from("job_assignments")
         .select(

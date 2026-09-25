@@ -130,7 +130,7 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
     : onCreateWhatsappGroup && !isProductionDepartment && isManagementUser && job.job_type !== "dryhire" && !isFestivalLike
       ? {
           id: "create-whatsapp",
-          label: "Crear grupo de WhatsApp",
+          label: whatsappGroup ? "Sincronizar grupo de WhatsApp" : "Crear grupo de WhatsApp",
           icon: MessageCircle,
           disabled: Boolean(whatsappDisabled),
           onSelect: onCreateWhatsappGroup,
