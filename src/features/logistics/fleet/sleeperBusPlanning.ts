@@ -51,14 +51,10 @@ type PlanOptions = {
 };
 
 /**
- * One layout per bus giving the smallest total that still reaches `need`
- * (null when even the largest layouts fall short). A subset-sum over the small
- * berth totals involved.
+ * Every berth total one layout per bus can give, each with the layouts giving it.
+ * A subset-sum over the small berth totals involved.
  */
-const smallestLayoutsReaching = (
-  buses: readonly SleeperBusCandidate[],
-  need: number,
-): number[] | null => {
+const layoutTotals = (buses: readonly SleeperBusCandidate[]): Map<number, number[]> => {
   let reachable = new Map<number, number[]>([[0, []]]);
   for (const bus of buses) {
     const next = new Map<number, number[]>();
@@ -70,8 +66,7 @@ const smallestLayoutsReaching = (
     }
     reachable = next;
   }
-  const best = [...reachable.keys()].filter((total) => total >= need).sort((a, b) => a - b)[0];
-  return best === undefined ? null : reachable.get(best) ?? null;
+  return reachable;
 };
 
 /** Fewest hired buses (then fewest empty berths) reaching `need`. */
@@ -92,6 +87,16 @@ const hiresReaching = (need: number, sizes: readonly number[]): number[] => {
     .sort((a, b) => total(a) - total(b))[0];
   return (best ?? Array.from({ length: count }, () => largest)).sort((a, b) => b - a);
 };
+
+const hiredBerths = (plan: SleeperBusPlan) =>
+  plan.buses.reduce((sum, bus) => sum + (bus.kind === "hire" ? bus.berths : 0), 0);
+
+/**
+ * Own buses first (hiring costs money), then fewer buses, then fewer empty
+ * berths, then the smaller hire (more of our own berths used).
+ */
+const compareSleeperBusPlans = (a: SleeperBusPlan, b: SleeperBusPlan) =>
+  a.hired - b.hired || a.buses.length - b.buses.length || a.spare - b.spare || hiredBerths(a) - hiredBerths(b);
 
 const signature = (plan: SleeperBusPlan) =>
   plan.buses.map((bus) => (bus.kind === "fleet" ? `f${bus.berths}` : `h${bus.berths}`)).sort().join("+");
@@ -118,21 +123,26 @@ export const suggestSleeperBusPlans = (
     const largest = subset.reduce((sum, bus) => sum + Math.max(...bus.layouts), 0);
     // A bus the others can do without only adds cost.
     if (subset.some((bus) => largest - Math.max(...bus.layouts) >= headcount)) continue;
-    const hires = hiresReaching(headcount - largest, hireSizes);
-    const hiredBerths = hires.reduce((sum, size) => sum + size, 0);
-    const layouts = smallestLayoutsReaching(subset, headcount - hiredBerths);
-    if (!layouts) continue;
-    const buses: PlannedBus[] = [
-      ...subset.map((bus, index): PlannedBus => ({ kind: "fleet", vehicleId: bus.id, name: bus.name, berths: layouts[index] })),
-      ...hires.map((berths): PlannedBus => ({ kind: "hire", berths })),
-    ];
-    const berths = buses.reduce((sum, bus) => sum + bus.berths, 0);
-    plans.push({ buses, berths, spare: berths - headcount, hired: hires.length });
+    // Each layout mix of these buses leaves a different gap for hires to fill (a
+    // bus set up small can pair with a hire that fits exactly), so keep the best.
+    let best: SleeperBusPlan | null = null;
+    for (const [fleetBerths, layouts] of layoutTotals(subset)) {
+      const hires = hiresReaching(headcount - fleetBerths, hireSizes);
+      const berths = fleetBerths + hires.reduce((sum, size) => sum + size, 0);
+      if (berths < headcount) continue;
+      const buses: PlannedBus[] = [
+        ...subset.map((bus, index): PlannedBus => ({ kind: "fleet", vehicleId: bus.id, name: bus.name, berths: layouts[index] })),
+        ...hires.map((size): PlannedBus => ({ kind: "hire", berths: size })),
+      ];
+      const plan: SleeperBusPlan = { buses, berths, spare: berths - headcount, hired: hires.length };
+      if (!best || compareSleeperBusPlans(plan, best) < 0) best = plan;
+    }
+    if (best) plans.push(best);
   }
 
   const seen = new Set<string>();
   return plans
-    .sort((a, b) => a.hired - b.hired || a.buses.length - b.buses.length || a.spare - b.spare)
+    .sort(compareSleeperBusPlans)
     .filter((plan) => {
       const key = signature(plan);
       if (seen.has(key)) return false;

@@ -72,6 +72,16 @@ alter table public.fleet_vehicles
 comment on column public.fleet_vehicles.passenger_seats is
   'Seats for passengers besides the driver. Null when unknown or not a people carrier.';
 
+-- The table-level cap was a flat 72 h, which would refuse any multi-day transfer.
+-- assign_transport_driver below now enforces the real limit per transport (72 h, or
+-- the transport's own span plus a day); the table keeps an absolute backstop at the
+-- longest span it allows (21 days) plus that day.
+alter table public.transport_driver_assignments
+  drop constraint if exists transport_driver_assignments_max_window_check;
+alter table public.transport_driver_assignments
+  add constraint transport_driver_assignments_max_window_check
+  check (ends_at - starts_at <= interval '22 days');
+
 create or replace function public.clear_crew_fields_off_crew_transfer()
 returns trigger
 language plpgsql

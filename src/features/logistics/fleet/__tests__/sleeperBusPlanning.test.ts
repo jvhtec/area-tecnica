@@ -56,6 +56,14 @@ describe("suggestSleeperBusPlans", () => {
     expect(suggestSleeperBusPlans(33, [])[0].buses.map((planned) => planned.berths)).toEqual([20, 14]);
   });
 
+  it("sets a reconfigurable bus up to pair with the hire that fits exactly", () => {
+    // 30 people, one bus as 12 or 20 berths: 12 + an 18-berth hire leaves nobody's bed empty,
+    // where 20 + a 12-berth hire would leave two.
+    const [best] = suggestSleeperBusPlans(30, [bus("R", [12, 20])]);
+    expect(describePlan(best)).toBe("Bus R (12) + Alquiler 18 literas");
+    expect(best.spare).toBe(0);
+  });
+
   it("seats a 20-bed crew in one of our own double-deckers", () => {
     const plans = suggestSleeperBusPlans(19, [bus("DD", [18, 20]), bus("B", [12])]);
     expect(plans.map(describePlan)).toEqual(["Bus DD (20)", "Alquiler 20 literas", "Bus B (12) + Alquiler 12 literas"]);
