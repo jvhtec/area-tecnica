@@ -177,3 +177,20 @@ export const resolveFestivalStageTechnicianIds = async ({
     shifts: stageShifts,
   });
 };
+
+const JAVIER_VADILLO_ID = '3f320605-c05c-4dcc-b668-c0e01e2c4af9';
+const BASTIAN_OLIVARES_ID = 'd51f69e1-ab53-44b3-aec7-871a10c6d6dd';
+
+// Buddy system: when one of these managers creates (or syncs) a group for the department,
+// their buddies are added too.
+const DEPARTMENT_BUDDIES: Partial<Record<Dept, Record<string, readonly string[]>>> = {
+  sound: {
+    [JAVIER_VADILLO_ID]: [BASTIAN_OLIVARES_ID],
+    [BASTIAN_OLIVARES_ID]: [JAVIER_VADILLO_ID],
+  },
+};
+
+export const resolveBuddyIds = (department: Dept, actorId: string | null | undefined): string[] => {
+  if (!actorId) return [];
+  return (DEPARTMENT_BUDDIES[department]?.[actorId] ?? []).filter((id) => id !== actorId);
+};

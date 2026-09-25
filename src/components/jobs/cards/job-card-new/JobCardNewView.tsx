@@ -498,7 +498,7 @@ export function JobCardNewView({
             onTransportClick={handleTransportClick}
             onCreateWhatsappGroup={handleCreateWhatsappGroup}
             onRetryWhatsappGroup={handleRetryWhatsappGroup}
-            whatsappDisabled={!!waGroup || !!waRequest}
+            whatsappDisabled={!waGroup?.wa_group_id && !!waRequest}
             whatsappGroup={waGroup}
             whatsappRequest={waRequest}
           />

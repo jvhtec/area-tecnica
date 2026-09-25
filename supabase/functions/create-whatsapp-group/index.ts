@@ -4,8 +4,10 @@ import {
   buildWahaGroupParticipants,
   normalizePhone,
   phoneToWahaJid,
+  resolveBuddyIds,
   resolveFestivalStageTechnicianIds,
 } from "./recipientUtils.ts";
+import { loadWahaConnection, resolveGroupOwnerConnection } from "./groupOwner.ts";
 import type { Dept } from "./recipientUtils.ts";
 import { checkAndRecordWhatsappQuota } from "../_shared/whatsappQuota.ts";
 import { joinedSingle } from "../_shared/joins.ts";
@@ -21,6 +23,8 @@ interface CreateRequest {
   job_id: string;
   department: Dept;
   stage_number?: number | string;
+  /** Re-add current crew, the requesting manager and buddies to an existing group. */
+  sync?: boolean;
 }
 
 type WahaFallbackAttempt = {
@@ -231,7 +235,7 @@ serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const finalizeOnly = url.searchParams.get('finalize') === '1';
-    const { job_id, department, stage_number } = await req.json() as CreateRequest;
+    const { job_id, department, stage_number, sync } = await req.json() as CreateRequest;
     let parsedStageNumber: number | null = null;
     if (stage_number !== undefined) {
       if (typeof stage_number === 'string') {
@@ -302,7 +306,7 @@ serve(async (req: Request) => {
     // Prevent duplicates: existing group already persisted
     const { data: existing, error: existingErr } = await supabaseAdmin
       .from('job_whatsapp_groups')
-      .select('id, wa_group_id')
+      .select('id, wa_group_id, created_by')
       .eq('job_id', job_id)
       .eq('department', department)
       .eq('stage_number', effectiveStageNumber)
@@ -311,8 +315,8 @@ serve(async (req: Request) => {
       console.warn('job_whatsapp_groups lookup error', existingErr);
     }
     const existingWaGroupId = existing?.wa_group_id || null;
-    const shouldSyncExistingStageGroup = !!existingWaGroupId && effectiveStageNumber > 0 && !finalizeOnly;
-    if (existing && !shouldSyncExistingStageGroup && !finalizeOnly) {
+    const shouldSyncExistingGroup = !!existingWaGroupId && (effectiveStageNumber > 0 || sync === true) && !finalizeOnly;
+    if (existing && !shouldSyncExistingGroup && !finalizeOnly) {
       return new Response(JSON.stringify({ success: true, wa_group_id: existing.wa_group_id, note: 'Group already exists' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -324,7 +328,7 @@ serve(async (req: Request) => {
       .eq('department', department)
       .eq('stage_number', effectiveStageNumber)
       .maybeSingle();
-    if (priorReq && !shouldSyncExistingStageGroup && !finalizeOnly) {
+    if (priorReq && !shouldSyncExistingGroup && !finalizeOnly) {
       return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -480,30 +484,15 @@ serve(async (req: Request) => {
       }
     }
 
-    // Buddy system: Javier auto-adds Carlos, Carlos auto-adds Javier (department sound)
-    if (department === 'sound') {
-      const buddyMap: Record<string, string> = {
-        '3f320605-c05c-4dcc-b668-c0e01e2c4af9': '4d1b7ec6-0657-496e-a759-c721916e0c09', // Javier → Carlos
-        '4d1b7ec6-0657-496e-a759-c721916e0c09': '3f320605-c05c-4dcc-b668-c0e01e2c4af9', // Carlos → Javier
-      };
-      const buddyId = buddyMap[actorId!];
-      if (buddyId) {
-        try {
-          const { data: buddy } = await supabaseAdmin
-            .from('profiles')
-            .select('phone')
-            .eq('id', buddyId)
-            .maybeSingle();
-          if (buddy?.phone) {
-            const norm = normalizePhone(buddy.phone, defaultCC);
-            if (norm.ok) {
-              supplementalParticipants.push(norm.value);
-              if (!participantDetailsByPhone.has(norm.value)) {
-                participantDetailsByPhone.set(norm.value, { label: 'Department buddy', source: 'buddy' });
-              }
-            }
-          }
-        } catch { /* ignore */ }
+    // Buddy system (see resolveBuddyIds): e.g. Javier and Bastián are added to each other's groups.
+    const buddyIds = resolveBuddyIds(department, actorId);
+    if (buddyIds.length > 0) {
+      const { data: buddies } = await supabaseAdmin
+        .from('profiles')
+        .select('first_name, last_name, phone')
+        .in('id', buddyIds);
+      for (const buddy of buddies ?? []) {
+        addProfilePhoneRecipient(buddy, 'Department buddy', supplementalParticipants, 'buddy');
       }
     }
 
@@ -555,34 +544,26 @@ serve(async (req: Request) => {
       }
     }
 
-    // WAHA config - use actor's endpoint
-    const normalizeBase = (s: string) => {
-      let b = (s || '').trim();
-      if (!/^https?:\/\//i.test(b)) b = 'https://' + b; // default to https if scheme missing
-      return b.replace(/\/+$/, '');
-    };
-    const base = normalizeBase(actor.waha_endpoint || 'https://waha.sector-pro.work');
-    const { data: cfg, error: cfgErr } = await supabaseAdmin.rpc('get_waha_config', { base_url: base });
-    if (cfgErr) {
-      console.warn('create-whatsapp-group WAHA config lookup failed', {
-        base_host: wahaHostFromBase(base),
-        message: cfgErr.message,
-        request_id: requestId,
-      });
+    // WAHA config: new groups use the actor's endpoint; syncs must go through the session
+    // that owns the group, since only a group admin can add participants.
+    const owner = shouldSyncExistingGroup && existingWaGroupId
+      ? await resolveGroupOwnerConnection({ createdBy: existing?.created_by ?? null, supabase: supabaseAdmin, waGroupId: existingWaGroupId })
+      : null;
+    if (shouldSyncExistingGroup && !owner) {
+      return new Response(JSON.stringify({ error: 'No WhatsApp session owning this group was found', request_id: requestId }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const apiKey = (cfg?.[0] as any)?.api_key || Deno.env.get('WAHA_API_KEY') || '';
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (apiKey) headers['X-API-Key'] = apiKey;
+    const { apiKey, base, headers, session } = owner ?? await loadWahaConnection(supabaseAdmin, actor.waha_endpoint || 'https://waha.sector-pro.work');
 
     const deptNameEs = department === 'sound' ? 'Sonido' : department === 'lights' ? 'Luces' : 'Video';
     const stageSuffix = effectiveStageNumber > 0 ? ` - ${stageDisplayName || `Stage ${effectiveStageNumber}`}` : '';
     const subject = `${job.title} - ${deptNameEs}${stageSuffix}`;
 
-    // WAHA expects JIDs like 34900111222@c.us and an object list
-    const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
+    // WAHA expects JIDs like 34900111222@c.us and an object list. The session owner is
+    // already in the group, so it is never sent as a participant.
     const actorJidCandidate = (() => {
-      if (actor?.phone && actor.department === department) {
-        const norm = normalizePhone(actor.phone, defaultCC);
+      const sessionOwnerPhone = owner ? owner.ownerPhone : actor?.department === department ? actor.phone : null;
+      if (sessionOwnerPhone) {
+        const norm = normalizePhone(sessionOwnerPhone, defaultCC);
         if (norm.ok) return phoneToWahaJid(norm.value);
       }
       return null;
@@ -820,7 +801,7 @@ serve(async (req: Request) => {
     if (!existingWaGroupId) {
       const { error: insErr } = await supabaseAdmin
         .from('job_whatsapp_groups')
-        .insert({ job_id, department, stage_number: effectiveStageNumber, wa_group_id });
+        .insert({ job_id, department, stage_number: effectiveStageNumber, wa_group_id, created_by: actorId });
       if (insErr) {
         // Best effort to not leave group untracked, still respond with success but include warning
         console.warn('Failed to persist job_whatsapp_groups:', insErr);
@@ -889,9 +870,9 @@ serve(async (req: Request) => {
       }
     };
 
-    // Existing festival stage groups may have been created before stage recipients were enabled.
-    if (shouldSyncExistingStageGroup) {
-      await addParticipantsBestEffort(allGroupParticipants, 'existing-stage-group-sync');
+    // Explicit syncs, and festival stage groups created before stage recipients were enabled.
+    if (shouldSyncExistingGroup) {
+      await addParticipantsBestEffort(allGroupParticipants, 'existing-group-sync');
     } else if (usedFallback && allGroupParticipants.length > 1) {
       const first = fallbackSeedParticipant || creationGroupParticipants[0];
       const toAdd = allGroupParticipants.filter((p) => p.id !== first.id);
@@ -992,7 +973,7 @@ serve(async (req: Request) => {
       warnings: { missing, invalid },
       participants: uniqueParticipants
     };
-    if (shouldSyncExistingStageGroup) resp.note = 'Grupo ya existia; participantes programados sincronizados.';
+    if (shouldSyncExistingGroup) resp.note = 'Grupo ya existía; participantes sincronizados.';
     else if (usedFallback) resp.note = 'Grupo creado con 1 participante por fallback; añadiremos el resto en una futura sincronización.';
     return new Response(JSON.stringify(resp), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
