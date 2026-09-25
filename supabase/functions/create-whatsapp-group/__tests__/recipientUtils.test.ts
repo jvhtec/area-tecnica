@@ -5,6 +5,7 @@ import {
   collectFestivalStageRecipients,
   normalizePhone,
   phoneToWahaJid,
+  resolveBuddyIds,
 } from "../recipientUtils.ts";
 
 describe("WAHA participant helpers", () => {
@@ -103,5 +104,26 @@ describe("festival stage recipient helpers", () => {
       shiftCount: 1,
       technicianIds: ["video-tech"],
     });
+  });
+});
+
+describe("department buddies", () => {
+  const JAVIER = "3f320605-c05c-4dcc-b668-c0e01e2c4af9";
+  const CARLOS = "4d1b7ec6-0657-496e-a759-c721916e0c09";
+  const BASTIAN = "d51f69e1-ab53-44b3-aec7-871a10c6d6dd";
+
+  it("adds Javier to sound groups created by Carlos or his substitute Bastián", () => {
+    expect(resolveBuddyIds("sound", CARLOS)).toEqual([JAVIER]);
+    expect(resolveBuddyIds("sound", BASTIAN)).toEqual([JAVIER]);
+  });
+
+  it("adds Carlos to sound groups created by Javier", () => {
+    expect(resolveBuddyIds("sound", JAVIER)).toEqual([CARLOS]);
+  });
+
+  it("adds nobody for other managers, departments or unknown actors", () => {
+    expect(resolveBuddyIds("sound", "someone-else")).toEqual([]);
+    expect(resolveBuddyIds("lights", BASTIAN)).toEqual([]);
+    expect(resolveBuddyIds("sound", null)).toEqual([]);
   });
 });

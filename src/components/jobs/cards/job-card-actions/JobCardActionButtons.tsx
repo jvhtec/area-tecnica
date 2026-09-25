@@ -247,7 +247,8 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
             onClick={onCreateWhatsappGroup}
             disabled={!!whatsappDisabled}
             className="gap-2"
-            title={whatsappDisabled ? "Grupo ya creado" : "Crear grupo WhatsApp"}
+            title={whatsappGroup ? "Sincronizar grupo WhatsApp" : "Crear grupo WhatsApp"}
+            aria-label={whatsappGroup ? "Sincronizar grupo WhatsApp" : "Crear grupo WhatsApp"}
           >
             <MessageCircle className="h-4 w-4" />
             <span className="hidden sm:inline">WhatsApp</span>
