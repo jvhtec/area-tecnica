@@ -8,8 +8,11 @@
 /** Longest transport the database accepts, in days from start date to end date. */
 export const MAX_TRANSPORT_SPAN_DAYS = 21;
 
+export const CREW_TRANSFER_TRANSPORT_TYPES = ["furgoneta", "rv", "sleeper_bus"] as const;
+
 export type TransportPlanInput = {
   eventType: string;
+  transportType: string;
   /** yyyy-MM-dd / HH:mm, local wall-clock values as the form edits them. */
   date: string;
   time: string;
@@ -43,6 +46,9 @@ export const validateTransportPlan = (plan: TransportPlanInput): string | null =
     return `Un transporte puede durar como máximo ${MAX_TRANSPORT_SPAN_DAYS} días.`;
   }
   if (plan.eventType !== "crew_transfer") return null;
+  if (!(CREW_TRANSFER_TRANSPORT_TYPES as readonly string[]).includes(plan.transportType)) {
+    return "Los traslados de personal solo pueden usar furgoneta, autocaravana o autobús cama.";
+  }
   if (!plan.originInput.trim()) return "Indica el punto de encuentro.";
   if (!plan.hasJob && !plan.destinationInput.trim()) return "Indica el destino.";
   if (!plan.passengerCount) return "Indica cuántas personas viajan.";
