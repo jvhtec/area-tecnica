@@ -29,6 +29,7 @@ import {
   type LogisticsEventType,
 } from "@/components/logistics/logisticsEventTypes";
 import { transportMovementLabel } from "@/constants/transportMovementTypes";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
 
 interface LogisticsEvent {
   id: string;
@@ -53,20 +54,6 @@ interface LogisticsExportData {
   events: LogisticsEvent[];
   currentDate: Date;
 }
-
-const TRANSPORT_TYPE_LABELS: Record<string, string> = {
-  trailer: "Tráiler",
-  sleeper_bus: "Autobús cama",
-  van: "Furgoneta",
-  truck: "Camión",
-  car: "Coche",
-  own_truck: "Camión Propio",
-  rental_truck: "Camión Alquiler",
-};
-
-const getTransportTypeLabel = (type: string): string => {
-  return TRANSPORT_TYPE_LABELS[type] || type;
-};
 
 const getTransportProviderLabel = (provider?: string | null): string => transportProviderLabel(provider) ?? "-";
 
@@ -167,7 +154,7 @@ export const generateLogisticsCalendarXLS = async (
       ? `${event.event_time.slice(0, 5)}–${event.end_time.slice(0, 5)}`
       : event.event_time;
     const jobTitle = getJobTitle(event);
-    const transportType = getTransportTypeLabel(event.transport_type);
+    const transportType = getLogisticsTransportTypeLabel(event.transport_type);
     const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
     const transportProvider = getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
@@ -291,7 +278,7 @@ export const generateLogisticsCalendarPDF = async (
       ? `${event.event_time.slice(0, 5)}–${event.end_time.slice(0, 5)}`
       : event.event_time;
     const jobTitle = getJobTitle(event);
-    const transportType = getTransportTypeLabel(event.transport_type);
+    const transportType = getLogisticsTransportTypeLabel(event.transport_type);
     const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
     const transportProvider = getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
