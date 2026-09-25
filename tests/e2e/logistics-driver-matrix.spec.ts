@@ -41,6 +41,22 @@ const mine = [
 const mapTile = { dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" };
 const producers = [{ job_id: "j1", producer_id: "p1", display_name: "Olga Producción", phone: "600 333 444", email: null }];
 
+const saveEventPlanMock = ({ body }: { body: unknown }) => {
+  const request = body && typeof body === "object" && !Array.isArray(body)
+    ? body as Record<string, unknown>
+    : {};
+  const event = request.p_event && typeof request.p_event === "object" && !Array.isArray(request.p_event)
+    ? request.p_event as Record<string, unknown>
+    : {};
+  const paired = request.p_paired_event && typeof request.p_paired_event === "object" && !Array.isArray(request.p_paired_event)
+    ? request.p_paired_event as Record<string, unknown>
+    : null;
+  return {
+    event: { id: typeof request.p_event_id === "string" ? request.p_event_id : "saved-event", ...event },
+    paired_event: paired ? { id: "saved-paired-event", ...paired } : null,
+  };
+};
+
 // Two shared positions at the fixed clock (08:00Z): Ana live, Beto silent for an hour.
 const liveLocations = [
   { driver_id: "d1", first_name: "Ana", last_name: "Conductora", nickname: null, latitude: 41.39, longitude: 2.16, accuracy_m: 12, heading_deg: 90, speed_mps: 13.9, recorded_at: "2026-09-30T07:59:30Z", assignment: { id: "a2", status: "confirmed", starts_at: "2026-09-30T13:00:00Z", ends_at: "2026-09-30T15:00:00Z", event_type: "unload", title: "Gala Liceu", timezone: "Europe/Madrid", vehicle_name: "Tráiler 1", vehicle_plate: "1234 ABC", destination_name: "Liceu", destination_lat: 41.38, destination_lng: 2.17 } },
@@ -154,7 +170,7 @@ test.describe("Logistics driver matrix", () => {
         jobs: [{ id: "j9", title: "Gira Norte", start_time: "2026-09-30T18:00:00Z", status: "Confirmado", job_type: "single" }],
         job_assignments: crew,
       },
-      rpc: { get_logistics_matrix: matrix, list_transport_requests: [] },
+      rpc: { get_logistics_matrix: matrix, list_transport_requests: [], save_logistics_event_plan: saveEventPlanMock },
     });
     await page.goto("/logistics?tab=calendar");
 
@@ -169,7 +185,7 @@ test.describe("Logistics driver matrix", () => {
     await expect(suggestions.nth(1)).toContainText("Alquiler 20 literas");
     await expect(suggestions.nth(2)).toContainText("Nightliner 2 (14) + Alquiler 12 literas");
 
-    await suggestions.first().getByRole("button", { name: "Usar Nightliner 1 (20)" }).click();
+    await suggestions.first().getByRole("button", { name: "Configurar este transporte: Nightliner 1 (20)" }).click();
     await expect(dialog.getByLabel("Literas de este autobús")).toHaveValue("20");
     await expect(dialog.getByText("Todo el personal tiene litera.")).toBeVisible();
 
@@ -181,8 +197,11 @@ test.describe("Logistics driver matrix", () => {
     await expect(dialog.getByText("Faltan 3 literas", { exact: false })).toBeVisible();
 
     await dialog.getByRole("button", { name: "Actualizar evento" }).click();
-    await expect.poll(() => calls.tableMutations.find((mutation) => mutation.table === "logistics_events")?.body)
-      .toMatchObject({ transport_type: "sleeper_bus", berth_count: 16, transport_provider: "montoya" });
+    await expect.poll(() => calls.rpcCalls.find((call) => call.name === "save_logistics_event_plan")?.body)
+      .toMatchObject({
+        p_event_id: "bus-run",
+        p_event: { transport_type: "sleeper_bus", berth_count: 16, transport_provider: "montoya" },
+      });
   });
 
   test("plans a multi-day crew transfer with its pick-up point and passengers", async ({ page }) => {
@@ -208,7 +227,7 @@ test.describe("Logistics driver matrix", () => {
         jobs: [{ id: "j9", title: "Gira Norte", start_time: "2026-09-30T18:00:00Z", end_time: "2026-10-02T21:00:00Z", timezone: "Europe/Madrid", status: "Confirmado", job_type: "single", location_id: "loc-venue" }],
         job_assignments: crew,
       },
-      rpc: { get_logistics_matrix: matrix, list_transport_requests: [] },
+      rpc: { get_logistics_matrix: matrix, list_transport_requests: [], save_logistics_event_plan: saveEventPlanMock },
     });
     await page.goto("/logistics?tab=calendar");
 
@@ -234,16 +253,19 @@ test.describe("Logistics driver matrix", () => {
     await dialog.getByLabel("Fecha de fin").fill("2026-10-03");
 
     await dialog.getByRole("button", { name: "Actualizar evento" }).click();
-    await expect.poll(() => calls.tableMutations.find((mutation) => mutation.table === "logistics_events")?.body)
+    await expect.poll(() => calls.rpcCalls.find((call) => call.name === "save_logistics_event_plan")?.body)
       .toMatchObject({
-        event_type: "crew_transfer",
-        passenger_count: 7,
-        event_date: "2026-09-30",
-        event_time: "20:00",
-        end_date: "2026-10-03",
-        end_time: "23:00",
-        origin_location_id: "loc-nave",
-        location_id: "loc-venue",
+        p_event_id: "crew-run",
+        p_event: {
+          event_type: "crew_transfer",
+          passenger_count: 7,
+          event_date: "2026-09-30",
+          event_time: "20:00",
+          end_date: "2026-10-03",
+          end_time: "23:00",
+          origin_location_id: "loc-nave",
+          location_id: "loc-venue",
+        },
       });
   });
 
@@ -262,7 +284,7 @@ test.describe("Logistics driver matrix", () => {
         profiles: [{ id: "mgr", first_name: "Marta", last_name: "Log", role: "management", department: "logistics" }],
         logistics_events: [pickup],
       },
-      rpc: { get_logistics_matrix: matrix, list_transport_requests: [] },
+      rpc: { get_logistics_matrix: matrix, list_transport_requests: [], save_logistics_event_plan: saveEventPlanMock },
     });
     await page.goto("/logistics?tab=calendar");
 
@@ -274,8 +296,8 @@ test.describe("Logistics driver matrix", () => {
     await dialog.getByLabel("Tipo de movimiento").click();
     await page.getByRole("option", { name: "Devolución" }).click();
     await dialog.getByRole("button", { name: "Actualizar evento" }).click();
-    await expect.poll(() => calls.tableMutations.find((mutation) => mutation.table === "logistics_events")?.body)
-      .toMatchObject({ event_type: "load", movement_type: "return" });
+    await expect.poll(() => calls.rpcCalls.find((call) => call.name === "save_logistics_event_plan")?.body)
+      .toMatchObject({ p_event_id: "pickup-run", p_event: { event_type: "load", movement_type: "return" } });
   });
 
   test("keeps house technicians read-only", async ({ page }) => {
