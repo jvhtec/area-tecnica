@@ -676,6 +676,14 @@ begin
   select coalesce(jsonb_agg(e order by e->>'event_date', e->>'event_time', e->>'id'), '[]'::jsonb)
   into v_events
   from (
+    with crew_counts as (
+      select
+        ja.job_id,
+        count(distinct coalesce(ja.technician_id::text, ja.external_technician_name)) as crew_count
+      from public.job_assignments ja
+      where ja.status is distinct from 'declined'
+      group by ja.job_id
+    )
     select jsonb_build_object(
       'id', le.id,
       'event_type', le.event_type,
@@ -695,13 +703,9 @@ begin
       'passenger_count', le.passenger_count,
       'movement_type', coalesce(le.movement_type, case when le.event_type::text <> 'crew_transfer' then tr.movement_type end),
       -- Crew on the job, for sleeper-bus berth planning. Everyone not declined
-      -- counts: an invited technician still needs a berth if they accept.
-      'job_crew_count', case when le.job_id is null then null else (
-        select count(distinct coalesce(ja.technician_id::text, ja.external_technician_name))
-        from public.job_assignments ja
-        where ja.job_id = le.job_id
-          and ja.status is distinct from 'declined'
-      ) end,
+      -- counts: an invited technician still needs a berth if they accept. Pre-aggregate
+      -- once per job instead of running a correlated count for every logistics event.
+      'job_crew_count', case when le.job_id is null then null else coalesce(cc.crew_count, 0) end,
       'loading_bay', le.loading_bay,
       'notes', le.notes,
       'transport_request_id', le.transport_request_id,
@@ -723,6 +727,7 @@ begin
     ) as e
     from public.logistics_events le
     left join public.jobs j on j.id = le.job_id
+    left join crew_counts cc on cc.job_id = le.job_id
     left join public.locations loc on loc.id = coalesce(le.location_id, j.location_id)
     left join public.locations origin_loc on origin_loc.id = le.origin_location_id
     left join public.transport_requests tr on tr.id = le.transport_request_id
