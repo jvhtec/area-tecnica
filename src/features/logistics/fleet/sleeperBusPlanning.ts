@@ -69,23 +69,39 @@ const layoutTotals = (buses: readonly SleeperBusCandidate[]): Map<number, number
   return reachable;
 };
 
-/** Fewest hired buses (then fewest empty berths) reaching `need`. */
+/** Fewest hired buses (then fewest empty berths) reaching `need`.
+ *
+ * Dynamic programming keeps this bounded by reachable berth totals instead of
+ * materialising every size combination. That matters when somebody pastes a
+ * silly headcount into the planner, because humans remain an adversarial input
+ * source even when they are merely tired.
+ */
 const hiresReaching = (need: number, sizes: readonly number[]): number[] => {
-  if (need <= 0 || sizes.length === 0) return [];
-  const largest = Math.max(...sizes);
+  const sorted = [...new Set(sizes)]
+    .filter((size) => Number.isFinite(size) && size > 0)
+    .sort((a, b) => a - b);
+  if (need <= 0 || sorted.length === 0) return [];
+
+  const largest = sorted[sorted.length - 1];
   const count = Math.ceil(need / largest);
-  // With `count` buses, the size mix (smallest total first) that still reaches `need`.
-  const sorted = [...sizes].sort((a, b) => a - b);
-  const combos = (remaining: number, from: number): number[][] =>
-    remaining === 0
-      ? [[]]
-      : sorted.slice(from).flatMap((size, offset) =>
-          combos(remaining - 1, from + offset).map((rest) => [size, ...rest]));
-  const total = (picks: readonly number[]) => picks.reduce((sum, size) => sum + size, 0);
-  const best = combos(count, 0)
-    .filter((picks) => total(picks) >= need)
-    .sort((a, b) => total(a) - total(b))[0];
-  return (best ?? Array.from({ length: count }, () => largest)).sort((a, b) => b - a);
+  let reachable = new Map<number, number[]>([[0, []]]);
+
+  for (let busIndex = 0; busIndex < count; busIndex += 1) {
+    const next = new Map<number, number[]>();
+    for (const [total, picks] of reachable) {
+      for (const size of sorted) {
+        const sum = total + size;
+        if (!next.has(sum)) next.set(sum, [...picks, size]);
+      }
+    }
+    reachable = next;
+  }
+
+  const bestTotal = [...reachable.keys()]
+    .filter((total) => total >= need)
+    .sort((a, b) => a - b)[0];
+  if (bestTotal === undefined) return [];
+  return [...(reachable.get(bestTotal) ?? [])].sort((a, b) => b - a);
 };
 
 const hiredBerths = (plan: SleeperBusPlan) =>
@@ -196,7 +212,11 @@ export const sleeperBusDayContext = (
       layouts: vehicle.berth_layouts,
       available: !busy.has(vehicle.id),
     }));
-  const others = jobId
+  // Loads/unloads represent the same job-wide travelling party, so parallel bus
+  // runs share coverage. Crew transfers are different: passenger_count already
+  // describes this run specifically, and another transfer must never "pay for"
+  // these passengers' berths.
+  const others = jobId && eventType !== "crew_transfer"
     ? data.events.filter((event) =>
         event.id !== excludeEventId
         && event.job_id === jobId
