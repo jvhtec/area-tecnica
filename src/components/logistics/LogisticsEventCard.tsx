@@ -13,12 +13,13 @@ import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transpo
 import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
 import { getDepartmentLabel } from "@/types/department";
 import { memo } from "react";
+import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 const isTransportProvider = (value: unknown): value is TransportProvider =>
   typeof value === "string" && value in TRANSPORT_PROVIDERS;
 
 interface LogisticsEventCardProps {
-  event: any;
+  event: LogisticsCalendarEvent;
   onClick: (e: React.MouseEvent) => void;
   variant?: "calendar" | "detailed";
   compact?: boolean;
@@ -149,7 +150,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
           )}
 
           <div className="mt-1 flex min-w-0 flex-wrap gap-1">
-            {event.departments?.map((dept: any) => (
+            {event.departments?.map((dept) => (
               <Badge key={dept.department} variant="secondary" className="max-w-full text-xs">
                 <span className="truncate">{getDepartmentLabel(dept.department)}</span>
               </Badge>
