@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(17);
+SELECT plan(24);
 
 -- ---------------------------------------------------------------------------
 -- Structure
@@ -90,11 +90,61 @@ SELECT throws_ok(
 );
 
 SELECT throws_ok(
-  $$ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, end_date, end_time)
-     VALUES ('crew_transfer', 'furgoneta', '2031-06-10', '08:00', '2031-07-10', '08:00') $$,
+  $ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, end_date, end_time)
+     VALUES ('crew_transfer', 'furgoneta', '2031-06-10', '08:00', '2031-07-10', '08:00') $,
   '23514',
   NULL,
   'a transport spans at most 21 days'
+);
+
+SELECT throws_ok(
+  $ INSERT INTO public.logistics_events (
+       event_type, transport_type, event_date, event_time, origin_location_id, location_id
+     ) VALUES (
+       'crew_transfer', 'furgoneta', '2031-06-10', '08:00',
+       'cc200000-0000-0000-0000-000000000001'::uuid,
+       'cc200000-0000-0000-0000-000000000002'::uuid
+     ) $,
+  '23514',
+  NULL,
+  'a crew transfer requires a passenger count'
+);
+
+SELECT throws_ok(
+  $ INSERT INTO public.logistics_events (
+       event_type, transport_type, event_date, event_time, origin_location_id, location_id, passenger_count
+     ) VALUES (
+       'crew_transfer', 'trailer', '2031-06-10', '08:00',
+       'cc200000-0000-0000-0000-000000000001'::uuid,
+       'cc200000-0000-0000-0000-000000000002'::uuid, 2
+     ) $,
+  '23514',
+  NULL,
+  'a crew transfer refuses a freight-only vehicle type'
+);
+
+SELECT throws_ok(
+  $ INSERT INTO public.logistics_events (
+       event_type, transport_type, event_date, event_time, location_id, passenger_count
+     ) VALUES (
+       'crew_transfer', 'furgoneta', '2031-06-10', '08:00',
+       'cc200000-0000-0000-0000-000000000002'::uuid, 2
+     ) $,
+  '23514',
+  NULL,
+  'a crew transfer requires a pick-up point'
+);
+
+SELECT throws_ok(
+  $ INSERT INTO public.logistics_events (
+       event_type, transport_type, event_date, event_time, origin_location_id, passenger_count
+     ) VALUES (
+       'crew_transfer', 'furgoneta', '2031-06-10', '08:00',
+       'cc200000-0000-0000-0000-000000000001'::uuid, 2
+     ) $,
+  '22023',
+  NULL,
+  'a crew transfer requires an effective destination'
 );
 
 -- ---------------------------------------------------------------------------
@@ -109,10 +159,59 @@ VALUES
   ('job.deleted', 'Job deleted', 'management', 'info', false)
 ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public.jobs (id, title, start_time, end_time, job_type)
+INSERT INTO public.jobs (id, title, start_time, end_time, job_type, location_id)
 VALUES (
   'cc500000-0000-0000-0000-000000000001'::uuid, 'Crew Transfer Movement Fixture',
-  '2031-06-20 08:00:00+02'::timestamptz, '2031-06-20 23:00:00+02'::timestamptz, 'single'
+  '2031-06-20 08:00:00+02'::timestamptz, '2031-06-20 23:00:00+02'::timestamptz, 'single',
+  'cc200000-0000-0000-0000-000000000002'::uuid
+);
+
+SELECT throws_ok(
+  $ INSERT INTO public.logistics_events (
+       event_type, transport_type, event_date, event_time, job_id, origin_location_id, passenger_count
+     ) VALUES (
+       'crew_transfer', 'furgoneta', '2031-06-20', '08:00',
+       'cc500000-0000-0000-0000-000000000001'::uuid,
+       'cc200000-0000-0000-0000-000000000002'::uuid, 2
+     ) $,
+  '22023',
+  NULL,
+  'the job venue counts as the crew-transfer destination when checking origin equality'
+);
+
+SELECT throws_ok(
+  $atomic$
+    SELECT public.save_logistics_event_plan(
+      jsonb_build_object(
+        'event_type', 'load',
+        'transport_type', 'furgoneta',
+        'event_date', '2031-06-21',
+        'event_time', '08:00',
+        'title', 'Atomic primary'
+      ),
+      ARRAY['sound']::text[],
+      NULL::uuid,
+      jsonb_build_object(
+        'event_type', 'crew_transfer',
+        'transport_type', 'trailer',
+        'event_date', '2031-06-21',
+        'event_time', '09:00',
+        'origin_location_id', 'cc200000-0000-0000-0000-000000000001',
+        'location_id', 'cc200000-0000-0000-0000-000000000002',
+        'passenger_count', 2,
+        'title', 'Atomic invalid paired'
+      )
+    )
+  $atomic$,
+  '23514',
+  NULL,
+  'an invalid paired leg aborts the atomic save'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.logistics_events WHERE title = 'Atomic primary'),
+  0,
+  'the primary leg is rolled back when its paired leg fails'
 );
 
 INSERT INTO public.transport_requests (
@@ -136,7 +235,11 @@ SELECT is(
   'a load planned from a request inherits its movement type'
 );
 
-UPDATE public.logistics_events SET event_type = 'crew_transfer'
+UPDATE public.logistics_events
+SET event_type = 'crew_transfer',
+    origin_location_id = 'cc200000-0000-0000-0000-000000000001'::uuid,
+    location_id = 'cc200000-0000-0000-0000-000000000002'::uuid,
+    passenger_count = 1
 WHERE id = 'cc400000-0000-0000-0000-000000000003'::uuid;
 
 SELECT is(
