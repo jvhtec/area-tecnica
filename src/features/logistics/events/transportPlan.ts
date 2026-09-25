@@ -1,7 +1,7 @@
 /**
  * Plan checks for the logistics event dialog: an optional end for any transport,
  * and the extra fields of a crew transfer (traslado de personal). Pure helpers;
- * the database enforces the same rules (migration 20260925101000), these just
+ * the database enforces the same rules (migration 20260925131000), these just
  * give a readable message before the round trip.
  */
 

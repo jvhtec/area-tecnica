@@ -1,7 +1,7 @@
 /**
  * Fields of a logistics event that change the plan a driver confirmed. Mirrors
  * the column list of the `sync_driver_assignments_after_logistics_event_change`
- * trigger (migrations 20260924133000 and 20260925101000): an edit to any of these resets the
+ * trigger (migrations 20260924133000 and 20260925131000): an edit to any of these resets the
  * driver's confirmation server-side, so the driver must be told. Cosmetic edits
  * (colour, departments, Hoja de Ruta flags, carrier, plate) leave the
  * confirmation intact and must not notify.

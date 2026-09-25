@@ -79,8 +79,8 @@ the vehicle:
     per bus; applying a plan sets this run's berths and, for a hire, the company.
   - The assignment form warns when the chosen bus cannot seat the run even in its
     largest layout (`berthShortfall`: the run's own berths, else the whole crew).
-- **Crew transfers** (`traslados de personal`, migrations `20260925100000` and
-  `20260925101000`): `logistics_event_type` gains `crew_transfer` next to `load`/`unload`,
+- **Crew transfers** (`traslados de personal`, migrations `20260925130000` and
+  `20260925131000`): `logistics_event_type` gains `crew_transfer` next to `load`/`unload`,
   for the vans, RVs and sleeper buses that move people.
   - `logistics_events.end_date`/`end_time` — optional end of **any** transport (both or
     neither, after the start, at most 21 days). A new assignment defaults to the whole

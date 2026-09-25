@@ -3,7 +3,7 @@ import type { Database } from "@/integrations/supabase/types";
 type LogisticsEventRow = Database["public"]["Tables"]["logistics_events"]["Row"];
 
 /**
- * `logistics_event_type`, including `crew_transfer` (20260925100000), which
+ * `logistics_event_type`, including `crew_transfer` (20260925130000), which
  * postdates the generated types.
  */
 export type LogisticsEventType = LogisticsEventRow["event_type"] | "crew_transfer";
