@@ -676,12 +676,37 @@ begin
   select coalesce(jsonb_agg(e order by e->>'event_date', e->>'event_time', e->>'id'), '[]'::jsonb)
   into v_events
   from (
-    with crew_counts as (
+    with event_scope as materialized (
+      select le.*
+      from public.logistics_events le
+      where le.event_date between p_start and p_end
+         -- A multi-day transport is in scope on every day it spans.
+         or (le.end_date is not null and le.event_date <= p_end and le.end_date >= p_start)
+         -- An assignment may overlap the range even when its event starts outside it.
+         or le.id in (
+           select a.logistics_event_id
+           from public.transport_driver_assignments a
+           where a.starts_at < (
+                   (p_end + 1)::timestamp
+                   at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+                 )
+             and a.ends_at > (
+                   p_start::timestamp
+                   at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
+                 )
+         )
+    ),
+    crew_counts as (
       select
         ja.job_id,
         count(distinct coalesce(ja.technician_id::text, ja.external_technician_name)) as crew_count
       from public.job_assignments ja
       where ja.status is distinct from 'declined'
+        and ja.job_id in (
+          select distinct es.job_id
+          from event_scope es
+          where es.job_id is not null
+        )
       group by ja.job_id
     )
     select jsonb_build_object(
@@ -725,30 +750,12 @@ begin
         where led.event_id = le.id
       ), '[]'::jsonb)
     ) as e
-    from public.logistics_events le
+    from event_scope le
     left join public.jobs j on j.id = le.job_id
     left join crew_counts cc on cc.job_id = le.job_id
     left join public.locations loc on loc.id = coalesce(le.location_id, j.location_id)
     left join public.locations origin_loc on origin_loc.id = le.origin_location_id
     left join public.transport_requests tr on tr.id = le.transport_request_id
-    where le.event_date between p_start and p_end
-       -- A multi-day transport (a crew transfer keeping a van for days) is on every
-       -- day it spans, assigned or not.
-       or (le.end_date is not null and le.event_date <= p_end and le.end_date >= p_start)
-       -- A run that overlaps the range from an out-of-range transport date (a Sunday-night
-       -- haul in a Monday-first week) still needs its transport to be labelled and editable.
-       or le.id in (
-         select a.logistics_event_id
-         from public.transport_driver_assignments a
-         where a.starts_at < (
-                 (p_end + 1)::timestamp
-                 at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
-               )
-           and a.ends_at > (
-                 p_start::timestamp
-                 at time zone coalesce(nullif(btrim(le.timezone), ''), 'Europe/Madrid')
-               )
-       )
   ) events;
 
   -- Assignments are selected by their own window as well as their event date, so a
