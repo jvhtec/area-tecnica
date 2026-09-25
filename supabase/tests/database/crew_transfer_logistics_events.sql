@@ -73,9 +73,9 @@ SELECT ok(
 );
 
 SELECT throws_ok(
-  $$ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, origin_location_id, location_id)
+  $$ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, origin_location_id, location_id, passenger_count)
      VALUES ('crew_transfer', 'furgoneta', '2031-06-10', '08:00',
-             'cc200000-0000-0000-0000-000000000001'::uuid, 'cc200000-0000-0000-0000-000000000001'::uuid) $$,
+             'cc200000-0000-0000-0000-000000000001'::uuid, 'cc200000-0000-0000-0000-000000000001'::uuid, 1) $$,
   '23514',
   NULL,
   'a crew transfer cannot start and end at the same place'
@@ -83,65 +83,65 @@ SELECT throws_ok(
 
 SELECT throws_ok(
   $$ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, end_date, end_time)
-     VALUES ('crew_transfer', 'furgoneta', '2031-06-10', '08:00', '2031-06-10', '07:00') $$,
+     VALUES ('load', 'furgoneta', '2031-06-10', '08:00', '2031-06-10', '07:00') $$,
   '23514',
   NULL,
   'a transport cannot end before it starts'
 );
 
 SELECT throws_ok(
-  $ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, end_date, end_time)
-     VALUES ('crew_transfer', 'furgoneta', '2031-06-10', '08:00', '2031-07-10', '08:00') $,
+  $$ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, end_date, end_time)
+     VALUES ('load', 'furgoneta', '2031-06-10', '08:00', '2031-07-10', '08:00') $$,
   '23514',
   NULL,
   'a transport spans at most 21 days'
 );
 
 SELECT throws_ok(
-  $ INSERT INTO public.logistics_events (
+  $$ INSERT INTO public.logistics_events (
        event_type, transport_type, event_date, event_time, origin_location_id, location_id
      ) VALUES (
        'crew_transfer', 'furgoneta', '2031-06-10', '08:00',
        'cc200000-0000-0000-0000-000000000001'::uuid,
        'cc200000-0000-0000-0000-000000000002'::uuid
-     ) $,
+     ) $$,
   '23514',
   NULL,
   'a crew transfer requires a passenger count'
 );
 
 SELECT throws_ok(
-  $ INSERT INTO public.logistics_events (
+  $$ INSERT INTO public.logistics_events (
        event_type, transport_type, event_date, event_time, origin_location_id, location_id, passenger_count
      ) VALUES (
        'crew_transfer', 'trailer', '2031-06-10', '08:00',
        'cc200000-0000-0000-0000-000000000001'::uuid,
        'cc200000-0000-0000-0000-000000000002'::uuid, 2
-     ) $,
+     ) $$,
   '23514',
   NULL,
   'a crew transfer refuses a freight-only vehicle type'
 );
 
 SELECT throws_ok(
-  $ INSERT INTO public.logistics_events (
+  $$ INSERT INTO public.logistics_events (
        event_type, transport_type, event_date, event_time, location_id, passenger_count
      ) VALUES (
        'crew_transfer', 'furgoneta', '2031-06-10', '08:00',
        'cc200000-0000-0000-0000-000000000002'::uuid, 2
-     ) $,
+     ) $$,
   '23514',
   NULL,
   'a crew transfer requires a pick-up point'
 );
 
 SELECT throws_ok(
-  $ INSERT INTO public.logistics_events (
+  $$ INSERT INTO public.logistics_events (
        event_type, transport_type, event_date, event_time, origin_location_id, passenger_count
      ) VALUES (
        'crew_transfer', 'furgoneta', '2031-06-10', '08:00',
        'cc200000-0000-0000-0000-000000000001'::uuid, 2
-     ) $,
+     ) $$,
   '22023',
   NULL,
   'a crew transfer requires an effective destination'
@@ -167,13 +167,13 @@ VALUES (
 );
 
 SELECT throws_ok(
-  $ INSERT INTO public.logistics_events (
+  $$ INSERT INTO public.logistics_events (
        event_type, transport_type, event_date, event_time, job_id, origin_location_id, passenger_count
      ) VALUES (
        'crew_transfer', 'furgoneta', '2031-06-20', '08:00',
        'cc500000-0000-0000-0000-000000000001'::uuid,
        'cc200000-0000-0000-0000-000000000002'::uuid, 2
-     ) $,
+     ) $$,
   '22023',
   NULL,
   'the job venue counts as the crew-transfer destination when checking origin equality'
