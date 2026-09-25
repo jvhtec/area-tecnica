@@ -116,6 +116,7 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   berth_count: null,
   job_crew_count: 20,
   passenger_count: null,
+  movement_type: null,
   origin_location_id: null,
   loading_bay: null,
   notes: null,

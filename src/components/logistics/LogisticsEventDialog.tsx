@@ -42,7 +42,8 @@ import {
 import type { Database } from "@/integrations/supabase/types";
 import { queryKeys } from "@/lib/react-query";
 import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
-import { CrewTransferFields, CrewTransferReturnFields, TransportEndFields } from "./LogisticsEventTransportFields";
+import { CrewTransferFields, CrewTransferReturnFields, TransportEndFields, TransportMovementField } from "./LogisticsEventTransportFields";
+import { isTransportMovementType, type TransportMovementType } from "@/constants/transportMovementTypes";
 import { buildReturnTrip, validateTransportPlan } from "@/features/logistics/events/transportPlan";
 import { useJobTimeSpan } from "@/features/logistics/events/useJobTimeSpan";
 import { LogisticsProviderSelect } from "./LogisticsProviderSelect";
@@ -67,15 +68,11 @@ type LogisticsEventPayload = Omit<LogisticsEventInsert, "event_type" | "transpor
   end_time: string | null;
   origin_location_id: string | null;
   passenger_count: number | null;
+  movement_type: TransportMovementType | null;
 };
 
 // Available departments
-const departments: Department[] = [
-  "sound",
-  "lights",
-  "video"
-];
-
+const departments: Department[] = ["sound", "lights", "video"];
 
 interface LogisticsEventDialogProps {
   open: boolean;
@@ -121,6 +118,7 @@ export const LogisticsEventDialog = ({
   const [endTime, setEndTime] = useState("");
   // Crew transfers (traslados de personal).
   const [passengerCount, setPassengerCount] = useState<number | null>(null);
+  const [movementType, setMovementType] = useState<TransportMovementType | null>("transfer");
   const [alsoCreateReturn, setAlsoCreateReturn] = useState(false);
   const [returnDate, setReturnDate] = useState("");
   const [returnTime, setReturnTime] = useState("");
@@ -182,6 +180,7 @@ export const LogisticsEventDialog = ({
       setEndDate(selectedEvent.end_date ?? "");
       setEndTime(selectedEvent.end_time?.slice(0, 5) ?? "");
       setPassengerCount(selectedEvent.passenger_count ?? null);
+      setMovementType(isTransportMovementType(selectedEvent.movement_type) ? selectedEvent.movement_type : null);
       setNotes(selectedEvent.notes || "");
       setSelectedDepartments(
         (selectedEvent.departments || [])
@@ -207,6 +206,7 @@ export const LogisticsEventDialog = ({
       setEndDate("");
       setEndTime("");
       setPassengerCount(null);
+      setMovementType("transfer");
       setAlsoCreateReturn(false);
       setReturnDate("");
       setReturnTime("");
@@ -345,6 +345,7 @@ export const LogisticsEventDialog = ({
         // Crew transfers only (the database clears them on loads/unloads).
         origin_location_id: resolvedOriginId,
         passenger_count: isCrewTransfer ? passengerCount : null,
+        movement_type: isCrewTransfer ? null : movementType,
       };
 
       if (selectedEvent) {
@@ -662,6 +663,7 @@ export const LogisticsEventDialog = ({
               />
             ) : (
               <>
+                <TransportMovementField value={movementType} onChange={setMovementType} />
                 <LogisticsEventPlaceField location={location} hasJob={Boolean(selectedJob)} />
 
                 {/* Loading Bay */}

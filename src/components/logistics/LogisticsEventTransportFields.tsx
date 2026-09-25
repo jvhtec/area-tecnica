@@ -2,6 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  TRANSPORT_MOVEMENT_LABELS,
+  TRANSPORT_MOVEMENT_TYPES,
+  type TransportMovementType,
+} from "@/constants/transportMovementTypes";
 import type { LogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
 import type { JobTimeSpan } from "@/features/logistics/events/useJobTimeSpan";
 
@@ -175,6 +181,32 @@ export function CrewTransferReturnFields({
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+/** What a load/unload is for: the same choices as a transport request's "Tipo de movimiento". */
+export function TransportMovementField({
+  value,
+  onChange,
+}: {
+  value: TransportMovementType | null;
+  onChange: (value: TransportMovementType | null) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="logistics-event-movement">Tipo de movimiento</Label>
+      <Select value={value ?? "none"} onValueChange={(next) => onChange(next === "none" ? null : (next as TransportMovementType))}>
+        <SelectTrigger id="logistics-event-movement">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">Sin indicar</SelectItem>
+          {TRANSPORT_MOVEMENT_TYPES.map((type) => (
+            <SelectItem key={type} value={type}>{TRANSPORT_MOVEMENT_LABELS[type]}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

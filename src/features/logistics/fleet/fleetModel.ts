@@ -9,6 +9,7 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
 
+import { transportMovementLabel } from "@/constants/transportMovementTypes";
 import { MADRID_TIMEZONE, addMadridCalendarDays } from "@/utils/timezoneUtils";
 
 export const LICENSE_CATEGORIES = ["B", "B+E", "C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"] as const;
@@ -49,6 +50,16 @@ export const TRANSPORT_EVENT_TYPE_LABELS: Record<string, string> = {
   load: "Carga",
   unload: "Descarga",
   crew_transfer: "Traslado de personal",
+};
+
+/**
+ * "Carga · Recogida": what happens at the stop, then what the move is for (the
+ * transport request's movement type) when there is one.
+ */
+export const transportOperationLabel = (eventType: string, movementType?: string | null): string => {
+  const operation = TRANSPORT_EVENT_TYPE_LABELS[eventType] ?? "Transporte";
+  const movement = transportMovementLabel(movementType);
+  return movement ? `${operation} · ${movement}` : operation;
 };
 
 /** A transport that moves people rather than gear (logistics_event_type `crew_transfer`). */
@@ -132,6 +143,8 @@ export type MatrixTransportEvent = {
   job_crew_count: number | null;
   /** Crew transfers only: people travelling. */
   passenger_count: number | null;
+  /** Loads/unloads: what the move is for (transfer, pickup, delivery, return, other). */
+  movement_type: string | null;
   /** Crew transfers only: the pick-up point (its name comes through `origin`). */
   origin_location_id: string | null;
   loading_bay: string | null;
@@ -183,6 +196,8 @@ export type MyTransportAssignment = {
   end_time: string | null;
   /** Crew transfers only: people travelling. */
   passenger_count: number | null;
+  /** Loads/unloads: what the move is for. */
+  movement_type: string | null;
   timezone: string;
   title: string | null;
   job_id: string | null;

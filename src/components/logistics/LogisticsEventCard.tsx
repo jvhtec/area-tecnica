@@ -1,8 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Package, PackageCheck, Truck, MessageSquare, UserRound, Users } from "lucide-react";
 import { assignmentStatusClass } from "@/components/logistics/fleet/matrixStyles";
-import { DRIVER_ASSIGNMENT_STATUS_LABELS, formatTransportSpan, type EventDriverSummary } from "@/features/logistics/fleet/fleetModel";
-import { logisticsEventTypeLabel } from "@/components/logistics/logisticsEventTypes";
+import {
+  DRIVER_ASSIGNMENT_STATUS_LABELS,
+  formatTransportSpan,
+  transportOperationLabel,
+  type EventDriverSummary,
+} from "@/features/logistics/fleet/fleetModel";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
@@ -68,7 +72,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
       event.job?.title;
     if (title) return title;
 
-    const typeLabel = logisticsEventTypeLabel(event.event_type);
+    const typeLabel = transportOperationLabel(event.event_type, event.movement_type);
     const transportLabel = event.transport_type ? ` - ${getLogisticsTransportTypeLabel(event.transport_type)}` : "";
     return `${typeLabel}${transportLabel}`;
   };
@@ -100,7 +104,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
                   className="flex items-center gap-1"
                 >
                   <EventTypeIcon className="h-3 w-3" />
-                  <span>{logisticsEventTypeLabel(event.event_type)}</span>
+                  <span>{transportOperationLabel(event.event_type, event.movement_type)}</span>
                 </Badge>
                 <Badge variant="outline" className="flex max-w-full items-center gap-1">
                   <Truck className="h-3 w-3 shrink-0" />

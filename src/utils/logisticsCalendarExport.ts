@@ -24,10 +24,13 @@ import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { transportProviderLabel } from "@/constants/transportProviders";
 import { logisticsEventTypeLabel, type LogisticsEventType } from "@/components/logistics/logisticsEventTypes";
+import { transportMovementLabel } from "@/constants/transportMovementTypes";
 
 interface LogisticsEvent {
   id: string;
   event_type: LogisticsEventType;
+  /** What a load/unload is for (transport request movement type). */
+  movement_type?: string | null;
   transport_type: string;
   event_time: string;
   event_date: string;
@@ -61,7 +64,11 @@ const getTransportTypeLabel = (type: string): string => {
 
 const getTransportProviderLabel = (provider?: string | null): string => transportProviderLabel(provider) ?? "-";
 
-const getOperationTypeLabel = (eventType: string): string => logisticsEventTypeLabel(eventType);
+/** "Carga · Recogida": the operation, then what the move is for when known. */
+const getOperationTypeLabel = (eventType: string, movementType?: string | null): string => {
+  const movement = transportMovementLabel(movementType);
+  return movement ? `${logisticsEventTypeLabel(eventType)} · ${movement}` : logisticsEventTypeLabel(eventType);
+};
 
 const getDepartmentsLabel = (departments?: { department: string }[]): string => {
   if (!departments || departments.length === 0) return "-";
@@ -151,7 +158,7 @@ export const generateLogisticsCalendarXLS = async (
     const formattedTime = event.event_time;
     const jobTitle = getJobTitle(event);
     const transportType = getTransportTypeLabel(event.transport_type);
-    const operationType = getOperationTypeLabel(event.event_type);
+    const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
     const transportProvider = getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
 
@@ -271,7 +278,7 @@ export const generateLogisticsCalendarPDF = async (
     const formattedTime = event.event_time;
     const jobTitle = getJobTitle(event);
     const transportType = getTransportTypeLabel(event.transport_type);
-    const operationType = getOperationTypeLabel(event.event_type);
+    const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
     const transportProvider = getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
 
@@ -317,7 +324,7 @@ export const generateLogisticsCalendarPDF = async (
         data.cell.styles.font = "courier";
         data.cell.styles.fontStyle = "bold";
         data.cell.styles.textColor =
-          data.cell.raw === "Carga"
+          String(data.cell.raw).startsWith("Carga")
             ? (REPORT_ACCENT as [number, number, number])
             : (REPORT_SOFT as [number, number, number]);
       }

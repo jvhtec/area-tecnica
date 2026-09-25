@@ -44,4 +44,6 @@ export type LogisticsCalendarEvent = Omit<LogisticsEventRow, "event_type"> & {
   origin_location_id?: string | null;
   /** Crew transfers only: people travelling; postdates the generated types. */
   passenger_count?: number | null;
+  /** Loads/unloads: what the move is for (transport request movement type); postdates the generated types. */
+  movement_type?: string | null;
 };

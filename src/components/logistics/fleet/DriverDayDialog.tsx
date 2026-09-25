@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { removeDriverAssignment } from "@/features/logistics/fleet/fleetApi";
 import {
   DRIVER_ASSIGNMENT_STATUS_LABELS,
-  TRANSPORT_EVENT_TYPE_LABELS,
+  transportOperationLabel,
   UNAVAILABILITY_LABELS,
   driverDisplayName,
   formatTransportTime,
@@ -209,7 +209,7 @@ export function DriverDayDialog({ open, onOpenChange, dayKey, row, data, rowAssi
                       <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm">
                         <div className="min-w-0">
                           <p className="font-medium">
-                            {event.event_time.slice(0, 5)} · {TRANSPORT_EVENT_TYPE_LABELS[event.event_type] ?? event.event_type} ·{" "}
+                            {event.event_time.slice(0, 5)} · {transportOperationLabel(event.event_type, event.movement_type)} ·{" "}
                             {transportEventTitle(event)}
                           </p>
                           <p className="text-muted-foreground">

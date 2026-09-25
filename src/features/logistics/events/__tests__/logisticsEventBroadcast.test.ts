@@ -27,6 +27,8 @@ describe("diffLogisticsEventChanges", () => {
   it("reports the crew-transfer fields drivers and crew care about", () => {
     const changes = diffLogisticsEventChanges(base, { ...base, end_date: "2026-10-04", passenger_count: 8, origin_location_id: "hotel" }, lists);
     expect(Object.keys(changes ?? {})).toEqual(["end_date", "origin_location_id", "passenger_count"]);
+    expect(diffLogisticsEventChanges({ ...base, movement_type: "pickup" }, { ...base, movement_type: "return" }, lists))
+      .toEqual({ movement_type: { from: "pickup", to: "return" } });
     expect(changes?.passenger_count).toEqual({ from: 6, to: 8 });
   });
 

@@ -79,6 +79,7 @@ type ComparableEvent = {
   end_time?: string | null;
   origin_location_id?: string | null;
   passenger_count?: number | null;
+  movement_type?: string | null;
 };
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -108,6 +109,7 @@ export function diffLogisticsEventChanges(
   track("license_plate", blank(before.license_plate) !== blank(after.license_plate));
   track("origin_location_id", blank(before.origin_location_id) !== blank(after.origin_location_id));
   track("passenger_count", blank(before.passenger_count) !== blank(after.passenger_count));
+  track("movement_type", blank(before.movement_type) !== blank(after.movement_type));
   const previousHojaRelevant = before.is_hoja_relevant ?? true;
   if (previousHojaRelevant !== (after.is_hoja_relevant ?? true)) {
     changes.is_hoja_relevant = { from: previousHojaRelevant, to: after.is_hoja_relevant };

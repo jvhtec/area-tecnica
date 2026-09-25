@@ -29,6 +29,7 @@ export function fmtFieldEs(field: string): string {
     case 'license_plate': return 'Matrícula';
     case 'origin_location_id': return 'Punto de encuentro';
     case 'passenger_count': return 'Personas';
+    case 'movement_type': return 'Tipo de movimiento';
     default: return field;
   }
 }

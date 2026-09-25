@@ -27,6 +27,7 @@ const assignment = (overrides: Partial<MyTransportAssignment>): MyTransportAssig
   end_date: null,
   end_time: null,
   passenger_count: null,
+  movement_type: null,
   timezone: "Europe/Madrid",
   title: null,
   job_id: null,

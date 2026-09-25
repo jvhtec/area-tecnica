@@ -112,6 +112,17 @@ the vehicle:
     refused. The new columns are material: editing them resets the driver's confirmation.
   - Drivers see the pick-up point (with its own *Ir al punto de encuentro* / Waze links
     and the map tile), the passenger count and the destination on `/conductor`.
+- **Movement type** (`logistics_events.movement_type`, same values as a transport
+  request's *Tipo de movimiento*: traslado, recogida, entrega, devolución, otro). The event
+  type says what happens at the stop (carga / descarga / traslado de personal); the
+  movement type says what the move is for. `trg_logistics_events_fill_movement_type`
+  copies it from the linked request when planning creates the load/unload pair
+  (existing planned events were backfilled), the event dialog sets it on manual
+  loads/unloads, and crew transfers have none. Labels come from
+  `@/constants/transportMovementTypes`; cards, the driver dashboard, the day dialog and
+  the calendar export show "Carga · Recogida" (`transportOperationLabel`). Crew
+  transport is deliberately not a request movement type: crew transfers are created
+  directly as logistics events.
 - **Hired transports need no driver of ours.** A run whose `transport_provider` is set
   to anything but `sector_pro` (a carrier, a hired bus, a client pick-up) is not counted
   as "sin conductor" and shows "Contratado a …" in the day dialog.

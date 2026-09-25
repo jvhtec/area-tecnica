@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   DRIVER_ASSIGNMENT_STATUS_LABELS,
-  TRANSPORT_EVENT_TYPE_LABELS,
+  transportOperationLabel,
   formatTransportTime,
   vehicleTypeLabel,
   type MyTransportAssignment,
@@ -45,7 +45,7 @@ export function ConductorAssignmentCard({
 }: ConductorAssignmentCardProps) {
   const { toast } = useToast();
   const title = assignment.title?.trim() || assignment.job_title?.trim() || "Transporte";
-  const movement = TRANSPORT_EVENT_TYPE_LABELS[assignment.event_type] ?? "Transporte";
+  const movement = transportOperationLabel(assignment.event_type, assignment.movement_type);
   const target = {
     lat: assignment.location_lat,
     lng: assignment.location_lng,

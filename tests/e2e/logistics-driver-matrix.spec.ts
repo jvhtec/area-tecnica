@@ -247,6 +247,37 @@ test.describe("Logistics driver matrix", () => {
       });
   });
 
+  test("shows and edits what a load is for, as its request said", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
+    const pickup = {
+      id: "pickup-run", event_type: "load", transport_type: "furgoneta", event_date: "2026-09-30", event_time: "10:00:00",
+      end_date: null, end_time: null, timezone: "Europe/Madrid", title: "Material proveedor", color: null, job_id: null,
+      license_plate: null, transport_provider: null, berth_count: null, loading_bay: null, notes: null, is_hoja_relevant: true,
+      hoja_categories: [], location_id: null, origin_location_id: null, passenger_count: null, movement_type: "pickup",
+      transport_request_id: null, job: null, departments: [],
+    };
+    const calls = await bootstrapApp(page, {
+      auth: { userId: "mgr", role: "management", department: "logistics" },
+      tables: {
+        profiles: [{ id: "mgr", first_name: "Marta", last_name: "Log", role: "management", department: "logistics" }],
+        logistics_events: [pickup],
+      },
+      rpc: { get_logistics_matrix: matrix, list_transport_requests: [] },
+    });
+    await page.goto("/logistics?tab=calendar");
+
+    await expect(page.getByText("Carga · Recogida")).toBeVisible();
+    await page.getByRole("heading", { name: "Material proveedor" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel("Tipo de movimiento")).toContainText("Recogida");
+
+    await dialog.getByLabel("Tipo de movimiento").click();
+    await page.getByRole("option", { name: "Devolución" }).click();
+    await dialog.getByRole("button", { name: "Actualizar evento" }).click();
+    await expect.poll(() => calls.tableMutations.find((mutation) => mutation.table === "logistics_events")?.body)
+      .toMatchObject({ event_type: "load", movement_type: "return" });
+  });
+
   test("keeps house technicians read-only", async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
     await bootstrapApp(page, {

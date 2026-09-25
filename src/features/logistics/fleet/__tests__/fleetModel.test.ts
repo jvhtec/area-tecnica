@@ -24,6 +24,7 @@ import {
   startOfMadridWeek,
   suggestedLicenseForVehicleType,
   summarizeDriversByEvent,
+  transportOperationLabel,
   unavailabilityByDay,
   vehicleTypeLabel,
   type DriverAssignment,
@@ -82,6 +83,7 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   berth_count: null,
   job_crew_count: null,
   passenger_count: null,
+  movement_type: null,
   origin_location_id: null,
   loading_bay: null,
   notes: null,
@@ -295,6 +297,13 @@ describe("coverage and defaults", () => {
       start: "2026-10-01T08:00",
       end: "2026-10-04T20:00",
     });
+  });
+
+  it("names the operation and, when known, what the move is for", () => {
+    expect(transportOperationLabel("load", "pickup")).toBe("Carga · Recogida");
+    expect(transportOperationLabel("unload", "return")).toBe("Descarga · Devolución");
+    expect(transportOperationLabel("crew_transfer", null)).toBe("Traslado de personal");
+    expect(transportOperationLabel("load", "bogus")).toBe("Carga");
   });
 
   it("describes a transport's span from its local wall-clock values", () => {

@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(14);
+SELECT plan(17);
 
 -- ---------------------------------------------------------------------------
 -- Structure
@@ -95,6 +95,53 @@ SELECT throws_ok(
   '23514',
   NULL,
   'a transport spans at most 21 days'
+);
+
+-- ---------------------------------------------------------------------------
+-- Movement type: a planned load inherits its request's, crew transfers have none.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.jobs (id, title, start_time, end_time, job_type)
+VALUES (
+  'cc500000-0000-0000-0000-000000000001'::uuid, 'Crew Transfer Movement Fixture',
+  '2031-06-20 08:00:00+02'::timestamptz, '2031-06-20 23:00:00+02'::timestamptz, 'single'
+);
+
+INSERT INTO public.transport_requests (
+  id, job_id, department, created_by, status, planning_status,
+  movement_type, priority, source_type, is_hoja_relevant
+) VALUES (
+  'cc600000-0000-0000-0000-000000000001'::uuid, 'cc500000-0000-0000-0000-000000000001'::uuid, 'sound',
+  'cc100000-0000-0000-0000-000000000001'::uuid, 'requested', 'requested',
+  'pickup', 'normal', 'manual', true
+);
+
+INSERT INTO public.logistics_events (id, event_type, transport_type, event_date, event_time, job_id, transport_request_id, timezone)
+VALUES (
+  'cc400000-0000-0000-0000-000000000003'::uuid, 'load', 'furgoneta', '2031-06-20', '09:00',
+  'cc500000-0000-0000-0000-000000000001'::uuid, 'cc600000-0000-0000-0000-000000000001'::uuid, 'Europe/Madrid'
+);
+
+SELECT is(
+  (SELECT movement_type FROM public.logistics_events WHERE id = 'cc400000-0000-0000-0000-000000000003'::uuid),
+  'pickup',
+  'a load planned from a request inherits its movement type'
+);
+
+UPDATE public.logistics_events SET event_type = 'crew_transfer'
+WHERE id = 'cc400000-0000-0000-0000-000000000003'::uuid;
+
+SELECT is(
+  (SELECT movement_type FROM public.logistics_events WHERE id = 'cc400000-0000-0000-0000-000000000003'::uuid),
+  NULL::text,
+  'a crew transfer has no movement type'
+);
+
+SELECT throws_ok(
+  $$ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, movement_type)
+     VALUES ('load', 'trailer', '2031-06-10', '08:00', 'bogus') $$,
+  '23514',
+  NULL,
+  'an unknown movement type is refused'
 );
 
 -- ---------------------------------------------------------------------------
@@ -192,8 +239,11 @@ DELETE FROM public.transport_driver_assignments WHERE logistics_event_id IN (
 );
 DELETE FROM public.logistics_events WHERE id IN (
   'cc400000-0000-0000-0000-000000000001'::uuid,
-  'cc400000-0000-0000-0000-000000000002'::uuid
+  'cc400000-0000-0000-0000-000000000002'::uuid,
+  'cc400000-0000-0000-0000-000000000003'::uuid
 );
+DELETE FROM public.transport_requests WHERE id = 'cc600000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.jobs WHERE id = 'cc500000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.fleet_vehicles WHERE id = 'cc300000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.locations WHERE id IN (
   'cc200000-0000-0000-0000-000000000001'::uuid,

@@ -16,18 +16,26 @@
 -- Origin and passengers only mean something on a crew transfer: a trigger clears
 -- them on loads/unloads instead of refusing the edit, as berths do on non-buses.
 -- A return trip is simply a second crew_transfer with origin and destination swapped.
+--
+--  * logistics_events.movement_type: what a load/unload is for, with the same values
+--    as transport_requests.movement_type (traslado, recogida, entrega, devolución,
+--    otro). Planning a request used to drop it; a trigger now fills it from the
+--    linked request, and the event dialog sets it on manual events. Crew transfers
+--    have none.
 
 alter table public.logistics_events
   add column if not exists end_date date,
   add column if not exists end_time time without time zone,
   add column if not exists origin_location_id uuid references public.locations(id) on delete set null,
-  add column if not exists passenger_count smallint;
+  add column if not exists passenger_count smallint,
+  add column if not exists movement_type text;
 
 alter table public.logistics_events
   drop constraint if exists logistics_events_end_pair_check,
   drop constraint if exists logistics_events_end_after_start_check,
   drop constraint if exists logistics_events_span_check,
   drop constraint if exists logistics_events_passenger_count_check,
+  drop constraint if exists logistics_events_movement_type_check,
   drop constraint if exists logistics_events_origin_not_destination_check;
 
 alter table public.logistics_events
@@ -39,6 +47,8 @@ alter table public.logistics_events
     check (end_date is null or end_date - event_date <= 21),
   add constraint logistics_events_passenger_count_check
     check (passenger_count is null or passenger_count between 1 and 80),
+  add constraint logistics_events_movement_type_check
+    check (movement_type is null or movement_type in ('transfer', 'pickup', 'delivery', 'return', 'other')),
   add constraint logistics_events_origin_not_destination_check
     check (origin_location_id is null or origin_location_id is distinct from location_id);
 
@@ -50,6 +60,8 @@ comment on column public.logistics_events.origin_location_id is
   'Crew transfers only: pick-up point (punto de encuentro). location_id is the destination.';
 comment on column public.logistics_events.passenger_count is
   'Crew transfers only: people travelling.';
+comment on column public.logistics_events.movement_type is
+  'Loads/unloads: what the move is for (transport_requests.movement_type values). Filled from the linked request when not given.';
 
 create index if not exists idx_logistics_events_origin_location_id
   on public.logistics_events(origin_location_id)
@@ -91,6 +103,8 @@ begin
   if new.event_type::text <> 'crew_transfer' then
     new.origin_location_id := null;
     new.passenger_count := null;
+  else
+    new.movement_type := null;
   end if;
   return new;
 end;
@@ -100,8 +114,45 @@ revoke all on function public.clear_crew_fields_off_crew_transfer() from public,
 
 drop trigger if exists trg_logistics_events_clear_crew_fields on public.logistics_events;
 create trigger trg_logistics_events_clear_crew_fields
-  before insert or update of event_type, origin_location_id, passenger_count on public.logistics_events
+  before insert or update of event_type, origin_location_id, passenger_count, movement_type on public.logistics_events
   for each row execute function public.clear_crew_fields_off_crew_transfer();
+
+-- A load/unload planned from a transport request inherits the request's movement
+-- type. schedule_transport_request (re)creates the events, so replanning after the
+-- request changes picks up the new type. Runs after the crew-field trigger (names
+-- fire alphabetically) and leaves crew transfers alone.
+create or replace function public.fill_logistics_event_movement_type()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.movement_type is null
+     and new.transport_request_id is not null
+     and new.event_type::text <> 'crew_transfer' then
+    select tr.movement_type into new.movement_type
+    from public.transport_requests tr
+    where tr.id = new.transport_request_id;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.fill_logistics_event_movement_type() from public, anon, authenticated;
+
+drop trigger if exists trg_logistics_events_fill_movement_type on public.logistics_events;
+create trigger trg_logistics_events_fill_movement_type
+  before insert or update of transport_request_id, movement_type on public.logistics_events
+  for each row execute function public.fill_logistics_event_movement_type();
+
+-- Existing planned events get their request's type.
+update public.logistics_events le
+set movement_type = tr.movement_type
+from public.transport_requests tr
+where tr.id = le.transport_request_id
+  and le.movement_type is null
+  and le.event_type::text <> 'crew_transfer';
 
 -- ---------------------------------------------------------------------------
 -- Event edits carry their assignments along. As in 20260924133000, plus: the new
@@ -642,6 +693,7 @@ begin
       'transport_provider', le.transport_provider,
       'berth_count', le.berth_count,
       'passenger_count', le.passenger_count,
+      'movement_type', coalesce(le.movement_type, case when le.event_type::text <> 'crew_transfer' then tr.movement_type end),
       -- Crew on the job, for sleeper-bus berth planning. Everyone not declined
       -- counts: an invited technician still needs a berth if they accept.
       'job_crew_count', case when le.job_id is null then null else (
@@ -775,6 +827,7 @@ begin
       'end_date', le.end_date,
       'end_time', le.end_time,
       'passenger_count', le.passenger_count,
+      'movement_type', coalesce(le.movement_type, case when le.event_type::text <> 'crew_transfer' then tr.movement_type end),
       'timezone', coalesce(le.timezone, 'Europe/Madrid'),
       'title', le.title,
       'job_id', le.job_id,
