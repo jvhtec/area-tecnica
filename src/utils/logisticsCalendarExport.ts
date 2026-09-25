@@ -284,8 +284,12 @@ export const generateLogisticsCalendarPDF = async (
   // Prepare table data
   const tableData = sortedEvents.map((event) => {
     const eventDate = new Date(event.event_date);
-    const formattedDate = format(eventDate, "EEE, d MMM yyyy", { locale: es });
-    const formattedTime = event.event_time;
+    const formattedDate = event.end_date && event.end_date !== event.event_date
+      ? `${format(eventDate, "EEE, d MMM yyyy", { locale: es })} → ${format(new Date(event.end_date), "EEE, d MMM yyyy", { locale: es })}`
+      : format(eventDate, "EEE, d MMM yyyy", { locale: es });
+    const formattedTime = event.end_time
+      ? `${event.event_time.slice(0, 5)}–${event.end_time.slice(0, 5)}`
+      : event.event_time;
     const jobTitle = getJobTitle(event);
     const transportType = getTransportTypeLabel(event.transport_type);
     const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
