@@ -53,6 +53,7 @@ import { useJobTimeSpan } from "@/features/logistics/events/useJobTimeSpan";
 import { LogisticsProviderSelect } from "./LogisticsProviderSelect";
 import { SleeperBusBerthPlanner } from "./fleet/SleeperBusBerthPlanner";
 import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
+import { resolveTransportPlaces } from "@/features/logistics/events/resolveTransportPlaces";
 import { deleteLogisticsEvent, notifyDriverAssignmentsForEvent } from "@/features/logistics/fleet/fleetApi";
 import { broadcastLogisticsEvent, diffLogisticsEventChanges } from "@/features/logistics/events/logisticsEventBroadcast";
 import { isDriverRelevantEventChange } from "@/features/logistics/events/driverRelevantEventChange";
@@ -307,52 +308,23 @@ export const LogisticsEventDialog = ({
     }
 
     try {
-      const resolvedLocationId = await location.resolve();
-      const resolvedOriginId = isCrewTransfer ? await origin.resolve() : null;
-
-      if (location.input.trim() && !resolvedLocationId) {
-        toast({
-          title: "Revisa el transporte",
-          description: "Selecciona el destino de la lista para guardar una ubicación válida.",
-          variant: "destructive",
-        });
+      const places = await resolveTransportPlaces({
+        isCrewTransfer,
+        selectedJob,
+        jobs,
+        location,
+        origin,
+      });
+      if (!places.ok) {
+        toast({ title: "Revisa el transporte", description: places.message, variant: "destructive" });
         return;
       }
-      if (isCrewTransfer && origin.input.trim() && !resolvedOriginId) {
-        toast({
-          title: "Revisa el transporte",
-          description: "Selecciona el punto de encuentro de la lista para guardar una ubicación válida.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const listedJob = jobs?.find((candidate) => candidate.id === selectedJob);
-      let jobLocationId = listedJob?.location_id ?? null;
-      let jobTitle = listedJob?.title ?? null;
-      if (isCrewTransfer && selectedJob && (!resolvedLocationId && !jobLocationId || !jobTitle)) {
-        const { data: selectedJobData, error: selectedJobError } = await dataLayerClient
-          .from("jobs")
-          .select("location_id, title")
-          .eq("id", selectedJob)
-          .maybeSingle();
-        if (selectedJobError) throw selectedJobError;
-        jobLocationId = jobLocationId ?? selectedJobData?.location_id ?? null;
-        jobTitle = jobTitle ?? selectedJobData?.title ?? null;
-      }
-      const effectiveDestinationId = resolvedLocationId ?? jobLocationId;
-      if (isCrewTransfer && !effectiveDestinationId) {
-        toast({
-          title: "Revisa el transporte",
-          description: "El traslado necesita un destino o un trabajo con recinto.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (isCrewTransfer && resolvedOriginId === effectiveDestinationId) {
-        toast({ title: "Revisa el transporte", description: "El origen y el destino no pueden ser el mismo lugar.", variant: "destructive" });
-        return;
-      }
+      const {
+        locationId: resolvedLocationId,
+        originId: resolvedOriginId,
+        effectiveDestinationId,
+        jobTitle,
+      } = places;
 
       const eventData: LogisticsEventSavePayload = {
         event_type: eventType,
