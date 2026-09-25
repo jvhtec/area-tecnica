@@ -10,6 +10,7 @@ import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import { useJobDistance } from "@/hooks/useJobDistance";
 import { getErrorMessage } from '@/utils/errorMessage';
 import { getLogisticsTransportTypeLabel } from '@/components/technician/details-modal/formatters';
+import { logisticsEventTypeLabel } from "@/components/logistics/logisticsEventTypes";
 
 interface JobDetailsLocationTabProps {
   open: boolean;
@@ -147,7 +148,7 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
                   {jobDetails.logistics_events.map((event: any) => (
                     <div key={event.id} className="flex items-center justify-between p-2 bg-muted rounded">
                       <div>
-                        <span className="capitalize font-medium">{event.event_type}</span>
+                        <span className="font-medium">{logisticsEventTypeLabel(event.event_type)}</span>
                         <span className="text-muted-foreground ml-2">({getLogisticsTransportTypeLabel(event.transport_type)})</span>
                       </div>
                       <div className="text-sm text-muted-foreground">

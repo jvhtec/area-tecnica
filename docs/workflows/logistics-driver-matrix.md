@@ -79,6 +79,35 @@ the vehicle:
     per bus; applying a plan sets this run's berths and, for a hire, the company.
   - The assignment form warns when the chosen bus cannot seat the run even in its
     largest layout (`berthShortfall`: the run's own berths, else the whole crew).
+- **Crew transfers** (`traslados de personal`, migrations `20260925100000` and
+  `20260925101000`): `logistics_event_type` gains `crew_transfer` next to `load`/`unload`,
+  for the vans, RVs and sleeper buses that move people.
+  - `logistics_events.end_date`/`end_time` — optional end of **any** transport (both or
+    neither, after the start, at most 21 days). A new assignment defaults to the whole
+    span instead of two hours, and may last longer than the usual 72 h cap up to the
+    transport plus a day. The matrix and all three calendars list the transport on
+    every day it spans (`isLogisticsEventOnDay`), assigned or not.
+  - `logistics_events.origin_location_id` — the pick-up point (*punto de encuentro*), a
+    `locations` row like `location_id`, which stays the destination (falling back to
+    the job venue). They cannot be the same place.
+  - `logistics_events.passenger_count` — people travelling. The event dialog offers
+    the job crew count as a one-click fill.
+  - Origin and passengers are crew-transfer-only: `trg_logistics_events_clear_crew_fields`
+    clears them on loads/unloads, as berths are cleared on non-buses.
+  - `fleet_vehicles.passenger_seats` — seats besides the driver. The assignment form
+    warns when a van cannot seat the transfer (`seatShortfall`: the passengers, else
+    the job crew). Sleeper buses keep using berths, and on a crew transfer the berth
+    planner seats the passengers instead of the whole crew.
+  - **Return trip**: "Crear también la vuelta" in the event dialog creates a second
+    `crew_transfer` with origin and destination swapped, the same passengers and vehicle
+    type, its own date/time and title "… · vuelta". It gets its own driver/vehicle in the
+    matrix. The two are not linked in the schema.
+  - An assignment whose window ended with the transport (or at the old two-hour
+    default) follows the transport's end when it moves; any other window keeps its
+    length and shifts with the start. Moving the end before an assignment's start is
+    refused. The new columns are material: editing them resets the driver's confirmation.
+  - Drivers see the pick-up point (with its own *Ir al punto de encuentro* / Waze links
+    and the map tile), the passenger count and the destination on `/conductor`.
 - **Hired transports need no driver of ours.** A run whose `transport_provider` is set
   to anything but `sector_pro` (a carrier, a hired bus, a client pick-up) is not counted
   as "sin conductor" and shows "Contratado a …" in the day dialog.

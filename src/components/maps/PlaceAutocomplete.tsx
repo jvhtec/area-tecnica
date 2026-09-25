@@ -26,6 +26,8 @@ interface PlaceAutocompleteProps {
   className?: string;
   onBusyChange?: (busy: boolean) => void;
   onInputChange?: (value: string) => void;
+  /** Input id; needed when a form shows more than one place picker. */
+  id?: string;
 }
 
 interface PredictionItem {
@@ -42,6 +44,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   className,
   onBusyChange,
   onInputChange,
+  id = 'place-autocomplete',
 }) => {
   const [inputValue, setInputValue] = useState(value || '');
   const [suggestions, setSuggestions] = useState<PredictionItem[]>([]);
@@ -185,10 +188,10 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
   return (
     <div className={className} ref={containerRef}>
-      {label && <Label htmlFor="place-autocomplete">{label}</Label>}
+      {label && <Label htmlFor={id}>{label}</Label>}
       <div className="relative">
         <Input
-          id="place-autocomplete"
+          id={id}
           value={inputValue}
           onChange={handleInputChange}
           placeholder={placeholder}

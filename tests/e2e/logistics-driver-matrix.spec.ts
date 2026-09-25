@@ -185,6 +185,63 @@ test.describe("Logistics driver matrix", () => {
       .toMatchObject({ transport_type: "sleeper_bus", berth_count: 16, transport_provider: "montoya" });
   });
 
+  test("plans a multi-day crew transfer with its pick-up point and passengers", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
+    const crew = Array.from({ length: 7 }, (_, index) => ({ technician_id: `t${index}`, external_technician_name: null, status: "confirmed" }));
+    const transfer = {
+      id: "crew-run", event_type: "crew_transfer", transport_type: "furgoneta", event_date: "2026-09-30", event_time: "07:30:00",
+      end_date: "2026-10-02", end_time: "20:00:00", timezone: "Europe/Madrid", title: null, color: null, job_id: "j9",
+      license_plate: null, transport_provider: null, berth_count: null, loading_bay: null, notes: null, is_hoja_relevant: true,
+      hoja_categories: [], location_id: "loc-venue", origin_location_id: "loc-nave", passenger_count: 5,
+      job: { title: "Gira Norte" }, departments: [],
+    };
+    const calls = await bootstrapApp(page, {
+      auth: { userId: "mgr", role: "management", department: "logistics" },
+      tables: {
+        profiles: [{ id: "mgr", first_name: "Marta", last_name: "Log", role: "management", department: "logistics" }],
+        logistics_events: [transfer],
+        // Looked up one by one (`id=eq.…` + maybeSingle), so honour the filter.
+        locations: ({ url }) => [
+          { id: "loc-nave", name: "Nave Sector Pro", formatted_address: "Calle Nave 1, Madrid" },
+          { id: "loc-venue", name: "Recinto Norte", formatted_address: "Avenida Norte 2, Bilbao" },
+        ].filter((row) => url.searchParams.get("id") === `eq.${row.id}`),
+        jobs: [{ id: "j9", title: "Gira Norte", start_time: "2026-09-30T18:00:00Z", status: "Confirmado", job_type: "single", location_id: "loc-venue" }],
+        job_assignments: crew,
+      },
+      rpc: { get_logistics_matrix: matrix, list_transport_requests: [] },
+    });
+    await page.goto("/logistics?tab=calendar");
+
+    // A multi-day transfer is on every day it spans (30/09–02/10), not just its start
+    // date: three month-grid cells plus the day panel on desktop. Mobile lists one day.
+    await expect(page.getByText("30/09 07:30 → 02/10 20:00 · 5 personas")).toBeVisible();
+    if (!isMobileViewport(page)) {
+      await expect(page.getByText("Gira Norte")).toHaveCount(4, { timeout: 15_000 });
+    }
+    await page.getByRole("heading", { name: "Gira Norte" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel("Tipo de evento")).toContainText("Traslado de personal");
+    await expect(dialog.getByLabel("Punto de encuentro (origen)")).toHaveValue("Nave Sector Pro");
+    await expect(dialog.getByLabel("Destino (si no es el recinto del trabajo)")).toHaveValue("Recinto Norte");
+    await expect(dialog.getByLabel("Muelle de carga")).toHaveCount(0);
+
+    // Everyone on the job travels, and the van stays out one more day.
+    await dialog.getByRole("button", { name: "Todo el personal del trabajo (7)" }).click();
+    await expect(dialog.getByLabel("Personas que viajan")).toHaveValue("7");
+    await dialog.getByLabel("Fecha de fin").fill("2026-10-03");
+
+    await dialog.getByRole("button", { name: "Actualizar evento" }).click();
+    await expect.poll(() => calls.tableMutations.find((mutation) => mutation.table === "logistics_events")?.body)
+      .toMatchObject({
+        event_type: "crew_transfer",
+        passenger_count: 7,
+        end_date: "2026-10-03",
+        end_time: "20:00",
+        origin_location_id: "loc-nave",
+        location_id: "loc-venue",
+      });
+  });
+
   test("keeps house technicians read-only", async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
     await bootstrapApp(page, {
@@ -269,6 +326,32 @@ test.describe("Conductor dashboard", () => {
     if (!isMobileViewport(page)) {
       await expect(page.getByRole("link", { name: "Matriz de asignaciones" })).toHaveCount(0);
     }
+  });
+
+  test("sends drivers on a crew transfer to the pick-up point first", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-09-30T08:00:00Z"));
+    const transfer = {
+      ...mine[0], id: "a9", event_id: "e9", event_type: "crew_transfer", transport_type: "furgoneta", loading_bay: null,
+      starts_at: "2026-09-30T10:00:00Z", ends_at: "2026-10-02T18:00:00Z", end_date: "2026-10-02", end_time: "20:00:00",
+      passenger_count: 6, origin: "Calle Nave 1, Madrid", destination: "Liceu", notes: null, event_notes: null,
+      pickup_name: "Nave Sector Pro", pickup_address: "Calle Nave 1, Madrid", pickup_lat: 40.4, pickup_lng: -3.7,
+    };
+    await bootstrapApp(page, {
+      auth: { userId: "d1", role: "conductor", department: "logistics" },
+      tables: {
+        profiles: [{ id: "d1", first_name: "Ana", last_name: "Conductora", role: "conductor", department: "logistics" }],
+        driver_details: [],
+      },
+      rpc: { get_my_transport_assignments: [transfer], get_job_producer_contacts: [] },
+      functions: { "static-map": mapTile },
+    });
+    await page.goto("/conductor");
+
+    await expect(page.getByText("Traslado de personal · Gala Liceu")).toBeVisible();
+    await expect(page.getByText("Nave Sector Pro, Calle Nave 1, Madrid")).toBeVisible();
+    await expect(page.getByRole("img", { name: "Mapa de Liceu" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Ir al punto de encuentro" })).toHaveAttribute("href", /destination=40\.4%2C-3\.7/);
+    await expect(page.getByRole("link", { name: "Cómo llegar al destino" })).toHaveAttribute("href", /destination=41\.38%2C2\.17/);
   });
 
   test("shares the driver's position only while a transport is close", async ({ page, context }) => {

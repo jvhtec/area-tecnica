@@ -24,6 +24,11 @@ export type SleeperBusBerthPlannerProps = {
   onBerthCountChange: (value: number | null) => void;
   provider: TransportProvider | null;
   onProviderChange: (value: TransportProvider | null) => void;
+  /**
+   * Crew transfers: the people on this run. When given it replaces the job crew
+   * as the head count, since a transfer may carry only part of it.
+   */
+  passengers?: number | null;
 };
 
 const isHireProvider = (provider: TransportProvider | null) =>
@@ -46,10 +51,11 @@ export function SleeperBusBerthPlanner({
   onBerthCountChange,
   provider,
   onProviderChange,
+  passengers = null,
 }: SleeperBusBerthPlannerProps) {
   const [extra, setExtra] = useState(0);
   const crew = useJobCrewCount(jobId);
-  const matrix = useLogisticsMatrix(dateKey, dateKey, Boolean(jobId && dateKey));
+  const matrix = useLogisticsMatrix(dateKey, dateKey, Boolean((jobId || passengers !== null) && dateKey));
 
   const context = useMemo(
     () =>
@@ -58,7 +64,7 @@ export function SleeperBusBerthPlanner({
         : null,
     [matrix.data, jobId, dateKey, eventType, eventId],
   );
-  const headcount = (crew.data?.total ?? 0) + extra;
+  const headcount = passengers ?? (crew.data?.total ?? 0) + extra;
   const stillNeeded = Math.max(0, headcount - (context?.otherBerths ?? 0));
   const plans = useMemo(
     () => suggestSleeperBusPlans(stillNeeded, context?.candidates ?? []),
@@ -96,7 +102,7 @@ export function SleeperBusBerthPlanner({
         />
       </div>
 
-      {!jobId ? (
+      {!jobId && passengers === null ? (
         <p className="text-xs text-muted-foreground">
           Elige un trabajo para calcular las literas según el personal asignado.
         </p>
@@ -104,26 +110,30 @@ export function SleeperBusBerthPlanner({
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Cargando personal y flota" />
       ) : (
         <div className="space-y-2 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span>
-              Personal asignado: <strong>{crew.data?.total ?? 0}</strong>
-              {crew.data ? ` (${crew.data.confirmed} confirmados)` : ""}
-            </span>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              Personas extra
-              <Input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={80}
-                className="h-8 w-16"
-                aria-label="Personas extra (artistas, invitados…)"
-                value={extra}
-                onChange={(changeEvent) => setExtra(Math.max(0, Number.parseInt(changeEvent.target.value, 10) || 0))}
-              />
-            </label>
-          </div>
-          {crew.error && <p className="text-xs text-destructive">No se pudo cargar el personal del trabajo.</p>}
+          {passengers !== null ? (
+            <p>Viajan: <strong>{plural(passengers, "persona", "personas")}</strong></p>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                Personal asignado: <strong>{crew.data?.total ?? 0}</strong>
+                {crew.data ? ` (${crew.data.confirmed} confirmados)` : ""}
+              </span>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Personas extra
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={80}
+                  className="h-8 w-16"
+                  aria-label="Personas extra (artistas, invitados…)"
+                  value={extra}
+                  onChange={(changeEvent) => setExtra(Math.max(0, Number.parseInt(changeEvent.target.value, 10) || 0))}
+                />
+              </label>
+            </div>
+          )}
+          {passengers === null && crew.error && <p className="text-xs text-destructive">No se pudo cargar el personal del trabajo.</p>}
           {context && context.otherRuns > 0 && (
             <p className="text-xs text-muted-foreground">
               Otros autobuses cama de este trabajo ese día: {plural(context.otherRuns, "autobús", "autobuses")}

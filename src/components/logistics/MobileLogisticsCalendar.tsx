@@ -14,7 +14,7 @@ import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/ut
 
 import { queryKeys } from "@/lib/react-query";
 import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
-import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+import { isLogisticsEventOnDay, type LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface MobileLogisticsCalendarProps {
   date: Date;
@@ -69,7 +69,8 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
     const targetDateKey = format(targetDate, "yyyy-MM-dd");
     // event_date is a DATE column, not an instant. Comparing the serialized calendar date
     // avoids shifting it to the previous day when an operator is browsing from another TZ.
-    return events.filter((event) => event.event_date === targetDateKey);
+    // A multi-day transport is listed on every day it spans.
+    return events.filter((event) => isLogisticsEventOnDay(event, targetDateKey));
   }, [events]);
 
   const currentDateEvents = getEventsForDate(currentDate);

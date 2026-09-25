@@ -23,10 +23,11 @@ import {
 import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { transportProviderLabel } from "@/constants/transportProviders";
+import { logisticsEventTypeLabel, type LogisticsEventType } from "@/components/logistics/logisticsEventTypes";
 
 interface LogisticsEvent {
   id: string;
-  event_type: "load" | "unload";
+  event_type: LogisticsEventType;
   transport_type: string;
   event_time: string;
   event_date: string;
@@ -60,9 +61,7 @@ const getTransportTypeLabel = (type: string): string => {
 
 const getTransportProviderLabel = (provider?: string | null): string => transportProviderLabel(provider) ?? "-";
 
-const getOperationTypeLabel = (eventType: "load" | "unload"): string => {
-  return eventType === "load" ? "Carga" : "Descarga";
-};
+const getOperationTypeLabel = (eventType: string): string => logisticsEventTypeLabel(eventType);
 
 const getDepartmentsLabel = (departments?: { department: string }[]): string => {
   if (!departments || departments.length === 0) return "-";

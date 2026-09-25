@@ -25,7 +25,7 @@ describe("isDriverRelevantEventChange", () => {
   });
 
   it("flags every field the database trigger resets confirmations for", () => {
-    const changed: Record<(typeof DRIVER_RELEVANT_EVENT_FIELDS)[number], string | null> = {
+    const changed: Record<(typeof DRIVER_RELEVANT_EVENT_FIELDS)[number], string | number | null> = {
       event_type: "unload",
       transport_type: "furgoneta",
       event_date: "2026-10-02",
@@ -36,6 +36,10 @@ describe("isDriverRelevantEventChange", () => {
       loading_bay: "Muelle 3",
       notes: "Acceso por la puerta norte",
       location_id: "loc-2",
+      end_date: "2026-10-04",
+      end_time: "20:00",
+      origin_location_id: "loc-3",
+      passenger_count: 7,
     };
     for (const field of DRIVER_RELEVANT_EVENT_FIELDS) {
       expect(isDriverRelevantEventChange(before, { ...before, [field]: changed[field] }), field).toBe(true);

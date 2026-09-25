@@ -47,8 +47,16 @@ export function buildLogisticsEventMessage(
       ? Object.keys(rawChanges as Record<string, unknown>)
       : []);
 
-  const eventLabel = eventType === 'unload' ? 'Descarga' : 'Carga';
-  const pairedLabel = pairedType === 'unload' ? 'descarga' : pairedType === 'load' ? 'carga' : undefined;
+  const isCrewTransfer = eventType === 'crew_transfer';
+  const eventLabel = isCrewTransfer ? 'Traslado de personal' : eventType === 'unload' ? 'Descarga' : 'Carga';
+  const pairedLabel = pairedType === 'unload'
+    ? 'descarga'
+    : pairedType === 'load'
+      ? 'carga'
+      : pairedType === 'crew_transfer' ? 'la vuelta' : undefined;
+  // "el traslado … programado" vs "la carga … programada".
+  const the = isCrewTransfer ? 'el' : 'la';
+  const done = (verb: string) => `${verb}${isCrewTransfer ? 'o' : 'a'}`;
   const whenLabel = formatSpanishDateTime(eventDate, eventTime);
   // Known types get their Spanish label ("Autobús cama", "Camión 9m"); anything else keeps the capitalised raw value.
   const transportLabel = transportType
@@ -60,21 +68,21 @@ export function buildLogisticsEventMessage(
   let text = '';
 
   if (type === 'logistics.event.cancelled') {
-    title = `${eventLabel} cancelada`;
-    text = `Se canceló la ${eventLabel.toLowerCase()} de "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
+    title = `${eventLabel} ${done('cancelad')}`;
+    text = `Se canceló ${the} ${eventLabel.toLowerCase()} de "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
   } else if (type === 'logistics.event.updated') {
-    title = `${eventLabel} actualizada`;
-    text = `Se actualizó la ${eventLabel.toLowerCase()} de "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
+    title = `${eventLabel} ${done('actualizad')}`;
+    text = `Se actualizó ${the} ${eventLabel.toLowerCase()} de "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
     if (changeFields.length) {
       const changeLabels = changeFields.map(fmtFieldEs);
       text += ` Cambios: ${changeLabels.join(', ')}.`;
     }
   } else {
-    title = `${eventLabel} programada`;
+    title = `${eventLabel} ${done('programad')}`;
     if (autoCreated) {
       text = `Se creó automáticamente una ${eventLabel.toLowerCase()} para "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
     } else {
-      text = `${eventLabel} para "${eventTitle}" programada${whenLabel ? ` (${whenLabel})` : ''}.`;
+      text = `${eventLabel} para "${eventTitle}" ${done('programad')}${whenLabel ? ` (${whenLabel})` : ''}.`;
     }
   }
 

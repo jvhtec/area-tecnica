@@ -143,7 +143,9 @@ serve(createHttpHandler(async (req) => {
   const timezone = event.timezone?.trim() || "Europe/Madrid";
   const when = formatWhen(assignment.starts_at, timezone);
   const driverName = [driver.first_name, driver.last_name].filter(Boolean).join(" ").trim() || "Conductor";
-  const transportName = event.title?.trim() || job?.title?.trim() || (event.event_type === "unload" ? "Descarga" : "Carga");
+  const transportName = event.title?.trim() || job?.title?.trim() || (event.event_type === "unload"
+      ? "Descarga"
+      : event.event_type === "crew_transfer" ? "Traslado de personal" : "Carga");
   const route = request?.origin || request?.destination
     ? `${request?.origin || "—"} → ${request?.destination || "—"}`
     : null;

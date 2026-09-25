@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { Package, PackageCheck, Truck, MessageSquare, UserRound } from "lucide-react";
+import { Package, PackageCheck, Truck, MessageSquare, UserRound, Users } from "lucide-react";
 import { assignmentStatusClass } from "@/components/logistics/fleet/matrixStyles";
-import { DRIVER_ASSIGNMENT_STATUS_LABELS, type EventDriverSummary } from "@/features/logistics/fleet/fleetModel";
+import { DRIVER_ASSIGNMENT_STATUS_LABELS, formatTransportSpan, type EventDriverSummary } from "@/features/logistics/fleet/fleetModel";
+import { logisticsEventTypeLabel } from "@/components/logistics/logisticsEventTypes";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
@@ -32,7 +33,11 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
   className,
   drivers,
 }: LogisticsEventCardProps) {
-  const defaultColor = event.event_type === "load" ? "rgb(191, 219, 254)" : "rgb(187, 247, 208)";
+  const isCrewTransfer = event.event_type === "crew_transfer";
+  const defaultColor = event.event_type === "load"
+    ? "rgb(191, 219, 254)"
+    : isCrewTransfer ? "rgb(254, 215, 170)" : "rgb(187, 247, 208)";
+  const EventTypeIcon = event.event_type === "load" ? Package : isCrewTransfer ? Users : PackageCheck;
   const borderColor = event.color || defaultColor;
   const transportProvider = event.transport_provider;
   const providerConfig = isTransportProvider(transportProvider)
@@ -63,7 +68,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
       event.job?.title;
     if (title) return title;
 
-    const typeLabel = event.event_type === "load" ? "Carga" : "Descarga";
+    const typeLabel = logisticsEventTypeLabel(event.event_type);
     const transportLabel = event.transport_type ? ` - ${getLogisticsTransportTypeLabel(event.transport_type)}` : "";
     return `${typeLabel}${transportLabel}`;
   };
@@ -94,12 +99,8 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
                   variant={event.event_type === "load" ? "default" : "secondary"}
                   className="flex items-center gap-1"
                 >
-                  {event.event_type === "load" ? (
-                    <Package className="h-3 w-3" />
-                  ) : (
-                    <PackageCheck className="h-3 w-3" />
-                  )}
-                  <span className="capitalize">{event.event_type === "load" ? "Carga" : "Descarga"}</span>
+                  <EventTypeIcon className="h-3 w-3" />
+                  <span>{logisticsEventTypeLabel(event.event_type)}</span>
                 </Badge>
                 <Badge variant="outline" className="flex max-w-full items-center gap-1">
                   <Truck className="h-3 w-3 shrink-0" />
@@ -131,7 +132,10 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
 
           <h3 className="mt-2 min-w-0 break-words font-medium">{getDisplayName()}</h3>
           <div className="mt-1 text-sm text-muted-foreground">
-            {format(new Date(`2000-01-01T${event.event_time}`), "HH:mm")}
+            {event.end_date && event.end_time
+              ? formatTransportSpan(event)
+              : format(new Date(`2000-01-01T${event.event_time}`), "HH:mm")}
+            {isCrewTransfer && event.passenger_count ? ` · ${event.passenger_count} personas` : ""}
           </div>
 
           {event.license_plate && (

@@ -86,6 +86,7 @@ const vehicle = (overrides: Partial<FleetVehicle>): FleetVehicle => ({
   notes: null,
   is_active: true,
   berth_layouts: [16],
+  passenger_seats: null,
   ...overrides,
 });
 
@@ -95,6 +96,8 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   transport_type: "sleeper_bus",
   event_date: "2026-10-01",
   event_time: "23:00:00",
+  end_date: null,
+  end_time: null,
   timezone: "Europe/Madrid",
   title: null,
   color: null,
@@ -104,6 +107,8 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   transport_provider: null,
   berth_count: null,
   job_crew_count: 20,
+  passenger_count: null,
+  origin_location_id: null,
   loading_bay: null,
   notes: null,
   transport_request_id: null,
@@ -176,6 +181,8 @@ describe("berth fit", () => {
     expect(berthsNeeded(event({ berth_count: 14, job_crew_count: 20 }))).toBe(14);
     expect(berthsNeeded(event({ berth_count: null, job_crew_count: 20 }))).toBe(20);
     expect(berthsNeeded(event({ transport_type: "trailer", job_crew_count: 20 }))).toBeNull();
+    // A crew transfer carries its passengers, not necessarily the whole crew.
+    expect(berthsNeeded(event({ berth_count: null, passenger_count: 9, job_crew_count: 20 }))).toBe(9);
   });
 
   it("flags a bus too small even in its largest layout", () => {

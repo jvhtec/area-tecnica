@@ -208,11 +208,17 @@ export const bestLayoutFor = (layouts: readonly number[], need: number): number 
   return [...layouts].sort((a, b) => a - b).find((layout) => layout >= need) ?? Math.max(...layouts);
 };
 
-/** Berths a bus run has to provide: its own figure, else the whole job crew. */
+/**
+ * Berths a bus run has to provide: its own figure, else the people on a crew
+ * transfer, else the whole job crew.
+ */
 export const berthsNeeded = (
-  event: Pick<MatrixTransportEvent, "transport_type" | "berth_count" | "job_crew_count">,
+  event: Pick<MatrixTransportEvent, "transport_type" | "berth_count" | "job_crew_count"> &
+    Partial<Pick<MatrixTransportEvent, "passenger_count">>,
 ): number | null =>
-  event.transport_type === "sleeper_bus" ? event.berth_count ?? event.job_crew_count ?? null : null;
+  event.transport_type === "sleeper_bus"
+    ? event.berth_count ?? event.passenger_count ?? event.job_crew_count ?? null
+    : null;
 
 /**
  * When the chosen bus cannot seat what the run needs even in its largest layout:
@@ -220,7 +226,8 @@ export const berthsNeeded = (
  */
 export const berthShortfall = (
   vehicle: Pick<FleetVehicle, "vehicle_type" | "berth_layouts"> | null,
-  event: Pick<MatrixTransportEvent, "transport_type" | "berth_count" | "job_crew_count">,
+  event: Pick<MatrixTransportEvent, "transport_type" | "berth_count" | "job_crew_count"> &
+    Partial<Pick<MatrixTransportEvent, "passenger_count">>,
 ): { needed: number; available: number } | null => {
   const needed = berthsNeeded(event);
   if (!vehicle || vehicle.vehicle_type !== "sleeper_bus" || vehicle.berth_layouts.length === 0 || !needed) return null;

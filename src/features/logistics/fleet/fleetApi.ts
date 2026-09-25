@@ -78,6 +78,7 @@ const toVehicle = (value: unknown): FleetVehicle => {
       .map(numOrNull)
       .filter((value): value is number => value !== null)
       .sort((a, b) => a - b),
+    passenger_seats: numOrNull(row.passenger_seats),
   };
 };
 
@@ -109,6 +110,8 @@ const toEvent = (value: unknown): MatrixTransportEvent => {
     transport_type: str(row.transport_type),
     event_date: str(row.event_date),
     event_time: str(row.event_time) || "00:00:00",
+    end_date: strOrNull(row.end_date),
+    end_time: strOrNull(row.end_time),
     timezone: str(row.timezone) || "Europe/Madrid",
     title: strOrNull(row.title),
     color: strOrNull(row.color),
@@ -118,6 +121,8 @@ const toEvent = (value: unknown): MatrixTransportEvent => {
     transport_provider: strOrNull(row.transport_provider),
     berth_count: numOrNull(row.berth_count),
     job_crew_count: numOrNull(row.job_crew_count),
+    passenger_count: numOrNull(row.passenger_count),
+    origin_location_id: strOrNull(row.origin_location_id),
     loading_bay: strOrNull(row.loading_bay),
     notes: strOrNull(row.notes),
     transport_request_id: strOrNull(row.transport_request_id),
@@ -161,6 +166,9 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     transport_type: str(row.transport_type),
     event_date: str(row.event_date),
     event_time: str(row.event_time),
+    end_date: strOrNull(row.end_date),
+    end_time: strOrNull(row.end_time),
+    passenger_count: numOrNull(row.passenger_count),
     timezone: str(row.timezone) || "Europe/Madrid",
     title: strOrNull(row.title),
     job_id: strOrNull(row.job_id),
@@ -173,6 +181,10 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     location_address: strOrNull(row.location_address),
     location_lat: numOrNull(row.location_lat),
     location_lng: numOrNull(row.location_lng),
+    pickup_name: strOrNull(row.pickup_name),
+    pickup_address: strOrNull(row.pickup_address),
+    pickup_lat: numOrNull(row.pickup_lat),
+    pickup_lng: numOrNull(row.pickup_lng),
     vehicle: vehicle
       ? {
           id: str(vehicle.id),
@@ -410,6 +422,7 @@ export async function saveFleetVehicle(input: FleetVehicleInput): Promise<void> 
     is_active: input.is_active,
     // The database clears these on anything that is not a sleeper bus.
     berth_layouts: input.vehicle_type === "sleeper_bus" ? input.berth_layouts : [],
+    passenger_seats: input.passenger_seats,
   };
   const { error } = input.id
     ? await dataLayerClient.from(fleetTable).update(row as never).eq("id", input.id)

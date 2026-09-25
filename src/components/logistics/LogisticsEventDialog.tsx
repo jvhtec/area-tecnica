@@ -44,15 +44,35 @@ import type { Database } from "@/integrations/supabase/types";
 
 import { queryKeys } from "@/lib/react-query";
 import { LogisticsEventPlaceField } from "./LogisticsEventPlaceField";
+import { CrewTransferFields, CrewTransferReturnFields, TransportEndFields } from "./LogisticsEventTransportFields";
+import { buildReturnTrip, validateTransportPlan } from "@/features/logistics/events/transportPlan";
 import { LogisticsProviderSelect } from "./LogisticsProviderSelect";
 import { SleeperBusBerthPlanner } from "./fleet/SleeperBusBerthPlanner";
 import { useLogisticsEventLocation } from "@/features/logistics/events/useLogisticsEventLocation";
 import { deleteLogisticsEvent, notifyDriverAssignmentsForEvent } from "@/features/logistics/fleet/fleetApi";
+import { broadcastLogisticsEvent, diffLogisticsEventChanges } from "@/features/logistics/events/logisticsEventBroadcast";
 import { isDriverRelevantEventChange } from "@/features/logistics/events/driverRelevantEventChange";
 import { getErrorMessage } from '@/utils/errorMessage';
-import type { BroadcastLogisticsEvent, LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+import { useJobCrewCount } from "@/features/logistics/fleet/useLogisticsFleet";
+import {
+  LOGISTICS_EVENT_TYPE_OPTIONS,
+  type LogisticsCalendarEvent,
+  type LogisticsEventType,
+} from "@/components/logistics/logisticsEventTypes";
 type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
-type LogisticsEventPayload = Database["public"]["Tables"]["logistics_events"]["Insert"];
+type LogisticsEventInsert = Database["public"]["Tables"]["logistics_events"]["Insert"];
+// Columns and the crew_transfer type added after the generated types were last
+// regenerated (see logisticsEventTypes.ts).
+type LogisticsEventPayload = Omit<LogisticsEventInsert, "event_type" | "transport_provider"> & {
+  event_type: LogisticsEventType;
+  transport_provider: TransportProvider | null;
+  location_id: string | null;
+  berth_count: number | null;
+  end_date: string | null;
+  end_time: string | null;
+  origin_location_id: string | null;
+  passenger_count: number | null;
+};
 
 // Available departments
 const departments: Department[] = [
@@ -71,8 +91,8 @@ interface LogisticsEventDialogProps {
   initialJobId?: string | null;
   initialDepartments?: Department[];
   initialTransportType?: LogisticsTransportType;
-  initialEventType?: 'load' | 'unload';
-  onCreated?: (details: { id: string; event_type: 'load' | 'unload'; event_date: string; event_time: string }) => void;
+  initialEventType?: LogisticsEventType;
+  onCreated?: (details: { id: string; event_type: LogisticsEventType; event_date: string; event_time: string }) => void;
 }
 
 export const LogisticsEventDialog = ({
@@ -86,7 +106,7 @@ export const LogisticsEventDialog = ({
   initialEventType,
   onCreated,
 }: LogisticsEventDialogProps) => {
-  const [eventType, setEventType] = useState<"load" | "unload">("load");
+  const [eventType, setEventType] = useState<LogisticsEventType>("load");
   const [transportType, setTransportType] = useState<LogisticsTransportType>("trailer");
   const [time, setTime] = useState("09:00");
   const [date, setDate] = useState(selectedDate ? format(selectedDate, "yyyy-MM-dd") : "");
@@ -101,9 +121,20 @@ export const LogisticsEventDialog = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [color, setColor] = useState("#7E69AB");
   const [alsoCreateUnload, setAlsoCreateUnload] = useState(false);
+  // Optional end of the transport: the driver/vehicle stay blocked until then.
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState("");
+  // Crew transfers (traslados de personal).
+  const [passengerCount, setPassengerCount] = useState<number | null>(null);
+  const [alsoCreateReturn, setAlsoCreateReturn] = useState(false);
+  const [returnDate, setReturnDate] = useState("");
+  const [returnTime, setReturnTime] = useState("");
   const [isHojaRelevant, setIsHojaRelevant] = useState(true);
   const [hojaCategories, setHojaCategories] = useState<LogisticsHojaCategory[]>([]);
+  // For a crew transfer `location` is the destination and `origin` the pick-up point.
   const location = useLogisticsEventLocation(open);
+  const origin = useLogisticsEventLocation(open);
+  const isCrewTransfer = eventType === "crew_transfer";
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -153,6 +184,9 @@ export const LogisticsEventDialog = ({
       setLicensePlate(selectedEvent.license_plate || "");
       setTransportProvider(selectedEvent.transport_provider || null);
       setBerthCount(selectedEvent.berth_count ?? null);
+      setEndDate(selectedEvent.end_date ?? "");
+      setEndTime(selectedEvent.end_time?.slice(0, 5) ?? "");
+      setPassengerCount(selectedEvent.passenger_count ?? null);
       setNotes(selectedEvent.notes || "");
       setSelectedDepartments(
         (selectedEvent.departments || [])
@@ -163,6 +197,7 @@ export const LogisticsEventDialog = ({
       setIsHojaRelevant(selectedEvent.is_hoja_relevant ?? true);
       setHojaCategories(normalizeCategories(selectedEvent.hoja_categories));
       location.reset(selectedEvent.location_id ?? null);
+      origin.reset(selectedEvent.origin_location_id ?? null);
     } else {
       setEventType(initialEventType || "load");
       setTransportType(initialTransportType || "trailer");
@@ -174,6 +209,12 @@ export const LogisticsEventDialog = ({
       setLicensePlate("");
       setTransportProvider(null);
       setBerthCount(null);
+      setEndDate("");
+      setEndTime("");
+      setPassengerCount(null);
+      setAlsoCreateReturn(false);
+      setReturnDate("");
+      setReturnTime("");
       setNotes("");
       setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
@@ -181,6 +222,7 @@ export const LogisticsEventDialog = ({
       setIsHojaRelevant(true);
       setHojaCategories([]);
       location.reset(null);
+      origin.reset(null);
       // Ensure job selection is cleared if no initial job is provided
       if (!initialJobId) {
         setSelectedJob(null);
@@ -198,7 +240,7 @@ export const LogisticsEventDialog = ({
     queryKey: queryKeys.scope("logistics-dialog-jobs", monthStart.toISOString(), monthEnd.toISOString()),
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from("jobs")
-        .select("id, title, start_time, status, job_type")
+        .select("id, title, start_time, status, job_type, location_id")
         .in("status", ["Tentativa", "Confirmado"])
         .neq("job_type", "dryhire")
         .gte("start_time", monthStart.toISOString())
@@ -208,6 +250,8 @@ export const LogisticsEventDialog = ({
       return data;
     },
   });
+
+  const jobCrew = useJobCrewCount(isCrewTransfer ? selectedJob : null);
 
   const handleDelete = async () => {
     try {
@@ -227,27 +271,10 @@ export const LogisticsEventDialog = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-transport-inbox") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request") });
 
-      const cancelledDepartments = (selectedEvent.departments || []).map((dept) => dept.department);
-      try {
-        await dataLayerClient.functions.invoke("push", {
-          body: {
-            action: "broadcast",
-            type: "logistics.event.cancelled",
-            job_id: selectedEvent.job_id || undefined,
-            event_id: selectedEvent.id,
-            event_type: selectedEvent.event_type,
-            event_date: selectedEvent.event_date,
-            event_time: selectedEvent.event_time,
-            title: selectedEvent.title,
-            transport_type: selectedEvent.transport_type,
-            loading_bay: selectedEvent.loading_bay,
-            departments: cancelledDepartments,
-            license_plate: selectedEvent.license_plate,
-          },
-        });
-      } catch (pushError) {
-        console.error("Failed to broadcast logistics event cancellation", pushError);
-      }
+      await broadcastLogisticsEvent(selectedEvent, {
+        type: "logistics.event.cancelled",
+        departments: (selectedEvent.departments || []).map((dept) => dept.department),
+      });
 
       // Close both the delete dialog and the main event dialog
       setShowDeleteDialog(false);
@@ -273,56 +300,33 @@ export const LogisticsEventDialog = ({
       });
       return;
     }
+    const validationError = validateTransportPlan({
+      eventType,
+      date,
+      time,
+      endDate,
+      endTime,
+      hasJob: Boolean(selectedJob),
+      originInput: origin.input,
+      destinationInput: location.input,
+      passengerCount,
+      createReturn: alsoCreateReturn && !selectedEvent,
+      returnDate,
+      returnTime,
+    });
+    if (validationError) {
+      toast({ title: "Revisa el transporte", description: validationError, variant: "destructive" });
+      return;
+    }
 
     try {
-      const broadcastLogisticsEvent = async (
-        event: BroadcastLogisticsEvent | null | undefined,
-        options: {
-          type?: "logistics.event.created" | "logistics.event.updated" | "logistics.event.cancelled";
-          autoCreatedUnload?: boolean;
-          pairedEvent?: { event_type: "load" | "unload"; event_date: string; event_time: string };
-          departmentsOverride?: Department[];
-          changes?: Record<string, unknown> | Record<string, { from?: unknown; to?: unknown }>;
-        } = {}
-      ) => {
-        if (!event) return;
-        const {
-          type = "logistics.event.created",
-          autoCreatedUnload,
-          pairedEvent,
-          departmentsOverride,
-          changes,
-        } = options;
-
-        try {
-          await dataLayerClient.functions.invoke("push", {
-            body: {
-              action: "broadcast",
-              type,
-              job_id: event.job_id || undefined,
-              event_id: event.id,
-              event_type: event.event_type,
-              event_date: event.event_date,
-              event_time: event.event_time,
-              title: event.title,
-              transport_type: event.transport_type,
-              loading_bay: event.loading_bay,
-              departments: departmentsOverride ?? selectedDepartments,
-              license_plate: event.license_plate,
-              auto_created_unload: autoCreatedUnload || undefined,
-              paired_event_type: pairedEvent?.event_type,
-              paired_event_date: pairedEvent?.event_date,
-              paired_event_time: pairedEvent?.event_time,
-              ...(changes ? { changes } : {}),
-            },
-          });
-        } catch (pushError) {
-          console.error(`Failed to broadcast logistics event ${type}`, pushError);
-        }
-      };
-
       const resolvedLocationId = await location.resolve();
-      const eventData = {
+      const resolvedOriginId = isCrewTransfer ? await origin.resolve() : null;
+      if (isCrewTransfer && resolvedOriginId && resolvedOriginId === resolvedLocationId) {
+        toast({ title: "Revisa el transporte", description: "El origen y el destino no pueden ser el mismo lugar.", variant: "destructive" });
+        return;
+      }
+      const eventData: LogisticsEventPayload = {
         event_type: eventType,
         transport_type: transportType,
         transport_provider: transportProvider || null,
@@ -338,13 +342,18 @@ export const LogisticsEventDialog = ({
         color: color,
         is_hoja_relevant: isHojaRelevant,
         hoja_categories: hojaCategories,
-        // Postdates the generated types (see logisticsEventTypes.ts).
+        // These postdate the generated types (see logisticsEventTypes.ts).
         location_id: resolvedLocationId,
-      } as LogisticsEventPayload;
+        end_date: endDate || null,
+        end_time: endDate && endTime ? endTime : null,
+        // Crew transfers only (the database clears them on loads/unloads).
+        origin_location_id: resolvedOriginId,
+        passenger_count: isCrewTransfer ? passengerCount : null,
+      };
 
       if (selectedEvent) {
         const { error: updateError } = await dataLayerClient.from("logistics_events")
-          .update(eventData)
+          .update(eventData as LogisticsEventInsert)
           .eq("id", selectedEvent.id);
 
         if (updateError) throw updateError;
@@ -364,53 +373,13 @@ export const LogisticsEventDialog = ({
           if (deptError) throw deptError;
         }
 
-        const previousDepartments = (selectedEvent.departments || []).map((d) => d.department).sort();
-        const updatedEventForNotification = {
-          ...selectedEvent,
-          ...eventData,
-        };
-        const changes: Record<string, { from?: unknown; to?: unknown }> = {};
-
-        if (selectedEvent.event_type !== eventData.event_type) {
-          changes.event_type = { from: selectedEvent.event_type, to: eventData.event_type };
-        }
-        if (selectedEvent.event_date !== eventData.event_date) {
-          changes.event_date = { from: selectedEvent.event_date, to: eventData.event_date };
-        }
-        const previousTime = (selectedEvent.event_time || "").slice(0, 5);
-        const newTime = (eventData.event_time || "").slice(0, 5);
-        if (previousTime !== newTime) {
-          changes.event_time = { from: selectedEvent.event_time, to: eventData.event_time };
-        }
-        if ((selectedEvent.transport_type || "") !== (eventData.transport_type || "")) {
-          changes.transport_type = { from: selectedEvent.transport_type, to: eventData.transport_type };
-        }
-        const previousLoading = selectedEvent.loading_bay || "";
-        const newLoading = eventData.loading_bay || "";
-        if (previousLoading !== newLoading) {
-          changes.loading_bay = { from: selectedEvent.loading_bay, to: eventData.loading_bay };
-        }
-        if ((selectedEvent.license_plate || "") !== (eventData.license_plate || "")) {
-          changes.license_plate = { from: selectedEvent.license_plate, to: eventData.license_plate };
-        }
-        const previousHojaRelevant = selectedEvent.is_hoja_relevant ?? true;
-        if (previousHojaRelevant !== eventData.is_hoja_relevant) {
-          changes.is_hoja_relevant = { from: previousHojaRelevant, to: eventData.is_hoja_relevant };
-        }
-        const previousCategories = normalizeCategories(selectedEvent.hoja_categories).slice().sort();
-        const nextCategories = normalizeCategories(eventData.hoja_categories).slice().sort();
-        if (JSON.stringify(previousCategories) !== JSON.stringify(nextCategories)) {
-          changes.hoja_categories = { from: previousCategories, to: nextCategories };
-        }
-        const nextDepartments = [...selectedDepartments].sort();
-        if (JSON.stringify(previousDepartments) !== JSON.stringify(nextDepartments)) {
-          changes.departments = { from: previousDepartments, to: nextDepartments };
-        }
-
-        await broadcastLogisticsEvent(updatedEventForNotification, {
+        await broadcastLogisticsEvent({ ...selectedEvent, ...eventData, id: selectedEvent.id }, {
           type: "logistics.event.updated",
-          departmentsOverride: selectedDepartments,
-          changes: Object.keys(changes).length > 0 ? changes : undefined,
+          departments: selectedDepartments,
+          changes: diffLogisticsEventChanges(selectedEvent, eventData, {
+            categories: [normalizeCategories(selectedEvent.hoja_categories), normalizeCategories(eventData.hoja_categories)],
+            departments: [(selectedEvent.departments || []).map((d) => d.department), selectedDepartments],
+          }),
         });
         // Only edits the DB trigger treats as material reset a driver's confirmation;
         // cosmetic ones (colour, departments, plate) must not push "confírmalo".
@@ -425,65 +394,53 @@ export const LogisticsEventDialog = ({
           description: "Evento de logística actualizado correctamente.",
         });
       } else {
-        const { data: newEvent, error } = await dataLayerClient.from("logistics_events")
-          .insert(eventData)
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        // notify caller on create
-        try {
-          onCreated?.({ id: newEvent.id, event_type: newEvent.event_type, event_date: newEvent.event_date, event_time: newEvent.event_time });
-        } catch { /* optional caller callback; ignore if it throws */ }
-
-        if (selectedDepartments.length > 0) {
-          const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
-            .insert(
-              selectedDepartments.map((dept) => ({
-                event_id: newEvent.id,
-                department: dept,
-              }))
-            );
-          if (deptError) throw deptError;
-        }
-
-        // Optional: create an unload event right after saving a load event
-        if (alsoCreateUnload && eventType === 'load') {
-          const unloadData = { ...eventData, event_type: 'unload' as const };
-          const { data: unloadEvent, error: unloadErr } = await dataLayerClient.from('logistics_events')
-            .insert(unloadData)
+        const insertEvent = async (data: LogisticsEventPayload) => {
+          const { data: created, error } = await dataLayerClient.from("logistics_events")
+            .insert(data as LogisticsEventInsert)
             .select()
             .single();
-          if (unloadErr) throw unloadErr;
-          if (selectedDepartments.length > 0) {
-            const { error: unloadDeptErr } = await dataLayerClient.from('logistics_event_departments')
-              .insert(selectedDepartments.map((dept) => ({ event_id: unloadEvent.id, department: dept })));
-            if (unloadDeptErr) throw unloadDeptErr;
-          }
+          if (error) throw error;
           try {
-            onCreated?.({ id: unloadEvent.id, event_type: unloadEvent.event_type, event_date: unloadEvent.event_date, event_time: unloadEvent.event_time });
+            onCreated?.({ id: created.id, event_type: created.event_type, event_date: created.event_date, event_time: created.event_time });
           } catch { /* optional caller callback; ignore if it throws */ }
+          if (selectedDepartments.length > 0) {
+            const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
+              .insert(selectedDepartments.map((dept) => ({ event_id: created.id, department: dept })));
+            if (deptError) throw deptError;
+          }
+          return created;
+        };
 
-          await broadcastLogisticsEvent(newEvent, {
-            type: "logistics.event.created",
-            pairedEvent: {
-              event_type: unloadEvent.event_type,
-              event_date: unloadEvent.event_date,
-              event_time: unloadEvent.event_time,
-            },
+        const newEvent = await insertEvent(eventData);
+        // Optional second leg: a crew transfer's return trip (origin and destination
+        // swapped, its own driver/vehicle in the matrix), or the unload after a load.
+        let pairedEvent: typeof newEvent | null = null;
+        if (alsoCreateReturn && isCrewTransfer) {
+          const job = jobs?.find((candidate) => candidate.id === selectedJob);
+          pairedEvent = await insertEvent(buildReturnTrip(eventData, {
+            destinationId: resolvedLocationId ?? job?.location_id ?? null,
+            returnDate,
+            returnTime,
+            outboundTitle: customTitle.trim() || job?.title || "Traslado",
+          }));
+        } else if (alsoCreateUnload && eventType === "load") {
+          pairedEvent = await insertEvent({ ...eventData, event_type: "unload" });
+        }
+
+        if (pairedEvent) {
+          const legOf = (event: typeof newEvent) => ({
+            event_type: event.event_type,
+            event_date: event.event_date,
+            event_time: event.event_time,
           });
-          await broadcastLogisticsEvent(unloadEvent, {
-            type: "logistics.event.created",
-            autoCreatedUnload: true,
-            pairedEvent: {
-              event_type: newEvent.event_type,
-              event_date: newEvent.event_date,
-              event_time: newEvent.event_time,
-            },
+          await broadcastLogisticsEvent(newEvent, { departments: selectedDepartments, pairedEvent: legOf(pairedEvent) });
+          await broadcastLogisticsEvent(pairedEvent, {
+            departments: selectedDepartments,
+            autoCreatedUnload: pairedEvent.event_type === "unload" || undefined,
+            pairedEvent: legOf(newEvent),
           });
         } else {
-          await broadcastLogisticsEvent(newEvent);
+          await broadcastLogisticsEvent(newEvent, { departments: selectedDepartments });
         }
 
         toast({
@@ -580,14 +537,21 @@ export const LogisticsEventDialog = ({
               <Label>Tipo de evento</Label>
               <Select
                 value={eventType}
-                onValueChange={(value: "load" | "unload") => setEventType(value)}
+                onValueChange={(value: LogisticsEventType) => {
+                  setEventType(value);
+                  // People travel in vans, RVs and sleeper buses, not in trucks.
+                  if (value === "crew_transfer" && !selectedEvent && !["furgoneta", "rv", "sleeper_bus"].includes(transportType)) {
+                    setTransportType("furgoneta");
+                  }
+                }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Tipo de evento">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="load">Carga</SelectItem>
-                  <SelectItem value="unload">Descarga</SelectItem>
+                  {LOGISTICS_EVENT_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -605,7 +569,7 @@ export const LogisticsEventDialog = ({
 
             {/* Time */}
             <div className="space-y-2">
-              <Label>Hora</Label>
+              <Label>{isCrewTransfer ? "Hora de salida" : "Hora"}</Label>
               <Input
                 type="time"
                 value={time}
@@ -613,6 +577,15 @@ export const LogisticsEventDialog = ({
                 required
               />
             </div>
+
+            <TransportEndFields
+              crewTransfer={isCrewTransfer}
+              startDate={date}
+              endDate={endDate}
+              endTime={endTime}
+              onEndDateChange={setEndDate}
+              onEndTimeChange={setEndTime}
+            />
 
             {/* Transport Type */}
             <div className="space-y-2">
@@ -653,6 +626,7 @@ export const LogisticsEventDialog = ({
                 onBerthCountChange={setBerthCount}
                 provider={transportProvider}
                 onProviderChange={setTransportProvider}
+                passengers={isCrewTransfer ? passengerCount : null}
               />
             )}
 
@@ -679,17 +653,30 @@ export const LogisticsEventDialog = ({
               </div>
             </div>
 
-            <LogisticsEventPlaceField location={location} hasJob={Boolean(selectedJob)} />
-
-            {/* Loading Bay */}
-            <div className="space-y-2">
-              <Label>Muelle de carga</Label>
-              <Input
-                value={loadingBay}
-                onChange={(e) => setLoadingBay(e.target.value)}
-                placeholder="Opcional"
+            {isCrewTransfer ? (
+              <CrewTransferFields
+                origin={origin}
+                destination={location}
+                hasJob={Boolean(selectedJob)}
+                passengerCount={passengerCount}
+                onPassengerCountChange={setPassengerCount}
+                jobCrewTotal={selectedJob ? jobCrew.data?.total ?? null : null}
               />
-            </div>
+            ) : (
+              <>
+                <LogisticsEventPlaceField location={location} hasJob={Boolean(selectedJob)} />
+
+                {/* Loading Bay */}
+                <div className="space-y-2">
+                  <Label>Muelle de carga</Label>
+                  <Input
+                    value={loadingBay}
+                    onChange={(e) => setLoadingBay(e.target.value)}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -750,6 +737,19 @@ export const LogisticsEventDialog = ({
                 {notes.length} / 500 caracteres
               </div>
             </div>
+
+            {!selectedEvent && isCrewTransfer && (
+              <CrewTransferReturnFields
+                enabled={alsoCreateReturn}
+                onEnabledChange={setAlsoCreateReturn}
+                returnDate={returnDate}
+                returnTime={returnTime}
+                minDate={endDate || date}
+                onReturnDateChange={setReturnDate}
+                onReturnTimeChange={setReturnTime}
+              />
+            )}
+
 
             {/* Submit & Delete Buttons */}
             <div className="flex justify-between items-center pt-2">

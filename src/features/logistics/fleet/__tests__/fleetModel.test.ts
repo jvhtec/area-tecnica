@@ -13,11 +13,14 @@ import {
   findDoubleBookedAssignmentIds,
   formatBerthLayouts,
   formatTransportDateKey,
+  formatTransportSpan,
   formatTransportTime,
   groupAssignmentsByRowAndDay,
+  isCrewTransfer,
   isExternallyHandledTransport,
   maxBerths,
   parseBerthLayouts,
+  seatShortfall,
   startOfMadridWeek,
   suggestedLicenseForVehicleType,
   summarizeDriversByEvent,
@@ -67,6 +70,8 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   transport_type: "trailer",
   event_date: "2026-10-01",
   event_time: "08:00:00",
+  end_date: null,
+  end_time: null,
   timezone: "Europe/Madrid",
   title: null,
   color: null,
@@ -76,6 +81,8 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   transport_provider: null,
   berth_count: null,
   job_crew_count: null,
+  passenger_count: null,
+  origin_location_id: null,
   loading_bay: null,
   notes: null,
   transport_request_id: null,
@@ -283,6 +290,34 @@ describe("coverage and defaults", () => {
     });
   });
 
+  it("defaults to the whole transport when it has an end", () => {
+    expect(defaultAssignmentWindow(event({ event_time: "08:00:00", end_date: "2026-10-04", end_time: "20:00:00" }))).toEqual({
+      start: "2026-10-01T08:00",
+      end: "2026-10-04T20:00",
+    });
+  });
+
+  it("describes a transport's span from its local wall-clock values", () => {
+    expect(formatTransportSpan(event({ event_time: "08:00:00" }))).toBe("08:00");
+    expect(formatTransportSpan(event({ event_time: "08:00:00", end_date: "2026-10-01", end_time: "13:30:00" }))).toBe("08:00–13:30");
+    expect(formatTransportSpan(event({ event_time: "08:00:00", end_date: "2026-10-04", end_time: "20:00:00" })))
+      .toBe("01/10 08:00 → 04/10 20:00");
+  });
+
+  it("warns when a van cannot seat a crew transfer", () => {
+    const van = { vehicle_type: "furgoneta" as const, passenger_seats: 8 };
+    const transfer = event({ event_type: "crew_transfer", passenger_count: 9 });
+    expect(isCrewTransfer(transfer)).toBe(true);
+    expect(seatShortfall(van, transfer)).toEqual({ needed: 9, available: 8 });
+    expect(seatShortfall(van, event({ event_type: "crew_transfer", passenger_count: 8 }))).toBeNull();
+    // Without a count, the job crew is who travels.
+    expect(seatShortfall(van, event({ event_type: "crew_transfer", job_crew_count: 12 }))).toEqual({ needed: 12, available: 8 });
+    // Loads, unknown seats and sleeper buses (checked on berths) are not second-guessed.
+    expect(seatShortfall(van, event({ event_type: "load", passenger_count: 20 }))).toBeNull();
+    expect(seatShortfall({ vehicle_type: "furgoneta", passenger_seats: null }, transfer)).toBeNull();
+    expect(seatShortfall({ vehicle_type: "sleeper_bus", passenger_seats: 2 }, transfer)).toBeNull();
+  });
+
   it("counts assignments still awaiting the driver's answer in the next 48 hours", () => {
     const now = "2026-10-01T06:00:00.000Z";
     const soon = assignment({ id: "soon", starts_at: "2026-10-02T06:00:00.000Z", ends_at: "2026-10-02T08:00:00.000Z" });
@@ -304,7 +339,7 @@ describe("coverage and defaults", () => {
       vehicles: [{
         id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer", required_license: "C+E",
         brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false,
-        itv_expiry: null, insurance_expiry: null, notes: null, is_active: true, berth_layouts: [],
+        itv_expiry: null, insurance_expiry: null, notes: null, is_active: true, berth_layouts: [], passenger_seats: null,
       }],
       assignments: [
         assignment({ id: "a1", logistics_event_id: "e1", vehicle_id: "v1", status: "confirmed" }),

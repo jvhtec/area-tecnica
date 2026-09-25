@@ -1,4 +1,4 @@
-import { Check, Copy, Loader2, MapPin, MessageCircle, Navigation, Phone, Truck, UserCog, X } from "lucide-react";
+import { Check, Copy, Loader2, MapPin, MessageCircle, Navigation, Phone, Truck, UserCog, Users, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,12 +54,21 @@ export function ConductorAssignmentCard({
   };
   const placeLabel = navigationQuery(target);
   const links = buildNavigationLinks(target, assignment.origin);
+  // Crew transfers: the driver goes to the pick-up point first.
+  const pickup = {
+    lat: assignment.pickup_lat,
+    lng: assignment.pickup_lng,
+    address: assignment.pickup_address,
+    name: assignment.pickup_name,
+  };
+  const pickupLabel = navigationQuery(pickup);
+  const pickupLinks = buildNavigationLinks(pickup);
   const hasRoute = Boolean(assignment.origin || assignment.destination);
   const finished = assignment.ends_at <= nowIso;
   const timeUntil = describeTimeUntil(assignment.starts_at, assignment.ends_at, nowIso, assignment.timezone);
   // Only the highlighted (next) run pays for a map tile; the others show it on demand
   // through the navigation links.
-  const map = useStaticMap(target, highlight && !finished);
+  const map = useStaticMap(pickupLabel ? pickup : target, highlight && !finished);
 
   const copyAddress = async () => {
     if (!placeLabel) return;
@@ -107,9 +116,27 @@ export function ConductorAssignmentCard({
               <dd className="break-words">{assignment.origin ?? "—"} → {assignment.destination ?? "—"}</dd>
             </div>
           )}
+          {pickupLabel && (
+            <div>
+              <dt className="text-muted-foreground">Punto de encuentro</dt>
+              <dd className="flex items-start gap-1 break-words">
+                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{pickupLabel}</span>
+              </dd>
+            </div>
+          )}
+          {assignment.passenger_count !== null && (
+            <div>
+              <dt className="text-muted-foreground">Personas</dt>
+              <dd className="inline-flex items-center gap-1">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                {assignment.passenger_count}
+              </dd>
+            </div>
+          )}
           {placeLabel && (
             <div>
-              <dt className="text-muted-foreground">Lugar</dt>
+              <dt className="text-muted-foreground">{pickupLabel ? "Destino" : "Lugar"}</dt>
               <dd className="flex items-start gap-1 break-words">
                 <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{placeLabel}</span>
@@ -133,11 +160,24 @@ export function ConductorAssignmentCard({
           )}
         </dl>
 
+        {pickupLinks && !finished && (
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <a href={pickupLinks.google} target="_blank" rel="noopener noreferrer">
+                <Navigation className="mr-1 h-4 w-4" /> Ir al punto de encuentro
+              </a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a href={pickupLinks.waze} target="_blank" rel="noopener noreferrer" aria-label="Waze al punto de encuentro">Waze</a>
+            </Button>
+          </div>
+        )}
+
         {links && !finished && (
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
               <a href={links.google} target="_blank" rel="noopener noreferrer">
-                <Navigation className="mr-1 h-4 w-4" /> Cómo llegar
+                <Navigation className="mr-1 h-4 w-4" /> {pickupLabel ? "Cómo llegar al destino" : "Cómo llegar"}
               </a>
             </Button>
             <Button asChild size="sm" variant="outline">
