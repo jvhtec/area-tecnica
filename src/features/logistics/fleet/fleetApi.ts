@@ -17,8 +17,9 @@ import {
 } from "./fleetModel";
 import type { DriverLiveLocation } from "./tracking";
 
-// The fleet tables and RPCs postdate the generated Supabase types, so calls go
-// through these untyped seams and every payload is normalised field by field.
+// Several logistics RPCs and the newest fleet columns postdate the production-
+// generated Supabase snapshot. Keep that temporary boundary isolated here and
+// normalise RPC payloads field by field.
 type RpcResult = { data: unknown; error: { message?: string } | null };
 type UntypedRpc = (name: string, args?: Record<string, unknown>) => PromiseLike<RpcResult>;
 
@@ -26,8 +27,8 @@ type UntypedRpc = (name: string, args?: Record<string, unknown>) => PromiseLike<
 const rpc: UntypedRpc = (name, args) =>
   (dataLayerClient.rpc as unknown as UntypedRpc).call(dataLayerClient, name, args);
 
-const fleetTable = "fleet_vehicles" as never;
-const driverDetailsTable = "driver_details" as never;
+const fleetTable = "fleet_vehicles";
+const driverDetailsTable = "driver_details";
 
 const throwIfError = (error: { message?: string } | null, fallback: string) => {
   if (error) throw new Error(error.message || fallback);
@@ -456,7 +457,7 @@ export async function saveDriverDetails(input: DriverDetailsInput): Promise<void
       adr_certified: input.adr_certified,
       default_vehicle_id: input.default_vehicle_id || null,
       notes: input.notes?.trim() || null,
-    } as never,
+    },
     { onConflict: "profile_id" },
   );
   throwIfError(error, "No se pudieron guardar los datos del conductor");
