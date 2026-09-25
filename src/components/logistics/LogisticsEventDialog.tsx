@@ -327,15 +327,18 @@ export const LogisticsEventDialog = ({
         return;
       }
 
-      let jobLocationId = jobs?.find((candidate) => candidate.id === selectedJob)?.location_id ?? null;
-      if (isCrewTransfer && selectedJob && !resolvedLocationId && !jobLocationId) {
+      const listedJob = jobs?.find((candidate) => candidate.id === selectedJob);
+      let jobLocationId = listedJob?.location_id ?? null;
+      let jobTitle = listedJob?.title ?? null;
+      if (isCrewTransfer && selectedJob && (!resolvedLocationId && !jobLocationId || !jobTitle)) {
         const { data: selectedJobData, error: selectedJobError } = await dataLayerClient
           .from("jobs")
-          .select("location_id")
+          .select("location_id, title")
           .eq("id", selectedJob)
           .maybeSingle();
         if (selectedJobError) throw selectedJobError;
-        jobLocationId = selectedJobData?.location_id ?? null;
+        jobLocationId = jobLocationId ?? selectedJobData?.location_id ?? null;
+        jobTitle = jobTitle ?? selectedJobData?.title ?? null;
       }
       const effectiveDestinationId = resolvedLocationId ?? jobLocationId;
       if (isCrewTransfer && !effectiveDestinationId) {
@@ -379,12 +382,11 @@ export const LogisticsEventDialog = ({
 
       let pairedPayload: LogisticsEventSavePayload | null = null;
       if (!selectedEvent && alsoCreateReturn && isCrewTransfer) {
-        const job = jobs?.find((candidate) => candidate.id === selectedJob);
         pairedPayload = buildReturnTrip(eventData, {
           destinationId: effectiveDestinationId,
           returnDate,
           returnTime,
-          outboundTitle: customTitle.trim() || job?.title || "Traslado",
+          outboundTitle: customTitle.trim() || jobTitle || "Traslado",
         });
       } else if (!selectedEvent && alsoCreateUnload && eventType === "load") {
         pairedPayload = { ...eventData, event_type: "unload" };
