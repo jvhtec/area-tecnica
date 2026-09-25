@@ -128,7 +128,7 @@ export function SleeperBusBerthPlanner({
                   className="h-8 w-16"
                   aria-label="Personas extra (artistas, invitados…)"
                   value={extra}
-                  onChange={(changeEvent) => setExtra(Math.max(0, Number.parseInt(changeEvent.target.value, 10) || 0))}
+                  onChange={(changeEvent) => setExtra(Math.min(80, Math.max(0, Number.parseInt(changeEvent.target.value, 10) || 0)))}
                 />
               </label>
             </div>
@@ -173,7 +173,7 @@ export function SleeperBusBerthPlanner({
                     <div className="mt-2 flex flex-wrap gap-2">
                       {first.kind === "fleet" ? (
                         <Button type="button" size="sm" variant="outline" onClick={() => apply(plan)}>
-                          Usar {first.name} ({first.berths})
+                          Configurar este transporte: {first.name} ({first.berths})
                         </Button>
                       ) : (
                         SLEEPER_BUS_HIRE_PROVIDERS.map((hireProvider) => (
