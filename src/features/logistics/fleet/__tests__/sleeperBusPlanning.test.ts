@@ -54,6 +54,7 @@ describe("suggestSleeperBusPlans", () => {
     expect(plan.buses.map((planned) => planned.berths)).toEqual([20, 20]);
     expect(plan.spare).toBe(0);
     expect(suggestSleeperBusPlans(33, [])[0].buses.map((planned) => planned.berths)).toEqual([20, 14]);
+    expect(suggestSleeperBusPlans(161, [])[0]).toMatchObject({ berths: 162, hired: 9, spare: 1 });
   });
 
   it("sets a reconfigurable bus up to pair with the hire that fits exactly", () => {
@@ -181,6 +182,23 @@ describe("sleeperBusDayContext", () => {
 
   it("has nothing planned for a run without a job", () => {
     const context = sleeperBusDayContext(data, { jobId: null, dateKey: "2026-10-01", eventType: "load" });
+    expect(context).toMatchObject({ otherBerths: 0, otherRuns: 0 });
+  });
+
+  it("does not borrow berths from another crew transfer on the same job and day", () => {
+    const crewData = {
+      ...data,
+      events: [
+        event({ id: "this-transfer", event_type: "crew_transfer", passenger_count: 9, berth_count: 9 }),
+        event({ id: "other-transfer", event_type: "crew_transfer", passenger_count: 20, berth_count: 20 }),
+      ],
+    };
+    const context = sleeperBusDayContext(crewData, {
+      jobId: "job-1",
+      dateKey: "2026-10-01",
+      eventType: "crew_transfer",
+      excludeEventId: "this-transfer",
+    });
     expect(context).toMatchObject({ otherBerths: 0, otherRuns: 0 });
   });
 });
