@@ -23,7 +23,11 @@ import {
 import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { transportProviderLabel } from "@/constants/transportProviders";
-import { logisticsEventTypeLabel, type LogisticsEventType } from "@/components/logistics/logisticsEventTypes";
+import {
+  logisticsEventOverlapsRange,
+  logisticsEventTypeLabel,
+  type LogisticsEventType,
+} from "@/components/logistics/logisticsEventTypes";
 import { transportMovementLabel } from "@/constants/transportMovementTypes";
 
 interface LogisticsEvent {
@@ -34,6 +38,8 @@ interface LogisticsEvent {
   transport_type: string;
   event_time: string;
   event_date: string;
+  end_date?: string | null;
+  end_time?: string | null;
   // Nullable to match the `logistics_events` columns.
   transport_provider?: string | null;
   job?: {
@@ -111,11 +117,11 @@ function prepareLogisticsCalendarData(
       rangeLabel = format(currentDate, "MMMM yyyy", { locale: es });
   }
 
-  const filteredEvents = events.filter((event) => {
-    if (!event.event_date) return false;
-    const eventDate = new Date(event.event_date);
-    return eventDate >= startDate && eventDate <= endDate;
-  });
+  const startKey = format(startDate, "yyyy-MM-dd");
+  const endKey = format(endDate, "yyyy-MM-dd");
+  const filteredEvents = events.filter((event) =>
+    Boolean(event.event_date) && logisticsEventOverlapsRange(event, startKey, endKey)
+  );
 
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     const dateCompare = a.event_date.localeCompare(b.event_date);
@@ -154,8 +160,12 @@ export const generateLogisticsCalendarXLS = async (
   // Data rows
   for (const event of sortedEvents) {
     const eventDate = new Date(event.event_date);
-    const formattedDate = format(eventDate, "EEE, d MMM yyyy", { locale: es });
-    const formattedTime = event.event_time;
+    const formattedDate = event.end_date && event.end_date !== event.event_date
+      ? `${format(eventDate, "EEE, d MMM yyyy", { locale: es })} → ${format(new Date(event.end_date), "EEE, d MMM yyyy", { locale: es })}`
+      : format(eventDate, "EEE, d MMM yyyy", { locale: es });
+    const formattedTime = event.end_time
+      ? `${event.event_time.slice(0, 5)}–${event.end_time.slice(0, 5)}`
+      : event.event_time;
     const jobTitle = getJobTitle(event);
     const transportType = getTransportTypeLabel(event.transport_type);
     const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
