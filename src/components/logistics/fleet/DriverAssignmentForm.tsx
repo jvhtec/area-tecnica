@@ -250,7 +250,7 @@ export function DriverAssignmentForm({
           <AlertTitle>Faltan literas</AlertTitle>
           <AlertDescription>
             {selectedVehicle?.name} tiene como máximo {shortfall.available} literas y este transporte necesita {shortfall.needed}
-            {event.berth_count ? "" : " (todo el personal del trabajo)"}. Añade otro autobús o alquila uno.
+            {event.berth_count ? "" : event.passenger_count ? " (personas que viajan)" : " (todo el personal del trabajo)"}. Añade otro autobús o alquila uno.
           </AlertDescription>
         </Alert>
       )}

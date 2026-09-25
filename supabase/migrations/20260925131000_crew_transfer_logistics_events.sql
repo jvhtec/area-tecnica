@@ -349,6 +349,21 @@ begin
     raise exception 'La persona seleccionada no tiene el rol de conductor' using errcode = '22023';
   end if;
 
+  -- Serialize every save that touches this driver or vehicle, so two concurrent saves
+  -- cannot both pass the overlap check below before either row is visible. Keys are
+  -- taken in a fixed order, and before any row lock, so this matches the event-sync
+  -- trigger (advisory keys, then assignment rows) and neither can deadlock the other.
+  perform pg_advisory_xact_lock(k)
+  from (
+    select hashtextextended('transport_driver_assignments:' || r, 0) as k
+    from unnest(array[
+      case when p_driver_id is not null then 'driver:' || p_driver_id::text end,
+      case when p_vehicle_id is not null then 'vehicle:' || p_vehicle_id::text end
+    ]) as r
+    where r is not null
+    order by 1
+  ) keys;
+
   if p_assignment_id is not null then
     select * into v_existing
     from public.transport_driver_assignments
@@ -394,20 +409,6 @@ begin
     raise exception 'La asignación dura más de lo previsto para este transporte' using errcode = '22023';
   end if;
   v_timezone := coalesce(nullif(btrim(v_event.timezone), ''), 'Europe/Madrid');
-
-  -- Serialize every save that touches this driver or vehicle, so two concurrent saves
-  -- cannot both pass the overlap check below before either row is visible. Keys are
-  -- taken in a fixed order to avoid deadlocks between saves that share both resources.
-  perform pg_advisory_xact_lock(k)
-  from (
-    select hashtextextended('transport_driver_assignments:' || r, 0) as k
-    from unnest(array[
-      case when p_driver_id is not null then 'driver:' || p_driver_id::text end,
-      case when p_vehicle_id is not null then 'vehicle:' || p_vehicle_id::text end
-    ]) as r
-    where r is not null
-    order by 1
-  ) keys;
 
   -- Double-booking: the same driver or vehicle on an overlapping window. Declined rows
   -- no longer hold the slot.
