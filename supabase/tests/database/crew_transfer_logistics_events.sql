@@ -76,8 +76,8 @@ SELECT throws_ok(
   $$ INSERT INTO public.logistics_events (event_type, transport_type, event_date, event_time, origin_location_id, location_id, passenger_count)
      VALUES ('crew_transfer', 'furgoneta', '2031-06-10', '08:00',
              'cc200000-0000-0000-0000-000000000001'::uuid, 'cc200000-0000-0000-0000-000000000001'::uuid, 1) $$,
-  '23514',
-  NULL,
+  '22023',
+  'El origen y el destino del traslado no pueden ser el mismo lugar',
   'a crew transfer cannot start and end at the same place'
 );
 
