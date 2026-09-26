@@ -105,6 +105,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     isLoadingJobs,
     isLoadingHojaDeRuta,
     isSaving,
+    isChangingStatus,
     jobs,
     hojaDeRuta,
     handleSaveAll,
@@ -113,6 +114,9 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasBasicJobData,
     isDirty,
     hasExternalConflict,
+    documentStatus,
+    isFinal,
+    handleStatusTransition,
     staffingDiff,
     applyStaffingChanges,
     hasPowerDrift,
@@ -230,6 +234,14 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
 
   // Enhanced save function with better error handling
   const handleSave = async () => {
+    if (isFinal) {
+      toast({
+        title: "Documento final",
+        description: "La Hoja de Ruta finalizada está bloqueada para edición.",
+      });
+      return;
+    }
+
     if (!selectedJobId) {
       toast({
         title: "Error",
@@ -320,6 +332,13 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
   const dataSourceInfo = getDataSourceInfo();
   const StatusIcon = statusInfo.icon;
   const DataSourceIcon = dataSourceInfo.icon;
+  const nextStatusAction = documentStatus === "draft"
+    ? { label: "Enviar a revisión", next: "review" as const }
+    : documentStatus === "review"
+      ? { label: "Aprobar", next: "approved" as const }
+      : documentStatus === "approved"
+        ? { label: "Finalizar", next: "final" as const }
+        : null;
 
   return (
     <div
@@ -361,6 +380,18 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                     {statusInfo.text}
                   </Badge>
                 )}
+                {nextStatusAction && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    disabled={isSaving || isChangingStatus}
+                    onClick={() => { void handleStatusTransition(nextStatusAction.next); }}
+                  >
+                    {isChangingStatus ? "Actualizando…" : nextStatusAction.label}
+                  </Button>
+                )}
                 <Badge variant="outline" className={dataSourceInfo.color}>
                   <DataSourceIcon className="w-3 h-3 mr-1" />
                   {dataSourceInfo.text}
@@ -387,6 +418,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                 isPreviewing={isPreviewing}
                 previewingTarget={previewingTarget}
                 onSave={handleSave}
+                canEdit={!isFinal}
                 onPreviewPDF={() => { void handlePreviewPDF(); }}
                 onExport={() => setShowPrintDialog(true)}
               />
@@ -420,7 +452,12 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                 Personal: {eventData.staff.filter(s => s.name || s.position).length} asignado(s)
               </span>
             )}
-            {(staffingDiff.added > 0 || staffingDiff.removed > 0) && (
+            {isFinal && (
+              <span className="text-emerald-700 font-medium">
+                Documento final · edición bloqueada
+              </span>
+            )}
+            {!isFinal && (staffingDiff.added > 0 || staffingDiff.removed > 0) && (
               <span className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-medium">
                 {staffingDiff.added > 0 && `${staffingDiff.added} técnico${staffingDiff.added === 1 ? "" : "s"} nuevo${staffingDiff.added === 1 ? "" : "s"}`}
                 {staffingDiff.added > 0 && staffingDiff.removed > 0 && " · "}
@@ -436,7 +473,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                 </Button>
               </span>
             )}
-            {hasPowerDrift && (
+            {!isFinal && hasPowerDrift && (
               <span className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-medium">
                 Consumos actualizado
                 <Button
@@ -483,6 +520,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 {/* Tab Contents */}
                 <AnimatePresence mode="wait">
+                  <fieldset disabled={isFinal} className="m-0 min-w-0 border-0 p-0">
                   <motion.div
                     key={activeTab}
                     initial={{ opacity: 0, x: 20 }}
@@ -618,6 +656,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                       />
                     </TabsContent>
                   </motion.div>
+                  </fieldset>
                 </AnimatePresence>
               </Tabs>
             </motion.div>
