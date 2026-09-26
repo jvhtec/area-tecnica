@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/integrations/supabase/types';
 import { aggregatePowerCalculations } from '@/features/technical-tools/power/powerAggregation';
+import { getVoltageForPhase } from '@/features/technical-tools/power/powerCalculations';
 import {
   POWER_CALCULATION_VERSION,
   type PhaseMode,
@@ -118,7 +119,7 @@ const getJobPowerCalculation = (
     : 0;
   const voltage = typeof data.voltage === 'number' && data.voltage > 0
     ? data.voltage
-    : phaseMode === 'single' ? 230 : 400;
+    : getVoltageForPhase(phaseMode);
   const totalWatts = row.total_watts || 0;
   const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
   const totalVa = computePowerTotalVa(totalWatts, data, department, rows);

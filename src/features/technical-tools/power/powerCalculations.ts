@@ -1,3 +1,7 @@
+import {
+  NOMINAL_LINE_TO_LINE_VOLTAGE,
+  NOMINAL_LINE_TO_NEUTRAL_VOLTAGE,
+} from "@/features/technical-tools/power/electricalStandards";
 import type {
   PhaseMode,
   PowerComponent,
@@ -30,7 +34,9 @@ export const POWER_PDU_OPTIONS: Record<TechnicalDepartment, Record<PhaseMode, st
   },
 };
 
-export const getVoltageForPhase = (phaseMode: PhaseMode) => (phaseMode === "single" ? 230 : 400);
+/** Nominal Spanish/CENELEC supply voltage for the chosen phase mode. */
+export const getVoltageForPhase = (phaseMode: PhaseMode) =>
+  phaseMode === "single" ? NOMINAL_LINE_TO_NEUTRAL_VOLTAGE : NOMINAL_LINE_TO_LINE_VOLTAGE;
 
 export const getPowerPduOptions = (department: TechnicalDepartment, phaseMode: PhaseMode) =>
   POWER_PDU_OPTIONS[department][phaseMode];
@@ -96,6 +102,10 @@ export const calculateElectricalTotals = ({
     : rawApparentPowerVa * loadMultiplier;
   const canCalculateCurrent =
     settings.voltage > 0 && (rawApparentPowerVa !== undefined || powerFactor > 0);
+  // Balanced three-phase line current from the line-to-line voltage:
+  // I = S / (sqrt(3) * V_LL), which for a PF-derived S is P / (sqrt(3) * V_LL * PF).
+  // Dividing the load across three phases and then by V_LL would mix a
+  // per-phase power with a line-to-line voltage and understate I by sqrt(3).
   const phaseDivisor = settings.phaseMode === "single" ? 1 : SQRT3;
   return {
     adjustedWatts,

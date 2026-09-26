@@ -13,9 +13,13 @@ The calculator is a planning aid for connected event loads. It reports:
 - line current, `I`, in amperes (A).
 
 The default Spanish/European supplies are 230 V single-phase and 400 V
-three-phase line-to-line, consistent with IEC 60038 nominal low-voltage
-systems. The voltage remains editable because the actual supply must be
-confirmed on site. See [IEC 60038](https://webstore.iec.ch/en/publication/153).
+three-phase line-to-line at 50 Hz, the nominal low-voltage values of
+UNE-EN 60038 (IEC 60038 / CENELEC HD 472 S1), which REBT ITC-BT-04 uses for
+Spain. Those two numbers live in one place,
+`src/features/technical-tools/power/electricalStandards.ts`, and every code
+path that needs a default voltage reads them through `getVoltageForPhase`.
+The voltage remains editable because the actual supply must be confirmed on
+site. See [IEC 60038](https://webstore.iec.ch/en/publication/153).
 
 ## Canonical equations
 
@@ -57,10 +61,24 @@ single phase:        I = S_adjusted / V_LN
 balanced 3 phase:   I_line = S_adjusted / (sqrt(3) × V_LL)
 ```
 
-The single-phase voltage is line-to-neutral. The three-phase voltage is
-line-to-line and the load is assumed balanced. These are the same standard
-single/three-phase load relationships summarized by
+The single-phase voltage is line-to-neutral (230 V). The three-phase voltage is
+line-to-line (400 V) and the load is assumed balanced. These are the same
+standard single/three-phase load relationships summarized by
 [Schneider Electric](https://www.se.com/us/en/faqs/FA101600/).
+
+Written out against the global-PF case, the three-phase line current is
+
+```text
+I_line = S_adjusted / (sqrt(3) × V_LL) = P_adjusted / (sqrt(3) × V_LL × PF)
+```
+
+The load is **not** split across three phases before dividing by `V_LL`.
+Doing that pairs a per-phase power with a line-to-line voltage and understates
+the current by a factor of sqrt(3): 34,8 kW at PF 0,85 on 400 V is 59,1 A per
+line, not the 34,1 A that `P / (3 × V_LL × PF)` gives, nor the 29 A that
+`(P / 3) / V_LL` gives. Both mistakes would undersize the supply, so
+`powerCalculations.test.ts` pins the 59,1 A result and asserts against both
+wrong values.
 
 ## Input validation
 
@@ -108,6 +126,37 @@ saved fields and department defaults and are visibly marked **legacy
 estimate**. The legacy manual tour-default form stores watts and current
 independently; its records therefore remain estimates.
 
+## Persistence of a job's saved set
+
+Saving from the calculator writes a whole **generation** of rows into
+`power_requirement_tables` and then removes the rows it replaced. Two sweeps
+run, and both are needed:
+
+- a per-stage sweep that clears the older rows of every stage present in the
+  new payload — it is scoped by stage so that saving one stage of a festival
+  never deletes another stage's tables;
+- a retirement pass over the specific row ids the save supersedes, computed by
+  `resolveRetiredPowerRequirementIds` from what the editor loaded, what it is
+  saving, and what it still holds for other stages.
+
+Removing a table from the editor deletes its row straight away rather than
+waiting for the next save to sweep it — leaving it alive was a second way for
+a deleted table to keep feeding reports and the Hoja de Ruta power summary.
+
+The second pass exists because the first cannot see a row whose stage changed.
+A table built with no stage selected and later saved under a stage — or removed
+from the editor while a different stage was selected — is filed under a stage
+the new payload never mentions, so the per-stage sweep skips it. The orphan then
+keeps appearing in reports and, most visibly, gets listed a second time in the
+Hoja de Ruta power summary. Rows belonging to tables the editor still holds but
+is not saving right now are never retired.
+
+`scripts/sql/audit_power_requirement_duplicates.sql` is a read-only audit that
+mirrors the reader's stage scoping and lists the rows that are still orphaned.
+Rows the editor cannot tell apart from legitimate unstaged tables are not
+cleaned up automatically: delete them from the Consumos tool, which now removes
+the row with them.
+
 ## Report aggregation
 
 Raw and adjusted watts can always be summed. System current and kVA are only
@@ -125,6 +174,70 @@ shown when the underlying electrical supplies can be combined soundly:
 Line currents are never scalar-added. “Not aggregable” is not the same as no
 load; the report continues to show the raw and adjusted watt totals and the
 reason aggregation was withheld.
+
+## Spanish design rules checked on top of the calculation
+
+The power triangle above gives the electrical result. Spanish practice adds
+requirements the triangle does not carry, so each generated table is also run
+through `evaluatePowerStandards`
+(`src/features/technical-tools/power/electricalStandards.ts`). These checks
+**never change a stored total, a current or a PDU recommendation** — they
+produce advisory findings shown under the table in the calculator and as
+notices in the power report.
+
+### Discharge lighting — REBT ITC-BT-44 apdo. 3.1
+
+A circuit feeding discharge lamps must be designed for a minimum load, in
+volt-amperes, of **1,8 times the lamp power in watts**. That single factor
+covers ballast losses, power factor and harmonic content together, so it is a
+floor on the circuit rating rather than a claim about what the fixture draws.
+
+For a table containing discharge rows the floor is
+
+```text
+S_min = k × (1.8 × ΣP_discharge + sqrt(ΣP_other² + ΣQ_other²))
+```
+
+where `k` is the same planning margin used everywhere else. Adding the
+discharge floor to the vector sum of the remaining rows is the conservative
+reading when both families share one circuit. A finding is raised only when
+`S_min` exceeds the calculated `S_adjusted`. Because the floor is conservative
+by construction it is reported as information, and escalates to a warning only
+when `S_min` no longer fits the recommended PDU's planning limit — the one case
+where it changes the connector to order.
+
+Only rows typed `discharge` count. Sound and video tables carry no fixture
+type, so the rule does not fire there; the catalogue's discharge entries are
+fixture *input* power, which already includes the ballast, so `S_min` is a
+deliberately conservative circuit floor rather than a corrected load figure.
+
+### Neutral loading — UNE-HD 60364-5-52 Annex E / REBT ITC-BT-19
+
+Past roughly a third of third-harmonic content, the neutral of a three-phase
+circuit can carry more current than the lines and becomes the conductor that
+sets the cable size. When more than 33% of a three-phase table's typed load is
+non-linear (LED, discharge, hazers, consoles — anything fronted by a
+rectifier), the table carries a warning that the figure reported is the line
+current only. The calculator does not compute neutral current: doing that
+needs measured or declared per-fixture harmonic spectra, which the catalogue
+does not hold.
+
+### Motor feeds — REBT ITC-BT-47 apdo. 3.1
+
+Conductors feeding a single motor are sized for **125% of full-load current**.
+Hoist supplies are recorded here as a connector requirement only and are
+excluded from the totals, so the rule is surfaced as a reminder next to the
+auxiliary-supply note rather than applied to anything.
+
+### Deliberately not modelled
+
+The 80% PDU planning factor below is company policy. IEC/UNE has no general
+continuous-load derating of a protective device — the 80% continuous-load rule
+is a North American one (NEC 210.20(A)) — so it is presented as a planning
+limit and never as conformity. Diversity factors (REBT ITC-BT-10), voltage
+drop limits (ITC-BT-19), temporary-installation rules for shows and stands
+(ITC-BT-34), breaker curve selection against tungsten inrush (UNE-EN 60898),
+RCD selection, earthing and fault-current coordination all stay out of scope.
 
 ## Loads excluded from totals
 
@@ -160,10 +273,15 @@ electrical professional.
 
 - Canonical calculations and validation:
   `src/features/technical-tools/power/powerCalculations.ts`
+- Nominal voltages and Spanish design-rule checks:
+  `src/features/technical-tools/power/electricalStandards.ts`, applied to a
+  table through `src/features/technical-tools/power/powerStandardsAssessment.ts`
 - Snapshot parsing/legacy reconstruction:
   `src/features/technical-tools/power/powerSnapshots.ts`
 - Compatible-system aggregation:
   `src/features/technical-tools/power/powerAggregation.ts`
 - Tour/report normalization: `src/utils/tourPowerTables.ts`
+- Job set persistence and row retirement:
+  `src/features/technical-tools/power/powerPersistence.ts`
 - Tests: `src/features/technical-tools/power/__tests__/` and
   `src/utils/__tests__/tourPowerTables.test.ts`

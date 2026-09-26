@@ -539,8 +539,8 @@ describe('powerSummaryData', () => {
       } as any,
     ]);
 
-    expect(text).toContain('Potencia Total: 29000.00W');
-    expect(text).not.toContain('Potencia Total: 31500.00W');
+    expect(text).toContain('Potencia total: 29.000 W');
+    expect(text).not.toContain('Potencia total: 31.500 W');
   });
 
   it('formats every row from the latest timestamped generation in hoja de ruta power text', () => {

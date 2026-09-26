@@ -27,6 +27,43 @@ describe("technical power calculations", () => {
     expect(totals.currentLine).toBeCloseTo(12, 3);
   });
 
+  it("derives three-phase line current from the line-to-line voltage, not a per-phase split", () => {
+    const totals = calculateElectricalTotals({
+      settings: {
+        phaseMode: "three",
+        powerFactor: 0.85,
+        safetyMargin: 0,
+        voltage: 400,
+      },
+      totalWatts: 34800,
+    });
+
+    // I = P / (sqrt(3) * V_LL * PF) = 34 800 / (1,732 x 400 x 0,85).
+    expect(totals.currentLine).toBeCloseTo(34800 / (Math.sqrt(3) * 400 * 0.85), 6);
+    expect(totals.currentLine).toBeCloseTo(59.09, 2);
+    // Guards the two ways a per-phase power gets paired with V_LL by mistake:
+    // P / (3 x V_LL x PF) = 34,1 A and (P / 3) / V_LL = 29 A. Both understate
+    // the real line current and would undersize the supply.
+    expect(totals.currentLine).not.toBeCloseTo(34800 / (3 * 400 * 0.85), 1);
+    expect(totals.currentLine).not.toBeCloseTo(34800 / 3 / 400, 1);
+  });
+
+  it("keeps the single-phase path on the line-to-neutral voltage", () => {
+    const totals = calculateElectricalTotals({
+      settings: {
+        phaseMode: "single",
+        powerFactor: 0.85,
+        safetyMargin: 0,
+        voltage: 230,
+      },
+      totalWatts: 3450,
+    });
+
+    // I = P / (V_LN * PF), with no sqrt(3) on a single-phase supply.
+    expect(totals.currentLine).toBeCloseTo(3450 / (230 * 0.85), 6);
+    expect(totals.currentLine).toBeCloseTo(17.65, 2);
+  });
+
   it("guards invalid voltage and power factor without returning infinite current", () => {
     const invalidPowerFactorTotals = calculateElectricalTotals({
       settings: {

@@ -257,6 +257,7 @@ const ENGLISH_LABELS: ConsumosLabels = {
   toastOverrideUpdated: "Override updated successfully",
   toastOverrideDeleted: "Override deleted successfully",
   toastOverrideDeleteError: "Failed to delete override",
+  toastTableDeleteError: "Failed to delete the saved table",
   toastTableNotFound: "Power requirement table not found",
   controls: ENGLISH_POWER_TABLE_CONTROL_LABELS,
 };
@@ -413,6 +414,7 @@ const SPANISH_LABELS: ConsumosLabels = {
   toastOverrideUpdated: "Anulación actualizada exitosamente",
   toastOverrideDeleted: "Anulación eliminada exitosamente",
   toastOverrideDeleteError: "Error al eliminar la anulación",
+  toastTableDeleteError: "No se pudo eliminar la tabla guardada",
   toastTableNotFound: "No se encontró la tabla de requerimientos de potencia",
   controls: SPANISH_POWER_TABLE_CONTROL_LABELS,
 };

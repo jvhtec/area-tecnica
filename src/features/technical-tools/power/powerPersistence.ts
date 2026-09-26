@@ -220,11 +220,64 @@ export const saveJobPowerRequirementTable = async ({
   return data.id as string;
 };
 
+/**
+ * Persisted rows a save supersedes. A row is retired when the editor loaded it
+ * and is not keeping it as-is: either the table it belongs to is part of this
+ * save (the insert replaces it, possibly under a different stage) or the user
+ * removed the table altogether. Rows of tables the editor still holds but is
+ * not saving right now — other stages — are left alone.
+ */
+export const resolveRetiredPowerRequirementIds = ({
+  loadedIds,
+  savingTables,
+  tables,
+}: {
+  loadedIds: readonly string[];
+  savingTables: readonly Pick<PowerTable, "powerRequirementId">[];
+  tables: readonly Pick<PowerTable, "powerRequirementId">[];
+}): string[] => {
+  const savingIds = new Set(
+    savingTables.flatMap((table) =>
+      table.powerRequirementId ? [table.powerRequirementId] : [],
+    ),
+  );
+  const keptElsewhere = new Set(
+    tables.flatMap((table) =>
+      table.powerRequirementId && !savingIds.has(table.powerRequirementId)
+        ? [table.powerRequirementId]
+        : [],
+    ),
+  );
+
+  return loadedIds.filter((id) => !keptElsewhere.has(id));
+};
+
+const deleteRetiredPowerRequirementRows = async ({
+  client,
+  jobId,
+  retiredIds,
+}: {
+  client: PowerPersistenceClient;
+  jobId: string;
+  retiredIds: string[];
+}) => {
+  if (retiredIds.length === 0) return;
+
+  const { error } = await client
+    .from("power_requirement_tables")
+    .delete()
+    .eq("job_id", jobId)
+    .in("id", retiredIds);
+
+  if (error) throw error;
+};
+
 export const saveJobPowerRequirementTablesGeneration = async ({
   client,
   department,
   generationTimestamp = new Date().toISOString(),
   jobId,
+  retiredPowerRequirementIds = [],
   settings,
   stage,
   tables,
@@ -233,11 +286,24 @@ export const saveJobPowerRequirementTablesGeneration = async ({
   department: TechnicalDepartment;
   generationTimestamp?: string;
   jobId: string;
+  /**
+   * Rows this generation supersedes, whatever stage they were filed under.
+   * The per-stage sweep below only reaches the stages present in the new
+   * payload, so a table that moved between stages — or was deleted from the
+   * editor — would otherwise leave its old row behind and keep showing up in
+   * reports and in the Hoja de Ruta power summary.
+   */
+  retiredPowerRequirementIds?: string[];
   settings: PowerRequirementSettingsResolver;
   stage?: TechnicalStage | null;
   tables: PowerTable[];
 }): Promise<SavedPowerRequirementGenerationTable[]> => {
   if (tables.length === 0) {
+    await deleteRetiredPowerRequirementRows({
+      client,
+      jobId,
+      retiredIds: retiredPowerRequirementIds,
+    });
     await deleteStalePowerRequirementGenerationRows({
       client,
       department,
@@ -282,6 +348,13 @@ export const saveJobPowerRequirementTablesGeneration = async ({
     const stageGroup = keepIdsByStage.get(stageKey) || { ids: [], stageNumber };
     stageGroup.ids.push(row.id);
     keepIdsByStage.set(stageKey, stageGroup);
+  });
+
+  const insertedIds = new Set(insertedRows.map((row) => row.id));
+  await deleteRetiredPowerRequirementRows({
+    client,
+    jobId,
+    retiredIds: retiredPowerRequirementIds.filter((id) => !insertedIds.has(id)),
   });
 
   await Promise.all(

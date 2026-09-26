@@ -72,6 +72,55 @@ Uses a modular PDF engine in `src/utils/hoja-de-ruta/pdf/`:
 - **Services**: LogoService, HeaderService, FooterService, QRService, MapService, StampService, PlacesImageService
 - PDF uploaded to job storage after generation
 
+### Print exclusions
+
+Each form block carries an "Excluir al imprimir" switch
+(`PrintSectionExclusionToggle`). The selected ids are stored on
+`eventData.printExcludedSections` (column `print_excluded_sections`) and are
+normalized through `normalizeHojaDeRutaPrintSections`, which also expands the
+legacy per-tab ids into the finer print-section ids.
+
+The exclusions apply to **every** export path — the full document, a
+single-section export, and both previews. `useHojaDeRutaExports.buildPdfOptions`
+attaches them regardless of whether a section was picked, and both
+`generateFullDocument` and `generateSelectedSections` gate on them.
+
+`power` is its own PDF section, so the power summary exports on its own even
+though it is edited inside the Programa tab. The form's tab list
+(`tabPresentationConfig`) and the print dialog's section list
+(`printSectionConfig`) are therefore deliberately different: the dialog carries
+one entry the form has no tab for. Records written before the split stored the
+tab id, so `LEGACY_PRINT_SECTION_EXPANSIONS` still expands a legacy `schedule`
+exclusion to cover `power`.
+
+### Power summary source
+
+`eventData.powerRequirements` is auto-populated from the job's
+`power_requirement_tables` via `formatPowerRequirementsText`, and a manually
+edited value always wins on reload
+(`resolvePowerRequirementsForHojaInitialization`).
+
+Because the saved copy always wins, later calculator changes never reach a Hoja
+on their own. `useJobPowerRequirementsText` re-derives what the calculator would
+produce right now and `getHojaPowerSummaryStatus` compares it with the saved
+text, so the Programa tab can offer to insert a summary the Hoja is missing or
+refresh one that has fallen behind. The offer never overwrites anything by
+itself — the user clicks.
+
+The generated text mirrors the power report rather than a subset of it:
+calculation power and margin, apparent power, the supply the current came from,
+the PDU, and the REBT advisories. Rows saved before calculation snapshots
+existed cannot be reproduced, so they report the stored line current and say
+they are estimates instead of implying a calculation.
+
+The Consumos calculator is the only writer of those rows. It replaces a whole
+generation at a time and sweeps stale rows **per stage**, so a table that moved
+between stages — or was deleted from the editor while another stage was
+selected — used to leave its old row behind and show up a second time in this
+summary. `resolveRetiredPowerRequirementIds` now names the rows each save
+supersedes so they are removed whatever stage they were filed under; see
+`docs/technical-tools/power-calculations.md`.
+
 ## Excel Export
 
 Generates a 10-sheet workbook via ExcelJS: Evento, Recinto, Contactos, Personal, Viajes, Alojamiento, Logística, Programa, Meteorología, Restaurantes.

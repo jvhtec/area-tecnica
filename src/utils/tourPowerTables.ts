@@ -1,4 +1,5 @@
 import type { Database } from '@/integrations/supabase/types';
+import { getVoltageForPhase } from '@/features/technical-tools/power/powerCalculations';
 import {
   buildLegacyPowerCalculationSnapshot,
   parsePowerCalculationSnapshot,
@@ -89,7 +90,7 @@ const getPowerCalculation = (
       safetyMargin: clampSafetyMargin(getNumber(record.safetyMargin) ?? 0),
       phaseMode,
       voltage:
-        getNumber(record.voltage) ?? (phaseMode === 'single' ? 230 : 400),
+        getNumber(record.voltage) ?? getVoltageForPhase(phaseMode),
       powerFactor,
     },
     totalWatts: watts,

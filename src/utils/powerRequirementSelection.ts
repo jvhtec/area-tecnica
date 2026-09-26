@@ -1,4 +1,9 @@
 import type { Database } from '@/integrations/supabase/types';
+import {
+  evaluatePowerStandards,
+  type PowerStandardsRow,
+} from '@/features/technical-tools/power/electricalStandards';
+import { parsePowerCalculationSnapshot } from '@/features/technical-tools/power/powerSnapshots';
 import { getResolvedPowerPosition } from '@/utils/powerPositions';
 import type { TechnicalPowerDepartment } from '@/utils/technicalPowerTypes';
 import { isRecord } from '@/utils/typeGuards';
@@ -109,23 +114,104 @@ export const getCurrentPowerRequirementTables = (
   return current.sort(compareRows).map(({ row }) => row);
 };
 
-const formatNumber = (value: number | string | null | undefined) =>
-  typeof value === 'number' ? value.toFixed(2) : value ?? 'N/D';
+const formatNumber = (value: number, fractionDigits: number) =>
+  new Intl.NumberFormat('es-ES', {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  }).format(value);
 
+const formatStoredNumber = (
+  value: number | string | null | undefined,
+  fractionDigits: number,
+) => (typeof value === 'number' && Number.isFinite(value)
+  ? formatNumber(value, fractionDigits)
+  : 'N/D');
+
+/** Narrows a persisted JSON row to the fields the standards checks read. */
+const toStandardsRow = (value: unknown): PowerStandardsRow | null => {
+  if (!isRecord(value)) return null;
+  const { quantity, watts, totalWatts, pf, fixtureType } = value;
+  return {
+    ...(typeof quantity === 'string' ? { quantity } : {}),
+    ...(typeof watts === 'string' ? { watts } : {}),
+    ...(typeof totalWatts === 'number' ? { totalWatts } : {}),
+    ...(typeof pf === 'string' ? { pf } : {}),
+    ...(typeof fixtureType === 'string' ? { fixtureType } : {}),
+  };
+};
+
+const getPowerTableRows = (row: PowerRequirementRow): PowerStandardsRow[] => {
+  const rows = isRecord(row.table_data) ? row.table_data.rows : null;
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((value) => {
+    const standardsRow = toStandardsRow(value);
+    return standardsRow ? [standardsRow] : [];
+  });
+};
+
+/**
+ * Plain-text power summary embedded in the Hoja de Ruta. It mirrors what the
+ * power report states — calculation power, apparent power, the supply the
+ * current was derived from, and the REBT advisories — because the Hoja is what
+ * crews physically carry, while the report may never leave the office.
+ */
 export const formatPowerRequirementsText = (rows: PowerRequirementRow[]) =>
   getCurrentPowerRequirementTables(rows)
     .map((row) => {
+      const calculation = parsePowerCalculationSnapshot(
+        isRecord(row.table_data) ? row.table_data.calculation : undefined,
+      );
       const lines = [
         `${[(row.department || 'general').toUpperCase(), getStageLabel(row), row.table_name || 'tabla'].filter(Boolean).join(' - ')}:`,
-        `Potencia Total: ${formatNumber(row.total_watts)}W`,
-        `Corriente de linea guardada: ${formatNumber(row.current_per_phase)}A`,
-        `PDU Recomendado: ${row.custom_pdu_type || row.pdu_type || 'N/D'}`,
+        `Potencia total: ${formatStoredNumber(row.total_watts, 0)} W`,
       ];
+
+      if (calculation) {
+        if (calculation.safetyMargin > 0) {
+          lines.push(
+            `Potencia de cálculo (${formatNumber(calculation.safetyMargin, 0)} %): ` +
+              `${formatNumber(calculation.adjustedWatts, 0)} W`,
+          );
+        }
+        lines.push(`Potencia aparente: ${formatNumber(calculation.totalVa / 1000, 2)} kVA`);
+        lines.push(
+          `Corriente de línea: ${formatNumber(calculation.currentLine, 2)} A ` +
+            `(${calculation.phaseMode === 'three' ? 'trifásico' : 'monofásico'} ` +
+            `${formatNumber(calculation.voltage, 0)} V)`,
+        );
+      } else {
+        // Pre-snapshot rows only stored the columns, so the assumptions behind
+        // this current cannot be reproduced.
+        lines.push(
+          `Corriente de línea (guardada): ${formatStoredNumber(row.current_per_phase, 2)} A`,
+        );
+        lines.push('Cálculo estimado: sin instantánea reproducible');
+      }
+
+      lines.push(`PDU recomendado: ${row.custom_pdu_type || row.pdu_type || 'N/D'}`);
+
       const position = getResolvedPowerPosition(row.position, row.custom_position);
       if (position) lines.push(`Posición: ${position}`);
       if (row.includes_hoist) {
-        lines.push('Suministro auxiliar de motores CEE32A 3P+N+G (excluido de totales)');
+        lines.push(
+          'Suministro auxiliar de motores CEE32A 3P+N+G (excluido de totales). ' +
+            'Dimensiónelo al 125 % de la intensidad a plena carga del motor ' +
+            '(REBT ITC-BT-47 apdo. 3.1).',
+        );
       }
+
+      if (calculation) {
+        // The motor advisory is left out: the hoist line above already carries
+        // it, worded for this circuit.
+        evaluatePowerStandards({
+          calculation,
+          includesHoist: Boolean(row.includes_hoist),
+          rows: getPowerTableRows(row),
+        })
+          .findings.filter((finding) => finding.code !== 'itc-bt-47-motor-feed')
+          .forEach((finding) => lines.push(`${finding.reference}: ${finding.message}`));
+      }
+
       return `${lines.join('\n')}\n`;
     })
     .join('\n');

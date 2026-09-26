@@ -70,6 +70,7 @@ interface UseConsumosTourDataOptions {
   features: ConsumosDepartmentConfig["features"];
   fohSchukoRequired: boolean;
   fohSchukoSetting: () => boolean | undefined;
+  getRetiredPowerRequirementIds: (savingTables: PowerTable[]) => string[];
   getTableSnapshotSettings: (
     table: PowerTable,
   ) => import("@/features/technical-tools/power/types").PowerElectricalSettings;
@@ -126,6 +127,7 @@ export function useConsumosTourData({
   features,
   fohSchukoRequired,
   fohSchukoSetting,
+  getRetiredPowerRequirementIds,
   getTableSnapshotSettings,
   isNormalMode,
   isOverrideMode,
@@ -709,6 +711,7 @@ export function useConsumosTourData({
           client: dataLayerClient,
           department,
           jobId: selectedJobId,
+          retiredPowerRequirementIds: getRetiredPowerRequirementIds(exportTables),
           settings: (table) => getTableSnapshotSettings(table as PowerTable),
           stage: selectedStage,
           tables: exportTables,

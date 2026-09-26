@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   calculateMixedLoadApparentPower,
@@ -42,10 +42,7 @@ import {
 } from "./config";
 import type { ConsumosJob } from "./consumosUtils";
 import type { CustomPowerComponentInput } from "./useCustomPowerComponents";
-import {
-  mapPowerRequirementRowToTable,
-  useJobPowerRequirementTables,
-} from "./useJobPowerRequirementTables";
+import { useSavedPowerRequirementTables } from "./useSavedPowerRequirementTables";
 import { useXmlpPowerImport } from "./useXmlpPowerImport";
 
 const DEFAULT_PDU_SELECT_VALUE = "default";
@@ -196,43 +193,17 @@ export function useConsumosBuilder({
     setSelectedJob(job);
   };
 
-  // NEW: load the saved power requirement set for the job so it can be edited
-  // instead of forcing users to rebuild it from scratch.
-  const savedTablesQuery = useJobPowerRequirementTables({
-    department,
-    enabled: isNormalMode,
-    jobId: selectedJobId,
-  });
-  const hydratedJobKeyRef = useRef<string | null>(null);
-  const [loadedSavedCount, setLoadedSavedCount] = useState(0);
-
-  useEffect(() => {
-    if (!isNormalMode || !selectedJobId || !savedTablesQuery.data) return;
-    const hydrationKey = `${selectedJobId}:${department}`;
-    if (hydratedJobKeyRef.current === hydrationKey) return;
-    hydratedJobKeyRef.current = hydrationKey;
-
-    const savedTables = savedTablesQuery.data.map((row) =>
-      mapPowerRequirementRowToTable(row, {
-        fallbackPowerFactor: config.defaultPowerFactor ?? 0.9,
-        fallbackSafetyMargin: config.defaultSafetyMargin,
-        perRowPf,
-      }),
-    );
-    setLoadedSavedCount(savedTables.length);
-    if (savedTables.length === 0) return;
-
-    // Keep any tables the user built before picking the job
-    setTables((prev) => [...savedTables, ...prev.filter((table) => !table.powerRequirementId)]);
-  }, [
-    savedTablesQuery.data,
-    selectedJobId,
-    isNormalMode,
-    department,
-    perRowPf,
-    config.defaultPowerFactor,
-    config.defaultSafetyMargin,
-  ]);
+  const { deletePersistedTable, getRetiredPowerRequirementIds, loadedSavedCount } =
+    useSavedPowerRequirementTables({
+      department,
+      fallbackPowerFactor: config.defaultPowerFactor ?? 0.9,
+      fallbackSafetyMargin: config.defaultSafetyMargin,
+      isNormalMode,
+      perRowPf,
+      selectedJobId,
+      setTables,
+      tables,
+    });
 
   const activeTables = selectedStage
     ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
@@ -698,7 +669,13 @@ export function useConsumosBuilder({
     }
   };
 
-  const removeTable = (tableId: number | string) => {
+  /**
+   * Removing a table also deletes the row it was loaded from. Dropping it only
+   * from local state left the row alive until a later save happened to sweep
+   * its stage, so a table deleted here kept feeding reports and the Hoja de
+   * Ruta power summary if the user navigated away without exporting again.
+   */
+  const removeTable = async (tableId: number | string) => {
     const tableToRemove = tables.find((table) => table.id === tableId);
     if (!tableToRemove) {
       toast({
@@ -708,6 +685,17 @@ export function useConsumosBuilder({
       });
       return;
     }
+
+    if (!(await deletePersistedTable(tableToRemove))) {
+      // The row is still there, so the editor must keep showing the table.
+      toast({
+        title: labels.toastError,
+        description: labels.toastTableDeleteError,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setTables((prev) => prev.filter((table) => table.id !== tableId));
     if (editing?.kind === "table" && editing.id === tableId) {
       resetCurrentTable();
@@ -744,6 +732,7 @@ export function useConsumosBuilder({
     fohSchukoRequired,
     fohSchukoSetting,
     generateTable,
+    getRetiredPowerRequirementIds,
     getTableSnapshotSettings,
     handleJobSelect,
     includesHoist,
