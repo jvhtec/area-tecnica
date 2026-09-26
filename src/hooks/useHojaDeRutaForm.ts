@@ -33,8 +33,6 @@ export const useHojaDeRutaForm = ({
   isImageDirty,
 }: UseHojaDeRutaFormOptions) => {
   const { toast } = useToast();
-  const { data: jobs, isLoading: isLoadingJobs } = useJobSelection();
-
   const {
     eventData,
     setEventData,
@@ -47,6 +45,8 @@ export const useHojaDeRutaForm = ({
     isInitialized,
     setIsInitialized,
   } = useHojaDeRutaState();
+
+  const { data: jobs, isLoading: isLoadingJobs } = useJobSelection(selectedJobId);
 
   const [hasSavedData, setHasSavedData] = useState(false);
   const [hasBasicJobData, setHasBasicJobData] = useState(false);
