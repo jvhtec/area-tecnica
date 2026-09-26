@@ -72,7 +72,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     isImageDirty,
   } = useHojaDeRutaImages();
 
-  const document = useHojaDocument({
+  const document = useHojaDocument(routedJobId, {
     prepareImagesForSave,
     commitImageSave,
     isImageDirty,
@@ -103,13 +103,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasPowerDrift,
     applyPowerRequirementsChanges,
   } = document;
-
-  // If a jobId is provided from parent or route query, lock selection to that job
-  useEffect(() => {
-    if (routedJobId && selectedJobId !== routedJobId) {
-      setSelectedJobId(routedJobId);
-    }
-  }, [routedJobId, selectedJobId, setSelectedJobId]);
 
   const completionProgress = useMemo(
     () => (
