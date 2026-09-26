@@ -244,6 +244,10 @@ export const syncTransportsWithLogistics = (
           // Preserve any manually-edited Hoja de Ruta datetime; only sync if empty.
           date_time: shouldSyncDateTime ? incomingTransport.date_time : existing.date_time,
           source_logistics_event_id: sourceId,
+          source_logistics_updated_at:
+            incomingTransport.source_logistics_updated_at ?? existing.source_logistics_updated_at,
+          origin: incomingTransport.origin ?? existing.origin,
+          destination: incomingTransport.destination ?? existing.destination,
           is_hoja_relevant: incomingTransport.is_hoja_relevant ?? true,
           logistics_categories: incomingTransport.logistics_categories || [],
           driver_name: incomingTransport.driver_name ?? existing.driver_name,
