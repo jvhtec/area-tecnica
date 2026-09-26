@@ -31,87 +31,75 @@ export const useHojaDocumentStore = (): HojaDocumentStore => {
   return value;
 };
 
-export function useHojaSection(sectionId: "event") {
-  const store = useHojaDocumentStore();
-  return {
-    eventData: store.eventData,
-    setEventData: store.setEventData,
-    selectedJobId: store.selectedJobId,
-    setSelectedJobId: store.setSelectedJobId,
-    jobs: store.jobs,
-    isLoadingJobs: store.isLoadingJobs,
-    refreshFromJob: store.autoPopulateFromJob,
-  };
-}
+type EventSlice = Pick<
+  HojaDocumentStore,
+  "eventData" | "setEventData" | "selectedJobId" | "setSelectedJobId" | "jobs" | "isLoadingJobs"
+> & { refreshFromJob: HojaDocumentStore["autoPopulateFromJob"] };
 
-export function useHojaSection(sectionId: "venue" | "weather" | "schedule" | "restaurants") {
-  const store = useHojaDocumentStore();
-  return {
-    eventData: store.eventData,
-    setEventData: store.setEventData,
-    accommodations: store.accommodations,
-  };
-}
+type EventDataSlice = Pick<
+  HojaDocumentStore,
+  "eventData" | "setEventData" | "accommodations"
+>;
 
-export function useHojaSection(sectionId: "contacts") {
-  const store = useHojaDocumentStore();
-  return {
-    eventData: store.eventData,
-    onContactChange: store.handleContactChange,
-    onAddContact: store.addContact,
-    onRemoveContact: store.removeContact,
-  };
-}
+type ContactsSlice = Pick<
+  HojaDocumentStore,
+  "eventData" | "handleContactChange" | "addContact" | "removeContact"
+>;
 
-export function useHojaSection(sectionId: "staff") {
-  const store = useHojaDocumentStore();
-  return {
-    eventData: store.eventData,
-    onStaffChange: store.handleStaffChange,
-    onAddStaff: store.addStaffMember,
-    onRemoveStaff: store.removeStaffMember,
-  };
-}
+type StaffSlice = Pick<
+  HojaDocumentStore,
+  "eventData" | "handleStaffChange" | "addStaffMember" | "removeStaffMember"
+>;
 
-export function useHojaSection(sectionId: "travel") {
-  const store = useHojaDocumentStore();
-  return {
-    travelArrangements: store.travelArrangements,
-    onUpdate: store.updateTravelArrangement,
-    onAdd: store.addTravelArrangement,
-    onRemove: store.removeTravelArrangement,
-  };
-}
+type TravelSlice = Pick<
+  HojaDocumentStore,
+  "travelArrangements" | "updateTravelArrangement" | "addTravelArrangement" | "removeTravelArrangement"
+>;
 
-export function useHojaSection(sectionId: "accommodation") {
-  const store = useHojaDocumentStore();
-  return {
-    accommodations: store.accommodations,
-    eventData: store.eventData,
-    setAccommodations: store.setAccommodations,
-    onUpdateRoom: store.updateRoom,
-    onAddAccommodation: store.addAccommodation,
-    onRemoveAccommodation: store.removeAccommodation,
-    onAddRoom: store.addRoom,
-    onRemoveRoom: store.removeRoom,
-  };
-}
+type AccommodationSlice = Pick<
+  HojaDocumentStore,
+  | "accommodations"
+  | "eventData"
+  | "setAccommodations"
+  | "updateRoom"
+  | "addAccommodation"
+  | "removeAccommodation"
+  | "addRoom"
+  | "removeRoom"
+>;
 
-export function useHojaSection(sectionId: "logistics") {
-  const store = useHojaDocumentStore();
-  return {
-    eventData: store.eventData,
-    setEventData: store.setEventData,
-    selectedJobId: store.selectedJobId,
-    onUpdateTransport: store.updateTransport,
-    onAddTransport: store.addTransport,
-    onRemoveTransport: store.removeTransport,
-    onImportTransports: store.importTransports,
-  };
-}
+type LogisticsSlice = Pick<
+  HojaDocumentStore,
+  | "eventData"
+  | "setEventData"
+  | "selectedJobId"
+  | "updateTransport"
+  | "addTransport"
+  | "removeTransport"
+  | "importTransports"
+>;
 
-export function useHojaSection(sectionId: HojaSectionId) {
+type HojaSectionSlice =
+  | EventSlice
+  | EventDataSlice
+  | ContactsSlice
+  | StaffSlice
+  | TravelSlice
+  | AccommodationSlice
+  | LogisticsSlice;
+
+export function useHojaSection(sectionId: "event"): EventSlice;
+export function useHojaSection(
+  sectionId: "venue" | "weather" | "schedule" | "restaurants",
+): EventDataSlice;
+export function useHojaSection(sectionId: "contacts"): ContactsSlice;
+export function useHojaSection(sectionId: "staff"): StaffSlice;
+export function useHojaSection(sectionId: "travel"): TravelSlice;
+export function useHojaSection(sectionId: "accommodation"): AccommodationSlice;
+export function useHojaSection(sectionId: "logistics"): LogisticsSlice;
+export function useHojaSection(sectionId: HojaSectionId): HojaSectionSlice {
   const store = useHojaDocumentStore();
+
   switch (sectionId) {
     case "event":
       return {
@@ -126,44 +114,44 @@ export function useHojaSection(sectionId: HojaSectionId) {
     case "contacts":
       return {
         eventData: store.eventData,
-        onContactChange: store.handleContactChange,
-        onAddContact: store.addContact,
-        onRemoveContact: store.removeContact,
+        handleContactChange: store.handleContactChange,
+        addContact: store.addContact,
+        removeContact: store.removeContact,
       };
     case "staff":
       return {
         eventData: store.eventData,
-        onStaffChange: store.handleStaffChange,
-        onAddStaff: store.addStaffMember,
-        onRemoveStaff: store.removeStaffMember,
+        handleStaffChange: store.handleStaffChange,
+        addStaffMember: store.addStaffMember,
+        removeStaffMember: store.removeStaffMember,
       };
     case "travel":
       return {
         travelArrangements: store.travelArrangements,
-        onUpdate: store.updateTravelArrangement,
-        onAdd: store.addTravelArrangement,
-        onRemove: store.removeTravelArrangement,
+        updateTravelArrangement: store.updateTravelArrangement,
+        addTravelArrangement: store.addTravelArrangement,
+        removeTravelArrangement: store.removeTravelArrangement,
       };
     case "accommodation":
       return {
         accommodations: store.accommodations,
         eventData: store.eventData,
         setAccommodations: store.setAccommodations,
-        onUpdateRoom: store.updateRoom,
-        onAddAccommodation: store.addAccommodation,
-        onRemoveAccommodation: store.removeAccommodation,
-        onAddRoom: store.addRoom,
-        onRemoveRoom: store.removeRoom,
+        updateRoom: store.updateRoom,
+        addAccommodation: store.addAccommodation,
+        removeAccommodation: store.removeAccommodation,
+        addRoom: store.addRoom,
+        removeRoom: store.removeRoom,
       };
     case "logistics":
       return {
         eventData: store.eventData,
         setEventData: store.setEventData,
         selectedJobId: store.selectedJobId,
-        onUpdateTransport: store.updateTransport,
-        onAddTransport: store.addTransport,
-        onRemoveTransport: store.removeTransport,
-        onImportTransports: store.importTransports,
+        updateTransport: store.updateTransport,
+        addTransport: store.addTransport,
+        removeTransport: store.removeTransport,
+        importTransports: store.importTransports,
       };
     default:
       return {
