@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { resolveConfiguredAppBase, toSafeOrigin } from "../_shared/appBase.ts";
+import { CANONICAL_APP_BASE, resolveConfiguredAppBase, toSafeOrigin } from "../_shared/appBase.ts";
 import { joinedSingle } from "../_shared/joins.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { broadcastPush } from "../_shared/pushBroadcast.ts";
@@ -356,7 +356,11 @@ serve(async (req) => {
     const envBase = resolveConfiguredAppBase();
     const rawOrigin = req.headers.get('origin') || req.headers.get('referer');
     const originBase = rawOrigin ? toSafeOrigin(rawOrigin.split('?')[0]) : undefined;
-    const baseUrl = envBase || originBase || 'http://localhost:3000';
+    // supabase.functions.invoke() from server-side callers (e.g. supabase-server's
+    // approveVacationRequests/rejectVacationRequests) sends neither PUBLIC_APP_URL nor
+    // an Origin/Referer header, so the terminal fallback must be a real, reachable
+    // origin — not localhost, which would land in a production email.
+    const baseUrl = envBase || originBase || CANONICAL_APP_BASE;
 
 
     // Fetch all rows
