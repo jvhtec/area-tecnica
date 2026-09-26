@@ -27,6 +27,7 @@ export interface HojaDeRutaMetadata {
 }
 
 export interface TravelArrangement {
+  id: string;
   transportation_type?: string;
   pickup_address?: string;
   pickup_time?: string; // ISO datetime string (e.g., "2025-02-26T14:30:00+00:00")
@@ -56,6 +57,7 @@ export interface Transport {
 }
 
 export interface RoomAssignment {
+  id: string;
   /** Always set: `addRoom` seeds 'single' and the loader maps a NOT NULL column. */
   room_type: string;
   room_number?: string;
@@ -95,6 +97,9 @@ export interface EventData {
   eventCode?: string;
   eventType?: string;
   eventDates?: string;
+  /** Structured Madrid-local job dates. The display string is derived from these when available. */
+  eventStartDate?: string;
+  eventEndDate?: string;
   eventStartTime?: string;
   eventEndTime?: string;
   setupTime?: string;
@@ -129,6 +134,7 @@ export interface EventData {
     email?: string;
   };
   contacts: Array<{
+    id?: string;
     name?: string;
     role?: string;
     phone?: string;
@@ -166,6 +172,7 @@ export interface EventData {
   auxiliaryStaffDismantleQty?: number;
   auxiliaryMachinery?: AuxiliaryMachineryRequirement[];
   weather?: WeatherData[];
+  weatherFetchedAt?: string;
   restaurants?: Restaurant[];
   selectedRestaurants?: string[];
   printExcludedSections?: HojaDeRutaPrintSectionId[];
@@ -281,6 +288,13 @@ export interface ImagePreviews {
 
 export interface Images {
   venue: File[];
+}
+
+export interface HojaDeRutaImageRecord {
+  id: string;
+  image_path: string;
+  image_type: "venue" | "venue_map" | string;
+  sort_order?: number;
 }
 
 // Backward compatibility
