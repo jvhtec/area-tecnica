@@ -10,7 +10,7 @@ import {
 import { resolveHojaAttachment } from "../_shared/hojaAttachment.ts";
 import {
   buildJobHojaLinkUrl,
-  computeJobHojaLinkExpiry,
+  computeJobHojaLinkExpiryForJob,
   getJobHojaLinkSecret,
   resolveJobHojaLinkTtlSeconds,
   signJobHojaLink,
@@ -171,9 +171,20 @@ serve(createHttpHandler(async (req: Request) => {
         return jsonResponse({ error: "Bad Request", reason: "hoja_de_ruta_not_found" }, { status: 400 });
       }
 
+      const { data: linkJob, error: linkJobError } = await supabaseAdmin
+        .from("jobs")
+        .select("end_time")
+        .eq("id", jobId)
+        .maybeSingle();
+      if (linkJobError) throw linkJobError;
+
       const secret = getJobHojaLinkSecret(Deno.env.get);
       const ttlSeconds = resolveJobHojaLinkTtlSeconds(Deno.env.get);
-      const expiresAt = computeJobHojaLinkExpiry(Math.floor(Date.now() / 1000), ttlSeconds);
+      const expiresAt = computeJobHojaLinkExpiryForJob({
+        jobEnd: linkJob?.end_time || null,
+        nowSeconds: Math.floor(Date.now() / 1000),
+        ttlSeconds,
+      });
       const token = await signJobHojaLink({ jobId, expiresAt, secret });
 
       if (!token) {
