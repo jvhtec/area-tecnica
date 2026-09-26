@@ -111,11 +111,16 @@ async function findLatestJobHojaAttachment(
       .maybeSingle();
 
     if (publishedError) throw publishedError;
-    if (published?.file_path) {
+    const publishedRow = published as HojaDocumentRow | null;
+    if (
+      publishedRow?.file_path
+      && publishedRow.document_kind === "hoja_de_ruta"
+      && isPdfDocument(publishedRow)
+    ) {
       return toHojaAttachment(
         "job_documents",
-        published as HojaDocumentRow,
-        resolveJobDocumentBucket(published.file_path),
+        publishedRow,
+        resolveJobDocumentBucket(publishedRow.file_path),
       );
     }
   }
