@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ import {
 
 interface ModernRestaurantSectionProps {
   eventData: EventData;
-  onUpdateEventData: (data: EventData) => void;
+  onUpdateEventData: Dispatch<SetStateAction<EventData>>;
   accommodations?: Accommodation[];
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
   onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
@@ -44,7 +44,7 @@ export function ModernRestaurantSection({
   isPrintSectionExcluded,
   onPrintSectionExcludedChange,
 }: ModernRestaurantSectionProps) {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>(() => eventData.restaurants || []);
   const [isLoading, setIsLoading] = useState(false);
   const [searchRadius, setSearchRadius] = useState('2000');
   const [priceFilter, setPriceFilter] = useState<string>('all');
@@ -76,11 +76,10 @@ export function ModernRestaurantSection({
   const [selectedOriginKeys, setSelectedOriginKeys] = useState<string[]>(originOptions.length ? [originOptions[0].key] : []);
 
   useEffect(() => {
-    if (selectedOriginKeys.length > 0) {
-      searchRestaurants();
+    if (restaurants.length === 0 && eventData.restaurants?.length) {
+      setRestaurants(eventData.restaurants);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOriginKeys.join('|')]);
+  }, [eventData.restaurants, restaurants.length]);
 
   const searchRestaurants = async () => {
     if (selectedOriginKeys.length === 0) {
@@ -163,12 +162,12 @@ export function ModernRestaurantSection({
       r.id === restaurant.id ? { ...r, isSelected: !r.isSelected } : r
     ));
 
-    // Update parent state
-    onUpdateEventData({
-      ...eventData,
+    // Update parent state from the freshest document snapshot.
+    onUpdateEventData((current) => ({
+      ...current,
       restaurants: updatedRestaurants,
       selectedRestaurants: updatedSelected,
-    });
+    }));
   };
 
   const filteredRestaurants = restaurants.filter(restaurant => {
