@@ -13,6 +13,8 @@ type ManagedImage = {
   imageType: "venue" | "venue_map";
   previewUrl: string;
   storagePath?: string;
+  /** Only set when the path was successfully resolved in job-documents and is safe to delete. */
+  cleanupStoragePath?: string;
   file?: File;
 };
 
@@ -38,6 +40,7 @@ export const useHojaDeRutaImages = () => {
   const [savedFingerprint, setSavedFingerprint] = useState("[]");
   const hydratedKeyRef = useRef<string | null>(null);
   const preparedFingerprintRef = useRef<string | null>(null);
+  const hydrationRunRef = useRef(0);
 
   const fingerprintFor = useCallback((items: ManagedImage[]) => JSON.stringify(
     items.map((item) => ({
@@ -71,8 +74,13 @@ export const useHojaDeRutaImages = () => {
   const replaceVenueMap = useCallback((next: ManagedImage | null) => {
     setManagedImages((current) => {
       const existing = current.find((item) => item.imageType === "venue_map");
-      if (existing?.storagePath && existing.storagePath !== next?.storagePath) {
-        setRemovedStoragePaths((paths) => Array.from(new Set([...paths, existing.storagePath!])));
+      if (
+        existing?.cleanupStoragePath
+        && existing.cleanupStoragePath !== next?.cleanupStoragePath
+      ) {
+        setRemovedStoragePaths((paths) =>
+          Array.from(new Set([...paths, existing.cleanupStoragePath!]))
+        );
       }
       if (existing?.previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(existing.previewUrl);
@@ -101,8 +109,10 @@ export const useHojaDeRutaImages = () => {
       const venue = current.filter((item) => item.imageType === "venue");
       const target = venue[index];
       if (!target) return current;
-      if (target.storagePath) {
-        setRemovedStoragePaths((paths) => Array.from(new Set([...paths, target.storagePath!])));
+      if (target.cleanupStoragePath) {
+        setRemovedStoragePaths((paths) =>
+          Array.from(new Set([...paths, target.cleanupStoragePath!]))
+        );
       }
       if (target.previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(target.previewUrl);
@@ -160,6 +170,7 @@ export const useHojaDeRutaImages = () => {
   ) => {
     const signature = `${jobId}:${(rows || []).map((row) => `${row.id}:${row.image_path}`).join("|")}`;
     if (hydratedKeyRef.current === signature) return;
+    const runId = ++hydrationRunRef.current;
 
     const hydrated = await Promise.all((rows || []).map(async (row): Promise<ManagedImage | null> => {
       if (!row.image_path || row.image_path.startsWith("blob:")) return null;
@@ -176,15 +187,27 @@ export const useHojaDeRutaImages = () => {
         .from(IMAGE_BUCKET)
         .createSignedUrl(row.image_path, 60 * 60);
 
-      if (error || !data?.signedUrl) return null;
+      if (error || !data?.signedUrl) {
+        // Keep the DB row in the next save even when a legacy/unresolved object
+        // cannot be previewed. It is deliberately not eligible for storage cleanup.
+        return {
+          id: row.id || crypto.randomUUID(),
+          imageType: row.image_type === "venue_map" ? "venue_map" : "venue",
+          previewUrl: row.image_path,
+          storagePath: row.image_path,
+        };
+      }
 
       return {
         id: row.id || crypto.randomUUID(),
         imageType: row.image_type === "venue_map" ? "venue_map" : "venue",
         previewUrl: data.signedUrl,
         storagePath: row.image_path,
+        cleanupStoragePath: row.image_path,
       };
     }));
+
+    if (runId !== hydrationRunRef.current) return;
 
     setManagedImages((current) => {
       current.forEach((item) => {
@@ -218,7 +241,7 @@ export const useHojaDeRutaImages = () => {
         });
 
       if (error) throw error;
-      next[index] = { ...item, storagePath };
+      next[index] = { ...item, storagePath, cleanupStoragePath: storagePath };
     }
 
     setManagedImages(next);
