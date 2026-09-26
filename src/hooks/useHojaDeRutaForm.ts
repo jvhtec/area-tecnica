@@ -66,6 +66,8 @@ export const useHojaDeRutaForm = ({
     fetchError,
     saveAll,
     isSaving,
+    setStatus,
+    isChangingStatus,
     forceRefetch,
   } = useHojaDeRutaPersistence(selectedJobId);
 
@@ -146,6 +148,50 @@ export const useHojaDeRutaForm = ({
     markSaved,
     onSavedVersion: setDocumentVersion,
   });
+
+  const documentStatus =
+    hojaDeRuta?.status === "review"
+    || hojaDeRuta?.status === "approved"
+    || hojaDeRuta?.status === "final"
+      ? hojaDeRuta.status
+      : "draft";
+  const isFinal = documentStatus === "final";
+
+  const handleStatusTransition = useCallback(async (
+    nextStatus: "review" | "approved" | "final",
+  ) => {
+    if (!selectedJobId) return;
+
+    if (isDirty || !hojaDeRuta?.id) {
+      await handleSaveAll();
+    }
+
+    const updated = await setStatus(nextStatus);
+    setDocumentVersion(updated.document_version);
+    setHasExternalConflict(false);
+
+    const labels = {
+      review: "En revisión",
+      approved: "Aprobada",
+      final: "Final",
+    } as const;
+    toast({
+      title: labels[nextStatus],
+      description:
+        nextStatus === "review"
+          ? "La Hoja de Ruta está lista para revisión."
+          : nextStatus === "approved"
+            ? "La Hoja de Ruta puede publicarse para el equipo."
+            : "La Hoja de Ruta se ha finalizado y queda bloqueada para edición.",
+    });
+  }, [
+    handleSaveAll,
+    hojaDeRuta?.id,
+    isDirty,
+    selectedJobId,
+    setStatus,
+    toast,
+  ]);
 
   useEffect(() => {
     if (!fetchError) return;
@@ -328,7 +374,7 @@ export const useHojaDeRutaForm = ({
         },
         (payload) => {
           const nextVersion = Number((payload.new as { document_version?: unknown }).document_version || 0);
-          if (!isSaving && nextVersion > documentVersion) {
+          if (!isSaving && !isChangingStatus && nextVersion > documentVersion) {
             setHasExternalConflict(true);
             toast({
               title: "Cambios externos",
@@ -343,7 +389,7 @@ export const useHojaDeRutaForm = ({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [documentVersion, isInitialized, isSaving, selectedJobId, toast]);
+  }, [documentVersion, isChangingStatus, isInitialized, isSaving, selectedJobId, toast]);
 
   const handleContactChange = useCallback((index: number, field: string, value: string) => {
     setEventData((prev) => ({
@@ -600,6 +646,7 @@ export const useHojaDeRutaForm = ({
     isLoadingJobs,
     isLoadingHojaDeRuta,
     isSaving,
+    isChangingStatus,
     jobs,
     hojaDeRuta,
     handleSaveAll,
@@ -613,6 +660,9 @@ export const useHojaDeRutaForm = ({
     dataSource,
     isDirty,
     hasExternalConflict,
+    documentStatus,
+    isFinal,
+    handleStatusTransition,
     staffingDiff,
     applyStaffingChanges,
     hasPowerDrift,
