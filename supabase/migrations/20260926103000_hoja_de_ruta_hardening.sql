@@ -336,7 +336,7 @@ create or replace function public.set_hoja_de_ruta_status(
   p_job_id uuid,
   p_status text
 )
-returns table(status text, approved_by uuid, approved_at timestamptz)
+returns table(status text, approved_by uuid, approved_at timestamptz, document_version integer)
 language plpgsql
 security definer
 set search_path = public, pg_temp
@@ -379,7 +379,7 @@ begin
 
   if v_target = v_current then
     return query
-    select h.status, h.approved_by, h.approved_at
+    select h.status, h.approved_by, h.approved_at, h.document_version
     from public.hoja_de_ruta h
     where h.id = v_hoja_id;
     return;
@@ -398,7 +398,8 @@ begin
     end,
     last_modified = now(),
     last_modified_by = v_actor,
-    updated_at = now()
+    updated_at = now(),
+    document_version = coalesce(h.document_version, 0) + 1
   where h.id = v_hoja_id;
 
   select nullif(btrim(concat_ws(' ', p.first_name, p.last_name)), '')
@@ -417,7 +418,7 @@ begin
     else 'actor_only'::public.activity_visibility
   end;
 
-  if v_code is not null then
+  if v_code is not null and v_actor is not null then
     insert into public.activity_log (
       code,
       job_id,
@@ -441,7 +442,7 @@ begin
   end if;
 
   return query
-  select h.status, h.approved_by, h.approved_at
+  select h.status, h.approved_by, h.approved_at, h.document_version
   from public.hoja_de_ruta h
   where h.id = v_hoja_id;
 end;
