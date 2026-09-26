@@ -74,14 +74,14 @@ export const SOUNDVISION_REPORT_BRANDS: Record<SoundvisionReportSystem, Soundvis
     predictionLabel: 'Predicción Soundvision',
     manufacturer: "L-Acoustics",
     filenamePrefix: 'Soundvision',
-    logoPath: '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png',
+    logoPath: '/media/a2246e0e-373b-4091-9471-1a7c00fe82ed.png',
   },
   Turbo: {
     reportLabel: 'Informe EASE Focus',
     predictionLabel: 'Predicción EASE Focus',
     manufacturer: 'Turbosound',
     filenamePrefix: 'EaseFocus',
-    logoPath: '/lovable-uploads/e78ab52e-aa81-4770-a6bb-f802a5ff651e.png',
+    logoPath: '/media/e78ab52e-aa81-4770-a6bb-f802a5ff651e.png',
   },
 };
 

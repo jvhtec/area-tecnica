@@ -551,7 +551,7 @@ export const MemoriaTecnica = () => {
                         decoding="async"
                         className="h-16 w-48 object-contain"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+                          (e.target as HTMLImageElement).src = '/media/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
                           console.error('Error loading logo preview');
                         }}
                       />

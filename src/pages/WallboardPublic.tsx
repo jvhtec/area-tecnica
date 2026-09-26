@@ -99,7 +99,7 @@ export default function WallboardPublic() {
               className="w-48 mx-auto mb-6"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
+                target.src = "/media/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
               }}
             />
             <h1 className="text-3xl font-bold text-red-500 mb-4">Access Denied</h1>

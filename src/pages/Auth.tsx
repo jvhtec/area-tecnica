@@ -13,7 +13,7 @@ import { Mail, Lock, ChevronRight, Loader2 } from "lucide-react";
 const BRAND_CONFIG = {
   name: "Sector Pro",
   tagline: "Área Técnica",
-  logo: "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png",
+  logo: "/media/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png",
   colors: {
     primary: "#3b82f6",
     accent: "#8b5cf6",

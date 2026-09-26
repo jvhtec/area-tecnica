@@ -10,7 +10,7 @@ Native webOS launcher for three Sector-Pro wallboards (Producción, Almacén, Of
 ## Files
 - `appinfo.json`: webOS app manifest.
 - `index.html`, `launcher.css`, `launcher.js`: launcher UI and remote-navigation logic (handles BACK key code 461).
-- `icon.png`: required icon (uses existing Sector-Pro logo asset from `public/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png`).
+- `icon.png`: required icon (uses existing Sector-Pro logo asset from `public/media/2f12a6ef-587b-4049-ad53-d83fb94064e3.png`).
 
 ## Setup: pair your TV (run once)
 1. `ares-setup-device`

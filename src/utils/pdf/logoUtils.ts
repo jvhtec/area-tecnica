@@ -8,7 +8,7 @@ const COMPANY_LOGO_FALLBACK_PATHS = [
   '/sector pro logo.png',
   '/sector-pro-logo.png',
   '/sector%20pro%20logo.png',
-  '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png',
+  '/media/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png',
 ];
 
 const inflight = new Map<string, Promise<string | undefined>>();
