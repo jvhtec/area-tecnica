@@ -225,6 +225,10 @@ export const useHojaDeRutaPersistence = (
         schedule: String(main.schedule || ""),
         programScheduleDays: stableProgramIds(main.program_schedule_json),
         powerRequirements: String(main.power_requirements || ""),
+        powerRequirementsSourceUpdatedAt:
+          typeof main.power_requirements_source_updated_at === "string"
+            ? main.power_requirements_source_updated_at
+            : undefined,
         auxiliaryNeeds: String(main.auxiliary_needs || ""),
         auxiliaryStaffSetupQty: toSafeNonNegativeInt(main.aux_staff_setup_qty),
         auxiliaryStaffDismantleQty: toSafeNonNegativeInt(main.aux_staff_dismantle_qty),
