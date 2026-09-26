@@ -3422,6 +3422,7 @@ export type Database = {
           local_contacts: Json | null
           logistics_info: Json | null
           power_requirements: string | null
+          power_requirements_source_updated_at: string | null
           published_document_id: string | null
           print_excluded_sections: Json
           program_schedule_json: Json | null
@@ -3462,6 +3463,7 @@ export type Database = {
           local_contacts?: Json | null
           logistics_info?: Json | null
           power_requirements?: string | null
+          power_requirements_source_updated_at?: string | null
           published_document_id?: string | null
           print_excluded_sections?: Json
           program_schedule_json?: Json | null
@@ -3502,6 +3504,7 @@ export type Database = {
           local_contacts?: Json | null
           logistics_info?: Json | null
           power_requirements?: string | null
+          power_requirements_source_updated_at?: string | null
           published_document_id?: string | null
           print_excluded_sections?: Json
           program_schedule_json?: Json | null
@@ -6427,6 +6430,7 @@ export type Database = {
           table_data: Json
           table_name: string
           total_watts: number
+          updated_at: string
         }
         Insert: {
           created_at?: string | null
@@ -6444,6 +6448,7 @@ export type Database = {
           table_data?: Json
           table_name: string
           total_watts: number
+          updated_at?: string
         }
         Update: {
           created_at?: string | null
@@ -6461,6 +6466,7 @@ export type Database = {
           table_data?: Json
           table_name?: string
           total_watts?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -13254,6 +13260,14 @@ export type Database = {
       publish_hoja_de_ruta_document: {
         Args: { p_document_id: string; p_job_id: string }
         Returns: string[]
+      }
+      set_hoja_de_ruta_status: {
+        Args: { p_job_id: string; p_status: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          status: string
+        }[]
       }
       replace_hoja_de_ruta_all: {
         Args: {
