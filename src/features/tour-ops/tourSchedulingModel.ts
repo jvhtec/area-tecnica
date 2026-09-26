@@ -14,7 +14,6 @@ import {
   normalizeContacts,
   normalizeDocument,
   normalizeHojaAccommodation,
-  normalizeHojaHotelInfo,
   normalizeHojaTransport,
   normalizeHojaTravelArrangement,
   normalizeJobAssignment,
@@ -123,8 +122,7 @@ export function normalizeTourOpsModel(
   const hojaAccommodations = asArray<UnknownRecord>(raw.hoja_accommodations).map((row) =>
     normalizeHojaAccommodation(row, hojaById, hojaStaffLookupById)
   );
-  const hojaInfoAccommodations = Array.from(hojaById.values()).flatMap(normalizeHojaHotelInfo);
-  const allAccommodationCandidates = [...normalizedAccommodations, ...hojaAccommodations, ...hojaInfoAccommodations];
+  const allAccommodationCandidates = [...normalizedAccommodations, ...hojaAccommodations];
   const accommodations = annotateAccommodationSyncStatus(
     mergeAccommodations(allAccommodationCandidates),
     allAccommodationCandidates,
@@ -180,7 +178,7 @@ export function normalizeTourOpsModel(
         travelOut: shouldIncludeSection(allowedSections, "travel") ? dateTravelOut : [],
         accommodations: dateAccommodations,
         weather: shouldIncludeSection(allowedSections, "weather") ? hoja?.weather_data ?? null : null,
-        logistics: hoja?.logistics_info ?? null,
+        logistics: hoja?.logistics ?? null,
         venueName: textOrNull(hoja?.venue_name) ?? date.location?.name ?? null,
         venueAddress: textOrNull(hoja?.venue_address) ?? date.location?.formattedAddress ?? null,
         restaurants: hoja?.restaurants_info ?? null,
