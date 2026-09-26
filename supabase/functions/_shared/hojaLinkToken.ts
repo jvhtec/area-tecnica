@@ -1,7 +1,9 @@
 const encoder = new TextEncoder();
 
-export const DEFAULT_JOB_HOJA_LINK_TTL_SECONDS = 60 * 60 * 24 * 365;
-const MAX_JOB_HOJA_LINK_TTL_SECONDS = 60 * 60 * 24 * 365 * 5;
+export const DEFAULT_JOB_HOJA_LINK_TTL_SECONDS = 60 * 60 * 24 * 30;
+const MAX_JOB_HOJA_LINK_TTL_SECONDS = 60 * 60 * 24 * 90;
+export const JOB_HOJA_POST_EVENT_MARGIN_SECONDS = 60 * 60 * 24 * 7;
+const MIN_JOB_HOJA_LINK_TTL_SECONDS = 60 * 60;
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -55,6 +57,40 @@ export function computeJobHojaLinkExpiry(
   ttlSeconds = DEFAULT_JOB_HOJA_LINK_TTL_SECONDS,
 ): number {
   return Math.trunc(nowSeconds) + Math.trunc(ttlSeconds);
+}
+
+export function computeJobHojaLinkExpiryForJob(args: {
+  jobEnd?: string | null;
+  nowSeconds?: number;
+  ttlSeconds?: number;
+  postEventMarginSeconds?: number;
+}): number {
+  const nowSeconds = Math.trunc(args.nowSeconds ?? Date.now() / 1000);
+  const ttlSeconds = Math.min(
+    Math.max(MIN_JOB_HOJA_LINK_TTL_SECONDS, Math.trunc(args.ttlSeconds ?? DEFAULT_JOB_HOJA_LINK_TTL_SECONDS)),
+    MAX_JOB_HOJA_LINK_TTL_SECONDS,
+  );
+  const ttlBound = nowSeconds + ttlSeconds;
+  const jobEndMs = args.jobEnd ? Date.parse(args.jobEnd) : NaN;
+
+  if (!Number.isFinite(jobEndMs)) return ttlBound;
+
+  const postEventMarginSeconds = Math.max(
+    0,
+    Math.trunc(args.postEventMarginSeconds ?? JOB_HOJA_POST_EVENT_MARGIN_SECONDS),
+  );
+  const jobBound = Math.trunc(jobEndMs / 1000) + postEventMarginSeconds;
+
+  // A document sent after its historical job should still be usable briefly,
+  // but never regain a long-lived bearer URL.
+  if (jobBound <= nowSeconds) {
+    return Math.min(ttlBound, nowSeconds + 60 * 60 * 24);
+  }
+
+  return Math.max(
+    nowSeconds + MIN_JOB_HOJA_LINK_TTL_SECONDS,
+    Math.min(ttlBound, jobBound),
+  );
 }
 
 export async function signJobHojaLink(args: {
