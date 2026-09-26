@@ -2,6 +2,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 import { generateHojaDeRutaXLS } from "@/utils/hojaDeRutaExport";
 import {
   normalizeHojaDeRutaPrintSections,
@@ -45,7 +46,7 @@ export const useHojaDeRutaExports = ({
   accommodations,
   eventData,
   handleSaveAll,
-  hasSavedData,
+  hasSavedData: _hasSavedData,
   hojaDeRuta,
   imagePreviews,
   isDirty,
@@ -120,11 +121,24 @@ export const useHojaDeRutaExports = ({
     return null;
   };
 
-  const getSelectedJobDetails = (jobIdToFind = selectedJobId) =>
-    jobs?.find((job) => job.id === jobIdToFind);
+  const getSelectedJobDetails = async (jobIdToFind = selectedJobId) => {
+    if (!jobIdToFind) return undefined;
+
+    const inMemory = jobs?.find((job) => job.id === jobIdToFind);
+    if (inMemory) return inMemory;
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("id,title,start_time,end_time")
+      .eq("id", jobIdToFind)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data || undefined;
+  };
 
   const saveBeforePdfGeneration = async () => {
-    if (isDirty || hasSavedData) {
+    if (isDirty) {
       await handleSaveAll();
     }
   };
@@ -133,7 +147,10 @@ export const useHojaDeRutaExports = ({
     const excludedSections = normalizeHojaDeRutaPrintSections(
       eventData.printExcludedSections
     );
-    return excludedSections.length > 0 ? { excludedSections } : undefined;
+    return {
+      ...(excludedSections.length > 0 ? { excludedSections } : {}),
+      publish: true,
+    };
   };
 
   const handlePrintExclusionChange = (
@@ -199,7 +216,7 @@ export const useHojaDeRutaExports = ({
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
       const enhancedEventData = await buildDocumentEventData(currentJobId);
 
-      const jobDetails = getSelectedJobDetails(currentJobId);
+      const jobDetails = await getSelectedJobDetails(currentJobId);
       // Convert accommodations to legacy room assignments for PDF generation
       const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
@@ -220,13 +237,13 @@ export const useHojaDeRutaExports = ({
       // PDF generation and download is handled within the generatePDF function
 
       toast({
-        title: "✅ Documento generado",
-        description: "La hoja de ruta ha sido generada correctamente.",
+        title: "Hoja de Ruta publicada",
+        description: "La Hoja de Ruta completa se ha descargado y publicado para el equipo.",
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: "Hubo un problema al generar el documento.",
         variant: "destructive",
       });
@@ -247,7 +264,7 @@ export const useHojaDeRutaExports = ({
       await saveBeforePdfGeneration();
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
-      const jobDetails = getSelectedJobDetails(currentJobId);
+      const jobDetails = await getSelectedJobDetails(currentJobId);
       const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
       await generatePDF(
@@ -261,12 +278,17 @@ export const useHojaDeRutaExports = ({
         jobDetails?.start_time || undefined,
         toast,
         accommodations,
-        { sections: [sectionId] }
+        { sections: [sectionId], publish: false }
       );
+
+      toast({
+        title: "Sección descargada",
+        description: "La sección se ha descargado sin modificar la Hoja de Ruta publicada.",
+      });
     } catch (error) {
       console.error("Error generating section PDF:", error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: "Hubo un problema al generar la sección seleccionada.",
         variant: "destructive",
       });
@@ -288,7 +310,7 @@ export const useHojaDeRutaExports = ({
       await saveBeforePdfGeneration();
 
       const { generatePDFPreview } = await import("@/utils/hoja-de-ruta/pdf");
-      const jobDetails = getSelectedJobDetails(currentJobId);
+      const jobDetails = await getSelectedJobDetails(currentJobId);
       const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
       const generatedPdf = await generatePDFPreview(
@@ -302,14 +324,16 @@ export const useHojaDeRutaExports = ({
         jobDetails?.start_time || undefined,
         undefined,
         accommodations,
-        sectionId ? { sections: [sectionId] } : buildFullDocumentPdfOptions()
+        sectionId
+          ? { sections: [sectionId], publish: false }
+          : { ...buildFullDocumentPdfOptions(), publish: false }
       );
 
       openGeneratedPdfPreview(generatedPdf);
     } catch (error) {
       console.error("Error previewing PDF:", error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: "Hubo un problema al preparar la vista previa.",
         variant: "destructive",
       });
@@ -332,7 +356,7 @@ export const useHojaDeRutaExports = ({
         "@/utils/hoja-de-ruta/pdf"
       );
 
-      const jobDetails = getSelectedJobDetails(currentJobId);
+      const jobDetails = await getSelectedJobDetails(currentJobId);
       const documentEventData = await buildDocumentEventData(currentJobId);
 
       await generateDriverCertificatePDF({
@@ -346,7 +370,7 @@ export const useHojaDeRutaExports = ({
     } catch (error) {
       console.error("Error generating driver certificate PDF:", error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: "Hubo un problema al generar la hoja de transportes.",
         variant: "destructive",
       });
@@ -368,7 +392,7 @@ export const useHojaDeRutaExports = ({
       const { generateDriverCertificatePDFPreview } = await import(
         "@/utils/hoja-de-ruta/pdf"
       );
-      const jobDetails = getSelectedJobDetails(currentJobId);
+      const jobDetails = await getSelectedJobDetails(currentJobId);
       const documentEventData = await buildDocumentEventData(currentJobId);
 
       const generatedPdf = await generateDriverCertificatePDFPreview({
@@ -383,7 +407,7 @@ export const useHojaDeRutaExports = ({
     } catch (error) {
       console.error("Error previewing driver certificate PDF:", error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description:
           "Hubo un problema al preparar la vista previa de transportes.",
         variant: "destructive",
@@ -407,7 +431,7 @@ export const useHojaDeRutaExports = ({
 
     setGeneratingSectionId(null);
     try {
-      const jobDetails = jobs?.find((job) => job.id === selectedJobId);
+      const jobDetails = await getSelectedJobDetails(selectedJobId);
 
       await generateHojaDeRutaXLS({
         eventData: await buildDocumentEventData(selectedJobId),
@@ -418,14 +442,14 @@ export const useHojaDeRutaExports = ({
       });
 
       toast({
-        title: "✅ Exportado correctamente",
+        title: "Exportado correctamente",
         description: "La hoja de ruta ha sido exportada a Excel.",
       });
       setShowPrintDialog(false);
     } catch (error) {
       console.error("Error generating Excel:", error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: "Hubo un problema al exportar a Excel.",
         variant: "destructive",
       });
