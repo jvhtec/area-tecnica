@@ -1,117 +1,129 @@
 import { useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type {
-  EventData,
-  TravelArrangement,
-  Accommodation,
-  AuxiliaryMachineryRequirement,
-  Transport,
-  WeatherData,
-  ProgramDay,
-} from "@/types/hoja-de-ruta";
-import type { Json } from "@/integrations/supabase/types";
-import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+
+import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+import { queryKeys } from "@/lib/react-query";
+import type {
+  Accommodation,
+  AuxiliaryMachineryRequirement,
+  EventData,
+  HojaDeRutaImageRecord,
+  ProgramDay,
+  Restaurant,
+  Transport,
+  TravelArrangement,
+  WeatherData,
+} from "@/types/hoja-de-ruta";
 import { isAuxiliaryMachineryType } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 import { normalizeHojaDeRutaPrintSections } from "@/utils/hoja-de-ruta/pdf/section-options";
-import {
-  normalizeVenueCoordinates,
-  resolveHojaVenue,
-} from "@/utils/hoja-de-ruta/venue-resolution";
 
-// Older programa rows were saved before `id` existed; backfill so push notifications
-// have a stable dedup key without forcing a one-time data migration.
-const backfillProgramDayIds = (days: ProgramDay[] | undefined): ProgramDay[] | undefined => {
-  if (!Array.isArray(days)) return days;
-  return days.map((day) => ({
-    ...day,
-    rows: (day.rows || []).map((row) => (row.id ? row : { ...row, id: crypto.randomUUID() })),
-  }));
-};
-
-
-
-import { queryKeys } from "@/lib/react-query";
+const MADRID_TIMEZONE = "Europe/Madrid";
 const PARTIAL_ISO_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 const ISO_WITH_TZ_REGEX = /([zZ]|[+-]\d{2}:\d{2})$/;
-const MADRID_TIMEZONE = "Europe/Madrid";
 
-const toDateTimeLocalInMadrid = (value: string | null | undefined): string => {
-  if (!value || !value.trim()) return "";
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-  try {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
-  } catch {
-    return "";
-  }
+const asArray = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value) ? value.filter(isRecord) : [];
+
+const toDateTimeLocalInMadrid = (value: unknown): string => {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
 };
 
-/**
- * Normalize datetime-local or ISO-ish inputs into explicit UTC ISO timestamps
- * so PostgreSQL timestamptz columns don't interpret naive values in server local time.
- */
 const toSafeTimestamptz = (value: string | null | undefined): string | null => {
-  if (!value || !value.trim()) return null;
-
+  if (!value?.trim()) return null;
   const raw = value.trim();
-  const normalizedInput = PARTIAL_ISO_NO_TZ_REGEX.test(raw)
+  const normalized = PARTIAL_ISO_NO_TZ_REGEX.test(raw)
     ? (raw.length === 16 ? `${raw}:00` : raw)
     : raw;
-
-  const date = ISO_WITH_TZ_REGEX.test(normalizedInput)
-    ? new Date(normalizedInput)
-    : fromZonedTime(normalizedInput, MADRID_TIMEZONE);
-
-  if (Number.isNaN(date.getTime())) {
-    console.warn('SAVE: Invalid datetime for timestamptz, storing null:', value);
-    return null;
-  }
-
-  return date.toISOString();
+  const date = ISO_WITH_TZ_REGEX.test(normalized)
+    ? new Date(normalized)
+    : fromZonedTime(normalized, MADRID_TIMEZONE);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
 const toSafeNonNegativeInt = (value: unknown): number => {
   const parsed = Number.parseInt(String(value ?? 0), 10);
-  if (Number.isNaN(parsed) || parsed < 0) return 0;
-  return parsed;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 };
 
 const normalizeAuxiliaryMachinery = (value: unknown): AuxiliaryMachineryRequirement[] => {
   if (!Array.isArray(value)) return [];
-
   const deduped = new Map<AuxiliaryMachineryRequirement["machineType"], number>();
-
-  for (const item of value) {
-    if (!item || typeof item !== "object") continue;
-
-    const machineTypeRaw = (item as { machineType?: unknown; machine_type?: unknown }).machineType
-      ?? (item as { machineType?: unknown; machine_type?: unknown }).machine_type;
-    const quantityRaw = (item as { quantity?: unknown }).quantity;
-    if (!isAuxiliaryMachineryType(machineTypeRaw)) continue;
-
-    const quantity = toSafeNonNegativeInt(quantityRaw);
-    if (quantity <= 0) continue;
-
-    deduped.set(machineTypeRaw, quantity);
-  }
-
-  return Array.from(deduped.entries()).map(([machineType, quantity]) => ({
-    machineType,
-    quantity,
-  }));
+  value.forEach((item) => {
+    if (!isRecord(item)) return;
+    const rawType = item.machineType ?? item.machine_type;
+    if (!isAuxiliaryMachineryType(rawType)) return;
+    const quantity = toSafeNonNegativeInt(item.quantity);
+    if (quantity > 0) deduped.set(rawType, quantity);
+  });
+  return Array.from(deduped, ([machineType, quantity]) => ({ machineType, quantity }));
 };
 
-const normalizeTravelTransportationType = (value: string | null | undefined): string => {
-  const raw = (value || "").trim();
+const normalizeTravelTransportationType = (value: unknown): string => {
+  const raw = typeof value === "string" ? value.trim() : "";
   if (!raw) return "van";
-
   if (raw === "RV" || raw === "rv") return "rv";
   if (raw === "bus") return "autobus";
-
   return raw;
+};
+
+const stableProgramIds = (days: unknown): ProgramDay[] | undefined => {
+  if (!Array.isArray(days)) return undefined;
+  return days.map((rawDay, dayIndex) => {
+    const day = isRecord(rawDay) ? rawDay : {};
+    const rows = Array.isArray(day.rows) ? day.rows : [];
+    return {
+      ...(day as unknown as ProgramDay),
+      rows: rows.map((rawRow, rowIndex) => {
+        const row = isRecord(rawRow) ? rawRow : {};
+        return {
+          ...row,
+          id: typeof row.id === "string" && row.id
+            ? row.id
+            : `legacy-${dayIndex}-${rowIndex}`,
+        };
+      }) as ProgramDay["rows"],
+    };
+  });
+};
+
+const parseRestaurantInfo = (value: unknown): {
+  restaurants?: Restaurant[];
+  selectedRestaurants?: string[];
+} => {
+  if (!isRecord(value)) return {};
+  return {
+    restaurants: Array.isArray(value.restaurants) ? value.restaurants as unknown as Restaurant[] : undefined,
+    selectedRestaurants: Array.isArray(value.selectedRestaurants)
+      ? value.selectedRestaurants.filter((item): item is string => typeof item === "string")
+      : undefined,
+  };
+};
+
+type Aggregate = {
+  main: Record<string, unknown>;
+  logistics?: Record<string, unknown>;
+  contacts?: Record<string, unknown>[];
+  staff?: Record<string, unknown>[];
+  transport?: Record<string, unknown>[];
+  travelArrangements?: Record<string, unknown>[];
+  accommodations?: Array<Record<string, unknown> & { rooms?: Record<string, unknown>[] }>;
+  images?: Record<string, unknown>[];
+};
+
+export type SaveHojaPayload = {
+  eventData: EventData;
+  travelArrangements: TravelArrangement[];
+  accommodations: Accommodation[];
+  images: HojaDeRutaImageRecord[];
+  expectedVersion: number;
 };
 
 interface SaveCallbacks {
@@ -121,668 +133,269 @@ interface SaveCallbacks {
 }
 
 export const useHojaDeRutaPersistence = (
-  jobId: string, 
-  callbacks: SaveCallbacks = {}
+  jobId: string,
+  callbacks: SaveCallbacks = {},
 ) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { onSuccess, onError, onSettled } = callbacks;
+  const queryKey = queryKeys.scope("hoja-de-ruta", jobId);
 
-  // Fetch existing hoja de ruta data with new structure
-  const { data: hojaDeRuta, isLoading, isFetching, error: fetchError } = useQuery({
-    queryKey: queryKeys.scope('hoja-de-ruta', jobId),
+  const {
+    data: hojaDeRuta,
+    isLoading,
+    isFetching,
+    error: fetchError,
+    refetch,
+  } = useQuery({
+    queryKey,
     queryFn: async () => {
       if (!jobId) return null;
 
-      console.log("🔍 FETCH: Starting to fetch hoja de ruta data for job:", jobId);
+      const { data, error } = await supabase.rpc("get_hoja_de_ruta", {
+        p_job_id: jobId,
+      });
+      if (error) throw error;
+      if (!data) return null;
 
-      // Fetch main hoja de ruta data
-      const { data: mainData, error: mainError } = await supabase
-        .from('hoja_de_ruta')
-        .select('*')
-        .eq('job_id', jobId)
-        .maybeSingle();
+      const aggregate = data as unknown as Aggregate;
+      const main = aggregate.main || {};
+      const logistics = aggregate.logistics || {};
+      const restaurants = parseRestaurantInfo(main.restaurants_info);
 
-      if (mainError) {
-        console.error('❌ FETCH: Error fetching main data:', mainError);
-        throw mainError;
-      }
-
-      if (!mainData) {
-        console.log("📝 FETCH: No hoja de ruta found for job");
-        return null;
-      }
-
-      console.log("✅ FETCH: Main data fetched:", mainData);
-
-      // Fetch all related data in parallel
-      const [
-        { data: contacts, error: contactsError },
-        { data: staff, error: staffError },
-        { data: logistics, error: logisticsError },
-        { data: transport, error: transportError },
-        { data: travelArrangements, error: travelError },
-        { data: accommodations, error: accommodationsError },
-        { data: images, error: imagesError }
-      ] = await Promise.all([
-        supabase.from('hoja_de_ruta_contacts').select('*').eq('hoja_de_ruta_id', mainData.id),
-        supabase.from('hoja_de_ruta_staff').select('*').eq('hoja_de_ruta_id', mainData.id),
-        supabase.from('hoja_de_ruta_logistics').select('*').eq('hoja_de_ruta_id', mainData.id).maybeSingle(),
-        supabase.from('hoja_de_ruta_transport').select('*').eq('hoja_de_ruta_id', mainData.id),
-        supabase.from('hoja_de_ruta_travel_arrangements').select('*').eq('hoja_de_ruta_id', mainData.id),
-        supabase.from('hoja_de_ruta_accommodations').select(`
-          *,
-          hoja_de_ruta_room_assignments(*)
-        `).eq('hoja_de_ruta_id', mainData.id),
-        supabase.from('hoja_de_ruta_images').select('*').eq('hoja_de_ruta_id', mainData.id)
-      ]);
-
-      // Handle any errors
-      const errors = [
-        { name: 'contacts', error: contactsError },
-        { name: 'staff', error: staffError },
-        { name: 'logistics', error: logisticsError },
-        { name: 'transport', error: transportError },
-        { name: 'travel', error: travelError },
-        { name: 'accommodations', error: accommodationsError },
-        { name: 'images', error: imagesError }
-      ].filter(item => item.error);
-
-      if (errors.length > 0) {
-        console.error('❌ FETCH: Errors fetching related data:', errors);
-        // Don't throw, just log warnings for non-critical data
-        errors.forEach(({ name, error }) => {
-          console.warn(`⚠️ FETCH: Warning fetching ${name}:`, error);
-        });
-      }
-
-      console.log("🔄 FETCH: Transforming data to frontend format");
-
-      // Load the job location only as a fallback. The saved Hoja venue may be
-      // intentionally corrected or more precise than the catalog location.
-      let venueFromJob: { name?: string; address?: string; coordinates?: { lat: number; lng: number } } | null = null;
-      try {
-        const { data: jobRec, error: jobErr } = await supabase
-          .from('jobs')
-          .select('location_id')
-          .eq('id', jobId)
-          .maybeSingle();
-
-        if (!jobErr && jobRec?.location_id) {
-          const { data: loc, error: locErr } = await supabase
-            .from('locations')
-            .select('name, formatted_address, latitude, longitude')
-            .eq('id', jobRec.location_id)
-            .maybeSingle();
-          if (!locErr && loc) {
-            venueFromJob = {
-              name: loc.name || undefined,
-              address: (loc.formatted_address || loc.name) || undefined,
-              coordinates: normalizeVenueCoordinates({
-                lat: loc.latitude,
-                lng: loc.longitude,
-              }),
-            };
-          }
-        }
-      } catch (e) {
-        console.warn('FETCH: Unable to read job location, falling back to hoja_de_ruta venue:', e);
-      }
-
-      // Transform the data back to the frontend format
       const eventData: EventData = {
-        eventName: mainData.event_name || '',
-        eventDates: mainData.event_dates || '',
-        venue: resolveHojaVenue({
-          name: mainData.venue_name || '',
-          address: mainData.venue_address || '',
-          coordinates: mainData.venue_latitude != null && mainData.venue_longitude != null ? {
-            lat: Number(mainData.venue_latitude),
-            lng: Number(mainData.venue_longitude)
-          } : undefined
-        }, venueFromJob),
-        contacts: contacts?.length ? contacts.map(c => ({
-          name: c.name,
-          role: c.role || '',
-          phone: c.phone || '',
-          technician_id: c.technician_id || undefined,
-        })) : [{ name: '', role: '', phone: '' }],
-        logistics: {
-          transport: transport?.length ? transport.map(t => ({
-            id: t.id,
-            transport_type: t.transport_type as Transport["transport_type"],
-            driver_name: t.driver_name ?? undefined,
-            driver_phone: t.driver_phone ?? undefined,
-            license_plate: t.license_plate ?? undefined,
-            company: t.company as Transport["company"],
-            date_time: toDateTimeLocalInMadrid(t.date_time),
-            has_return: t.has_return ?? undefined,
-            return_date_time: toDateTimeLocalInMadrid(t.return_date_time),
-            source_logistics_event_id: t.source_logistics_event_id || undefined,
-            is_hoja_relevant: t.is_hoja_relevant ?? true,
-            logistics_categories: t.logistics_categories || [],
-          })) : [],
-          loadingDetails: logistics?.loading_details || '',
-          unloadingDetails: logistics?.unloading_details || '',
-          equipmentLogistics: logistics?.equipment_logistics || ''
+        eventName: String(main.event_name || ""),
+        eventDates: String(main.event_dates || ""),
+        eventStartDate: typeof main.event_start_date === "string" ? main.event_start_date : undefined,
+        eventEndDate: typeof main.event_end_date === "string" ? main.event_end_date : undefined,
+        venue: {
+          name: String(main.venue_name || ""),
+          address: String(main.venue_address || ""),
+          coordinates:
+            main.venue_latitude != null && main.venue_longitude != null
+              ? { lat: Number(main.venue_latitude), lng: Number(main.venue_longitude) }
+              : undefined,
         },
-        staff: staff?.length ? staff.map(s => ({
-          name: s.name,
-          surname1: s.surname1 || '',
-          surname2: s.surname2 || '',
-          position: s.position || '',
-          dni: s.dni || '',
-          technician_id: s.technician_id || undefined,
-        })) : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
-        schedule: mainData.schedule || '',
-        // Load multi-day program if available
-        programScheduleDays: backfillProgramDayIds((mainData as any).program_schedule_json || undefined),
-        powerRequirements: mainData.power_requirements || '',
-        auxiliaryNeeds: mainData.auxiliary_needs || '',
-        auxiliaryStaffSetupQty: toSafeNonNegativeInt(mainData.aux_staff_setup_qty),
-        auxiliaryStaffDismantleQty: toSafeNonNegativeInt(mainData.aux_staff_dismantle_qty),
-        auxiliaryMachinery: normalizeAuxiliaryMachinery(mainData.aux_machinery_requirements),
-        weather: (Array.isArray(mainData.weather_data) ? mainData.weather_data : []) as unknown as WeatherData[],
-        printExcludedSections: normalizeHojaDeRutaPrintSections(mainData.print_excluded_sections),
+        contacts: (aggregate.contacts?.length ? aggregate.contacts : [{}]).map((contact) => ({
+          id: typeof contact.id === "string" ? contact.id : crypto.randomUUID(),
+          name: String(contact.name || ""),
+          role: String(contact.role || ""),
+          phone: String(contact.phone || ""),
+          email: String(contact.email || ""),
+          technician_id: typeof contact.technician_id === "string" ? contact.technician_id : undefined,
+        })),
+        logistics: {
+          transport: (aggregate.transport || []).map((transport) => ({
+            id: typeof transport.id === "string" ? transport.id : crypto.randomUUID(),
+            transport_type: transport.transport_type as Transport["transport_type"],
+            driver_name: typeof transport.driver_name === "string" ? transport.driver_name : undefined,
+            driver_phone: typeof transport.driver_phone === "string" ? transport.driver_phone : undefined,
+            license_plate: typeof transport.license_plate === "string" ? transport.license_plate : undefined,
+            company: transport.company as Transport["company"],
+            date_time: toDateTimeLocalInMadrid(transport.date_time),
+            has_return: Boolean(transport.has_return),
+            return_date_time: toDateTimeLocalInMadrid(transport.return_date_time),
+            source_logistics_event_id:
+              typeof transport.source_logistics_event_id === "string"
+                ? transport.source_logistics_event_id
+                : undefined,
+            is_hoja_relevant: transport.is_hoja_relevant !== false,
+            logistics_categories: Array.isArray(transport.logistics_categories)
+              ? transport.logistics_categories as Transport["logistics_categories"]
+              : [],
+          })),
+          loadingDetails: String(logistics.loading_details || ""),
+          unloadingDetails: String(logistics.unloading_details || ""),
+          equipmentLogistics: String(logistics.equipment_logistics || ""),
+        },
+        staff: (aggregate.staff?.length ? aggregate.staff : [{}]).map((staff) => ({
+          id: typeof staff.id === "string" ? staff.id : crypto.randomUUID(),
+          name: String(staff.name || ""),
+          surname1: String(staff.surname1 || ""),
+          surname2: String(staff.surname2 || ""),
+          position: String(staff.position || ""),
+          dni: String(staff.dni || ""),
+          technician_id: typeof staff.technician_id === "string" ? staff.technician_id : undefined,
+        })),
+        schedule: String(main.schedule || ""),
+        programScheduleDays: stableProgramIds(main.program_schedule_json),
+        powerRequirements: String(main.power_requirements || ""),
+        auxiliaryNeeds: String(main.auxiliary_needs || ""),
+        auxiliaryStaffSetupQty: toSafeNonNegativeInt(main.aux_staff_setup_qty),
+        auxiliaryStaffDismantleQty: toSafeNonNegativeInt(main.aux_staff_dismantle_qty),
+        auxiliaryMachinery: normalizeAuxiliaryMachinery(main.aux_machinery_requirements),
+        weather: Array.isArray(main.weather_data)
+          ? main.weather_data as unknown as WeatherData[]
+          : undefined,
+        weatherFetchedAt:
+          typeof main.weather_fetched_at === "string" ? main.weather_fetched_at : undefined,
+        restaurants: restaurants.restaurants,
+        selectedRestaurants: restaurants.selectedRestaurants,
+        printExcludedSections: normalizeHojaDeRutaPrintSections(main.print_excluded_sections),
       };
 
-      // Transform accommodations data
-      const accommodationsData = accommodations?.map(acc => ({
-        id: acc.id,
-        hotel_name: acc.hotel_name,
-        address: acc.address || '',
-        check_in: acc.check_in || '',
-        check_out: acc.check_out || '',
-        coordinates: acc.latitude != null && acc.longitude != null ? {
-	          lat: Number(acc.latitude),
-	          lng: Number(acc.longitude)
-        } : undefined,
-        rooms: acc.hoja_de_ruta_room_assignments?.map(room => ({
-          room_type: room.room_type,
-          room_number: room.room_number || '',
-          staff_member1_id: room.staff_member1_id || '',
-          staff_member2_id: room.staff_member2_id || ''
-        })) || []
-      })) || [];
-
-      // Transform travel arrangements
-      const travelData = travelArrangements?.map(travel => ({
+      const travelArrangements: TravelArrangement[] = (aggregate.travelArrangements || []).map((travel) => ({
+        id: typeof travel.id === "string" ? travel.id : crypto.randomUUID(),
         transportation_type: normalizeTravelTransportationType(travel.transportation_type),
-        pickup_address: travel.pickup_address,
-        pickup_time: travel.pickup_time,
-        flight_train_number: travel.flight_train_number,
-        departure_time: travel.departure_time,
-        arrival_time: travel.arrival_time,
-        driver_name: travel.driver_name,
-        driver_phone: travel.driver_phone,
-        plate_number: travel.plate_number,
-        notes: travel.notes
-      })) || [];
+        pickup_address: String(travel.pickup_address || ""),
+        pickup_time: toDateTimeLocalInMadrid(travel.pickup_time),
+        flight_train_number: String(travel.flight_train_number || ""),
+        departure_time: toDateTimeLocalInMadrid(travel.departure_time),
+        arrival_time: toDateTimeLocalInMadrid(travel.arrival_time),
+        driver_name: String(travel.driver_name || ""),
+        driver_phone: String(travel.driver_phone || ""),
+        plate_number: String(travel.plate_number || ""),
+        notes: String(travel.notes || ""),
+      }));
 
-      console.log("✅ FETCH: Data transformation complete");
-      console.log("📊 FETCH: Event data:", eventData);
-      console.log("🏨 FETCH: Accommodations:", accommodationsData);
-      console.log("✈️ FETCH: Travel arrangements:", travelData);
+      const accommodations: Accommodation[] = (aggregate.accommodations || []).map((accommodation) => ({
+        id: typeof accommodation.id === "string" ? accommodation.id : crypto.randomUUID(),
+        hotel_name: String(accommodation.hotel_name || ""),
+        address: String(accommodation.address || ""),
+        check_in: toDateTimeLocalInMadrid(accommodation.check_in),
+        check_out: toDateTimeLocalInMadrid(accommodation.check_out),
+        coordinates:
+          accommodation.latitude != null && accommodation.longitude != null
+            ? { lat: Number(accommodation.latitude), lng: Number(accommodation.longitude) }
+            : undefined,
+        rooms: asArray(accommodation.rooms).map((room) => ({
+          id: typeof room.id === "string" ? room.id : crypto.randomUUID(),
+          room_type: String(room.room_type || "single"),
+          room_number: String(room.room_number || ""),
+          staff_member1_id:
+            typeof room.staff_member1_hoja_staff_id === "string"
+              ? room.staff_member1_hoja_staff_id
+              : String(room.staff_member1_id || ""),
+          staff_member2_id:
+            typeof room.staff_member2_hoja_staff_id === "string"
+              ? room.staff_member2_hoja_staff_id
+              : String(room.staff_member2_id || ""),
+        })),
+      }));
+
+      const images: HojaDeRutaImageRecord[] = (aggregate.images || []).map((image) => ({
+        id: typeof image.id === "string" ? image.id : crypto.randomUUID(),
+        image_path: String(image.image_path || ""),
+        image_type: String(image.image_type || "venue"),
+        sort_order: Number(image.sort_order || 0),
+      }));
 
       return {
-        ...mainData, // Include all original metadata fields
+        ...main,
+        id: String(main.id || ""),
+        document_version: Number(main.document_version || 0),
         eventData,
-        travelArrangements: travelData,
-        accommodations: accommodationsData,
-        images: images || []
+        travelArrangements,
+        accommodations,
+        images,
       };
     },
-    enabled: !!jobId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1
+    enabled: Boolean(jobId),
+    staleTime: 60_000,
+    retry: 1,
   });
 
-  // Create or update hoja de ruta with enhanced functionality
-  const saveHojaDeRuta = useMutation({
-    mutationFn: async ({ eventData, userId }: { eventData: EventData; userId: string }) => {
-      console.log("💾 SAVE: Starting to save hoja de ruta data for job:", jobId);
-      console.log("📊 SAVE: Event data to save:", eventData);
+  const saveAll = useMutation({
+    mutationFn: async ({
+      eventData,
+      travelArrangements,
+      accommodations,
+      images,
+      expectedVersion,
+    }: SaveHojaPayload) => {
+      if (!jobId) throw new Error("No hay un trabajo seleccionado");
 
-      if (!jobId) {
-        throw new Error('No job ID provided');
-      }
+      const payload = {
+        eventData: {
+          ...eventData,
+          contacts: (eventData.contacts || []).map((contact, sortOrder) => ({
+            ...contact,
+            id: contact.id || crypto.randomUUID(),
+            sort_order: sortOrder,
+          })),
+          staff: (eventData.staff || []).map((staff, sortOrder) => ({
+            ...staff,
+            id: staff.id || crypto.randomUUID(),
+            sort_order: sortOrder,
+          })),
+          logistics: {
+            ...eventData.logistics,
+            transport: (eventData.logistics?.transport || []).map((transport, sortOrder) => ({
+              ...transport,
+              id: transport.id || crypto.randomUUID(),
+              date_time: toSafeTimestamptz(transport.date_time),
+              return_date_time: toSafeTimestamptz(transport.return_date_time),
+              sort_order: sortOrder,
+            })),
+          },
+          auxiliaryStaffSetupQty: toSafeNonNegativeInt(eventData.auxiliaryStaffSetupQty),
+          auxiliaryStaffDismantleQty: toSafeNonNegativeInt(eventData.auxiliaryStaffDismantleQty),
+          auxiliaryMachinery: normalizeAuxiliaryMachinery(eventData.auxiliaryMachinery),
+          printExcludedSections: normalizeHojaDeRutaPrintSections(eventData.printExcludedSections),
+        },
+        travelArrangements: travelArrangements.map((travel, sortOrder) => ({
+          ...travel,
+          id: travel.id || crypto.randomUUID(),
+          transportation_type: normalizeTravelTransportationType(travel.transportation_type),
+          pickup_time: toSafeTimestamptz(travel.pickup_time),
+          departure_time: toSafeTimestamptz(travel.departure_time),
+          arrival_time: toSafeTimestamptz(travel.arrival_time),
+          sort_order: sortOrder,
+        })),
+        accommodations: accommodations.map((accommodation, sortOrder) => ({
+          ...accommodation,
+          id: accommodation.id || crypto.randomUUID(),
+          latitude: accommodation.coordinates?.lat ?? null,
+          longitude: accommodation.coordinates?.lng ?? null,
+          coordinates: undefined,
+          check_in: toSafeTimestamptz(accommodation.check_in),
+          check_out: toSafeTimestamptz(accommodation.check_out),
+          sort_order: sortOrder,
+          rooms: (accommodation.rooms || []).map((room, roomOrder) => ({
+            id: room.id || crypto.randomUUID(),
+            room_type: room.room_type || "single",
+            room_number: room.room_number || "",
+            staff_member1_hoja_staff_id: room.staff_member1_id || null,
+            staff_member2_hoja_staff_id: room.staff_member2_id || null,
+            sort_order: roomOrder,
+          })),
+        })),
+        images,
+      } satisfies Record<string, unknown>;
 
-      // Validate required fields
-      if (!eventData.eventName?.trim()) {
-        throw new Error('Event name is required');
-      }
-
-      const now = new Date().toISOString();
-      const auxiliaryStaffSetupQty = toSafeNonNegativeInt(eventData.auxiliaryStaffSetupQty);
-      const auxiliaryStaffDismantleQty = toSafeNonNegativeInt(eventData.auxiliaryStaffDismantleQty);
-      const auxiliaryMachinery = normalizeAuxiliaryMachinery(eventData.auxiliaryMachinery);
-
-      // First, upsert the main hoja de ruta record
-      const mainData = {
-        job_id: jobId,
-        event_name: eventData.eventName,
-        event_dates: eventData.eventDates || '',
-        venue_name: eventData.venue?.name || '',
-        venue_address: eventData.venue?.address || '',
-        venue_latitude: eventData.venue?.coordinates?.lat || null,
-        venue_longitude: eventData.venue?.coordinates?.lng || null,
-        schedule: eventData.schedule || '',
-        // Save multi-day program as JSONB
-        program_schedule_json: eventData.programScheduleDays && eventData.programScheduleDays.length > 0 ? eventData.programScheduleDays as unknown as Json : null,
-        power_requirements: eventData.powerRequirements || '',
-        auxiliary_needs: eventData.auxiliaryNeeds || '',
-        aux_staff_setup_qty: auxiliaryStaffSetupQty,
-        aux_staff_dismantle_qty: auxiliaryStaffDismantleQty,
-        aux_machinery_requirements: auxiliaryMachinery as unknown as Json,
-        weather_data: eventData.weather as unknown as Json || null,
-        print_excluded_sections: normalizeHojaDeRutaPrintSections(eventData.printExcludedSections) as unknown as Json,
-        updated_at: now,
-        last_modified: now,
-        last_modified_by: userId
-      };
-
-      console.log("🔄 SAVE: Upserting main data:", mainData);
-
-      const { data: savedMain, error: mainError } = await supabase
-        .from('hoja_de_ruta')
-        .upsert(mainData, { 
-          onConflict: 'job_id',
-          ignoreDuplicates: false 
-        })
-        .select()
-        .single();
-
-      if (mainError) {
-        console.error('❌ SAVE: Error saving main data:', mainError);
-        throw mainError;
-      }
-
-      console.log("✅ SAVE: Main data saved:", savedMain);
-
-      const hojaDeRutaId = savedMain.id;
-
-      // Save logistics data
-      const logisticsData = {
-        hoja_de_ruta_id: hojaDeRutaId,
-        loading_details: eventData.logistics?.loadingDetails || '',
-        unloading_details: eventData.logistics?.unloadingDetails || '',
-        equipment_logistics: eventData.logistics?.equipmentLogistics || ''
-      };
-
-      console.log("🔄 SAVE: Upserting logistics data:", logisticsData);
-
-      const { error: logisticsError } = await supabase
-        .from('hoja_de_ruta_logistics')
-        .upsert(logisticsData, { onConflict: 'hoja_de_ruta_id' });
-
-      if (logisticsError) {
-        console.error('❌ SAVE: Error saving logistics:', logisticsError);
-        throw logisticsError;
-      }
-
-      const transportRows = (eventData.logistics?.transport && Array.isArray(eventData.logistics.transport)
-        ? eventData.logistics.transport
-        : []
-      ).map(transport => ({
-        transport_type: transport.transport_type,
-        driver_name: transport.driver_name || '',
-        driver_phone: transport.driver_phone || '',
-        license_plate: transport.license_plate || '',
-        company: transport.company || null,
-        date_time: toSafeTimestamptz(transport.date_time),
-        has_return: transport.has_return || false,
-        return_date_time: toSafeTimestamptz(transport.return_date_time),
-        source_logistics_event_id: transport.source_logistics_event_id || null,
-        is_hoja_relevant: transport.is_hoja_relevant ?? true,
-        logistics_categories: transport.logistics_categories || [],
-      }));
-
-      const validContacts = eventData.contacts?.filter(c =>
-        c.name?.trim() || c.role?.trim() || c.phone?.trim()
-      ) || [];
-
-      const contactsRows = validContacts.map((contact) => ({
-          name: contact.name || '',
-          role: contact.role || '',
-          phone: contact.phone || '',
-          technician_id: contact.technician_id || null,
-      }));
-
-      const validStaff = eventData.staff?.filter(s =>
-        s.name?.trim() || s.surname1?.trim() || s.surname2?.trim() || s.position?.trim()
-      ) || [];
-
-      const staffRows = validStaff.map((staff) => ({
-          technician_id: staff.technician_id || null,
-          name: staff.name || '',
-          surname1: staff.surname1 || '',
-          surname2: staff.surname2 || '',
-          position: staff.position || '',
-          dni: staff.dni || '',
-      }));
-
-      console.log("🔄 SAVE: Replacing transport/contacts/staff data via single RPC", {
-        transportCount: transportRows.length,
-        contactsCount: contactsRows.length,
-        staffCount: staffRows.length,
+      const { data, error } = await supabase.rpc("save_hoja_de_ruta", {
+        p_job_id: jobId,
+        p_expected_version: expectedVersion,
+        p_payload: payload as unknown as Json,
       });
 
-      const { error: replaceAllError } = await supabase.rpc('replace_hoja_de_ruta_all', {
-        p_hoja_de_ruta_id: hojaDeRutaId,
-        p_transport_rows: transportRows,
-        p_contact_rows: contactsRows,
-        p_staff_rows: staffRows,
-      });
-
-      if (replaceAllError) {
-        console.error('❌ SAVE: Error replacing transport/contacts/staff via RPC:', replaceAllError);
-        throw replaceAllError;
-      }
-
-      console.log("✅ SAVE: All data saved successfully");
-      return savedMain;
+      if (error) throw error;
+      const saved = data?.[0];
+      if (!saved) throw new Error("El servidor no devolvió la Hoja de Ruta guardada");
+      return saved;
     },
-    onSuccess: (data) => {
-      console.log("🎉 SAVE: Success callback - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
+    onSuccess: (saved) => {
+      queryClient.setQueryData(queryKey, (current: typeof hojaDeRuta) => current
+        ? { ...current, document_version: saved.document_version }
+        : current);
+      void queryClient.invalidateQueries({ queryKey });
       onSuccess?.();
     },
-    onError: (error) => {
-      console.error("💥 SAVE: Error callback:", error);
-      onError?.(error);
-    },
-    onSettled: () => {
-      console.log("🏁 SAVE: Settled callback");
-      onSettled?.();
-    }
+    onError,
+    onSettled,
   });
 
-  // Save travel arrangements
-  const saveTravelArrangements = useMutation({
-    mutationFn: async (travelArrangements: TravelArrangement[]) => {
-      console.log("✈️ SAVE TRAVEL: Starting to save travel arrangements for job:", jobId);
-      console.log("📊 SAVE TRAVEL: Travel data:", travelArrangements);
-
-      if (!jobId) {
-        throw new Error('No job ID provided');
-      }
-
-      // First get the hoja de ruta ID
-      const { data: hojaDeRuta, error: fetchError } = await supabase
-        .from('hoja_de_ruta')
-        .select('id')
-        .eq('job_id', jobId)
-        .maybeSingle();
-
-      if (fetchError || !hojaDeRuta) {
-        console.error('❌ SAVE TRAVEL: Error fetching hoja de ruta:', fetchError);
-        throw new Error('Hoja de ruta not found. Please save the main data first.');
-      }
-
-      const hojaDeRutaId = hojaDeRuta.id;
-
-      // Delete existing travel arrangements
-      const { error: deleteError } = await supabase
-        .from('hoja_de_ruta_travel_arrangements')
-        .delete()
-        .eq('hoja_de_ruta_id', hojaDeRutaId);
-
-      if (deleteError) {
-        console.error('❌ SAVE TRAVEL: Error deleting old travel arrangements:', deleteError);
-        throw deleteError;
-      }
-
-      // Insert new travel arrangements if any
-      const validArrangements = travelArrangements.filter(arrangement => 
-        arrangement.transportation_type?.trim() ||
-        arrangement.pickup_address?.trim() ||
-        arrangement.pickup_time?.trim() ||
-        arrangement.departure_time?.trim() ||
-        arrangement.arrival_time?.trim()
-      );
-
-      if (validArrangements.length > 0) {
-        const travelData = validArrangements.map(arrangement => ({
-          hoja_de_ruta_id: hojaDeRutaId,
-          transportation_type: normalizeTravelTransportationType(arrangement.transportation_type),
-          pickup_address: arrangement.pickup_address || '',
-          pickup_time: arrangement.pickup_time || null,
-          flight_train_number: arrangement.flight_train_number || '',
-          departure_time: arrangement.departure_time || null,
-          arrival_time: arrangement.arrival_time || null,
-          driver_name: arrangement.driver_name || '',
-          driver_phone: arrangement.driver_phone || '',
-          plate_number: arrangement.plate_number || '',
-          notes: arrangement.notes || ''
-        }));
-
-        console.log("🔄 SAVE TRAVEL: Inserting travel data:", travelData);
-
-        const { error: insertError } = await supabase
-          .from('hoja_de_ruta_travel_arrangements')
-          .insert(travelData);
-
-        if (insertError) {
-          console.error('❌ SAVE TRAVEL: Error saving travel arrangements:', insertError);
-          throw insertError;
-        }
-      }
-
-      console.log("✅ SAVE TRAVEL: Travel arrangements saved successfully");
-      return travelArrangements;
-    },
-    onSuccess: () => {
-      console.log("🎉 SAVE TRAVEL: Success - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
-    },
-    onError: (error) => {
-      console.error("💥 SAVE TRAVEL: Error:", error);
-      onError?.(error);
-    }
-  });
-
-  // Save accommodations
-  const saveAccommodations = useMutation({
-    mutationFn: async (accommodations: Accommodation[]) => {
-      console.log("🏨 SAVE ACCOMMODATION: Starting to save accommodations for job:", jobId);
-      console.log("📊 SAVE ACCOMMODATION: Accommodation data:", accommodations);
-
-      if (!jobId) {
-        throw new Error('No job ID provided');
-      }
-
-      // First get the hoja de ruta ID
-      const { data: hojaDeRuta, error: fetchError } = await supabase
-        .from('hoja_de_ruta')
-        .select('id')
-        .eq('job_id', jobId)
-        .maybeSingle();
-
-      if (fetchError || !hojaDeRuta) {
-        console.error('❌ SAVE ACCOMMODATION: Error fetching hoja de ruta:', fetchError);
-        throw new Error('Hoja de ruta not found. Please save the main data first.');
-      }
-
-      const hojaDeRutaId = hojaDeRuta.id;
-
-      // Delete existing accommodations and their room assignments (cascade should handle rooms)
-      const { error: deleteError } = await supabase
-        .from('hoja_de_ruta_accommodations')
-        .delete()
-        .eq('hoja_de_ruta_id', hojaDeRutaId);
-
-      if (deleteError) {
-        console.error('❌ SAVE ACCOMMODATION: Error deleting old accommodations:', deleteError);
-        throw deleteError;
-      }
-
-      // Insert new accommodations if any
-      const validAccommodations = accommodations.filter(acc => 
-        acc.hotel_name?.trim() || acc.address?.trim()
-      );
-
-      if (validAccommodations.length > 0) {
-        for (const accommodation of validAccommodations) {
-          // Insert accommodation
-          const accommodationData = {
-            hoja_de_ruta_id: hojaDeRutaId,
-            hotel_name: accommodation.hotel_name || '',
-            address: accommodation.address || '',
-            check_in: accommodation.check_in || '',
-            check_out: accommodation.check_out || '',
-            latitude: accommodation.coordinates?.lat || null,
-            longitude: accommodation.coordinates?.lng || null
-          };
-
-          console.log("🔄 SAVE ACCOMMODATION: Inserting accommodation:", accommodationData);
-
-          const { data: savedAccommodation, error: accommodationError } = await supabase
-            .from('hoja_de_ruta_accommodations')
-            .insert(accommodationData)
-            .select()
-            .single();
-
-          if (accommodationError) {
-            console.error('❌ SAVE ACCOMMODATION: Error saving accommodation:', accommodationError);
-            throw accommodationError;
-          }
-
-          // Insert room assignments if any
-          const validRooms = accommodation.rooms?.filter(room => 
-            room.room_type?.trim() || room.room_number?.trim() || 
-            room.staff_member1_id?.trim() || room.staff_member2_id?.trim()
-          ) || [];
-
-          if (validRooms.length > 0) {
-            const roomsData = validRooms.map(room => ({
-              accommodation_id: savedAccommodation.id,
-              room_type: room.room_type,
-              room_number: room.room_number || '',
-              staff_member1_id: room.staff_member1_id || null,
-              staff_member2_id: room.staff_member2_id || null
-            }));
-
-            console.log("🔄 SAVE ACCOMMODATION: Inserting rooms:", roomsData);
-
-            const { error: roomsError } = await supabase
-              .from('hoja_de_ruta_room_assignments')
-              .insert(roomsData);
-
-            if (roomsError) {
-              console.error('❌ SAVE ACCOMMODATION: Error saving rooms:', roomsError);
-              throw roomsError;
-            }
-          }
-        }
-      }
-
-      console.log("✅ SAVE ACCOMMODATION: Accommodations saved successfully");
-      return accommodations;
-    },
-    onSuccess: () => {
-      console.log("🎉 SAVE ACCOMMODATION: Success - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
-    },
-    onError: (error) => {
-      console.error("💥 SAVE ACCOMMODATION: Error:", error);
-      onError?.(error);
-    }
-  });
-
-  // Save venue images
-  const saveVenueImages = useMutation({
-    mutationFn: async (images: { image_path: string; image_type: string }[]) => {
-      console.log("📸 SAVE IMAGES: Starting to save venue images for job:", jobId);
-      console.log("📊 SAVE IMAGES: Images data:", images);
-
-      if (!jobId) {
-        throw new Error('No job ID provided');
-      }
-
-      // First get the hoja de ruta ID
-      const { data: hojaDeRuta, error: fetchError } = await supabase
-        .from('hoja_de_ruta')
-        .select('id')
-        .eq('job_id', jobId)
-        .maybeSingle();
-
-      if (fetchError || !hojaDeRuta) {
-        console.error('❌ SAVE IMAGES: Error fetching hoja de ruta:', fetchError);
-        throw new Error('Hoja de ruta not found. Please save the main data first.');
-      }
-
-      const hojaDeRutaId = hojaDeRuta.id;
-
-      // Delete existing images
-      const { error: deleteError } = await supabase
-        .from('hoja_de_ruta_images')
-        .delete()
-        .eq('hoja_de_ruta_id', hojaDeRutaId);
-
-      if (deleteError) {
-        console.error('❌ SAVE IMAGES: Error deleting old images:', deleteError);
-        throw deleteError;
-      }
-
-      // Insert new images if any
-      if (images.length > 0) {
-        const imagesData = images.map(img => ({
-          hoja_de_ruta_id: hojaDeRutaId,
-          image_path: img.image_path,
-          image_type: img.image_type
-        }));
-
-        console.log("🔄 SAVE IMAGES: Inserting images data:", imagesData);
-
-        const { error: insertError } = await supabase
-          .from('hoja_de_ruta_images')
-          .insert(imagesData);
-
-        if (insertError) {
-          console.error('❌ SAVE IMAGES: Error saving images:', insertError);
-          throw insertError;
-        }
-      }
-
-      console.log("✅ SAVE IMAGES: Images saved successfully");
-      return images;
-    },
-    onSuccess: () => {
-      console.log("🎉 SAVE IMAGES: Success - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
-    },
-    onError: (error) => {
-      console.error("💥 SAVE IMAGES: Error:", error);
-      onError?.(error);
-    }
-  });
-
-  // Force a manual refetch of the data with cache invalidation
-  const refreshData = useCallback(() => {
-    if (jobId) {
-      console.log("🔄 REFRESH: Manually refreshing data for job:", jobId);
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
-    }
-  }, [jobId, queryClient]);
+  const forceRefetch = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey });
+    return refetch();
+  }, [queryClient, queryKey, refetch]);
 
   return {
-    hojaDeRuta: hojaDeRuta || null,
+    hojaDeRuta,
     isLoading,
     isFetching,
     fetchError,
-    saveHojaDeRuta: saveHojaDeRuta.mutateAsync,
-    isSaving: saveHojaDeRuta.isPending,
-    saveTravelArrangements: saveTravelArrangements.mutateAsync,
-    isSavingTravel: saveTravelArrangements.isPending,
-    saveRoomAssignments: saveAccommodations.mutateAsync, // Alias for backward compatibility
-    isSavingRooms: saveAccommodations.isPending,
-    saveAccommodations: saveAccommodations.mutateAsync,
-    saveVenueImages: saveVenueImages.mutateAsync,
-    isSavingImages: saveVenueImages.isPending,
-    refreshData,
-    resetSaveMutation: saveHojaDeRuta.reset,
-    resetTravelMutation: saveTravelArrangements.reset,
-    resetRoomsMutation: saveAccommodations.reset,
-    resetImagesMutation: saveVenueImages.reset,
+    saveAll: saveAll.mutateAsync,
+    isSaving: saveAll.isPending,
+    forceRefetch,
   };
 };
