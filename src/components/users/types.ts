@@ -19,6 +19,7 @@ export type Profile = {
   flex_resource_id?: string | null;
   soundvision_access_enabled?: boolean | null;
   soundvision_tool_access_enabled?: boolean | null;
+  waha_endpoint?: string | null;
   autonomo?: boolean | null;
   seasonal_house_tech?: boolean | null;
   seasonal_house_tech_start_date?: string | null;

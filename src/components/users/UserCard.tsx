@@ -6,6 +6,7 @@ import { Profile } from "./types";
 import { AlertTriangle, Pencil, Trash2, Award, Trophy } from "lucide-react";
 import { formatUserName } from "@/utils/userName";
 import { getDepartmentLabel } from "@/types/department";
+import { getWahaEndpointLabel } from "@/constants/wahaEndpoints";
 
 interface UserCardProps {
   user: Profile;
@@ -42,11 +43,12 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
           </HoverCardTrigger>
           <HoverCardContent className="w-80">
             <div className="space-y-2">
-              <h4 className="text-sm font-semibold">User Details</h4>
+              <h4 className="text-sm font-semibold">Detalles del usuario</h4>
               <div className="text-sm">
-                <p><span className="font-medium">Phone:</span> {user.phone || 'Not provided'}</p>
-                <p><span className="font-medium">DNI/NIE:</span> {user.dni || 'Not provided'}</p>
-                <p><span className="font-medium">Residencia:</span> {user.residencia || 'Not provided'}</p>
+                <p><span className="font-medium">Teléfono:</span> {user.phone || 'No indicado'}</p>
+                <p><span className="font-medium">DNI/NIE:</span> {user.dni || 'No indicado'}</p>
+                <p><span className="font-medium">Residencia:</span> {user.residencia || 'No indicada'}</p>
+                <p><span className="font-medium">WAHA:</span> {user.waha_endpoint ? getWahaEndpointLabel(user.waha_endpoint) : 'Sin asignar'}</p>
               </div>
             </div>
           </HoverCardContent>
