@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -74,7 +74,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
   const [searchParams] = useSearchParams();
   const routedJobId = jobId ?? searchParams.get("jobId") ?? searchParams.get("openHojaDeRuta") ?? undefined;
   const [activeTab, setActiveTab] = useState("event");
-  const [completionProgress, setCompletionProgress] = useState(0);
+
 
   // Get image management functions first (needed for form hook)
   const {
@@ -83,33 +83,14 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     venueMapPreview,
     handleImageUpload,
     removeImage,
-    handleVenueMapInputChange,
+    handleVenueMapUpload,
     handleVenueMapUrl,
     appendVenuePreviews,
+    hydratePersistedImages,
+    prepareImagesForSave,
+    commitImageSave,
+    isImageDirty,
   } = useHojaDeRutaImages();
-
-  // Convert image previews to database format
-  const venueImagesForSave = React.useMemo(() => {
-    const imageList: { image_path: string; image_type: string }[] = [];
-    
-    // Add venue images
-    imagePreviews.venue?.forEach((preview) => {
-      imageList.push({
-        image_path: preview,
-        image_type: 'venue'
-      });
-    });
-    
-    // Add venue map if available
-    if (venueMapPreview) {
-      imageList.push({
-        image_path: venueMapPreview,
-        image_type: 'venue_map'
-      });
-    }
-    
-    return imageList;
-  }, [imagePreviews.venue, venueMapPreview]);
 
   // Use the working hooks - single call to avoid state conflicts
   const {
@@ -130,6 +111,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasSavedData,
     hasBasicJobData,
     isDirty,
+    hasExternalConflict,
     autoPopulateFromJob,
     // Form handlers
     handleContactChange,
@@ -150,7 +132,11 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     addTransport,
     removeTransport,
     importTransports
-  } = useHojaDeRutaForm(venueImagesForSave);
+  } = useHojaDeRutaForm({
+    prepareImagesForSave,
+    commitImageSave,
+    isImageDirty,
+  });
 
   // If a jobId is provided from parent or route query, lock selection to that job
   useEffect(() => {
@@ -159,29 +145,26 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     }
   }, [routedJobId, selectedJobId, setSelectedJobId]);
 
-  // Calculate completion progress including weather and restaurants
+  const completionProgress = useMemo(() => {
+    const checks = [
+      Boolean(eventData.eventName && eventData.eventDates),
+      Boolean(eventData.venue.name && eventData.venue.address),
+      Boolean(eventData.weather?.length),
+      eventData.contacts.some((contact) => Boolean(contact.name && (contact.phone || contact.email))),
+      eventData.staff.some((staff) => Boolean(staff.name && staff.position)),
+      travelArrangements.some((travel) => Boolean(travel.transportation_type)),
+      accommodations.some((acc) => Boolean(acc.hotel_name || acc.rooms.some((room) => room.room_type))),
+      Boolean(eventData.logistics.transport.length || eventData.logistics.loadingDetails),
+      Boolean(eventData.schedule || eventData.programScheduleDays?.some((day) => day.rows.length)),
+      Boolean(eventData.restaurants?.some((restaurant) => restaurant.isSelected)),
+    ];
+    return (checks.filter(Boolean).length / checks.length) * 100;
+  }, [accommodations, eventData, travelArrangements]);
+
   useEffect(() => {
-    const calculateProgress = () => {
-      let completed = 0;
-      const total = 10; // Updated to include restaurants
-
-      // Check completion of each section
-      if (eventData.eventName && eventData.eventDates) completed++;
-      if (eventData.venue.name && eventData.venue.address) completed++;
-      if (eventData.weather && eventData.weather.length > 0) completed++;
-      if (eventData.contacts.some(c => c.name && c.phone)) completed++;
-      if (eventData.staff.some(s => s.name && s.position)) completed++;
-      if (travelArrangements.some(t => t.transportation_type)) completed++;
-      if (accommodations.some(acc => acc.hotel_name || acc.rooms.some(r => r.room_type))) completed++;
-      if (eventData.logistics.transport || eventData.logistics.loadingDetails) completed++;
-      if (eventData.schedule) completed++;
-      if (eventData.restaurants && eventData.restaurants.some(r => r.isSelected)) completed++;
-
-      setCompletionProgress((completed / total) * 100);
-    };
-
-    calculateProgress();
-  }, [eventData, travelArrangements, accommodations]);
+    if (!selectedJobId || !hojaDeRuta) return;
+    void hydratePersistedImages(selectedJobId, hojaDeRuta.images || []);
+  }, [hojaDeRuta, hydratePersistedImages, selectedJobId]);
 
   const {
     generatingSectionId,
@@ -229,18 +212,11 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     }
 
     try {
-      const autoPopulatedData = await autoPopulateFromJob();
-
-      if (autoPopulatedData && Object.keys(autoPopulatedData).length > 0) {
-        setEventData(prev => ({
-          ...prev,
-          ...autoPopulatedData,
-        }));
-      }
+      await autoPopulateFromJob(selectedJobId);
     } catch (error) {
       console.error("Error loading job data:", error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: "No se pudieron cargar los datos del trabajo.",
         variant: "destructive",
       });
@@ -384,10 +360,12 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                   <DataSourceIcon className="w-3 h-3 mr-1" />
                   {dataSourceInfo.text}
                 </Badge>
-                {isDirty && (
-                  <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                    💾 Cambios sin guardar
-                  </Badge>
+                {hasExternalConflict ? (
+                  <Badge variant="destructive">Conflicto de edición</Badge>
+                ) : isDirty ? (
+                  <Badge variant="outline">Cambios sin guardar</Badge>
+                ) : (
+                  <Badge variant="secondary">Guardado</Badge>
                 )}
               </div>
               <div className="hidden md:block">
@@ -414,27 +392,27 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
           <div className="mt-2 md:mt-3 text-[11px] md:text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!selectedJobId && (
               <span className="text-amber-600 font-medium">
-                ⚠️ Selecciona un trabajo para comenzar
+                Selecciona un trabajo para comenzar
               </span>
             )}
             {selectedJobId && !isInitialized && (
               <span className="text-blue-600 font-medium">
-                ⏳ Inicializando...
+                Inicializando...
               </span>
             )}
             {selectedJobId && isInitialized && hasSavedData && (
               <span className="text-green-600 font-medium">
-                ✅ Datos guardados cargados
+                Datos guardados cargados
               </span>
             )}
             {selectedJobId && isInitialized && !hasSavedData && hasBasicJobData && (
               <span className="text-blue-600 font-medium">
-                📋 Datos básicos cargados
+                Datos básicos cargados
               </span>
             )}
             {selectedJobId && isInitialized && eventData.staff.some(s => s.name || s.position) && (
               <span className="text-purple-600 font-medium">
-                👥 Personal: {eventData.staff.filter(s => s.name || s.position).length} asignado(s)
+                Personal: {eventData.staff.filter(s => s.name || s.position).length} asignado(s)
               </span>
             )}
           </div>
@@ -487,7 +465,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                         isLoadingJobs={isLoadingJobs}
                         jobDetails={null}
                         onAutoPopulate={handleLoadJobData}
-                        hideJobSelection={!!jobId}
+                        hideJobSelection={Boolean(routedJobId)}
                         isPrintSectionExcluded={isPrintSectionExcluded}
                         onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
@@ -501,12 +479,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                         imagePreviews={imagePreviews}
                         onImageUpload={handleImageUpload}
                         onRemoveImage={removeImage}
-                        onVenueMapUpload={(file: File) => {
-                          const fakeEvent = {
-                            target: { files: [file] }
-                          } as unknown as React.ChangeEvent<HTMLInputElement>;
-                          handleVenueMapInputChange(fakeEvent);
-                        }}
+                        onVenueMapUpload={handleVenueMapUpload}
                         handleVenueMapUrl={handleVenueMapUrl}
                         appendVenuePreviews={appendVenuePreviews}
                         isPrintSectionExcluded={isPrintSectionExcluded}
