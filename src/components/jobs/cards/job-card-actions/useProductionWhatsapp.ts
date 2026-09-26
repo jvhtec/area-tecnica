@@ -7,11 +7,9 @@ import {
   formatDateGroupLabel,
   resolveSuggestedCallTime,
 } from "@/components/jobs/cards/job-card-actions/jobActionFormatters";
-import {
-  pickLatestJobHojaDeRutaDocument,
-  pickLatestLinkedJobHojaDeRutaDocument,
-  pickLatestTourHojaDeRutaDocument,
-  type HojaDeRutaAttachmentRow,
+import type {
+  HojaDeRutaAttachmentDoc,
+  HojaDeRutaAttachmentRow,
 } from "@/components/jobs/cards/job-card-actions/hojaDeRutaAttachment";
 import {
   MADRID_TIME_ZONE,
@@ -126,63 +124,55 @@ export const useProductionWhatsapp = ({
     queryKey: [
       ...createQueryKey.whatsapp.prodHojaDeRutaDocByJob(job.id),
       job.tour_date_id ?? null,
-      job.tour_id ?? job.tour?.id ?? null,
     ],
     queryFn: async (): Promise<WaProdHojaDeRutaDoc | null> => {
-      const findJobHojaDocument = async (jobId: string): Promise<WaProdHojaDeRutaDoc | null> => {
-        const { data, error } = await dataLayerClient.from("job_documents")
-          .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
+      const findPublishedJobHoja = async (jobId: string): Promise<HojaDeRutaAttachmentDoc | null> => {
+        const { data: hoja, error: hojaError } = await dataLayerClient
+          .from("hoja_de_ruta")
+          .select("published_document_id")
           .eq("job_id", jobId)
-          .order("uploaded_at", { ascending: false })
-          .limit(25);
-
-        if (error) throw error;
-        return pickLatestJobHojaDeRutaDocument(data as HojaDeRutaAttachmentRow[] | null, jobId);
-      };
-
-      const directJobDoc = await findJobHojaDocument(job.id);
-      if (directJobDoc) return directJobDoc;
-
-      if (job.tour_date_id) {
-        const { data: hojaRows, error: hojaError } = await dataLayerClient.from("hoja_de_ruta")
-          .select("job_id")
-          .eq("tour_date_id", job.tour_date_id)
-          .order("created_at", { ascending: false });
+          .maybeSingle();
 
         if (hojaError) throw hojaError;
+        const documentId = hoja?.published_document_id;
+        if (!documentId) return null;
 
-        const linkedJobIds = Array.from(new Set(
-          ((hojaRows as Array<{ job_id: string | null }> | null) || [])
-            .map((row) => row.job_id)
-            .filter((id): id is string => Boolean(id && id !== job.id))
-        ));
+        const { data: doc, error: docError } = await dataLayerClient
+          .from("job_documents")
+          .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
+          .eq("id", documentId)
+          .eq("job_id", jobId)
+          .eq("document_kind", "hoja_de_ruta")
+          .maybeSingle();
 
-        if (linkedJobIds.length > 0) {
-          const { data: linkedDocs, error: linkedDocsError } = await dataLayerClient.from("job_documents")
-            .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
-            .in("job_id", linkedJobIds)
-            .order("uploaded_at", { ascending: false });
+        if (docError) throw docError;
+        if (!doc?.file_path) return null;
+        return {
+          ...(doc as HojaDeRutaAttachmentRow),
+          source: "job_documents",
+        };
+      };
 
-          if (linkedDocsError) throw linkedDocsError;
-          const linkedJobDoc = pickLatestLinkedJobHojaDeRutaDocument(
-            linkedDocs as HojaDeRutaAttachmentRow[] | null,
-            linkedJobIds
-          );
-          if (linkedJobDoc) return linkedJobDoc;
-        }
+      const direct = await findPublishedJobHoja(job.id);
+      if (direct) return direct;
+
+      if (!job.tour_date_id) return null;
+
+      const { data: linkedRows, error: linkedError } = await dataLayerClient
+        .from("hoja_de_ruta")
+        .select("job_id,updated_at")
+        .eq("tour_date_id", job.tour_date_id)
+        .neq("job_id", job.id)
+        .not("published_document_id", "is", null)
+        .order("updated_at", { ascending: false });
+
+      if (linkedError) throw linkedError;
+      for (const linked of linkedRows || []) {
+        if (!linked.job_id) continue;
+        const doc = await findPublishedJobHoja(linked.job_id);
+        if (doc) return doc;
       }
-
-      const tourId = job.tour_id || job.tour?.id || null;
-      if (!tourId) return null;
-
-      const { data: tourDocs, error: tourDocsError } = await dataLayerClient.from("tour_documents")
-        .select("id, file_name, file_path, file_type, uploaded_at")
-        .eq("tour_id", tourId)
-        .order("uploaded_at", { ascending: false })
-        .limit(25);
-
-      if (tourDocsError) throw tourDocsError;
-      return pickLatestTourHojaDeRutaDocument(tourDocs as HojaDeRutaAttachmentRow[] | null);
+      return null;
     },
     enabled: Boolean(waProdOpen && canSendProductionWhatsapp && job?.id),
     staleTime: 30_000,
