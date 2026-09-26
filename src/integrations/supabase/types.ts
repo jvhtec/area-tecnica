@@ -13242,6 +13242,10 @@ export type Database = {
           id: string
         }[]
       }
+      publish_hoja_de_ruta_document: {
+        Args: { p_document_id: string; p_job_id: string }
+        Returns: string[]
+      }
       replace_hoja_de_ruta_all: {
         Args: {
           p_contact_rows: Json
