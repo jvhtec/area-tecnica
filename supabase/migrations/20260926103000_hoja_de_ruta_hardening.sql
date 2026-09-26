@@ -61,6 +61,50 @@ create index if not exists idx_hoja_de_ruta_published_document_id
   on public.hoja_de_ruta (published_document_id)
   where published_document_id is not null;
 
+-- Programa reminders require durable row identity. Backfill historical JSON once
+-- in the migration, never during reads or push ticks.
+update public.hoja_de_ruta h
+set program_schedule_json = (
+  select jsonb_agg(
+    case
+      when jsonb_typeof(day_value->'rows') = 'array' then
+        jsonb_set(
+          day_value,
+          '{rows}',
+          coalesce((
+            select jsonb_agg(
+              case
+                when nullif(btrim(coalesce(row_value->>'id', '')), '') is null
+                  then row_value || jsonb_build_object('id', gen_random_uuid())
+                else row_value
+              end
+              order by row_ord
+            )
+            from jsonb_array_elements(day_value->'rows') with ordinality
+              as rows(row_value, row_ord)
+          ), '[]'::jsonb),
+          true
+        )
+      else day_value
+    end
+    order by day_ord
+  )
+  from jsonb_array_elements(h.program_schedule_json) with ordinality
+    as days(day_value, day_ord)
+)
+where jsonb_typeof(h.program_schedule_json) = 'array'
+  and exists (
+    select 1
+    from jsonb_array_elements(h.program_schedule_json) as day_value
+    cross join lateral jsonb_array_elements(
+      case
+        when jsonb_typeof(day_value->'rows') = 'array' then day_value->'rows'
+        else '[]'::jsonb
+      end
+    ) as row_value
+    where nullif(btrim(coalesce(row_value->>'id', '')), '') is null
+  );
+
 -- Existing generated Hoja PDFs live in this canonical folder. Marking only
 -- canonical paths avoids turning arbitrary customer uploads with "hoja" in
 -- the filename into published route sheets.
