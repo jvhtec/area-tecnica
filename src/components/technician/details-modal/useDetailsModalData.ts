@@ -13,7 +13,6 @@ import {
   openRider,
   openTourDocument,
 } from "@/components/technician/details-modal/documentActions";
-import { isUuidLike } from "@/components/technician/details-modal/formatters";
 import type {
   DetailsModalProps,
   FestivalShiftAssignment,
@@ -25,7 +24,6 @@ import type {
   HojaDeRutaTravelArrangement,
   JobArtist,
   RiderFile,
-  RoomOccupantProfile,
   TechShiftAssignmentDetail,
   TabId,
 } from "@/components/technician/details-modal/types";
@@ -40,8 +38,7 @@ import { createQueryKey } from "@/lib/react-query";
 import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from "@/types/job";
-import type { WeatherData } from "@/types/hoja-de-ruta";
-import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
+import type { Restaurant, WeatherData } from "@/types/hoja-de-ruta";
 import { isTechnicianRole } from "@/utils/permissions";
 import { labelForCode } from "@/utils/roles";
 
@@ -52,6 +49,17 @@ type JobDetailsRow = JobWithLocationAndDocs & {
 type JobDateType = {
   date: string;
   type: string;
+};
+
+type TechHojaAccommodation = HojaDeRutaAccommodation & {
+  rooms?: HojaDeRutaAccommodation["hoja_de_ruta_room_assignments"];
+};
+
+type TechHojaAggregate = {
+  main?: (HojaDeRutaMeta & { restaurants_info?: unknown }) | null;
+  accommodations?: TechHojaAccommodation[] | null;
+  travelArrangements?: HojaDeRutaTravelArrangement[] | null;
+  transport?: HojaDeRutaTransport[] | null;
 };
 
 const supabaseForDocuments = dataLayerClient as SupabaseClient;
@@ -255,144 +263,64 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose, initialTab, o
     enabled: artistIdList.length > 0,
   });
 
-  const { data: hojaDeRutaMeta, isLoading: hojaDeRutaLoading } = useQuery({
+  const { data: hojaAggregate, isLoading: hojaDeRutaLoading } = useQuery({
     queryKey: createQueryKey.technicianJobModal.hojaDeRutaMeta(job?.id),
-    queryFn: async () => {
+    queryFn: async (): Promise<TechHojaAggregate | null> => {
       if (!job?.id) return null;
-      const { data, error } = await dataLayerClient.from("hoja_de_ruta")
-        .select("id")
-        .eq("job_id", job.id)
-        .maybeSingle();
+      const { data, error } = await dataLayerClient.rpc("get_hoja_de_ruta", {
+        p_job_id: job.id,
+      });
 
       if (error) {
-        console.warn("No se pudo cargar hoja de ruta para el técnico:", error.message);
+        console.warn("No se pudo cargar la Hoja de Ruta agregada para el técnico:", error.message);
         return null;
       }
 
-      return data as HojaDeRutaMeta | null;
+      return data && typeof data === "object" && !Array.isArray(data)
+        ? data as unknown as TechHojaAggregate
+        : null;
     },
     enabled: !!job?.id,
   });
 
+  const hojaDeRutaMeta = hojaAggregate?.main || null;
   const hojaDeRutaId = hojaDeRutaMeta?.id || null;
 
-  const { data: hojaAccommodations = [], isLoading: hojaAccommodationsLoading } = useQuery({
-    queryKey: createQueryKey.technicianJobModal.hojaAccommodations(hojaDeRutaId),
-    queryFn: async () => {
-      if (!hojaDeRutaId) return [];
-      const { data, error } = await dataLayerClient.from("hoja_de_ruta_accommodations")
-        .select(`
-          id,
-          hotel_name,
-          address,
-          check_in,
-          check_out,
-          hoja_de_ruta_room_assignments(
-            id,
-            room_type,
-            room_number,
-            staff_member1_id,
-            staff_member2_id
-          )
-        `)
-        .eq("hoja_de_ruta_id", hojaDeRutaId)
-        .order("check_in", { ascending: true });
+  const hojaAccommodations = useMemo<HojaDeRutaAccommodation[]>(
+    () => (hojaAggregate?.accommodations || []).map((accommodation) => ({
+      ...accommodation,
+      hoja_de_ruta_room_assignments:
+        accommodation.rooms || accommodation.hoja_de_ruta_room_assignments || [],
+    })),
+    [hojaAggregate?.accommodations],
+  );
+  const hojaTravelArrangements = useMemo(
+    () => hojaAggregate?.travelArrangements || [],
+    [hojaAggregate?.travelArrangements],
+  );
+  const hojaTransportEntries = useMemo(
+    () => (hojaAggregate?.transport || []).filter((entry) => {
+      const candidate = entry as HojaDeRutaTransport & { is_hoja_relevant?: boolean | null };
+      return candidate.is_hoja_relevant !== false;
+    }),
+    [hojaAggregate?.transport],
+  );
 
-      if (error) {
-        console.warn("No se pudo cargar alojamientos de hoja de ruta:", error.message);
-        return [];
-      }
+  const restaurants = useMemo<Restaurant[]>(() => {
+    const info = hojaAggregate?.main?.restaurants_info;
+    if (!info || typeof info !== "object" || Array.isArray(info)) return [];
+    const raw = (info as { restaurants?: unknown }).restaurants;
+    return Array.isArray(raw)
+      ? raw.filter((item): item is Restaurant =>
+          Boolean(item && typeof item === "object" && !Array.isArray(item))
+        )
+      : [];
+  }, [hojaAggregate?.main?.restaurants_info]);
 
-      return (data || []) as HojaDeRutaAccommodation[];
-    },
-    enabled: !!hojaDeRutaId,
-  });
-
-  const { data: hojaTravelArrangements = [], isLoading: hojaTravelLoading } = useQuery({
-    queryKey: createQueryKey.technicianJobModal.hojaTravelArrangements(hojaDeRutaId),
-    queryFn: async () => {
-      if (!hojaDeRutaId) return [];
-      const { data, error } = await dataLayerClient.from("hoja_de_ruta_travel_arrangements")
-        .select(`
-          id,
-          transportation_type,
-          pickup_address,
-          pickup_time,
-          departure_time,
-          arrival_time,
-          flight_train_number,
-          driver_name,
-          driver_phone,
-          plate_number,
-          notes
-        `)
-        .eq("hoja_de_ruta_id", hojaDeRutaId)
-        .order("pickup_time", { ascending: true });
-
-      if (error) {
-        console.warn("No se pudo cargar traslados de hoja de ruta:", error.message);
-        return [];
-      }
-
-      return (data || []) as HojaDeRutaTravelArrangement[];
-    },
-    enabled: !!hojaDeRutaId,
-  });
-
-  const { data: hojaTransportEntries = [], isLoading: hojaTransportLoading } = useQuery({
-    queryKey: createQueryKey.technicianJobModal.hojaTransport(hojaDeRutaId),
-    queryFn: async () => {
-      if (!hojaDeRutaId) return [];
-      const { data, error } = await dataLayerClient.from("hoja_de_ruta_transport")
-        .select(`
-          id,
-          transport_type,
-          driver_name,
-          driver_phone,
-          license_plate,
-          company,
-          date_time,
-          has_return,
-          return_date_time,
-          logistics_categories
-        `)
-        .eq("hoja_de_ruta_id", hojaDeRutaId)
-        .or("is_hoja_relevant.eq.true,is_hoja_relevant.is.null")
-        .order("date_time", { ascending: true });
-
-      if (error) {
-        console.warn("No se pudo cargar transporte logístico de hoja de ruta:", error.message);
-        return [];
-      }
-
-      return (data || []) as HojaDeRutaTransport[];
-    },
-    enabled: !!hojaDeRutaId,
-  });
-
-  const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
-    queryKey: createQueryKey.jobDetailsModal.restaurants(job?.id, jobDetails?.locations?.formatted_address),
-    queryFn: async () => {
-      const locationData = jobDetails?.locations;
-      const address = locationData?.formatted_address || locationData?.name;
-
-      if (!address && !locationData?.latitude) {
-        return [];
-      }
-
-      const coordinates = locationData?.latitude && locationData?.longitude
-        ? { lat: Number(locationData.latitude), lng: Number(locationData.longitude) }
-        : undefined;
-
-      return await PlacesRestaurantService.searchRestaurantsNearVenue(
-        address || `${coordinates?.lat},${coordinates?.lng}`,
-        2000,
-        10,
-        coordinates,
-      );
-    },
-    enabled: !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude)),
-  });
+  const hojaAccommodationsLoading = hojaDeRutaLoading;
+  const hojaTravelLoading = hojaDeRutaLoading;
+  const hojaTransportLoading = hojaDeRutaLoading;
+  const isRestaurantsLoading = hojaDeRutaLoading;
 
   const startTime = jobDetails?.start_time || job?.start_time;
   const endTime = jobDetails?.end_time || job?.end_time;
