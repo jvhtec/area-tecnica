@@ -27,7 +27,7 @@ export interface HojaDeRutaMetadata {
 }
 
 export interface TravelArrangement {
-  id: string;
+  id?: string;
   transportation_type?: string;
   pickup_address?: string;
   pickup_time?: string; // ISO datetime string (e.g., "2025-02-26T14:30:00+00:00")
@@ -57,7 +57,7 @@ export interface Transport {
 }
 
 export interface RoomAssignment {
-  id: string;
+  id?: string;
   /** Always set: `addRoom` seeds 'single' and the loader maps a NOT NULL column. */
   room_type: string;
   room_number?: string;
