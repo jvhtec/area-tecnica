@@ -17,8 +17,9 @@ import {
 } from "./fleetModel";
 import type { DriverLiveLocation } from "./tracking";
 
-// The fleet tables and RPCs postdate the generated Supabase types, so calls go
-// through these untyped seams and every payload is normalised field by field.
+// Several logistics RPCs and the newest fleet columns postdate the production-
+// generated Supabase snapshot. Keep that temporary boundary isolated here and
+// normalise RPC payloads field by field.
 type RpcResult = { data: unknown; error: { message?: string } | null };
 type UntypedRpc = (name: string, args?: Record<string, unknown>) => PromiseLike<RpcResult>;
 
@@ -26,8 +27,8 @@ type UntypedRpc = (name: string, args?: Record<string, unknown>) => PromiseLike<
 const rpc: UntypedRpc = (name, args) =>
   (dataLayerClient.rpc as unknown as UntypedRpc).call(dataLayerClient, name, args);
 
-const fleetTable = "fleet_vehicles" as never;
-const driverDetailsTable = "driver_details" as never;
+const fleetTable = "fleet_vehicles";
+const driverDetailsTable = "driver_details";
 
 const throwIfError = (error: { message?: string } | null, fallback: string) => {
   if (error) throw new Error(error.message || fallback);
@@ -74,6 +75,11 @@ const toVehicle = (value: unknown): FleetVehicle => {
     insurance_expiry: strOrNull(row.insurance_expiry),
     notes: strOrNull(row.notes),
     is_active: row.is_active !== false,
+    berth_layouts: asArray(row.berth_layouts)
+      .map(numOrNull)
+      .filter((value): value is number => value !== null)
+      .sort((a, b) => a - b),
+    passenger_seats: numOrNull(row.passenger_seats),
   };
 };
 
@@ -105,6 +111,8 @@ const toEvent = (value: unknown): MatrixTransportEvent => {
     transport_type: str(row.transport_type),
     event_date: str(row.event_date),
     event_time: str(row.event_time) || "00:00:00",
+    end_date: strOrNull(row.end_date),
+    end_time: strOrNull(row.end_time),
     timezone: str(row.timezone) || "Europe/Madrid",
     title: strOrNull(row.title),
     color: strOrNull(row.color),
@@ -112,6 +120,11 @@ const toEvent = (value: unknown): MatrixTransportEvent => {
     job_title: strOrNull(row.job_title),
     license_plate: strOrNull(row.license_plate),
     transport_provider: strOrNull(row.transport_provider),
+    berth_count: numOrNull(row.berth_count),
+    job_crew_count: numOrNull(row.job_crew_count),
+    passenger_count: numOrNull(row.passenger_count),
+    movement_type: strOrNull(row.movement_type),
+    origin_location_id: strOrNull(row.origin_location_id),
     loading_bay: strOrNull(row.loading_bay),
     notes: strOrNull(row.notes),
     transport_request_id: strOrNull(row.transport_request_id),
@@ -155,6 +168,10 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     transport_type: str(row.transport_type),
     event_date: str(row.event_date),
     event_time: str(row.event_time),
+    end_date: strOrNull(row.end_date),
+    end_time: strOrNull(row.end_time),
+    passenger_count: numOrNull(row.passenger_count),
+    movement_type: strOrNull(row.movement_type),
     timezone: str(row.timezone) || "Europe/Madrid",
     title: strOrNull(row.title),
     job_id: strOrNull(row.job_id),
@@ -167,6 +184,10 @@ const toMyAssignment = (value: unknown): MyTransportAssignment => {
     location_address: strOrNull(row.location_address),
     location_lat: numOrNull(row.location_lat),
     location_lng: numOrNull(row.location_lng),
+    pickup_name: strOrNull(row.pickup_name),
+    pickup_address: strOrNull(row.pickup_address),
+    pickup_lat: numOrNull(row.pickup_lat),
+    pickup_lng: numOrNull(row.pickup_lng),
     vehicle: vehicle
       ? {
           id: str(vehicle.id),
@@ -358,6 +379,29 @@ export async function fetchOwnDriverDetails(profileId: string): Promise<DriverDe
   };
 }
 
+export type JobCrewCount = { total: number; confirmed: number };
+
+/**
+ * People assigned to a job who have not declined, for sleeper-bus berth planning.
+ * Same rule as job_crew_count in get_logistics_matrix; invited technicians count
+ * because they need a berth if they accept.
+ */
+export async function fetchJobCrewCount(jobId: string): Promise<JobCrewCount> {
+  const { data, error } = await dataLayerClient
+    .from("job_assignments")
+    .select("technician_id, external_technician_name, status")
+    .eq("job_id", jobId);
+  throwIfError(error, "No se pudo cargar el personal del trabajo");
+  const people = new Map<string, boolean>();
+  for (const row of data ?? []) {
+    if (row.status === "declined") continue;
+    const key = row.technician_id ?? row.external_technician_name;
+    if (!key) continue;
+    people.set(key, people.get(key) === true || row.status === "confirmed");
+  }
+  return { total: people.size, confirmed: [...people.values()].filter(Boolean).length };
+}
+
 // ---------------------------------------------------------------------------
 // Fleet and driver details management
 // ---------------------------------------------------------------------------
@@ -379,6 +423,9 @@ export async function saveFleetVehicle(input: FleetVehicleInput): Promise<void> 
     insurance_expiry: input.insurance_expiry || null,
     notes: input.notes?.trim() || null,
     is_active: input.is_active,
+    // The database clears these on anything that is not a sleeper bus.
+    berth_layouts: input.vehicle_type === "sleeper_bus" ? input.berth_layouts : [],
+    passenger_seats: input.passenger_seats,
   };
   const { error } = input.id
     ? await dataLayerClient.from(fleetTable).update(row as never).eq("id", input.id)
@@ -410,7 +457,7 @@ export async function saveDriverDetails(input: DriverDetailsInput): Promise<void
       adr_certified: input.adr_certified,
       default_vehicle_id: input.default_vehicle_id || null,
       notes: input.notes?.trim() || null,
-    } as never,
+    },
     { onConflict: "profile_id" },
   );
   throwIfError(error, "No se pudieron guardar los datos del conductor");

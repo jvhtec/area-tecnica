@@ -16,7 +16,7 @@ import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/ut
 
 import { queryKeys } from "@/lib/react-query";
 import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
-import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+import { isLogisticsEventOnDay, type LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface LogisticsCalendarProps {
   onDateSelect?: (date: Date) => void;
@@ -82,7 +82,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
   const getDayEvents = (date: Date) => {
     if (!events) return [];
     const dateKey = format(date, "yyyy-MM-dd");
-    return events.filter((event) => event.event_date === dateKey);
+    return events.filter((event) => isLogisticsEventOnDay(event, dateKey));
   };
 
   const handlePreviousMonth = () => {

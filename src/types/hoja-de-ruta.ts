@@ -46,7 +46,7 @@ export interface Transport {
   driver_name?: string;
   driver_phone?: string;
   license_plate?: string;
-  company?: "pantoja" | "transluminaria" | "transcamarena" | "wild tour" | "camionaje" | "sector-pro" | "crespo" | "montabi_dorado" | "grupo_sese" | "nacex" | "recogida_cliente" | "other";
+  company?: "pantoja" | "transluminaria" | "transcamarena" | "wild tour" | "camionaje" | "sector-pro" | "crespo" | "montabi_dorado" | "grupo_sese" | "nacex" | "montoya" | "recogida_cliente" | "other";
   date_time?: string;
   has_return?: boolean;
   return_date_time?: string;

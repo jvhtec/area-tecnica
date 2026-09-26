@@ -51,6 +51,12 @@ export class Formatters {
       'wild tour': 'Wild Tour',
       'camionaje': 'Camionaje',
       'sector-pro': 'Sector-Pro',
+      'crespo': 'Crespo',
+      'montabi_dorado': 'Montabi Dorado',
+      'grupo_sese': 'Grupo Sesé',
+      'nacex': 'Nacex',
+      'montoya': 'Montoya',
+      'recogida_cliente': 'Recogida Cliente',
       'other': 'Otro'
     };
     return map[company] || company;

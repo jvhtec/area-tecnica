@@ -11,12 +11,20 @@ import {
   driverDisplayName,
   driverVehicleWarnings,
   findDoubleBookedAssignmentIds,
+  formatBerthLayouts,
   formatTransportDateKey,
+  formatTransportSpan,
   formatTransportTime,
   groupAssignmentsByRowAndDay,
+  isCrewTransfer,
+  isExternallyHandledTransport,
+  maxBerths,
+  parseBerthLayouts,
+  seatShortfall,
   startOfMadridWeek,
   suggestedLicenseForVehicleType,
   summarizeDriversByEvent,
+  transportOperationLabel,
   unavailabilityByDay,
   vehicleTypeLabel,
   type DriverAssignment,
@@ -63,6 +71,8 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   transport_type: "trailer",
   event_date: "2026-10-01",
   event_time: "08:00:00",
+  end_date: null,
+  end_time: null,
   timezone: "Europe/Madrid",
   title: null,
   color: null,
@@ -70,6 +80,11 @@ const event = (overrides: Partial<MatrixTransportEvent>): MatrixTransportEvent =
   job_title: null,
   license_plate: null,
   transport_provider: null,
+  berth_count: null,
+  job_crew_count: null,
+  passenger_count: null,
+  movement_type: null,
+  origin_location_id: null,
   loading_bay: null,
   notes: null,
   transport_request_id: null,
@@ -250,6 +265,22 @@ describe("coverage and defaults", () => {
     expect(counts.get("2026-10-02")).toBe(1);
   });
 
+  it("does not ask for a driver on runs an outside company handles", () => {
+    const counts = countUncoveredTransportsByDay(
+      [
+        event({ id: "hired", transport_type: "sleeper_bus", transport_provider: "montoya" }),
+        event({ id: "carrier", transport_provider: "pantoja" }),
+        event({ id: "own", transport_provider: "sector_pro" }),
+        event({ id: "unset" }),
+      ],
+      [],
+    );
+    expect(counts.get("2026-10-01")).toBe(2);
+    expect(isExternallyHandledTransport({ transport_provider: "the_wild_tour" })).toBe(true);
+    expect(isExternallyHandledTransport({ transport_provider: "sector_pro" })).toBe(false);
+    expect(isExternallyHandledTransport({ transport_provider: null })).toBe(false);
+  });
+
   it("defaults to a two-hour window from the transport time, crossing midnight when needed", () => {
     expect(defaultAssignmentWindow(event({ event_time: "08:30:00" }))).toEqual({
       start: "2026-10-01T08:30",
@@ -259,6 +290,41 @@ describe("coverage and defaults", () => {
       start: "2026-10-01T23:15",
       end: "2026-10-02T01:15",
     });
+  });
+
+  it("defaults to the whole transport when it has an end", () => {
+    expect(defaultAssignmentWindow(event({ event_time: "08:00:00", end_date: "2026-10-04", end_time: "20:00:00" }))).toEqual({
+      start: "2026-10-01T08:00",
+      end: "2026-10-04T20:00",
+    });
+  });
+
+  it("names the operation and, when known, what the move is for", () => {
+    expect(transportOperationLabel("load", "pickup")).toBe("Carga · Recogida");
+    expect(transportOperationLabel("unload", "return")).toBe("Descarga · Devolución");
+    expect(transportOperationLabel("crew_transfer", null)).toBe("Traslado de personal");
+    expect(transportOperationLabel("load", "bogus")).toBe("Carga");
+  });
+
+  it("describes a transport's span from its local wall-clock values", () => {
+    expect(formatTransportSpan(event({ event_time: "08:00:00" }))).toBe("08:00");
+    expect(formatTransportSpan(event({ event_time: "08:00:00", end_date: "2026-10-01", end_time: "13:30:00" }))).toBe("08:00–13:30");
+    expect(formatTransportSpan(event({ event_time: "08:00:00", end_date: "2026-10-04", end_time: "20:00:00" })))
+      .toBe("01/10 08:00 → 04/10 20:00");
+  });
+
+  it("warns when a van cannot seat a crew transfer", () => {
+    const van = { vehicle_type: "furgoneta" as const, passenger_seats: 8 };
+    const transfer = event({ event_type: "crew_transfer", passenger_count: 9 });
+    expect(isCrewTransfer(transfer)).toBe(true);
+    expect(seatShortfall(van, transfer)).toEqual({ needed: 9, available: 8 });
+    expect(seatShortfall(van, event({ event_type: "crew_transfer", passenger_count: 8 }))).toBeNull();
+    // Without a count, the job crew is who travels.
+    expect(seatShortfall(van, event({ event_type: "crew_transfer", job_crew_count: 12 }))).toEqual({ needed: 12, available: 8 });
+    // Loads, unknown seats and sleeper buses (checked on berths) are not second-guessed.
+    expect(seatShortfall(van, event({ event_type: "load", passenger_count: 20 }))).toBeNull();
+    expect(seatShortfall({ vehicle_type: "furgoneta", passenger_seats: null }, transfer)).toBeNull();
+    expect(seatShortfall({ vehicle_type: "sleeper_bus", passenger_seats: 2 }, transfer)).toBeNull();
   });
 
   it("counts assignments still awaiting the driver's answer in the next 48 hours", () => {
@@ -282,7 +348,7 @@ describe("coverage and defaults", () => {
       vehicles: [{
         id: "v1", name: "Tráiler 1", license_plate: "1234 ABC", vehicle_type: "trailer", required_license: "C+E",
         brand: null, model: null, payload_kg: null, cargo_length_m: null, has_tail_lift: false,
-        itv_expiry: null, insurance_expiry: null, notes: null, is_active: true,
+        itv_expiry: null, insurance_expiry: null, notes: null, is_active: true, berth_layouts: [], passenger_seats: null,
       }],
       assignments: [
         assignment({ id: "a1", logistics_event_id: "e1", vehicle_id: "v1", status: "confirmed" }),
@@ -298,5 +364,24 @@ describe("coverage and defaults", () => {
     expect(driverDisplayName({ first_name: "Ana", last_name: "Ruiz", nickname: null })).toBe("Ana Ruiz");
     expect(driverDisplayName({ first_name: " ", last_name: null, nickname: "Pepe" })).toBe("Pepe");
     expect(driverDisplayName({ first_name: null, last_name: null, nickname: null })).toBe("Sin nombre");
+  });
+});
+
+describe("sleeper-bus berths", () => {
+  it("parses the berth layouts typed in the vehicle form", () => {
+    expect(parseBerthLayouts("16")).toEqual({ layouts: [16] });
+    expect(parseBerthLayouts(" 16, 12 / 14 12 ")).toEqual({ layouts: [12, 14, 16] });
+    expect(parseBerthLayouts("")).toEqual({ layouts: [] });
+    expect(parseBerthLayouts("12, doce")).toEqual({ error: '"doce" no es un número de literas válido (1–40)' });
+    expect(parseBerthLayouts("0")).toHaveProperty("error");
+    expect(parseBerthLayouts("41")).toHaveProperty("error");
+    expect(parseBerthLayouts("1 2 3 4 5 6 7")).toEqual({ error: "Como máximo 6 configuraciones de literas" });
+  });
+
+  it("formats layouts and finds the largest", () => {
+    expect(formatBerthLayouts([16, 12])).toBe("12 / 16 literas");
+    expect(formatBerthLayouts([])).toBeNull();
+    expect(maxBerths({ berth_layouts: [12, 16, 14] })).toBe(16);
+    expect(maxBerths({ berth_layouts: [] })).toBe(0);
   });
 });

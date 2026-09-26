@@ -1,4 +1,7 @@
+import type { TransportMovementType } from "@/constants/transportMovementTypes";
 import { dataLayerClient } from "@/services/dataLayerClient";
+
+export { TRANSPORT_MOVEMENT_LABELS, type TransportMovementType } from "@/constants/transportMovementTypes";
 
 export type TransportPlanningStatus =
   | "requested"
@@ -9,7 +12,7 @@ export type TransportPlanningStatus =
   | "cancelled";
 
 export type TransportPriority = "low" | "normal" | "high" | "urgent";
-export type TransportMovementType = "transfer" | "pickup" | "delivery" | "return" | "other";
+
 export type TransportSourceType = "manual" | "subrental" | "tour" | "truck_planner";
 
 export type TransportRequestItem = {
@@ -118,14 +121,6 @@ export const TRANSPORT_SOURCE_LABELS: Record<TransportSourceType, string> = {
   subrental: "Subalquiler",
   tour: "Gira",
   truck_planner: "Planificador de camiones",
-};
-
-export const TRANSPORT_MOVEMENT_LABELS: Record<TransportMovementType, string> = {
-  transfer: "Traslado",
-  pickup: "Recogida",
-  delivery: "Entrega",
-  return: "Devolución",
-  other: "Otro",
 };
 
 export async function listTransportRequests(options: {

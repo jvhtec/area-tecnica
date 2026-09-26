@@ -67,7 +67,7 @@ describe("usePersonalCalendarData", () => {
       }),
     ]);
     expect(mockSupabase.rpc).toHaveBeenCalledWith("get_profile_directory", {
-      p_profile_ids: null,
+      p_profile_ids: undefined,
     });
   });
 });

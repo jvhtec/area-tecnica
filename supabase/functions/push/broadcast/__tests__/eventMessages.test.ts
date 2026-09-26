@@ -285,6 +285,33 @@ describe("push broadcast event message builders", () => {
       .toContain("Transporte: Camión 9m.");
   });
 
+  it("words crew transfers in the masculine and links the return trip", () => {
+    const created = buildLogisticsEventMessage("logistics.event.created", "Gira", {
+      action: "broadcast",
+      type: "logistics.event.created",
+      event_type: "crew_transfer",
+      event_date: "2026-10-05",
+      event_time: "08:00",
+      transport_type: "furgoneta",
+      paired_event_type: "crew_transfer",
+      paired_event_date: "2026-10-08",
+      paired_event_time: "18:00",
+    });
+    expect(created.title).toBe("Traslado de personal programado");
+    expect(created.text).toContain('Traslado de personal para "Gira" programado');
+    expect(created.text).toContain("También se programó la vuelta (2026-10-08 18:00).");
+
+    const cancelled = buildLogisticsEventMessage("logistics.event.cancelled", "Gira", {
+      action: "broadcast",
+      type: "logistics.event.cancelled",
+      event_type: "crew_transfer",
+      event_date: "2026-10-05",
+      event_time: "08:00",
+    });
+    expect(cancelled.title).toBe("Traslado de personal cancelado");
+    expect(cancelled.text).toContain('Se canceló el traslado de personal de "Gira"');
+  });
+
   it("builds festival public submission messages with optional dates and rider filenames", () => {
     const body: BroadcastBody = {
       action: "broadcast",

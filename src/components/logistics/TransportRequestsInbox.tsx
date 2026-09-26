@@ -29,7 +29,7 @@ import {
   type TransportRequestRecord,
 } from "@/features/logistics/transportRequests";
 import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
-import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
+import { transportProviderLabel } from "@/constants/transportProviders";
 import { ACTIVE_DEPARTMENTS, getDepartmentLabel } from "@/types/department";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { TransportRequestDialog } from "./TransportRequestDialog";
@@ -37,11 +37,6 @@ import { TransportRequestPlanningDialog } from "./TransportRequestPlanningDialog
 
 const ACTIVE_STAGES: TransportPlanningStatus[] = ["requested", "reviewing", "planned", "confirmed"];
 const EDITABLE_DEMAND_STAGES: TransportPlanningStatus[] = ["requested", "reviewing"];
-
-const providerLabel = (value: string | null): string | null => {
-  if (!value) return null;
-  return (TRANSPORT_PROVIDERS as Record<string, { label: string } | undefined>)[value]?.label ?? value;
-};
 
 const eventMoment = (date: string, time: string): string => {
   const [, month, day] = date.split("-");
@@ -234,8 +229,8 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
                       <div className="flex min-w-0 flex-wrap gap-x-5 gap-y-1">
                         {load && <span>Carga: {eventMoment(load.event_date, load.event_time)}</span>}
                         {unload && <span>Descarga: {eventMoment(unload.event_date, unload.event_time)}</span>}
-                        {providerLabel(load?.transport_provider ?? unload?.transport_provider ?? null) && (
-                          <span>Proveedor: {providerLabel(load?.transport_provider ?? unload?.transport_provider ?? null)}</span>
+                        {transportProviderLabel(load?.transport_provider ?? unload?.transport_provider ?? null) && (
+                          <span>Proveedor: {transportProviderLabel(load?.transport_provider ?? unload?.transport_provider ?? null)}</span>
                         )}
                         {(load?.license_plate || unload?.license_plate) && <span>Matrícula: {load?.license_plate || unload?.license_plate}</span>}
                       </div>

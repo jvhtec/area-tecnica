@@ -37,7 +37,11 @@ export function formatMadridDriverWindow(iso: string | null | undefined): string
 }
 
 const movementLabel = (eventType: string | null): string =>
-  eventType === "unload" ? "Descarga" : eventType === "load" ? "Carga" : "Transporte";
+  eventType === "unload"
+    ? "Descarga"
+    : eventType === "load"
+      ? "Carga"
+      : eventType === "crew_transfer" ? "Traslado de personal" : "Transporte";
 
 function describeTransport(facts: DriverAssignmentFacts): string {
   const what = facts.eventTitle

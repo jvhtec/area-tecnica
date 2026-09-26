@@ -7,6 +7,7 @@ export type TransportProvider =
   | 'montabi_dorado'
   | 'grupo_sese'
   | 'nacex'
+  | 'montoya'
   | 'sector_pro'
   | 'recogida_cliente';
 
@@ -49,6 +50,10 @@ export const TRANSPORT_PROVIDERS: Record<
     label: 'Nacex',
     icon: '/Logos/logo-nacex-grande-20-aniversario1.png',
   },
+  montoya: {
+    label: 'Montoya',
+    icon: null,
+  },
   sector_pro: {
     label: 'Sector-Pro',
     icon: '/Logos/sector pro logo.png',
@@ -58,3 +63,7 @@ export const TRANSPORT_PROVIDERS: Record<
     icon: null,
   },
 };
+
+/** Display name of a stored provider value; unknown values are shown as stored. */
+export const transportProviderLabel = (value: string | null | undefined): string | null =>
+  value ? (TRANSPORT_PROVIDERS as Record<string, { label: string } | undefined>)[value]?.label ?? value : null;

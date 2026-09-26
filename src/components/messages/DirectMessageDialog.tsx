@@ -48,8 +48,9 @@ export const DirectMessageDialog = ({
   useEffect(() => {
     const fetchProfiles = async () => {
       console.log("Fetching profiles for direct message dialog");
+      // p_profile_ids defaults to null (the whole directory); undefined sends the default.
       const { data, error } = await dataLayerClient.rpc('get_profile_directory', {
-        p_profile_ids: null,
+        p_profile_ids: undefined,
       });
 
       if (error) {

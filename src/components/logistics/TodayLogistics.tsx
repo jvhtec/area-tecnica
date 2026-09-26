@@ -33,7 +33,8 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
           job:jobs(id, title),
           departments:logistics_event_departments(department)
         `)
-        .eq("event_date", formattedDate)
+        // Starting today, or a multi-day transport still running today.
+        .or(`event_date.eq.${formattedDate},and(event_date.lte.${formattedDate},end_date.gte.${formattedDate})`)
         .order("event_time", { ascending: true });
 
       if (error) {

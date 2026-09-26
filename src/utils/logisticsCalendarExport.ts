@@ -22,13 +22,25 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
+import { transportProviderLabel } from "@/constants/transportProviders";
+import {
+  logisticsEventOverlapsRange,
+  logisticsEventTypeLabel,
+  type LogisticsEventType,
+} from "@/components/logistics/logisticsEventTypes";
+import { transportMovementLabel } from "@/constants/transportMovementTypes";
+import { getLogisticsTransportTypeLabel } from "@/components/technician/details-modal/formatters";
 
 interface LogisticsEvent {
   id: string;
-  event_type: "load" | "unload";
+  event_type: LogisticsEventType;
+  /** What a load/unload is for (transport request movement type). */
+  movement_type?: string | null;
   transport_type: string;
   event_time: string;
   event_date: string;
+  end_date?: string | null;
+  end_time?: string | null;
   // Nullable to match the `logistics_events` columns.
   transport_provider?: string | null;
   job?: {
@@ -43,38 +55,12 @@ interface LogisticsExportData {
   currentDate: Date;
 }
 
-const TRANSPORT_TYPE_LABELS: Record<string, string> = {
-  trailer: "Tráiler",
-  sleeper_bus: "Autobús cama",
-  van: "Furgoneta",
-  truck: "Camión",
-  car: "Coche",
-  own_truck: "Camión Propio",
-  rental_truck: "Camión Alquiler",
-};
+const getTransportProviderLabel = (provider?: string | null): string => transportProviderLabel(provider) ?? "-";
 
-const TRANSPORT_PROVIDER_LABELS: Record<string, string> = {
-  dachser: "Dachser",
-  transgesa: "Transgesa",
-  nacex: "Nacex",
-  seur: "Seur",
-  correos: "Correos",
-  mrw: "MRW",
-  own: "Propio",
-  other: "Otro",
-};
-
-const getTransportTypeLabel = (type: string): string => {
-  return TRANSPORT_TYPE_LABELS[type] || type;
-};
-
-const getTransportProviderLabel = (provider?: string | null): string => {
-  if (!provider) return "-";
-  return TRANSPORT_PROVIDER_LABELS[provider] || provider;
-};
-
-const getOperationTypeLabel = (eventType: "load" | "unload"): string => {
-  return eventType === "load" ? "Carga" : "Descarga";
+/** "Carga · Recogida": the operation, then what the move is for when known. */
+const getOperationTypeLabel = (eventType: string, movementType?: string | null): string => {
+  const movement = transportMovementLabel(movementType);
+  return movement ? `${logisticsEventTypeLabel(eventType)} · ${movement}` : logisticsEventTypeLabel(eventType);
 };
 
 const getDepartmentsLabel = (departments?: { department: string }[]): string => {
@@ -118,11 +104,11 @@ function prepareLogisticsCalendarData(
       rangeLabel = format(currentDate, "MMMM yyyy", { locale: es });
   }
 
-  const filteredEvents = events.filter((event) => {
-    if (!event.event_date) return false;
-    const eventDate = new Date(event.event_date);
-    return eventDate >= startDate && eventDate <= endDate;
-  });
+  const startKey = format(startDate, "yyyy-MM-dd");
+  const endKey = format(endDate, "yyyy-MM-dd");
+  const filteredEvents = events.filter((event) =>
+    Boolean(event.event_date) && logisticsEventOverlapsRange(event, startKey, endKey)
+  );
 
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     const dateCompare = a.event_date.localeCompare(b.event_date);
@@ -161,11 +147,15 @@ export const generateLogisticsCalendarXLS = async (
   // Data rows
   for (const event of sortedEvents) {
     const eventDate = new Date(event.event_date);
-    const formattedDate = format(eventDate, "EEE, d MMM yyyy", { locale: es });
-    const formattedTime = event.event_time;
+    const formattedDate = event.end_date && event.end_date !== event.event_date
+      ? `${format(eventDate, "EEE, d MMM yyyy", { locale: es })} → ${format(new Date(event.end_date), "EEE, d MMM yyyy", { locale: es })}`
+      : format(eventDate, "EEE, d MMM yyyy", { locale: es });
+    const formattedTime = event.end_time
+      ? `${event.event_time.slice(0, 5)}–${event.end_time.slice(0, 5)}`
+      : event.event_time;
     const jobTitle = getJobTitle(event);
-    const transportType = getTransportTypeLabel(event.transport_type);
-    const operationType = getOperationTypeLabel(event.event_type);
+    const transportType = getLogisticsTransportTypeLabel(event.transport_type);
+    const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
     const transportProvider = getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
 
@@ -281,11 +271,15 @@ export const generateLogisticsCalendarPDF = async (
   // Prepare table data
   const tableData = sortedEvents.map((event) => {
     const eventDate = new Date(event.event_date);
-    const formattedDate = format(eventDate, "EEE, d MMM yyyy", { locale: es });
-    const formattedTime = event.event_time;
+    const formattedDate = event.end_date && event.end_date !== event.event_date
+      ? `${format(eventDate, "EEE, d MMM yyyy", { locale: es })} → ${format(new Date(event.end_date), "EEE, d MMM yyyy", { locale: es })}`
+      : format(eventDate, "EEE, d MMM yyyy", { locale: es });
+    const formattedTime = event.end_time
+      ? `${event.event_time.slice(0, 5)}–${event.end_time.slice(0, 5)}`
+      : event.event_time;
     const jobTitle = getJobTitle(event);
-    const transportType = getTransportTypeLabel(event.transport_type);
-    const operationType = getOperationTypeLabel(event.event_type);
+    const transportType = getLogisticsTransportTypeLabel(event.transport_type);
+    const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
     const transportProvider = getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
 
@@ -331,7 +325,7 @@ export const generateLogisticsCalendarPDF = async (
         data.cell.styles.font = "courier";
         data.cell.styles.fontStyle = "bold";
         data.cell.styles.textColor =
-          data.cell.raw === "Carga"
+          String(data.cell.raw).startsWith("Carga")
             ? (REPORT_ACCENT as [number, number, number])
             : (REPORT_SOFT as [number, number, number]);
       }

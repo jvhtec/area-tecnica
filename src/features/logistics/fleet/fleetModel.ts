@@ -9,6 +9,7 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
 
+import { transportMovementLabel } from "@/constants/transportMovementTypes";
 import { MADRID_TIMEZONE, addMadridCalendarDays } from "@/utils/timezoneUtils";
 
 export const LICENSE_CATEGORIES = ["B", "B+E", "C1", "C1+E", "C", "C+E", "D1", "D1+E", "D", "D+E"] as const;
@@ -48,7 +49,21 @@ export const DRIVER_ASSIGNMENT_STATUS_LABELS: Record<DriverAssignmentStatus, str
 export const TRANSPORT_EVENT_TYPE_LABELS: Record<string, string> = {
   load: "Carga",
   unload: "Descarga",
+  crew_transfer: "Traslado de personal",
 };
+
+/**
+ * "Carga · Recogida": what happens at the stop, then what the move is for (the
+ * transport request's movement type) when there is one.
+ */
+export const transportOperationLabel = (eventType: string, movementType?: string | null): string => {
+  const operation = TRANSPORT_EVENT_TYPE_LABELS[eventType] ?? "Transporte";
+  const movement = transportMovementLabel(movementType);
+  return movement ? `${operation} · ${movement}` : operation;
+};
+
+/** A transport that moves people rather than gear (logistics_event_type `crew_transfer`). */
+export const isCrewTransfer = (event: { event_type: string }): boolean => event.event_type === "crew_transfer";
 
 export type FleetVehicle = {
   id: string;
@@ -67,6 +82,10 @@ export type FleetVehicle = {
   insurance_expiry: string | null;
   notes: string | null;
   is_active: boolean;
+  /** Sleeper buses only: berth counts the bus can be set up with, ascending. */
+  berth_layouts: number[];
+  /** Seats for passengers besides the driver; null when unknown. */
+  passenger_seats: number | null;
 };
 
 export const UNAVAILABILITY_STATUSES = ["vacation", "travel", "sick", "day_off", "unavailable", "warehouse"] as const;
@@ -108,6 +127,9 @@ export type MatrixTransportEvent = {
   transport_type: string;
   event_date: string;
   event_time: string;
+  /** Optional local end of the transport (yyyy-MM-dd / HH:mm:ss), both or neither. */
+  end_date: string | null;
+  end_time: string | null;
   timezone: string;
   title: string | null;
   color: string | null;
@@ -115,6 +137,16 @@ export type MatrixTransportEvent = {
   job_title: string | null;
   license_plate: string | null;
   transport_provider: string | null;
+  /** Sleeper buses only: berths this run provides. */
+  berth_count: number | null;
+  /** People assigned to the event's job who have not declined (null without a job). */
+  job_crew_count: number | null;
+  /** Crew transfers only: people travelling. */
+  passenger_count: number | null;
+  /** Loads/unloads: what the move is for (transfer, pickup, delivery, return, other). */
+  movement_type: string | null;
+  /** Crew transfers only: the pick-up point (its name comes through `origin`). */
+  origin_location_id: string | null;
   loading_bay: string | null;
   notes: string | null;
   transport_request_id: string | null;
@@ -160,6 +192,12 @@ export type MyTransportAssignment = {
   transport_type: string;
   event_date: string;
   event_time: string;
+  end_date: string | null;
+  end_time: string | null;
+  /** Crew transfers only: people travelling. */
+  passenger_count: number | null;
+  /** Loads/unloads: what the move is for. */
+  movement_type: string | null;
   timezone: string;
   title: string | null;
   job_id: string | null;
@@ -172,6 +210,11 @@ export type MyTransportAssignment = {
   location_address: string | null;
   location_lat: number | null;
   location_lng: number | null;
+  /** Crew transfers only: where the crew is picked up (punto de encuentro). */
+  pickup_name: string | null;
+  pickup_address: string | null;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
   vehicle: Pick<FleetVehicle, "id" | "name" | "license_plate" | "vehicle_type" | "has_tail_lift"> | null;
 };
 
@@ -201,6 +244,46 @@ export const vehicleTypeLabel = (type: string | null | undefined): string =>
 
 export const vehicleLabel = (vehicle: Pick<FleetVehicle, "name" | "license_plate">): string =>
   `${vehicle.name} · ${vehicle.license_plate}`;
+
+/**
+ * A transport handled by an outside company (a hired truck or sleeper bus, a client
+ * pick-up) needs no driver from our own staff. Sector-Pro is the company itself.
+ */
+export const isExternallyHandledTransport = (event: Pick<MatrixTransportEvent, "transport_provider">): boolean =>
+  Boolean(event.transport_provider) && event.transport_provider !== "sector_pro";
+
+/** Most berths the vehicle can be set up with (0 when none are configured). */
+export const maxBerths = (vehicle: Pick<FleetVehicle, "berth_layouts">): number =>
+  vehicle.berth_layouts.length > 0 ? Math.max(...vehicle.berth_layouts) : 0;
+
+/** "16 literas" or "12 / 14 / 16 literas"; null when none are configured. */
+export const formatBerthLayouts = (layouts: readonly number[]): string | null =>
+  layouts.length > 0 ? `${[...layouts].sort((a, b) => a - b).join(" / ")} literas` : null;
+
+export const MAX_BERTH_LAYOUTS = 6;
+export const MAX_BERTHS_PER_BUS = 40;
+
+/**
+ * Parses what the vehicle form accepts for berth layouts: numbers separated by
+ * commas, slashes or spaces ("16", "12, 14, 16"). Returns the sorted distinct
+ * values, or an error message in Spanish.
+ */
+export const parseBerthLayouts = (input: string): { layouts: number[] } | { error: string } => {
+  const parts = input.split(/[\s,;/]+/).filter((part) => part.length > 0);
+  const values: number[] = [];
+  for (const part of parts) {
+    const value = Number(part);
+    if (!Number.isInteger(value) || value < 1 || value > MAX_BERTHS_PER_BUS) {
+      return { error: `"${part}" no es un número de literas válido (1–${MAX_BERTHS_PER_BUS})` };
+    }
+    values.push(value);
+  }
+  const layouts = [...new Set(values)].sort((a, b) => a - b);
+  if (layouts.length > MAX_BERTH_LAYOUTS) {
+    return { error: `Como máximo ${MAX_BERTH_LAYOUTS} configuraciones de literas` };
+  }
+  return { layouts };
+};
 
 export const transportEventTitle = (event: Pick<MatrixTransportEvent, "title" | "job_title" | "event_type">): string =>
   event.title?.trim() || event.job_title?.trim() || TRANSPORT_EVENT_TYPE_LABELS[event.event_type] || "Transporte";
@@ -433,7 +516,10 @@ export const findDoubleBookedAssignmentIds = (assignments: readonly DriverAssign
   return conflicted;
 };
 
-/** Transports on each day that still have no driver who has not declined. */
+/**
+ * Transports on each day that still have no driver who has not declined. Runs an
+ * outside company handles (a hired bus, a carrier) are not ours to cover.
+ */
 export const countUncoveredTransportsByDay = (
   events: readonly MatrixTransportEvent[],
   assignments: readonly DriverAssignment[],
@@ -445,7 +531,7 @@ export const countUncoveredTransportsByDay = (
   );
   const counts = new Map<string, number>();
   for (const event of events) {
-    if (covered.has(event.id)) continue;
+    if (covered.has(event.id) || isExternallyHandledTransport(event)) continue;
     counts.set(event.event_date, (counts.get(event.event_date) ?? 0) + 1);
   }
   return counts;
@@ -495,15 +581,55 @@ export const countPendingConfirmations = (
   ).length;
 };
 
-/** Default window for a new assignment: the transport's local time, two hours long. */
+/**
+ * Default window for a new assignment: from the transport's local time until its
+ * end when it has one (a crew transfer keeping the van for days), else two hours.
+ */
 export const defaultAssignmentWindow = (
-  event: Pick<MatrixTransportEvent, "event_date" | "event_time">,
+  event: Pick<MatrixTransportEvent, "event_date" | "event_time"> &
+    Partial<Pick<MatrixTransportEvent, "end_date" | "end_time">>,
 ): { start: string; end: string } => {
   const start = `${event.event_date}T${event.event_time.slice(0, 5)}`;
+  if (event.end_date && event.end_time) {
+    return { start, end: `${event.end_date}T${event.end_time.slice(0, 5)}` };
+  }
   const [hours, minutes] = event.event_time.split(":").map(Number);
   const endMinutes = hours * 60 + minutes + 120;
   const endDayKey = endMinutes >= 24 * 60 ? addMadridCalendarDays(event.event_date, 1) : event.event_date;
   const wrapped = endMinutes % (24 * 60);
   const end = `${endDayKey}T${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
   return { start, end };
+};
+
+/**
+ * "12/06 08:00 → 15/06 20:00" for a transport with an end, "08:00" otherwise.
+ * Local wall-clock values straight from the event, no timezone conversion.
+ */
+export const formatTransportSpan = (
+  event: Pick<MatrixTransportEvent, "event_date" | "event_time"> &
+    Partial<Pick<MatrixTransportEvent, "end_date" | "end_time">>,
+): string => {
+  const time = event.event_time.slice(0, 5);
+  if (!event.end_date || !event.end_time) return time;
+  const day = (key: string) => `${key.slice(8, 10)}/${key.slice(5, 7)}`;
+  const endTime = event.end_time.slice(0, 5);
+  return event.end_date === event.event_date
+    ? `${time}–${endTime}`
+    : `${day(event.event_date)} ${time} → ${day(event.end_date)} ${endTime}`;
+};
+
+/**
+ * When the chosen vehicle cannot seat a crew transfer's passengers (the job crew
+ * when no count was given): `{ needed, available }`, else null. Sleeper buses
+ * are checked on berths instead (berthShortfall), and a vehicle without seats
+ * entered is not second-guessed.
+ */
+export const seatShortfall = (
+  vehicle: Pick<FleetVehicle, "vehicle_type" | "passenger_seats"> | null,
+  event: Pick<MatrixTransportEvent, "event_type" | "passenger_count" | "job_crew_count">,
+): { needed: number; available: number } | null => {
+  if (!vehicle || !isCrewTransfer(event) || vehicle.vehicle_type === "sleeper_bus" || !vehicle.passenger_seats) return null;
+  const needed = event.passenger_count ?? event.job_crew_count;
+  if (!needed) return null;
+  return vehicle.passenger_seats < needed ? { needed, available: vehicle.passenger_seats } : null;
 };

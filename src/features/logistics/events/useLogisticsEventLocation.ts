@@ -63,8 +63,11 @@ export function useLogisticsEventLocation(open: boolean) {
   /** Row id to store: a fresh pick becomes a `locations` row, an untouched field keeps its id. */
   const resolve = useCallback(async (): Promise<string | null> => {
     if (picked) return getOrCreateLocationWithDetails(picked);
-    return input.trim() ? locationId : null;
-  }, [picked, input, locationId, getOrCreateLocationWithDetails]);
+    // onInputChange clears locationId when the user actually clears or edits the
+    // field. Keeping it here preserves an untouched stored place even if its
+    // display name is still loading when the form is submitted.
+    return locationId;
+  }, [picked, locationId, getOrCreateLocationWithDetails]);
 
   return { input, reset, onInputChange, onSelect, resolve };
 }

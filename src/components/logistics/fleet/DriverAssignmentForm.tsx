@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, BedDouble, Loader2, Users } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { transportProviderLabel } from "@/constants/transportProviders";
 import { useToast } from "@/hooks/use-toast";
 import {
   saveDriverAssignment,
@@ -17,7 +18,12 @@ import {
   defaultAssignmentWindow,
   driverDisplayName,
   driverVehicleWarnings,
+  formatBerthLayouts,
+  formatTransportSpan,
   formatTransportTime,
+  isCrewTransfer,
+  isExternallyHandledTransport,
+  seatShortfall,
   transportEventTitle,
   vehicleLabel,
   vehicleTypeLabel,
@@ -25,6 +31,7 @@ import {
   type LogisticsMatrixData,
   type MatrixTransportEvent,
 } from "@/features/logistics/fleet/fleetModel";
+import { berthShortfall } from "@/features/logistics/fleet/sleeperBusPlanning";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { localInputToUTC, utcToLocalInput } from "@/utils/timezoneUtils";
 
@@ -82,6 +89,13 @@ export function DriverAssignmentForm({
     [data.vehicles, existing?.vehicle_id],
   );
   const warnings = driverVehicleWarnings(selectedDriver, selectedVehicle, event.event_date);
+  const isBus = event.transport_type === "sleeper_bus";
+  const shortfall = berthShortfall(selectedVehicle, event);
+  const seats = seatShortfall(selectedVehicle, event);
+  const crewTransfer = isCrewTransfer(event);
+  const hiredFrom = isExternallyHandledTransport(event)
+    ? transportProviderLabel(event.transport_provider)
+    : null;
   const hasTarget = driverId !== NONE || vehicleId !== NONE;
 
   const submit = async (force: boolean) => {
@@ -125,9 +139,29 @@ export function DriverAssignmentForm({
       <div className="rounded-md border bg-muted/40 p-3 text-sm">
         <p className="font-medium">{transportEventTitle(event)}</p>
         <p className="text-muted-foreground">
-          {event.event_time.slice(0, 5)} · {vehicleTypeLabel(event.transport_type)}
+          {formatTransportSpan(event)} · {vehicleTypeLabel(event.transport_type)}
           {event.origin || event.destination ? ` · ${event.origin ?? "—"} → ${event.destination ?? "—"}` : ""}
         </p>
+        {crewTransfer && (
+          <p className="flex items-center gap-1.5 text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            {event.passenger_count
+              ? `${event.passenger_count} personas viajan`
+              : event.job_crew_count !== null ? `${event.job_crew_count} personas en el trabajo` : "Personas sin indicar"}
+          </p>
+        )}
+        {isBus && (
+          <p className="flex items-center gap-1.5 text-muted-foreground">
+            <BedDouble className="h-3.5 w-3.5" />
+            {event.berth_count ? `${event.berth_count} literas previstas` : "Literas sin indicar"}
+            {event.job_crew_count !== null ? ` · ${event.job_crew_count} personas en el trabajo` : ""}
+          </p>
+        )}
+        {hiredFrom && (
+          <p className="text-muted-foreground">
+            Contratado a {hiredFrom}: normalmente no necesita conductor ni vehículo propios.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -155,7 +189,10 @@ export function DriverAssignmentForm({
               <SelectItem value={NONE}>Sin vehículo propio</SelectItem>
               {vehicleOptions.map((vehicle) => (
                 <SelectItem key={vehicle.id} value={vehicle.id}>
-                  {vehicleLabel(vehicle)}{vehicle.is_active ? "" : " (inactivo)"}
+                  {vehicleLabel(vehicle)}
+                  {isBus && vehicle.vehicle_type === "sleeper_bus" ? ` · ${formatBerthLayouts(vehicle.berth_layouts) ?? "sin literas"}` : ""}
+                  {crewTransfer && vehicle.vehicle_type !== "sleeper_bus" && vehicle.passenger_seats ? ` · ${vehicle.passenger_seats} plazas` : ""}
+                  {vehicle.is_active ? "" : " (inactivo)"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -203,6 +240,28 @@ export function DriverAssignmentForm({
             <ul className="list-disc pl-4">
               {warnings.map((warning) => <li key={warning}>{DRIVER_WARNING_LABELS[warning]}</li>)}
             </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {shortfall && (
+        <Alert>
+          <BedDouble className="h-4 w-4" />
+          <AlertTitle>Faltan literas</AlertTitle>
+          <AlertDescription>
+            {selectedVehicle?.name} tiene como máximo {shortfall.available} literas y este transporte necesita {shortfall.needed}
+            {event.berth_count ? "" : event.passenger_count ? " (personas que viajan)" : " (todo el personal del trabajo)"}. Añade otro autobús o alquila uno.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {seats && (
+        <Alert>
+          <Users className="h-4 w-4" />
+          <AlertTitle>Faltan plazas</AlertTitle>
+          <AlertDescription>
+            {selectedVehicle?.name} tiene {seats.available} plazas y viajan {seats.needed} personas
+            {event.passenger_count ? "" : " (todo el personal del trabajo)"}. Añade otro vehículo en otro traslado.
           </AlertDescription>
         </Alert>
       )}

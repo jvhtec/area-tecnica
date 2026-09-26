@@ -60,6 +60,72 @@ the vehicle:
   Plate uniqueness ignores spaces/dashes/case. Carries
   `itv_expiry`, `insurance_expiry` and `has_tail_lift` (plataforma elevadora). A vehicle
   with assignment history cannot be deleted (FK `restrict`); deactivate it instead.
+- **Sleeper-bus berths** (migration `20260924201000`):
+  - `fleet_vehicles.berth_layouts smallint[]` — the berth counts a bus can be set up
+    with (`{16}` for a fixed layout, `{12,14,16}` when bunks can be swapped for lounge).
+    Entered in the vehicle form ("Literas"); a trigger sorts/deduplicates them and
+    clears them on any non-bus vehicle.
+  - `logistics_events.berth_count` — berths one bus run provides, whether it is a
+    fleet bus or one hired from The Wild Tour / Montoya (`transport_provider`). Cleared
+    by the same trigger if the run stops being a `sleeper_bus`.
+  - `get_logistics_matrix()` returns both, plus each event's `job_crew_count`
+    (distinct people on the job who have not declined — invited ones count).
+  - **Planner** (`SleeperBusBerthPlanner` in the event dialog, logic in
+    `features/logistics/fleet/sleeperBusPlanning.ts`): headcount = job crew + "personas
+    extra", minus berths the job's other bus runs that day and direction already
+    provide. It ranks combinations of own buses (tightest layout, buses busy that day
+    excluded) and hired 12–20-berth buses (`SLEEPER_BUS_HIRE_SIZES`): fewest hires, then fewest buses, then
+    fewest empty berths. One run is one bus, so a multi-bus plan means one transport
+    per bus; applying a plan sets this run's berths and, for a hire, the company.
+  - The assignment form warns when the chosen bus cannot seat the run even in its
+    largest layout (`berthShortfall`: the run's own berths, else the whole crew).
+- **Crew transfers** (`traslados de personal`, migrations `20260925130000` and
+  `20260925131000`): `logistics_event_type` gains `crew_transfer` next to `load`/`unload`,
+  for the vans, RVs and sleeper buses that move people.
+  - `logistics_events.end_date`/`end_time` — optional end of **any** transport (both or
+    neither, after the start, at most 21 days). A new assignment defaults to the whole
+    span instead of two hours, and may last longer than the usual 72 h cap up to the
+    transport plus a day. The matrix and all three calendars list the transport on
+    every day it spans (`isLogisticsEventOnDay`), assigned or not.
+    When the transport belongs to a job, *Usar las fechas del trabajo* fills the
+    departure and end from the job's `start_time`/`end_time` in the job's timezone
+    (`useJobTimeSpan`); both stay editable.
+  - `logistics_events.origin_location_id` — the pick-up point (*punto de encuentro*), a
+    `locations` row like `location_id`, which stays the destination (falling back to
+    the job venue). They cannot be the same place.
+  - Created by admin/management on `/logistics`, like every logistics event.
+  - `logistics_events.passenger_count` — people travelling. The event dialog offers
+    the job crew count as a one-click fill.
+  - Origin and passengers are crew-transfer-only: `trg_logistics_events_clear_crew_fields`
+    clears them on loads/unloads, as berths are cleared on non-buses.
+  - `fleet_vehicles.passenger_seats` — seats besides the driver. The assignment form
+    warns when a van cannot seat the transfer (`seatShortfall`: the passengers, else
+    the job crew). Sleeper buses keep using berths, and on a crew transfer the berth
+    planner seats the passengers instead of the whole crew.
+  - **Return trip**: "Crear también la vuelta" in the event dialog creates a second
+    `crew_transfer` with origin and destination swapped, the same passengers and vehicle
+    type, its own date/time and title "… · vuelta". It gets its own driver/vehicle in the
+    matrix. The two are not linked in the schema.
+  - An assignment whose window ended with the transport (or at the old two-hour
+    default) follows the transport's end when it moves; any other window keeps its
+    length and shifts with the start. Moving the end before an assignment's start is
+    refused. The new columns are material: editing them resets the driver's confirmation.
+  - Drivers see the pick-up point (with its own *Ir al punto de encuentro* / Waze links
+    and the map tile), the passenger count and the destination on `/conductor`.
+- **Movement type** (`logistics_events.movement_type`, same values as a transport
+  request's *Tipo de movimiento*: traslado, recogida, entrega, devolución, otro). The event
+  type says what happens at the stop (carga / descarga / traslado de personal); the
+  movement type says what the move is for. `trg_logistics_events_fill_movement_type`
+  copies it from the linked request when planning creates the load/unload pair
+  (existing planned events were backfilled), the event dialog sets it on manual
+  loads/unloads, and crew transfers have none. Labels come from
+  `@/constants/transportMovementTypes`; cards, the driver dashboard, the day dialog and
+  the calendar export show "Carga · Recogida" (`transportOperationLabel`). Crew
+  transport is deliberately not a request movement type: crew transfers are created
+  directly as logistics events.
+- **Hired transports need no driver of ours.** A run whose `transport_provider` is set
+  to anything but `sector_pro` (a carrier, a hired bus, a client pick-up) is not counted
+  as "sin conductor" and shows "Contratado a …" in the day dialog.
 - `driver_details` — one row per conductor: licence categories (`B…D+E`), licence, CAP
   and tachograph-card expiry, ADR, usual vehicle, notes. **Notes are visible to the driver.**
 - `transport_driver_assignments` — event × driver and/or vehicle, window, status
