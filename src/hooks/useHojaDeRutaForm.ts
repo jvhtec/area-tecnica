@@ -57,6 +57,7 @@ export const useHojaDeRutaForm = ({
   const [documentVersion, setDocumentVersion] = useState(0);
   const [hasExternalConflict, setHasExternalConflict] = useState(false);
   const [staffingDiff, setStaffingDiff] = useState({ added: 0, removed: 0 });
+  const [hasPowerDrift, setHasPowerDrift] = useState(false);
 
   const {
     hojaDeRuta,
@@ -68,7 +69,11 @@ export const useHojaDeRutaForm = ({
     forceRefetch,
   } = useHojaDeRutaPersistence(selectedJobId);
 
-  const { autoPopulateBasicJobData, loadCurrentJobAssignments } = useHojaDeRutaInitialization(
+  const {
+    autoPopulateBasicJobData,
+    loadCurrentJobAssignments,
+    fetchPowerRequirements,
+  } = useHojaDeRutaInitialization(
     selectedJobId,
     hojaDeRuta,
     isLoadingHojaDeRuta || isFetchingHojaDeRuta,
@@ -98,6 +103,7 @@ export const useHojaDeRutaForm = ({
     setDocumentVersion(0);
     setHasExternalConflict(false);
     setStaffingDiff({ added: 0, removed: 0 });
+    setHasPowerDrift(false);
     setHasSavedData(false);
     setHasBasicJobData(false);
     setDataSource("none");
@@ -233,6 +239,67 @@ export const useHojaDeRutaForm = ({
       void supabase.removeChannel(channel);
     };
   }, [checkStaffingDiff, isInitialized, selectedJobId]);
+
+  const checkPowerDrift = useCallback(async () => {
+    if (!selectedJobId || !isInitialized) return;
+    const current = await fetchPowerRequirements(selectedJobId);
+    if (!current.sourceUpdatedAt) {
+      setHasPowerDrift(false);
+      return;
+    }
+
+    const representedRevision = eventData.powerRequirementsSourceUpdatedAt
+      ? Date.parse(eventData.powerRequirementsSourceUpdatedAt)
+      : NaN;
+    const currentRevision = Date.parse(current.sourceUpdatedAt);
+    const missingSnapshot = !Number.isFinite(representedRevision);
+    const sourceIsNewer = Number.isFinite(currentRevision)
+      && Number.isFinite(representedRevision)
+      && currentRevision > representedRevision;
+
+    setHasPowerDrift(Boolean(current.text) && (missingSnapshot || sourceIsNewer));
+  }, [
+    eventData.powerRequirementsSourceUpdatedAt,
+    fetchPowerRequirements,
+    isInitialized,
+    selectedJobId,
+  ]);
+
+  const applyPowerRequirementsChanges = useCallback(async () => {
+    if (!selectedJobId) return;
+    const current = await fetchPowerRequirements(selectedJobId);
+    setEventData((prev) => ({
+      ...prev,
+      powerRequirements: current.text,
+      powerRequirementsSourceUpdatedAt: current.sourceUpdatedAt,
+    }));
+    setHasPowerDrift(false);
+  }, [fetchPowerRequirements, selectedJobId, setEventData]);
+
+  useEffect(() => {
+    if (!selectedJobId || !isInitialized) return;
+
+    void checkPowerDrift();
+    const channel = supabase
+      .channel(`hoja-power:${selectedJobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "power_requirement_tables",
+          filter: `job_id=eq.${selectedJobId}`,
+        },
+        () => {
+          void checkPowerDrift();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [checkPowerDrift, isInitialized, selectedJobId]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -548,6 +615,8 @@ export const useHojaDeRutaForm = ({
     hasExternalConflict,
     staffingDiff,
     applyStaffingChanges,
+    hasPowerDrift,
+    applyPowerRequirementsChanges,
     documentVersion,
     handleContactChange,
     addContact,
