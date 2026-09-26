@@ -202,26 +202,31 @@ export const useHojaDeRutaExports = ({
     window.open(pdfPreview.url, "_blank", "noopener,noreferrer");
   };
 
-  // Enhanced PDF generation using the working functionality
-  const handleGeneratePDF = async () => {
+  const generateFullDocument = async (publish: boolean) => {
     const currentJobId = getRequiredSelectedJobId();
     if (!currentJobId) return;
+
+    const status = normalizeHojaStatus(hojaDeRuta?.status);
+    if (publish && status !== "approved" && status !== "final") {
+      toast({
+        title: "Aprobación necesaria",
+        description: "Aprueba la Hoja de Ruta antes de publicarla para el equipo.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setGeneratingSectionId(null);
     setIsGenerating(true);
     try {
-      // Save data first if there are changes
       await saveBeforePdfGeneration();
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
-      const enhancedEventData = await buildDocumentEventData(currentJobId);
-
       const jobDetails = await getSelectedJobDetails(currentJobId);
-      // Convert accommodations to legacy room assignments for PDF generation
       const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
       await generatePDF(
-        enhancedEventData,
+        await buildDocumentEventData(currentJobId),
         travelArrangements,
         legacyRoomAssignments,
         imagePreviews,
@@ -231,25 +236,38 @@ export const useHojaDeRutaExports = ({
         jobDetails?.start_time || undefined,
         toast,
         accommodations,
-        buildFullDocumentPdfOptions()
+        {
+          ...buildFullDocumentPdfOptions(),
+          publish,
+        },
       );
 
-      // PDF generation and download is handled within the generatePDF function
-
       toast({
-        title: "Hoja de Ruta publicada",
-        description: "La Hoja de Ruta completa se ha descargado y publicado para el equipo.",
+        title: publish ? "Hoja de Ruta publicada" : "Hoja de Ruta descargada",
+        description: publish
+          ? "La versión aprobada ya es la Hoja de Ruta canónica para el equipo."
+          : "El PDF se ha descargado localmente sin modificar la versión publicada.",
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast({
         title: "Error",
-        description: "Hubo un problema al generar el documento.",
+        description: publish
+          ? "Hubo un problema al publicar el documento."
+          : "Hubo un problema al generar el documento.",
         variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleGeneratePDF = async () => {
+    await generateFullDocument(false);
+  };
+
+  const handlePublishPDF = async () => {
+    await generateFullDocument(true);
   };
 
   const handleGenerateSectionPDF = async (
@@ -461,6 +479,7 @@ export const useHojaDeRutaExports = ({
     handleDownloadPdfPreview,
     handleGenerateDriverCertificatePDF,
     handleGeneratePDF,
+    handlePublishPDF,
     handleGenerateSectionPDF,
     handleGenerateXLS,
     handleOpenPdfPreviewInNewTab,
