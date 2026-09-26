@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Eye, Loader2, Table, Printer } from "lucide-react";
+import { Eye, Loader2, Table, Printer, Send } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { HojaDeRutaPdfSectionId } from "@/utils/hoja-de-ruta/pdf";
 
@@ -29,6 +29,8 @@ interface HojaDeRutaPrintDialogProps {
   showDialog: boolean;
   setShowDialog: (open: boolean) => void;
   onGeneratePDF: () => void;
+  onPublishPDF: () => void;
+  canPublish: boolean;
   onGenerateDriverCertificatePDF: () => void;
   onGenerateSectionPDF: (sectionId: HojaDeRutaPdfSectionId) => void;
   onPreviewPDF: () => void;
@@ -46,6 +48,8 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
   showDialog,
   setShowDialog,
   onGeneratePDF,
+  onPublishPDF,
+  canPublish,
   onGenerateDriverCertificatePDF,
   onGenerateSectionPDF,
   onPreviewPDF,
@@ -107,10 +111,19 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
               <div className="grid grid-cols-[minmax(0,1fr)_44px] gap-2">
                 <Button onClick={() => { void onGeneratePDF(); }} disabled={isBusy}>
                   <Printer className="h-4 w-4 mr-2" />
-                  Documento Completo PDF
+                  Descargar documento completo PDF
                 </Button>
                 {renderPreviewButton("Vista previa documento completo PDF", "full", onPreviewPDF)}
               </div>
+              <Button
+                onClick={() => { void onPublishPDF(); }}
+                disabled={isBusy || !canPublish}
+                variant="default"
+                className="w-full"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {canPublish ? "Publicar para el equipo" : "Aprobar antes de publicar"}
+              </Button>
               <div className="grid grid-cols-[minmax(0,1fr)_44px] gap-2">
                 <Button onClick={() => { void onGenerateDriverCertificatePDF(); }} disabled={isBusy} variant="outline">
                   <Printer className="h-4 w-4 mr-2" />
