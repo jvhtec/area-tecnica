@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   Activity,
   Bed,
@@ -14,16 +14,19 @@ import {
 } from "lucide-react";
 import { TabsContent } from "@/components/ui/tabs";
 
-import { ModernAccommodationSection } from "@/components/hoja-de-ruta/sections/ModernAccommodationSection";
-import { ModernContactsSection } from "@/components/hoja-de-ruta/sections/ModernContactsSection";
-import { ModernEventSection } from "@/components/hoja-de-ruta/sections/ModernEventSection";
-import { ModernLogisticsSection } from "@/components/hoja-de-ruta/sections/ModernLogisticsSection";
-import { ModernRestaurantSection } from "@/components/hoja-de-ruta/sections/ModernRestaurantSection";
-import { ModernScheduleSection } from "@/components/hoja-de-ruta/sections/ModernScheduleSection";
-import { ModernStaffSection } from "@/components/hoja-de-ruta/sections/ModernStaffSection";
-import { ModernTravelSection } from "@/components/hoja-de-ruta/sections/ModernTravelSection";
-import { ModernVenueSection } from "@/components/hoja-de-ruta/sections/ModernVenueSection";
-import { ModernWeatherSection } from "@/components/hoja-de-ruta/sections/ModernWeatherSection";
+import {
+  AccommodationSectionView,
+  ContactsSectionView,
+  EventSectionView,
+  LogisticsSectionView,
+  RestaurantsSectionView,
+  ScheduleSectionView,
+  StaffSectionView,
+  TravelSectionView,
+  VenueSectionView,
+  WeatherSectionView,
+  type HojaSectionRuntime,
+} from "@/features/hoja-de-ruta/sections/HojaSectionViews";
 import {
   HOJA_SECTION_DEFINITIONS,
   type HojaPrintPartId,
@@ -41,19 +44,6 @@ export type HojaSectionCompletionContext = {
   accommodations: Accommodation[];
 };
 
-export type HojaSectionRenderContext = {
-  event: ComponentProps<typeof ModernEventSection>;
-  venue: ComponentProps<typeof ModernVenueSection>;
-  weather: ComponentProps<typeof ModernWeatherSection>;
-  contacts: ComponentProps<typeof ModernContactsSection>;
-  staff: ComponentProps<typeof ModernStaffSection>;
-  travel: ComponentProps<typeof ModernTravelSection>;
-  accommodation: ComponentProps<typeof ModernAccommodationSection>;
-  logistics: ComponentProps<typeof ModernLogisticsSection>;
-  schedule: ComponentProps<typeof ModernScheduleSection>;
-  restaurants: ComponentProps<typeof ModernRestaurantSection>;
-};
-
 export type HojaSectionRegistryEntry = {
   id: HojaSectionId;
   label: string;
@@ -62,7 +52,7 @@ export type HojaSectionRegistryEntry = {
   color: string;
   printParts: readonly HojaPrintPartId[];
   isComplete: (ctx: HojaSectionCompletionContext) => boolean;
-  render: (ctx: HojaSectionRenderContext) => ReactNode;
+  render: (runtime: HojaSectionRuntime) => ReactNode;
   exportRow: (ctx: HojaSectionCompletionContext) => readonly [string, string, string];
 };
 
@@ -75,7 +65,7 @@ const entry = (
   icon: LucideIcon,
   color: string,
   isComplete: HojaSectionRegistryEntry["isComplete"],
-  renderContent: (ctx: HojaSectionRenderContext) => ReactNode,
+  renderContent: (runtime: HojaSectionRuntime) => ReactNode,
 ): HojaSectionRegistryEntry => {
   const definition = definitionById.get(id);
   if (!definition) throw new Error(`Sección de Hoja de Ruta no registrada: ${id}`);
@@ -85,9 +75,9 @@ const entry = (
     icon,
     color,
     isComplete,
-    render: (ctx) => (
+    render: (runtime) => (
       <TabsContent key={id} value={id} className="mt-0" id={`panel-${id}`} role="tabpanel">
-        {renderContent(ctx)}
+        {renderContent(runtime)}
       </TabsContent>
     ),
     exportRow: (ctx) => [
@@ -104,21 +94,21 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
     Calendar,
     "text-blue-600",
     ({ eventData }) => Boolean(eventData.eventName && eventData.eventDates),
-    (ctx) => <ModernEventSection {...ctx.event} />,
+    (runtime) => <EventSectionView runtime={runtime} />,
   ),
   entry(
     "venue",
     MapPin,
     "text-green-600",
     ({ eventData }) => Boolean(eventData.venue.name && eventData.venue.address),
-    (ctx) => <ModernVenueSection {...ctx.venue} />,
+    (runtime) => <VenueSectionView runtime={runtime} />,
   ),
   entry(
     "weather",
     CloudSun,
     "text-sky-600",
     ({ eventData }) => Boolean(eventData.weather?.length),
-    (ctx) => <ModernWeatherSection {...ctx.weather} />,
+    (runtime) => <WeatherSectionView runtime={runtime} />,
   ),
   entry(
     "contacts",
@@ -128,7 +118,7 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
       eventData.contacts.some((contact) =>
         Boolean(contact.name && (contact.phone || contact.email))
       ),
-    (ctx) => <ModernContactsSection {...ctx.contacts} />,
+    (runtime) => <ContactsSectionView runtime={runtime} />,
   ),
   entry(
     "staff",
@@ -136,7 +126,7 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
     "text-orange-600",
     ({ eventData }) =>
       eventData.staff.some((staff) => Boolean(staff.name && staff.position)),
-    (ctx) => <ModernStaffSection {...ctx.staff} />,
+    (runtime) => <StaffSectionView runtime={runtime} />,
   ),
   entry(
     "travel",
@@ -144,7 +134,7 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
     "text-cyan-600",
     ({ travelArrangements }) =>
       travelArrangements.some((travel) => Boolean(travel.transportation_type)),
-    (ctx) => <ModernTravelSection {...ctx.travel} />,
+    (runtime) => <TravelSectionView runtime={runtime} />,
   ),
   entry(
     "accommodation",
@@ -157,7 +147,7 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
           || accommodation.rooms.some((room) => room.room_type),
         )
       ),
-    (ctx) => <ModernAccommodationSection {...ctx.accommodation} />,
+    (runtime) => <AccommodationSectionView runtime={runtime} />,
   ),
   entry(
     "logistics",
@@ -170,7 +160,7 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
         || eventData.logistics.unloadingDetails
         || eventData.logistics.equipmentLogistics,
       ),
-    (ctx) => <ModernLogisticsSection {...ctx.logistics} />,
+    (runtime) => <LogisticsSectionView runtime={runtime} />,
   ),
   entry(
     "schedule",
@@ -182,7 +172,7 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
         || eventData.programScheduleDays?.some((day) => day.rows.length)
         || eventData.powerRequirements,
       ),
-    (ctx) => <ModernScheduleSection {...ctx.schedule} />,
+    (runtime) => <ScheduleSectionView runtime={runtime} />,
   ),
   entry(
     "restaurants",
@@ -190,7 +180,7 @@ export const HOJA_SECTION_REGISTRY: readonly HojaSectionRegistryEntry[] = [
     "text-emerald-600",
     ({ eventData }) =>
       Boolean(eventData.restaurants?.some((restaurant) => restaurant.isSelected)),
-    (ctx) => <ModernRestaurantSection {...ctx.restaurants} />,
+    (runtime) => <RestaurantsSectionView runtime={runtime} />,
   ),
 ] as const;
 
