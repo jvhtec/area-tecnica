@@ -383,7 +383,7 @@ export class PDFEngine {
     const eventName = eventData.eventName || jobTitle || 'Evento';
     const safeEventName = eventName.replace(/_/g, ' ').replace(/\s+/g, ' ').trim() || 'Evento';
     const datePart = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
-    const timePart = formatInTimeZone(new Date(), 'Europe/Madrid', 'HH-mm-ss')
+    const timePart = formatInTimeZone(new Date(), 'Europe/Madrid', 'HH-mm-ss');
     const sectionPart = sectionFilenameLabel ? ` - ${sectionFilenameLabel}` : "";
     const filename = `Hoja de Ruta${sectionPart} - ${safeEventName} - ${datePart} ${timePart}.pdf`;
 

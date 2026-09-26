@@ -31,9 +31,6 @@ const blobFromPreview = async (previewUrl: string): Promise<Blob> => {
   return response.blob();
 };
 
-const isDurableStoragePath = (value?: string | null) =>
-  Boolean(value && !value.startsWith("blob:") && !value.startsWith("data:"));
-
 export const useHojaDeRutaImages = () => {
   const [managedImages, setManagedImages] = useState<ManagedImage[]>([]);
   const [removedStoragePaths, setRemovedStoragePaths] = useState<string[]>([]);
