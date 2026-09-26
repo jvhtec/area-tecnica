@@ -198,6 +198,12 @@ export const useHojaDeRutaPersistence = (
               typeof transport.source_logistics_event_id === "string"
                 ? transport.source_logistics_event_id
                 : undefined,
+            source_logistics_updated_at:
+              typeof transport.source_logistics_updated_at === "string"
+                ? transport.source_logistics_updated_at
+                : undefined,
+            origin: typeof transport.origin === "string" ? transport.origin : undefined,
+            destination: typeof transport.destination === "string" ? transport.destination : undefined,
             is_hoja_relevant: transport.is_hoja_relevant !== false,
             logistics_categories: Array.isArray(transport.logistics_categories)
               ? transport.logistics_categories as Transport["logistics_categories"]
