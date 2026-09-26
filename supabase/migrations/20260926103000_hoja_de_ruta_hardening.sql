@@ -9,10 +9,34 @@ alter table public.hoja_de_ruta
   add column if not exists event_start_date date,
   add column if not exists event_end_date date,
   add column if not exists weather_fetched_at timestamptz,
+  add column if not exists power_requirements_source_updated_at timestamptz,
   add column if not exists published_document_id uuid;
 
 alter table public.job_documents
   add column if not exists document_kind text;
+
+alter table public.power_requirement_tables
+  add column if not exists updated_at timestamptz not null default now();
+
+drop trigger if exists trg_power_requirement_tables_updated_at on public.power_requirement_tables;
+create trigger trg_power_requirement_tables_updated_at
+before update on public.power_requirement_tables
+for each row execute function public.set_updated_at();
+
+do $
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'hoja_de_ruta_status_check'
+      and conrelid = 'public.hoja_de_ruta'::regclass
+  ) then
+    alter table public.hoja_de_ruta
+      add constraint hoja_de_ruta_status_check
+      check (coalesce(status, 'draft') in ('draft', 'review', 'approved', 'final'));
+  end if;
+end
+$;
 
 create index if not exists idx_job_documents_job_kind_uploaded
   on public.job_documents (job_id, document_kind, uploaded_at desc);
@@ -55,7 +79,20 @@ set published_document_id = (
     and jd.document_kind = 'hoja_de_ruta'
     and (
       lower(split_part(coalesce(jd.file_type, ''), ';', 1)) = 'application/pdf'
-      or jd.file_path ~* '\\.pdf
+      or jd.file_path ~* '\\.pdf$'
+    )
+  order by jd.uploaded_at desc nulls last, jd.id desc
+  limit 1
+)
+where h.published_document_id is null
+  and exists (
+    select 1
+    from public.job_documents jd
+    where jd.job_id = h.job_id
+      and jd.document_kind = 'hoja_de_ruta'
+  );
+
+alter table public.hoja_de_ruta_contacts
   add column if not exists email text,
   add column if not exists sort_order integer not null default 0;
 
