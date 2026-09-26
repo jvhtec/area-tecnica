@@ -18,12 +18,12 @@ import {
   syncTransportsWithLogistics,
 } from "@/utils/hoja-de-ruta/staffSync";
 
-import { useHojaDeRutaInitialization } from "./hoja-de-ruta/useHojaDeRutaInitialization";
-import { useHojaDeRutaSave } from "./hoja-de-ruta/useHojaDeRutaSave";
-import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";
+import { useHojaDeRutaInitialization } from "@/hooks/hoja-de-ruta/useHojaDeRutaInitialization";
+import { useHojaDeRutaSave } from "@/hooks/hoja-de-ruta/useHojaDeRutaSave";
+import { useHojaDeRutaPersistence } from "@/hooks/useHojaDeRutaPersistence";
 import { useHojaDocumentState } from "@/features/hoja-de-ruta/model/useHojaDocumentState";
 
-type UseHojaDeRutaFormOptions = {
+export type UseHojaDocumentOptions = {
   prepareImagesForSave: (jobId: string) => Promise<HojaDeRutaImageRecord[]>;
   commitImageSave: () => Promise<void>;
   isImageDirty: boolean;
@@ -33,7 +33,7 @@ export const useHojaDocument = ({
   prepareImagesForSave,
   commitImageSave,
   isImageDirty,
-}: UseHojaDeRutaFormOptions) => {
+}: UseHojaDocumentOptions) => {
   const { toast } = useToast();
   const {
     eventData,
