@@ -1,66 +1,48 @@
-import { useState, useEffect } from 'react';
-import { EventData, TravelArrangement, Accommodation } from '@/types/hoja-de-ruta';
+import { useEffect, useState } from "react";
+import type { Accommodation, EventData, TravelArrangement } from "@/types/hoja-de-ruta";
 
-const initialEventData: EventData = {
-  eventName: '',
-  eventDates: '',
-  venue: { name: '', address: '' },
-  contacts: [{ name: '', role: '', phone: '' }],
-  staff: [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
+const createInitialEventData = (): EventData => ({
+  eventName: "",
+  eventDates: "",
+  venue: { name: "", address: "" },
+  contacts: [{ id: crypto.randomUUID(), name: "", role: "", phone: "" }],
+  staff: [{
+    id: crypto.randomUUID(),
+    name: "",
+    surname1: "",
+    surname2: "",
+    position: "",
+    dni: "",
+  }],
   logistics: {
     transport: [],
-    loadingDetails: '',
-    unloadingDetails: '',
-    equipmentLogistics: ''
+    loadingDetails: "",
+    unloadingDetails: "",
+    equipmentLogistics: "",
   },
-  schedule: '',
-  powerRequirements: '',
-  auxiliaryNeeds: '',
+  schedule: "",
+  powerRequirements: "",
+  auxiliaryNeeds: "",
   auxiliaryStaffSetupQty: 0,
   auxiliaryStaffDismantleQty: 0,
   auxiliaryMachinery: [],
   printExcludedSections: [],
-};
+});
 
 export const useHojaDeRutaState = () => {
-  const [eventData, setEventData] = useState<EventData>(initialEventData);
+  const [eventData, setEventData] = useState<EventData>(createInitialEventData);
   const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [selectedJobId, setSelectedJobId] = useState("");
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
 
-  // Reset state when job changes
+  // Single reset owner. The form hook only resets metadata/query state.
   useEffect(() => {
-    if (selectedJobId) {
-      setEventData(initialEventData);
-      setTravelArrangements([]);
-      setAccommodations([]);
-      setIsInitialized(false);
-      setIsDirty(false);
-    }
+    setEventData(createInitialEventData());
+    setTravelArrangements([]);
+    setAccommodations([]);
+    setIsInitialized(!selectedJobId);
   }, [selectedJobId]);
-
-  // Track if data has been modified
-  useEffect(() => {
-    const hasContent = eventData.eventName || 
-                     eventData.eventDates || 
-                     eventData.venue.name ||
-                     eventData.venue.address || 
-                     eventData.schedule || 
-                     eventData.powerRequirements ||
-                     eventData.auxiliaryNeeds ||
-                     (eventData.auxiliaryStaffSetupQty ?? 0) > 0 ||
-                     (eventData.auxiliaryStaffDismantleQty ?? 0) > 0 ||
-                     (eventData.auxiliaryMachinery?.some(item => (item.quantity ?? 0) > 0) ?? false) ||
-                     (eventData.printExcludedSections?.length ?? 0) > 0 ||
-                     eventData.contacts.some(c => c.name) ||
-                     eventData.staff.some(s => s.name) || 
-                     travelArrangements.length > 0 ||
-                     accommodations.length > 0;
-    
-    setIsDirty(Boolean(hasContent) && isInitialized);
-  }, [eventData, travelArrangements, accommodations, isInitialized]);
 
   return {
     eventData,
@@ -73,7 +55,5 @@ export const useHojaDeRutaState = () => {
     setSelectedJobId,
     isInitialized,
     setIsInitialized,
-    isDirty,
-    setIsDirty
   };
 };
