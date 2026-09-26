@@ -12,6 +12,7 @@ import {
 import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { hojaGeometry } from '../hoja-report-system';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 /**
  * The cover of the hoja de ruta.
@@ -51,7 +52,7 @@ export class CoverSection {
         const format = this.logoData.includes('data:image/jpeg') ? 'JPEG' : 'PNG';
         this.pdfDoc.addImage(this.logoData, format, geo.left, 40 * mm, drawW, drawH);
       } catch (error) {
-        console.error('Error adding logo to cover:', error);
+        reportHojaError('pdf.cover.logo.add', error);
       }
     }
 

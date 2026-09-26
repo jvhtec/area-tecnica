@@ -1,3 +1,4 @@
+import { useRef, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,32 @@ export const QuickNavigationSidebar = ({
   activeTab,
   onTabChange,
   embedded,
-}: QuickNavigationSidebarProps) => (
+}: QuickNavigationSidebarProps) => {
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const focusTabAt = (index: number) => {
+    const wrapped = (index + tabConfig.length) % tabConfig.length;
+    buttonRefs.current[wrapped]?.focus();
+    onTabChange(tabConfig[wrapped].id);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusTabAt(index + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusTabAt(index - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusTabAt(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusTabAt(tabConfig.length - 1);
+    }
+  };
+
+  return (
   <div className="hidden md:block md:col-span-3">
     <div className={cn("sticky space-y-4", embedded ? "top-0" : "top-24")}>
       <Card className="border-2">
@@ -27,16 +53,22 @@ export const QuickNavigationSidebar = ({
             Navegación Rápida
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {tabConfig.map((tab) => {
+        <CardContent className="space-y-2" role="tablist" aria-label="Navegación rápida" aria-orientation="vertical">
+          {tabConfig.map((tab, index) => {
             const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
             return (
               <Button
                 key={tab.id}
-                variant={activeTab === tab.id ? "default" : "ghost"}
+                ref={(el) => { buttonRefs.current[index] = el; }}
+                variant={isActive ? "default" : "ghost"}
                 size="sm"
                 onClick={() => onTabChange(tab.id)}
-                className={`w-full justify-start ${activeTab === tab.id ? "bg-primary text-primary-foreground" : ""}`}
+                onKeyDown={(event) => handleKeyDown(event, index)}
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                className={`w-full justify-start ${isActive ? "bg-primary text-primary-foreground" : ""}`}
               >
                 <Icon className={`w-4 h-4 mr-2 ${tab.color}`} />
                 {tab.label}
@@ -47,6 +79,7 @@ export const QuickNavigationSidebar = ({
       </Card>
     </div>
   </div>
-);
+  );
+};
 
 export default QuickNavigationSidebar;

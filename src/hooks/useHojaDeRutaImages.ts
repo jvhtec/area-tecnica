@@ -34,6 +34,7 @@ const blobFromPreview = async (previewUrl: string): Promise<Blob> => {
 export const useHojaDeRutaImages = () => {
   const [managedImages, setManagedImages] = useState<ManagedImage[]>([]);
   const [removedStoragePaths, setRemovedStoragePaths] = useState<string[]>([]);
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [savedFingerprint, setSavedFingerprint] = useState("[]");
   const hydratedKeyRef = useRef<string | null>(null);
   const preparedFingerprintRef = useRef<string | null>(null);
@@ -79,6 +80,9 @@ export const useHojaDeRutaImages = () => {
           Array.from(new Set([...paths, existing.cleanupStoragePath!]))
         );
       }
+      if (existing && existing.id !== next?.id) {
+        setRemovedImageIds((ids) => Array.from(new Set([...ids, existing.id])));
+      }
       if (existing?.previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(existing.previewUrl);
       }
@@ -111,6 +115,7 @@ export const useHojaDeRutaImages = () => {
           Array.from(new Set([...paths, target.cleanupStoragePath!]))
         );
       }
+      setRemovedImageIds((ids) => Array.from(new Set([...ids, target.id])));
       if (target.previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(target.previewUrl);
       }
@@ -164,9 +169,10 @@ export const useHojaDeRutaImages = () => {
   const hydratePersistedImages = useCallback(async (
     jobId: string,
     rows: HojaDeRutaImageRecord[] | null | undefined,
+    options: { force?: boolean } = {},
   ) => {
     const signature = `${jobId}:${(rows || []).map((row) => `${row.id}:${row.image_path}`).join("|")}`;
-    if (hydratedKeyRef.current === signature) return;
+    if (!options.force && hydratedKeyRef.current === signature) return;
     const runId = ++hydrationRunRef.current;
 
     const hydrated = await Promise.all((rows || []).map(async (row): Promise<ManagedImage | null> => {
@@ -213,6 +219,7 @@ export const useHojaDeRutaImages = () => {
       return hydrated.filter((item): item is ManagedImage => Boolean(item));
     });
     setRemovedStoragePaths([]);
+    setRemovedImageIds([]);
     const clean = hydrated.filter((item): item is ManagedImage => Boolean(item));
     setSavedFingerprint(fingerprintFor(clean));
     hydratedKeyRef.current = signature;
@@ -259,6 +266,8 @@ export const useHojaDeRutaImages = () => {
       preparedFingerprintRef.current = null;
     }
 
+    setRemovedImageIds([]);
+
     if (removedStoragePaths.length === 0) return;
     const paths = [...removedStoragePaths];
     setRemovedStoragePaths([]);
@@ -273,6 +282,7 @@ export const useHojaDeRutaImages = () => {
 
   const imageFingerprint = useMemo(() => fingerprintFor(managedImages), [fingerprintFor, managedImages]);
   const isImageDirty = imageFingerprint !== savedFingerprint;
+  const getRemovedImageIds = useCallback(() => [...removedImageIds], [removedImageIds]);
 
   return {
     images,
@@ -289,6 +299,7 @@ export const useHojaDeRutaImages = () => {
     hydratePersistedImages,
     prepareImagesForSave,
     commitImageSave,
+    getRemovedImageIds,
     imageFingerprint,
     isImageDirty,
   };

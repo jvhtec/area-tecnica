@@ -5,6 +5,10 @@ import { loadExceljs } from "@/utils/lazyExceljs";
 import { applyStyle, populateSheet, saveWorkbook } from "@/utils/excelExport";
 import type ExcelJS from "exceljs";
 import { formatLogisticsHojaCategories } from "@/constants/logisticsHojaCategories";
+import {
+  HOJA_SECTION_DEFINITIONS,
+  type HojaSectionId,
+} from "@/features/hoja-de-ruta/model/sectionDefinitions";
 
 interface ExportData {
   eventData: EventData;
@@ -623,17 +627,22 @@ export const generateHojaDeRutaXLS = async (data: ExportData) => {
   const ExcelJS = await loadExceljs();
   const wb = new ExcelJS.Workbook();
 
-  // Create all sheets
-  createEventSheet(wb, data);
-  createVenueSheet(wb, data);
-  createContactsSheet(wb, data);
-  createStaffSheet(wb, data);
-  createTravelSheet(wb, data);
-  createAccommodationSheet(wb, data);
-  createLogisticsSheet(wb, data);
-  createScheduleSheet(wb, data);
-  createWeatherSheet(wb, data);
-  createRestaurantsSheet(wb, data);
+  const sectionBuilders: Record<HojaSectionId, (workbook: ExcelJS.Workbook, value: ExportData) => void> = {
+    event: createEventSheet,
+    venue: createVenueSheet,
+    weather: createWeatherSheet,
+    contacts: createContactsSheet,
+    staff: createStaffSheet,
+    travel: createTravelSheet,
+    accommodation: createAccommodationSheet,
+    logistics: createLogisticsSheet,
+    schedule: createScheduleSheet,
+    restaurants: createRestaurantsSheet,
+  };
+
+  HOJA_SECTION_DEFINITIONS.forEach((section) => {
+    sectionBuilders[section.id](wb, data);
+  });
 
   // Generate filename
   const timestamp = format(new Date(), "yyyy-MM-dd");

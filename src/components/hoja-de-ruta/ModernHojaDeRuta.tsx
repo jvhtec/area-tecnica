@@ -1,14 +1,16 @@
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useBlocker, useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
+  ArrowLeft,
   FileText,
   Sparkles,
   CheckCircle2,
@@ -22,12 +24,14 @@ import {
 // Import the working hooks
 import { useHojaDocument } from "@/features/hoja-de-ruta/model/useHojaDocument";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
+import { useHojaLeaveGuard } from "@/features/hoja-de-ruta/model/useHojaLeaveGuard";
 
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { HojaDeRutaHeaderActions } from "@/components/hoja-de-ruta/components/HojaDeRutaHeaderActions";
 import { MobileSectionSwitcher } from "@/components/hoja-de-ruta/components/MobileSectionSwitcher";
 import { MobileSaveBar } from "@/components/hoja-de-ruta/components/MobileSaveBar";
 import { QuickNavigationSidebar } from "@/components/hoja-de-ruta/components/QuickNavigationSidebar";
+import { HojaConflictBanner } from "@/components/hoja-de-ruta/components/HojaConflictBanner";
 import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
 import { HojaDeRutaPdfPreviewDialog } from "./HojaDeRutaPdfPreviewDialog";
 import {
@@ -46,11 +50,15 @@ type ModernHojaDeRutaProps = {
   // instead of the standalone /hoja-de-ruta page — switches the root layout from
   // page-flow (min-h-screen) to a flex column that stretches to fill its parent.
   embedded?: boolean;
+  // Reports live isDirty changes to an embedding dialog shell so it can guard
+  // its own Esc/overlay/close dismissal (see HojaDeRutaDialog).
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
-export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaProps) => {
+export const ModernHojaDeRuta = ({ jobId, embedded = false, onDirtyChange }: ModernHojaDeRutaProps) => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const routedJobId = jobId ?? searchParams.get("jobId") ?? searchParams.get("openHojaDeRuta") ?? undefined;
   const [activeTab, setActiveTab] = useState("event");
@@ -69,12 +77,15 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hydratePersistedImages,
     prepareImagesForSave,
     commitImageSave,
+    getRemovedImageIds,
     isImageDirty,
   } = useHojaDeRutaImages();
 
   const document = useHojaDocument(routedJobId, {
     prepareImagesForSave,
+    hydratePersistedImages,
     commitImageSave,
+    getRemovedImageIds,
     isImageDirty,
   });
   const {
@@ -95,6 +106,9 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasBasicJobData,
     isDirty,
     hasExternalConflict,
+    reloadLatest,
+    overwriteWithLocalChanges,
+    validation,
     documentStatus,
     isFinal,
     handleStatusTransition,
@@ -103,6 +117,56 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasPowerDrift,
     applyPowerRequirementsChanges,
   } = document;
+
+  const confirmLeave = useHojaLeaveGuard(isDirty);
+  const routeBlocker = useBlocker(({ currentLocation, nextLocation }) => (
+    !embedded
+    && isDirty
+    && `${currentLocation.pathname}${currentLocation.search}`
+      !== `${nextLocation.pathname}${nextLocation.search}`
+  ));
+
+  useEffect(() => {
+    if (routeBlocker.state !== "blocked") return;
+    let active = true;
+    void confirmLeave().then((confirmed) => {
+      if (!active) return;
+      if (confirmed) routeBlocker.proceed();
+      else routeBlocker.reset();
+    });
+    return () => {
+      active = false;
+    };
+  }, [confirmLeave, routeBlocker]);
+
+  useEffect(() => {
+    const firstIssue = validation.showAllErrors ? validation.issues[0] : undefined;
+    if (firstIssue) setActiveTab(firstIssue.section);
+  }, [validation.issues, validation.showAllErrors]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  // Guards job switching (standalone page only — embedded dialogs fix the job
+  // via the `jobId` prop and hide this selector) so unsaved edits are never
+  // silently discarded when the user picks a different job. The reducer stays
+  // the single source of truth: this only decides *whether* to call its
+  // setter, never bypasses it.
+  const guardedSetSelectedJobId = useCallback<typeof setSelectedJobId>((next) => {
+    const nextValue = typeof next === "function"
+      ? (next as (previous: string) => string)(selectedJobId)
+      : next;
+    if (nextValue === selectedJobId) return;
+    void confirmLeave().then((confirmed) => {
+      if (confirmed) setSelectedJobId(nextValue);
+    });
+  }, [confirmLeave, selectedJobId, setSelectedJobId]);
+
+  const guardedDocument = useMemo(
+    () => ({ ...document, setSelectedJobId: guardedSetSelectedJobId }),
+    [document, guardedSetSelectedJobId],
+  );
 
   const completionProgress = useMemo(
     () => (
@@ -127,6 +191,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     handlePublishPDF,
     handleGenerateSectionPDF,
     handleGenerateXLS,
+    handleGenerateAccreditationXLS,
     handleOpenPdfPreviewInNewTab,
     handlePdfPreviewOpenChange,
     handlePreviewDriverCertificatePDF,
@@ -147,12 +212,34 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hojaDeRuta,
     imagePreviews,
     isDirty,
+    hasExternalConflict,
     jobs,
     selectedJobId,
+    documentVersion: document.documentVersion,
     setEventData,
     travelArrangements,
+    validateDocument: validation.validateDocument,
     venueMapPreview,
   });
+
+  const handleConflictReload = useCallback(async () => {
+    try {
+      const confirmed = await confirmLeave();
+      if (confirmed) {
+        await reloadLatest();
+      }
+    } catch (error) {
+      reportHojaError("document.conflict.reload", error);
+    }
+  }, [confirmLeave, reloadLatest]);
+
+  const handleConflictOverwrite = useCallback(async () => {
+    try {
+      await overwriteWithLocalChanges();
+    } catch (error) {
+      reportHojaError("document.conflict.overwrite", error);
+    }
+  }, [overwriteWithLocalChanges]);
 
   // Enhanced save function with better error handling
   const handleSave = async () => {
@@ -176,7 +263,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     try {
       await handleSaveAll();
     } catch (error) {
-      console.error("Save error:", error);
+      reportHojaError("document.save", error);
       // Error handling is already done in handleSaveAll
     }
   };
@@ -186,26 +273,26 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     const status = hojaDeRuta?.status || 'draft';
     switch (status) {
       case 'draft':
-        return { icon: Clock, color: 'bg-yellow-500', text: 'Borrador' };
+        return { icon: Clock, color: 'bg-warning', text: 'Borrador' };
       case 'review':
-        return { icon: Eye, color: 'bg-blue-500', text: 'En Revisión' };
+        return { icon: Eye, color: 'bg-info', text: 'En Revisión' };
       case 'approved':
-        return { icon: CheckCircle2, color: 'bg-green-500', text: 'Aprobado' };
+        return { icon: CheckCircle2, color: 'bg-success', text: 'Aprobado' };
       case 'final':
-        return { icon: CheckCircle2, color: 'bg-green-600', text: 'Final' };
+        return { icon: CheckCircle2, color: 'bg-success', text: 'Final' };
       default:
-        return { icon: AlertCircle, color: 'bg-gray-500', text: 'Sin Estado' };
+        return { icon: AlertCircle, color: 'bg-muted-foreground', text: 'Sin Estado' };
     }
   };
 
   // Get data source info
   const getDataSourceInfo = () => {
     if (hasSavedData) {
-      return { icon: Database, color: 'bg-green-100 text-green-800 border-green-200', text: 'Datos Guardados' };
+      return { icon: Database, color: 'bg-success/15 text-success border-success/30', text: 'Datos Guardados' };
     } else if (hasBasicJobData) {
-      return { icon: FileDown, color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Datos Básicos' };
+      return { icon: FileDown, color: 'bg-info/15 text-info border-info/30', text: 'Datos Básicos' };
     } else {
-      return { icon: AlertCircle, color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Sin Datos' };
+      return { icon: AlertCircle, color: 'bg-muted text-muted-foreground border-border', text: 'Sin Datos' };
     }
   };
 
@@ -226,6 +313,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     isReadOnly: isFinal,
     isPrintSectionExcluded,
     onPrintSectionExcludedChange: handlePrintExclusionChange,
+    validationErrorFor: validation.errorFor,
     venue: {
       images,
       imagePreviews,
@@ -239,6 +327,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
 
   if (isLoadingHojaDeRuta) {
     return (
+      <MotionConfig reducedMotion="user">
       <div className="flex items-center justify-center min-h-[60vh]">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -246,12 +335,13 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
           className="text-center space-y-4"
         >
           <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary to-primary/60 rounded-full flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-white animate-pulse" />
+            <Sparkles className="w-8 h-8 text-primary-foreground" />
           </div>
           <h3 className="text-xl font-semibold">Preparando el espacio de trabajo...</h3>
           <p className="text-muted-foreground">Cargando datos de la hoja de ruta</p>
         </motion.div>
       </div>
+      </MotionConfig>
     );
   }
 
@@ -268,7 +358,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         : null;
 
   return (
-    <HojaDocumentProvider value={document}>
+    <HojaDocumentProvider value={guardedDocument}>
+    <MotionConfig reducedMotion="user">
     <div
       className={cn(
         "bg-gradient-to-br from-background via-background to-muted/20",
@@ -285,8 +376,19 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         <div className="max-w-screen-2xl mx-auto px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-4">
+              {!embedded && isMobile && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Volver"
+                  onClick={() => navigate(-1)}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              )}
               <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/60 rounded-xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+                <FileText className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
                 <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent leading-tight">
@@ -361,22 +463,22 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
           {/* Enhanced Status Messages */}
           <div className="mt-2 md:mt-3 text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!selectedJobId && (
-              <span className="text-amber-600 font-medium">
+              <span className="text-warning font-medium">
                 Selecciona un trabajo para comenzar
               </span>
             )}
             {selectedJobId && !isInitialized && (
-              <span className="text-blue-600 font-medium">
+              <span className="text-info font-medium">
                 Inicializando...
               </span>
             )}
             {selectedJobId && isInitialized && hasSavedData && (
-              <span className="text-green-600 font-medium">
+              <span className="text-success font-medium">
                 Datos guardados cargados
               </span>
             )}
             {selectedJobId && isInitialized && !hasSavedData && hasBasicJobData && (
-              <span className="text-blue-600 font-medium">
+              <span className="text-info font-medium">
                 Datos básicos cargados
               </span>
             )}
@@ -386,7 +488,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
               </span>
             )}
             {isFinal && (
-              <span className="text-emerald-700 font-medium">
+              <span className="text-success font-medium">
                 Documento final · edición bloqueada
               </span>
             )}
@@ -423,6 +525,28 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
           </div>
         </div>
       </motion.div>
+
+      {hasExternalConflict && (
+        <HojaConflictBanner
+          isBusy={isSaving}
+          onReload={() => { void handleConflictReload(); }}
+          onOverwrite={() => { void handleConflictOverwrite(); }}
+        />
+      )}
+
+      {validation.showAllErrors && validation.issues.length > 0 && (
+        <div role="alert" className="border-b border-destructive/30 bg-destructive/10 px-4 py-3">
+          <div className="mx-auto flex max-w-screen-2xl items-start gap-2 text-sm">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-destructive">Revisa los campos obligatorios</p>
+              <p className="text-muted-foreground">
+                {validation.issues[0].message} ({validation.issues.length} pendiente{validation.issues.length === 1 ? "" : "s"})
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className={cn(embedded && "flex-1 overflow-y-auto")}>
@@ -479,6 +603,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
           onSave={handleSave}
           disabled={isFinal || !selectedJobId || !isInitialized || isSaving}
           isSaving={isSaving}
+          embedded={embedded}
         />
       )}
 
@@ -494,6 +619,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         onPreviewDriverCertificatePDF={handlePreviewDriverCertificatePDF}
         onPreviewSectionPDF={handlePreviewPDF}
         onGenerateXLS={handleGenerateXLS}
+        onGenerateAccreditationXLS={handleGenerateAccreditationXLS}
         sections={tabConfig}
         isGenerating={isGenerating}
         generatingSectionId={generatingSectionId}
@@ -508,6 +634,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         onOpenInNewTab={handleOpenPdfPreviewInNewTab}
       />
     </div>
+    </MotionConfig>
     </HojaDocumentProvider>
   );
 };

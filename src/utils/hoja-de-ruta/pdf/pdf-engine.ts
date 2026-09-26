@@ -12,6 +12,7 @@ import {
   getHojaDeRutaPdfSelectionLabel,
   normalizeHojaDeRutaPrintSections,
 } from '@/utils/hoja-de-ruta/pdf/section-options';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 import type {
   HojaDeRutaPdfSectionId,
   HojaDeRutaPrintSectionId,
@@ -34,7 +35,7 @@ export class PDFEngine {
   }
 
   async generate(): Promise<void> {
-    const { selectedJobId, publish = false } = this.options;
+    const { selectedJobId, publish = false, expectedDocumentVersion } = this.options;
     const generatedPdf = await this.renderPDF();
 
     this.pdfDoc.save(generatedPdf.filename);
@@ -42,7 +43,15 @@ export class PDFEngine {
     // Publication is an explicit, full-document action. Section downloads and
     // previews can never replace the crew-facing Hoja or fire a push.
     if (publish) {
-      await this.uploadPDF(selectedJobId, generatedPdf.blob, generatedPdf.filename);
+      if (expectedDocumentVersion === undefined) {
+        throw new Error('Falta la versión esperada para publicar la Hoja de Ruta');
+      }
+      await this.uploadPDF(
+        selectedJobId,
+        generatedPdf.blob,
+        generatedPdf.filename,
+        expectedDocumentVersion,
+      );
     }
   }
 
@@ -339,7 +348,7 @@ export class PDFEngine {
         }
       }
     } catch (e) {
-      console.warn('Weather fetch during PDF generation failed:', e);
+      reportHojaError('pdf.weather.fetch', e);
     }
   }
 
@@ -394,11 +403,19 @@ export class PDFEngine {
     };
   }
 
-  private async uploadPDF(selectedJobId: string, pdfBlob: Blob, filename: string): Promise<void> {
+  private async uploadPDF(
+    selectedJobId: string,
+    pdfBlob: Blob,
+    filename: string,
+    expectedDocumentVersion: number,
+  ): Promise<void> {
     try {
-      await uploadPdfToJob(selectedJobId, pdfBlob, filename, { kind: 'hoja_de_ruta' });
+      await uploadPdfToJob(selectedJobId, pdfBlob, filename, {
+        kind: 'hoja_de_ruta',
+        expectedDocumentVersion,
+      });
     } catch (uploadError) {
-      console.error('Error uploading PDF to job storage:', uploadError);
+      reportHojaError('pdf.upload', uploadError);
       throw uploadError
     }
   }

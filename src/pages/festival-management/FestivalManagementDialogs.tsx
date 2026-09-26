@@ -9,7 +9,7 @@ import { FestivalScheduling } from "@/components/festival/scheduling/FestivalSch
 import { PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { RiderLibraryDialog } from "@/components/festival/RiderLibraryDialog";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
-import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
+import { HojaDeRutaDialog } from "@/components/hoja-de-ruta/HojaDeRutaDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
@@ -156,11 +156,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
       />
 
       {!isHouseTech && (
-        <Dialog open={isRouteSheetOpen} onOpenChange={setIsRouteSheetOpen}>
-          <DialogContent className="max-w-[96vw] w-[96vw] max-h-[90vh] md:h-[90vh] p-0 overflow-hidden flex flex-col">
-            <div className="h-full overflow-auto">{jobId && <ModernHojaDeRuta jobId={jobId} />}</div>
-          </DialogContent>
-        </Dialog>
+        <HojaDeRutaDialog open={isRouteSheetOpen} onOpenChange={setIsRouteSheetOpen} jobId={jobId} />
       )}
 
       {isSchedulingRoute && (

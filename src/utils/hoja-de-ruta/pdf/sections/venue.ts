@@ -6,6 +6,7 @@ import { MapService } from '../services/map-service';
 import { PlacesImageService } from '../services/places-image-service';
 import { QRService } from '../services/qr-service';
 import { normalizeVenueCoordinates } from '@/utils/hoja-de-ruta/venue-resolution';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export class VenueSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -79,7 +80,7 @@ export class VenueSection {
           try {
             this.pdfDoc.addImage(dataUrl, 'PNG', x, yPosition, maxPerImage, imgHeight);
           } catch (err) {
-            console.error('Error adding venue image preview:', err);
+            reportHojaError('pdf.venue.image.add', err);
           }
         }
         // Optional border for images
@@ -118,7 +119,7 @@ export class VenueSection {
         try {
           mapDataUrl = await MapService.getMapImageForVenue(eventData.venue, mapW, mapHeight);
         } catch (e) {
-          console.warn('Venue map fetch failed:', e);
+          reportHojaError('pdf.venue.map.fetch', e);
         }
       }
 
@@ -136,7 +137,7 @@ export class VenueSection {
           try {
             this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapW, mapHeight);
           } catch (err) {
-            console.error('Error adding venue map:', err);
+            reportHojaError('pdf.venue.map.add', err);
             this.pdfDoc.addText('[MAPA NO DISPONIBLE]', mapX, mapY + mapHeight / 2);
           }
         }
@@ -160,7 +161,7 @@ export class VenueSection {
           this.pdfDoc.setText(8, [51, 51, 51]);
           this.pdfDoc.addText('Escanea para direcciones', qrX, qrY + qrSize + 6);
         } catch (error) {
-          console.error('Error generating venue QR:', error);
+          reportHojaError('pdf.venue.qr.generate', error);
         }
       }
 

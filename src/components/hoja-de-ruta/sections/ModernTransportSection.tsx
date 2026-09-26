@@ -22,6 +22,7 @@ import {
 import { fetchLogisticsMatrix } from "@/features/logistics/fleet/fleetApi";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
 import type { Transport } from "@/types/hoja-de-ruta";
 
 interface ModernTransportSectionProps {
@@ -178,7 +179,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       .eq("job_id", jobId);
 
     if (error) {
-      console.warn("No se pudo comprobar el estado de Logística para la Hoja de Ruta:", error);
+      reportHojaError("logistics.driftCheck", error);
       return;
     }
     if (
@@ -301,7 +302,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       try {
         matrix = await fetchLogisticsMatrix(startKey, endKey);
       } catch (matrixError) {
-        console.warn("No se pudo cargar la matriz logística; se importarán solo los eventos:", matrixError);
+        reportHojaError("logistics.matrix.fetch", matrixError);
       }
       const jobEventIds = new Set(logisticsEvents.map((event) => event.id));
       const jobMatrix: LogisticsMatrixData = {
@@ -322,7 +323,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
         description: `Se sincronizaron ${importedTransports.length} transportes con conductores, flota y ubicaciones.`,
       });
     } catch (error) {
-      console.error("Error importing logistics:", error);
+      reportHojaError("logistics.import", error);
       toast({
         title: "Error",
         description: "No se pudieron sincronizar los eventos logísticos",
@@ -367,7 +368,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
             className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
           >
             <span className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTriangle className="h-4 w-4 text-warning" />
               {logisticsDriftCount} cambio{logisticsDriftCount === 1 ? "" : "s"} en Logística desde la última sincronización.
             </span>
             <Button

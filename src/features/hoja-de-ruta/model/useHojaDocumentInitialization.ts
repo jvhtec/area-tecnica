@@ -16,6 +16,7 @@ import { getErrorMessage } from '@/utils/errorMessage';
 import { labelForCode } from '@/types/roles';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { HojaDocument } from '@/features/hoja-de-ruta/model/HojaDocument';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 type JobRow = Database['public']['Tables']['jobs']['Row'];
 type JobAssignmentRow = Database['public']['Tables']['job_assignments']['Row'];
@@ -197,7 +198,7 @@ export const useHojaDocumentInitialization = (
 
       if (error || !powerRequirements?.length) {
         if (error) {
-          console.warn("No se pudieron cargar los requisitos de potencia:", error);
+          reportHojaError("initialization.powerRequirements.fetch", error);
         }
         return { text: "" };
       }
@@ -213,7 +214,7 @@ export const useHojaDocumentInitialization = (
         sourceUpdatedAt,
       };
     } catch (error) {
-      console.warn("No se pudieron cargar los requisitos de potencia:", error);
+      reportHojaError("initialization.powerRequirements.fetch", error);
       return { text: "" };
     }
   }, []);
@@ -221,8 +222,6 @@ export const useHojaDocumentInitialization = (
   // Load current job assignments
   const loadCurrentJobAssignments = useCallback(async (jobId: string) => {
     if (!jobId) return null;
-    
-    console.log("👥 INITIALIZATION: Loading current job assignments for:", jobId);
     
     try {
       const { data: jobData, error: jobError } = await supabase
@@ -239,7 +238,7 @@ export const useHojaDocumentInitialization = (
         .single();
 
       if (jobError || !jobData) {
-        console.error("❌ INITIALIZATION: Error fetching job assignments:", jobError);
+        reportHojaError("initialization.assignments.fetch", jobError);
         return null;
       }
 
@@ -281,10 +280,9 @@ export const useHojaDocumentInitialization = (
         }
       }
 
-      console.log("✅ INITIALIZATION: Loaded current assignments:", staffFromAssignments);
       return { jobData: typedJobData, staffFromAssignments, tourContacts };
     } catch (error) {
-      console.error("❌ INITIALIZATION: Error loading job assignments:", error);
+      reportHojaError("initialization.assignments.fetch", error);
       return null;
     }
   }, []);
@@ -292,8 +290,6 @@ export const useHojaDocumentInitialization = (
   // Auto-populate basic job data with assignments
   const autoPopulateBasicJobData = useCallback(async (jobId: string) => {
     if (!jobId) return;
-
-    console.log("🔄 INITIALIZATION: Auto-populating basic job data with assignments for:", jobId);
 
     try {
       const [assignmentData, powerRequirements] = await Promise.all([
@@ -314,13 +310,6 @@ export const useHojaDocumentInitialization = (
         powerRequirementsSourceUpdatedAt: powerRequirements.sourceUpdatedAt,
       });
 
-      console.log("✅ INITIALIZATION: Setting basic job data with assignments:", {
-        eventName: basicEventData.eventName,
-        staffCount: basicEventData.staff.length,
-        staffData: basicEventData.staff,
-        hasPowerRequirements: !!powerRequirementsText
-      });
-
       setEventData(basicEventData);
       setHasBasicJobData(true);
       setDataSource('job');
@@ -337,7 +326,7 @@ export const useHojaDocumentInitialization = (
           : "Se han cargado los datos básicos del trabajo seleccionado.",
       });
     } catch (error) {
-      console.error("❌ INITIALIZATION: Error auto-populating basic job data:", error);
+      reportHojaError("initialization.autoPopulate", error);
       toast({
         title: "Error",
         description: getErrorMessage(error, "No se pudieron cargar los datos básicos del trabajo."),
@@ -361,8 +350,6 @@ export const useHojaDocumentInitialization = (
     // apply their results over the newer job's state.
     const isCurrentRun = () => initializingRunRef.current === runToken;
 
-    console.log("🔄 INITIALIZATION: Initialization effect triggered for job:", selectedJobId);
-
     const initializeFormData = async () => {
       // Always load current job assignments and power requirements first
       const [assignmentData, powerRequirements] = await Promise.all([
@@ -374,12 +361,10 @@ export const useHojaDocumentInitialization = (
       // Everything below is synchronous, so this single check after the only
       // await guards every state mutation in this run.
       if (!isCurrentRun()) {
-        console.log("⏭️ INITIALIZATION: Discarding stale initialization for job:", selectedJobId);
         return;
       }
 
       if (!assignmentData) {
-        console.log("❌ INITIALIZATION: No assignment data available");
         setIsInitialized(true);
         return;
       }
@@ -389,7 +374,6 @@ export const useHojaDocumentInitialization = (
 
       // If we have saved data, merge current assignments with saved data
       if (hojaDeRuta) {
-        console.log("✅ INITIALIZATION: Initializing with SAVED data + current assignments");
         setHasSavedData(true);
         setDataSource('saved');
         
@@ -484,7 +468,6 @@ export const useHojaDocumentInitialization = (
         });
       } else {
         // No saved data - use current job data with assignments
-        console.log("🆕 INITIALIZATION: No saved data, using current job data with assignments");
         setHasSavedData(false);
         setDataSource('job');
 

@@ -5,6 +5,7 @@ import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
 import { MapService } from '../services/map-service';
 import { QRService } from '../services/qr-service';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export class TravelSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -130,7 +131,7 @@ export class TravelSection {
             this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapWidth, mapHeight);
             mapAdded = true;
           } catch (err) {
-            console.error('Error adding pickup map:', err);
+            reportHojaError('pdf.travel.map.add', err);
           }
         }
         // Add a subtle border around the map
@@ -139,7 +140,7 @@ export class TravelSection {
         this.pdfDoc.document.rect(mapX, mapY, mapWidth, mapHeight);
       }
     } catch (error) {
-      console.error('Error adding pickup map:', error);
+      reportHojaError('pdf.travel.map.add', error);
     }
 
     if (!mapAdded) {
@@ -165,7 +166,7 @@ export class TravelSection {
         this.pdfDoc.addText('Escanea para direcciones', qrX, qrY + qrSize + 12);
       }
     } catch (qrError) {
-      console.error('Error generating pickup QR:', qrError);
+      reportHojaError('pdf.travel.qr.generate', qrError);
     }
   }
 }

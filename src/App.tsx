@@ -1,5 +1,10 @@
 import React, { Suspense, lazy } from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import {
+  createBrowserRouter,
+  Route,
+  RouterProvider,
+  Routes,
+} from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -44,7 +49,38 @@ const renderRoute = (route: AppRoute) => (
   <Route key={route.id} path={route.path} element={createRouteElement(route)} />
 );
 
+const AppRoutes = () => (
+  <OptimizedAuthProvider>
+    <ThemePreferenceSync />
+    <ConfirmDialogProvider>
+      <AppRuntimeCoordinator />
+      <RouteAwareGlobalInitializers />
+      <div className="app">
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {publicRoutes.map(renderRoute)}
+            <Route element={<AuthenticatedShell />}>
+              {fullscreenRoutes.map(renderRoute)}
+              <Route element={<Layout />}>
+                {appShellRoutes.map(renderRoute)}
+              </Route>
+            </Route>
+          </Routes>
+        </Suspense>
+        <RouteAwareGlobalOverlays />
+      </div>
+    </ConfirmDialogProvider>
+  </OptimizedAuthProvider>
+);
+
 export default function App() {
+  const router = React.useMemo(() => createBrowserRouter([
+    {
+      path: "*",
+      element: <AppRoutes />,
+    },
+  ]), []);
+
   React.useEffect(() => {
     const coordinator = MultiTabCoordinator.getInstance(queryClient);
 
@@ -60,29 +96,7 @@ export default function App() {
           <ThemeProvider defaultTheme="system" storageKey={APP_THEME_STORAGE_KEY} attribute="class">
             <ThemeColorMeta />
             <AppBadgeProvider>
-              <Router>
-                <OptimizedAuthProvider>
-                  <ThemePreferenceSync />
-                  <ConfirmDialogProvider>
-                    <AppRuntimeCoordinator />
-                    <RouteAwareGlobalInitializers />
-                    <div className="app">
-                      <Suspense fallback={<PageLoader />}>
-                        <Routes>
-                          {publicRoutes.map(renderRoute)}
-                          <Route element={<AuthenticatedShell />}>
-                            {fullscreenRoutes.map(renderRoute)}
-                            <Route element={<Layout />}>
-                              {appShellRoutes.map(renderRoute)}
-                            </Route>
-                          </Route>
-                        </Routes>
-                      </Suspense>
-                      <RouteAwareGlobalOverlays />
-                    </div>
-                  </ConfirmDialogProvider>
-                </OptimizedAuthProvider>
-              </Router>
+              <RouterProvider router={router} />
             </AppBadgeProvider>
           </ThemeProvider>
         </ViewportProvider>

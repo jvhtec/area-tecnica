@@ -3990,6 +3990,7 @@ export type Database = {
       }
       hoja_de_ruta_staff: {
         Row: {
+          department: string | null
           dni: string | null
           hoja_de_ruta_id: string | null
           id: string
@@ -4001,6 +4002,7 @@ export type Database = {
           technician_id: string | null
         }
         Insert: {
+          department?: string | null
           dni?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
@@ -4012,6 +4014,7 @@ export type Database = {
           technician_id?: string | null
         }
         Update: {
+          department?: string | null
           dni?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
@@ -13251,18 +13254,35 @@ export type Database = {
           p_expected_version: number | null
           p_job_id: string
           p_payload: Json
+          p_removed_image_ids: string[]
         }
         Returns: {
           document_version: number
           id: string
         }[]
       }
+      migrate_hoja_legacy_image_path: {
+        Args: {
+          p_expected_path: string
+          p_image_id: string
+          p_storage_path: string
+        }
+        Returns: boolean
+      }
       publish_hoja_de_ruta_document: {
-        Args: { p_document_id: string; p_job_id: string }
+        Args: {
+          p_document_id: string
+          p_expected_version: number
+          p_job_id: string
+        }
         Returns: string[]
       }
       set_hoja_de_ruta_status: {
-        Args: { p_job_id: string; p_status: string }
+        Args: {
+          p_expected_version: number
+          p_job_id: string
+          p_status: string
+        }
         Returns: {
           approved_at: string | null
           approved_by: string | null

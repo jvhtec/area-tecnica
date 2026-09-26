@@ -23,9 +23,16 @@ import { useHojaDocumentInitialization } from "@/features/hoja-de-ruta/model/use
 import { useHojaDocumentSave } from "@/features/hoja-de-ruta/model/useHojaDocumentSave";
 import { useHojaDocumentPersistence } from "@/features/hoja-de-ruta/api/useHojaDocumentPersistence";
 import { useHojaDocumentState } from "@/features/hoja-de-ruta/model/useHojaDocumentState";
+import { useHojaValidation } from "@/features/hoja-de-ruta/model/useHojaValidation";
 
 export type UseHojaDocumentOptions = {
   prepareImagesForSave: (jobId: string) => Promise<HojaDeRutaImageRecord[]>;
+  hydratePersistedImages: (
+    jobId: string,
+    rows: HojaDeRutaImageRecord[] | null | undefined,
+    options?: { force?: boolean },
+  ) => Promise<void>;
+  getRemovedImageIds: () => string[];
   commitImageSave: () => Promise<void>;
   isImageDirty: boolean;
 };
@@ -34,6 +41,8 @@ export const useHojaDocument = (
   jobId: string | undefined,
   {
     prepareImagesForSave,
+    hydratePersistedImages,
+    getRemovedImageIds,
     commitImageSave,
     isImageDirty,
   }: UseHojaDocumentOptions,
@@ -153,6 +162,8 @@ export const useHojaDocument = (
     && (savedSnapshotRef.current !== snapshot || isImageDirty),
   );
 
+  const validation = useHojaValidation(eventData, travelArrangements, accommodations);
+
   const { handleSaveAll } = useHojaDocumentSave({
     selectedJobId,
     eventData,
@@ -161,10 +172,13 @@ export const useHojaDocument = (
     expectedVersion: documentVersion,
     saveAll,
     prepareImagesForSave,
+    getRemovedImageIds,
     commitImageSave,
     setLastSaveTime,
     markSaved,
     onSavedVersion: setDocumentVersion,
+    onConflict: () => setHasExternalConflict(true),
+    validateBeforeSave: validation.validateDocument,
   });
 
   const documentStatus =
@@ -188,9 +202,23 @@ export const useHojaDocument = (
       return;
     }
 
+    try {
+      await validation.validateDocument();
+    } catch {
+      toast({
+        title: "Revisa la Hoja de Ruta",
+        description: "Corrige los campos indicados antes de cambiar el estado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let expectedStatusVersion = documentVersionRef.current;
     if (isDirty || !hojaDeRuta?.id) {
       try {
-        await handleSaveAll();
+        const saved = await handleSaveAll();
+        if (!saved) return;
+        expectedStatusVersion = saved.document_version;
       } catch {
         return;
       }
@@ -198,8 +226,14 @@ export const useHojaDocument = (
 
     let updated: Awaited<ReturnType<typeof setStatus>>;
     try {
-      updated = await setStatus(nextStatus);
+      updated = await setStatus({
+        status: nextStatus,
+        expectedVersion: expectedStatusVersion,
+      });
     } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "40001") {
+        setHasExternalConflict(true);
+      }
       toast({
         title: "No se pudo cambiar el estado",
         description: getErrorMessage(error, "Inténtalo de nuevo."),
@@ -232,6 +266,7 @@ export const useHojaDocument = (
     selectedJobId,
     setStatus,
     toast,
+    validation,
   ]);
 
   useEffect(() => {
@@ -676,8 +711,18 @@ export const useHojaDocument = (
     savedSnapshotRef.current = null;
     setHasExternalConflict(false);
     setIsInitialized(false);
-    await forceRefetch();
-  }, [forceRefetch, setIsInitialized]);
+    const latest = await forceRefetch();
+    if (selectedJobId) {
+      await hydratePersistedImages(selectedJobId, latest.data?.images || [], { force: true });
+    }
+  }, [forceRefetch, hydratePersistedImages, selectedJobId, setIsInitialized]);
+
+  const overwriteWithLocalChanges = useCallback(async () => {
+    const latest = await forceRefetch();
+    const latestVersion = Number(latest.data?.document_version ?? documentVersionRef.current);
+    await handleSaveAll({ expectedVersion: latestVersion });
+    setHasExternalConflict(false);
+  }, [forceRefetch, handleSaveAll]);
 
   return {
     eventData,
@@ -699,6 +744,7 @@ export const useHojaDocument = (
     autoPopulateBasicJobData,
     refreshData: forceRefetch,
     reloadLatest,
+    overwriteWithLocalChanges,
     isInitialized,
     hasSavedData,
     hasBasicJobData,
@@ -713,6 +759,7 @@ export const useHojaDocument = (
     hasPowerDrift,
     applyPowerRequirementsChanges,
     documentVersion,
+    validation,
     handleContactChange,
     addContact,
     removeContact,

@@ -7,13 +7,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Eye, Loader2, Table, Printer, Send } from "lucide-react";
+import { AlertTriangle, Eye, Loader2, Table, Printer, Send } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { HojaDeRutaPdfSectionId } from "@/utils/hoja-de-ruta/pdf";
 
@@ -37,6 +38,7 @@ interface HojaDeRutaPrintDialogProps {
   onPreviewDriverCertificatePDF: () => void;
   onPreviewSectionPDF: (sectionId: HojaDeRutaPdfSectionId) => void;
   onGenerateXLS: () => void;
+  onGenerateAccreditationXLS: () => void;
   sections: HojaDeRutaPrintSection[];
   isGenerating?: boolean;
   generatingSectionId?: HojaDeRutaPdfSectionId | null;
@@ -56,13 +58,26 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
   onPreviewDriverCertificatePDF,
   onPreviewSectionPDF,
   onGenerateXLS,
+  onGenerateAccreditationXLS,
   sections,
   isGenerating = false,
   generatingSectionId = null,
   isPreviewing = false,
   previewingTarget = null,
 }) => {
+  const confirm = useConfirm();
   const isBusy = isGenerating || isPreviewing;
+
+  const handleAccreditationExport = async () => {
+    const accepted = await confirm({
+      title: "Exportar datos personales",
+      description: "El archivo incluirá los DNI del personal. ¿Continuar?",
+      confirmText: "Exportar",
+      cancelText: "Cancelar",
+      destructive: true,
+    });
+    if (accepted) onGenerateAccreditationXLS();
+  };
 
   const renderPreviewButton = (
     label: string,
@@ -135,6 +150,22 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
                   onPreviewDriverCertificatePDF
                 )}
               </div>
+            </div>
+            <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 p-3">
+              <h3 className="font-semibold text-base">Acreditaciones</h3>
+              <p className="flex gap-2 text-sm text-warning-foreground">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                Contiene datos personales (DNI). Solo para uso interno; no se publica al equipo.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { void handleAccreditationExport(); }}
+                disabled={isBusy}
+              >
+                <Table className="h-4 w-4 mr-2" />
+                Exportar acreditaciones (XLS)
+              </Button>
             </div>
             <div className="flex flex-col gap-2">
               <h3 className="font-semibold text-base">Imprimir sección a PDF</h3>

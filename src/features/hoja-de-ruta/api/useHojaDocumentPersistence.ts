@@ -71,9 +71,15 @@ export const useHojaDocumentPersistence = (
   });
 
   const statusMutation = useMutation({
-    mutationFn: async (status: HojaStatus) => {
+    mutationFn: async ({
+      status,
+      expectedVersion,
+    }: {
+      status: HojaStatus;
+      expectedVersion: number;
+    }) => {
       if (!jobId) throw new Error("No hay un trabajo seleccionado");
-      return setHojaStatus(jobId, status);
+      return setHojaStatus(jobId, status, expectedVersion);
     },
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKey, (current: typeof hojaDeRuta) => current

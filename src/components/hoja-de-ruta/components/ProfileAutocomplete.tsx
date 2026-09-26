@@ -5,6 +5,8 @@ import { User, Search } from "lucide-react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { maskDni } from "@/utils/hoja-de-ruta/maskDni";
+import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
 
 export interface Profile {
   id: string;
@@ -51,14 +53,14 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
         .limit(10);
 
       if (error) {
-        console.error('Error fetching profiles:', error);
+        reportHojaError("profiles.search", error);
         setProfiles([]);
         return;
       }
 
       setProfiles(data || []);
     } catch (error) {
-      console.error('Error fetching profiles:', error);
+      reportHojaError("profiles.search", error);
     } finally {
       setLoading(false);
     }
@@ -114,14 +116,14 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
         <Input
           ref={inputRef}
           value={value}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           placeholder={placeholder}
-          className={cn("pl-10 border-2 focus:border-orange-300", className)}
+          className={cn("pl-10 border-2 focus:border-warning/50", className)}
         />
       </div>
 
@@ -133,9 +135,9 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
             exit={{ opacity: 0, y: -10 }}
             className="absolute z-50 w-full mt-1"
           >
-            <Card className="border-2 border-orange-200 shadow-lg max-h-60 overflow-y-auto">
+            <Card className="border-2 border-warning/30 shadow-lg max-h-60 overflow-y-auto">
               {loading && (
-                <div className="p-3 text-center text-sm text-gray-500">
+                <div className="p-3 text-center text-sm text-muted-foreground">
                   Buscando...
                 </div>
               )}
@@ -148,12 +150,12 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.05 }}
-                    className="p-3 hover:bg-orange-50 cursor-pointer border-b last:border-b-0 transition-colors"
+                    className="p-3 hover:bg-warning/10 cursor-pointer border-b last:border-b-0 transition-colors"
                     onClick={() => handleProfileSelect(profile)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-orange-600" />
+                      <div className="w-8 h-8 bg-warning/15 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-warning" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">
@@ -161,17 +163,17 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           {profile.dni && (
-                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                              {profile.dni}
+                            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                              {maskDni(profile.dni)}
                             </span>
                           )}
                           {profile.department && (
-                            <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                            <span className="text-xs text-warning bg-warning/15 px-2 py-1 rounded">
                               {profile.department}
                             </span>
                           )}
                           {profile.role && (
-                            <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                            <span className="text-xs text-info bg-info/15 px-2 py-1 rounded">
                               {profile.role}
                             </span>
                           )}
