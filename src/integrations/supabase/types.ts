@@ -3730,7 +3730,6 @@ export type Database = {
           image_path: string
           image_type: string
           sort_order?: number
-          sort_order: number
         }
         Update: {
           hoja_de_ruta_id?: string | null
