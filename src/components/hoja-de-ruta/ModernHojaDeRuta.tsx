@@ -115,6 +115,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasExternalConflict,
     staffingDiff,
     applyStaffingChanges,
+    hasPowerDrift,
+    applyPowerRequirementsChanges,
     autoPopulateFromJob,
     // Form handlers
     handleContactChange,
@@ -431,6 +433,20 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                   onClick={() => { void applyStaffingChanges(); }}
                 >
                   Actualizar personal
+                </Button>
+              </span>
+            )}
+            {hasPowerDrift && (
+              <span className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-medium">
+                Consumos actualizado
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => { void applyPowerRequirementsChanges(); }}
+                >
+                  Actualizar potencia
                 </Button>
               </span>
             )}
