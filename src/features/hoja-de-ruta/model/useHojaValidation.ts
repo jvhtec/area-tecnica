@@ -77,8 +77,8 @@ export const useHojaValidation = (
 
   const validateDocument = useCallback(async () => {
     setShowAllErrors(true);
-    const isValid = await form.trigger(undefined, { shouldFocus: false });
-    if (!isValid && issues.length) {
+    await form.trigger(undefined, { shouldFocus: false });
+    if (issues.length) {
       throw new HojaDocumentValidationError(issues[0].section, issues);
     }
     return true;
