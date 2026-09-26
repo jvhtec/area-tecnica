@@ -10,7 +10,6 @@ import type {
   AuxiliaryMachineryRequirement,
   EventData,
   HojaDeRutaImageRecord,
-  ProgramDay,
   Restaurant,
   Transport,
   TravelArrangement,
@@ -72,26 +71,6 @@ const normalizeTravelTransportationType = (value: unknown): string => {
   if (raw === "RV" || raw === "rv") return "rv";
   if (raw === "bus") return "autobus";
   return raw;
-};
-
-const stableProgramIds = (days: unknown): ProgramDay[] | undefined => {
-  if (!Array.isArray(days)) return undefined;
-  return days.map((rawDay, dayIndex) => {
-    const day = isRecord(rawDay) ? rawDay : {};
-    const rows = Array.isArray(day.rows) ? day.rows : [];
-    return {
-      ...(day as unknown as ProgramDay),
-      rows: rows.map((rawRow, rowIndex) => {
-        const row = isRecord(rawRow) ? rawRow : {};
-        return {
-          ...row,
-          id: typeof row.id === "string" && row.id
-            ? row.id
-            : `legacy-${dayIndex}-${rowIndex}`,
-        };
-      }) as ProgramDay["rows"],
-    };
-  });
 };
 
 const parseRestaurantInfo = (value: unknown): {
@@ -223,7 +202,9 @@ export const useHojaDeRutaPersistence = (
           technician_id: typeof staff.technician_id === "string" ? staff.technician_id : undefined,
         })),
         schedule: String(main.schedule || ""),
-        programScheduleDays: stableProgramIds(main.program_schedule_json),
+        programScheduleDays: Array.isArray(main.program_schedule_json)
+          ? main.program_schedule_json as unknown as EventData["programScheduleDays"]
+          : undefined,
         powerRequirements: String(main.power_requirements || ""),
         powerRequirementsSourceUpdatedAt:
           typeof main.power_requirements_source_updated_at === "string"
