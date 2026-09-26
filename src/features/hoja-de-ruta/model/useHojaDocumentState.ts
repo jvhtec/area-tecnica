@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from "react";
+import { useCallback, useReducer } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import type {
@@ -139,10 +139,6 @@ export const useHojaDocumentState = () => {
     },
     [state.isInitialized],
   );
-
-  // Keep the selected-job reset in the reducer so there is exactly one owner
-  // for editor state invalidation.
-  useEffect(() => undefined, [state.selectedJobId]);
 
   return {
     ...state,
