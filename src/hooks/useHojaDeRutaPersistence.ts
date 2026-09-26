@@ -394,6 +394,32 @@ export const useHojaDeRutaPersistence = (
     onSettled,
   });
 
+  const setStatus = useMutation({
+    mutationFn: async (status: "draft" | "review" | "approved" | "final") => {
+      if (!jobId) throw new Error("No hay un trabajo seleccionado");
+      const { data, error } = await supabase.rpc("set_hoja_de_ruta_status", {
+        p_job_id: jobId,
+        p_status: status,
+      });
+      if (error) throw error;
+      const updated = data?.[0];
+      if (!updated) throw new Error("El servidor no devolvió el nuevo estado");
+      return updated;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKey, (current: typeof hojaDeRuta) => current
+        ? {
+            ...current,
+            status: updated.status,
+            approved_by: updated.approved_by,
+            approved_at: updated.approved_at,
+            document_version: updated.document_version,
+          }
+        : current);
+      void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   const forceRefetch = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey });
     return refetch();
@@ -406,6 +432,8 @@ export const useHojaDeRutaPersistence = (
     fetchError,
     saveAll: saveAll.mutateAsync,
     isSaving: saveAll.isPending,
+    setStatus: setStatus.mutateAsync,
+    isChangingStatus: setStatus.isPending,
     forceRefetch,
   };
 };
