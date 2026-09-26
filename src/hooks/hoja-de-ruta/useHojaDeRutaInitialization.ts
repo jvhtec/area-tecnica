@@ -8,6 +8,8 @@ import {
   remapAccommodationStaffReferences,
 } from '@/utils/hoja-de-ruta/staffSync';
 import { getErrorMessage } from '@/utils/errorMessage';
+import { labelForCode } from '@/types/roles';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export const resolvePowerRequirementsForHojaInitialization = ({
   savedPowerRequirements,
@@ -44,40 +46,49 @@ export const useHojaDeRutaInitialization = (
     return value
       .filter((contact): contact is Record<string, unknown> => Boolean(contact && typeof contact === "object" && !Array.isArray(contact)))
       .map((contact) => ({
+        id: typeof contact.id === "string" ? contact.id : crypto.randomUUID(),
         name: typeof contact.name === "string" ? contact.name : "",
         role: typeof contact.role === "string" ? contact.role : "",
         phone: typeof contact.phone === "string" ? contact.phone : "",
+        email: typeof contact.email === "string" ? contact.email : "",
       }))
       .filter((contact) => contact.name.trim());
   };
 
-  const mergeContacts = (...groups: Array<Array<{ name?: string; role?: string; phone?: string }> | undefined>) => {
-    const merged: Array<{ name: string; role: string; phone: string }> = [];
+  const mergeContacts = (...groups: Array<Array<{ id?: string; name?: string; role?: string; phone?: string; email?: string }> | undefined>) => {
+    const merged: Array<{ id: string; name: string; role: string; phone: string; email: string }> = [];
     const seen = new Set<string>();
     groups.flatMap((group) => group || []).forEach((contact) => {
       const name = contact.name || "";
       const role = contact.role || "";
       const phone = contact.phone || "";
-      const key = [name, role, phone].map((value) => value.trim().toLowerCase()).join("|");
+      const email = contact.email || "";
+      const key = [name, role, phone, email].map((value) => value.trim().toLowerCase()).join("|");
       if (!name.trim() || seen.has(key)) return;
       seen.add(key);
-      merged.push({ name, role, phone });
+      merged.push({ id: contact.id || crypto.randomUUID(), name, role, phone, email });
     });
-    return merged.length ? merged : [{ name: "", role: "", phone: "" }];
+    return merged.length ? merged : [{ id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" }];
   };
 
   const formatJobEventDates = (jobData: { start_time?: string | null; end_time?: string | null }) => {
     const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
     const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+    const eventStartDate = startDate && !Number.isNaN(startDate.getTime())
+      ? formatInTimeZone(startDate, "Europe/Madrid", "yyyy-MM-dd")
+      : undefined;
+    const eventEndDate = endDate && !Number.isNaN(endDate.getTime())
+      ? formatInTimeZone(endDate, "Europe/Madrid", "yyyy-MM-dd")
+      : undefined;
 
     let eventDates = "";
-    if (startDate && endDate) {
-      eventDates = startDate.toDateString() === endDate.toDateString()
-        ? startDate.toLocaleDateString('es-ES')
-        : `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+    if (eventStartDate && eventEndDate) {
+      const startLabel = formatInTimeZone(startDate!, "Europe/Madrid", "dd/MM/yyyy");
+      const endLabel = formatInTimeZone(endDate!, "Europe/Madrid", "dd/MM/yyyy");
+      eventDates = eventStartDate === eventEndDate ? startLabel : `${startLabel} - ${endLabel}`;
     }
 
-    return { startDate, endDate, eventDates };
+    return { startDate, endDate, eventStartDate, eventEndDate, eventDates };
   };
 
   // Builds the EventData used when there is no saved hoja for the job, shared
@@ -90,14 +101,16 @@ export const useHojaDeRutaInitialization = (
   }: {
     jobData: any;
     staffFromAssignments: NonNullable<EventData['staff']>;
-    tourContacts: Array<{ name: string; role: string; phone: string }>;
+    tourContacts: Array<{ id?: string; name: string; role: string; phone: string; email?: string }>;
     powerRequirementsText: string;
   }): EventData => {
-    const { startDate, eventDates } = formatJobEventDates(jobData);
+    const { startDate, eventStartDate, eventEndDate, eventDates } = formatJobEventDates(jobData);
 
     return {
       eventName: jobData.title || "",
       eventDates,
+      eventStartDate,
+      eventEndDate,
       venue: {
         name: jobData.location?.name || "",
         address: jobData.location?.formatted_address || "",
@@ -112,8 +125,17 @@ export const useHojaDeRutaInitialization = (
         unloadingDetails: "",
         equipmentLogistics: "",
       },
-      staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-      schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
+      staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{
+        id: crypto.randomUUID(),
+        name: "",
+        surname1: "",
+        surname2: "",
+        position: "",
+        dni: "",
+      }],
+      schedule: startDate
+        ? `Inicio del evento: ${formatInTimeZone(startDate, "Europe/Madrid", "HH:mm")}`
+        : "",
       powerRequirements: powerRequirementsText || "",
       auxiliaryNeeds: "",
       auxiliaryStaffSetupQty: 0,
@@ -182,18 +204,32 @@ export const useHojaDeRutaInitialization = (
         return null;
       }
 
-      const staffFromAssignments = jobData.job_assignments?.map((assignment: any) => ({
-        technician_id: assignment.technician_id,
-        name: assignment.profiles?.first_name || "",
-        surname1: assignment.profiles?.last_name || "",
-        surname2: "",
-        position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico",
-        dni: assignment.profiles?.dni || "",
-        phone: assignment.profiles?.phone || "",
-        role: "house_tech",
-      })) || [];
+      const staffFromAssignments = (jobData.job_assignments || [])
+        .filter((assignment: any) => assignment.status === "confirmed")
+        .map((assignment: any) => {
+          const roleEntries = [
+            ["Sonido", assignment.sound_role],
+            ["Luces", assignment.lights_role],
+            ["Vídeo", assignment.video_role],
+            ["Producción", assignment.production_role],
+          ].filter(([, code]) => Boolean(code)) as Array<[string, string]>;
 
-      let tourContacts: Array<{ name: string; role: string; phone: string }> = [];
+          return {
+            id: crypto.randomUUID(),
+            technician_id: assignment.technician_id,
+            name: assignment.profiles?.first_name || "",
+            surname1: assignment.profiles?.last_name || "",
+            surname2: "",
+            position: roleEntries.length
+              ? roleEntries.map(([department, code]) => `${department}: ${labelForCode(code)}`).join(" · ")
+              : "Técnico",
+            department: roleEntries.map(([department]) => department).join(", "),
+            dni: assignment.profiles?.dni || "",
+            phone: assignment.profiles?.phone || "",
+          };
+        });
+
+      let tourContacts: Array<{ id?: string; name: string; role: string; phone: string; email?: string }> = [];
       if ((jobData as any).tour_id) {
         const { data: tourData, error: tourError } = await supabase
           .from('tours')
@@ -253,7 +289,7 @@ export const useHojaDeRutaInitialization = (
       ].filter(Boolean).join(' y ');
 
       toast({
-        title: "📋 Datos básicos cargados",
+        title: "Datos básicos cargados",
         description: description
           ? `Se han cargado los datos básicos del trabajo con ${description}.`
           : "Se han cargado los datos básicos del trabajo seleccionado.",
@@ -306,7 +342,7 @@ export const useHojaDeRutaInitialization = (
       }
 
       const { jobData, staffFromAssignments, tourContacts } = assignmentData;
-      const { startDate, eventDates } = formatJobEventDates(jobData);
+      const { startDate, eventStartDate, eventEndDate, eventDates } = formatJobEventDates(jobData);
 
       // If we have saved data, merge current assignments with saved data
       if (hojaDeRuta) {
@@ -327,6 +363,8 @@ export const useHojaDeRutaInitialization = (
         setEventData({
           eventName: savedEventData?.eventName || jobData.title || "",
           eventDates: savedEventData?.eventDates || eventDates,
+          eventStartDate: savedEventData?.eventStartDate || eventStartDate,
+          eventEndDate: savedEventData?.eventEndDate || eventEndDate,
           venue: {
             name: savedEventData?.venue?.name || jobData.location?.name || "",
             address: savedEventData?.venue?.address || jobData.location?.formatted_address || "",
@@ -348,8 +386,17 @@ export const useHojaDeRutaInitialization = (
           // Merge saved staff with current assignments to preserve DNIs and manual entries
           staff: (mergedStaff.length > 0)
             ? mergedStaff
-            : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-          schedule: savedEventData?.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
+            : [{
+                id: crypto.randomUUID(),
+                name: "",
+                surname1: "",
+                surname2: "",
+                position: "",
+                dni: "",
+              }],
+          schedule: savedEventData?.schedule || (
+            startDate ? `Inicio del evento: ${formatInTimeZone(startDate, "Europe/Madrid", "HH:mm")}` : ""
+          ),
           // Structured program schedules
           programSchedule: savedEventData?.programSchedule || undefined,
           programScheduleDays: savedEventData?.programScheduleDays || undefined,
@@ -362,6 +409,7 @@ export const useHojaDeRutaInitialization = (
           auxiliaryStaffDismantleQty: savedEventData?.auxiliaryStaffDismantleQty ?? 0,
           auxiliaryMachinery: savedEventData?.auxiliaryMachinery || [],
           weather: savedEventData?.weather || undefined,
+          weatherFetchedAt: savedEventData?.weatherFetchedAt || undefined,
           // Restaurants
           restaurants: savedEventData?.restaurants || undefined,
           selectedRestaurants: savedEventData?.selectedRestaurants || undefined,
@@ -384,7 +432,7 @@ export const useHojaDeRutaInitialization = (
         );
         
         toast({
-          title: "✅ Datos cargados",
+          title: "Datos cargados",
           description: `Se han cargado los datos guardados con ${staffFromAssignments.length} miembros del personal actual.`,
         });
       } else {
@@ -408,7 +456,7 @@ export const useHojaDeRutaInitialization = (
         ].filter(Boolean).join(' y ');
 
         toast({
-          title: "📋 Datos del trabajo cargados",
+          title: "Datos del trabajo cargados",
           description: description
             ? `Se han cargado ${description}.`
             : "Se han cargado los datos básicos del trabajo.",
