@@ -504,16 +504,6 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose, initialTab, o
     return map;
   }, [staffAssignments]);
 
-  const assignedTechIdByIndex = useMemo(() => {
-    const map = new Map<string, string>();
-    staffAssignments.forEach((assignment, index) => {
-      const techId = assignment.technician?.id;
-      if (!techId) return;
-      map.set(String(index), techId);
-    });
-    return map;
-  }, [staffAssignments]);
-
   const roomStaffIds = useMemo(() => {
     const ids = new Set<string>();
     hojaAccommodations.forEach((accommodation) => {
@@ -525,87 +515,54 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose, initialTab, o
     return Array.from(ids).sort((a, b) => a.localeCompare(b));
   }, [hojaAccommodations]);
 
-  const roomStaffProfileIds = useMemo(
-    () => roomStaffIds.filter((id) => isUuidLike(id)),
-    [roomStaffIds],
-  );
-
-  const { data: roomOccupantProfiles = [], isLoading: roomOccupantsLoading } = useQuery({
-    queryKey: createQueryKey.technicianJobModal.roomOccupants(roomStaffProfileIds),
-    queryFn: async () => {
-      if (roomStaffProfileIds.length === 0) return [];
-      const { data, error } = await dataLayerClient.from("profiles")
-        .select("id, first_name, last_name, nickname")
-        .in("id", roomStaffProfileIds);
-
-      if (error) {
-        console.warn("No se pudieron cargar perfiles de rooming:", error.message);
-        return [];
-      }
-
-      return (data || []) as RoomOccupantProfile[];
-    },
-    enabled: roomStaffProfileIds.length > 0,
-  });
-
   const roomOccupantNameMap = useMemo(() => {
     const map = new Map<string, string>();
     assignedTechNameById.forEach((name, id) => map.set(id, name));
 
-    roomOccupantProfiles.forEach((profile) => {
-      const fullName = [profile.first_name, profile.last_name]
-        .filter((value): value is string => Boolean(value && value.trim()))
-        .join(" ");
-      map.set(profile.id, fullName || profile.nickname || "Técnico");
+    hojaAccommodations.forEach((accommodation) => {
+      (accommodation.hoja_de_ruta_room_assignments || []).forEach((room) => {
+        if (room.staff_member1_id && room.staff_member1_name) {
+          map.set(room.staff_member1_id, room.staff_member1_name);
+        }
+        if (room.staff_member2_id && room.staff_member2_name) {
+          map.set(room.staff_member2_id, room.staff_member2_name);
+        }
+      });
     });
     return map;
-  }, [assignedTechNameById, roomOccupantProfiles]);
-
-  const normalizeRoomOccupantId = useCallback((rawId?: string | null): string | null => {
-    if (!rawId || !rawId.trim()) return null;
-    const trimmed = rawId.trim();
-    return assignedTechIdByIndex.get(trimmed) || trimmed;
-  }, [assignedTechIdByIndex]);
+  }, [assignedTechNameById, hojaAccommodations]);
 
   const resolveRoomOccupantName = useCallback((rawId?: string | null): string => {
-    const normalizedId = normalizeRoomOccupantId(rawId);
-    if (!normalizedId) return "Sin asignar";
-
-    const mappedName = roomOccupantNameMap.get(normalizedId);
-    if (mappedName) return mappedName;
-
-    if (rawId && /^\d+$/.test(rawId)) {
-      const byIndex = staffAssignments[Number(rawId)]?.technician;
-      if (byIndex) {
-        const fullName = [byIndex.first_name, byIndex.last_name]
-          .filter((value): value is string => Boolean(value && value.trim()))
-          .join(" ");
-        if (fullName) return fullName;
-        if (byIndex.email) return byIndex.email;
-      }
-    }
-
-    return `Técnico (${normalizedId.slice(0, 8)})`;
-  }, [normalizeRoomOccupantId, roomOccupantNameMap, staffAssignments]);
+    if (!rawId?.trim()) return "Sin asignar";
+    return roomOccupantNameMap.get(rawId.trim()) || `Técnico (${rawId.trim().slice(0, 8)})`;
+  }, [roomOccupantNameMap]);
 
   const roomieNamesByTechId = useMemo(() => {
     const map = new Map<string, Set<string>>();
 
     hojaAccommodations.forEach((accommodation) => {
       (accommodation.hoja_de_ruta_room_assignments || []).forEach((room) => {
-        const normalizedOccupants = [room.staff_member1_id, room.staff_member2_id]
-          .map((id) => normalizeRoomOccupantId(id))
-          .filter((id): id is string => Boolean(id));
-        const uniqueOccupants = Array.from(new Set(normalizedOccupants));
-        if (uniqueOccupants.length < 2) return;
+        const occupants = [
+          {
+            id: room.staff_member1_id || null,
+            name: room.staff_member1_name
+              || (room.staff_member1_id ? resolveRoomOccupantName(room.staff_member1_id) : null),
+          },
+          {
+            id: room.staff_member2_id || null,
+            name: room.staff_member2_name
+              || (room.staff_member2_id ? resolveRoomOccupantName(room.staff_member2_id) : null),
+          },
+        ].filter((occupant) => occupant.name);
 
-        uniqueOccupants.forEach((techId) => {
-          const others = uniqueOccupants.filter((otherId) => otherId !== techId);
-          if (others.length === 0) return;
+        occupants.forEach((occupant) => {
+          if (!occupant.id) return;
+          const others = occupants.filter((other) => other !== occupant && other.name);
+          if (!others.length) return;
 
-          if (!map.has(techId)) map.set(techId, new Set<string>());
-          const roomieSet = map.get(techId)!;
-          others.forEach((otherId) => roomieSet.add(resolveRoomOccupantName(otherId)));
+          if (!map.has(occupant.id)) map.set(occupant.id, new Set<string>());
+          const roomieSet = map.get(occupant.id)!;
+          others.forEach((other) => roomieSet.add(other.name!));
         });
       });
     });
@@ -616,14 +573,27 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose, initialTab, o
         Array.from(names).sort((a, b) => a.localeCompare(b)),
       ]),
     );
-  }, [hojaAccommodations, normalizeRoomOccupantId, resolveRoomOccupantName]);
+  }, [hojaAccommodations, resolveRoomOccupantName]);
 
-  const getRoomOccupantsLabel = useCallback((room: { staff_member1_id?: string | null; staff_member2_id?: string | null }): string => {
-    const occupants = [room.staff_member1_id, room.staff_member2_id]
-      .filter((id): id is string => Boolean(id))
-      .map((id) => resolveRoomOccupantName(id));
+  const getRoomOccupantsLabel = useCallback((
+    room: {
+      staff_member1_id?: string | null;
+      staff_member2_id?: string | null;
+      staff_member1_name?: string | null;
+      staff_member2_name?: string | null;
+    },
+  ): string => {
+    const occupants = [
+      room.staff_member1_name
+        || (room.staff_member1_id ? resolveRoomOccupantName(room.staff_member1_id) : null),
+      room.staff_member2_name
+        || (room.staff_member2_id ? resolveRoomOccupantName(room.staff_member2_id) : null),
+    ].filter((name): name is string => Boolean(name));
+
     return occupants.length > 0 ? occupants.join(" · ") : "Sin ocupantes asignados";
   }, [resolveRoomOccupantName]);
+
+  const roomOccupantsLoading = false;
 
   const hasHojaAccommodationData = hojaAccommodations.length > 0;
   const hasHojaTransportData = hojaTravelArrangements.length > 0 || hojaTransportEntries.length > 0;
