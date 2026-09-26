@@ -162,9 +162,9 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
   }, [accommodations, eventData, travelArrangements]);
 
   useEffect(() => {
-    if (!selectedJobId || !hojaDeRuta) return;
-    void hydratePersistedImages(selectedJobId, hojaDeRuta.images || []);
-  }, [hojaDeRuta, hydratePersistedImages, selectedJobId]);
+    if (!selectedJobId || isLoadingHojaDeRuta) return;
+    void hydratePersistedImages(selectedJobId, hojaDeRuta?.images || []);
+  }, [hojaDeRuta, hydratePersistedImages, isLoadingHojaDeRuta, selectedJobId]);
 
   const {
     generatingSectionId,
