@@ -684,6 +684,18 @@ begin
       or le.hoja_categories is distinct from coalesce(ht.logistics_categories, '{}'::public.logistics_transport_category[])
     );
 
+  -- The Hoja snapshot must include its own category/relevance write-back, or
+  -- the editor would report drift immediately after a successful save.
+  update public.hoja_de_ruta_transport ht
+  set source_logistics_updated_at = le.updated_at
+  from public.logistics_events le
+  where ht.hoja_de_ruta_id = v_id
+    and ht.source_logistics_event_id = le.id
+    and (
+      ht.source_logistics_updated_at is null
+      or ht.source_logistics_updated_at is distinct from le.updated_at
+    );
+
   -- Travel.
   if exists (
     select 1
