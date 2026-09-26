@@ -4102,6 +4102,9 @@ export type Database = {
           return_date_time: string | null
           sort_order: number
           source_logistics_event_id: string | null
+          source_logistics_updated_at: string | null
+          origin: string | null
+          destination: string | null
           transport_type: string
           updated_at: string | null
         }
@@ -4120,6 +4123,9 @@ export type Database = {
           return_date_time?: string | null
           sort_order?: number
           source_logistics_event_id?: string | null
+          source_logistics_updated_at?: string | null
+          origin?: string | null
+          destination?: string | null
           transport_type: string
           updated_at?: string | null
         }
@@ -4138,6 +4144,9 @@ export type Database = {
           return_date_time?: string | null
           sort_order?: number
           source_logistics_event_id?: string | null
+          source_logistics_updated_at?: string | null
+          origin?: string | null
+          destination?: string | null
           transport_type?: string
           updated_at?: string | null
         }
