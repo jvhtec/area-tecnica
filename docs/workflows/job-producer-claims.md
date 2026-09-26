@@ -20,7 +20,7 @@ Ownership is recorded as a *claim*: a row in `job_producer_claims` linking a job
 | **Tech super app panel** | `src/components/technician/details-modal/ProducerContactPanel.tsx` |
 | **Tech modal data** | `src/components/technician/details-modal/useDetailsModalData.ts` |
 | **Phone / WhatsApp links** | `src/utils/phoneLinks.ts` |
-| **Document contacts** | `mergeProducerClaimsIntoContacts` in `producerClaims.ts`, used by `src/components/hoja-de-ruta/useHojaDeRutaExports.ts` |
+| **Document contacts** | `mergeProducerClaimsIntoContacts` in `producerClaims.ts`, used by `src/features/hoja-de-ruta/exports/useHojaDocumentExports.ts` |
 | **Permissions** | `canAssignJobProducerClaims`, `isProductionDepartment` in `src/utils/permissions.ts` |
 
 ## Database
@@ -63,7 +63,7 @@ The department check accepts `production`, `produccion` and `producción` — hi
 
 **Tech super app** (`ProducerContactPanel`, Info tab of the job details modal) shows every producer carrying the job with, when the profile has them, shortcuts to WhatsApp (`wa.me`, prefilled with the job title), phone (`tel:`) and email (`mailto:`). The block is hidden entirely when nobody has claimed the job, and shows *Sin datos de contacto en su perfil* when a producer's profile has neither number nor address. Numbers are normalized to E.164 by `src/utils/phoneLinks.ts`, which mirrors the Spain-default normalization in the `send-job-whatsapp-message` edge function.
 
-**Generated documentation.** `buildDocumentEventData` in `useHojaDeRutaExports.ts` merges the producers into the Hoja de Ruta contact list before every export, so the PDF, the print preview and the XLS all list them under *Producción* with their phone (and email, in the XLS, which has that column). A producer already listed from job staffing is not duplicated — their phone/email are backfilled onto the existing row instead.
+**Generated documentation.** `buildDocumentEventData` in `useHojaDocumentExports.ts` merges the producers into the Hoja de Ruta contact list before every export, so the PDF, the print preview and the XLS all list them under *Producción* with their phone (and email, in the XLS, which has that column). A producer already listed from job staffing is not duplicated — their phone/email are backfilled onto the existing row instead.
 
 ## Gotchas
 

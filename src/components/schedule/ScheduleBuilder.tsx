@@ -57,6 +57,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
       const ra = a[i];
       const rb = b[i];
       if (
+        (ra.id || '') !== (rb.id || '') ||
         ra.time !== rb.time ||
         ra.item !== rb.item ||
         (ra.dept || '') !== (rb.dept || '') ||

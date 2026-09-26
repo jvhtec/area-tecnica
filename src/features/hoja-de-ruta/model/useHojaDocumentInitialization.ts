@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { EventData } from '@/types/hoja-de-ruta';
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import type { Database } from '@/integrations/supabase/types';
+import type {
+  Accommodation,
+  EventData,
+  TravelArrangement,
+} from '@/types/hoja-de-ruta';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPowerRequirementsText } from '@/utils/powerRequirementSelection';
@@ -8,6 +13,29 @@ import {
   remapAccommodationStaffReferences,
 } from '@/utils/hoja-de-ruta/staffSync';
 import { getErrorMessage } from '@/utils/errorMessage';
+import { labelForCode } from '@/types/roles';
+import { formatInTimeZone } from 'date-fns-tz';
+import type { HojaDocument } from '@/features/hoja-de-ruta/model/HojaDocument';
+
+type JobRow = Database['public']['Tables']['jobs']['Row'];
+type JobAssignmentRow = Database['public']['Tables']['job_assignments']['Row'];
+type LocationRow = Database['public']['Tables']['locations']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+
+type JobWithHojaRelations = JobRow & {
+  location: Pick<LocationRow, 'name' | 'formatted_address' | 'latitude' | 'longitude'> | null;
+  job_assignments: Array<JobAssignmentRow & {
+    profiles: Pick<ProfileRow, 'first_name' | 'last_name' | 'dni' | 'phone'> | null;
+  }>;
+};
+
+type HojaContact = {
+  id?: string;
+  name?: string;
+  role?: string;
+  phone?: string;
+  email?: string;
+};
 
 export const resolvePowerRequirementsForHojaInitialization = ({
   savedPowerRequirements,
@@ -22,113 +50,143 @@ export const resolvePowerRequirementsForHojaInitialization = ({
   return generatedPowerRequirements ?? "";
 };
 
-export const useHojaDeRutaInitialization = (
+const normalizeTourContacts = (value: unknown): HojaContact[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((contact): contact is Record<string, unknown> => Boolean(
+      contact && typeof contact === "object" && !Array.isArray(contact),
+    ))
+    .map((contact) => ({
+      // Tour contacts are shared across tour dates; each Hoja owns its row identity.
+      id: crypto.randomUUID(),
+      name: typeof contact.name === "string" ? contact.name : "",
+      role: typeof contact.role === "string" ? contact.role : "",
+      phone: typeof contact.phone === "string" ? contact.phone : "",
+      email: typeof contact.email === "string" ? contact.email : "",
+    }))
+    .filter((contact) => contact.name.trim());
+};
+
+const mergeContacts = (...groups: Array<HojaContact[] | undefined>) => {
+  const merged: Array<Required<HojaContact>> = [];
+  const seen = new Set<string>();
+  groups.flatMap((group) => group || []).forEach((contact) => {
+    const name = contact.name || "";
+    const role = contact.role || "";
+    const phone = contact.phone || "";
+    const email = contact.email || "";
+    const key = [name, role, phone, email]
+      .map((value) => value.trim().toLowerCase())
+      .join("|");
+    if (!name.trim() || seen.has(key)) return;
+    seen.add(key);
+    merged.push({ id: contact.id || crypto.randomUUID(), name, role, phone, email });
+  });
+  return merged.length
+    ? merged
+    : [{ id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" }];
+};
+
+const formatJobEventDates = (
+  jobData: Pick<JobRow, 'start_time' | 'end_time'>,
+) => {
+  const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
+  const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+  const eventStartDate = startDate && !Number.isNaN(startDate.getTime())
+    ? formatInTimeZone(startDate, "Europe/Madrid", "yyyy-MM-dd")
+    : undefined;
+  const eventEndDate = endDate && !Number.isNaN(endDate.getTime())
+    ? formatInTimeZone(endDate, "Europe/Madrid", "yyyy-MM-dd")
+    : undefined;
+
+  let eventDates = "";
+  if (eventStartDate && eventEndDate && startDate && endDate) {
+    const startLabel = formatInTimeZone(startDate, "Europe/Madrid", "dd/MM/yyyy");
+    const endLabel = formatInTimeZone(endDate, "Europe/Madrid", "dd/MM/yyyy");
+    eventDates = eventStartDate === eventEndDate ? startLabel : `${startLabel} - ${endLabel}`;
+  }
+
+  return { startDate, eventStartDate, eventEndDate, eventDates };
+};
+
+const buildEventDataFromJob = ({
+  jobData,
+  staffFromAssignments,
+  tourContacts,
+  powerRequirementsText,
+  powerRequirementsSourceUpdatedAt,
+}: {
+  jobData: JobWithHojaRelations;
+  staffFromAssignments: NonNullable<EventData['staff']>;
+  tourContacts: HojaContact[];
+  powerRequirementsText: string;
+  powerRequirementsSourceUpdatedAt?: string;
+}): EventData => {
+  const { startDate, eventStartDate, eventEndDate, eventDates } = formatJobEventDates(jobData);
+
+  return {
+    eventName: jobData.title || "",
+    eventDates,
+    eventStartDate,
+    eventEndDate,
+    venue: {
+      name: jobData.location?.name || "",
+      address: jobData.location?.formatted_address || "",
+      coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
+        ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
+        : undefined,
+    },
+    contacts: mergeContacts(tourContacts),
+    logistics: {
+      transport: [],
+      loadingDetails: "",
+      unloadingDetails: "",
+      equipmentLogistics: "",
+    },
+    staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{
+      id: crypto.randomUUID(),
+      name: "",
+      surname1: "",
+      surname2: "",
+      position: "",
+      dni: "",
+    }],
+    schedule: startDate
+      ? `Inicio del evento: ${formatInTimeZone(startDate, "Europe/Madrid", "HH:mm")}`
+      : "",
+    powerRequirements: powerRequirementsText || "",
+    powerRequirementsSourceUpdatedAt,
+    auxiliaryNeeds: "",
+    auxiliaryStaffSetupQty: 0,
+    auxiliaryStaffDismantleQty: 0,
+    auxiliaryMachinery: [],
+    weather: undefined,
+    printExcludedSections: [],
+  };
+};
+
+export const useHojaDocumentInitialization = (
   selectedJobId: string,
-  hojaDeRuta: any,
+  hojaDeRuta: HojaDocument | null | undefined,
   isLoadingHojaDeRuta: boolean,
   isInitialized: boolean,
-  setEventData: React.Dispatch<React.SetStateAction<EventData>>,
-  setTravelArrangements: any,
-  setAccommodations: any,
-  setIsInitialized: React.Dispatch<React.SetStateAction<boolean>>,
-  setHasSavedData: React.Dispatch<React.SetStateAction<boolean>>,
-  setHasBasicJobData: React.Dispatch<React.SetStateAction<boolean>>,
-  setDataSource: React.Dispatch<React.SetStateAction<'none' | 'saved' | 'job' | 'mixed'>>
+  setEventData: Dispatch<SetStateAction<EventData>>,
+  setTravelArrangements: Dispatch<SetStateAction<TravelArrangement[]>>,
+  setAccommodations: Dispatch<SetStateAction<Accommodation[]>>,
+  setIsInitialized: Dispatch<SetStateAction<boolean>>,
+  setHasSavedData: Dispatch<SetStateAction<boolean>>,
+  setHasBasicJobData: Dispatch<SetStateAction<boolean>>,
+  setDataSource: Dispatch<SetStateAction<'none' | 'saved' | 'job' | 'mixed'>>
 ) => {
   const { toast } = useToast();
   // Token of the initialization run currently in flight (see the effect below)
   const initializingRunRef = useRef<{ jobId: string } | null>(null);
 
-  const normalizeTourContacts = (value: unknown) => {
-    if (!Array.isArray(value)) return [];
-    return value
-      .filter((contact): contact is Record<string, unknown> => Boolean(contact && typeof contact === "object" && !Array.isArray(contact)))
-      .map((contact) => ({
-        name: typeof contact.name === "string" ? contact.name : "",
-        role: typeof contact.role === "string" ? contact.role : "",
-        phone: typeof contact.phone === "string" ? contact.phone : "",
-      }))
-      .filter((contact) => contact.name.trim());
-  };
-
-  const mergeContacts = (...groups: Array<Array<{ name?: string; role?: string; phone?: string }> | undefined>) => {
-    const merged: Array<{ name: string; role: string; phone: string }> = [];
-    const seen = new Set<string>();
-    groups.flatMap((group) => group || []).forEach((contact) => {
-      const name = contact.name || "";
-      const role = contact.role || "";
-      const phone = contact.phone || "";
-      const key = [name, role, phone].map((value) => value.trim().toLowerCase()).join("|");
-      if (!name.trim() || seen.has(key)) return;
-      seen.add(key);
-      merged.push({ name, role, phone });
-    });
-    return merged.length ? merged : [{ name: "", role: "", phone: "" }];
-  };
-
-  const formatJobEventDates = (jobData: { start_time?: string | null; end_time?: string | null }) => {
-    const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
-    const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
-
-    let eventDates = "";
-    if (startDate && endDate) {
-      eventDates = startDate.toDateString() === endDate.toDateString()
-        ? startDate.toLocaleDateString('es-ES')
-        : `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
-    }
-
-    return { startDate, endDate, eventDates };
-  };
-
-  // Builds the EventData used when there is no saved hoja for the job, shared
-  // by the initialization effect and autoPopulateBasicJobData.
-  const buildEventDataFromJob = ({
-    jobData,
-    staffFromAssignments,
-    tourContacts,
-    powerRequirementsText,
-  }: {
-    jobData: any;
-    staffFromAssignments: NonNullable<EventData['staff']>;
-    tourContacts: Array<{ name: string; role: string; phone: string }>;
-    powerRequirementsText: string;
-  }): EventData => {
-    const { startDate, eventDates } = formatJobEventDates(jobData);
-
-    return {
-      eventName: jobData.title || "",
-      eventDates,
-      venue: {
-        name: jobData.location?.name || "",
-        address: jobData.location?.formatted_address || "",
-        coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
-          ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
-          : undefined,
-      },
-      contacts: mergeContacts(tourContacts),
-      logistics: {
-        transport: [],
-        loadingDetails: "",
-        unloadingDetails: "",
-        equipmentLogistics: "",
-      },
-      staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-      schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
-      powerRequirements: powerRequirementsText || "",
-      auxiliaryNeeds: "",
-      auxiliaryStaffSetupQty: 0,
-      auxiliaryStaffDismantleQty: 0,
-      auxiliaryMachinery: [],
-      weather: undefined,
-      printExcludedSections: [],
-    };
-  };
-
-  // Fetch power requirements for a job
-  const fetchPowerRequirements = useCallback(async (jobId: string): Promise<string> => {
-    if (!jobId) return "";
-
-    console.log("⚡ INITIALIZATION: Fetching power requirements for:", jobId);
+  // Fetch current Consumos-derived power requirements and its source revision.
+  const fetchPowerRequirements = useCallback(async (
+    jobId: string,
+  ): Promise<{ text: string; sourceUpdatedAt?: string }> => {
+    if (!jobId) return { text: "" };
 
     try {
       const { data: powerRequirements, error } = await supabase
@@ -137,23 +195,26 @@ export const useHojaDeRutaInitialization = (
         .eq("job_id", jobId)
         .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error("❌ INITIALIZATION: Error fetching power requirements:", error);
-        return "";
+      if (error || !powerRequirements?.length) {
+        if (error) {
+          console.warn("No se pudieron cargar los requisitos de potencia:", error);
+        }
+        return { text: "" };
       }
 
-      if (!powerRequirements || powerRequirements.length === 0) {
-        console.log("ℹ️ INITIALIZATION: No power requirements found for this job");
-        return "";
-      }
+      const sourceUpdatedAt = powerRequirements
+        .map((row) => row.updated_at || row.created_at)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1);
 
-      const powerText = formatPowerRequirementsText(powerRequirements);
-
-      console.log("✅ INITIALIZATION: Power requirements fetched successfully");
-      return powerText;
+      return {
+        text: formatPowerRequirementsText(powerRequirements),
+        sourceUpdatedAt,
+      };
     } catch (error) {
-      console.error("❌ INITIALIZATION: Error fetching power requirements:", error);
-      return "";
+      console.warn("No se pudieron cargar los requisitos de potencia:", error);
+      return { text: "" };
     }
   }, []);
 
@@ -182,31 +243,46 @@ export const useHojaDeRutaInitialization = (
         return null;
       }
 
-      const staffFromAssignments = jobData.job_assignments?.map((assignment: any) => ({
-        technician_id: assignment.technician_id,
-        name: assignment.profiles?.first_name || "",
-        surname1: assignment.profiles?.last_name || "",
-        surname2: "",
-        position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico",
-        dni: assignment.profiles?.dni || "",
-        phone: assignment.profiles?.phone || "",
-        role: "house_tech",
-      })) || [];
+      const typedJobData = jobData as JobWithHojaRelations;
+      const staffFromAssignments = typedJobData.job_assignments
+        .filter((assignment) => assignment.status === "confirmed")
+        .map((assignment) => {
+          const roleEntries = [
+            ["Sonido", assignment.sound_role],
+            ["Luces", assignment.lights_role],
+            ["Vídeo", assignment.video_role],
+            ["Producción", assignment.production_role],
+          ].filter(([, code]) => Boolean(code)) as Array<[string, string]>;
 
-      let tourContacts: Array<{ name: string; role: string; phone: string }> = [];
-      if ((jobData as any).tour_id) {
+          return {
+            id: crypto.randomUUID(),
+            technician_id: assignment.technician_id,
+            name: assignment.profiles?.first_name || "",
+            surname1: assignment.profiles?.last_name || "",
+            surname2: "",
+            position: roleEntries.length
+              ? roleEntries.map(([department, code]) => `${department}: ${labelForCode(code)}`).join(" · ")
+              : "Técnico",
+            department: roleEntries.map(([department]) => department).join(", "),
+            dni: assignment.profiles?.dni || "",
+            phone: assignment.profiles?.phone || "",
+          };
+        });
+
+      let tourContacts: HojaContact[] = [];
+      if (typedJobData.tour_id) {
         const { data: tourData, error: tourError } = await supabase
           .from('tours')
           .select('tour_contacts')
-          .eq('id', (jobData as any).tour_id)
+          .eq('id', typedJobData.tour_id)
           .maybeSingle();
         if (!tourError) {
-          tourContacts = normalizeTourContacts((tourData as any)?.tour_contacts);
+          tourContacts = normalizeTourContacts(tourData?.tour_contacts);
         }
       }
 
       console.log("✅ INITIALIZATION: Loaded current assignments:", staffFromAssignments);
-      return { jobData, staffFromAssignments, tourContacts };
+      return { jobData: typedJobData, staffFromAssignments, tourContacts };
     } catch (error) {
       console.error("❌ INITIALIZATION: Error loading job assignments:", error);
       return null;
@@ -220,10 +296,11 @@ export const useHojaDeRutaInitialization = (
     console.log("🔄 INITIALIZATION: Auto-populating basic job data with assignments for:", jobId);
 
     try {
-      const [assignmentData, powerRequirementsText] = await Promise.all([
+      const [assignmentData, powerRequirements] = await Promise.all([
         loadCurrentJobAssignments(jobId),
         fetchPowerRequirements(jobId)
       ]);
+      const powerRequirementsText = powerRequirements.text;
 
       if (!assignmentData) return;
 
@@ -234,6 +311,7 @@ export const useHojaDeRutaInitialization = (
         staffFromAssignments,
         tourContacts,
         powerRequirementsText,
+        powerRequirementsSourceUpdatedAt: powerRequirements.sourceUpdatedAt,
       });
 
       console.log("✅ INITIALIZATION: Setting basic job data with assignments:", {
@@ -253,7 +331,7 @@ export const useHojaDeRutaInitialization = (
       ].filter(Boolean).join(' y ');
 
       toast({
-        title: "📋 Datos básicos cargados",
+        title: "Datos básicos cargados",
         description: description
           ? `Se han cargado los datos básicos del trabajo con ${description}.`
           : "Se han cargado los datos básicos del trabajo seleccionado.",
@@ -287,10 +365,11 @@ export const useHojaDeRutaInitialization = (
 
     const initializeFormData = async () => {
       // Always load current job assignments and power requirements first
-      const [assignmentData, powerRequirementsText] = await Promise.all([
+      const [assignmentData, powerRequirements] = await Promise.all([
         loadCurrentJobAssignments(selectedJobId),
         fetchPowerRequirements(selectedJobId)
       ]);
+      const powerRequirementsText = powerRequirements.text;
 
       // Everything below is synchronous, so this single check after the only
       // await guards every state mutation in this run.
@@ -306,7 +385,7 @@ export const useHojaDeRutaInitialization = (
       }
 
       const { jobData, staffFromAssignments, tourContacts } = assignmentData;
-      const { startDate, eventDates } = formatJobEventDates(jobData);
+      const { startDate, eventStartDate, eventEndDate, eventDates } = formatJobEventDates(jobData);
 
       // If we have saved data, merge current assignments with saved data
       if (hojaDeRuta) {
@@ -327,6 +406,8 @@ export const useHojaDeRutaInitialization = (
         setEventData({
           eventName: savedEventData?.eventName || jobData.title || "",
           eventDates: savedEventData?.eventDates || eventDates,
+          eventStartDate: savedEventData?.eventStartDate || eventStartDate,
+          eventEndDate: savedEventData?.eventEndDate || eventEndDate,
           venue: {
             name: savedEventData?.venue?.name || jobData.location?.name || "",
             address: savedEventData?.venue?.address || jobData.location?.formatted_address || "",
@@ -348,8 +429,17 @@ export const useHojaDeRutaInitialization = (
           // Merge saved staff with current assignments to preserve DNIs and manual entries
           staff: (mergedStaff.length > 0)
             ? mergedStaff
-            : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-          schedule: savedEventData?.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
+            : [{
+                id: crypto.randomUUID(),
+                name: "",
+                surname1: "",
+                surname2: "",
+                position: "",
+                dni: "",
+              }],
+          schedule: savedEventData?.schedule || (
+            startDate ? `Inicio del evento: ${formatInTimeZone(startDate, "Europe/Madrid", "HH:mm")}` : ""
+          ),
           // Structured program schedules
           programSchedule: savedEventData?.programSchedule || undefined,
           programScheduleDays: savedEventData?.programScheduleDays || undefined,
@@ -357,11 +447,16 @@ export const useHojaDeRutaInitialization = (
             savedPowerRequirements: savedEventData?.powerRequirements,
             generatedPowerRequirements: powerRequirementsText,
           }),
+          powerRequirementsSourceUpdatedAt:
+            savedEventData?.powerRequirements?.trim()
+              ? savedEventData?.powerRequirementsSourceUpdatedAt
+              : powerRequirements.sourceUpdatedAt,
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
           auxiliaryStaffSetupQty: savedEventData?.auxiliaryStaffSetupQty ?? 0,
           auxiliaryStaffDismantleQty: savedEventData?.auxiliaryStaffDismantleQty ?? 0,
           auxiliaryMachinery: savedEventData?.auxiliaryMachinery || [],
           weather: savedEventData?.weather || undefined,
+          weatherFetchedAt: savedEventData?.weatherFetchedAt || undefined,
           // Restaurants
           restaurants: savedEventData?.restaurants || undefined,
           selectedRestaurants: savedEventData?.selectedRestaurants || undefined,
@@ -384,7 +479,7 @@ export const useHojaDeRutaInitialization = (
         );
         
         toast({
-          title: "✅ Datos cargados",
+          title: "Datos cargados",
           description: `Se han cargado los datos guardados con ${staffFromAssignments.length} miembros del personal actual.`,
         });
       } else {
@@ -398,6 +493,7 @@ export const useHojaDeRutaInitialization = (
           staffFromAssignments,
           tourContacts,
           powerRequirementsText,
+          powerRequirementsSourceUpdatedAt: powerRequirements.sourceUpdatedAt,
         }));
         setTravelArrangements([]);
         setAccommodations([]);
@@ -408,7 +504,7 @@ export const useHojaDeRutaInitialization = (
         ].filter(Boolean).join(' y ');
 
         toast({
-          title: "📋 Datos del trabajo cargados",
+          title: "Datos del trabajo cargados",
           description: description
             ? `Se han cargado ${description}.`
             : "Se han cargado los datos básicos del trabajo.",
@@ -427,6 +523,7 @@ export const useHojaDeRutaInitialization = (
 
   return {
     autoPopulateBasicJobData,
-    loadCurrentJobAssignments
+    loadCurrentJobAssignments,
+    fetchPowerRequirements,
   };
 };

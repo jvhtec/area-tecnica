@@ -2,8 +2,8 @@
 import type {
   EventData,
   TravelArrangement,
-  RoomAssignment,
   Accommodation,
+  RoomAssignment,
   WeatherData,
   ImagePreviews
 } from '@/types/hoja-de-ruta';
@@ -13,8 +13,8 @@ import type { HojaDeRutaPrintSectionId } from '@/utils/hoja-de-ruta/pdf/section-
 export type {
   EventData,
   TravelArrangement,
-  RoomAssignment,
   Accommodation,
+  RoomAssignment,
   WeatherData,
   ImagePreviews
 };
@@ -35,7 +35,6 @@ export type HojaDeRutaPdfToast = (props: {
 export interface PDFGenerationOptions {
   eventData: EventData;
   travelArrangements: TravelArrangement[];
-  roomAssignments: RoomAssignment[];
   imagePreviews: ImagePreviews;
   venueMapPreview: string | null;
   selectedJobId: string;
@@ -51,6 +50,8 @@ export interface PDFGenerationOptions {
   dedupeTransportAcrossSections?: boolean;
   sections?: HojaDeRutaPdfSectionId[];
   excludedSections?: HojaDeRutaPrintSectionId[];
+  /** Only the complete crew-facing document may set this to true. */
+  publish?: boolean;
 }
 
 export interface DriverCertificatePDFGenerationOptions {

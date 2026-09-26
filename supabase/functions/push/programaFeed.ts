@@ -5,7 +5,6 @@ import { sendPayloadToUsers } from "./broadcast/delivery.ts";
 import type { PushPayload } from "./types.ts";
 import { addDaysToDateKey, formatDateKeyInTimeZone, isDueInWindow, zonedDateTimeToUtc } from "./festivalFeedUtils.ts";
 import {
-  backfillMissingRowIds,
   buildProgramaDueEvents,
   buildProgramaPayload,
   PROGRAMA_FEED_TIMEZONE,
@@ -106,25 +105,7 @@ const loadEligibleJobsWithProgramas = async (
     const job = jobById.get(hoja.job_id);
     if (!job || !Array.isArray(hoja.program_schedule_json)) continue;
 
-    // Rows saved before `notify`/`id` existed only pick up an id once the frontend
-    // re-saves the whole hoja de ruta. Backfill and persist it here so `notify: true`
-    // rows are never silently skipped by buildProgramaDueEvents' `row.id` check.
-    const { days, changed } = backfillMissingRowIds(hoja.program_schedule_json);
-    if (changed) {
-      const { error: updateError } = await client
-        .from("hoja_de_ruta")
-        .update({ program_schedule_json: days })
-        .eq("job_id", hoja.job_id);
-
-      if (updateError) {
-        console.error("programa feed failed persisting backfilled row ids", {
-          jobId: hoja.job_id,
-          error: updateError,
-        });
-      }
-    }
-
-    entries.push({ job, days });
+    entries.push({ job, days: hoja.program_schedule_json });
   }
 
   return entries;

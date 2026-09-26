@@ -8,6 +8,7 @@ type HojaDeRutaHeaderActionsProps = {
   selectedJobId?: string | null;
   isInitialized: boolean;
   isSaving: boolean;
+  canEdit?: boolean;
   isGenerating: boolean;
   isPreviewing: boolean;
   previewingTarget: HojaDeRutaPrintPreviewTarget;
@@ -26,6 +27,7 @@ export const HojaDeRutaHeaderActions = ({
   selectedJobId,
   isInitialized,
   isSaving,
+  canEdit = true,
   isGenerating,
   isPreviewing,
   previewingTarget,
@@ -73,7 +75,7 @@ export const HojaDeRutaHeaderActions = ({
     <>
       <Button
         onClick={onSave}
-        disabled={!selectedJobId || !isInitialized || isSaving}
+        disabled={!canEdit || !selectedJobId || !isInitialized || isSaving}
         variant="outline"
         size="sm"
         aria-label="Guardar hoja de ruta"

@@ -1,3 +1,5 @@
+import type { Transport } from "@/types/hoja-de-ruta";
+
 export type TransportProvider =
   | 'camionaje'
   | 'transluminaria'
@@ -67,3 +69,26 @@ export const TRANSPORT_PROVIDERS: Record<
 /** Display name of a stored provider value; unknown values are shown as stored. */
 export const transportProviderLabel = (value: string | null | undefined): string | null =>
   value ? (TRANSPORT_PROVIDERS as Record<string, { label: string } | undefined>)[value]?.label ?? value : null;
+
+
+/** Canonical mapping from logistics provider values to the Hoja transport domain. */
+export const transportProviderToHojaCompany = (
+  value: string | null | undefined,
+): Transport["company"] | undefined => {
+  if (!value) return undefined;
+  const aliases: Record<string, Transport["company"]> = {
+    pantoja: "pantoja",
+    transluminaria: "transluminaria",
+    transcamarena: "transcamarena",
+    the_wild_tour: "wild tour",
+    camionaje: "camionaje",
+    sector_pro: "sector-pro",
+    crespo: "crespo",
+    montabi_dorado: "montabi_dorado",
+    grupo_sese: "grupo_sese",
+    nacex: "nacex",
+    montoya: "montoya",
+    recogida_cliente: "recogida_cliente",
+  };
+  return aliases[value] ?? "other";
+};

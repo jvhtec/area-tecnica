@@ -31,7 +31,6 @@ export async function fetchTourOpsModel(
 
   const [
     jobsResult,
-    hojaResult,
     eventsResult,
     travelResult,
     accommodationsResult,
@@ -69,12 +68,6 @@ export async function fetchTourOpsModel(
               )
             )
           `)
-          .in("tour_date_id", dateIds)
-      : Promise.resolve({ data: [] as never[], error: null }),
-    dateIds.length
-      ? client
-          .from("hoja_de_ruta")
-          .select("id, job_id, tour_date_id, program_schedule_json, logistics_info, venue_name, venue_address, weather_data, hotel_info, local_contacts, restaurants_info")
           .in("tour_date_id", dateIds)
       : Promise.resolve({ data: [] as never[], error: null }),
     client
@@ -119,99 +112,86 @@ export async function fetchTourOpsModel(
       .eq("tour_id", tourId),
   ]);
 
-  const results = [jobsResult, hojaResult, eventsResult, travelResult, accommodationsResult, documentsResult, assignmentsResult];
+  const results = [
+    jobsResult,
+    eventsResult,
+    travelResult,
+    accommodationsResult,
+    documentsResult,
+    assignmentsResult,
+  ];
   const firstError = results.find((result) => result.error)?.error;
   if (firstError) throw firstError;
 
-  const jobIds = asArray<UnknownRecord>(jobsResult.data).flatMap((job) => {
+  const jobs = asArray<UnknownRecord>(jobsResult.data);
+  const jobIds = jobs.flatMap((job) => {
     const id = textOrNull(job.id);
     return id ? [id] : [];
   });
-  const emptyHojaByJobResult: { data: never[]; error: null } = { data: [], error: null };
-  const hojaByJobResult = jobIds.length
-    ? await client
-        .from("hoja_de_ruta")
-        .select("id, job_id, tour_date_id, program_schedule_json, logistics_info, venue_name, venue_address, weather_data, hotel_info, local_contacts, restaurants_info")
-        .in("job_id", jobIds)
-    : emptyHojaByJobResult;
-  if (hojaByJobResult.error) throw hojaByJobResult.error;
 
-  const hojaRecordsById = new Map<string, UnknownRecord>();
-  [...asArray<UnknownRecord>(hojaResult.data), ...asArray<UnknownRecord>(hojaByJobResult.data)].forEach((hoja) => {
-    const id = textOrNull(hoja.id);
-    if (id) hojaRecordsById.set(id, hoja);
-  });
-  const hojaRecords = Array.from(hojaRecordsById.values());
-  const hojaIds = hojaRecords.flatMap((hoja) => {
-    const id = textOrNull(hoja.id);
-    return id ? [id] : [];
-  });
-  const [
-    hojaTravelArrangementsResult,
-    hojaTransportResult,
-    hojaAccommodationsResult,
-    hojaStaffResult,
-  ] = await Promise.all([
-    hojaIds.length
-      ? client
-          .from("hoja_de_ruta_travel_arrangements")
-          .select("id, hoja_de_ruta_id, transportation_type, pickup_address, pickup_time, departure_time, arrival_time, flight_train_number, driver_name, driver_phone, plate_number, notes")
-          .in("hoja_de_ruta_id", hojaIds)
-      : Promise.resolve({ data: [] as never[], error: null }),
-    hojaIds.length
-      ? client
-          .from("hoja_de_ruta_transport")
-          .select("id, hoja_de_ruta_id, transport_type, driver_name, driver_phone, license_plate, company, date_time, has_return, return_date_time, logistics_categories, is_hoja_relevant")
-          .in("hoja_de_ruta_id", hojaIds)
-          .or("is_hoja_relevant.eq.true,is_hoja_relevant.is.null")
-      : Promise.resolve({ data: [] as never[], error: null }),
-    hojaIds.length
-      ? client
-          .from("hoja_de_ruta_accommodations")
-          .select(`
-            id,
-            hoja_de_ruta_id,
-            hotel_name,
-            address,
-            check_in,
-            check_out,
-            latitude,
-            longitude,
-            hoja_de_ruta_room_assignments (
-              id,
-              room_type,
-              room_number,
-              staff_member1_id,
-              staff_member2_id
-            )
-          `)
-          .in("hoja_de_ruta_id", hojaIds)
-      : Promise.resolve({ data: [] as never[], error: null }),
-    hojaIds.length
-      ? client
-          .from("hoja_de_ruta_staff")
-          .select("id, hoja_de_ruta_id, name, surname1, surname2, position")
-          .in("hoja_de_ruta_id", hojaIds)
-      : Promise.resolve({ data: [] as never[], error: null }),
-  ]);
+  const aggregateResults = await Promise.all(
+    jobIds.map(async (jobId) => {
+      const { data, error } = await client.rpc("get_hoja_de_ruta", { p_job_id: jobId });
+      if (error) {
+        if (error.code === "42501") return null;
+        throw error;
+      }
+      return isRecord(data) ? data : null;
+    }),
+  );
 
-  const childResults = [hojaTravelArrangementsResult, hojaTransportResult, hojaAccommodationsResult, hojaStaffResult];
-  const firstChildError = childResults.find((result) => result.error)?.error;
-  if (firstChildError) throw firstChildError;
+  const hojaRecords: UnknownRecord[] = [];
+  const hojaTravelArrangements: UnknownRecord[] = [];
+  const hojaTransport: UnknownRecord[] = [];
+  const hojaAccommodations: UnknownRecord[] = [];
+  const hojaStaff: UnknownRecord[] = [];
+
+  aggregateResults.forEach((aggregate) => {
+    if (!aggregate) return;
+    const main = isRecord(aggregate.main) ? aggregate.main : null;
+    if (!main) return;
+
+    hojaRecords.push({
+      ...main,
+      // These are live aggregate fields, not the retired hoja_de_ruta JSON columns.
+      logistics: isRecord(aggregate.logistics) ? aggregate.logistics : {},
+    });
+
+    asArray<UnknownRecord>(aggregate.travelArrangements).forEach((row) => {
+      hojaTravelArrangements.push(row);
+    });
+    asArray<UnknownRecord>(aggregate.transport)
+      .filter((row) => row.is_hoja_relevant !== false)
+      .forEach((row) => {
+        hojaTransport.push(row);
+      });
+    asArray<UnknownRecord>(aggregate.accommodations).forEach((row) => {
+      hojaAccommodations.push({
+        ...row,
+        hoja_de_ruta_room_assignments: asArray<UnknownRecord>(row.rooms),
+      });
+    });
+    asArray<UnknownRecord>(aggregate.staff).forEach((row) => {
+      // Tour Ops never needs DNI. Keep the aggregate projection narrow even
+      // when a management caller is entitled to the full editor payload.
+      const { dni: _dni, ...safeStaff } = row;
+      hojaStaff.push(safeStaff);
+    });
+  });
 
   return normalizeTourOpsModel(
     {
       tour,
       tour_dates: tourDates,
-      jobs: jobsResult.data ?? [],
+      jobs,
       hoja_de_ruta: hojaRecords,
       timeline_events: eventsResult.data ?? [],
       travel_segments: travelResult.data ?? [],
       accommodations: accommodationsResult.data ?? [],
-      hoja_travel_arrangements: hojaTravelArrangementsResult.data ?? [],
-      hoja_transport: hojaTransportResult.data ?? [],
-      hoja_accommodations: hojaAccommodationsResult.data ?? [],
-      hoja_staff: hojaStaffResult.data ?? [],
+      hoja_travel_arrangements: hojaTravelArrangements,
+      hoja_transport: hojaTransport,
+      hoja_accommodations: hojaAccommodations,
+      hoja_staff: hojaStaff,
       documents: documentsResult.data ?? [],
       tour_assignments: assignmentsResult.data ?? [],
     },

@@ -160,7 +160,7 @@ const createStaffSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: SheetRow[] = [
     ["PERSONAL"],
     [],
-    ["Nombre", "Apellidos", "DNI", "Posición", "Departamento", "Teléfono", "Rol"],
+    ["Nombre", "Apellidos", "Posición", "Departamento", "Rol"],
   ];
 
   if (data.eventData.staff && data.eventData.staff.length > 0) {
@@ -169,33 +169,29 @@ const createStaffSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
       sheetData.push([
         member.name || "",
         fullSurname,
-        member.dni || "",
         member.position || "",
         member.department || "",
-        member.phone || "",
         member.role || "",
       ]);
     });
   } else {
-    sheetData.push(["No hay personal registrado", "", "", "", "", "", ""]);
+    sheetData.push(["No hay personal registrado", "", "", "", ""]);
   }
 
   const ws = wb.addWorksheet("Personal");
   populateSheet(ws, sheetData);
 
   applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
-  ws.mergeCells("A1:G1");
+  ws.mergeCells("A1:E1");
 
-  applyHeaderRow(ws, 3, 7);
-  applyAlternatingRows(ws, 4, sheetData.length, 7);
+  applyHeaderRow(ws, 3, 5);
+  applyAlternatingRows(ws, 4, sheetData.length, 5);
 
   ws.getColumn(1).width = 15;
   ws.getColumn(2).width = 20;
-  ws.getColumn(3).width = 12;
-  ws.getColumn(4).width = 20;
-  ws.getColumn(5).width = 15;
-  ws.getColumn(6).width = 15;
-  ws.getColumn(7).width = 15;
+  ws.getColumn(3).width = 24;
+  ws.getColumn(4).width = 18;
+  ws.getColumn(5).width = 18;
 };
 
 // Travel Sheet

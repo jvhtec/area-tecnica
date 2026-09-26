@@ -1,3 +1,4 @@
+import { formatInTimeZone } from 'date-fns-tz';
 import { PDFDocument } from './core/pdf-document';
 import type { GeneratedHojaDeRutaPdf, PDFGenerationOptions } from './core/pdf-types';
 import { LogoService } from './services/logo-service';
@@ -33,29 +34,15 @@ export class PDFEngine {
   }
 
   async generate(): Promise<void> {
-    const { selectedJobId, toast } = this.options;
+    const { selectedJobId, publish = false } = this.options;
+    const generatedPdf = await this.renderPDF();
 
-    try {
-      const generatedPdf = await this.renderPDF();
+    this.pdfDoc.save(generatedPdf.filename);
 
-      this.pdfDoc.save(generatedPdf.filename);
+    // Publication is an explicit, full-document action. Section downloads and
+    // previews can never replace the crew-facing Hoja or fire a push.
+    if (publish) {
       await this.uploadPDF(selectedJobId, generatedPdf.blob, generatedPdf.filename);
-
-      toast?.({
-        title: "✅ Documento generado",
-        description: generatedPdf.sectionLabel
-          ? `${generatedPdf.sectionLabel} se ha generado y descargado correctamente.`
-          : "La hoja de ruta ha sido generada y descargada correctamente.",
-      });
-
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast?.({
-        title: "❌ Error",
-        description: "Hubo un problema al generar el documento.",
-        variant: "destructive",
-      });
-      throw error;
     }
   }
 
@@ -395,9 +382,8 @@ export class PDFEngine {
     // Generate filename
     const eventName = eventData.eventName || jobTitle || 'Evento';
     const safeEventName = eventName.replace(/_/g, ' ').replace(/\s+/g, ' ').trim() || 'Evento';
-    const nowIso = new Date().toISOString();
-    const datePart = nowIso.slice(0, 10); // YYYY-MM-DD (UTC)
-    const timePart = nowIso.slice(11, 19).replace(/:/g, '-'); // HH-MM-SS (UTC)
+    const datePart = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
+    const timePart = formatInTimeZone(new Date(), 'Europe/Madrid', 'HH-mm-ss');
     const sectionPart = sectionFilenameLabel ? ` - ${sectionFilenameLabel}` : "";
     const filename = `Hoja de Ruta${sectionPart} - ${safeEventName} - ${datePart} ${timePart}.pdf`;
 
@@ -410,11 +396,10 @@ export class PDFEngine {
 
   private async uploadPDF(selectedJobId: string, pdfBlob: Blob, filename: string): Promise<void> {
     try {
-      await uploadPdfToJob(selectedJobId, pdfBlob, filename);
-      console.log('✅ PDF uploaded to job storage successfully');
+      await uploadPdfToJob(selectedJobId, pdfBlob, filename, { kind: 'hoja_de_ruta' });
     } catch (uploadError) {
-      console.error('❌ Error uploading PDF to job storage:', uploadError);
-      // Continue anyway - local download still works
+      console.error('Error uploading PDF to job storage:', uploadError);
+      throw uploadError
     }
   }
 }

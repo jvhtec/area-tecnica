@@ -10,10 +10,9 @@ export class StaffSection {
     // Start directly after the section header; no repeated subtitle
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
 
-    const validStaff = eventData.staff?.filter(staff => 
-      DataValidators.hasData(staff.name) || 
-      DataValidators.hasData(staff.position) || 
-      DataValidators.hasData(staff.dni)
+    const validStaff = eventData.staff?.filter(staff =>
+      DataValidators.hasData(staff.name) ||
+      DataValidators.hasData(staff.position)
     ) || [];
 
     if (validStaff.length === 0) {
@@ -24,16 +23,14 @@ export class StaffSection {
       (staff.name || '').trim(),
       `${staff.surname1 || ''} ${staff.surname2 || ''}`.trim(),
       staff.position || '',
-      staff.dni || '—',
     ]);
 
     this.pdfDoc.addTable({
       startY: yPosition,
-      head: [["Nombre", "Apellidos", "Posición", "DNI"]],
+      head: [["Nombre", "Apellidos", "Posición"]],
       body: staffData,
       ...hojaTable(hojaGeometry(this.pdfDoc.document), {
-        numericColumns: [3],
-        weights: [30, 34, 32, 24],
+        weights: [32, 36, 52],
       }),
     });
 

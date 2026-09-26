@@ -1,64 +1,44 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
-  Calendar,
-  MapPin,
-  Users,
   Sparkles,
   CheckCircle2,
   Clock,
   Eye,
-  Building2,
-  Phone,
-  Car,
-  Bed,
-  Activity,
   Database,
-  UtensilsCrossed,
   AlertCircle,
   FileDown,
-  CloudSun
 } from "lucide-react";
 
 // Import the working hooks
-import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
+import { useHojaDocument } from "@/features/hoja-de-ruta/model/useHojaDocument";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 
-// Import new modern sections
-import { ModernEventSection } from "./sections/ModernEventSection";
-import { ModernVenueSection } from "./sections/ModernVenueSection";
-import { ModernContactsSection } from "./sections/ModernContactsSection";
-import { ModernStaffSection } from "./sections/ModernStaffSection";
-import { ModernTravelSection } from "./sections/ModernTravelSection";
-import { ModernAccommodationSection } from "./sections/ModernAccommodationSection";
-import { ModernLogisticsSection } from "./sections/ModernLogisticsSection";
-import { ModernScheduleSection } from "./sections/ModernScheduleSection";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { HojaDeRutaHeaderActions } from "@/components/hoja-de-ruta/components/HojaDeRutaHeaderActions";
 import { MobileSectionSwitcher } from "@/components/hoja-de-ruta/components/MobileSectionSwitcher";
 import { MobileSaveBar } from "@/components/hoja-de-ruta/components/MobileSaveBar";
 import { QuickNavigationSidebar } from "@/components/hoja-de-ruta/components/QuickNavigationSidebar";
-import { ModernWeatherSection } from "./sections/ModernWeatherSection";
-import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
 import { HojaDeRutaPdfPreviewDialog } from "./HojaDeRutaPdfPreviewDialog";
 import {
-  getHojaDeRutaPdfSectionLabel,
-  type HojaDeRutaPdfSectionId,
   type HojaDeRutaPrintSectionId,
   normalizeHojaDeRutaPrintSections,
 } from "@/utils/hoja-de-ruta/pdf";
-import type { LucideIcon } from "lucide-react";
+import { HOJA_SECTION_REGISTRY } from "@/features/hoja-de-ruta/sections/sectionRegistry";
+import type { HojaSectionRuntime } from "@/features/hoja-de-ruta/sections/HojaSectionViews";
+import { HojaDocumentProvider } from "@/features/hoja-de-ruta/model/HojaDocumentProvider";
 import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
-import { useHojaDeRutaExports } from "@/components/hoja-de-ruta/useHojaDeRutaExports";
+import { useHojaDocumentExports } from "@/features/hoja-de-ruta/exports/useHojaDocumentExports";
 
 type ModernHojaDeRutaProps = {
   jobId?: string;
@@ -74,7 +54,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
   const [searchParams] = useSearchParams();
   const routedJobId = jobId ?? searchParams.get("jobId") ?? searchParams.get("openHojaDeRuta") ?? undefined;
   const [activeTab, setActiveTab] = useState("event");
-  const [completionProgress, setCompletionProgress] = useState(0);
+
 
   // Get image management functions first (needed for form hook)
   const {
@@ -83,35 +63,20 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     venueMapPreview,
     handleImageUpload,
     removeImage,
-    handleVenueMapInputChange,
+    handleVenueMapUpload,
     handleVenueMapUrl,
     appendVenuePreviews,
+    hydratePersistedImages,
+    prepareImagesForSave,
+    commitImageSave,
+    isImageDirty,
   } = useHojaDeRutaImages();
 
-  // Convert image previews to database format
-  const venueImagesForSave = React.useMemo(() => {
-    const imageList: { image_path: string; image_type: string }[] = [];
-    
-    // Add venue images
-    imagePreviews.venue?.forEach((preview) => {
-      imageList.push({
-        image_path: preview,
-        image_type: 'venue'
-      });
-    });
-    
-    // Add venue map if available
-    if (venueMapPreview) {
-      imageList.push({
-        image_path: venueMapPreview,
-        image_type: 'venue_map'
-      });
-    }
-    
-    return imageList;
-  }, [imagePreviews.venue, venueMapPreview]);
-
-  // Use the working hooks - single call to avoid state conflicts
+  const document = useHojaDocument(routedJobId, {
+    prepareImagesForSave,
+    commitImageSave,
+    isImageDirty,
+  });
   const {
     eventData,
     setEventData,
@@ -119,10 +84,9 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     setSelectedJobId,
     travelArrangements,
     accommodations,
-    setAccommodations,
-    isLoadingJobs,
     isLoadingHojaDeRuta,
     isSaving,
+    isChangingStatus,
     jobs,
     hojaDeRuta,
     handleSaveAll,
@@ -130,64 +94,37 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasSavedData,
     hasBasicJobData,
     isDirty,
-    autoPopulateFromJob,
-    // Form handlers
-    handleContactChange,
-    addContact,
-    removeContact,
-    handleStaffChange,
-    addStaffMember,
-    removeStaffMember,
-    updateTravelArrangement,
-    addTravelArrangement,
-    removeTravelArrangement,
-    addAccommodation,
-    removeAccommodation,
-    updateRoom,
-    addRoom,
-    removeRoom,
-    updateTransport,
-    addTransport,
-    removeTransport,
-    importTransports
-  } = useHojaDeRutaForm(venueImagesForSave);
+    hasExternalConflict,
+    documentStatus,
+    isFinal,
+    handleStatusTransition,
+    staffingDiff,
+    applyStaffingChanges,
+    hasPowerDrift,
+    applyPowerRequirementsChanges,
+  } = document;
 
-  // If a jobId is provided from parent or route query, lock selection to that job
+  const completionProgress = useMemo(
+    () => (
+      HOJA_SECTION_REGISTRY.filter((section) =>
+        section.isComplete({ eventData, travelArrangements, accommodations })
+      ).length
+      / HOJA_SECTION_REGISTRY.length
+    ) * 100,
+    [accommodations, eventData, travelArrangements],
+  );
+
   useEffect(() => {
-    if (routedJobId && selectedJobId !== routedJobId) {
-      setSelectedJobId(routedJobId);
-    }
-  }, [routedJobId, selectedJobId, setSelectedJobId]);
-
-  // Calculate completion progress including weather and restaurants
-  useEffect(() => {
-    const calculateProgress = () => {
-      let completed = 0;
-      const total = 10; // Updated to include restaurants
-
-      // Check completion of each section
-      if (eventData.eventName && eventData.eventDates) completed++;
-      if (eventData.venue.name && eventData.venue.address) completed++;
-      if (eventData.weather && eventData.weather.length > 0) completed++;
-      if (eventData.contacts.some(c => c.name && c.phone)) completed++;
-      if (eventData.staff.some(s => s.name && s.position)) completed++;
-      if (travelArrangements.some(t => t.transportation_type)) completed++;
-      if (accommodations.some(acc => acc.hotel_name || acc.rooms.some(r => r.room_type))) completed++;
-      if (eventData.logistics.transport || eventData.logistics.loadingDetails) completed++;
-      if (eventData.schedule) completed++;
-      if (eventData.restaurants && eventData.restaurants.some(r => r.isSelected)) completed++;
-
-      setCompletionProgress((completed / total) * 100);
-    };
-
-    calculateProgress();
-  }, [eventData, travelArrangements, accommodations]);
+    if (!selectedJobId || isLoadingHojaDeRuta) return;
+    void hydratePersistedImages(selectedJobId, hojaDeRuta?.images || []);
+  }, [hojaDeRuta, hydratePersistedImages, isLoadingHojaDeRuta, selectedJobId]);
 
   const {
     generatingSectionId,
     handleDownloadPdfPreview,
     handleGenerateDriverCertificatePDF,
     handleGeneratePDF,
+    handlePublishPDF,
     handleGenerateSectionPDF,
     handleGenerateXLS,
     handleOpenPdfPreviewInNewTab,
@@ -202,7 +139,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     setShowPrintDialog,
     showPdfPreviewDialog,
     showPrintDialog,
-  } = useHojaDeRutaExports({
+  } = useHojaDocumentExports({
     accommodations,
     eventData,
     handleSaveAll,
@@ -217,38 +154,16 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     venueMapPreview,
   });
 
-  // Enhanced load job data function
-  const handleLoadJobData = async () => {
-    if (!selectedJobId) {
+  // Enhanced save function with better error handling
+  const handleSave = async () => {
+    if (isFinal) {
       toast({
-        title: "Error",
-        description: "No hay trabajo seleccionado para cargar datos.",
-        variant: "destructive",
+        title: "Documento final",
+        description: "La Hoja de Ruta finalizada está bloqueada para edición.",
       });
       return;
     }
 
-    try {
-      const autoPopulatedData = await autoPopulateFromJob();
-
-      if (autoPopulatedData && Object.keys(autoPopulatedData).length > 0) {
-        setEventData(prev => ({
-          ...prev,
-          ...autoPopulatedData,
-        }));
-      }
-    } catch (error) {
-      console.error("Error loading job data:", error);
-      toast({
-        title: "❌ Error",
-        description: "No se pudieron cargar los datos del trabajo.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Enhanced save function with better error handling
-  const handleSave = async () => {
     if (!selectedJobId) {
       toast({
         title: "Error",
@@ -294,28 +209,33 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     }
   };
 
-  const tabPresentationConfig: Array<{ id: HojaDeRutaPdfSectionId; icon: LucideIcon; color: string }> = [
-    { id: "event", icon: Calendar, color: "text-blue-600" },
-    { id: "venue", icon: MapPin, color: "text-green-600" },
-    { id: "weather", icon: CloudSun, color: "text-sky-600" },
-    { id: "contacts", icon: Phone, color: "text-purple-600" },
-    { id: "staff", icon: Users, color: "text-orange-600" },
-    { id: "travel", icon: Car, color: "text-cyan-600" },
-    { id: "accommodation", icon: Bed, color: "text-pink-600" },
-    { id: "logistics", icon: Building2, color: "text-indigo-600" },
-    { id: "schedule", icon: Activity, color: "text-red-600" },
-    { id: "restaurants", icon: UtensilsCrossed, color: "text-emerald-600" },
-  ];
-
-  const tabConfig: HojaDeRutaTabOption[] = tabPresentationConfig.map((section) => ({
-    ...section,
-    label: getHojaDeRutaPdfSectionLabel(section.id),
+  const tabConfig: HojaDeRutaTabOption[] = HOJA_SECTION_REGISTRY.map((section) => ({
+    id: section.id,
+    label: section.label,
+    icon: section.icon,
+    color: section.color,
   }));
 
   const excludedPrintSections = normalizeHojaDeRutaPrintSections(eventData.printExcludedSections);
   const excludedPrintSectionSet = new Set<HojaDeRutaPrintSectionId>(excludedPrintSections);
   const isPrintSectionExcluded = (sectionId: HojaDeRutaPrintSectionId) =>
     excludedPrintSectionSet.has(sectionId);
+
+  const sectionRuntime: HojaSectionRuntime = {
+    hideJobSelection: Boolean(routedJobId),
+    isReadOnly: isFinal,
+    isPrintSectionExcluded,
+    onPrintSectionExcludedChange: handlePrintExclusionChange,
+    venue: {
+      images,
+      imagePreviews,
+      onImageUpload: handleImageUpload,
+      onRemoveImage: removeImage,
+      onVenueMapUpload: handleVenueMapUpload,
+      handleVenueMapUrl,
+      appendVenuePreviews,
+    },
+  };
 
   if (isLoadingHojaDeRuta) {
     return (
@@ -339,8 +259,16 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
   const dataSourceInfo = getDataSourceInfo();
   const StatusIcon = statusInfo.icon;
   const DataSourceIcon = dataSourceInfo.icon;
+  const nextStatusAction = documentStatus === "draft"
+    ? { label: "Enviar a revisión", next: "review" as const }
+    : documentStatus === "review"
+      ? { label: "Aprobar", next: "approved" as const }
+      : documentStatus === "approved"
+        ? { label: "Finalizar", next: "final" as const }
+        : null;
 
   return (
+    <HojaDocumentProvider value={document}>
     <div
       className={cn(
         "bg-gradient-to-br from-background via-background to-muted/20",
@@ -380,14 +308,33 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                     {statusInfo.text}
                   </Badge>
                 )}
+                {selectedJobId && nextStatusAction && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    disabled={
+                      !isInitialized
+                      || hasExternalConflict
+                      || isSaving
+                      || isChangingStatus
+                    }
+                    onClick={() => { void handleStatusTransition(nextStatusAction.next); }}
+                  >
+                    {isChangingStatus ? "Actualizando…" : nextStatusAction.label}
+                  </Button>
+                )}
                 <Badge variant="outline" className={dataSourceInfo.color}>
                   <DataSourceIcon className="w-3 h-3 mr-1" />
                   {dataSourceInfo.text}
                 </Badge>
-                {isDirty && (
-                  <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                    💾 Cambios sin guardar
-                  </Badge>
+                {hasExternalConflict ? (
+                  <Badge variant="destructive">Conflicto de edición</Badge>
+                ) : isDirty ? (
+                  <Badge variant="outline">Cambios sin guardar</Badge>
+                ) : (
+                  <Badge variant="secondary">Guardado</Badge>
                 )}
               </div>
               <div className="hidden md:block">
@@ -404,6 +351,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                 isPreviewing={isPreviewing}
                 previewingTarget={previewingTarget}
                 onSave={handleSave}
+                canEdit={!isFinal}
                 onPreviewPDF={() => { void handlePreviewPDF(); }}
                 onExport={() => setShowPrintDialog(true)}
               />
@@ -411,30 +359,65 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
           </div>
 
           {/* Enhanced Status Messages */}
-          <div className="mt-2 md:mt-3 text-[11px] md:text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-2 md:mt-3 text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!selectedJobId && (
               <span className="text-amber-600 font-medium">
-                ⚠️ Selecciona un trabajo para comenzar
+                Selecciona un trabajo para comenzar
               </span>
             )}
             {selectedJobId && !isInitialized && (
               <span className="text-blue-600 font-medium">
-                ⏳ Inicializando...
+                Inicializando...
               </span>
             )}
             {selectedJobId && isInitialized && hasSavedData && (
               <span className="text-green-600 font-medium">
-                ✅ Datos guardados cargados
+                Datos guardados cargados
               </span>
             )}
             {selectedJobId && isInitialized && !hasSavedData && hasBasicJobData && (
               <span className="text-blue-600 font-medium">
-                📋 Datos básicos cargados
+                Datos básicos cargados
               </span>
             )}
             {selectedJobId && isInitialized && eventData.staff.some(s => s.name || s.position) && (
-              <span className="text-purple-600 font-medium">
-                👥 Personal: {eventData.staff.filter(s => s.name || s.position).length} asignado(s)
+              <span className="font-medium">
+                Personal: {eventData.staff.filter(s => s.name || s.position).length} asignado(s)
+              </span>
+            )}
+            {isFinal && (
+              <span className="text-emerald-700 font-medium">
+                Documento final · edición bloqueada
+              </span>
+            )}
+            {!isFinal && (staffingDiff.added > 0 || staffingDiff.removed > 0) && (
+              <span className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-medium">
+                {staffingDiff.added > 0 && `${staffingDiff.added} técnico${staffingDiff.added === 1 ? "" : "s"} nuevo${staffingDiff.added === 1 ? "" : "s"}`}
+                {staffingDiff.added > 0 && staffingDiff.removed > 0 && " · "}
+                {staffingDiff.removed > 0 && `${staffingDiff.removed} baja${staffingDiff.removed === 1 ? "" : "s"}`}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => { void applyStaffingChanges(); }}
+                >
+                  Actualizar personal
+                </Button>
+              </span>
+            )}
+            {!isFinal && hasPowerDrift && (
+              <span className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-medium">
+                Consumos actualizado
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => { void applyPowerRequirementsChanges(); }}
+                >
+                  Actualizar potencia
+                </Button>
               </span>
             )}
           </div>
@@ -470,6 +453,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 {/* Tab Contents */}
                 <AnimatePresence mode="wait">
+                  <fieldset disabled={isFinal} className="m-0 min-w-0 border-0 p-0">
                   <motion.div
                     key={activeTab}
                     initial={{ opacity: 0, x: 20 }}
@@ -477,139 +461,11 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <TabsContent value="event" className="mt-0" id="panel-event" role="tabpanel">
-                      <ModernEventSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        selectedJobId={selectedJobId}
-                        setSelectedJobId={setSelectedJobId}
-                        jobs={jobs}
-                        isLoadingJobs={isLoadingJobs}
-                        jobDetails={null}
-                        onAutoPopulate={handleLoadJobData}
-                        hideJobSelection={!!jobId}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="venue" className="mt-0" id="panel-venue" role="tabpanel">
-                      <ModernVenueSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        images={images}
-                        imagePreviews={imagePreviews}
-                        onImageUpload={handleImageUpload}
-                        onRemoveImage={removeImage}
-                        onVenueMapUpload={(file: File) => {
-                          const fakeEvent = {
-                            target: { files: [file] }
-                          } as unknown as React.ChangeEvent<HTMLInputElement>;
-                          handleVenueMapInputChange(fakeEvent);
-                        }}
-                        handleVenueMapUrl={handleVenueMapUrl}
-                        appendVenuePreviews={appendVenuePreviews}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="weather" className="mt-0" id="panel-weather" role="tabpanel">
-                      <ModernWeatherSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="contacts" className="mt-0" id="panel-contacts" role="tabpanel">
-                      <ModernContactsSection
-                        eventData={eventData}
-                        onContactChange={handleContactChange}
-                        onAddContact={addContact}
-                        onRemoveContact={removeContact}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="staff" className="mt-0" id="panel-staff" role="tabpanel">
-                      <ModernStaffSection
-                        eventData={eventData}
-                        onStaffChange={handleStaffChange}
-                        onAddStaff={addStaffMember}
-                        onRemoveStaff={removeStaffMember}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="travel" className="mt-0" id="panel-travel" role="tabpanel">
-                      <ModernTravelSection
-                        travelArrangements={travelArrangements}
-                        onUpdate={updateTravelArrangement}
-                        onAdd={addTravelArrangement}
-                        onRemove={removeTravelArrangement}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="accommodation" className="mt-0" id="panel-accommodation" role="tabpanel">
-                       <ModernAccommodationSection
-                         accommodations={accommodations}
-                         eventData={eventData}
-                         onUpdateAccommodation={(index, data) => {
-                           setAccommodations(prev => 
-                             prev.map((acc, i) => 
-                               i === index ? { ...acc, ...data } : acc
-                             )
-                           );
-                         }}
-                         onUpdateRoom={updateRoom}
-                         onAddAccommodation={addAccommodation}
-                         onRemoveAccommodation={removeAccommodation}
-                         onAddRoom={addRoom}
-                         onRemoveRoom={removeRoom}
-                         isPrintSectionExcluded={isPrintSectionExcluded}
-                         onPrintSectionExcludedChange={handlePrintExclusionChange}
-                       />
-                    </TabsContent>
-
-                     <TabsContent value="logistics" className="mt-0" id="panel-logistics" role="tabpanel">
-                       <ModernLogisticsSection
-                         eventData={eventData}
-                         setEventData={setEventData}
-                         onUpdateTransport={updateTransport}
-                         onAddTransport={addTransport}
-                         onRemoveTransport={removeTransport}
-                         onImportTransports={importTransports}
-                         jobId={jobId || selectedJobId}
-                         isPrintSectionExcluded={isPrintSectionExcluded}
-                         onPrintSectionExcludedChange={handlePrintExclusionChange}
-                       />
-                     </TabsContent>
-
-                    <TabsContent value="schedule" className="mt-0" id="panel-schedule" role="tabpanel">
-                      <ModernScheduleSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="restaurants" className="mt-0" id="panel-restaurants" role="tabpanel">
-                      <ModernRestaurantSection
-                        eventData={eventData}
-                        onUpdateEventData={setEventData}
-                        accommodations={accommodations}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
+                    {HOJA_SECTION_REGISTRY.map((section) =>
+                      section.render(sectionRuntime)
+                    )}
                   </motion.div>
+                  </fieldset>
                 </AnimatePresence>
               </Tabs>
             </motion.div>
@@ -621,7 +477,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
       {isMobile && (
         <MobileSaveBar
           onSave={handleSave}
-          disabled={!selectedJobId || !isInitialized || isSaving}
+          disabled={isFinal || !selectedJobId || !isInitialized || isSaving}
           isSaving={isSaving}
         />
       )}
@@ -630,6 +486,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         showDialog={showPrintDialog}
         setShowDialog={setShowPrintDialog}
         onGeneratePDF={handleGeneratePDF}
+        onPublishPDF={handlePublishPDF}
+        canPublish={documentStatus === "approved" || documentStatus === "final"}
         onGenerateDriverCertificatePDF={handleGenerateDriverCertificatePDF}
         onGenerateSectionPDF={handleGenerateSectionPDF}
         onPreviewPDF={() => { void handlePreviewPDF(); }}
@@ -650,6 +508,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         onOpenInNewTab={handleOpenPdfPreviewInNewTab}
       />
     </div>
+    </HojaDocumentProvider>
   );
 };
 

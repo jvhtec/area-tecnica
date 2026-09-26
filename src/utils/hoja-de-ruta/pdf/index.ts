@@ -22,91 +22,17 @@ import type {
   PDFGenerationOptions,
 } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
 
-const createPDFEngine = (
-  eventData: PDFGenerationOptions['eventData'],
-  travelArrangements: PDFGenerationOptions['travelArrangements'],
-  roomAssignments: PDFGenerationOptions['roomAssignments'],
-  imagePreviews: PDFGenerationOptions['imagePreviews'],
-  venueMapPreview: string | null,
-  selectedJobId: string,
-  jobTitle: string,
-  jobDate?: string,
-  toast?: PDFGenerationOptions['toast'],
-  accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
-) => new PDFEngine({
-  eventData,
-  travelArrangements,
-  roomAssignments,
-  imagePreviews,
-  venueMapPreview,
-  selectedJobId,
-  jobTitle,
-  jobDate,
-  toast,
-  accommodations,
-  ...pdfOptions
-});
-
-// Main export function for backward compatibility
 export const generatePDF = async (
-  eventData: PDFGenerationOptions['eventData'],
-  travelArrangements: PDFGenerationOptions['travelArrangements'],
-  roomAssignments: PDFGenerationOptions['roomAssignments'],
-  imagePreviews: PDFGenerationOptions['imagePreviews'],
-  venueMapPreview: string | null,
-  selectedJobId: string,
-  jobTitle: string,
-  // Optional parameters to enhance headers without breaking callers
-  jobDate?: string,
-  toast?: PDFGenerationOptions['toast'],
-  accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
+  options: PDFGenerationOptions,
 ): Promise<void> => {
-  const engine = createPDFEngine(
-    eventData,
-    travelArrangements,
-    roomAssignments,
-    imagePreviews,
-    venueMapPreview,
-    selectedJobId,
-    jobTitle,
-    jobDate,
-    toast,
-    accommodations,
-    pdfOptions
-  );
-  
+  const engine = new PDFEngine(options);
   return engine.generate();
 };
 
 export const generatePDFPreview = async (
-  eventData: PDFGenerationOptions['eventData'],
-  travelArrangements: PDFGenerationOptions['travelArrangements'],
-  roomAssignments: PDFGenerationOptions['roomAssignments'],
-  imagePreviews: PDFGenerationOptions['imagePreviews'],
-  venueMapPreview: string | null,
-  selectedJobId: string,
-  jobTitle: string,
-  jobDate?: string,
-  toast?: PDFGenerationOptions['toast'],
-  accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
+  options: PDFGenerationOptions,
 ): Promise<GeneratedHojaDeRutaPdf> => {
-  const engine = createPDFEngine(
-    eventData,
-    travelArrangements,
-    roomAssignments,
-    imagePreviews,
-    venueMapPreview,
-    selectedJobId,
-    jobTitle,
-    jobDate,
-    toast,
-    accommodations,
-    pdfOptions
-  );
-
+  const engine = new PDFEngine(options);
   return engine.generatePreview();
 };
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePowerRequirementsForHojaInitialization } from "@/hooks/hoja-de-ruta/useHojaDeRutaInitialization";
+import { resolvePowerRequirementsForHojaInitialization } from "@/features/hoja-de-ruta/model/useHojaDocumentInitialization";
 
 describe("resolvePowerRequirementsForHojaInitialization", () => {
   it("keeps saved manual Hoja power requirements over generated table text", () => {

@@ -1,9 +1,8 @@
-
 import { useQuery } from "@tanstack/react-query";
+
 import { supabase } from "@/lib/supabase";
-
-
 import { queryKeys } from "@/lib/react-query";
+
 export interface TourDate {
   id: string;
   tour: {
@@ -21,62 +20,92 @@ export interface JobSelection {
   end_time: string;
 }
 
-export const useJobSelection = () => {
-  return useQuery({
-    queryKey: queryKeys.scope("jobs-for-selection"),
+type TourRow = { id: string; name: string };
+type TourDateRow = { id: string; tour?: TourRow | TourRow[] | null };
+
+type JobSelectionRow = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  tour_date_id: string | null;
+  tour_date?: TourDateRow | TourDateRow[] | null;
+};
+
+const firstEmbed = <T,>(value: T | T[] | null | undefined): T | undefined =>
+  Array.isArray(value) ? value[0] : value ?? undefined;
+
+const mapJob = (job: JobSelectionRow): JobSelection => {
+  const tourDate = firstEmbed(job.tour_date);
+  const tour = firstEmbed(tourDate?.tour);
+
+  return {
+    id: job.id,
+    title: job.title,
+    start_time: job.start_time,
+    end_time: job.end_time,
+    tour_date_id: job.tour_date_id,
+    tour_date: tourDate
+      ? {
+          id: tourDate.id,
+          tour: {
+            id: tour?.id || "",
+            name: tour?.name || "",
+          },
+        }
+      : null,
+  };
+};
+
+const JOB_SELECTION_COLUMNS = `
+  id,
+  title,
+  start_time,
+  end_time,
+  tour_date_id,
+  job_type,
+  status,
+  tour_date:tour_dates!tour_date_id (
+    id,
+    tour:tours (
+      id,
+      name
+    )
+  )
+`;
+
+export const useJobSelection = (includeJobId?: string) =>
+  useQuery({
+    queryKey: queryKeys.scope("jobs-for-selection", includeJobId || "active"),
     queryFn: async () => {
-      console.log("Fetching jobs for selection...");
-      
       const activeJobCutoff = new Date().toISOString();
-      
-      const { data: jobs, error } = await supabase
+
+      const { data: activeJobs, error } = await supabase
         .from("jobs")
-        .select(`
-          id,
-          title,
-          start_time,
-          end_time,
-          tour_date_id,
-          job_type,
-          status,
-          tour_date:tour_dates!tour_date_id (
-            id,
-            tour:tours (
-              id,
-              name
-            )
-          )
-        `)
-        .gte('end_time', activeJobCutoff) // Include ongoing jobs; exclude jobs that already ended
-        .in('job_type', ['single', 'festival', 'ciclo', 'tourdate']) // Only include relevant job types
-        .or('status.is.null,status.in.(Tentativa,Confirmado)') // Exclude completed/cancelled jobs
+        .select(JOB_SELECTION_COLUMNS)
+        .gte("end_time", activeJobCutoff)
+        .in("job_type", ["single", "festival", "ciclo", "tourdate"])
+        .or("status.is.null,status.in.(Tentativa,Confirmado)")
         .order("start_time", { ascending: true });
 
-      if (error) {
-        console.error("Error fetching jobs:", error);
-        throw error;
+      if (error) throw error;
+
+      const rows = [...((activeJobs || []) as unknown as JobSelectionRow[])];
+
+      // A deep link or embedded job card is authoritative. Always include that
+      // job even if it is historical, completed, evento/dryhire, or otherwise
+      // outside the browse selector's active-job filters.
+      if (includeJobId && !rows.some((job) => job.id === includeJobId)) {
+        const { data: includedJob, error: includedError } = await supabase
+          .from("jobs")
+          .select(JOB_SELECTION_COLUMNS)
+          .eq("id", includeJobId)
+          .maybeSingle();
+
+        if (includedError) throw includedError;
+        if (includedJob) rows.unshift(includedJob as unknown as JobSelectionRow);
       }
 
-      console.log("Raw jobs data:", jobs);
-
-      // Transform the data to match our expected types
-      const transformedJobs = jobs?.map(job => ({
-        id: job.id,
-        title: job.title,
-        start_time: job.start_time,
-        end_time: job.end_time,
-        tour_date_id: job.tour_date_id,
-        tour_date: job.tour_date ? {
-          id: job.tour_date[0]?.id, // Access first element of tour_date array
-          tour: {
-            id: job.tour_date[0]?.tour[0]?.id, // Access first tour from the first tour_date
-            name: job.tour_date[0]?.tour[0]?.name
-          }
-        } : null
-      })) as JobSelection[];
-
-      console.log("Transformed jobs:", transformedJobs);
-      return transformedJobs;
+      return rows.map(mapJob);
     },
   });
-};

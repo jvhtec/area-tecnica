@@ -105,12 +105,11 @@ export const mergeStaffWithAssignments = (
 };
 
 /**
- * Stable select value for a staff member in room assignments: technician_id
- * when the entry comes from job staffing, the array index otherwise. The PDF
- * generator resolves both forms.
+ * Stable room reference. New rows always use the Hoja staff UUID. Technician
+ * ids and array indexes remain read-compatible only for legacy documents.
  */
 export const staffOptionValue = (entry: HojaStaffEntry, index: number) =>
-  entry?.technician_id || index.toString();
+  entry?.id || entry?.technician_id || index.toString();
 
 const isIndexReference = (value: string) => /^\d+$/.test(value);
 
@@ -128,7 +127,6 @@ const remapRoomReference = (
   savedStaff: HojaStaffEntry[],
   savedIndexMap: number[],
   mergedStaff: HojaStaffEntry[],
-  mergedTechnicianIds: Set<string>,
 ): string => {
   if (!value) return "";
 
@@ -140,8 +138,12 @@ const remapRoomReference = (
     return target ? staffOptionValue(target, mergedIndex) : "";
   }
 
-  // technician_id reference: clear it when that technician was pruned
-  return mergedTechnicianIds.has(value) ? value : "";
+  // Legacy UUIDs may be a Hoja staff id or a technician/profile id. Resolve
+  // either form to the stable Hoja staff id when the person still exists.
+  const mergedIndex = mergedStaff.findIndex(
+    (entry) => entry?.id === value || entry?.technician_id === value,
+  );
+  return mergedIndex >= 0 ? staffOptionValue(mergedStaff[mergedIndex], mergedIndex) : "";
 };
 
 /**
@@ -156,14 +158,11 @@ export const remapAccommodationStaffReferences = (
   savedIndexMap: number[],
   mergedStaff: HojaStaffEntry[],
 ): Accommodation[] => {
-  const mergedTechnicianIds = new Set(
-    mergedStaff.map((entry) => entry?.technician_id).filter(Boolean) as string[],
-  );
   return accommodations.map((accommodation) => ({
     ...accommodation,
     rooms: (accommodation.rooms || []).map((room) =>
       mapRoomStaffReferences(room, (value) =>
-        remapRoomReference(value, savedStaff, savedIndexMap, mergedStaff, mergedTechnicianIds),
+        remapRoomReference(value, savedStaff, savedIndexMap, mergedStaff),
       ),
     ),
   }));
@@ -180,6 +179,7 @@ const adjustReferenceForRemoval = (
     if (index === removedIndex) return "";
     return index > removedIndex ? String(index - 1) : value;
   }
+  if (removedEntry?.id && value === removedEntry.id) return "";
   if (removedEntry?.technician_id && value === removedEntry.technician_id) return "";
   return value;
 };
@@ -244,6 +244,10 @@ export const syncTransportsWithLogistics = (
           // Preserve any manually-edited Hoja de Ruta datetime; only sync if empty.
           date_time: shouldSyncDateTime ? incomingTransport.date_time : existing.date_time,
           source_logistics_event_id: sourceId,
+          source_logistics_updated_at:
+            incomingTransport.source_logistics_updated_at ?? existing.source_logistics_updated_at,
+          origin: incomingTransport.origin ?? existing.origin,
+          destination: incomingTransport.destination ?? existing.destination,
           is_hoja_relevant: incomingTransport.is_hoja_relevant ?? true,
           logistics_categories: incomingTransport.logistics_categories || [],
           driver_name: incomingTransport.driver_name ?? existing.driver_name,

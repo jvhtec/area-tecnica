@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildJobHojaLinkUrl,
   computeJobHojaLinkExpiry,
+  computeJobHojaLinkExpiryForJob,
   getJobHojaLinkSecret,
   resolveJobHojaLinkTtlSeconds,
   signJobHojaLink,
@@ -87,11 +88,38 @@ describe("Hoja de Ruta stable link tokens", () => {
     );
   });
 
-  it("uses a long-lived but bounded default ttl that can be configured", () => {
+  it("uses a bounded default ttl that can be configured", () => {
     expect(computeJobHojaLinkExpiry(100, 60)).toBe(160);
-    expect(resolveJobHojaLinkTtlSeconds(() => undefined)).toBe(60 * 60 * 24 * 365);
+    expect(resolveJobHojaLinkTtlSeconds(() => undefined)).toBe(60 * 60 * 24 * 30);
     expect(resolveJobHojaLinkTtlSeconds((name) => name === "JOB_HOJA_LINK_TTL_SECONDS" ? "3600" : undefined)).toBe(3600);
     expect(resolveJobHojaLinkTtlSeconds((name) => name === "JOB_HOJA_LINK_TTL_SECONDS" ? "10" : undefined)).toBe(60);
+    expect(resolveJobHojaLinkTtlSeconds((name) => name === "JOB_HOJA_LINK_TTL_SECONDS" ? "31536000" : undefined)).toBe(60 * 60 * 24 * 90);
+  });
+
+  it("bounds a link by the job end plus the post-event margin", () => {
+    const nowSeconds = 1_800_000_000;
+    const day = 60 * 60 * 24;
+
+    expect(computeJobHojaLinkExpiryForJob({
+      nowSeconds,
+      jobEnd: new Date((nowSeconds + 10 * day) * 1000).toISOString(),
+    })).toBe(nowSeconds + 17 * day);
+
+    expect(computeJobHojaLinkExpiryForJob({
+      nowSeconds,
+      jobEnd: new Date((nowSeconds + 365 * day) * 1000).toISOString(),
+    })).toBe(nowSeconds + 30 * day);
+
+    expect(computeJobHojaLinkExpiryForJob({
+      nowSeconds,
+      jobEnd: new Date((nowSeconds - 8 * day) * 1000).toISOString(),
+    })).toBe(nowSeconds + day);
+
+    expect(computeJobHojaLinkExpiryForJob({
+      nowSeconds,
+      jobEnd: "not-a-date",
+      ttlSeconds: 365 * day,
+    })).toBe(nowSeconds + 90 * day);
   });
 
   it("prefers explicit Hoja link secrets before falling back to service role", () => {

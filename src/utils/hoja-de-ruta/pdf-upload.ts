@@ -1,11 +1,10 @@
-
 import { supabase } from "@/lib/supabase";
 
-type HojaPdfDocumentKind = 'hoja_de_ruta' | 'certificado_entrega';
+export type HojaPdfDocumentKind = "hoja_de_ruta" | "certificado_entrega";
 
 const HOJA_PDF_FOLDER_BY_KIND: Record<HojaPdfDocumentKind, string> = {
-  hoja_de_ruta: 'hojas-de-ruta',
-  certificado_entrega: 'certificados-entrega',
+  hoja_de_ruta: "hojas-de-ruta",
+  certificado_entrega: "certificados-entrega",
 };
 
 interface UploadPdfToJobOptions {
@@ -14,144 +13,131 @@ interface UploadPdfToJobOptions {
 
 export const sanitizeHojaPdfFileName = (fileName: string): string => {
   const sanitized = fileName
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/_/g, ' ')
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\s+\./g, '.')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/_/g, " ")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+\./g, ".")
     .trim();
 
-  return sanitized || 'Hoja de Ruta.pdf';
+  return sanitized || "Hoja de Ruta.pdf";
 };
 
 export const uploadPdfToJob = async (
   jobId: string,
   pdfBlob: Blob,
   fileName: string,
-  options: UploadPdfToJobOptions = {}
-): Promise<void> => {
-  try {
-    const kind = options.kind || 'hoja_de_ruta';
-    const folderBase = HOJA_PDF_FOLDER_BY_KIND[kind];
+  options: UploadPdfToJobOptions = {},
+): Promise<{ id: string; file_path: string }> => {
+  const kind = options.kind || "hoja_de_ruta";
+  const folderBase = HOJA_PDF_FOLDER_BY_KIND[kind];
+  const sanitizedFileName = sanitizeHojaPdfFileName(fileName);
+  const folderPath = `${folderBase}/${jobId}`;
+  const filePath = `${folderPath}/${crypto.randomUUID()}-${sanitizedFileName}`;
 
-    // Sanitize filename for storage while preserving human-readable spaces.
-    const sanitizedFileName = sanitizeHojaPdfFileName(fileName);
+  const { data: authData } = await supabase.auth.getUser();
+  const userId = authData.user?.id || null;
 
-    const folderPath = `${folderBase}/${jobId}`;
-    const filePath = `${folderPath}/${sanitizedFileName}`;
+  // Non-published document kinds can use ordinary replacement cleanup. The
+  // canonical Hoja path is finalized by one database transaction below.
+  let previousDocs: Array<{ id: string; file_path: string }> = [];
+  if (kind !== "hoja_de_ruta") {
+    const { data: existingDocs, error: snapshotError } = await supabase
+      .from("job_documents")
+      .select("id,file_path")
+      .eq("job_id", jobId)
+      .like("file_path", `${folderPath}/%`)
+      .order("uploaded_at", { ascending: false });
 
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.warn('Auth getUser warning (hoja de ruta upload):', authError);
-    }
-    const userId = authData.user?.id || null;
+    if (snapshotError) throw snapshotError;
+    previousDocs = (existingDocs || []).filter((doc) => doc.file_path !== filePath);
+  }
 
-    console.log('Uploading job PDF:', {
-      kind,
-      fileName: sanitizedFileName,
-      jobId,
-      userId,
+  const { error: uploadError } = await supabase.storage
+    .from("job-documents")
+    .upload(filePath, pdfBlob, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: "application/pdf",
     });
 
-    // Snapshot existing PDFs in the same scoped folder so we can clean up
-    // *after* a successful upload+insert.
-    // This avoids a window where the DB row exists but the file has already been deleted.
-    let previousDocs: Array<{ id: string; file_path: string }> = [];
-    try {
-      const { data, error } = await supabase
-        .from('job_documents')
-        .select('id,file_path')
-        .eq('job_id', jobId)
-        .like('file_path', `${folderPath}/%`)
-        .order('uploaded_at', { ascending: false });
+  if (uploadError) throw uploadError;
 
-      if (error) {
-        console.warn('DB select warning (hoja de ruta cleanup snapshot):', error);
-      } else if (Array.isArray(data)) {
-        previousDocs = data
-          .filter((doc) => doc.file_path !== filePath)
-          .map((doc) => ({ id: doc.id, file_path: doc.file_path }));
-      }
-    } catch (snapshotErr) {
-      console.warn('Cleanup snapshot step encountered an issue (non-blocking):', snapshotErr);
-    }
+  const { data: inserted, error: insertError } = await supabase
+    .from("job_documents")
+    .insert({
+      job_id: jobId,
+      file_name: sanitizedFileName,
+      file_path: filePath,
+      file_type: "application/pdf",
+      file_size: pdfBlob.size,
+      uploaded_by: userId,
+      original_type: "pdf",
+      document_kind: kind,
+      visible_to_tech: kind === "hoja_de_ruta",
+    })
+    .select("id,file_path")
+    .single();
 
-    // Upload new PDF first (no pre-delete)
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("job-documents")
-      .upload(filePath, pdfBlob, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: 'application/pdf',
-      });
-
-    console.log('Upload result:', { uploadData, uploadError });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      throw uploadError;
-    }
-
-    // Insert document reference into the database using correct column names
-    const { error: insertError } = await supabase
-      .from("job_documents")
-      .insert({
-        job_id: jobId,
-        file_name: sanitizedFileName,
-        file_path: filePath,
-        file_type: 'application/pdf',
-        file_size: pdfBlob.size,
-        uploaded_by: userId,
-        original_type: 'pdf',
-        visible_to_tech: true
-      });
-
-    if (insertError) {
-      console.error('Database insert error:', insertError);
-      throw insertError;
-    }
-    
-    console.log('PDF uploaded successfully:', sanitizedFileName);
-
-    // Best-effort cleanup: delete previous DB rows first, then their storage objects.
-    // If DB delete is not permitted, we intentionally skip storage removal to avoid broken download links.
-    if (previousDocs.length > 0) {
-      try {
-        const previousIds = previousDocs.map((doc) => doc.id);
-        const previousPaths = previousDocs.map((doc) => doc.file_path);
-
-        const { error: dbDeleteError } = await supabase
-          .from('job_documents')
-          .delete()
-          .in('id', previousIds);
-
-        if (dbDeleteError) {
-          console.warn('DB delete warning (hoja de ruta cleanup):', dbDeleteError);
-        } else if (previousPaths.length > 0) {
-          const { error: removeError } = await supabase.storage
-            .from('job-documents')
-            .remove(previousPaths);
-
-          if (removeError) {
-            console.warn('Storage remove warning (hoja de ruta cleanup):', removeError);
-          } else {
-            console.log(`Removed ${previousPaths.length} previous PDF file(s) from storage for kind "${kind}".`);
-          }
-        }
-      } catch (cleanupErr) {
-        console.warn('Hoja de Ruta cleanup step encountered an issue (non-blocking):', cleanupErr);
-      }
-    }
-
-    // Broadcast push: new Hoja de Ruta uploaded
-    try {
-      void supabase.functions.invoke('push', {
-        body: { action: 'broadcast', type: 'document.uploaded', job_id: jobId, file_name: sanitizedFileName }
-      });
-    } catch { /* best-effort push notification; ignore delivery failures */ }
-  } catch (error) {
-    console.error("Error uploading PDF:", error);
-    throw error;
+  if (insertError || !inserted) {
+    await supabase.storage.from("job-documents").remove([filePath]);
+    throw insertError || new Error("No se pudo registrar el documento publicado");
   }
+
+  let previousPaths: string[] = [];
+
+  if (kind === "hoja_de_ruta") {
+    const { data: retiredPaths, error: publishError } = await supabase.rpc(
+      "publish_hoja_de_ruta_document",
+      { p_job_id: jobId, p_document_id: inserted.id },
+    );
+
+    if (publishError) {
+      await supabase.from("job_documents").delete().eq("id", inserted.id);
+      await supabase.storage.from("job-documents").remove([filePath]);
+      throw publishError;
+    }
+    previousPaths = Array.isArray(retiredPaths) ? retiredPaths : [];
+  } else if (previousDocs.length) {
+    const previousIds = previousDocs.map((doc) => doc.id);
+    previousPaths = previousDocs.map((doc) => doc.file_path);
+
+    const { error: dbDeleteError } = await supabase
+      .from("job_documents")
+      .delete()
+      .in("id", previousIds);
+
+    if (dbDeleteError) {
+      console.warn("No se pudieron limpiar referencias antiguas del documento:", dbDeleteError);
+      previousPaths = [];
+    }
+  }
+
+  if (previousPaths.length) {
+    const { error: removeError } = await supabase.storage
+      .from("job-documents")
+      .remove(previousPaths);
+    if (removeError) {
+      console.warn("No se pudieron limpiar objetos de documentos antiguos:", removeError);
+    }
+  }
+
+  // Only the canonical crew-facing Hoja triggers document.uploaded.
+  if (kind === "hoja_de_ruta") {
+    try {
+      void supabase.functions.invoke("push", {
+        body: {
+          action: "broadcast",
+          type: "document.uploaded",
+          job_id: jobId,
+          file_name: sanitizedFileName,
+        },
+      });
+    } catch {
+      // Best effort. Publication itself is already committed.
+    }
+  }
+
+  return inserted;
 };

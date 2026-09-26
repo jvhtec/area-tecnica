@@ -1,32 +1,69 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { CloudSun, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
-import { getWeatherForJob, formatWeatherDisplay } from "@/utils/weather/weatherApi";
-import { EventData, WeatherData } from "@/types/hoja-de-ruta";
+import { getWeatherForJob } from "@/utils/weather/weatherApi";
+import type { EventData } from "@/types/hoja-de-ruta";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
+import { formatInTimeZone } from "date-fns-tz";
 
 interface ModernWeatherSectionProps {
   eventData: EventData;
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
+  isReadOnly?: boolean;
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
   onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
+const WEATHER_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const WEATHER_FORECAST_HORIZON_DAYS = 16;
+const MADRID_TIMEZONE = "Europe/Madrid";
+
 export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
   eventData,
   setEventData,
+  isReadOnly = false,
   isPrintSectionExcluded,
   onPrintSectionExcludedChange,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastFetch, setLastFetch] = useState<Date | null>(null);
+  const [lastFetch, setLastFetch] = useState<Date | null>(() => {
+    const date = eventData.weatherFetchedAt ? new Date(eventData.weatherFetchedAt) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
+  });
+  const lastAutomaticAttemptRef = useRef("");
 
-  const fetchWeather = async () => {
+  const isInsideForecastHorizon = useMemo(() => {
+    const start = eventData.eventStartDate;
+    const end = eventData.eventEndDate || start;
+    if (!start || !end) return false;
+
+    const today = formatInTimeZone(new Date(), MADRID_TIMEZONE, "yyyy-MM-dd");
+    const horizon = formatInTimeZone(
+      new Date(Date.now() + (WEATHER_FORECAST_HORIZON_DAYS - 1) * 24 * 60 * 60 * 1000),
+      MADRID_TIMEZONE,
+      "yyyy-MM-dd",
+    );
+    return start <= horizon && end >= today;
+  }, [eventData.eventEndDate, eventData.eventStartDate]);
+
+  const isWeatherStale = useMemo(() => {
+    if (!eventData.weather?.length || !eventData.weatherFetchedAt) return true;
+    const fetchedAt = new Date(eventData.weatherFetchedAt).getTime();
+    return !Number.isFinite(fetchedAt) || Date.now() - fetchedAt >= WEATHER_MAX_AGE_MS;
+  }, [eventData.weather, eventData.weatherFetchedAt]);
+
+  useEffect(() => {
+    const date = eventData.weatherFetchedAt ? new Date(eventData.weatherFetchedAt) : null;
+    setLastFetch(date && !Number.isNaN(date.getTime()) ? date : null);
+  }, [eventData.weatherFetchedAt]);
+
+  const fetchWeather = useCallback(async () => {
+    if (isReadOnly) return;
     if (!eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)) {
       setError("Se requieren fechas del evento y ubicación del venue para obtener el clima");
       return;
@@ -45,12 +82,14 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
       
       console.log('WeatherSection: Received weather data:', weatherData);
       
+      const fetchedAt = new Date();
       setEventData(prev => ({
         ...prev,
-        weather: weatherData || undefined
+        weather: weatherData || undefined,
+        weatherFetchedAt: weatherData?.length ? fetchedAt.toISOString() : prev.weatherFetchedAt,
       }));
-      
-      setLastFetch(new Date());
+
+      setLastFetch(weatherData?.length ? fetchedAt : null);
       
       if (!weatherData) {
         setError("No se pudieron obtener datos meteorológicos para esta ubicación y fecha");
@@ -61,23 +100,40 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [eventData.eventDates, eventData.venue, isReadOnly, setEventData]);
 
-  // Auto-fetch weather when event data changes
+  const automaticAttemptKey = useMemo(() => JSON.stringify([
+    eventData.eventDates || "",
+    eventData.venue.address || "",
+    eventData.venue.coordinates || null,
+  ]), [eventData.eventDates, eventData.venue.address, eventData.venue.coordinates]);
+
+  // Refresh only when Open-Meteo can actually forecast the event, and only
+  // when the saved forecast is missing or older than 12 hours.
   useEffect(() => {
-    console.log('WeatherSection: Checking if should fetch weather:', {
-      eventDates: eventData.eventDates,
-      address: eventData.venue.address,
-      coordinates: eventData.venue.coordinates,
-      hasWeather: !!eventData.weather,
-      isLoading
-    });
-    
-    if (eventData.eventDates && (eventData.venue.address || eventData.venue.coordinates) && !eventData.weather && !isLoading) {
-      console.log('WeatherSection: Auto-fetching weather...');
-      fetchWeather();
+    if (
+      !isReadOnly
+      && eventData.eventDates
+      && (eventData.venue.address || eventData.venue.coordinates)
+      && isInsideForecastHorizon
+      && isWeatherStale
+      && !isLoading
+      && lastAutomaticAttemptRef.current !== automaticAttemptKey
+    ) {
+      lastAutomaticAttemptRef.current = automaticAttemptKey;
+      void fetchWeather();
     }
-  }, [eventData.eventDates, eventData.venue.address, eventData.venue.coordinates?.lat, eventData.venue.coordinates?.lng]);
+  }, [
+    eventData.eventDates,
+    eventData.venue.address,
+    eventData.venue.coordinates,
+    fetchWeather,
+    automaticAttemptKey,
+    isInsideForecastHorizon,
+    isReadOnly,
+    isLoading,
+    isWeatherStale,
+  ]);
 
   const hasWeatherData = eventData.weather && eventData.weather.length > 0;
 
@@ -108,7 +164,12 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
               )}
               <Button
                 onClick={fetchWeather}
-                disabled={isLoading || !eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)}
+                disabled={
+                  isReadOnly
+                  || isLoading
+                  || !eventData.eventDates
+                  || (!eventData.venue.address && !eventData.venue.coordinates)
+                }
                 variant="outline"
                 size="sm"
                 className="text-sky-600 border-sky-300 hover:bg-sky-50"

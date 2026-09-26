@@ -67,6 +67,8 @@ export type HojaDeRutaRoomAssignment = {
   room_number: string | null;
   staff_member1_id: string | null;
   staff_member2_id: string | null;
+  staff_member1_name?: string | null;
+  staff_member2_name?: string | null;
 };
 
 export type HojaDeRutaAccommodation = {

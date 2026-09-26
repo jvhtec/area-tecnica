@@ -3411,7 +3411,9 @@ export type Database = {
           crew_calls: Json | null
           document_version: number | null
           event_dates: string | null
+          event_end_date: string | null
           event_name: string | null
+          event_start_date: string | null
           hotel_info: Json | null
           id: string
           job_id: string | null
@@ -3420,6 +3422,8 @@ export type Database = {
           local_contacts: Json | null
           logistics_info: Json | null
           power_requirements: string | null
+          power_requirements_source_updated_at: string | null
+          published_document_id: string | null
           print_excluded_sections: Json
           program_schedule_json: Json | null
           restaurants_info: Json | null
@@ -3433,6 +3437,7 @@ export type Database = {
           venue_name: string | null
           venue_technical_specs: Json | null
           weather_data: Json | null
+          weather_fetched_at: string | null
         }
         Insert: {
           alerts?: Json | null
@@ -3447,7 +3452,9 @@ export type Database = {
           crew_calls?: Json | null
           document_version?: number | null
           event_dates?: string | null
+          event_end_date?: string | null
           event_name?: string | null
+          event_start_date?: string | null
           hotel_info?: Json | null
           id?: string
           job_id?: string | null
@@ -3456,6 +3463,8 @@ export type Database = {
           local_contacts?: Json | null
           logistics_info?: Json | null
           power_requirements?: string | null
+          power_requirements_source_updated_at?: string | null
+          published_document_id?: string | null
           print_excluded_sections?: Json
           program_schedule_json?: Json | null
           restaurants_info?: Json | null
@@ -3469,6 +3478,7 @@ export type Database = {
           venue_name?: string | null
           venue_technical_specs?: Json | null
           weather_data?: Json | null
+          weather_fetched_at?: string | null
         }
         Update: {
           alerts?: Json | null
@@ -3483,7 +3493,9 @@ export type Database = {
           crew_calls?: Json | null
           document_version?: number | null
           event_dates?: string | null
+          event_end_date?: string | null
           event_name?: string | null
+          event_start_date?: string | null
           hotel_info?: Json | null
           id?: string
           job_id?: string | null
@@ -3492,6 +3504,8 @@ export type Database = {
           local_contacts?: Json | null
           logistics_info?: Json | null
           power_requirements?: string | null
+          power_requirements_source_updated_at?: string | null
+          published_document_id?: string | null
           print_excluded_sections?: Json
           program_schedule_json?: Json | null
           restaurants_info?: Json | null
@@ -3505,6 +3519,7 @@ export type Database = {
           venue_name?: string | null
           venue_technical_specs?: Json | null
           weather_data?: Json | null
+          weather_fetched_at?: string | null
         }
         Relationships: [
           {
@@ -3555,6 +3570,7 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
+          sort_order: number
           updated_at: string | null
         }
         Insert: {
@@ -3567,6 +3583,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          sort_order?: number
           updated_at?: string | null
         }
         Update: {
@@ -3579,6 +3596,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          sort_order?: number
           updated_at?: string | null
         }
         Relationships: [
@@ -3593,27 +3611,33 @@ export type Database = {
       }
       hoja_de_ruta_contacts: {
         Row: {
+          email: string | null
           hoja_de_ruta_id: string | null
           id: string
           name: string
           phone: string | null
           role: string | null
+          sort_order: number
           technician_id: string | null
         }
         Insert: {
+          email?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
           name: string
           phone?: string | null
           role?: string | null
+          sort_order?: number
           technician_id?: string | null
         }
         Update: {
+          email?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
           name?: string
           phone?: string | null
           role?: string | null
+          sort_order?: number
           technician_id?: string | null
         }
         Relationships: [
@@ -3701,18 +3725,21 @@ export type Database = {
           id: string
           image_path: string
           image_type: string
+          sort_order: number
         }
         Insert: {
           hoja_de_ruta_id?: string | null
           id?: string
           image_path: string
           image_type: string
+          sort_order?: number
         }
         Update: {
           hoja_de_ruta_id?: string | null
           id?: string
           image_path?: string
           image_type?: string
+          sort_order?: number
         }
         Relationships: [
           {
@@ -3848,7 +3875,10 @@ export type Database = {
           id: string
           room_number: string | null
           room_type: string
+          sort_order: number
+          staff_member1_hoja_staff_id: string | null
           staff_member1_id: string | null
+          staff_member2_hoja_staff_id: string | null
           staff_member2_id: string | null
           updated_at: string | null
         }
@@ -3858,7 +3888,10 @@ export type Database = {
           id?: string
           room_number?: string | null
           room_type: string
+          sort_order?: number
+          staff_member1_hoja_staff_id?: string | null
           staff_member1_id?: string | null
+          staff_member2_hoja_staff_id?: string | null
           staff_member2_id?: string | null
           updated_at?: string | null
         }
@@ -3868,7 +3901,10 @@ export type Database = {
           id?: string
           room_number?: string | null
           room_type?: string
+          sort_order?: number
+          staff_member1_hoja_staff_id?: string | null
           staff_member1_id?: string | null
+          staff_member2_hoja_staff_id?: string | null
           staff_member2_id?: string | null
           updated_at?: string | null
         }
@@ -3959,6 +3995,7 @@ export type Database = {
           id: string
           name: string
           position: string | null
+          sort_order: number
           surname1: string | null
           surname2: string | null
           technician_id: string | null
@@ -3969,6 +4006,7 @@ export type Database = {
           id?: string
           name: string
           position?: string | null
+          sort_order?: number
           surname1?: string | null
           surname2?: string | null
           technician_id?: string | null
@@ -3979,6 +4017,7 @@ export type Database = {
           id?: string
           name?: string
           position?: string | null
+          sort_order?: number
           surname1?: string | null
           surname2?: string | null
           technician_id?: string | null
@@ -4064,7 +4103,11 @@ export type Database = {
           license_plate: string | null
           logistics_categories: Database["public"]["Enums"]["logistics_transport_category"][]
           return_date_time: string | null
+          sort_order: number
           source_logistics_event_id: string | null
+          source_logistics_updated_at: string | null
+          origin: string | null
+          destination: string | null
           transport_type: string
           updated_at: string | null
         }
@@ -4081,7 +4124,11 @@ export type Database = {
           license_plate?: string | null
           logistics_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
           return_date_time?: string | null
+          sort_order?: number
           source_logistics_event_id?: string | null
+          source_logistics_updated_at?: string | null
+          origin?: string | null
+          destination?: string | null
           transport_type: string
           updated_at?: string | null
         }
@@ -4098,7 +4145,11 @@ export type Database = {
           license_plate?: string | null
           logistics_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
           return_date_time?: string | null
+          sort_order?: number
           source_logistics_event_id?: string | null
+          source_logistics_updated_at?: string | null
+          origin?: string | null
+          destination?: string | null
           transport_type?: string
           updated_at?: string | null
         }
@@ -4184,6 +4235,7 @@ export type Database = {
           pickup_address: string | null
           pickup_time: string | null
           plate_number: string | null
+          sort_order: number
           transportation_type: string
           updated_at: string | null
         }
@@ -4200,6 +4252,7 @@ export type Database = {
           pickup_address?: string | null
           pickup_time?: string | null
           plate_number?: string | null
+          sort_order?: number
           transportation_type: string
           updated_at?: string | null
         }
@@ -4216,6 +4269,7 @@ export type Database = {
           pickup_address?: string | null
           pickup_time?: string | null
           plate_number?: string | null
+          sort_order?: number
           transportation_type?: string
           updated_at?: string | null
         }
@@ -4399,6 +4453,7 @@ export type Database = {
           file_path: string
           file_size: number | null
           file_type: string | null
+          document_kind: string | null
           has_preview: boolean
           id: string
           job_id: string
@@ -4416,6 +4471,7 @@ export type Database = {
           file_path: string
           file_size?: number | null
           file_type?: string | null
+          document_kind?: string | null
           has_preview?: boolean
           id?: string
           job_id: string
@@ -4433,6 +4489,7 @@ export type Database = {
           file_path?: string
           file_size?: number | null
           file_type?: string | null
+          document_kind?: string | null
           has_preview?: boolean
           id?: string
           job_id?: string
@@ -6373,6 +6430,7 @@ export type Database = {
           table_data: Json
           table_name: string
           total_watts: number
+          updated_at: string
         }
         Insert: {
           created_at?: string | null
@@ -6390,6 +6448,7 @@ export type Database = {
           table_data?: Json
           table_name: string
           total_watts: number
+          updated_at?: string
         }
         Update: {
           created_at?: string | null
@@ -6407,6 +6466,7 @@ export type Database = {
           table_data?: Json
           table_name?: string
           total_watts?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -12644,7 +12704,15 @@ export type Database = {
           status: string
         }[]
       }
+      can_manage_hoja: {
+        Args: { p_job_id?: string | null }
+        Returns: boolean
+      }
       get_current_user_role: { Args: never; Returns: string }
+      get_hoja_de_ruta: {
+        Args: { p_job_id: string }
+        Returns: Json
+      }
       get_driver_locations: { Args: never; Returns: Json }
       get_event_driver_assignment_ids: {
         Args: { p_event_id: string }
@@ -13177,6 +13245,30 @@ export type Database = {
       remove_transport_driver_assignment: {
         Args: { p_assignment_id: string }
         Returns: Json
+      }
+      save_hoja_de_ruta: {
+        Args: {
+          p_expected_version: number | null
+          p_job_id: string
+          p_payload: Json
+        }
+        Returns: {
+          document_version: number
+          id: string
+        }[]
+      }
+      publish_hoja_de_ruta_document: {
+        Args: { p_document_id: string; p_job_id: string }
+        Returns: string[]
+      }
+      set_hoja_de_ruta_status: {
+        Args: { p_job_id: string; p_status: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          document_version: number
+          status: string
+        }[]
       }
       replace_hoja_de_ruta_all: {
         Args: {
