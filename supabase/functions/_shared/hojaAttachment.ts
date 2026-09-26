@@ -3,264 +3,137 @@ import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
 type SupabaseAdminClient = SupabaseClient;
 
 type HojaDocumentRow = {
-  id?: string;
-  job_id?: string | null;
-  file_name?: string | null;
-  file_path?: string | null;
-  file_type?: string | null;
-  uploaded_at?: string | null;
-  document_kind?: string | null;
+  id: string;
+  job_id: string | null;
+  file_name: string | null;
+  file_path: string | null;
+  file_type: string | null;
+  document_kind: string | null;
+};
+
+type PublishedHojaRow = {
+  job_id: string | null;
+  published_document_id: string | null;
 };
 
 export type HojaAttachment = {
-  source: "job_documents" | "tour_documents";
-  bucket: "job-documents" | "job_documents" | "tour-documents";
+  source: "job_documents";
+  bucket: "job-documents" | "job_documents";
   path: string;
   filename: string;
 };
 
-const DEPT_PREFIXES = new Set(["sound", "lights", "video", "production", "logistics", "administrative"]);
+const DEPT_PREFIXES = new Set([
+  "sound",
+  "lights",
+  "video",
+  "production",
+  "logistics",
+  "administrative",
+]);
 
-const normalizeObjectPath = (value: string | null | undefined) => (value || "").replace(/^\/+/, "");
+const normalizeObjectPath = (value: string | null | undefined) =>
+  (value || "").replace(/^\/+/, "");
 
-const normalizeText = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-const hasHojaDeRutaText = (doc: HojaDocumentRow) => {
-  const text = normalizeText(`${doc.file_name || ""} ${doc.file_path || ""}`);
-  return text.includes("hoja") && (text.includes("ruta") || text.includes("route"));
-};
-
-const isPdfDocument = (doc: HojaDocumentRow) => {
+const isPdfDocument = (doc: HojaDocumentRow): boolean => {
   const mimeType = (doc.file_type || "").split(";")[0].trim().toLowerCase();
-  if (mimeType === "application/pdf") return true;
-
-  return [doc.file_name, doc.file_path].some((value) =>
-    /\.pdf$/i.test(normalizeObjectPath(value))
-  );
+  return mimeType === "application/pdf"
+    || /\.pdf$/i.test(normalizeObjectPath(doc.file_path));
 };
 
-const uploadedAtMs = (doc: HojaDocumentRow) => {
-  const value = doc.uploaded_at ? Date.parse(doc.uploaded_at) : NaN;
-  return Number.isFinite(value) ? value : 0;
-};
-
-const byNewestUpload = (a: HojaDocumentRow, b: HojaDocumentRow) =>
-  uploadedAtMs(b) - uploadedAtMs(a);
-
-function resolveJobDocumentBucket(filePath: string): "job-documents" | "job_documents" {
+function resolveJobDocumentBucket(
+  filePath: string,
+): "job-documents" | "job_documents" {
   const first = normalizeObjectPath(filePath).split("/")[0] || "";
   return DEPT_PREFIXES.has(first) ? "job_documents" : "job-documents";
 }
 
-function isJobHojaDeRutaDocument(doc: HojaDocumentRow, jobId: string): boolean {
-  const path = normalizeObjectPath(doc.file_path);
-  if (!path) return false;
-  if (!isPdfDocument(doc)) return false;
-  if (path.startsWith(`hojas-de-ruta/${jobId}/`)) return true;
-  if (path.startsWith("hojas-de-ruta/") && hasHojaDeRutaText(doc)) return true;
-  if (path.startsWith(`${jobId}/`) && hasHojaDeRutaText(doc)) return true;
-  return hasHojaDeRutaText(doc);
-}
+async function fetchPublishedDocument(
+  supabaseAdmin: SupabaseAdminClient,
+  hoja: PublishedHojaRow | null,
+): Promise<HojaAttachment | null> {
+  const documentId = hoja?.published_document_id;
+  const jobId = hoja?.job_id;
+  if (!documentId || !jobId) return null;
 
-function isTourHojaDeRutaDocument(doc: HojaDocumentRow): boolean {
-  const path = normalizeObjectPath(doc.file_path);
-  if (!path) return false;
-  if (!isPdfDocument(doc)) return false;
-  if (path.startsWith("hojas-de-ruta/")) return true;
-  return hasHojaDeRutaText(doc);
-}
+  const { data, error } = await supabaseAdmin
+    .from("job_documents")
+    .select("id, job_id, file_name, file_path, file_type, document_kind")
+    .eq("id", documentId)
+    .eq("job_id", jobId)
+    .eq("document_kind", "hoja_de_ruta")
+    .maybeSingle();
 
-function toHojaAttachment(
-  source: HojaAttachment["source"],
-  doc: HojaDocumentRow,
-  bucket: HojaAttachment["bucket"],
-): HojaAttachment | null {
-  const path = normalizeObjectPath(doc.file_path);
-  if (!path) return null;
+  if (error) throw error;
+  const doc = data as HojaDocumentRow | null;
+  if (!doc?.file_path || !isPdfDocument(doc)) return null;
+
   return {
-    source,
-    bucket,
-    path,
-    filename: (doc.file_name || "Hoja de Ruta.pdf").toString(),
+    source: "job_documents",
+    bucket: resolveJobDocumentBucket(doc.file_path),
+    path: normalizeObjectPath(doc.file_path),
+    filename: doc.file_name || "Hoja de Ruta.pdf",
   };
 }
 
-async function findLatestJobHojaAttachment(
+async function findDirectPublishedHoja(
   supabaseAdmin: SupabaseAdminClient,
   jobId: string,
 ): Promise<HojaAttachment | null> {
-  const { data: hoja, error: hojaError } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("hoja_de_ruta")
-    .select("published_document_id")
+    .select("job_id,published_document_id")
     .eq("job_id", jobId)
     .maybeSingle();
 
-  if (hojaError) throw hojaError;
-  const publishedId = (hoja as { published_document_id?: string | null } | null)?.published_document_id;
-
-  if (publishedId) {
-    const { data: published, error: publishedError } = await supabaseAdmin
-      .from("job_documents")
-      .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
-      .eq("id", publishedId)
-      .eq("job_id", jobId)
-      .maybeSingle();
-
-    if (publishedError) throw publishedError;
-    const publishedRow = published as HojaDocumentRow | null;
-    if (
-      publishedRow?.file_path
-      && publishedRow.document_kind === "hoja_de_ruta"
-      && isPdfDocument(publishedRow)
-    ) {
-      return toHojaAttachment(
-        "job_documents",
-        publishedRow,
-        resolveJobDocumentBucket(publishedRow.file_path),
-      );
-    }
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("job_documents")
-    .select("id, file_name, file_path, file_type, uploaded_at, document_kind")
-    .eq("job_id", jobId)
-    .order("uploaded_at", { ascending: false });
-
   if (error) throw error;
-
-  const rows = (data || []) as HojaDocumentRow[];
-  const typed = rows.find((row) => row.document_kind === "hoja_de_ruta" && isPdfDocument(row));
-  const doc = typed || rows
-    .filter((row) => isJobHojaDeRutaDocument(row, jobId))
-    .sort(byNewestUpload)[0];
-
-  if (!doc?.file_path) return null;
-  return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
+  return fetchPublishedDocument(supabaseAdmin, data as PublishedHojaRow | null);
 }
 
-async function findLatestLinkedJobHojaAttachment(
-  supabaseAdmin: SupabaseAdminClient,
-  linkedJobIds: string[],
-): Promise<HojaAttachment | null> {
-  if (linkedJobIds.length === 0) return null;
-
-  const { data, error } = await supabaseAdmin
-    .from("job_documents")
-    .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
-    .in("job_id", linkedJobIds)
-    .order("uploaded_at", { ascending: false });
-
-  if (error) throw error;
-
-  const linkedJobIdSet = new Set(linkedJobIds);
-  const doc = ((data || []) as HojaDocumentRow[])
-    .filter((row) => {
-      const rowJobId = row.job_id || null;
-      return Boolean(
-        rowJobId &&
-        linkedJobIdSet.has(rowJobId) &&
-        (row.document_kind === "hoja_de_ruta" || isJobHojaDeRutaDocument(row, rowJobId))
-      );
-    })
-    .sort(byNewestUpload)[0];
-
-  if (!doc?.file_path) return null;
-  return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
-}
-
-async function findLinkedHojaJobIdsForTourDate(
+async function findLinkedPublishedHoja(
   supabaseAdmin: SupabaseAdminClient,
   tourDateId: string,
   currentJobId: string,
-): Promise<string[]> {
-  const { data, error } = await supabaseAdmin
-    .from("hoja_de_ruta")
-    .select("job_id")
-    .eq("tour_date_id", tourDateId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-
-  return Array.from(new Set(
-    ((data || []) as Array<{ job_id?: string | null }>)
-      .map((row) => row.job_id)
-      .filter((id): id is string => Boolean(id && id !== currentJobId))
-  ));
-}
-
-async function resolveTourIdFromTourDate(
-  supabaseAdmin: SupabaseAdminClient,
-  tourDateId: string | null,
-): Promise<string | null> {
-  if (!tourDateId) return null;
-
-  const { data, error } = await supabaseAdmin
-    .from("tour_dates")
-    .select("tour_id")
-    .eq("id", tourDateId)
-    .maybeSingle();
-
-  if (error) throw error;
-  const tourId = (data as { tour_id?: string | null } | null)?.tour_id;
-  return typeof tourId === "string" && tourId ? tourId : null;
-}
-
-async function findLatestTourHojaAttachment(
-  supabaseAdmin: SupabaseAdminClient,
-  tourId: string,
 ): Promise<HojaAttachment | null> {
   const { data, error } = await supabaseAdmin
-    .from("tour_documents")
-    .select("id, file_name, file_path, file_type, uploaded_at")
-    .eq("tour_id", tourId)
-    .order("uploaded_at", { ascending: false });
+    .from("hoja_de_ruta")
+    .select("job_id,published_document_id,updated_at")
+    .eq("tour_date_id", tourDateId)
+    .neq("job_id", currentJobId)
+    .not("published_document_id", "is", null)
+    .order("updated_at", { ascending: false });
 
   if (error) throw error;
 
-  const doc = ((data || []) as HojaDocumentRow[])
-    .filter(isTourHojaDeRutaDocument)
-    .sort(byNewestUpload)[0];
-  return doc ? toHojaAttachment("tour_documents", doc, "tour-documents") : null;
+  for (const row of (data || []) as Array<PublishedHojaRow & { updated_at?: string | null }>) {
+    const attachment = await fetchPublishedDocument(supabaseAdmin, row);
+    if (attachment) return attachment;
+  }
+
+  return null;
 }
 
 /**
- * Resolve the latest Hoja de Ruta PDF visible from a job context.
- *
- * Lookup order intentionally mirrors the existing job-message behavior:
- * direct job document, linked job document for the same tour date, then tour document.
+ * Resolve the canonical published Hoja PDF for a job. A tour-date sibling is a
+ * deliberate fallback because several operational job records may represent
+ * the same tour stop. There are no filename/path heuristics.
  */
 export async function resolveHojaAttachment(
   supabaseAdmin: SupabaseAdminClient,
   jobId: string,
 ): Promise<HojaAttachment | null> {
-  const directJobDoc = await findLatestJobHojaAttachment(supabaseAdmin, jobId);
-  if (directJobDoc) return directJobDoc;
+  const direct = await findDirectPublishedHoja(supabaseAdmin, jobId);
+  if (direct) return direct;
 
-  const { data: jobRow, error: jobErr } = await supabaseAdmin
+  const { data: jobRow, error: jobError } = await supabaseAdmin
     .from("jobs")
-    .select("id, tour_id, tour_date_id")
+    .select("tour_date_id")
     .eq("id", jobId)
     .maybeSingle();
 
-  if (jobErr) throw jobErr;
-
-  const jobContext = (jobRow || {}) as { tour_id?: string | null; tour_date_id?: string | null };
-  const tourDateId = typeof jobContext.tour_date_id === "string" ? jobContext.tour_date_id : null;
-
-  if (tourDateId) {
-    const linkedJobIds = await findLinkedHojaJobIdsForTourDate(supabaseAdmin, tourDateId, jobId);
-    const linkedJobDoc = await findLatestLinkedJobHojaAttachment(supabaseAdmin, linkedJobIds);
-    if (linkedJobDoc) return linkedJobDoc;
-  }
-
-  const tourId = typeof jobContext.tour_id === "string" && jobContext.tour_id
-    ? jobContext.tour_id
-    : await resolveTourIdFromTourDate(supabaseAdmin, tourDateId);
-
-  return tourId ? findLatestTourHojaAttachment(supabaseAdmin, tourId) : null;
+  if (jobError) throw jobError;
+  const tourDateId = (jobRow as { tour_date_id?: string | null } | null)?.tour_date_id;
+  return tourDateId
+    ? findLinkedPublishedHoja(supabaseAdmin, tourDateId, jobId)
+    : null;
 }
