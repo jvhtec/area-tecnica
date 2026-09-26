@@ -4,6 +4,7 @@ import {
   buildRootPlan,
   childDepartmentsForTour,
   plannerOwnedTourSemanticKeys,
+  selectedDepartmentsForTour,
   type TourRecord,
 } from "./tourPlan.ts";
 
@@ -25,6 +26,31 @@ const tour = (overrides: Partial<TourRecord> = {}): TourRecord => ({
 });
 
 describe("tour root plan expansion", () => {
+  it("recovers departments from legacy Flex roots when a tour has no date jobs", () => {
+    const record = tour({
+      flex_sound_folder_id: "sound",
+      flex_lights_folder_id: null,
+      flex_video_folder_id: "video",
+    });
+
+    expect([...selectedDepartmentsForTour(record, new Set())]).toEqual(["sound", "video"]);
+  });
+
+  it("does not infer departments for a new tour without a Flex root", () => {
+    const record = tour({
+      flex_main_folder_id: null,
+      flex_sound_folder_id: "sound",
+    });
+
+    expect(selectedDepartmentsForTour(record, new Set())).toEqual(new Set());
+  });
+
+  it("prefers persisted job departments when they exist", () => {
+    const record = tour({ flex_video_folder_id: "video" });
+
+    expect(selectedDepartmentsForTour(record, new Set(["lights"]))).toEqual(new Set(["lights"]));
+  });
+
   it("plans canonical children for a department added to a durable tour", () => {
     const record = tour();
     const selected = new Set(["sound", "lights"]);
