@@ -291,6 +291,165 @@ $$;
 revoke all on function public.can_manage_hoja(uuid) from public, anon;
 grant execute on function public.can_manage_hoja(uuid) to authenticated, service_role;
 
+insert into public.activity_catalog (
+  code,
+  default_visibility,
+  label,
+  severity,
+  template,
+  toast_enabled
+)
+values
+  (
+    'hoja.status.review',
+    'actor_only'::public.activity_visibility,
+    'Hoja de Ruta enviada a revisión',
+    'info',
+    null,
+    false
+  ),
+  (
+    'hoja.status.approved',
+    'job_participants'::public.activity_visibility,
+    'Hoja de Ruta aprobada',
+    'info',
+    null,
+    true
+  ),
+  (
+    'hoja.status.final',
+    'job_participants'::public.activity_visibility,
+    'Hoja de Ruta finalizada',
+    'info',
+    null,
+    true
+  )
+on conflict (code) do update
+set
+  default_visibility = excluded.default_visibility,
+  label = excluded.label,
+  severity = excluded.severity,
+  template = excluded.template,
+  toast_enabled = excluded.toast_enabled;
+
+create or replace function public.set_hoja_de_ruta_status(
+  p_job_id uuid,
+  p_status text
+)
+returns table(status text, approved_by uuid, approved_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_current text;
+  v_target text := lower(btrim(coalesce(p_status, '')));
+  v_actor uuid := auth.uid();
+  v_hoja_id uuid;
+  v_actor_name text;
+  v_visibility public.activity_visibility;
+  v_code text;
+begin
+  if not public.can_manage_hoja(p_job_id) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+
+  if v_target not in ('draft', 'review', 'approved', 'final') then
+    raise exception 'Estado de Hoja de Ruta no válido' using errcode = '22023';
+  end if;
+
+  select h.id, coalesce(h.status, 'draft')
+    into v_hoja_id, v_current
+  from public.hoja_de_ruta h
+  where h.job_id = p_job_id
+  for update;
+
+  if not found then
+    raise exception 'No existe una Hoja de Ruta para este trabajo' using errcode = '22023';
+  end if;
+
+  if v_target <> v_current and not (
+    (v_current = 'draft' and v_target = 'review')
+    or (v_current = 'review' and v_target = 'approved')
+    or (v_current = 'approved' and v_target = 'final')
+  ) then
+    raise exception 'Transición de estado no permitida: % → %', v_current, v_target
+      using errcode = '22023';
+  end if;
+
+  if v_target = v_current then
+    return query
+    select h.status, h.approved_by, h.approved_at
+    from public.hoja_de_ruta h
+    where h.id = v_hoja_id;
+    return;
+  end if;
+
+  update public.hoja_de_ruta h
+  set
+    status = v_target,
+    approved_by = case
+      when v_target in ('approved', 'final') then coalesce(h.approved_by, v_actor)
+      else null
+    end,
+    approved_at = case
+      when v_target in ('approved', 'final') then coalesce(h.approved_at, now())
+      else null
+    end,
+    last_modified = now(),
+    last_modified_by = v_actor,
+    updated_at = now()
+  where h.id = v_hoja_id;
+
+  select nullif(btrim(concat_ws(' ', p.first_name, p.last_name)), '')
+    into v_actor_name
+  from public.profiles p
+  where p.id = v_actor;
+
+  v_code := case v_target
+    when 'review' then 'hoja.status.review'
+    when 'approved' then 'hoja.status.approved'
+    when 'final' then 'hoja.status.final'
+    else null
+  end;
+  v_visibility := case
+    when v_target in ('approved', 'final') then 'job_participants'::public.activity_visibility
+    else 'actor_only'::public.activity_visibility
+  end;
+
+  if v_code is not null then
+    insert into public.activity_log (
+      code,
+      job_id,
+      actor_id,
+      actor_name,
+      entity_type,
+      entity_id,
+      visibility,
+      payload
+    )
+    values (
+      v_code,
+      p_job_id,
+      v_actor,
+      v_actor_name,
+      'hoja_de_ruta',
+      v_hoja_id,
+      v_visibility,
+      jsonb_build_object('from', v_current, 'to', v_target)
+    );
+  end if;
+
+  return query
+  select h.status, h.approved_by, h.approved_at
+  from public.hoja_de_ruta h
+  where h.id = v_hoja_id;
+end;
+$;
+
+revoke all on function public.set_hoja_de_ruta_status(uuid, text) from public, anon;
+grant execute on function public.set_hoja_de_ruta_status(uuid, text) to authenticated, service_role;
+
 -- Clear legacy text room references when their matching staff row disappears.
 create or replace function public.clear_legacy_hoja_room_staff_references()
 returns trigger
@@ -1214,10 +1373,12 @@ begin
     into v_current_document_id
   from public.hoja_de_ruta h
   where h.job_id = p_job_id
+    and coalesce(h.status, 'draft') in ('approved', 'final')
   for update;
 
   if not found then
-    raise exception 'No existe una Hoja de Ruta para este trabajo' using errcode = '22023';
+    raise exception 'La Hoja de Ruta debe estar aprobada antes de publicarse'
+      using errcode = '22023';
   end if;
 
   if v_current_document_id is not null and v_current_document_id <> p_document_id then
