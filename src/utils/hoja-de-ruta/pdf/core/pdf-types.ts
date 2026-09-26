@@ -51,6 +51,8 @@ export interface PDFGenerationOptions {
   dedupeTransportAcrossSections?: boolean;
   sections?: HojaDeRutaPdfSectionId[];
   excludedSections?: HojaDeRutaPrintSectionId[];
+  /** Only the complete crew-facing document may set this to true. */
+  publish?: boolean;
 }
 
 export interface DriverCertificatePDFGenerationOptions {
