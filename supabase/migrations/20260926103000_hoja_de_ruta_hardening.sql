@@ -365,6 +365,11 @@ begin
   for update;
 
   if found then
+    if coalesce(v_existing.status, 'draft') = 'final' then
+      raise exception 'La Hoja de Ruta está finalizada y no admite edición'
+        using errcode = '22023';
+    end if;
+
     if coalesce(v_existing.document_version, 0) <> coalesce(p_expected_version, 0) then
       raise exception 'Otra persona ha guardado cambios en esta Hoja de Ruta'
         using errcode = '40001',
@@ -404,6 +409,7 @@ begin
     schedule,
     program_schedule_json,
     power_requirements,
+    power_requirements_source_updated_at,
     auxiliary_needs,
     aux_staff_setup_qty,
     aux_staff_dismantle_qty,
@@ -432,6 +438,7 @@ begin
     coalesce(v_event->>'schedule', ''),
     nullif(v_event->'programScheduleDays', 'null'::jsonb),
     coalesce(v_event->>'powerRequirements', ''),
+    nullif(v_event->>'powerRequirementsSourceUpdatedAt', '')::timestamptz,
     coalesce(v_event->>'auxiliaryNeeds', ''),
     greatest(coalesce((v_event->>'auxiliaryStaffSetupQty')::integer, 0), 0),
     greatest(coalesce((v_event->>'auxiliaryStaffDismantleQty')::integer, 0), 0),
@@ -463,6 +470,7 @@ begin
     schedule = excluded.schedule,
     program_schedule_json = excluded.program_schedule_json,
     power_requirements = excluded.power_requirements,
+    power_requirements_source_updated_at = excluded.power_requirements_source_updated_at,
     auxiliary_needs = excluded.auxiliary_needs,
     aux_staff_setup_qty = excluded.aux_staff_setup_qty,
     aux_staff_dismantle_qty = excluded.aux_staff_dismantle_qty,
