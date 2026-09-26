@@ -131,7 +131,7 @@ export const useProductionWhatsapp = ({
     queryFn: async (): Promise<WaProdHojaDeRutaDoc | null> => {
       const findJobHojaDocument = async (jobId: string): Promise<WaProdHojaDeRutaDoc | null> => {
         const { data, error } = await dataLayerClient.from("job_documents")
-          .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+          .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
           .eq("job_id", jobId)
           .order("uploaded_at", { ascending: false })
           .limit(25);
@@ -159,7 +159,7 @@ export const useProductionWhatsapp = ({
 
         if (linkedJobIds.length > 0) {
           const { data: linkedDocs, error: linkedDocsError } = await dataLayerClient.from("job_documents")
-            .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+            .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
             .in("job_id", linkedJobIds)
             .order("uploaded_at", { ascending: false });
 
