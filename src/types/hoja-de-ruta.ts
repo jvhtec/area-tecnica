@@ -171,6 +171,8 @@ export interface EventData {
   // Multi-day structured program
   programScheduleDays?: ProgramDay[];
   powerRequirements?: string;
+  /** Latest Consumos source revision represented by powerRequirements. */
+  powerRequirementsSourceUpdatedAt?: string;
   auxiliaryNeeds?: string;
   auxiliaryStaffSetupQty?: number;
   auxiliaryStaffDismantleQty?: number;
