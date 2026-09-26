@@ -1073,11 +1073,23 @@ begin
                   'id', r.id,
                   'room_type', r.room_type,
                   'room_number', r.room_number,
+                  'staff_member1_id', (
+                    select s1.technician_id
+                    from public.hoja_de_ruta_staff s1
+                    where s1.id = r.staff_member1_hoja_staff_id
+                      and s1.hoja_de_ruta_id = h.id
+                  ),
                   'staff_member1_name', (
                     select nullif(btrim(concat_ws(' ', s1.name, s1.surname1, s1.surname2)), '')
                     from public.hoja_de_ruta_staff s1
                     where s1.id = r.staff_member1_hoja_staff_id
                       and s1.hoja_de_ruta_id = h.id
+                  ),
+                  'staff_member2_id', (
+                    select s2.technician_id
+                    from public.hoja_de_ruta_staff s2
+                    where s2.id = r.staff_member2_hoja_staff_id
+                      and s2.hoja_de_ruta_id = h.id
                   ),
                   'staff_member2_name', (
                     select nullif(btrim(concat_ws(' ', s2.name, s2.surname1, s2.surname2)), '')
