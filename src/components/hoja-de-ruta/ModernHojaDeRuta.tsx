@@ -40,7 +40,7 @@ import {
   type HojaSectionRenderContext,
 } from "@/features/hoja-de-ruta/sections/sectionRegistry";
 import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
-import { useHojaDeRutaExports } from "@/components/hoja-de-ruta/useHojaDeRutaExports";
+import { useHojaDocumentExports } from "@/features/hoja-de-ruta/exports/useHojaDocumentExports";
 
 type ModernHojaDeRutaProps = {
   jobId?: string;
@@ -175,7 +175,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     setShowPrintDialog,
     showPdfPreviewDialog,
     showPrintDialog,
-  } = useHojaDeRutaExports({
+  } = useHojaDocumentExports({
     accommodations,
     eventData,
     handleSaveAll,
