@@ -34,11 +34,9 @@ import {
   type HojaDeRutaPrintSectionId,
   normalizeHojaDeRutaPrintSections,
 } from "@/utils/hoja-de-ruta/pdf";
-import {
-  HOJA_SECTION_REGISTRY,
-  type HojaSectionCompletionContext,
-  type HojaSectionRenderContext,
-} from "@/features/hoja-de-ruta/sections/sectionRegistry";
+import { HOJA_SECTION_REGISTRY } from "@/features/hoja-de-ruta/sections/sectionRegistry";
+import type { HojaSectionRuntime } from "@/features/hoja-de-ruta/sections/HojaSectionViews";
+import { HojaDocumentProvider } from "@/features/hoja-de-ruta/model/HojaDocumentContext";
 import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
 import { useHojaDocumentExports } from "@/features/hoja-de-ruta/exports/useHojaDocumentExports";
 
@@ -74,7 +72,11 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     isImageDirty,
   } = useHojaDeRutaImages();
 
-  // Use the working hooks - single call to avoid state conflicts
+  const document = useHojaDocument({
+    prepareImagesForSave,
+    commitImageSave,
+    isImageDirty,
+  });
   const {
     eventData,
     setEventData,
@@ -82,8 +84,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     setSelectedJobId,
     travelArrangements,
     accommodations,
-    setAccommodations,
-    isLoadingJobs,
     isLoadingHojaDeRuta,
     isSaving,
     isChangingStatus,
@@ -102,31 +102,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     applyStaffingChanges,
     hasPowerDrift,
     applyPowerRequirementsChanges,
-    autoPopulateFromJob,
-    // Form handlers
-    handleContactChange,
-    addContact,
-    removeContact,
-    handleStaffChange,
-    addStaffMember,
-    removeStaffMember,
-    updateTravelArrangement,
-    addTravelArrangement,
-    removeTravelArrangement,
-    addAccommodation,
-    removeAccommodation,
-    updateRoom,
-    addRoom,
-    removeRoom,
-    updateTransport,
-    addTransport,
-    removeTransport,
-    importTransports
-  } = useHojaDocument({
-    prepareImagesForSave,
-    commitImageSave,
-    isImageDirty,
-  });
+  } = document;
 
   // If a jobId is provided from parent or route query, lock selection to that job
   useEffect(() => {
@@ -135,11 +111,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     }
   }, [routedJobId, selectedJobId, setSelectedJobId]);
 
-  const sectionCompletionContext: HojaSectionCompletionContext = {
-    eventData,
-    travelArrangements,
-    accommodations,
-  };
   const completionProgress = useMemo(
     () => (
       HOJA_SECTION_REGISTRY.filter((section) =>
@@ -189,29 +160,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     travelArrangements,
     venueMapPreview,
   });
-
-  // Enhanced load job data function
-  const handleLoadJobData = async () => {
-    if (!selectedJobId) {
-      toast({
-        title: "Error",
-        description: "No hay trabajo seleccionado para cargar datos.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      await autoPopulateFromJob(selectedJobId);
-    } catch (error) {
-      console.error("Error loading job data:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los datos del trabajo.",
-        variant: "destructive",
-      });
-    }
-  };
 
   // Enhanced save function with better error handling
   const handleSave = async () => {
@@ -280,23 +228,11 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
   const isPrintSectionExcluded = (sectionId: HojaDeRutaPrintSectionId) =>
     excludedPrintSectionSet.has(sectionId);
 
-  const sectionRenderContext: HojaSectionRenderContext = {
-    event: {
-      eventData,
-      setEventData,
-      selectedJobId,
-      setSelectedJobId,
-      jobs,
-      isLoadingJobs,
-      jobDetails: null,
-      onAutoPopulate: handleLoadJobData,
-      hideJobSelection: Boolean(routedJobId),
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
+  const sectionRuntime: HojaSectionRuntime = {
+    hideJobSelection: Boolean(routedJobId),
+    isPrintSectionExcluded,
+    onPrintSectionExcludedChange: handlePrintExclusionChange,
     venue: {
-      eventData,
-      setEventData,
       images,
       imagePreviews,
       onImageUpload: handleImageUpload,
@@ -304,80 +240,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
       onVenueMapUpload: handleVenueMapUpload,
       handleVenueMapUrl,
       appendVenuePreviews,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    weather: {
-      eventData,
-      setEventData,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    contacts: {
-      eventData,
-      onContactChange: handleContactChange,
-      onAddContact: addContact,
-      onRemoveContact: removeContact,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    staff: {
-      eventData,
-      onStaffChange: handleStaffChange,
-      onAddStaff: addStaffMember,
-      onRemoveStaff: removeStaffMember,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    travel: {
-      travelArrangements,
-      onUpdate: updateTravelArrangement,
-      onAdd: addTravelArrangement,
-      onRemove: removeTravelArrangement,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    accommodation: {
-      accommodations,
-      eventData,
-      onUpdateAccommodation: (index, data) => {
-        setAccommodations((previous) =>
-          previous.map((accommodation, currentIndex) =>
-            currentIndex === index ? { ...accommodation, ...data } : accommodation
-          )
-        );
-      },
-      onUpdateRoom: updateRoom,
-      onAddAccommodation: addAccommodation,
-      onRemoveAccommodation: removeAccommodation,
-      onAddRoom: addRoom,
-      onRemoveRoom: removeRoom,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    logistics: {
-      eventData,
-      setEventData,
-      onUpdateTransport: updateTransport,
-      onAddTransport: addTransport,
-      onRemoveTransport: removeTransport,
-      onImportTransports: importTransports,
-      jobId: jobId || selectedJobId,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    schedule: {
-      eventData,
-      setEventData,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
-    },
-    restaurants: {
-      eventData,
-      onUpdateEventData: setEventData,
-      accommodations,
-      isPrintSectionExcluded,
-      onPrintSectionExcludedChange: handlePrintExclusionChange,
     },
   };
 
@@ -412,6 +274,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         : null;
 
   return (
+    <HojaDocumentProvider value={document}>
     <div
       className={cn(
         "bg-gradient-to-br from-background via-background to-muted/20",
@@ -600,7 +463,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                     transition={{ duration: 0.2 }}
                   >
                     {HOJA_SECTION_REGISTRY.map((section) =>
-                      section.render(sectionRenderContext)
+                      section.render(sectionRuntime)
                     )}
                   </motion.div>
                   </fieldset>
@@ -646,6 +509,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         onOpenInNewTab={handleOpenPdfPreviewInNewTab}
       />
     </div>
+    </HojaDocumentProvider>
   );
 };
 
