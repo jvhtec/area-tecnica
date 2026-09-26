@@ -3,6 +3,7 @@ import { EventData } from '../core/pdf-types';
 import { createWeatherTableIconHooks } from '@/utils/pdf/weatherPdfIcons';
 import { REPORT_INK } from '@/utils/pdf/report-system';
 import { hojaGeometry, hojaTable } from '../hoja-report-system';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export class WeatherSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -15,6 +16,19 @@ export class WeatherSection {
 
     if (!eventData.weather || eventData.weather.length === 0) {
       return yPosition;
+    }
+
+    if (eventData.weatherFetchedAt) {
+      const fetchedAt = new Date(eventData.weatherFetchedAt);
+      if (!Number.isNaN(fetchedAt.getTime())) {
+        this.pdfDoc.setText(8, REPORT_INK);
+        this.pdfDoc.addText(
+          `Previsión del ${formatInTimeZone(fetchedAt, 'Europe/Madrid', 'dd/MM HH:mm')}`,
+          20,
+          yPosition,
+        );
+        yPosition += 5;
+      }
     }
 
     // Prepare weather data for table
