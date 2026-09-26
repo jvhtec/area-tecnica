@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -112,6 +113,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     hasBasicJobData,
     isDirty,
     hasExternalConflict,
+    staffingDiff,
+    applyStaffingChanges,
     autoPopulateFromJob,
     // Form handlers
     handleContactChange,
@@ -411,8 +414,24 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
               </span>
             )}
             {selectedJobId && isInitialized && eventData.staff.some(s => s.name || s.position) && (
-              <span className="text-purple-600 font-medium">
+              <span className="font-medium">
                 Personal: {eventData.staff.filter(s => s.name || s.position).length} asignado(s)
+              </span>
+            )}
+            {(staffingDiff.added > 0 || staffingDiff.removed > 0) && (
+              <span className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-medium">
+                {staffingDiff.added > 0 && `${staffingDiff.added} técnico${staffingDiff.added === 1 ? "" : "s"} nuevo${staffingDiff.added === 1 ? "" : "s"}`}
+                {staffingDiff.added > 0 && staffingDiff.removed > 0 && " · "}
+                {staffingDiff.removed > 0 && `${staffingDiff.removed} baja${staffingDiff.removed === 1 ? "" : "s"}`}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => { void applyStaffingChanges(); }}
+                >
+                  Actualizar personal
+                </Button>
               </span>
             )}
           </div>
