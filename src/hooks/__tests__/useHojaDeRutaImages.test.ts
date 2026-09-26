@@ -1,18 +1,20 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
+
+const storageMocks = vi.hoisted(() => ({
+  createSignedUrl: vi.fn(),
+  remove: vi.fn(),
+  upload: vi.fn(),
+}));
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     storage: {
-      from: vi.fn(() => ({
-        createSignedUrl: vi.fn(),
-        remove: vi.fn(),
-        upload: vi.fn(),
-      })),
+      from: vi.fn(() => storageMocks),
     },
   },
 }));
@@ -20,6 +22,14 @@ vi.mock("@/lib/supabase", () => ({
 describe("useHojaDeRutaImages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storageMocks.remove.mockResolvedValue({ error: null });
+    storageMocks.upload.mockResolvedValue({ error: null });
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:local-preview");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("force-hydrates the same server rows and discards a local image removal", async () => {
@@ -49,5 +59,31 @@ describe("useHojaDeRutaImages", () => {
       expect(result.current.getRemovedImageIds()).toEqual([]);
       expect(result.current.isImageDirty).toBe(false);
     });
+  });
+
+  it("removes an uploaded object when conflict reload discards the unsaved image", async () => {
+    const { result } = renderHook(() => useHojaDeRutaImages());
+    const file = new File([new Uint8Array([1, 2, 3])], "venue.png", {
+      type: "image/png",
+    });
+    const files = {
+      0: file,
+      length: 1,
+      item: (index: number) => index === 0 ? file : null,
+    } as unknown as FileList;
+
+    act(() => result.current.handleImageUpload("venue", files));
+    let uploadedPath = "";
+    await act(async () => {
+      const savedRows = await result.current.prepareImagesForSave("job-1");
+      uploadedPath = savedRows[0].image_path;
+    });
+
+    await act(async () => {
+      await result.current.hydratePersistedImages("job-1", [], { force: true });
+    });
+
+    expect(storageMocks.remove).toHaveBeenCalledWith([uploadedPath]);
+    expect(result.current.imagePreviews.venue).toEqual([]);
   });
 });

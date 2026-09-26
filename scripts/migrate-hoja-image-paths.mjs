@@ -95,7 +95,6 @@ for (const row of rows || []) {
     }
     bytes = await readFile(join(blobDir, localFile.filename));
     mimeType = localFile.mimeType;
-    extension = supportedMimeTypes.get(mimeType);
     summary.reuploadReady += 1;
   } else {
     summary.data += 1;

@@ -26,7 +26,7 @@ type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type JobWithHojaRelations = JobRow & {
   location: Pick<LocationRow, 'name' | 'formatted_address' | 'latitude' | 'longitude'> | null;
   job_assignments: Array<JobAssignmentRow & {
-    profiles: Pick<ProfileRow, 'first_name' | 'last_name' | 'dni' | 'phone'> | null;
+    profiles: Pick<ProfileRow, 'first_name' | 'last_name' | 'dni' | 'phone' | 'department'> | null;
   }>;
 };
 
@@ -231,7 +231,7 @@ export const useHojaDocumentInitialization = (
           location:locations(name, formatted_address, latitude, longitude),
           job_assignments(
             *,
-            profiles:technician_id(first_name, last_name, dni, phone)
+            profiles:technician_id(first_name, last_name, dni, phone, department)
           )
         `)
         .eq('id', jobId)
@@ -262,7 +262,9 @@ export const useHojaDocumentInitialization = (
             position: roleEntries.length
               ? roleEntries.map(([department, code]) => `${department}: ${labelForCode(code)}`).join(" · ")
               : "Técnico",
-            department: roleEntries.map(([department]) => department).join(", "),
+            department: roleEntries.map(([department]) => department).join(", ")
+              || assignment.profiles?.department
+              || "",
             dni: assignment.profiles?.dni || "",
             phone: assignment.profiles?.phone || "",
           };

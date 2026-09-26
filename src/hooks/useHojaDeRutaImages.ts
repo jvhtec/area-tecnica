@@ -38,6 +38,7 @@ export const useHojaDeRutaImages = () => {
   const [savedFingerprint, setSavedFingerprint] = useState("[]");
   const hydratedKeyRef = useRef<string | null>(null);
   const preparedFingerprintRef = useRef<string | null>(null);
+  const pendingUploadPathsRef = useRef(new Set<string>());
   const hydrationRunRef = useRef(0);
 
   const fingerprintFor = useCallback((items: ManagedImage[]) => JSON.stringify(
@@ -174,6 +175,17 @@ export const useHojaDeRutaImages = () => {
     const signature = `${jobId}:${(rows || []).map((row) => `${row.id}:${row.image_path}`).join("|")}`;
     if (!options.force && hydratedKeyRef.current === signature) return;
     const runId = ++hydrationRunRef.current;
+    let failedPendingCleanup: string[] = [];
+
+    if (options.force && pendingUploadPathsRef.current.size > 0) {
+      const pendingPaths = Array.from(pendingUploadPathsRef.current);
+      const { error } = await supabase.storage.from(IMAGE_BUCKET).remove(pendingPaths);
+      if (error) {
+        failedPendingCleanup = pendingPaths;
+      } else {
+        pendingPaths.forEach((path) => pendingUploadPathsRef.current.delete(path));
+      }
+    }
 
     const hydrated = await Promise.all((rows || []).map(async (row): Promise<ManagedImage | null> => {
       if (!row.image_path || row.image_path.startsWith("blob:")) return null;
@@ -218,7 +230,7 @@ export const useHojaDeRutaImages = () => {
       });
       return hydrated.filter((item): item is ManagedImage => Boolean(item));
     });
-    setRemovedStoragePaths([]);
+    setRemovedStoragePaths(failedPendingCleanup);
     setRemovedImageIds([]);
     const clean = hydrated.filter((item): item is ManagedImage => Boolean(item));
     setSavedFingerprint(fingerprintFor(clean));
@@ -245,6 +257,7 @@ export const useHojaDeRutaImages = () => {
         });
 
       if (error) throw error;
+      pendingUploadPathsRef.current.add(storagePath);
       next[index] = { ...item, storagePath, cleanupStoragePath: storagePath };
     }
 
@@ -261,6 +274,7 @@ export const useHojaDeRutaImages = () => {
   }, [fingerprintFor, managedImages]);
 
   const commitImageSave = useCallback(async () => {
+    pendingUploadPathsRef.current.clear();
     if (preparedFingerprintRef.current) {
       setSavedFingerprint(preparedFingerprintRef.current);
       preparedFingerprintRef.current = null;
