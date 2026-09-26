@@ -26,6 +26,7 @@ type UseHojaDeRutaSaveOptions = {
   commitImageSave: () => Promise<void>;
   setLastSaveTime: React.Dispatch<React.SetStateAction<number>>;
   markSaved: () => void;
+  onSavedVersion: (version: number) => void;
 };
 
 const errorCode = (error: unknown): string | undefined => {
@@ -45,6 +46,7 @@ export const useHojaDeRutaSave = ({
   commitImageSave,
   setLastSaveTime,
   markSaved,
+  onSavedVersion,
 }: UseHojaDeRutaSaveOptions) => {
   const { toast } = useToast();
   const saveInProgressRef = useRef(false);
@@ -64,7 +66,7 @@ export const useHojaDeRutaSave = ({
     saveInProgressRef.current = true;
     try {
       const images = await prepareImagesForSave(selectedJobId);
-      await saveAll({
+      const saved = await saveAll({
         eventData,
         travelArrangements,
         accommodations,
@@ -72,6 +74,7 @@ export const useHojaDeRutaSave = ({
         expectedVersion,
       });
 
+      onSavedVersion(saved.document_version);
       await commitImageSave();
       setLastSaveTime(Date.now());
       markSaved();
@@ -101,6 +104,7 @@ export const useHojaDeRutaSave = ({
     eventData,
     expectedVersion,
     markSaved,
+    onSavedVersion,
     prepareImagesForSave,
     saveAll,
     selectedJobId,
