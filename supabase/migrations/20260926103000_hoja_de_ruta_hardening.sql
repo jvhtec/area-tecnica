@@ -1066,7 +1066,29 @@ begin
       select jsonb_agg(
         to_jsonb(a) || jsonb_build_object(
           'rooms', coalesce((
-            select jsonb_agg(to_jsonb(r) order by r.sort_order, r.id)
+            select jsonb_agg(
+              case
+                when v_full_access then to_jsonb(r)
+                else jsonb_build_object(
+                  'id', r.id,
+                  'room_type', r.room_type,
+                  'room_number', r.room_number,
+                  'staff_member1_name', (
+                    select nullif(btrim(concat_ws(' ', s1.name, s1.surname1, s1.surname2)), '')
+                    from public.hoja_de_ruta_staff s1
+                    where s1.id = r.staff_member1_hoja_staff_id
+                      and s1.hoja_de_ruta_id = h.id
+                  ),
+                  'staff_member2_name', (
+                    select nullif(btrim(concat_ws(' ', s2.name, s2.surname1, s2.surname2)), '')
+                    from public.hoja_de_ruta_staff s2
+                    where s2.id = r.staff_member2_hoja_staff_id
+                      and s2.hoja_de_ruta_id = h.id
+                  )
+                )
+              end
+              order by r.sort_order, r.id
+            )
             from public.hoja_de_ruta_room_assignments r
             where r.accommodation_id = a.id
           ), '[]'::jsonb)
