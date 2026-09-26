@@ -18,9 +18,9 @@ import {
   syncTransportsWithLogistics,
 } from "@/utils/hoja-de-ruta/staffSync";
 
-import { useHojaDeRutaInitialization } from "@/hooks/hoja-de-ruta/useHojaDeRutaInitialization";
-import { useHojaDeRutaSave } from "@/hooks/hoja-de-ruta/useHojaDeRutaSave";
-import { useHojaDeRutaPersistence } from "@/hooks/useHojaDeRutaPersistence";
+import { useHojaDocumentInitialization } from "@/features/hoja-de-ruta/model/useHojaDocumentInitialization";
+import { useHojaDocumentSave } from "@/features/hoja-de-ruta/model/useHojaDocumentSave";
+import { useHojaDocumentPersistence } from "@/features/hoja-de-ruta/api/useHojaDocumentPersistence";
 import { useHojaDocumentState } from "@/features/hoja-de-ruta/model/useHojaDocumentState";
 
 export type UseHojaDocumentOptions = {
@@ -69,13 +69,13 @@ export const useHojaDocument = ({
     setStatus,
     isChangingStatus,
     forceRefetch,
-  } = useHojaDeRutaPersistence(selectedJobId);
+  } = useHojaDocumentPersistence(selectedJobId);
 
   const {
     autoPopulateBasicJobData,
     loadCurrentJobAssignments,
     fetchPowerRequirements,
-  } = useHojaDeRutaInitialization(
+  } = useHojaDocumentInitialization(
     selectedJobId,
     hojaDeRuta,
     isLoadingHojaDeRuta || isFetchingHojaDeRuta,
@@ -135,7 +135,7 @@ export const useHojaDocument = ({
     && (savedSnapshotRef.current !== snapshot || isImageDirty),
   );
 
-  const { handleSaveAll } = useHojaDeRutaSave({
+  const { handleSaveAll } = useHojaDocumentSave({
     selectedJobId,
     eventData,
     travelArrangements,
