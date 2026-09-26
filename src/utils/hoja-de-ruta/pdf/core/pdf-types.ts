@@ -2,7 +2,6 @@
 import type {
   EventData,
   TravelArrangement,
-  RoomAssignment,
   Accommodation,
   WeatherData,
   ImagePreviews
@@ -13,7 +12,6 @@ import type { HojaDeRutaPrintSectionId } from '@/utils/hoja-de-ruta/pdf/section-
 export type {
   EventData,
   TravelArrangement,
-  RoomAssignment,
   Accommodation,
   WeatherData,
   ImagePreviews
@@ -35,7 +33,6 @@ export type HojaDeRutaPdfToast = (props: {
 export interface PDFGenerationOptions {
   eventData: EventData;
   travelArrangements: TravelArrangement[];
-  roomAssignments: RoomAssignment[];
   imagePreviews: ImagePreviews;
   venueMapPreview: string | null;
   selectedJobId: string;
