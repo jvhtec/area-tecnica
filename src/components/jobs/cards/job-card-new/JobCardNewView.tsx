@@ -5,8 +5,7 @@ import React, { useMemo } from "react";
 import { createPortal } from "react-dom";
 
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
-import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
-import { getHojaDeRutaDialogClassName } from "@/components/hoja-de-ruta/hojaDeRutaDialogClassName";
+import { HojaDeRutaDialog } from "@/components/hoja-de-ruta/HojaDeRutaDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
@@ -24,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Department } from "@/types/department";
@@ -290,7 +288,6 @@ export function JobCardNewView({
   handleFlexPickerConfirm,
 }: JobCardNewViewProps) {
   const reducedMotion = useReducedMotion();
-  const isMobile = useIsMobile();
   const canManageTransportRequests = userDepartment === "logistics" || isManagementRole(userRole);
   const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
@@ -610,11 +607,7 @@ export function JobCardNewView({
 
           {isProjectManagementPage && (
             <>
-              <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-                <DialogContent className={getHojaDeRutaDialogClassName(isMobile)}>
-                  <ModernHojaDeRuta jobId={job.id} embedded />
-                </DialogContent>
-              </Dialog>
+              <HojaDeRutaDialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen} jobId={job.id} />
               <ProjectNotesDialog
                 open={projectNotesOpen}
                 onOpenChange={setProjectNotesOpen}

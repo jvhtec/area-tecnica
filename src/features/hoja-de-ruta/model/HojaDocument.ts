@@ -33,6 +33,7 @@ export type HojaDocumentSaveInput = {
   travelArrangements: TravelArrangement[];
   accommodations: Accommodation[];
   images: HojaDeRutaImageRecord[];
+  removedImageIds?: string[];
   expectedVersion: number;
 };
 

@@ -79,7 +79,7 @@ export const HojaDeRutaHeaderActions = ({
         variant="outline"
         size="sm"
         aria-label="Guardar hoja de ruta"
-        className="h-11 min-w-[44px] border-2 border-green-500 text-green-600 hover:bg-green-50"
+        className="h-11 min-w-[44px] border-2 border-success text-success hover:bg-success/10"
       >
         {isSaving ? (
           <>
@@ -100,7 +100,7 @@ export const HojaDeRutaHeaderActions = ({
         variant="outline"
         size="sm"
         aria-label="Vista previa PDF"
-        className="h-11 min-w-[44px] border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+        className="h-11 min-w-[44px] border-2 border-info text-info hover:bg-info/10"
       >
         {isPreviewing && previewingTarget === "full" ? (
           <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />

@@ -126,17 +126,10 @@ export const useProductionWhatsapp = ({
       job.tour_date_id ?? null,
     ],
     queryFn: async (): Promise<WaProdHojaDeRutaDoc | null> => {
-      const findPublishedJobHoja = async (jobId: string): Promise<HojaDeRutaAttachmentDoc | null> => {
-        const { data: hoja, error: hojaError } = await dataLayerClient
-          .from("hoja_de_ruta")
-          .select("published_document_id")
-          .eq("job_id", jobId)
-          .maybeSingle();
-
-        if (hojaError) throw hojaError;
-        const documentId = hoja?.published_document_id;
-        if (!documentId) return null;
-
+      const findPublishedJobHoja = async (
+        jobId: string,
+        documentId: string,
+      ): Promise<HojaDeRutaAttachmentDoc | null> => {
         const { data: doc, error: docError } = await dataLayerClient
           .from("job_documents")
           .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
@@ -153,23 +146,20 @@ export const useProductionWhatsapp = ({
         };
       };
 
-      const direct = await findPublishedJobHoja(job.id);
-      if (direct) return direct;
+      const { data: publishedRows, error: publishedError } = await dataLayerClient.rpc(
+        "get_published_hoja_documents_for_production",
+        {
+          p_job_id: job.id,
+          p_tour_date_id: job.tour_date_id ?? null,
+        },
+      );
 
-      if (!job.tour_date_id) return null;
-
-      const { data: linkedRows, error: linkedError } = await dataLayerClient
-        .from("hoja_de_ruta")
-        .select("job_id,updated_at")
-        .eq("tour_date_id", job.tour_date_id)
-        .neq("job_id", job.id)
-        .not("published_document_id", "is", null)
-        .order("updated_at", { ascending: false });
-
-      if (linkedError) throw linkedError;
-      for (const linked of linkedRows || []) {
-        if (!linked.job_id) continue;
-        const doc = await findPublishedJobHoja(linked.job_id);
+      if (publishedError) throw publishedError;
+      for (const published of publishedRows || []) {
+        const doc = await findPublishedJobHoja(
+          published.job_id,
+          published.published_document_id,
+        );
         if (doc) return doc;
       }
       return null;

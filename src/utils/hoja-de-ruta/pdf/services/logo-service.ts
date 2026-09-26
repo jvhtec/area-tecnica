@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export class LogoService {
   static async loadJobLogo(jobId: string): Promise<string | null> {
@@ -22,7 +23,7 @@ export class LogoService {
             return await this.blobToDataURL(data);
           }
         } catch (error) {
-          console.warn('Festival logo download failed, falling back to signed URL:', error);
+          reportHojaError('pdf.logo.festival.download', error);
         }
 
         try {
@@ -37,7 +38,7 @@ export class LogoService {
             }
           }
         } catch (error) {
-          console.warn('Festival logo signed URL fetch failed:', error);
+          reportHojaError('pdf.logo.festival.signedUrl', error);
         }
       }
 
@@ -66,7 +67,7 @@ export class LogoService {
               return await this.blobToDataURL(data);
             }
           } catch (error) {
-            console.warn('Tour logo download failed, falling back to signed URL:', error);
+            reportHojaError('pdf.logo.tour.download', error);
           }
 
           try {
@@ -81,14 +82,14 @@ export class LogoService {
               }
             }
           } catch (error) {
-            console.error('Tour logo signed URL fetch failed:', error);
+            reportHojaError('pdf.logo.tour.signedUrl', error);
           }
         }
       }
 
       return null;
     } catch (error) {
-      console.error('Error in loadJobLogo:', error);
+      reportHojaError('pdf.logo.load', error);
       return null;
     }
   }

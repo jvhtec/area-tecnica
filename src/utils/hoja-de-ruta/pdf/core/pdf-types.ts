@@ -52,6 +52,8 @@ export interface PDFGenerationOptions {
   excludedSections?: HojaDeRutaPrintSectionId[];
   /** Only the complete crew-facing document may set this to true. */
   publish?: boolean;
+  /** Required by the canonical publication RPC for optimistic concurrency. */
+  expectedDocumentVersion?: number;
 }
 
 export interface DriverCertificatePDFGenerationOptions {

@@ -1,6 +1,7 @@
 import { formatInTimeZone } from 'date-fns-tz';
 
 import { supabase } from '@/integrations/supabase/client';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 import type { EventData, Transport } from '@/types/hoja-de-ruta';
 import {
   normalizeVenueCoordinates,
@@ -71,7 +72,7 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
   if (transportError) throw transportError;
   if (imagesError) throw imagesError;
   if (jobError) {
-    console.warn('Unable to load job location for Hoja de Transportes; using saved Hoja venue:', jobError);
+    reportHojaError('transportPdf.jobLocation.fetch', jobError);
   }
 
   let venueFromJob:
@@ -90,7 +91,7 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
       .maybeSingle();
 
     if (locationError) {
-      console.warn('Unable to load catalog location for Hoja de Transportes; using saved Hoja venue:', locationError);
+      reportHojaError('transportPdf.catalogLocation.fetch', locationError);
     }
 
     if (!locationError && locationData) {

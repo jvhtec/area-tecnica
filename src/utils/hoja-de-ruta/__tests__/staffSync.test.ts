@@ -60,6 +60,20 @@ describe("mergeStaffWithAssignments", () => {
     expect(staff[0].position).toBe("FoH");
     expect(staff[0].dni).toBe("111A");
   });
+
+  it("fills a missing saved department from the current assignment", () => {
+    const saved = [{
+      technician_id: "t1",
+      name: "Ana",
+      surname1: "Ana-S",
+      department: "",
+    }];
+    const current = { ...assigned("t1", "Ana"), department: "Sonido" };
+
+    const { staff } = mergeStaffWithAssignments(saved, [current]);
+
+    expect(staff[0].department).toBe("Sonido");
+  });
 });
 
 describe("remapAccommodationStaffReferences", () => {

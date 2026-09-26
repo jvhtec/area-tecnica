@@ -9,6 +9,7 @@ import type {
 } from "@/types/hoja-de-ruta";
 import { getErrorMessage } from "@/utils/errorMessage";
 import type { HojaDocumentSaveInput } from "@/features/hoja-de-ruta/model/HojaDocument";
+import { HojaDocumentValidationError } from "@/features/hoja-de-ruta/model/useHojaValidation";
 
 type AtomicSave = (payload: HojaDocumentSaveInput) => Promise<{
   id: string;
@@ -23,10 +24,13 @@ type UseHojaDeRutaSaveOptions = {
   expectedVersion: number;
   saveAll: AtomicSave;
   prepareImagesForSave: (jobId: string) => Promise<HojaDeRutaImageRecord[]>;
+  getRemovedImageIds: () => string[];
   commitImageSave: () => Promise<void>;
   setLastSaveTime: React.Dispatch<React.SetStateAction<number>>;
   markSaved: () => void;
   onSavedVersion: (version: number) => void;
+  onConflict: () => void;
+  validateBeforeSave: () => Promise<boolean>;
 };
 
 const errorCode = (error: unknown): string | undefined => {
@@ -43,15 +47,18 @@ export const useHojaDocumentSave = ({
   expectedVersion,
   saveAll,
   prepareImagesForSave,
+  getRemovedImageIds,
   commitImageSave,
   setLastSaveTime,
   markSaved,
   onSavedVersion,
+  onConflict,
+  validateBeforeSave,
 }: UseHojaDeRutaSaveOptions) => {
   const { toast } = useToast();
   const saveInProgressRef = useRef(false);
 
-  const handleSaveAll = useCallback(async () => {
+  const handleSaveAll = useCallback(async (options?: { expectedVersion?: number }) => {
     if (!selectedJobId) {
       toast({
         title: "Error",
@@ -65,13 +72,15 @@ export const useHojaDocumentSave = ({
 
     saveInProgressRef.current = true;
     try {
+      await validateBeforeSave();
       const images = await prepareImagesForSave(selectedJobId);
       const saved = await saveAll({
         eventData,
         travelArrangements,
         accommodations,
         images,
-        expectedVersion,
+        removedImageIds: getRemovedImageIds(),
+        expectedVersion: options?.expectedVersion ?? expectedVersion,
       });
 
       onSavedVersion(saved.document_version);
@@ -83,8 +92,18 @@ export const useHojaDocumentSave = ({
         title: "Guardado",
         description: "La Hoja de Ruta se ha guardado correctamente.",
       });
+      return saved;
     } catch (error: unknown) {
+      if (error instanceof HojaDocumentValidationError) {
+        toast({
+          title: "Revisa la Hoja de Ruta",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
       const isConflict = errorCode(error) === "40001";
+      if (isConflict) onConflict();
       const message = isConflict
         ? "Otra persona ha guardado cambios en esta Hoja de Ruta. Recarga los datos antes de sobrescribirlos."
         : getErrorMessage(error, "No se pudo guardar la Hoja de Ruta.");
@@ -103,14 +122,17 @@ export const useHojaDocumentSave = ({
     commitImageSave,
     eventData,
     expectedVersion,
+    getRemovedImageIds,
     markSaved,
     onSavedVersion,
+    onConflict,
     prepareImagesForSave,
     saveAll,
     selectedJobId,
     setLastSaveTime,
     toast,
     travelArrangements,
+    validateBeforeSave,
   ]);
 
   return {

@@ -27,6 +27,7 @@ interface ModernEventSectionProps {
   hideJobSelection?: boolean;
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
   onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
+  validationErrorFor?: (path: string) => string | undefined;
 }
 
 export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
@@ -41,6 +42,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   hideJobSelection = false,
   isPrintSectionExcluded,
   onPrintSectionExcludedChange,
+  validationErrorFor = () => undefined,
 }) => {
   const handleVenueSelect = (place: any) => {
     setEventData(prev => ({
@@ -120,6 +122,10 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
 
   const auxiliaryMachinery = eventData.auxiliaryMachinery || [];
   const selectedAuxMachineryTypes = new Set(auxiliaryMachinery.map((row) => row.machineType));
+  const eventNameError = validationErrorFor("eventData.eventName");
+  const eventDatesError = validationErrorFor("eventData.eventDates");
+  const venueNameError = validationErrorFor("eventData.venue.name");
+  const venueAddressError = validationErrorFor("eventData.venue.address");
 
   return (
     <div className="space-y-6">
@@ -156,7 +162,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   <Button
                     onClick={onAutoPopulate}
                     disabled={!selectedJobId || !jobDetails}
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                   >
                     <Zap className="w-4 h-4 mr-2" />
                     Auto-completar
@@ -168,19 +174,19 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
-                  className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200"
+                  className="mt-4 p-4 bg-info/10 rounded-lg border border-info/30"
                 >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="font-medium text-blue-700">Fechas:</span>
-                      <p className="text-blue-600">
+                      <span className="font-medium text-info">Fechas:</span>
+                      <p className="text-info">
                         {new Date(jobDetails.start_time).toLocaleDateString()} - 
                         {new Date(jobDetails.end_time).toLocaleDateString()}
                       </p>
                     </div>
                     <div>
-                      <span className="font-medium text-blue-700">Ubicación:</span>
-                      <p className="text-blue-600">{jobDetails.location || "No especificada"}</p>
+                      <span className="font-medium text-info">Ubicación:</span>
+                      <p className="text-info">{jobDetails.location || "No especificada"}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -222,7 +228,10 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   onChange={(e) => setEventData(prev => ({ ...prev, eventName: e.target.value }))}
                   placeholder="Ej. Festival de Música 2024"
                   className="border-2 focus:border-purple-300"
+                  aria-invalid={Boolean(eventNameError)}
+                  aria-describedby={eventNameError ? "event-name-error" : undefined}
                 />
+                {eventNameError && <p id="event-name-error" role="alert" className="text-sm text-destructive">{eventNameError}</p>}
               </div>
 
               <div className="space-y-2">
@@ -235,7 +244,10 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   onChange={(e) => setEventData(prev => ({ ...prev, eventDates: e.target.value }))}
                   placeholder="Ej. 15-17 Junio 2024"
                   className="border-2 focus:border-purple-300"
+                  aria-invalid={Boolean(eventDatesError)}
+                  aria-describedby={eventDatesError ? "event-dates-error" : undefined}
                 />
+                {eventDatesError && <p id="event-dates-error" role="alert" className="text-sm text-destructive">{eventDatesError}</p>}
               </div>
             </div>
 
@@ -248,8 +260,9 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   value={eventData.venue.name ?? ""}
                   onSelect={handleVenueSelect}
                   placeholder="Ej. Palacio de Congresos"
-                  className="border-2 focus:border-purple-300"
+                  className={venueNameError ? "border-2 border-destructive" : "border-2 focus:border-purple-300"}
                 />
+                {venueNameError && <p role="alert" className="text-sm text-destructive">{venueNameError}</p>}
               </div>
 
               <div className="space-y-2">
@@ -272,7 +285,10 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   }))}
                   placeholder="Ej. Calle Mayor 123, Madrid"
                   className="border-2 focus:border-purple-300"
+                  aria-invalid={Boolean(venueAddressError)}
+                  aria-describedby={venueAddressError ? "venue-address-error" : undefined}
                 />
+                {venueAddressError && <p id="venue-address-error" role="alert" className="text-sm text-destructive">{venueAddressError}</p>}
               </div>
             </div>
 
@@ -383,7 +399,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                             onClick={() => removeAuxMachineryRow(index)}
                             className="mb-0.5"
                           >
-                            <Trash2 className="w-4 h-4 text-red-500" />
+                            <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
                         </div>
                       );

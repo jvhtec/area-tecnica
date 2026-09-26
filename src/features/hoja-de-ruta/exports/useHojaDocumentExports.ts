@@ -14,6 +14,7 @@ import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { HojaDeRutaPrintPreviewTarget } from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
 import type { HojaDeRutaPdfPreview } from "@/components/hoja-de-ruta/HojaDeRutaPdfPreviewDialog";
 import { fetchJobProducerContacts, mergeProducerClaimsIntoContacts } from "@/features/jobs/producer-claims/producerClaims";
+import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
 
 /**
  * The subset of `hoja_de_ruta` metadata the export flow reads. Nullable because it comes
@@ -29,8 +30,10 @@ type HojaDeRutaExportMetadata = {
 
 type Options = {
   accommodations: any[];
+  documentVersion: number;
   eventData: EventData;
-  handleSaveAll: () => Promise<unknown>;
+  handleSaveAll: () => Promise<{ document_version: number } | undefined>;
+  hasExternalConflict: boolean;
   hasSavedData: boolean | string;
   hojaDeRuta: HojaDeRutaExportMetadata | null | undefined;
   imagePreviews: any;
@@ -39,13 +42,24 @@ type Options = {
   selectedJobId: string | undefined;
   setEventData: Dispatch<SetStateAction<EventData>>;
   travelArrangements: any[];
+  validateDocument: () => Promise<boolean>;
   venueMapPreview: string | null;
+};
+
+export const getHojaPublishBlockReason = (
+  hasExternalConflict: boolean,
+  status: HojaDeRutaMetadata["status"],
+): "conflict" | "status" | null => {
+  if (hasExternalConflict) return "conflict";
+  return status === "approved" || status === "final" ? null : "status";
 };
 
 export const useHojaDocumentExports = ({
   accommodations,
+  documentVersion,
   eventData,
   handleSaveAll,
+  hasExternalConflict,
   hasSavedData: _hasSavedData,
   hojaDeRuta,
   imagePreviews,
@@ -54,6 +68,7 @@ export const useHojaDocumentExports = ({
   selectedJobId,
   setEventData,
   travelArrangements,
+  validateDocument,
   venueMapPreview,
 }: Options) => {
   const { toast } = useToast();
@@ -90,7 +105,10 @@ export const useHojaDocumentExports = ({
     return "draft";
   };
 
-  const buildDocumentEventData = async (jobId: string): Promise<EventData> => {
+  const buildDocumentEventData = async (
+    jobId: string,
+    versionOverride?: number,
+  ): Promise<EventData> => {
     const claims = await fetchJobProducerContacts([jobId]);
 
     return {
@@ -99,7 +117,7 @@ export const useHojaDocumentExports = ({
       metadata: hojaDeRuta
         ? {
             id: hojaDeRuta.id ?? undefined,
-            document_version: hojaDeRuta.document_version || 1,
+            document_version: versionOverride ?? hojaDeRuta.document_version ?? 1,
             status: normalizeHojaStatus(hojaDeRuta.status),
             created_at: hojaDeRuta.created_at || new Date().toISOString(),
             updated_at: hojaDeRuta.updated_at || new Date().toISOString(),
@@ -137,10 +155,14 @@ export const useHojaDocumentExports = ({
     return data || undefined;
   };
 
-  const saveBeforePdfGeneration = async () => {
+  const saveBeforePdfGeneration = async (): Promise<number> => {
     if (isDirty) {
-      await handleSaveAll();
+      const saved = await handleSaveAll();
+      if (!saved) throw new Error("No se pudo confirmar la versión guardada");
+      return saved.document_version;
     }
+    await validateDocument();
+    return documentVersion;
   };
 
   const buildFullDocumentPdfOptions = () => {
@@ -204,7 +226,18 @@ export const useHojaDocumentExports = ({
     if (!currentJobId) return;
 
     const status = normalizeHojaStatus(hojaDeRuta?.status);
-    if (publish && status !== "approved" && status !== "final") {
+    const publishBlockReason = publish
+      ? getHojaPublishBlockReason(hasExternalConflict, status)
+      : null;
+    if (publishBlockReason === "conflict") {
+      toast({
+        title: "Conflicto de edición",
+        description: "Recarga la versión más reciente antes de publicar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (publishBlockReason === "status") {
       toast({
         title: "Aprobación necesaria",
         description: "Aprueba la Hoja de Ruta antes de publicarla para el equipo.",
@@ -216,13 +249,13 @@ export const useHojaDocumentExports = ({
     setGeneratingSectionId(null);
     setIsGenerating(true);
     try {
-      await saveBeforePdfGeneration();
+      const expectedDocumentVersion = await saveBeforePdfGeneration();
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
       const jobDetails = await getSelectedJobDetails(currentJobId);
 
       await generatePDF({
-        eventData: await buildDocumentEventData(currentJobId),
+        eventData: await buildDocumentEventData(currentJobId, expectedDocumentVersion),
         travelArrangements,
         imagePreviews,
         venueMapPreview,
@@ -233,6 +266,7 @@ export const useHojaDocumentExports = ({
         accommodations,
         ...buildFullDocumentPdfOptions(),
         publish,
+        expectedDocumentVersion,
       });
 
       toast({
@@ -242,7 +276,7 @@ export const useHojaDocumentExports = ({
           : "El PDF se ha descargado localmente sin modificar la versión publicada.",
       });
     } catch (error) {
-      console.error("Error generating PDF:", error);
+      reportHojaError("export.pdf.generate", error);
       toast({
         title: "Error",
         description: publish
@@ -296,7 +330,7 @@ export const useHojaDocumentExports = ({
         description: "La sección se ha descargado sin modificar la Hoja de Ruta publicada.",
       });
     } catch (error) {
-      console.error("Error generating section PDF:", error);
+      reportHojaError("export.sectionPdf.generate", error);
       toast({
         title: "Error",
         description: "Hubo un problema al generar la sección seleccionada.",
@@ -339,7 +373,7 @@ export const useHojaDocumentExports = ({
 
       openGeneratedPdfPreview(generatedPdf);
     } catch (error) {
-      console.error("Error previewing PDF:", error);
+      reportHojaError("export.pdf.preview", error);
       toast({
         title: "Error",
         description: "Hubo un problema al preparar la vista previa.",
@@ -376,7 +410,7 @@ export const useHojaDocumentExports = ({
         toast,
       });
     } catch (error) {
-      console.error("Error generating driver certificate PDF:", error);
+      reportHojaError("export.driverCertificate.generate", error);
       toast({
         title: "Error",
         description: "Hubo un problema al generar la hoja de transportes.",
@@ -413,7 +447,7 @@ export const useHojaDocumentExports = ({
 
       openGeneratedPdfPreview(generatedPdf);
     } catch (error) {
-      console.error("Error previewing driver certificate PDF:", error);
+      reportHojaError("export.driverCertificate.preview", error);
       toast({
         title: "Error",
         description:
@@ -439,6 +473,7 @@ export const useHojaDocumentExports = ({
 
     setGeneratingSectionId(null);
     try {
+      await saveBeforePdfGeneration();
       const jobDetails = await getSelectedJobDetails(selectedJobId);
 
       await generateHojaDeRutaXLS({
@@ -455,10 +490,45 @@ export const useHojaDocumentExports = ({
       });
       setShowPrintDialog(false);
     } catch (error) {
-      console.error("Error generating Excel:", error);
+      reportHojaError("export.excel.generate", error);
       toast({
         title: "Error",
         description: "Hubo un problema al exportar a Excel.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGenerateAccreditationXLS = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Selecciona un trabajo antes de exportar acreditaciones.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await saveBeforePdfGeneration();
+      const jobDetails = await getSelectedJobDetails(selectedJobId);
+      const { generateHojaAccreditationXLS } = await import(
+        "@/utils/hoja-de-ruta/accreditationExport"
+      );
+      await generateHojaAccreditationXLS({
+        staff: eventData.staff,
+        jobTitle: jobDetails?.title || "",
+      });
+      toast({
+        title: "Acreditaciones exportadas",
+        description: "El archivo con DNI se ha descargado para uso interno.",
+      });
+      setShowPrintDialog(false);
+    } catch (error) {
+      reportHojaError("export.accreditationExcel.generate", error);
+      toast({
+        title: "Error",
+        description: "No se pudo exportar el archivo de acreditaciones.",
         variant: "destructive",
       });
     }
@@ -472,6 +542,7 @@ export const useHojaDocumentExports = ({
     handlePublishPDF,
     handleGenerateSectionPDF,
     handleGenerateXLS,
+    handleGenerateAccreditationXLS,
     handleOpenPdfPreviewInNewTab,
     handlePdfPreviewOpenChange,
     handlePreviewDriverCertificatePDF,

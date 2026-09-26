@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Phone, Plus, Trash2, User, Briefcase } from "lucide-react";
+import { Briefcase, Mail, MessageCircle, Phone, Plus, Trash2, User } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
+import { buildTelHref, buildWhatsAppHref } from "@/utils/phoneLinks";
 
 interface ModernContactsSectionProps {
   eventData: EventData;
@@ -59,15 +60,19 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
         <CardContent>
           <div className="space-y-4">
             <AnimatePresence>
-              {eventData.contacts.map((contact, index) => (
+              {eventData.contacts.map((contact, index) => {
+                const phoneHref = buildTelHref(contact.phone);
+                const whatsappHref = buildWhatsAppHref(contact.phone);
+
+                return (
                 <motion.div
-                  key={index}
+                  key={contact.id || index}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="p-4 border-2 border-gray-200 rounded-lg bg-gradient-to-r from-purple-50 to-transparent"
+                  className="rounded-lg border-2 border-border bg-muted/30 p-4"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <User className="w-4 h-4" />
@@ -77,7 +82,7 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
                         value={contact.name}
                         onChange={(e) => onContactChange(index, 'name', e.target.value)}
                         placeholder="Nombre completo"
-                        className="border-2 focus:border-purple-300"
+                        className="border-2"
                       />
                     </div>
                     
@@ -90,7 +95,7 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
                         value={contact.role}
                         onChange={(e) => onContactChange(index, 'role', e.target.value)}
                         placeholder="Director, Técnico..."
-                        className="border-2 focus:border-purple-300"
+                        className="border-2"
                       />
                     </div>
                     
@@ -104,23 +109,57 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
                           value={contact.phone}
                           onChange={(e) => onContactChange(index, 'phone', e.target.value)}
                           placeholder="+34 xxx xxx xxx"
-                          className="border-2 focus:border-purple-300"
+                          className="min-w-0 border-2"
                         />
+                        {phoneHref && (
+                          <Button asChild size="icon" variant="outline" className="shrink-0" title="Llamar">
+                            <a href={phoneHref} aria-label={`Llamar a ${contact.name || "contacto"}`}>
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                        {whatsappHref && (
+                          <Button asChild size="icon" variant="outline" className="shrink-0" title="Abrir WhatsApp">
+                            <a
+                              href={whatsappHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Abrir WhatsApp de ${contact.name || "contacto"}`}
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
                         {eventData.contacts.length > 1 && (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => onRemoveContact(index)}
                             className="px-3"
+                            aria-label={`Eliminar contacto ${contact.name || index + 1}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2 text-sm font-medium">
+                        <Mail className="h-4 w-4" />
+                        Correo electrónico
+                      </Label>
+                      <Input
+                        type="email"
+                        value={contact.email || ""}
+                        onChange={(event) => onContactChange(index, "email", event.target.value)}
+                        placeholder="contacto@empresa.com"
+                        className="border-2"
+                      />
+                    </div>
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </AnimatePresence>
           </div>
         </CardContent>

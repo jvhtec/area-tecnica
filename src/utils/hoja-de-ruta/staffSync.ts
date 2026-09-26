@@ -19,6 +19,7 @@ const mergeTwo = (assigned: HojaStaffEntry, saved: HojaStaffEntry): HojaStaffEnt
   technician_id: saved.technician_id || assigned.technician_id,
   phone: saved.phone || assigned.phone || "",
   role: saved.role || assigned.role,
+  department: saved.department?.trim() || assigned.department?.trim() || "",
 });
 
 export type MergedStaffResult = {

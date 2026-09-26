@@ -300,6 +300,7 @@ export const secondaryAppRoutes: readonly AppRoute[] = [
     layout: "app",
     access: "management",
     subscriptions: "hojaDeRuta",
+    chrome: { mobileFullscreen: true },
     breadcrumb: { label: "Hoja de ruta" },
     nav: {
       id: "hoja-de-ruta",

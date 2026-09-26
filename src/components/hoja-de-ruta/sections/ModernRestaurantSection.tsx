@@ -21,6 +21,7 @@ import type { Restaurant, EventData, Accommodation } from '@/types/hoja-de-ruta'
 import { useToast } from '@/hooks/use-toast';
 import { PrintSectionExclusionToggle } from '../components/PrintSectionExclusionToggle';
 import type { HojaDeRutaPrintSectionId } from '@/utils/hoja-de-ruta/pdf';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 import {
   Select,
   SelectContent,
@@ -128,7 +129,7 @@ export function ModernRestaurantSection({
         });
       }
     } catch (error) {
-      console.error('Error searching restaurants:', error);
+      reportHojaError("restaurants.search", error);
       toast({
         title: 'Error',
         description: 'Error al buscar restaurantes. Inténtalo de nuevo.',

@@ -31,4 +31,4 @@ it("forwards baseline-write arguments to both independent checks", () => {
   expect(result.status).toBe(0);
   expect(JSON.parse(readFileSync(join(root, "scripts/governance/file-size-baseline.json"), "utf8")).files["src/new.ts"]).toBe(801);
   expect(JSON.parse(readFileSync(join(root, "scripts/governance/function-file-size-baseline.json"), "utf8")).files["supabase/functions/example/index.ts"]).toBe(801);
-});
+}, 15_000);

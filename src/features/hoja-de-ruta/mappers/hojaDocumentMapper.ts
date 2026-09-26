@@ -157,6 +157,7 @@ export function mapHojaAggregateToDocument(
       surname2: String(staff.surname2 || ""),
       position: String(staff.position || ""),
       dni: String(staff.dni || ""),
+      department: String(staff.department || ""),
       technician_id: typeof staff.technician_id === "string" ? staff.technician_id : undefined,
     })),
     schedule: String(main.schedule || ""),
@@ -306,5 +307,6 @@ export function buildHojaSavePayload(input: HojaDocumentSaveInput): Record<strin
       })),
     })),
     images: input.images,
+    removedImageIds: input.removedImageIds || [],
   };
 }

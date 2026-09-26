@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Restaurant } from '@/types/hoja-de-ruta';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 /**
  * Service for fetching restaurant data using Google Places API
@@ -17,17 +18,13 @@ export class PlacesRestaurantService {
     coordinates?: { lat: number; lng: number }
   ): Promise<Restaurant[]> {
     try {
-      console.log('SearchRestaurantsNearVenue called with:', { venueAddress, radius, maxResults });
-      
       if (!coordinates && !venueAddress?.trim()) {
-        console.warn('No venue coordinates or address provided');
         return [];
       }
 
       const cacheKey = `${coordinates ? `${coordinates.lat},${coordinates.lng}` : venueAddress.trim().toLowerCase()}::${radius}::${maxResults}`;
       const cached = this.restaurantCache.get(cacheKey);
       if (cached) {
-        console.log('Returning cached results for:', cacheKey);
         return cached;
       }
 
@@ -65,10 +62,10 @@ export class PlacesRestaurantService {
           this.restaurantCache.set(cacheKey, restaurants);
           return restaurants;
         } else if (error) {
-          console.warn('place-restaurants edge call failed:', error);
+          reportHojaError('restaurants.edge.search', error);
         }
       } catch (edgeErr) {
-        console.warn('place-restaurants edge call threw:', edgeErr);
+        reportHojaError('restaurants.edge.search', edgeErr);
       }
 
       // The edge function is the only path: it keeps the Google key server-side
@@ -76,7 +73,7 @@ export class PlacesRestaurantService {
       // calling Google directly from the browser.
       return [];
     } catch (e) {
-      console.error('searchRestaurantsNearVenue failed:', e);
+      reportHojaError('restaurants.nearVenue.search', e);
       return [];
     }
   }
@@ -93,11 +90,11 @@ export class PlacesRestaurantService {
         return this.formatRestaurantData(data.restaurant);
       }
       if (error) {
-        console.warn('place-restaurants details failed:', error);
+        reportHojaError('restaurants.details.fetch', error);
       }
       return null;
     } catch (e) {
-      console.warn('getRestaurantDetails failed:', e);
+      reportHojaError('restaurants.details.fetch', e);
       return null;
     }
   }

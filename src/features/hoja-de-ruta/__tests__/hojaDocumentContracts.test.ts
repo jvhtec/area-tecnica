@@ -66,6 +66,7 @@ const aggregateFixture: HojaAggregate = {
     surname1: "Tecnica",
     position: "SND-PA",
     dni: "12345678Z",
+    department: "sound",
   }],
   transport: [{
     id: TRANSPORT_ID,
@@ -110,6 +111,7 @@ describe("Hoja document contracts", () => {
     expect(document.document_version).toBe(4);
     expect(document.eventData.contacts[0]?.id).toBe(CONTACT_ID);
     expect(document.eventData.staff[0]?.id).toBe(STAFF_ID);
+    expect(document.eventData.staff[0]?.department).toBe("sound");
     expect(document.eventData.logistics.transport[0]?.date_time).toBe("2032-02-01T10:00");
     expect(document.travelArrangements[0]?.transportation_type).toBe("rv");
     expect(document.accommodations[0]?.rooms[0]?.staff_member1_id).toBe(STAFF_ID);
@@ -120,6 +122,7 @@ describe("Hoja document contracts", () => {
       travelArrangements: document.travelArrangements,
       accommodations: document.accommodations,
       images: document.images,
+      removedImageIds: [IMAGE_ID],
       expectedVersion: document.document_version || 0,
     });
     const eventData = payload.eventData as Record<string, unknown>;
@@ -154,6 +157,8 @@ describe("Hoja document contracts", () => {
       sort_order: 0,
     });
     expect(payload.images).toEqual(aggregateFixture.images);
+    expect(payload.removedImageIds).toEqual([IMAGE_ID]);
+    expect((eventData.staff as Array<Record<string, unknown>>)[0]?.department).toBe("sound");
   });
 
   it("normalizes quantities, machinery, and exclusions in the save payload", () => {

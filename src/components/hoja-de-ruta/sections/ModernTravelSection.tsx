@@ -130,7 +130,7 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
-                    className="p-4 border-2 border-gray-200 rounded-lg bg-gradient-to-r from-cyan-50 to-transparent"
+                    className="p-4 border-2 border-border rounded-lg bg-gradient-to-r from-info/10 to-transparent"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
@@ -141,7 +141,7 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                         size="sm"
                         variant="outline"
                         onClick={() => onRemove(index)}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-destructive hover:text-destructive/80"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -335,7 +335,7 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                         className="border-2 focus:border-cyan-300"
                       />
                       {arrangement.transportation_type === 'own_means' && (
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Con "Medios propios" no es necesario completar direcciones, horarios ni datos de conductor.
                         </p>
                       )}

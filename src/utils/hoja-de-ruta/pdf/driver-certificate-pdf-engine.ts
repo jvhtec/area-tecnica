@@ -20,6 +20,7 @@ import { StampImage, StampService } from './services/stamp-service';
 import { DeliveryCertificateSection } from './sections/delivery-certificate';
 import { Formatters } from './utils/formatters';
 import type { EventData, Transport } from '@/types/hoja-de-ruta';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 type LogisticsEventRow = {
   id: string;
@@ -78,7 +79,7 @@ export class DriverCertificatePDFEngine {
         description: 'La hoja de transportes ha sido generada y descargada correctamente.',
       });
     } catch (error) {
-      console.error('Error generating driver certificate PDF:', error);
+      reportHojaError('driverCertificate.generate', error);
       toast?.({
         title: '❌ Error',
         description: 'Hubo un problema al generar la hoja de transportes.',
@@ -378,7 +379,7 @@ export class DriverCertificatePDFEngine {
 
       return this.normalizeWarehouseLogisticsRows((relatedJobEvents || []) as LogisticsEventRow[]);
     } catch (error) {
-      console.warn('Unable to fetch warehouse logistics events for driver certificate:', error);
+      reportHojaError('driverCertificate.warehouseEvents.fetch', error);
       return [];
     }
   }
@@ -440,7 +441,7 @@ export class DriverCertificatePDFEngine {
 
       return Array.from(new Set(candidates));
     } catch (error) {
-      console.warn('Unable to find related jobs for warehouse fallback:', error);
+      reportHojaError('driverCertificate.relatedJobs.fetch', error);
       return [];
     }
   }
@@ -479,7 +480,7 @@ export class DriverCertificatePDFEngine {
         jobLocation,
       };
     } catch (error) {
-      console.warn('Unable to fetch driver certificate job context:', error);
+      reportHojaError('driverCertificate.jobContext.fetch', error);
       return {
         invoicingCompany: null,
         jobLocation: null,
@@ -507,9 +508,8 @@ export class DriverCertificatePDFEngine {
   private async uploadPDF(selectedJobId: string, pdfBlob: Blob, filename: string): Promise<void> {
     try {
       await uploadPdfToJob(selectedJobId, pdfBlob, filename, { kind: 'certificado_entrega' });
-      console.log('✅ Driver certificate PDF uploaded to job storage successfully');
     } catch (uploadError) {
-      console.error('❌ Error uploading driver certificate PDF to job storage:', uploadError);
+      reportHojaError('driverCertificate.upload', uploadError);
     }
   }
 
@@ -569,7 +569,7 @@ export class DriverCertificatePDFEngine {
         const mapDataUrl = await MapService.getMapImageForVenue(venue, mapWidth, mapHeight);
         if (mapDataUrl) return mapDataUrl;
       } catch (error) {
-        console.warn('Unable to fetch venue map for driver certificate:', error);
+        reportHojaError('driverCertificate.venueMap.fetch', error);
       }
     }
 

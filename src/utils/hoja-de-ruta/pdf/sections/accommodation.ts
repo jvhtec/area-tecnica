@@ -5,6 +5,7 @@ import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
 import { MapService } from '../services/map-service';
 import { QRService } from '../services/qr-service';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export class AccommodationSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -61,7 +62,7 @@ export class AccommodationSection {
           }
         }
       } catch (e) {
-        console.warn('Failed to fetch accommodation photo:', e);
+        reportHojaError('pdf.accommodation.photo.fetch', e);
       }
       if (DataValidators.hasData(accommodation.hotel_name)) {
         this.pdfDoc.setText(12, HOJA_HEADING);
@@ -131,7 +132,7 @@ export class AccommodationSection {
                 this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapW, mapHeight);
                 mapAdded = true;
               } catch (err) {
-                console.error('Error adding accommodation map:', err);
+                reportHojaError('pdf.accommodation.map.add', err);
               }
             }
             // Add a subtle border around the map
@@ -140,7 +141,7 @@ export class AccommodationSection {
             this.pdfDoc.document.rect(mapX, mapY, mapW, mapHeight);
           }
         } catch (error) {
-          console.error("Error adding hotel map:", error);
+          reportHojaError('pdf.accommodation.map.add', error);
         }
 
         if (!mapAdded) {
@@ -162,7 +163,7 @@ export class AccommodationSection {
           this.pdfDoc.setText(8, [80, 80, 80]);
           this.pdfDoc.addText("Escanea para direcciones", qrX, qrY + qrSize + 12);
         } catch (qrError) {
-          console.error("Error generating hotel QR:", qrError);
+          reportHojaError('pdf.accommodation.qr.generate', qrError);
         }
 
         // advance yPosition past the lower of map/QR blocks

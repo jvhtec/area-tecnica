@@ -95,7 +95,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
             {/* Unloading Details */}
             <div className="space-y-3">
               <Label className="text-sm font-medium flex items-center gap-2">
-                <ArrowDown className="w-4 h-4 text-red-600" />
+                <ArrowDown className="w-4 h-4 text-destructive" />
                 Detalles de Descarga
               </Label>
               <Textarea
@@ -116,7 +116,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
             {/* Loading Details */}
             <div className="space-y-3">
               <Label className="text-sm font-medium flex items-center gap-2">
-                <ArrowUp className="w-4 h-4 text-green-600" />
+                <ArrowUp className="w-4 h-4 text-success" />
                 Detalles de Carga
               </Label>
               <Textarea
