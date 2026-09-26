@@ -147,10 +147,7 @@ export const useHojaDeRutaExports = ({
     const excludedSections = normalizeHojaDeRutaPrintSections(
       eventData.printExcludedSections
     );
-    return {
-      ...(excludedSections.length > 0 ? { excludedSections } : {}),
-      publish: true,
-    };
+    return excludedSections.length > 0 ? { excludedSections } : {};
   };
 
   const handlePrintExclusionChange = (
@@ -223,24 +220,20 @@ export const useHojaDeRutaExports = ({
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
       const jobDetails = await getSelectedJobDetails(currentJobId);
-      const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
-      await generatePDF(
-        await buildDocumentEventData(currentJobId),
+      await generatePDF({
+        eventData: await buildDocumentEventData(currentJobId),
         travelArrangements,
-        legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
-        currentJobId,
-        jobDetails?.title || "",
-        jobDetails?.start_time || undefined,
+        selectedJobId: currentJobId,
+        jobTitle: jobDetails?.title || "",
+        jobDate: jobDetails?.start_time || undefined,
         toast,
         accommodations,
-        {
-          ...buildFullDocumentPdfOptions(),
-          publish,
-        },
-      );
+        ...buildFullDocumentPdfOptions(),
+        publish,
+      });
 
       toast({
         title: publish ? "Hoja de Ruta publicada" : "Hoja de Ruta descargada",
@@ -283,21 +276,20 @@ export const useHojaDeRutaExports = ({
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
       const jobDetails = await getSelectedJobDetails(currentJobId);
-      const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
-      await generatePDF(
-        await buildDocumentEventData(currentJobId),
+      await generatePDF({
+        eventData: await buildDocumentEventData(currentJobId),
         travelArrangements,
-        legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
-        currentJobId,
-        jobDetails?.title || "",
-        jobDetails?.start_time || undefined,
+        selectedJobId: currentJobId,
+        jobTitle: jobDetails?.title || "",
+        jobDate: jobDetails?.start_time || undefined,
         toast,
         accommodations,
-        { sections: [sectionId], publish: false }
-      );
+        sections: [sectionId],
+        publish: false,
+      });
 
       toast({
         title: "Sección descargada",
@@ -329,23 +321,21 @@ export const useHojaDeRutaExports = ({
 
       const { generatePDFPreview } = await import("@/utils/hoja-de-ruta/pdf");
       const jobDetails = await getSelectedJobDetails(currentJobId);
-      const legacyRoomAssignments = accommodations.flatMap((acc) => acc.rooms);
 
-      const generatedPdf = await generatePDFPreview(
-        await buildDocumentEventData(currentJobId),
+      const generatedPdf = await generatePDFPreview({
+        eventData: await buildDocumentEventData(currentJobId),
         travelArrangements,
-        legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
-        currentJobId,
-        jobDetails?.title || "",
-        jobDetails?.start_time || undefined,
-        undefined,
+        selectedJobId: currentJobId,
+        jobTitle: jobDetails?.title || "",
+        jobDate: jobDetails?.start_time || undefined,
         accommodations,
-        sectionId
-          ? { sections: [sectionId], publish: false }
-          : { ...buildFullDocumentPdfOptions(), publish: false }
-      );
+        ...(sectionId
+          ? { sections: [sectionId] }
+          : buildFullDocumentPdfOptions()),
+        publish: false,
+      });
 
       openGeneratedPdfPreview(generatedPdf);
     } catch (error) {
