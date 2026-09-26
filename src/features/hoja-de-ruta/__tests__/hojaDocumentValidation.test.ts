@@ -27,6 +27,22 @@ describe("Hoja document validation", () => {
     expect(hojaDocumentSchema.safeParse(validDocument).success).toBe(true);
   });
 
+  it("accepts normalized DNI, passport, and phone-extension formats", () => {
+    const result = hojaDocumentSchema.safeParse({
+      ...validDocument,
+      eventData: {
+        ...validDocument.eventData,
+        contacts: [{ phone: "+34 600 000 000 ext. 123", email: "prod@example.com" }],
+        staff: [
+          { dni: "12345678-Z", phone: "+34 611 111 111 x42" },
+          { dni: "PA-1234567", phone: "0034 622 222 222" },
+        ],
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("reports required, privacy-field, and chronology errors", () => {
     const result = hojaDocumentSchema.safeParse({
       ...validDocument,

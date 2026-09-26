@@ -83,7 +83,12 @@ set search_path = public, pg_temp
 as $$
 begin
   if (old.image_path like 'blob:%' or old.image_path like 'data:%')
-     and coalesce(current_setting('app.allow_legacy_hoja_image_delete', true), '') <> 'on' then
+     and coalesce(current_setting('app.allow_legacy_hoja_image_delete', true), '') <> 'on'
+     and exists (
+       select 1
+       from public.hoja_de_ruta hoja
+       where hoja.id = old.hoja_de_ruta_id
+     ) then
     return null;
   end if;
   return old;
@@ -311,6 +316,45 @@ revoke all on function public.migrate_hoja_legacy_image_path(uuid, text, text)
   from public, anon, authenticated;
 grant execute on function public.migrate_hoja_legacy_image_path(uuid, text, text)
   to service_role;
+
+-- Production crew can attach the canonical Hoja PDF without receiving direct
+-- access to the Hoja aggregate tables or their private child rows.
+create or replace function public.get_published_hoja_documents_for_production(
+  p_job_id uuid,
+  p_tour_date_id uuid default null
+)
+returns table(job_id uuid, published_document_id uuid)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.can_manage_hoja(p_job_id)
+     and lower(btrim(coalesce(public.current_user_department(), ''))) not in (
+       'production',
+       'produccion',
+       'producción'
+     ) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+
+  return query
+  select hoja.job_id, hoja.published_document_id
+  from public.hoja_de_ruta hoja
+  where hoja.published_document_id is not null
+    and (
+      hoja.job_id = p_job_id
+      or (p_tour_date_id is not null and hoja.tour_date_id = p_tour_date_id)
+    )
+  order by (hoja.job_id = p_job_id) desc, hoja.updated_at desc nulls last;
+end;
+$$;
+
+revoke all on function public.get_published_hoja_documents_for_production(uuid, uuid)
+  from public, anon;
+grant execute on function public.get_published_hoja_documents_for_production(uuid, uuid)
+  to authenticated, service_role;
 
 -- Remove every historical policy on Hoja aggregate tables before installing a
 -- single policy model. Technicians consume the restricted aggregate RPC; direct

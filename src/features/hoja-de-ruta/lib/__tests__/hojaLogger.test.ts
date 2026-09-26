@@ -44,4 +44,20 @@ describe("Hoja privacy logger", () => {
       { system: "documents", operation: "unknown" },
     );
   });
+
+  it("deduplicates only the same failure for a short window", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const { reportHojaError } = await import("@/features/hoja-de-ruta/lib/hojaLogger");
+
+    reportHojaError("document.save", { code: "40001" });
+    reportHojaError("document.save", { code: "40001" });
+    reportHojaError("document.save", { code: "42501" });
+
+    expect(trackError).toHaveBeenCalledTimes(2);
+
+    now.mockReturnValue(61_000);
+    reportHojaError("document.save", { code: "40001" });
+
+    expect(trackError).toHaveBeenCalledTimes(3);
+  });
 });

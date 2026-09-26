@@ -12716,6 +12716,13 @@ export type Database = {
         Args: { p_job_id: string }
         Returns: Json
       }
+      get_published_hoja_documents_for_production: {
+        Args: { p_job_id: string; p_tour_date_id?: string | null }
+        Returns: {
+          job_id: string
+          published_document_id: string
+        }[]
+      }
       get_driver_locations: { Args: never; Returns: Json }
       get_event_driver_assignment_ids: {
         Args: { p_event_id: string }

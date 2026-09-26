@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(42);
+SELECT plan(48);
 
 SELECT has_column(
   'public',
@@ -82,6 +82,15 @@ SELECT function_privs_are(
   'only the service migration path can replace legacy image paths'
 );
 
+SELECT function_privs_are(
+  'public',
+  'get_published_hoja_documents_for_production',
+  ARRAY['uuid', 'uuid'],
+  'authenticated',
+  ARRAY['EXECUTE'],
+  'production users can call the narrow canonical-document lookup RPC'
+);
+
 SELECT ok(
   NOT has_function_privilege(
     'authenticated',
@@ -118,13 +127,15 @@ DELETE FROM public.profiles
 WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
-  'db100000-0000-0000-0000-000000000003'::uuid
+  'db100000-0000-0000-0000-000000000003'::uuid,
+  'db100000-0000-0000-0000-000000000004'::uuid
 );
 DELETE FROM auth.users
 WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
-  'db100000-0000-0000-0000-000000000003'::uuid
+  'db100000-0000-0000-0000-000000000003'::uuid,
+  'db100000-0000-0000-0000-000000000004'::uuid
 );
 
 INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
@@ -159,7 +170,8 @@ SELECT
 FROM (VALUES
   ('db100000-0000-0000-0000-000000000001'::uuid, 'hoja-manager@test.local'),
   ('db100000-0000-0000-0000-000000000002'::uuid, 'hoja-tech@test.local'),
-  ('db100000-0000-0000-0000-000000000003'::uuid, 'hoja-outsider@test.local')
+  ('db100000-0000-0000-0000-000000000003'::uuid, 'hoja-outsider@test.local'),
+  ('db100000-0000-0000-0000-000000000004'::uuid, 'hoja-production@test.local')
 ) AS fixture(id, email)
 ON CONFLICT (id) DO NOTHING;
 
@@ -167,7 +179,8 @@ INSERT INTO public.profiles (id, email, first_name, last_name, role, department)
 VALUES
   ('db100000-0000-0000-0000-000000000001'::uuid, 'hoja-manager@test.local', 'Hoja', 'Manager', 'management', 'production'),
   ('db100000-0000-0000-0000-000000000002'::uuid, 'hoja-tech@test.local', 'Tech', 'Assigned', 'technician', 'sound'),
-  ('db100000-0000-0000-0000-000000000003'::uuid, 'hoja-outsider@test.local', 'Tech', 'Outside', 'technician', 'lights')
+  ('db100000-0000-0000-0000-000000000003'::uuid, 'hoja-outsider@test.local', 'Tech', 'Outside', 'technician', 'lights'),
+  ('db100000-0000-0000-0000-000000000004'::uuid, 'hoja-production@test.local', 'Prod', 'Crew', 'technician', 'produccion')
 ON CONFLICT (id) DO UPDATE
 SET role = excluded.role,
     department = excluded.department;
@@ -588,6 +601,16 @@ SELECT throws_ok(
   'an unassigned technician cannot read the Hoja aggregate'
 );
 
+SELECT throws_ok(
+  $$ SELECT * FROM public.get_published_hoja_documents_for_production(
+       'db200000-0000-0000-0000-000000000001'::uuid,
+       NULL
+     ) $$,
+  '42501',
+  'permission denied',
+  'an unrelated technician cannot resolve production Hoja documents'
+);
+
 RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
@@ -685,6 +708,48 @@ SELECT throws_ok(
 );
 
 SELECT lives_ok(
+  $$ SELECT public.publish_hoja_de_ruta_document(
+       'db200000-0000-0000-0000-000000000001'::uuid,
+       'db800000-0000-0000-0000-000000000001'::uuid,
+       5
+     ) $$,
+  'a current editor can publish the canonical PDF'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'db100000-0000-0000-0000-000000000004', false);
+SET ROLE authenticated;
+
+SELECT is(
+  (
+    SELECT published_document_id
+    FROM public.get_published_hoja_documents_for_production(
+      'db200000-0000-0000-0000-000000000001'::uuid,
+      NULL
+    )
+    LIMIT 1
+  ),
+  'db800000-0000-0000-0000-000000000001'::uuid,
+  'production crew can resolve the canonical published Hoja document'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM public.get_published_hoja_documents_for_production(
+      'db200000-0000-0000-0000-000000000002'::uuid,
+      NULL
+    )
+  ),
+  0,
+  'the production lookup omits unpublished Hoja rows'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'db100000-0000-0000-0000-000000000001', false);
+SET ROLE authenticated;
+
+SELECT lives_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'final',
@@ -720,6 +785,35 @@ RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
 
+INSERT INTO public.hoja_de_ruta_images (
+  id,
+  hoja_de_ruta_id,
+  image_path,
+  image_type,
+  sort_order
+)
+SELECT
+  'db700000-0000-0000-0000-000000000002'::uuid,
+  id,
+  'blob:cascade-cleanup',
+  'venue',
+  0
+FROM public.hoja_de_ruta
+WHERE job_id = 'db200000-0000-0000-0000-000000000002'::uuid;
+
+DELETE FROM public.hoja_de_ruta
+WHERE job_id = 'db200000-0000-0000-0000-000000000002'::uuid;
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM public.hoja_de_ruta_images
+    WHERE id = 'db700000-0000-0000-0000-000000000002'::uuid
+  ),
+  0,
+  'deleting a Hoja cascades through the legacy-image preservation trigger'
+);
+
 DELETE FROM public.hoja_de_ruta
 WHERE job_id IN (
   'db200000-0000-0000-0000-000000000001'::uuid,
@@ -739,13 +833,15 @@ DELETE FROM public.profiles
 WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
-  'db100000-0000-0000-0000-000000000003'::uuid
+  'db100000-0000-0000-0000-000000000003'::uuid,
+  'db100000-0000-0000-0000-000000000004'::uuid
 );
 DELETE FROM auth.users
 WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
-  'db100000-0000-0000-0000-000000000003'::uuid
+  'db100000-0000-0000-0000-000000000003'::uuid,
+  'db100000-0000-0000-0000-000000000004'::uuid
 );
 
 SELECT * FROM finish();

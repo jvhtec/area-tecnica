@@ -8,6 +8,7 @@ import { Briefcase, Mail, MessageCircle, Phone, Plus, Trash2, User } from "lucid
 import { EventData } from "@/types/hoja-de-ruta";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
+import { buildTelHref, buildWhatsAppHref } from "@/utils/phoneLinks";
 
 interface ModernContactsSectionProps {
   eventData: EventData;
@@ -60,12 +61,8 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
           <div className="space-y-4">
             <AnimatePresence>
               {eventData.contacts.map((contact, index) => {
-                const phoneHref = contact.phone?.trim()
-                  ? `tel:${contact.phone.replace(/[^+\d]/g, "")}`
-                  : null;
-                const whatsappHref = contact.phone?.trim()
-                  ? `https://wa.me/${contact.phone.replace(/\D/g, "")}`
-                  : null;
+                const phoneHref = buildTelHref(contact.phone);
+                const whatsappHref = buildWhatsAppHref(contact.phone);
 
                 return (
                 <motion.div

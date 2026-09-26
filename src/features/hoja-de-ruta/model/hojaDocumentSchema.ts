@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const optionalText = z.string().optional();
 const optionalPhone = optionalText.refine(
-  (value) => !value || /^[+0-9() .-]{7,25}$/.test(value),
+  (value) => !value || /^[+0-9() .\-/]{7,25}(?:\s*(?:ext\.?|x)\s*\d{1,8})?$/i.test(value.trim()),
   "Introduce un teléfono válido.",
 );
 const optionalEmail = optionalText.refine(
@@ -10,8 +10,13 @@ const optionalEmail = optionalText.refine(
   "Introduce un correo electrónico válido.",
 );
 const optionalDni = optionalText.refine(
-  (value) => !value || /^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Za-z]$/.test(value.trim()),
-  "Introduce un DNI o NIE válido.",
+  (value) => {
+    if (!value) return true;
+    const normalized = value.replace(/[\s-]/g, "");
+    return /^(?:[0-9]{8}|[XYZ][0-9]{7})[A-Za-z]$/i.test(normalized)
+      || /^(?=.*\d)[A-Za-z0-9]{5,20}$/.test(normalized);
+  },
+  "Introduce un documento de identidad válido.",
 );
 const optionalDateTime = optionalText;
 

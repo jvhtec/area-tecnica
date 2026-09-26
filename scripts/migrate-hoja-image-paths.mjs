@@ -71,7 +71,7 @@ if (blobDir) {
 
 const { data: rows, error } = await client
   .from("hoja_de_ruta_images")
-  .select("id,image_path,image_type,hoja_de_ruta!inner(job_id)")
+  .select("id,image_path,image_type,hoja_de_ruta!hoja_de_ruta_images_hoja_de_ruta_id_fkey!inner(job_id)")
   .or("image_path.like.blob:%,image_path.like.data:%")
   .order("id");
 

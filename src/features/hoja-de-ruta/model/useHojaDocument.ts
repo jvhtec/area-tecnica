@@ -720,8 +720,8 @@ export const useHojaDocument = (
   const overwriteWithLocalChanges = useCallback(async () => {
     const latest = await forceRefetch();
     const latestVersion = Number(latest.data?.document_version ?? documentVersionRef.current);
-    await handleSaveAll({ expectedVersion: latestVersion });
-    setHasExternalConflict(false);
+    const saved = await handleSaveAll({ expectedVersion: latestVersion });
+    if (saved) setHasExternalConflict(false);
   }, [forceRefetch, handleSaveAll]);
 
   return {
