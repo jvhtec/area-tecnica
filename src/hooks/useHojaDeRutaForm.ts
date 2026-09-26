@@ -1,23 +1,40 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { EventData, TravelArrangement, Accommodation, Transport } from "@/types/hoja-de-ruta";
-import { useJobSelection } from "@/hooks/useJobSelection";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { useToast } from "@/hooks/use-toast";
-import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";
-import { useHojaDeRutaState } from "./hoja-de-ruta/useHojaDeRutaState";
-import { useHojaDeRutaInitialization } from "./hoja-de-ruta/useHojaDeRutaInitialization";
-import { useHojaDeRutaSave } from "./hoja-de-ruta/useHojaDeRutaSave";
+import { useJobSelection } from "@/hooks/useJobSelection";
+import { supabase } from "@/lib/supabase";
+import type {
+  Accommodation,
+  EventData,
+  HojaDeRutaImageRecord,
+  Transport,
+  TravelArrangement,
+} from "@/types/hoja-de-ruta";
+import { createHojaDocumentSnapshot } from "@/utils/hoja-de-ruta/documentSnapshot";
 import {
   adjustAccommodationsForStaffRemoval,
   syncTransportsWithLogistics,
 } from "@/utils/hoja-de-ruta/staffSync";
 
-export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type: string }[] = []) => {
+import { useHojaDeRutaInitialization } from "./hoja-de-ruta/useHojaDeRutaInitialization";
+import { useHojaDeRutaSave } from "./hoja-de-ruta/useHojaDeRutaSave";
+import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";
+import { useHojaDeRutaState } from "./hoja-de-ruta/useHojaDeRutaState";
+
+type UseHojaDeRutaFormOptions = {
+  prepareImagesForSave: (jobId: string) => Promise<HojaDeRutaImageRecord[]>;
+  commitImageSave: () => Promise<void>;
+  isImageDirty: boolean;
+};
+
+export const useHojaDeRutaForm = ({
+  prepareImagesForSave,
+  commitImageSave,
+  isImageDirty,
+}: UseHojaDeRutaFormOptions) => {
   const { toast } = useToast();
   const { data: jobs, isLoading: isLoadingJobs } = useJobSelection();
-  const [showAlert, setShowAlert] = useState(false);
-  const [alertMessage, setAlertMessage] = useState("");
-  
-  // Use the state management sub-hook
+
   const {
     eventData,
     setEventData,
@@ -29,61 +46,28 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     setSelectedJobId,
     isInitialized,
     setIsInitialized,
-    isDirty,
-    setIsDirty
   } = useHojaDeRutaState();
 
-  const [hasSavedData, setHasSavedData] = useState<boolean>(false);
-  const [hasBasicJobData, setHasBasicJobData] = useState<boolean>(false);
-  const [dataSource, setDataSource] = useState<'none' | 'saved' | 'job' | 'mixed'>('none');
-  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+  const [hasSavedData, setHasSavedData] = useState(false);
+  const [hasBasicJobData, setHasBasicJobData] = useState(false);
+  const [dataSource, setDataSource] = useState<"none" | "saved" | "job" | "mixed">("none");
+  const [lastSaveTime, setLastSaveTime] = useState(0);
+  const [documentVersion, setDocumentVersion] = useState(0);
+  const [hasExternalConflict, setHasExternalConflict] = useState(false);
 
-  // Get persistence functions
   const {
     hojaDeRuta,
     isLoading: isLoadingHojaDeRuta,
     isFetching: isFetchingHojaDeRuta,
     fetchError,
-    saveHojaDeRuta,
+    saveAll,
     isSaving,
-    saveTravelArrangements,
-    isSavingTravel,
-    saveRoomAssignments,
-    isSavingRooms,
-    saveVenueImages,
-    isSavingImages,
-    refreshData,
-    resetSaveMutation,
-    resetTravelMutation,
-    resetRoomsMutation,
-    resetImagesMutation,
-    saveAccommodations,
+    forceRefetch,
   } = useHojaDeRutaPersistence(selectedJobId);
 
-  console.log("🚀 FORM HOOK: Current state:", {
-    selectedJobId,
-    hasHojaDeRuta: !!hojaDeRuta,
-    hasSavedData,
-    hasBasicJobData,
-    dataSource,
-    isLoadingHojaDeRuta,
-    eventDataEventName: eventData.eventName,
-    isInitialized,
-    staffCount: eventData.staff?.length || 0,
-    hasStaffData: eventData.staff?.some(s => s.name || s.position) || false,
-    isSaving,
-    lastSaveTime: new Date(lastSaveTime).toLocaleTimeString(),
-    travelCount: travelArrangements.length,
-    roomsCount: accommodations.reduce((total, acc) => total + acc.rooms.length, 0),
-    isDirty
-  });
-
-  // Use the initialization sub-hook
   const { autoPopulateBasicJobData } = useHojaDeRutaInitialization(
     selectedJobId,
     hojaDeRuta,
-    // Wait for in-flight refetches so initialization never runs on stale
-    // cached data (it only runs once per job selection).
     isLoadingHojaDeRuta || isFetchingHojaDeRuta,
     isInitialized,
     setEventData,
@@ -92,296 +76,358 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     setIsInitialized,
     setHasSavedData,
     setHasBasicJobData,
-    setDataSource
+    setDataSource,
   );
 
-  // Use the save sub-hook
-  const { handleSaveAll, autoPopulateFromJob } = useHojaDeRutaSave(
+  const snapshot = useMemo(
+    () => createHojaDocumentSnapshot(eventData, travelArrangements, accommodations),
+    [eventData, travelArrangements, accommodations],
+  );
+  const savedSnapshotRef = useRef<string | null>(null);
+  const baselineJobRef = useRef("");
+
+  useEffect(() => {
+    if (baselineJobRef.current === selectedJobId) return;
+    baselineJobRef.current = selectedJobId;
+    savedSnapshotRef.current = null;
+    setDocumentVersion(0);
+    setHasExternalConflict(false);
+    setHasSavedData(false);
+    setHasBasicJobData(false);
+    setDataSource("none");
+    setLastSaveTime(0);
+    if (selectedJobId) void forceRefetch();
+  }, [forceRefetch, selectedJobId]);
+
+  useEffect(() => {
+    if (!isInitialized || savedSnapshotRef.current !== null) return;
+    savedSnapshotRef.current = snapshot;
+    setDocumentVersion(Number(hojaDeRuta?.document_version || 0));
+  }, [hojaDeRuta?.document_version, isInitialized, snapshot]);
+
+  const markSaved = useCallback(() => {
+    savedSnapshotRef.current = snapshot;
+    setHasExternalConflict(false);
+    setHasSavedData(true);
+  }, [snapshot]);
+
+  const isDirty = Boolean(
+    isInitialized
+    && savedSnapshotRef.current !== null
+    && (savedSnapshotRef.current !== snapshot || isImageDirty),
+  );
+
+  const { handleSaveAll } = useHojaDeRutaSave({
     selectedJobId,
     eventData,
     travelArrangements,
     accommodations,
-    saveHojaDeRuta,
-    saveTravelArrangements,
-    saveAccommodations,
-    saveVenueImages,
-    venueImages, // Pass venue images for saving
-    isSaving,
-    isSavingTravel,
-    setLastSaveTime
-  );
+    expectedVersion: documentVersion,
+    saveAll,
+    prepareImagesForSave,
+    commitImageSave,
+    setLastSaveTime,
+    markSaved,
+    onSavedVersion: setDocumentVersion,
+  });
 
-  // Reset form when job selection changes
   useEffect(() => {
-    console.log("🔄 FORM: Job selection changed to:", selectedJobId);
-    if (selectedJobId) {
-      // Reset states when job changes
-      setIsInitialized(false);
-      setHasSavedData(false);
-      setHasBasicJobData(false);
-      setDataSource('none');
-      setLastSaveTime(0);
-      setIsDirty(false);
-
-      // Reset all mutation states
-      resetSaveMutation();
-      resetTravelMutation();
-      resetRoomsMutation();
-      resetImagesMutation();
-
-      // Data will be loaded by the initialization hook
-      refreshData();
-    } else {
-      // Clear all data when no job is selected - handled by state hook
-      setHasSavedData(false);
-      setHasBasicJobData(false);
-      setDataSource('none');
-      setLastSaveTime(0);
-      setIsInitialized(true);
-    }
-  }, [selectedJobId, refreshData, resetSaveMutation, resetTravelMutation, resetRoomsMutation, resetImagesMutation, setIsInitialized, setIsDirty]);
-
-  // Display error toast if there was a fetch error
-  useEffect(() => {
-    if (fetchError) {
-      console.error("❌ FORM: Error fetching saved data:", fetchError);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los datos guardados. Por favor, intente de nuevo.",
-        variant: "destructive",
-      });
-    }
+    if (!fetchError) return;
+    toast({
+      title: "Error",
+      description: "No se pudieron cargar los datos guardados. Inténtalo de nuevo.",
+      variant: "destructive",
+    });
   }, [fetchError, toast]);
 
-  // Check if form is dirty (has unsaved changes)
-  const isDirtyMemo = useMemo(() => {
-    if (!isInitialized) return false;
-    
-    const hasContent = eventData.eventName || 
-                     eventData.eventDates || 
-                     eventData.venue?.name ||
-                     eventData.venue?.address || 
-                     eventData.schedule || 
-                     eventData.powerRequirements ||
-                     eventData.auxiliaryNeeds ||
-                     (eventData.auxiliaryStaffSetupQty ?? 0) > 0 ||
-                     (eventData.auxiliaryStaffDismantleQty ?? 0) > 0 ||
-                     (eventData.auxiliaryMachinery?.some(item => (item.quantity ?? 0) > 0) ?? false) ||
-                     (eventData.printExcludedSections?.length ?? 0) > 0 ||
-                     eventData.contacts?.some(c => c.name) ||
-                     eventData.staff?.some(s => s.name) || 
-                     travelArrangements.length > 0 ||
-                     accommodations.length > 0;
-    
-    return hasContent;
-  }, [eventData, travelArrangements, accommodations, isInitialized]);
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
 
-  // Form handlers for backward compatibility
+  // Detect a newer document version saved by another editor. The RPC remains
+  // the final authority and rejects stale writes with SQLSTATE 40001.
+  useEffect(() => {
+    if (!selectedJobId || !isInitialized) return;
+
+    const channel = supabase
+      .channel(`hoja-editor:${selectedJobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "hoja_de_ruta",
+          filter: `job_id=eq.${selectedJobId}`,
+        },
+        (payload) => {
+          const nextVersion = Number((payload.new as { document_version?: unknown }).document_version || 0);
+          if (!isSaving && nextVersion > documentVersion) {
+            setHasExternalConflict(true);
+            toast({
+              title: "Cambios externos",
+              description: "Otra persona ha guardado una versión más reciente de esta Hoja de Ruta.",
+              variant: "destructive",
+            });
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [documentVersion, isInitialized, isSaving, selectedJobId, toast]);
+
   const handleContactChange = useCallback((index: number, field: string, value: string) => {
-    setEventData(prev => ({
+    setEventData((prev) => ({
       ...prev,
-      contacts: prev.contacts?.map((contact, i) => 
+      contacts: (prev.contacts || []).map((contact, i) =>
         i === index ? { ...contact, [field]: value } : contact
-      ) || []
+      ),
     }));
   }, [setEventData]);
 
   const addContact = useCallback(() => {
-    setEventData(prev => ({
+    setEventData((prev) => ({
       ...prev,
-      contacts: [...(prev.contacts || []), { name: '', role: '', phone: '' }]
+      contacts: [
+        ...(prev.contacts || []),
+        { id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" },
+      ],
     }));
   }, [setEventData]);
 
   const removeContact = useCallback((index: number) => {
-    setEventData(prev => {
+    setEventData((prev) => {
       const next = (prev.contacts || []).filter((_, i) => i !== index);
       return {
         ...prev,
-        contacts: next.length > 0 ? next : [{ name: '', role: '', phone: '' }],
+        contacts: next.length
+          ? next
+          : [{ id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" }],
       };
     });
   }, [setEventData]);
 
   const handleStaffChange = useCallback((index: number, field: string, value: string) => {
-    setEventData(prev => ({
+    setEventData((prev) => ({
       ...prev,
-      staff: prev.staff?.map((staff, i) => 
+      staff: (prev.staff || []).map((staff, i) =>
         i === index ? { ...staff, [field]: value } : staff
-      ) || []
+      ),
     }));
   }, [setEventData]);
 
   const addStaffMember = useCallback(() => {
-    setEventData(prev => ({
+    setEventData((prev) => ({
       ...prev,
-      staff: [...(prev.staff || []), { name: '', surname1: '', surname2: '', position: '', dni: '' }]
+      staff: [
+        ...(prev.staff || []),
+        {
+          id: crypto.randomUUID(),
+          name: "",
+          surname1: "",
+          surname2: "",
+          position: "",
+          dni: "",
+        },
+      ],
     }));
   }, [setEventData]);
 
   const removeStaffMember = useCallback((index: number) => {
     const removedEntry = eventData.staff?.[index];
-    setEventData(prev => {
+    setEventData((prev) => {
       const next = (prev.staff || []).filter((_, i) => i !== index);
       return {
         ...prev,
-        staff: next.length > 0 ? next : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
+        staff: next.length
+          ? next
+          : [{
+              id: crypto.randomUUID(),
+              name: "",
+              surname1: "",
+              surname2: "",
+              position: "",
+              dni: "",
+            }],
       };
     });
-    // Keep room assignments consistent: clear references to the removed
-    // person and shift index-based references down.
-    setAccommodations(prev => adjustAccommodationsForStaffRemoval(prev, index, removedEntry));
-  }, [setEventData, setAccommodations, eventData.staff]);
+    setAccommodations((prev) => adjustAccommodationsForStaffRemoval(prev, index, removedEntry));
+  }, [eventData.staff, setAccommodations, setEventData]);
 
-  const updateTravelArrangement = useCallback((index: number, field: string, value: string | undefined) => {
-    setTravelArrangements(prev => 
-      prev.map((arrangement, i) => 
+  const updateTravelArrangement = useCallback((
+    index: number,
+    field: string,
+    value: string | undefined,
+  ) => {
+    setTravelArrangements((prev) =>
+      prev.map((arrangement, i) =>
         i === index ? { ...arrangement, [field]: value } : arrangement
       )
     );
   }, [setTravelArrangements]);
 
   const addTravelArrangement = useCallback(() => {
-    setTravelArrangements(prev => [...prev, {
-      transportation_type: 'van' as const,
-      pickup_address: '',
-      pickup_time: '',
-      departure_time: '',
-      arrival_time: '',
-      flight_train_number: '',
-      driver_name: '',
-      driver_phone: '',
-      plate_number: '',
-      notes: ''
+    setTravelArrangements((prev) => [...prev, {
+      id: crypto.randomUUID(),
+      transportation_type: "van",
+      pickup_address: "",
+      pickup_time: "",
+      departure_time: "",
+      arrival_time: "",
+      flight_train_number: "",
+      driver_name: "",
+      driver_phone: "",
+      plate_number: "",
+      notes: "",
     }]);
   }, [setTravelArrangements]);
 
   const removeTravelArrangement = useCallback((index: number) => {
-    setTravelArrangements(prev => prev.filter((_, i) => i !== index));
+    setTravelArrangements((prev) => prev.filter((_, i) => i !== index));
   }, [setTravelArrangements]);
 
-  const updateAccommodation = useCallback((index: number, field: string, value: any) => {
-    setAccommodations(prev => 
-      prev.map((accommodation, i) => 
+  const updateAccommodation = useCallback((index: number, field: string, value: unknown) => {
+    setAccommodations((prev) =>
+      prev.map((accommodation, i) =>
         i === index ? { ...accommodation, [field]: value } : accommodation
       )
     );
   }, [setAccommodations]);
 
   const addAccommodation = useCallback(() => {
-    setAccommodations(prev => [...prev, {
+    setAccommodations((prev) => [...prev, {
       id: crypto.randomUUID(),
-      hotel_name: '',
-      address: '',
-      check_in: '',
-      check_out: '',
-      rooms: []
+      hotel_name: "",
+      address: "",
+      check_in: "",
+      check_out: "",
+      rooms: [],
     }]);
   }, [setAccommodations]);
 
   const removeAccommodation = useCallback((index: number) => {
-    setAccommodations(prev => prev.filter((_, i) => i !== index));
+    setAccommodations((prev) => prev.filter((_, i) => i !== index));
   }, [setAccommodations]);
 
-  const updateRoom = useCallback((accommodationIndex: number, roomIndex: number, field: string, value: string) => {
-    setAccommodations(prev => 
-      prev.map((accommodation, i) => 
-        i === accommodationIndex ? {
-          ...accommodation,
-          rooms: accommodation.rooms.map((room, j) => 
-            j === roomIndex ? { ...room, [field]: value } : room
-          )
-        } : accommodation
+  const updateRoom = useCallback((
+    accommodationIndex: number,
+    roomIndex: number,
+    field: string,
+    value: string,
+  ) => {
+    setAccommodations((prev) =>
+      prev.map((accommodation, i) =>
+        i === accommodationIndex
+          ? {
+              ...accommodation,
+              rooms: accommodation.rooms.map((room, j) =>
+                j === roomIndex ? { ...room, [field]: value } : room
+              ),
+            }
+          : accommodation
       )
     );
   }, [setAccommodations]);
 
   const addRoom = useCallback((accommodationIndex: number) => {
-    setAccommodations(prev => 
-      prev.map((accommodation, i) => 
-        i === accommodationIndex ? {
-          ...accommodation,
-          rooms: [...accommodation.rooms, {
-            room_type: 'single' as const,
-            room_number: '',
-            staff_member1_id: '',
-            staff_member2_id: ''
-          }]
-        } : accommodation
+    setAccommodations((prev) =>
+      prev.map((accommodation, i) =>
+        i === accommodationIndex
+          ? {
+              ...accommodation,
+              rooms: [...accommodation.rooms, {
+                id: crypto.randomUUID(),
+                room_type: "single",
+                room_number: "",
+                staff_member1_id: "",
+                staff_member2_id: "",
+              }],
+            }
+          : accommodation
       )
     );
   }, [setAccommodations]);
 
   const removeRoom = useCallback((accommodationIndex: number, roomIndex: number) => {
-    setAccommodations(prev => 
-      prev.map((accommodation, i) => 
-        i === accommodationIndex ? {
-          ...accommodation,
-          rooms: accommodation.rooms.filter((_, j) => j !== roomIndex)
-        } : accommodation
+    setAccommodations((prev) =>
+      prev.map((accommodation, i) =>
+        i === accommodationIndex
+          ? { ...accommodation, rooms: accommodation.rooms.filter((_, j) => j !== roomIndex) }
+          : accommodation
       )
     );
   }, [setAccommodations]);
 
-  // Transport handlers
-  const updateTransport = useCallback((index: number, field: string, value: any) => {
-    setEventData(prev => ({
+  const updateTransport = useCallback((index: number, field: string, value: unknown) => {
+    setEventData((prev) => ({
       ...prev,
       logistics: {
         ...prev.logistics,
-        transport: prev.logistics.transport.map((transport, i) => 
+        transport: prev.logistics.transport.map((transport, i) =>
           i === index ? { ...transport, [field]: value } : transport
-        )
-      }
+        ),
+      },
     }));
   }, [setEventData]);
 
   const addTransport = useCallback(() => {
-    setEventData(prev => ({
+    setEventData((prev) => ({
       ...prev,
       logistics: {
         ...prev.logistics,
         transport: [...prev.logistics.transport, {
           id: crypto.randomUUID(),
-          transport_type: 'trailer',
-          driver_name: '',
-          driver_phone: '',
-          license_plate: '',
+          transport_type: "trailer",
+          driver_name: "",
+          driver_phone: "",
+          license_plate: "",
           has_return: false,
           is_hoja_relevant: true,
           logistics_categories: [],
-        }]
-      }
+        }],
+      },
     }));
   }, [setEventData]);
 
   const removeTransport = useCallback((index: number) => {
-    setEventData(prev => ({
+    setEventData((prev) => ({
       ...prev,
       logistics: {
         ...prev.logistics,
-        transport: prev.logistics.transport.filter((_, i) => i !== index)
-      }
+        transport: prev.logistics.transport.filter((_, i) => i !== index),
+      },
     }));
   }, [setEventData]);
 
   const importTransports = useCallback((transports: Transport[]) => {
-    setEventData(prev => ({
+    setEventData((prev) => ({
       ...prev,
       logistics: {
         ...prev.logistics,
-        // Full sync against the logistics snapshot: prunes transports whose
-        // logistics event was deleted, keeps manual edits and manual rows.
         transport: syncTransportsWithLogistics(
           Array.isArray(prev.logistics.transport) ? prev.logistics.transport : [],
-          transports
-        )
-      }
+          transports,
+        ),
+      },
     }));
   }, [setEventData]);
 
+  const reloadLatest = useCallback(async () => {
+    savedSnapshotRef.current = null;
+    setHasExternalConflict(false);
+    setIsInitialized(false);
+    await forceRefetch();
+  }, [forceRefetch, setIsInitialized]);
+
   return {
-    // State
     eventData,
     setEventData,
     selectedJobId,
@@ -390,33 +436,23 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     setTravelArrangements,
     accommodations,
     setAccommodations,
-    
-    // Loading states
     isLoadingJobs,
     isLoadingHojaDeRuta,
     isSaving,
-    isSavingTravel,
-    isSavingRooms,
-    isSavingImages,
-    
-    // Data
     jobs,
     hojaDeRuta,
-    
-    // Functions
     handleSaveAll,
-    autoPopulateFromJob,
+    autoPopulateFromJob: autoPopulateBasicJobData,
     autoPopulateBasicJobData,
-    refreshData,
-    
-    // Status flags
+    refreshData: forceRefetch,
+    reloadLatest,
     isInitialized,
     hasSavedData,
     hasBasicJobData,
     dataSource,
-    isDirty: isDirtyMemo,
-    
-    // Form handlers (for backward compatibility)
+    isDirty,
+    hasExternalConflict,
+    documentVersion,
     handleContactChange,
     addContact,
     removeContact,
@@ -436,15 +472,7 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     addTransport,
     removeTransport,
     importTransports,
-
-    // Alert system
-    showAlert,
-    setShowAlert,
-    alertMessage,
-    setAlertMessage,
-    
-    // Additional state
     fetchError,
-    lastSaveTime
+    lastSaveTime,
   };
 };
