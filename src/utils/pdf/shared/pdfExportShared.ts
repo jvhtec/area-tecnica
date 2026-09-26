@@ -10,7 +10,7 @@ export type PdfImageFormat = 'PNG' | 'JPEG';
 // ---------------------------------------------------------------------------
 
 export const SECTOR_PRO_LOGO_PATH = '/sector pro logo.png';
-export const FALLBACK_BRAND_LOGO_PATH = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+export const FALLBACK_BRAND_LOGO_PATH = '/media/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
 
 // ---------------------------------------------------------------------------
 // Filename helpers

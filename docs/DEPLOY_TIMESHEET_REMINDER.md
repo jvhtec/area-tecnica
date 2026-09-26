@@ -27,11 +27,11 @@ The `send-timesheet-reminder` edge function returns 404 because it hasn't been d
    npx supabase functions deploy send-timesheet-reminder
    ```
 
-### Option 2: Using Lovable.dev Dashboard
+### Option 2: Using the "Deploy Edge Functions" GitHub Action
 
-1. Open your Lovable project: https://lovable.dev/projects/d0a166bb-d73b-4553-8f2b-be914bc1e2d8
-2. Navigate to the Supabase functions deployment section
-3. Deploy the `send-timesheet-reminder` function
+1. Go to the repo's **Actions** tab → **Deploy Edge Functions** → **Run workflow**
+2. Enter `send-timesheet-reminder` (or `all`) in the function slugs input
+3. Run against `main` (or the ref you want to deploy)
 
 ### Option 3: Using Supabase Dashboard
 

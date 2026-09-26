@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+import { pickConfiguredAppBase } from "../_shared/appBase.ts";
 import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 import { escapeHtml } from "../_shared/corporateEmailTemplate.ts";
@@ -45,26 +46,6 @@ const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: numbe
   } finally {
     clearTimeout(timer);
   }
-};
-
-const pickAppBase = () => {
-  for (const value of [
-    Deno.env.get("PUBLIC_APP_URL"),
-    Deno.env.get("PUBLIC_SITE_URL"),
-    Deno.env.get("NEXT_PUBLIC_SITE_URL"),
-    Deno.env.get("SITE_URL"),
-    Deno.env.get("PUBLIC_CONFIRM_BASE"),
-    "https://sector-pro.work",
-  ]) {
-    if (!value?.trim()) continue;
-    try {
-      const url = new URL(value.trim());
-      return `${url.protocol}//${url.host}`;
-    } catch {
-      // Continue to the next candidate.
-    }
-  }
-  return "https://sector-pro.work";
 };
 
 const formatWhen = (iso: string, timezone: string) => {
@@ -152,7 +133,7 @@ serve(createHttpHandler(async (req) => {
   const vehicleLabel = vehicle
     ? [vehicle.name, vehicle.license_plate].filter(Boolean).join(" · ")
     : null;
-  const conductorUrl = `${pickAppBase()}/conductor`;
+  const conductorUrl = `${pickConfiguredAppBase()}/conductor`;
   const actionText = kind === "updated" ? "Tu transporte ha cambiado" : "Tienes un transporte asignado";
 
   const alreadySent = async (channel: "email" | "whatsapp") => {

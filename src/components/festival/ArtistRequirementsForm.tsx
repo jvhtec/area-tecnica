@@ -747,7 +747,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
             loading="lazy"
             decoding="async"
             className="h-16 w-48 object-contain mt-8"
-            onError={() => setCompanyLogo("/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png")}
+            onError={() => setCompanyLogo("/media/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png")}
           />
         </div>
       </div>

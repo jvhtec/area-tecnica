@@ -360,8 +360,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Nueva actualización'
   const options = {
     body: payload.body || '',
-    icon: '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png',
-    badge: '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png',
+    icon: '/media/2f12a6ef-587b-4049-ad53-d83fb94064e3.png',
+    badge: '/media/2f12a6ef-587b-4049-ad53-d83fb94064e3.png',
     data: {
       url: payload.url || '/',
       type: payload.type,

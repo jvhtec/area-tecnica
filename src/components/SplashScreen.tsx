@@ -274,9 +274,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 8000
             loading="eager"
             decoding="async"
             onError={(e) => {
-              // Fallback to lovable-uploads if main logo fails
+              // Fallback to media if main logo fails
               const target = e.target as HTMLImageElement;
-              target.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
+              target.src = "/media/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
             }}
           />
         </div>
