@@ -46,7 +46,8 @@ export const useHojaDeRutaInitialization = (
     return value
       .filter((contact): contact is Record<string, unknown> => Boolean(contact && typeof contact === "object" && !Array.isArray(contact)))
       .map((contact) => ({
-        id: typeof contact.id === "string" ? contact.id : crypto.randomUUID(),
+        // Tour contacts are shared across tour dates; each Hoja owns its row identity.
+        id: crypto.randomUUID(),
         name: typeof contact.name === "string" ? contact.name : "",
         role: typeof contact.role === "string" ? contact.role : "",
         phone: typeof contact.phone === "string" ? contact.phone : "",
