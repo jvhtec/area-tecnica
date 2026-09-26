@@ -48,7 +48,7 @@ export const EventSectionView = ({ runtime }: { runtime: HojaSectionRuntime }) =
       jobs={slice.jobs}
       isLoadingJobs={slice.isLoadingJobs}
       jobDetails={null}
-      onAutoPopulate={slice.refreshFromJob}
+      onAutoPopulate={() => void slice.refreshFromJob(slice.selectedJobId)}
       hideJobSelection={runtime.hideJobSelection}
       {...printProps(runtime)}
     />

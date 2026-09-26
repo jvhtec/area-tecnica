@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { EventData } from '@/types/hoja-de-ruta';
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import type { Database } from '@/integrations/supabase/types';
+import type {
+  Accommodation,
+  EventData,
+  TravelArrangement,
+} from '@/types/hoja-de-ruta';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPowerRequirementsText } from '@/utils/powerRequirementSelection';
@@ -10,6 +15,27 @@ import {
 import { getErrorMessage } from '@/utils/errorMessage';
 import { labelForCode } from '@/types/roles';
 import { formatInTimeZone } from 'date-fns-tz';
+import type { HojaDocument } from '@/features/hoja-de-ruta/model/HojaDocument';
+
+type JobRow = Database['public']['Tables']['jobs']['Row'];
+type JobAssignmentRow = Database['public']['Tables']['job_assignments']['Row'];
+type LocationRow = Database['public']['Tables']['locations']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+
+type JobWithHojaRelations = JobRow & {
+  location: Pick<LocationRow, 'name' | 'formatted_address' | 'latitude' | 'longitude'> | null;
+  job_assignments: Array<JobAssignmentRow & {
+    profiles: Pick<ProfileRow, 'first_name' | 'last_name' | 'dni' | 'phone'> | null;
+  }>;
+};
+
+type HojaContact = {
+  id?: string;
+  name?: string;
+  role?: string;
+  phone?: string;
+  email?: string;
+};
 
 export const resolvePowerRequirementsForHojaInitialization = ({
   savedPowerRequirements,
@@ -24,131 +50,137 @@ export const resolvePowerRequirementsForHojaInitialization = ({
   return generatedPowerRequirements ?? "";
 };
 
+const normalizeTourContacts = (value: unknown): HojaContact[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((contact): contact is Record<string, unknown> => Boolean(
+      contact && typeof contact === "object" && !Array.isArray(contact),
+    ))
+    .map((contact) => ({
+      // Tour contacts are shared across tour dates; each Hoja owns its row identity.
+      id: crypto.randomUUID(),
+      name: typeof contact.name === "string" ? contact.name : "",
+      role: typeof contact.role === "string" ? contact.role : "",
+      phone: typeof contact.phone === "string" ? contact.phone : "",
+      email: typeof contact.email === "string" ? contact.email : "",
+    }))
+    .filter((contact) => contact.name.trim());
+};
+
+const mergeContacts = (...groups: Array<HojaContact[] | undefined>) => {
+  const merged: Array<Required<HojaContact>> = [];
+  const seen = new Set<string>();
+  groups.flatMap((group) => group || []).forEach((contact) => {
+    const name = contact.name || "";
+    const role = contact.role || "";
+    const phone = contact.phone || "";
+    const email = contact.email || "";
+    const key = [name, role, phone, email]
+      .map((value) => value.trim().toLowerCase())
+      .join("|");
+    if (!name.trim() || seen.has(key)) return;
+    seen.add(key);
+    merged.push({ id: contact.id || crypto.randomUUID(), name, role, phone, email });
+  });
+  return merged.length
+    ? merged
+    : [{ id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" }];
+};
+
+const formatJobEventDates = (
+  jobData: Pick<JobRow, 'start_time' | 'end_time'>,
+) => {
+  const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
+  const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+  const eventStartDate = startDate && !Number.isNaN(startDate.getTime())
+    ? formatInTimeZone(startDate, "Europe/Madrid", "yyyy-MM-dd")
+    : undefined;
+  const eventEndDate = endDate && !Number.isNaN(endDate.getTime())
+    ? formatInTimeZone(endDate, "Europe/Madrid", "yyyy-MM-dd")
+    : undefined;
+
+  let eventDates = "";
+  if (eventStartDate && eventEndDate && startDate && endDate) {
+    const startLabel = formatInTimeZone(startDate, "Europe/Madrid", "dd/MM/yyyy");
+    const endLabel = formatInTimeZone(endDate, "Europe/Madrid", "dd/MM/yyyy");
+    eventDates = eventStartDate === eventEndDate ? startLabel : `${startLabel} - ${endLabel}`;
+  }
+
+  return { startDate, eventStartDate, eventEndDate, eventDates };
+};
+
+const buildEventDataFromJob = ({
+  jobData,
+  staffFromAssignments,
+  tourContacts,
+  powerRequirementsText,
+  powerRequirementsSourceUpdatedAt,
+}: {
+  jobData: JobWithHojaRelations;
+  staffFromAssignments: NonNullable<EventData['staff']>;
+  tourContacts: HojaContact[];
+  powerRequirementsText: string;
+  powerRequirementsSourceUpdatedAt?: string;
+}): EventData => {
+  const { startDate, eventStartDate, eventEndDate, eventDates } = formatJobEventDates(jobData);
+
+  return {
+    eventName: jobData.title || "",
+    eventDates,
+    eventStartDate,
+    eventEndDate,
+    venue: {
+      name: jobData.location?.name || "",
+      address: jobData.location?.formatted_address || "",
+      coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
+        ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
+        : undefined,
+    },
+    contacts: mergeContacts(tourContacts),
+    logistics: {
+      transport: [],
+      loadingDetails: "",
+      unloadingDetails: "",
+      equipmentLogistics: "",
+    },
+    staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{
+      id: crypto.randomUUID(),
+      name: "",
+      surname1: "",
+      surname2: "",
+      position: "",
+      dni: "",
+    }],
+    schedule: startDate
+      ? `Inicio del evento: ${formatInTimeZone(startDate, "Europe/Madrid", "HH:mm")}`
+      : "",
+    powerRequirements: powerRequirementsText || "",
+    powerRequirementsSourceUpdatedAt,
+    auxiliaryNeeds: "",
+    auxiliaryStaffSetupQty: 0,
+    auxiliaryStaffDismantleQty: 0,
+    auxiliaryMachinery: [],
+    weather: undefined,
+    printExcludedSections: [],
+  };
+};
+
 export const useHojaDocumentInitialization = (
   selectedJobId: string,
-  hojaDeRuta: any,
+  hojaDeRuta: HojaDocument | null | undefined,
   isLoadingHojaDeRuta: boolean,
   isInitialized: boolean,
-  setEventData: React.Dispatch<React.SetStateAction<EventData>>,
-  setTravelArrangements: any,
-  setAccommodations: any,
-  setIsInitialized: React.Dispatch<React.SetStateAction<boolean>>,
-  setHasSavedData: React.Dispatch<React.SetStateAction<boolean>>,
-  setHasBasicJobData: React.Dispatch<React.SetStateAction<boolean>>,
-  setDataSource: React.Dispatch<React.SetStateAction<'none' | 'saved' | 'job' | 'mixed'>>
+  setEventData: Dispatch<SetStateAction<EventData>>,
+  setTravelArrangements: Dispatch<SetStateAction<TravelArrangement[]>>,
+  setAccommodations: Dispatch<SetStateAction<Accommodation[]>>,
+  setIsInitialized: Dispatch<SetStateAction<boolean>>,
+  setHasSavedData: Dispatch<SetStateAction<boolean>>,
+  setHasBasicJobData: Dispatch<SetStateAction<boolean>>,
+  setDataSource: Dispatch<SetStateAction<'none' | 'saved' | 'job' | 'mixed'>>
 ) => {
   const { toast } = useToast();
   // Token of the initialization run currently in flight (see the effect below)
   const initializingRunRef = useRef<{ jobId: string } | null>(null);
-
-  const normalizeTourContacts = (value: unknown) => {
-    if (!Array.isArray(value)) return [];
-    return value
-      .filter((contact): contact is Record<string, unknown> => Boolean(contact && typeof contact === "object" && !Array.isArray(contact)))
-      .map((contact) => ({
-        // Tour contacts are shared across tour dates; each Hoja owns its row identity.
-        id: crypto.randomUUID(),
-        name: typeof contact.name === "string" ? contact.name : "",
-        role: typeof contact.role === "string" ? contact.role : "",
-        phone: typeof contact.phone === "string" ? contact.phone : "",
-        email: typeof contact.email === "string" ? contact.email : "",
-      }))
-      .filter((contact) => contact.name.trim());
-  };
-
-  const mergeContacts = (...groups: Array<Array<{ id?: string; name?: string; role?: string; phone?: string; email?: string }> | undefined>) => {
-    const merged: Array<{ id: string; name: string; role: string; phone: string; email: string }> = [];
-    const seen = new Set<string>();
-    groups.flatMap((group) => group || []).forEach((contact) => {
-      const name = contact.name || "";
-      const role = contact.role || "";
-      const phone = contact.phone || "";
-      const email = contact.email || "";
-      const key = [name, role, phone, email].map((value) => value.trim().toLowerCase()).join("|");
-      if (!name.trim() || seen.has(key)) return;
-      seen.add(key);
-      merged.push({ id: contact.id || crypto.randomUUID(), name, role, phone, email });
-    });
-    return merged.length ? merged : [{ id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" }];
-  };
-
-  const formatJobEventDates = (jobData: { start_time?: string | null; end_time?: string | null }) => {
-    const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
-    const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
-    const eventStartDate = startDate && !Number.isNaN(startDate.getTime())
-      ? formatInTimeZone(startDate, "Europe/Madrid", "yyyy-MM-dd")
-      : undefined;
-    const eventEndDate = endDate && !Number.isNaN(endDate.getTime())
-      ? formatInTimeZone(endDate, "Europe/Madrid", "yyyy-MM-dd")
-      : undefined;
-
-    let eventDates = "";
-    if (eventStartDate && eventEndDate) {
-      const startLabel = formatInTimeZone(startDate!, "Europe/Madrid", "dd/MM/yyyy");
-      const endLabel = formatInTimeZone(endDate!, "Europe/Madrid", "dd/MM/yyyy");
-      eventDates = eventStartDate === eventEndDate ? startLabel : `${startLabel} - ${endLabel}`;
-    }
-
-    return { startDate, endDate, eventStartDate, eventEndDate, eventDates };
-  };
-
-  // Builds the EventData used when there is no saved hoja for the job, shared
-  // by the initialization effect and autoPopulateBasicJobData.
-  const buildEventDataFromJob = ({
-    jobData,
-    staffFromAssignments,
-    tourContacts,
-    powerRequirementsText,
-    powerRequirementsSourceUpdatedAt,
-  }: {
-    jobData: any;
-    staffFromAssignments: NonNullable<EventData['staff']>;
-    tourContacts: Array<{ id?: string; name: string; role: string; phone: string; email?: string }>;
-    powerRequirementsText: string;
-    powerRequirementsSourceUpdatedAt?: string;
-  }): EventData => {
-    const { startDate, eventStartDate, eventEndDate, eventDates } = formatJobEventDates(jobData);
-
-    return {
-      eventName: jobData.title || "",
-      eventDates,
-      eventStartDate,
-      eventEndDate,
-      venue: {
-        name: jobData.location?.name || "",
-        address: jobData.location?.formatted_address || "",
-        coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
-          ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
-          : undefined,
-      },
-      contacts: mergeContacts(tourContacts),
-      logistics: {
-        transport: [],
-        loadingDetails: "",
-        unloadingDetails: "",
-        equipmentLogistics: "",
-      },
-      staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{
-        id: crypto.randomUUID(),
-        name: "",
-        surname1: "",
-        surname2: "",
-        position: "",
-        dni: "",
-      }],
-      schedule: startDate
-        ? `Inicio del evento: ${formatInTimeZone(startDate, "Europe/Madrid", "HH:mm")}`
-        : "",
-      powerRequirements: powerRequirementsText || "",
-      powerRequirementsSourceUpdatedAt,
-      auxiliaryNeeds: "",
-      auxiliaryStaffSetupQty: 0,
-      auxiliaryStaffDismantleQty: 0,
-      auxiliaryMachinery: [],
-      weather: undefined,
-      printExcludedSections: [],
-    };
-  };
 
   // Fetch current Consumos-derived power requirements and its source revision.
   const fetchPowerRequirements = useCallback(async (
@@ -211,9 +243,10 @@ export const useHojaDocumentInitialization = (
         return null;
       }
 
-      const staffFromAssignments = (jobData.job_assignments || [])
-        .filter((assignment: any) => assignment.status === "confirmed")
-        .map((assignment: any) => {
+      const typedJobData = jobData as JobWithHojaRelations;
+      const staffFromAssignments = typedJobData.job_assignments
+        .filter((assignment) => assignment.status === "confirmed")
+        .map((assignment) => {
           const roleEntries = [
             ["Sonido", assignment.sound_role],
             ["Luces", assignment.lights_role],
@@ -236,20 +269,20 @@ export const useHojaDocumentInitialization = (
           };
         });
 
-      let tourContacts: Array<{ id?: string; name: string; role: string; phone: string; email?: string }> = [];
-      if ((jobData as any).tour_id) {
+      let tourContacts: HojaContact[] = [];
+      if (typedJobData.tour_id) {
         const { data: tourData, error: tourError } = await supabase
           .from('tours')
           .select('tour_contacts')
-          .eq('id', (jobData as any).tour_id)
+          .eq('id', typedJobData.tour_id)
           .maybeSingle();
         if (!tourError) {
-          tourContacts = normalizeTourContacts((tourData as any)?.tour_contacts);
+          tourContacts = normalizeTourContacts(tourData?.tour_contacts);
         }
       }
 
       console.log("✅ INITIALIZATION: Loaded current assignments:", staffFromAssignments);
-      return { jobData, staffFromAssignments, tourContacts };
+      return { jobData: typedJobData, staffFromAssignments, tourContacts };
     } catch (error) {
       console.error("❌ INITIALIZATION: Error loading job assignments:", error);
       return null;

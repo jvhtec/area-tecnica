@@ -710,12 +710,14 @@ Campaign-based crew assignment engine for matching technicians to jobs:
 
 ### Hoja de Ruta (Route Sheets)
 
-Complex document builder for daily route/logistics sheets:
+Versioned document builder for event logistics and controlled publication:
 - **Page**: `src/pages/HojaDeRuta.tsx`
-- **Hooks**: `useHojaDeRutaForm` (14.4KB form state), `useHojaDeRutaPersistence` (28.9KB data persistence), `useHojaDeRutaImages` (image handling), `useHojaDeRutaTemplates` (template management)
-- **Utils**: `src/utils/hoja-de-ruta/`, `src/utils/hojaDeRutaExport.ts` (20.8KB PDF export)
-- **Workflow**: Create/edit route sheets with stops, images, notes → save as template → export to PDF
-- **Note**: One of the most complex form systems in the app — 4 dedicated hooks totaling 50KB+
+- **Feature module**: `src/features/hoja-de-ruta/` (canonical model, aggregate API, mapper, section registry, exports)
+- **Image handling**: `src/hooks/useHojaDeRutaImages.ts`
+- **Utils**: `src/utils/hoja-de-ruta/`, `src/utils/hojaDeRutaExport.ts`
+- **Database boundary**: `get_hoja_de_ruta`, `save_hoja_de_ruta`, `set_hoja_de_ruta_status`, `publish_hoja_de_ruta_document`
+- **Workflow**: Load/edit one aggregate document → optimistic versioned save → review/approve/finalize → download or explicitly publish
+- **Docs**: `docs/workflows/hoja-de-ruta.md`
 
 ### SoundVision File Library
 

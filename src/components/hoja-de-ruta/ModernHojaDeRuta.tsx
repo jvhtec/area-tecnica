@@ -36,7 +36,7 @@ import {
 } from "@/utils/hoja-de-ruta/pdf";
 import { HOJA_SECTION_REGISTRY } from "@/features/hoja-de-ruta/sections/sectionRegistry";
 import type { HojaSectionRuntime } from "@/features/hoja-de-ruta/sections/HojaSectionViews";
-import { HojaDocumentProvider } from "@/features/hoja-de-ruta/model/HojaDocumentContext";
+import { HojaDocumentProvider } from "@/features/hoja-de-ruta/model/HojaDocumentProvider";
 import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
 import { useHojaDocumentExports } from "@/features/hoja-de-ruta/exports/useHojaDocumentExports";
 
@@ -353,7 +353,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
           </div>
 
           {/* Enhanced Status Messages */}
-          <div className="mt-2 md:mt-3 text-[11px] md:text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-2 md:mt-3 text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!selectedJobId && (
               <span className="text-amber-600 font-medium">
                 Selecciona un trabajo para comenzar
@@ -393,7 +393,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                   type="button"
                   size="sm"
                   variant="secondary"
-                  className="h-6 px-2 text-[11px]"
+                  className="h-6 px-2 text-xs"
                   onClick={() => { void applyStaffingChanges(); }}
                 >
                   Actualizar personal
@@ -407,7 +407,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                   type="button"
                   size="sm"
                   variant="secondary"
-                  className="h-6 px-2 text-[11px]"
+                  className="h-6 px-2 text-xs"
                   onClick={() => { void applyPowerRequirementsChanges(); }}
                 >
                   Actualizar potencia

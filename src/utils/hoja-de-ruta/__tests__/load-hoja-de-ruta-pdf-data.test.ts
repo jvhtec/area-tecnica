@@ -7,15 +7,31 @@ import {
   type MockSupabaseResult,
 } from "@/test/mockSupabase";
 
+const { fetchJobProducerContactsMock } = vi.hoisted(() => ({
+  fetchJobProducerContactsMock: vi.fn(),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
+
+vi.mock("@/features/jobs/producer-claims/producerClaims", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/features/jobs/producer-claims/producerClaims")
+  >();
+  return {
+    ...actual,
+    fetchJobProducerContacts: fetchJobProducerContactsMock,
+  };
+});
 
 import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
 
 describe("loadHojaDeRutaPdfData", () => {
   beforeEach(() => {
     resetMockSupabase();
+    fetchJobProducerContactsMock.mockReset();
+    fetchJobProducerContactsMock.mockResolvedValue([]);
 
     const results: Record<string, MockSupabaseResult> = {
       hoja_de_ruta: {

@@ -25,6 +25,8 @@ describe("HojaDeRutaPrintDialog", () => {
         showDialog
         setShowDialog={vi.fn()}
         onGeneratePDF={vi.fn()}
+        onPublishPDF={vi.fn()}
+        canPublish
         onGenerateDriverCertificatePDF={vi.fn()}
         onGenerateSectionPDF={onGenerateSectionPDF}
         onPreviewPDF={vi.fn()}
@@ -36,7 +38,9 @@ describe("HojaDeRutaPrintDialog", () => {
     );
 
     expect(screen.getByText("Imprimir sección a PDF")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Documento Completo PDF" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Descargar documento completo PDF" })
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Evento" }));
 
@@ -55,6 +59,8 @@ describe("HojaDeRutaPrintDialog", () => {
         showDialog
         setShowDialog={vi.fn()}
         onGeneratePDF={onGeneratePDF}
+        onPublishPDF={vi.fn()}
+        canPublish
         onGenerateDriverCertificatePDF={vi.fn()}
         onGenerateSectionPDF={vi.fn()}
         onPreviewPDF={onPreviewPDF}

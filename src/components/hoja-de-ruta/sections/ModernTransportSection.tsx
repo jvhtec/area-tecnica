@@ -145,7 +145,10 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
   const [logisticsDriftCount, setLogisticsDriftCount] = useState(0);
-  const validTransport = Array.isArray(transport) ? transport : [];
+  const validTransport = useMemo(
+    () => (Array.isArray(transport) ? transport : []),
+    [transport],
+  );
 
   const sourceFingerprint = useMemo(
     () => validTransport
@@ -205,7 +208,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       .forEach((row) => drifted.add(row.id));
 
     setLogisticsDriftCount(drifted.size);
-  }, [jobId, sourceFingerprint, validTransport]);
+  }, [jobId, validTransport]);
 
   useEffect(() => {
     void checkLogisticsDrift();

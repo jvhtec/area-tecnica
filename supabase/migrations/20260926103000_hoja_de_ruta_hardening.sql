@@ -23,7 +23,7 @@ create trigger trg_power_requirement_tables_updated_at
 before update on public.power_requirement_tables
 for each row execute function public.set_updated_at();
 
-do $
+do $$
 begin
   if not exists (
     select 1
@@ -36,7 +36,7 @@ begin
       check (coalesce(status, 'draft') in ('draft', 'review', 'approved', 'final'));
   end if;
 end
-$;
+$$;
 
 create index if not exists idx_job_documents_job_kind_uploaded
   on public.job_documents (job_id, document_kind, uploaded_at desc);
@@ -384,7 +384,7 @@ returns table(status text, approved_by uuid, approved_at timestamptz, document_v
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_current text;
   v_target text := lower(btrim(coalesce(p_status, '')));
@@ -490,7 +490,7 @@ begin
   from public.hoja_de_ruta h
   where h.id = v_hoja_id;
 end;
-$;
+$$;
 
 revoke all on function public.set_hoja_de_ruta_status(uuid, text) from public, anon;
 grant execute on function public.set_hoja_de_ruta_status(uuid, text) to authenticated, service_role;
@@ -756,7 +756,7 @@ begin
     sort_order integer
   )
   where nullif(btrim(coalesce(r.name, '') || coalesce(r.role, '') || coalesce(r.phone, '') || coalesce(r.email, '')), '') is not null
-  on conflict (id) do update
+  on conflict on constraint hoja_de_ruta_contacts_pkey do update
   set
     hoja_de_ruta_id = excluded.hoja_de_ruta_id,
     name = excluded.name,
@@ -812,7 +812,7 @@ begin
     coalesce(r.name, '') || coalesce(r.surname1, '') ||
     coalesce(r.surname2, '') || coalesce(r.position, '')
   ), '') is not null
-  on conflict (id) do update
+  on conflict on constraint hoja_de_ruta_staff_pkey do update
   set
     hoja_de_ruta_id = excluded.hoja_de_ruta_id,
     technician_id = excluded.technician_id,
@@ -910,7 +910,7 @@ begin
     sort_order integer
   )
   where nullif(btrim(coalesce(r.transport_type, '')), '') is not null
-  on conflict (id) do update
+  on conflict on constraint hoja_de_ruta_transport_pkey do update
   set
     hoja_de_ruta_id = excluded.hoja_de_ruta_id,
     transport_type = excluded.transport_type,
@@ -1025,7 +1025,7 @@ begin
      or r.pickup_time is not null
      or r.departure_time is not null
      or r.arrival_time is not null
-  on conflict (id) do update
+  on conflict on constraint hoja_de_ruta_travel_arrangements_pkey do update
   set
     hoja_de_ruta_id = excluded.hoja_de_ruta_id,
     transportation_type = excluded.transportation_type,
@@ -1092,7 +1092,7 @@ begin
     rooms jsonb
   )
   where nullif(btrim(coalesce(r.hotel_name, '') || coalesce(r.address, '')), '') is not null
-  on conflict (id) do update
+  on conflict on constraint hoja_de_ruta_accommodations_pkey do update
   set
     hoja_de_ruta_id = excluded.hoja_de_ruta_id,
     hotel_name = excluded.hotel_name,
@@ -1185,7 +1185,7 @@ begin
       where a.id = (acc_json->>'id')::uuid
         and a.hoja_de_ruta_id = v_id
     )
-  on conflict (id) do update
+  on conflict on constraint hoja_de_ruta_room_assignments_pkey do update
   set
     accommodation_id = excluded.accommodation_id,
     room_type = excluded.room_type,
@@ -1234,7 +1234,7 @@ begin
   where nullif(btrim(coalesce(r.image_path, '')), '') is not null
     and r.image_path not like 'blob:%'
     and r.image_path not like 'data:%'
-  on conflict (id) do update
+  on conflict on constraint hoja_de_ruta_images_pkey do update
   set
     hoja_de_ruta_id = excluded.hoja_de_ruta_id,
     image_path = excluded.image_path,

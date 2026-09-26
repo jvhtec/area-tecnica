@@ -123,7 +123,7 @@ describe("tour ops normalization", () => {
     expect(normalizeComparison("  BCN Airport  ")).toBe("bcn airport");
   });
 
-  it("merges tour dates, jobs, hoja schedule, crew, accommodation, and legacy travel", () => {
+  it("merges tour dates, jobs, aggregate hoja data, and legacy tour travel", () => {
     const model = normalizeTourOpsModel(rawPayload, "management");
 
     expect(model.tour.name).toBe("Arena Tour");
@@ -133,7 +133,12 @@ describe("tour ops normalization", () => {
     expect(model.dates[0].program[0].rows[0].item).toBe("Load in");
     expect(model.dates[0].crew.map((member) => member.name)).toContain("Ada Lovelace");
     expect(model.dates[0].crew.filter((member) => member.name === "Ada Lovelace")).toHaveLength(1);
-    expect(model.dates[0].accommodations.map((hotel) => hotel.hotelName)).toEqual(expect.arrayContaining(["Hotel One", "Hoja Hotel", "Legacy Hoja Hotel"]));
+    expect(model.dates[0].accommodations.map((hotel) => hotel.hotelName)).toEqual(
+      expect.arrayContaining(["Hotel One", "Hoja Hotel"]),
+    );
+    expect(model.dates[0].accommodations.map((hotel) => hotel.hotelName)).not.toContain(
+      "Legacy Hoja Hotel",
+    );
     expect(model.travelSegments).toEqual(expect.arrayContaining([
       expect.objectContaining({
         source: "legacy",

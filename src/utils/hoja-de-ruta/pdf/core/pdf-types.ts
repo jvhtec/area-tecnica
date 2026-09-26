@@ -3,6 +3,7 @@ import type {
   EventData,
   TravelArrangement,
   Accommodation,
+  RoomAssignment,
   WeatherData,
   ImagePreviews
 } from '@/types/hoja-de-ruta';
@@ -13,6 +14,7 @@ export type {
   EventData,
   TravelArrangement,
   Accommodation,
+  RoomAssignment,
   WeatherData,
   ImagePreviews
 };

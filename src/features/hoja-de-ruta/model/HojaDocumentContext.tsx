@@ -1,7 +1,6 @@
 import {
   createContext,
   useContext,
-  type ReactNode,
 } from "react";
 
 import type { HojaSectionId } from "@/features/hoja-de-ruta/model/sectionDefinitions";
@@ -9,19 +8,7 @@ import type { useHojaDocument } from "@/features/hoja-de-ruta/model/useHojaDocum
 
 export type HojaDocumentStore = ReturnType<typeof useHojaDocument>;
 
-const HojaDocumentContext = createContext<HojaDocumentStore | null>(null);
-
-export const HojaDocumentProvider = ({
-  value,
-  children,
-}: {
-  value: HojaDocumentStore;
-  children: ReactNode;
-}) => (
-  <HojaDocumentContext.Provider value={value}>
-    {children}
-  </HojaDocumentContext.Provider>
-);
+export const HojaDocumentContext = createContext<HojaDocumentStore | null>(null);
 
 export const useHojaDocumentStore = (): HojaDocumentStore => {
   const value = useContext(HojaDocumentContext);
