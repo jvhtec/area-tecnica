@@ -13266,6 +13266,7 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          document_version: number
           status: string
         }[]
       }
