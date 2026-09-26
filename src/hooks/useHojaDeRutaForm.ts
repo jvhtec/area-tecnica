@@ -13,6 +13,8 @@ import type {
 import { createHojaDocumentSnapshot } from "@/utils/hoja-de-ruta/documentSnapshot";
 import {
   adjustAccommodationsForStaffRemoval,
+  mergeStaffWithAssignments,
+  remapAccommodationStaffReferences,
   syncTransportsWithLogistics,
 } from "@/utils/hoja-de-ruta/staffSync";
 
@@ -54,6 +56,7 @@ export const useHojaDeRutaForm = ({
   const [lastSaveTime, setLastSaveTime] = useState(0);
   const [documentVersion, setDocumentVersion] = useState(0);
   const [hasExternalConflict, setHasExternalConflict] = useState(false);
+  const [staffingDiff, setStaffingDiff] = useState({ added: 0, removed: 0 });
 
   const {
     hojaDeRuta,
@@ -65,7 +68,7 @@ export const useHojaDeRutaForm = ({
     forceRefetch,
   } = useHojaDeRutaPersistence(selectedJobId);
 
-  const { autoPopulateBasicJobData } = useHojaDeRutaInitialization(
+  const { autoPopulateBasicJobData, loadCurrentJobAssignments } = useHojaDeRutaInitialization(
     selectedJobId,
     hojaDeRuta,
     isLoadingHojaDeRuta || isFetchingHojaDeRuta,
@@ -94,6 +97,7 @@ export const useHojaDeRutaForm = ({
     awaitingInitRef.current = Boolean(selectedJobId);
     setDocumentVersion(0);
     setHasExternalConflict(false);
+    setStaffingDiff({ added: 0, removed: 0 });
     setHasSavedData(false);
     setHasBasicJobData(false);
     setDataSource("none");
@@ -145,6 +149,90 @@ export const useHojaDeRutaForm = ({
       variant: "destructive",
     });
   }, [fetchError, toast]);
+
+  const checkStaffingDiff = useCallback(async () => {
+    if (!selectedJobId || !isInitialized) return;
+    const assignmentData = await loadCurrentJobAssignments(selectedJobId);
+    if (!assignmentData) return;
+
+    const currentIds = new Set(
+      assignmentData.staffFromAssignments
+        .map((entry) => entry.technician_id)
+        .filter((id): id is string => Boolean(id)),
+    );
+    const documentIds = new Set(
+      eventData.staff
+        .map((entry) => entry.technician_id)
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    setStaffingDiff({
+      added: Array.from(currentIds).filter((id) => !documentIds.has(id)).length,
+      removed: Array.from(documentIds).filter((id) => !currentIds.has(id)).length,
+    });
+  }, [eventData.staff, isInitialized, loadCurrentJobAssignments, selectedJobId]);
+
+  const applyStaffingChanges = useCallback(async () => {
+    if (!selectedJobId) return;
+    const assignmentData = await loadCurrentJobAssignments(selectedJobId);
+    if (!assignmentData) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las asignaciones actuales.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const savedStaff = eventData.staff;
+    const merged = mergeStaffWithAssignments(
+      savedStaff,
+      assignmentData.staffFromAssignments,
+    );
+
+    setEventData((prev) => ({ ...prev, staff: merged.staff }));
+    setAccommodations((prev) =>
+      remapAccommodationStaffReferences(
+        prev,
+        savedStaff,
+        merged.savedIndexMap,
+        merged.staff,
+      )
+    );
+    setStaffingDiff({ added: 0, removed: 0 });
+  }, [
+    eventData.staff,
+    loadCurrentJobAssignments,
+    selectedJobId,
+    setAccommodations,
+    setEventData,
+    toast,
+  ]);
+
+  useEffect(() => {
+    if (!selectedJobId || !isInitialized) return;
+
+    void checkStaffingDiff();
+    const channel = supabase
+      .channel(`hoja-staffing:${selectedJobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "job_assignments",
+          filter: `job_id=eq.${selectedJobId}`,
+        },
+        () => {
+          void checkStaffingDiff();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [checkStaffingDiff, isInitialized, selectedJobId]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -458,6 +546,8 @@ export const useHojaDeRutaForm = ({
     dataSource,
     isDirty,
     hasExternalConflict,
+    staffingDiff,
+    applyStaffingChanges,
     documentVersion,
     handleContactChange,
     addContact,
