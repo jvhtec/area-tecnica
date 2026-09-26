@@ -52,6 +52,10 @@ export interface Transport {
   has_return?: boolean;
   return_date_time?: string;
   source_logistics_event_id?: string;
+  /** Timestamp of the logistics event imported into this row, used for drift detection. */
+  source_logistics_updated_at?: string;
+  origin?: string;
+  destination?: string;
   is_hoja_relevant?: boolean;
   logistics_categories?: LogisticsHojaCategory[];
 }
