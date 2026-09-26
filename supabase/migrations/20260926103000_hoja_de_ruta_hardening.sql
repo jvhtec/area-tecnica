@@ -53,7 +53,10 @@ alter table public.hoja_de_ruta_staff
   add column if not exists sort_order integer not null default 0;
 
 alter table public.hoja_de_ruta_transport
-  add column if not exists sort_order integer not null default 0;
+  add column if not exists sort_order integer not null default 0,
+  add column if not exists source_logistics_updated_at timestamptz,
+  add column if not exists origin text,
+  add column if not exists destination text;
 
 alter table public.hoja_de_ruta_travel_arrangements
   add column if not exists sort_order integer not null default 0;
@@ -604,6 +607,9 @@ begin
     has_return,
     return_date_time,
     source_logistics_event_id,
+    source_logistics_updated_at,
+    origin,
+    destination,
     is_hoja_relevant,
     logistics_categories,
     sort_order
@@ -620,6 +626,9 @@ begin
     coalesce(r.has_return, false),
     r.return_date_time,
     r.source_logistics_event_id,
+    r.source_logistics_updated_at,
+    nullif(r.origin, ''),
+    nullif(r.destination, ''),
     coalesce(r.is_hoja_relevant, true),
     coalesce(r.logistics_categories::public.logistics_transport_category[], '{}'::public.logistics_transport_category[]),
     coalesce(r.sort_order, 0)
@@ -634,6 +643,9 @@ begin
     has_return boolean,
     return_date_time timestamptz,
     source_logistics_event_id uuid,
+    source_logistics_updated_at timestamptz,
+    origin text,
+    destination text,
     is_hoja_relevant boolean,
     logistics_categories text[],
     sort_order integer
@@ -651,6 +663,9 @@ begin
     has_return = excluded.has_return,
     return_date_time = excluded.return_date_time,
     source_logistics_event_id = excluded.source_logistics_event_id,
+    source_logistics_updated_at = excluded.source_logistics_updated_at,
+    origin = excluded.origin,
+    destination = excluded.destination,
     is_hoja_relevant = excluded.is_hoja_relevant,
     logistics_categories = excluded.logistics_categories,
     sort_order = excluded.sort_order;
