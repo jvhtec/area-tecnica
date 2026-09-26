@@ -175,6 +175,27 @@ describe("Hoja document contracts", () => {
     expect(eventData.printExcludedSections).toEqual(["weather"]);
   });
 
+  it("does not reinterpret legacy room references as Hoja staff UUIDs", () => {
+    const document = mapHojaAggregateToDocument(JOB_ID, {
+      ...aggregateFixture,
+      accommodations: [{
+        ...aggregateFixture.accommodations![0],
+        rooms: [{
+          id: ROOM_ID,
+          room_type: "single",
+          room_number: "101",
+          staff_member1_id: "legacy-index-0",
+          staff_member2_id: "legacy-index-1",
+        }],
+      }],
+    });
+
+    expect(document.accommodations[0]?.rooms[0]).toMatchObject({
+      staff_member1_id: "",
+      staff_member2_id: "",
+    });
+  });
+
   it("produces the same dirty snapshot regardless of object key insertion order", () => {
     const eventA: EventData = {
       eventName: "Evento",

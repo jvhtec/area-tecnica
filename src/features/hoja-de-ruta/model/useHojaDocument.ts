@@ -10,6 +10,7 @@ import type {
   Transport,
   TravelArrangement,
 } from "@/types/hoja-de-ruta";
+import { getErrorMessage } from "@/utils/errorMessage";
 import { createHojaDocumentSnapshot } from "@/utils/hoja-de-ruta/documentSnapshot";
 import {
   adjustAccommodationsForStaffRemoval,
@@ -79,6 +80,14 @@ export const useHojaDocument = (
     isChangingStatus,
     forceRefetch,
   } = useHojaDocumentPersistence(selectedJobId);
+  const staffRef = useRef(eventData.staff);
+  const documentVersionRef = useRef(documentVersion);
+  const isSavingRef = useRef(isSaving);
+  const isChangingStatusRef = useRef(isChangingStatus);
+  staffRef.current = eventData.staff;
+  documentVersionRef.current = documentVersion;
+  isSavingRef.current = isSaving;
+  isChangingStatusRef.current = isChangingStatus;
 
   const {
     autoPopulateBasicJobData,
@@ -170,12 +179,34 @@ export const useHojaDocument = (
     nextStatus: "review" | "approved" | "final",
   ) => {
     if (!selectedJobId) return;
-
-    if (isDirty || !hojaDeRuta?.id) {
-      await handleSaveAll();
+    if (hasExternalConflict) {
+      toast({
+        title: "Conflicto de edición",
+        description: "Recarga la versión más reciente antes de cambiar el estado.",
+        variant: "destructive",
+      });
+      return;
     }
 
-    const updated = await setStatus(nextStatus);
+    if (isDirty || !hojaDeRuta?.id) {
+      try {
+        await handleSaveAll();
+      } catch {
+        return;
+      }
+    }
+
+    let updated: Awaited<ReturnType<typeof setStatus>>;
+    try {
+      updated = await setStatus(nextStatus);
+    } catch (error) {
+      toast({
+        title: "No se pudo cambiar el estado",
+        description: getErrorMessage(error, "Inténtalo de nuevo."),
+        variant: "destructive",
+      });
+      return;
+    }
     setDocumentVersion(updated.document_version);
     setHasExternalConflict(false);
 
@@ -195,6 +226,7 @@ export const useHojaDocument = (
     });
   }, [
     handleSaveAll,
+    hasExternalConflict,
     hojaDeRuta?.id,
     isDirty,
     selectedJobId,
@@ -222,7 +254,7 @@ export const useHojaDocument = (
         .filter((id): id is string => Boolean(id)),
     );
     const documentIds = new Set(
-      eventData.staff
+      staffRef.current
         .map((entry) => entry.technician_id)
         .filter((id): id is string => Boolean(id)),
     );
@@ -231,7 +263,7 @@ export const useHojaDocument = (
       added: Array.from(currentIds).filter((id) => !documentIds.has(id)).length,
       removed: Array.from(documentIds).filter((id) => !currentIds.has(id)).length,
     });
-  }, [eventData.staff, isInitialized, loadCurrentJobAssignments, selectedJobId]);
+  }, [isInitialized, loadCurrentJobAssignments, selectedJobId]);
 
   const applyStaffingChanges = useCallback(async () => {
     if (!selectedJobId) return;
@@ -383,7 +415,11 @@ export const useHojaDocument = (
         },
         (payload) => {
           const nextVersion = Number((payload.new as { document_version?: unknown }).document_version || 0);
-          if (!isSaving && !isChangingStatus && nextVersion > documentVersion) {
+          if (
+            !isSavingRef.current
+            && !isChangingStatusRef.current
+            && nextVersion > documentVersionRef.current
+          ) {
             setHasExternalConflict(true);
             toast({
               title: "Cambios externos",
@@ -398,7 +434,7 @@ export const useHojaDocument = (
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [documentVersion, isChangingStatus, isInitialized, isSaving, selectedJobId, toast]);
+  }, [isInitialized, selectedJobId, toast]);
 
   const handleContactChange = useCallback((index: number, field: string, value: string) => {
     setEventData((prev) => ({

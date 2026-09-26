@@ -123,7 +123,7 @@ set published_document_id = (
     and jd.document_kind = 'hoja_de_ruta'
     and (
       lower(split_part(coalesce(jd.file_type, ''), ';', 1)) = 'application/pdf'
-      or jd.file_path ~* '\\.pdf$'
+      or jd.file_path ~* '\.pdf$'
     )
   order by jd.uploaded_at desc nulls last, jd.id desc
   limit 1
@@ -294,7 +294,7 @@ begin
   end if;
 
   begin
-    if v ~* '(z|[+-][0-9]{2}:[0-9]{2})$' then
+    if v ~* '(z|[+-][0-9]{2}(:?[0-9]{2})?)$' then
       return v::timestamptz;
     end if;
 
@@ -1405,7 +1405,7 @@ begin
     and jd.document_kind = 'hoja_de_ruta'
     and (
       lower(split_part(coalesce(jd.file_type, ''), ';', 1)) = 'application/pdf'
-      or jd.file_path ~* '\\.pdf$'
+      or jd.file_path ~* '\.pdf$'
     )
   for update;
 
@@ -1487,14 +1487,20 @@ set search_path = public, pg_temp
 as $$
 declare
   v_job_id uuid;
+  v_status text;
 begin
-  select job_id into v_job_id
+  select job_id, coalesce(status, 'draft') into v_job_id, v_status
   from public.hoja_de_ruta
   where id = p_hoja_de_ruta_id
   for update;
 
   if v_job_id is null or not public.can_manage_hoja(v_job_id) then
     raise exception 'permission denied' using errcode = '42501';
+  end if;
+
+  if v_status = 'final' then
+    raise exception 'La Hoja de Ruta está finalizada y no admite edición'
+      using errcode = '22023';
   end if;
 
   update public.hoja_de_ruta

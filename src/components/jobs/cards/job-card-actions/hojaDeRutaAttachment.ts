@@ -68,9 +68,11 @@ export const pickLatestJobHojaDeRutaDocument = (
   docs: HojaDeRutaAttachmentRow[] | null | undefined,
   jobId: string
 ): HojaDeRutaAttachmentDoc | null => {
-  const candidates = (docs || []).filter((candidate) => isJobHojaDeRutaDocument(candidate, jobId));
+  const candidates = (docs || [])
+    .filter((candidate) => isJobHojaDeRutaDocument(candidate, jobId))
+    .sort(byNewestUpload);
   const doc = candidates.find((candidate) => candidate.document_kind === "hoja_de_ruta")
-    || candidates.sort(byNewestUpload)[0];
+    || candidates[0];
   return doc ? { ...doc, source: "job_documents" } : null;
 };
 

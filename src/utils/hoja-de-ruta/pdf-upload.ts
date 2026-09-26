@@ -34,7 +34,7 @@ export const uploadPdfToJob = async (
   const folderBase = HOJA_PDF_FOLDER_BY_KIND[kind];
   const sanitizedFileName = sanitizeHojaPdfFileName(fileName);
   const folderPath = `${folderBase}/${jobId}`;
-  const filePath = `${folderPath}/${sanitizedFileName}`;
+  const filePath = `${folderPath}/${crypto.randomUUID()}-${sanitizedFileName}`;
 
   const { data: authData } = await supabase.auth.getUser();
   const userId = authData.user?.id || null;

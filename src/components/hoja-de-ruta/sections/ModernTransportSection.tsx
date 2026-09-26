@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Download, Plus, Trash2, Truck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -149,6 +149,9 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
     () => (Array.isArray(transport) ? transport : []),
     [transport],
   );
+  const transportRef = useRef(validTransport);
+  const driftRunRef = useRef(0);
+  transportRef.current = validTransport;
 
   const sourceFingerprint = useMemo(
     () => validTransport
@@ -158,8 +161,12 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       .join("|"),
     [validTransport],
   );
+  const sourceFingerprintRef = useRef(sourceFingerprint);
+  sourceFingerprintRef.current = sourceFingerprint;
 
   const checkLogisticsDrift = useCallback(async () => {
+    const run = ++driftRunRef.current;
+    const requestedFingerprint = sourceFingerprint;
     if (!jobId) {
       setLogisticsDriftCount(0);
       return;
@@ -174,6 +181,10 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       console.warn("No se pudo comprobar el estado de Logística para la Hoja de Ruta:", error);
       return;
     }
+    if (
+      run !== driftRunRef.current
+      || requestedFingerprint !== sourceFingerprintRef.current
+    ) return;
 
     const currentRows = (data || []) as Array<{
       id: string;
@@ -181,7 +192,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       is_hoja_relevant: boolean | null;
     }>;
     const currentById = new Map(currentRows.map((row) => [row.id, row]));
-    const sourced = validTransport.filter((item) => item.source_logistics_event_id);
+    const sourced = transportRef.current.filter((item) => item.source_logistics_event_id);
     const sourcedIds = new Set(sourced.map((item) => item.source_logistics_event_id));
     const drifted = new Set<string>();
 
@@ -208,7 +219,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       .forEach((row) => drifted.add(row.id));
 
     setLogisticsDriftCount(drifted.size);
-  }, [jobId, validTransport]);
+  }, [jobId, sourceFingerprint]);
 
   useEffect(() => {
     void checkLogisticsDrift();
@@ -281,7 +292,17 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
         .filter(Boolean)
         .sort()
         .at(-1) || startKey;
-      const matrix = await fetchLogisticsMatrix(startKey, endKey);
+      let matrix: LogisticsMatrixData = {
+        drivers: [],
+        vehicles: [],
+        events: [],
+        assignments: [],
+      };
+      try {
+        matrix = await fetchLogisticsMatrix(startKey, endKey);
+      } catch (matrixError) {
+        console.warn("No se pudo cargar la matriz logística; se importarán solo los eventos:", matrixError);
+      }
       const jobEventIds = new Set(logisticsEvents.map((event) => event.id));
       const jobMatrix: LogisticsMatrixData = {
         drivers: matrix.drivers,

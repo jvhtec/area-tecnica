@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(22);
+SELECT plan(23);
 
 SELECT function_privs_are(
   'public',
@@ -465,6 +465,18 @@ SELECT throws_ok(
   '22023',
   'La Hoja de Ruta está finalizada y no admite edición',
   'a final Hoja cannot be edited'
+);
+
+SELECT throws_ok(
+  $$ SELECT public.replace_hoja_de_ruta_all(
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid),
+       '[]'::jsonb,
+       '[]'::jsonb,
+       '[]'::jsonb
+     ) $$,
+  '22023',
+  'La Hoja de Ruta está finalizada y no admite edición',
+  'the compatibility replacement RPC cannot edit a final Hoja'
 );
 
 RESET ROLE;

@@ -223,6 +223,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
 
   const sectionRuntime: HojaSectionRuntime = {
     hideJobSelection: Boolean(routedJobId),
+    isReadOnly: isFinal,
     isPrintSectionExcluded,
     onPrintSectionExcludedChange: handlePrintExclusionChange,
     venue: {
@@ -307,13 +308,18 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                     {statusInfo.text}
                   </Badge>
                 )}
-                {nextStatusAction && (
+                {selectedJobId && nextStatusAction && (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     className="h-7 px-2 text-xs"
-                    disabled={isSaving || isChangingStatus}
+                    disabled={
+                      !isInitialized
+                      || hasExternalConflict
+                      || isSaving
+                      || isChangingStatus
+                    }
                     onClick={() => { void handleStatusTransition(nextStatusAction.next); }}
                   >
                     {isChangingStatus ? "Actualizando…" : nextStatusAction.label}

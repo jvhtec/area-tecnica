@@ -15,6 +15,7 @@ import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 export type HojaSectionRuntime = {
   hideJobSelection: boolean;
+  isReadOnly: boolean;
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
   onPrintSectionExcludedChange: (
     sectionId: HojaDeRutaPrintSectionId,
@@ -39,6 +40,7 @@ const printProps = (runtime: HojaSectionRuntime) => ({
 
 export const EventSectionView = ({ runtime }: { runtime: HojaSectionRuntime }) => {
   const slice = useHojaSection("event");
+  const selectedJob = slice.jobs?.find((job) => job.id === slice.selectedJobId) ?? null;
   return (
     <ModernEventSection
       eventData={slice.eventData}
@@ -47,7 +49,12 @@ export const EventSectionView = ({ runtime }: { runtime: HojaSectionRuntime }) =
       setSelectedJobId={slice.setSelectedJobId}
       jobs={slice.jobs}
       isLoadingJobs={slice.isLoadingJobs}
-      jobDetails={null}
+      jobDetails={selectedJob
+        ? {
+            start_time: selectedJob.start_time,
+            end_time: selectedJob.end_time,
+          }
+        : null}
       onAutoPopulate={() => void slice.refreshFromJob(slice.selectedJobId)}
       hideJobSelection={runtime.hideJobSelection}
       {...printProps(runtime)}
@@ -73,6 +80,7 @@ export const WeatherSectionView = ({ runtime }: { runtime: HojaSectionRuntime })
     <ModernWeatherSection
       eventData={slice.eventData}
       setEventData={slice.setEventData}
+      isReadOnly={runtime.isReadOnly}
       {...printProps(runtime)}
     />
   );

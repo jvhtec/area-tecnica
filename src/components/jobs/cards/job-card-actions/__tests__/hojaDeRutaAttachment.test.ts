@@ -79,6 +79,27 @@ describe("hojaDeRutaAttachment", () => {
     expect(selected).toMatchObject({ id: "new-hoja", source: "job_documents" });
   });
 
+  it("picks the newest tagged document regardless of input order", () => {
+    const selected = pickLatestJobHojaDeRutaDocument([
+      {
+        id: "old-tagged",
+        file_name: "Hoja de Ruta - Old.pdf",
+        file_path: "hojas-de-ruta/job-1/old.pdf",
+        document_kind: "hoja_de_ruta",
+        uploaded_at: "2026-06-16T10:00:00Z",
+      },
+      {
+        id: "new-tagged",
+        file_name: "Hoja de Ruta - New.pdf",
+        file_path: "hojas-de-ruta/job-1/new.pdf",
+        document_kind: "hoja_de_ruta",
+        uploaded_at: "2026-06-16T12:00:00Z",
+      },
+    ], "job-1");
+
+    expect(selected).toMatchObject({ id: "new-tagged", source: "job_documents" });
+  });
+
   it("picks the latest linked job Hoja de Ruta across all candidate jobs", () => {
     const selected = pickLatestLinkedJobHojaDeRutaDocument([
       {

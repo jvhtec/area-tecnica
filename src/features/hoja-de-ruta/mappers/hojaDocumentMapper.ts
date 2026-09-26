@@ -213,11 +213,11 @@ export function mapHojaAggregateToDocument(
       staff_member1_id:
         typeof room.staff_member1_hoja_staff_id === "string"
           ? room.staff_member1_hoja_staff_id
-          : String(room.staff_member1_id || ""),
+          : "",
       staff_member2_id:
         typeof room.staff_member2_hoja_staff_id === "string"
           ? room.staff_member2_hoja_staff_id
-          : String(room.staff_member2_id || ""),
+          : "",
     })),
   }));
 

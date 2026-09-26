@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { formatInTimeZone } from "date-fns-tz";
 interface ModernWeatherSectionProps {
   eventData: EventData;
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
+  isReadOnly?: boolean;
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
   onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
@@ -24,6 +25,7 @@ const MADRID_TIMEZONE = "Europe/Madrid";
 export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
   eventData,
   setEventData,
+  isReadOnly = false,
   isPrintSectionExcluded,
   onPrintSectionExcludedChange,
 }) => {
@@ -33,6 +35,7 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
     const date = eventData.weatherFetchedAt ? new Date(eventData.weatherFetchedAt) : null;
     return date && !Number.isNaN(date.getTime()) ? date : null;
   });
+  const lastAutomaticAttemptRef = useRef("");
 
   const isInsideForecastHorizon = useMemo(() => {
     const start = eventData.eventStartDate;
@@ -60,6 +63,7 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
   }, [eventData.weatherFetchedAt]);
 
   const fetchWeather = useCallback(async () => {
+    if (isReadOnly) return;
     if (!eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)) {
       setError("Se requieren fechas del evento y ubicación del venue para obtener el clima");
       return;
@@ -96,18 +100,27 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [eventData.eventDates, eventData.venue, setEventData]);
+  }, [eventData.eventDates, eventData.venue, isReadOnly, setEventData]);
+
+  const automaticAttemptKey = useMemo(() => JSON.stringify([
+    eventData.eventDates || "",
+    eventData.venue.address || "",
+    eventData.venue.coordinates || null,
+  ]), [eventData.eventDates, eventData.venue.address, eventData.venue.coordinates]);
 
   // Refresh only when Open-Meteo can actually forecast the event, and only
   // when the saved forecast is missing or older than 12 hours.
   useEffect(() => {
     if (
-      eventData.eventDates
+      !isReadOnly
+      && eventData.eventDates
       && (eventData.venue.address || eventData.venue.coordinates)
       && isInsideForecastHorizon
       && isWeatherStale
       && !isLoading
+      && lastAutomaticAttemptRef.current !== automaticAttemptKey
     ) {
+      lastAutomaticAttemptRef.current = automaticAttemptKey;
       void fetchWeather();
     }
   }, [
@@ -115,7 +128,9 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
     eventData.venue.address,
     eventData.venue.coordinates,
     fetchWeather,
+    automaticAttemptKey,
     isInsideForecastHorizon,
+    isReadOnly,
     isLoading,
     isWeatherStale,
   ]);
@@ -149,7 +164,12 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
               )}
               <Button
                 onClick={fetchWeather}
-                disabled={isLoading || !eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)}
+                disabled={
+                  isReadOnly
+                  || isLoading
+                  || !eventData.eventDates
+                  || (!eventData.venue.address && !eventData.venue.coordinates)
+                }
                 variant="outline"
                 size="sm"
                 className="text-sky-600 border-sky-300 hover:bg-sky-50"

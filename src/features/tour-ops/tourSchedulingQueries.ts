@@ -132,7 +132,10 @@ export async function fetchTourOpsModel(
   const aggregateResults = await Promise.all(
     jobIds.map(async (jobId) => {
       const { data, error } = await client.rpc("get_hoja_de_ruta", { p_job_id: jobId });
-      if (error) throw error;
+      if (error) {
+        if (error.code === "42501") return null;
+        throw error;
+      }
       return isRecord(data) ? data : null;
     }),
   );
