@@ -7,6 +7,7 @@ export type HojaDeRutaAttachmentRow = {
   file_path: string | null;
   file_type?: string | null;
   uploaded_at?: string | null;
+  document_kind?: string | null;
 };
 
 export type HojaDeRutaAttachmentDoc = HojaDeRutaAttachmentRow & {
@@ -47,6 +48,8 @@ export const isJobHojaDeRutaDocument = (doc: HojaDeRutaAttachmentRow, jobId: str
   const path = normalizePath(doc.file_path);
   if (!path) return false;
   if (!isPdfDocument(doc)) return false;
+  if (doc.document_kind === "hoja_de_ruta") return true;
+  if (doc.document_kind && doc.document_kind !== "hoja_de_ruta") return false;
   if (path.startsWith(`hojas-de-ruta/${jobId}/`)) return true;
   if (path.startsWith("hojas-de-ruta/") && hasHojaDeRutaText(doc)) return true;
   if (path.startsWith(`${jobId}/`) && hasHojaDeRutaText(doc)) return true;
@@ -65,9 +68,9 @@ export const pickLatestJobHojaDeRutaDocument = (
   docs: HojaDeRutaAttachmentRow[] | null | undefined,
   jobId: string
 ): HojaDeRutaAttachmentDoc | null => {
-  const doc = (docs || [])
-    .filter((candidate) => isJobHojaDeRutaDocument(candidate, jobId))
-    .sort(byNewestUpload)[0];
+  const candidates = (docs || []).filter((candidate) => isJobHojaDeRutaDocument(candidate, jobId));
+  const doc = candidates.find((candidate) => candidate.document_kind === "hoja_de_ruta")
+    || candidates.sort(byNewestUpload)[0];
   return doc ? { ...doc, source: "job_documents" } : null;
 };
 
