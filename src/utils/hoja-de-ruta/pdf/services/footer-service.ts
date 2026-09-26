@@ -1,6 +1,7 @@
 import { stampReportFolios } from '@/utils/pdf/report-system';
 import { PDFDocument } from '../core/pdf-document';
 import { HojaPageLabels, drawHojaChrome } from '../hoja-report-system';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 /**
  * Final pass over the document: the running head, the footer band and the folio
@@ -36,7 +37,7 @@ export class FooterService {
 
       stampReportFolios(pdfDoc.document, { skipPages: hasCoverPage ? [1] : [] });
     } catch (error) {
-      console.error('Error adding footer to pages:', error);
+      reportHojaError('pdf.footer.add', error);
     }
   }
 }

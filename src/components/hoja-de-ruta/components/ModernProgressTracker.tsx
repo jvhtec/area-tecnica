@@ -9,10 +9,10 @@ interface ModernProgressTrackerProps {
 
 export const ModernProgressTracker: React.FC<ModernProgressTrackerProps> = ({ progress }) => {
   const getProgressColor = () => {
-    if (progress < 25) return "bg-red-500";
-    if (progress < 50) return "bg-amber-500";
-    if (progress < 75) return "bg-blue-500";
-    return "bg-green-500";
+    if (progress < 25) return "bg-destructive";
+    if (progress < 50) return "bg-warning";
+    if (progress < 75) return "bg-info";
+    return "bg-success";
   };
 
   const getProgressText = () => {
@@ -30,7 +30,7 @@ export const ModernProgressTracker: React.FC<ModernProgressTrackerProps> = ({ pr
           transition={{ duration: 0.5 }}
         >
           {progress === 100 ? (
-            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <CheckCircle2 className="w-5 h-5 text-success" />
           ) : (
             <Circle className="w-5 h-5 text-muted-foreground" />
           )}

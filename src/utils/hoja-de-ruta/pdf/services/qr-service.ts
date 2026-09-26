@@ -1,4 +1,5 @@
 import * as QRCode from 'qrcode';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export class QRService {
   static async generateQRCode(text: string): Promise<string> {
@@ -9,7 +10,7 @@ export class QRService {
         color: { dark: '#000000', light: '#FFFFFF' }
       });
     } catch (error) {
-      console.error('Error generating QR code:', error);
+      reportHojaError('pdf.qr.generate', error);
       throw error;
     }
   }

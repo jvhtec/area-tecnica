@@ -27,10 +27,14 @@ export async function saveHojaAggregate(args: {
   expectedVersion: number;
   payload: Record<string, unknown>;
 }): Promise<{ id: string; document_version: number }> {
+  const removedImageIds = Array.isArray(args.payload.removedImageIds)
+    ? args.payload.removedImageIds.filter((value): value is string => typeof value === "string")
+    : [];
   const { data, error } = await client.rpc("save_hoja_de_ruta", {
     p_job_id: args.jobId,
     p_expected_version: args.expectedVersion,
     p_payload: args.payload as Json,
+    p_removed_image_ids: removedImageIds,
   });
   if (error) throw error;
 
@@ -51,8 +55,10 @@ export async function saveHojaAggregate(args: {
 export async function setHojaStatus(
   jobId: string,
   status: HojaStatus,
+  expectedVersion: number,
 ): Promise<HojaStatusTransitionResult> {
   const { data, error } = await client.rpc("set_hoja_de_ruta_status", {
+    p_expected_version: expectedVersion,
     p_job_id: jobId,
     p_status: status,
   });

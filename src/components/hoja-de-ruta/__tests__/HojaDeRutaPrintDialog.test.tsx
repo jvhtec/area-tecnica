@@ -9,33 +9,40 @@ import {
   HojaDeRutaPrintDialog,
   type HojaDeRutaPrintSection,
 } from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 
 const sections: HojaDeRutaPrintSection[] = [
   { id: "event", label: "Evento", icon: Calendar },
   { id: "venue", label: "Lugar", icon: MapPin },
 ];
 
+const renderDialog = (overrides: Partial<React.ComponentProps<typeof HojaDeRutaPrintDialog>> = {}) => render(
+  <ConfirmDialogProvider>
+    <HojaDeRutaPrintDialog
+      showDialog
+      setShowDialog={vi.fn()}
+      onGeneratePDF={vi.fn()}
+      onPublishPDF={vi.fn()}
+      canPublish
+      onGenerateDriverCertificatePDF={vi.fn()}
+      onGenerateSectionPDF={vi.fn()}
+      onPreviewPDF={vi.fn()}
+      onPreviewDriverCertificatePDF={vi.fn()}
+      onPreviewSectionPDF={vi.fn()}
+      onGenerateXLS={vi.fn()}
+      onGenerateAccreditationXLS={vi.fn()}
+      sections={sections}
+      {...overrides}
+    />
+  </ConfirmDialogProvider>,
+);
+
 describe("HojaDeRutaPrintDialog", () => {
   it("renders section PDF actions and calls the selected section handler", async () => {
     const user = userEvent.setup();
     const onGenerateSectionPDF = vi.fn();
 
-    render(
-      <HojaDeRutaPrintDialog
-        showDialog
-        setShowDialog={vi.fn()}
-        onGeneratePDF={vi.fn()}
-        onPublishPDF={vi.fn()}
-        canPublish
-        onGenerateDriverCertificatePDF={vi.fn()}
-        onGenerateSectionPDF={onGenerateSectionPDF}
-        onPreviewPDF={vi.fn()}
-        onPreviewDriverCertificatePDF={vi.fn()}
-        onPreviewSectionPDF={vi.fn()}
-        onGenerateXLS={vi.fn()}
-        sections={sections}
-      />
-    );
+    renderDialog({ onGenerateSectionPDF });
 
     expect(screen.getByText("Imprimir sección a PDF")).toBeInTheDocument();
     expect(
@@ -54,22 +61,7 @@ describe("HojaDeRutaPrintDialog", () => {
     const onPreviewPDF = vi.fn();
     const onPreviewSectionPDF = vi.fn();
 
-    render(
-      <HojaDeRutaPrintDialog
-        showDialog
-        setShowDialog={vi.fn()}
-        onGeneratePDF={onGeneratePDF}
-        onPublishPDF={vi.fn()}
-        canPublish
-        onGenerateDriverCertificatePDF={vi.fn()}
-        onGenerateSectionPDF={vi.fn()}
-        onPreviewPDF={onPreviewPDF}
-        onPreviewDriverCertificatePDF={vi.fn()}
-        onPreviewSectionPDF={onPreviewSectionPDF}
-        onGenerateXLS={vi.fn()}
-        sections={sections}
-      />
-    );
+    renderDialog({ onGeneratePDF, onPreviewPDF, onPreviewSectionPDF });
 
     await user.click(screen.getByRole("button", { name: "Vista previa documento completo PDF" }));
     await user.click(screen.getByRole("button", { name: "Vista previa Evento" }));
@@ -77,5 +69,17 @@ describe("HojaDeRutaPrintDialog", () => {
     expect(onPreviewPDF).toHaveBeenCalledTimes(1);
     expect(onPreviewSectionPDF).toHaveBeenCalledWith("event");
     expect(onGeneratePDF).not.toHaveBeenCalled();
+  });
+
+  it("requires confirmation before exporting accreditation data", async () => {
+    const user = userEvent.setup();
+    const onGenerateAccreditationXLS = vi.fn();
+    renderDialog({ onGenerateAccreditationXLS });
+
+    await user.click(screen.getByRole("button", { name: "Exportar acreditaciones (XLS)" }));
+    expect(onGenerateAccreditationXLS).not.toHaveBeenCalled();
+
+    await user.click(await screen.findByRole("button", { name: "Exportar" }));
+    expect(onGenerateAccreditationXLS).toHaveBeenCalledTimes(1);
   });
 });

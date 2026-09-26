@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { PlacesImageService } from "@/utils/hoja-de-ruta/pdf/services/places-image-service";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
+import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
 
 interface ModernVenueSectionProps {
   eventData: EventData;
@@ -45,18 +46,9 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
   const [staticMapUrl, setStaticMapUrl] = useState<string | null>(null);
   const fetchedQueriesRef = useRef<Set<string>>(new Set());
 
-  // Update coordinates when eventData changes
-  useEffect(() => {
-    if (eventData.venue.coordinates && eventData.venue.address) {
-      // Sync with coordinates from venue selection in EventDetailsSection
-      console.log('VenueLocationSection: Syncing with venue data:', eventData.venue);
-    }
-  }, [eventData.venue.coordinates, eventData.venue.address]);
-
   // When we receive a static map URL from GoogleMap, convert it to a preview for the PDF
   useEffect(() => {
     if (staticMapUrl) {
-      console.log('🗺️ ModernVenueSection: staticMapUrl received, generating preview for PDF');
       handleVenueMapUrl(staticMapUrl);
     }
   }, [staticMapUrl, handleVenueMapUrl]);
@@ -92,7 +84,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
           fetchedQueriesRef.current.add(key);
         }
       } catch (e) {
-        console.warn('Failed to fetch venue suggestion photos:', e);
+        reportHojaError("venue.suggestionPhotos.fetch", e);
       }
     })();
 
@@ -148,7 +140,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
         <Card className="border-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-green-600" />
+              <ImageIcon className="w-5 h-5 text-success" />
               Imágenes del Venue
             </CardTitle>
           </CardHeader>
@@ -156,7 +148,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
             {/* Upload Area */}
             <div
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragOver ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-green-400'
+                dragOver ? 'border-success bg-success/10' : 'border-border hover:border-success/60'
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -165,11 +157,11 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => handleDrop(e, 'venue')}
             >
-              <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">
+              <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 Subir Imágenes del Venue
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-muted-foreground mb-4">
                 Arrastra las imágenes aquí o haz clic para seleccionar
               </p>
               <input
@@ -200,7 +192,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="relative group rounded-lg overflow-hidden border-2 border-gray-200"
+                      className="relative group rounded-lg overflow-hidden border-2 border-border"
                     >
                       <img
                         src={preview}
@@ -240,7 +232,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 justify-between">
               <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-600" />
+                <MapPin className="w-5 h-5 text-success" />
                 Ubicación del Venue
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -322,8 +314,8 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
             {eventData.venue.address || eventData.venue.coordinates ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-4">
-                  <MapPin className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-700">
+                  <MapPin className="w-4 h-4 text-success" />
+                  <span className="text-sm font-medium text-success">
                     {eventData.venue.name ? `${eventData.venue.name} - Ubicación confirmada` : 'Ubicación confirmada'}
                   </span>
                 </div>
@@ -349,10 +341,10 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <MapPin className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-lg font-medium mb-2">No hay ubicación configurada</p>
                 <p className="text-sm mb-4">Complete el nombre del venue en la sección "Información del Evento" para ver el mapa aquí automáticamente</p>
-                <p className="text-xs text-blue-600">✓ Integración Google Maps habilitada</p>
+                <p className="text-xs text-info">✓ Integración Google Maps habilitada</p>
               </div>
             )}
           </CardContent>

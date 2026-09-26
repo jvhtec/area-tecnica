@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
 
 export type HojaPdfDocumentKind = "hoja_de_ruta" | "certificado_entrega";
 
@@ -9,6 +10,7 @@ const HOJA_PDF_FOLDER_BY_KIND: Record<HojaPdfDocumentKind, string> = {
 
 interface UploadPdfToJobOptions {
   kind?: HojaPdfDocumentKind;
+  expectedDocumentVersion?: number;
 }
 
 export const sanitizeHojaPdfFileName = (fileName: string): string => {
@@ -88,9 +90,18 @@ export const uploadPdfToJob = async (
   let previousPaths: string[] = [];
 
   if (kind === "hoja_de_ruta") {
+    if (options.expectedDocumentVersion === undefined) {
+      await supabase.from("job_documents").delete().eq("id", inserted.id);
+      await supabase.storage.from("job-documents").remove([filePath]);
+      throw new Error("Falta la versión esperada para publicar la Hoja de Ruta");
+    }
     const { data: retiredPaths, error: publishError } = await supabase.rpc(
       "publish_hoja_de_ruta_document",
-      { p_job_id: jobId, p_document_id: inserted.id },
+      {
+        p_job_id: jobId,
+        p_document_id: inserted.id,
+        p_expected_version: options.expectedDocumentVersion,
+      },
     );
 
     if (publishError) {
@@ -109,7 +120,7 @@ export const uploadPdfToJob = async (
       .in("id", previousIds);
 
     if (dbDeleteError) {
-      console.warn("No se pudieron limpiar referencias antiguas del documento:", dbDeleteError);
+      reportHojaError("pdfUpload.oldReferences.cleanup", dbDeleteError);
       previousPaths = [];
     }
   }
@@ -119,7 +130,7 @@ export const uploadPdfToJob = async (
       .from("job-documents")
       .remove(previousPaths);
     if (removeError) {
-      console.warn("No se pudieron limpiar objetos de documentos antiguos:", removeError);
+      reportHojaError("pdfUpload.oldObjects.cleanup", removeError);
     }
   }
 

@@ -21,6 +21,7 @@ export type HojaSectionRuntime = {
     sectionId: HojaDeRutaPrintSectionId,
     isExcluded: boolean,
   ) => void;
+  validationErrorFor: (path: string) => string | undefined;
   venue: Pick<
     ComponentProps<typeof ModernVenueSection>,
     | "images"
@@ -57,6 +58,7 @@ export const EventSectionView = ({ runtime }: { runtime: HojaSectionRuntime }) =
         : null}
       onAutoPopulate={() => void slice.refreshFromJob(slice.selectedJobId)}
       hideJobSelection={runtime.hideJobSelection}
+      validationErrorFor={runtime.validationErrorFor}
       {...printProps(runtime)}
     />
   );

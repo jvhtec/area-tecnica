@@ -87,7 +87,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="p-6 border-2 border-gray-200 rounded-lg bg-gradient-to-r from-pink-50 to-transparent"
+                  className="p-6 border-2 border-border rounded-lg bg-gradient-to-r from-muted/40 to-transparent"
                 >
                   {/* Hotel Header */}
                   <div className="flex items-center justify-between mb-6">
@@ -99,7 +99,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                       size="sm"
                       variant="outline"
                       onClick={() => onRemoveAccommodation(accommodationIndex)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-destructive hover:text-destructive/80"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -202,7 +202,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 10 }}
-                          className="p-4 border border-gray-200 rounded-lg bg-white/70"
+                          className="p-4 border border-border rounded-lg bg-card"
                         >
                           <div className="flex items-center justify-between mb-4">
                             <h5 className="font-medium text-sm">Habitación {roomIndex + 1}</h5>
@@ -210,7 +210,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                               size="sm"
                               variant="outline"
                               onClick={() => onRemoveRoom(accommodationIndex, roomIndex)}
-                              className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                              className="text-destructive hover:text-destructive/80 h-8 w-8 p-0"
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>

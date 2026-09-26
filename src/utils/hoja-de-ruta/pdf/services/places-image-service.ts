@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 /**
  * Fetches location photos via the `place-photos` edge function.
@@ -38,14 +39,14 @@ export class PlacesImageService {
         },
       });
       if (error) {
-        console.warn('place-photos function failed:', error);
+        reportHojaError('pdf.placePhotos.fetch', error);
         return [];
       }
       const photos = (data?.photos as string[]) || [];
       this.photoCache.set(cacheKey, photos);
       return photos;
     } catch (e) {
-      console.warn('getPhotosForQuery failed:', e);
+      reportHojaError('pdf.placePhotos.fetch', e);
       return [];
     }
   }

@@ -1,6 +1,7 @@
 import type { EventData } from '@/types/hoja-de-ruta';
 import { normalizeVenueCoordinates } from '@/utils/hoja-de-ruta/venue-resolution';
 import { buildStaticMapUrl, geocodeForward, getMapboxToken } from '@/lib/mapbox/mapboxClient';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export class MapService {
   private static geocodeCache: Map<string, { lat: number; lng: number }> = new Map();
@@ -23,7 +24,7 @@ export class MapService {
       }
       return null;
     } catch (e) {
-      console.warn('Geocoding failed for address:', address, e);
+      reportHojaError('pdf.map.geocode', e);
       return null;
     }
   }
@@ -58,7 +59,7 @@ export class MapService {
       this.mapCache.set(cacheKey, dataUrl);
       return dataUrl;
     } catch (e) {
-      console.warn('Mapbox static map fetch failed:', e);
+      reportHojaError('pdf.map.static.fetch', e);
       return null;
     }
   }
@@ -119,7 +120,7 @@ export class MapService {
       if (!coords) return null;
       return this.getStaticMapDataUrl(coords.lat, coords.lng, width, height, zoom);
     } catch (e) {
-      console.warn('getMapImageForAddress failed:', e);
+      reportHojaError('pdf.map.address.fetch', e);
       return null;
     }
   }

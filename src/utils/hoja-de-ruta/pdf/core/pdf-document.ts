@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import { reportGeometry } from '@/utils/pdf/report-system';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
@@ -59,7 +60,7 @@ export class PDFDocument {
     try {
       this.doc.addImage(imageData, format, x, y, width, height);
     } catch (error) {
-      console.error('Error adding image to PDF:', error);
+      reportHojaError('pdfDocument.image.add', error);
     }
   }
 
@@ -168,7 +169,7 @@ export class PDFDocument {
     try {
       this.doc.link(x, y, width, height, { url });
     } catch (error) {
-      console.error('Error adding link to PDF:', error);
+      reportHojaError('pdfDocument.link.add', error);
     }
   }
 }

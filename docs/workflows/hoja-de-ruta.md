@@ -23,6 +23,7 @@ Hoja de Ruta is modeled as one versioned document. The React feature owns a cano
 | **PDF export** | `src/utils/hoja-de-ruta/pdf/` |
 | **Excel export** | `src/utils/hojaDeRutaExport.ts` |
 | **Database hardening** | `supabase/migrations/20260926103000_hoja_de_ruta_hardening.sql` |
+| **Roadmap completion migration** | `supabase/migrations/20260926144902_complete_hoja_roadmap.sql` |
 | **Authorization tests** | `supabase/tests/database/hoja_de_ruta_hardening.sql` |
 
 ## Document Boundary
@@ -32,9 +33,9 @@ The canonical database API is:
 | RPC | Purpose |
 |-----|---------|
 | `get_hoja_de_ruta(job_id)` | Returns the authorized aggregate projection for a job. |
-| `save_hoja_de_ruta(job_id, expected_version, document)` | Creates or updates the complete document in one transaction. |
-| `set_hoja_de_ruta_status(job_id, status)` | Applies the forward-only document status transition. |
-| `publish_hoja_de_ruta_document(job_id, file_id)` | Publishes an approved/final PDF to job participants. |
+| `save_hoja_de_ruta(job_id, expected_version, document, removed_image_ids)` | Creates or updates the complete document in one transaction while preserving legacy images unless explicitly removed. |
+| `set_hoja_de_ruta_status(job_id, status, expected_version)` | Applies the forward-only document status transition when the editor still owns the current version. |
+| `publish_hoja_de_ruta_document(job_id, file_id, expected_version)` | Publishes an approved/final PDF to job participants when its source version is still current. |
 
 `replace_hoja_de_ruta_all` remains only as a hardened compatibility RPC for older deployed clients. New code must use `save_hoja_de_ruta`.
 
@@ -59,7 +60,7 @@ The section registry is the source of truth for tabs, completion checks, export 
 ## Concurrency And Status
 
 - Every successful save increments `document_version`.
-- A stale `expected_version` is rejected with SQLSTATE `40001`; the client must reload instead of overwriting newer work.
+- A stale `expected_version` is rejected with SQLSTATE `40001`. The conflict banner offers either a confirmed reload or a deliberate retry against the latest version; the retry never bypasses optimistic concurrency.
 - Status transitions are forward only: `draft -> review -> approved -> final`.
 - A final document is immutable. Both UI controls and the database RPC enforce the lock.
 - PDF download and preview are local export actions. They do not publish a file.
@@ -79,7 +80,19 @@ Keep authorization in the RPCs and database policies. Do not replace aggregate r
 
 Image rows persist storage paths, not expiring signed URLs. Initialization hydrates paths to signed URLs for display; saves map them back to their stable storage representation.
 
+Legacy `data:` rows can be migrated to the private `job-documents` bucket with `npm run hoja:migrate-images -- --apply` after the completion migration is deployed. The script is dry-run by default, validates MIME type and size, uploads to a deterministic path, and swaps the row through a compare-and-set RPC. A `blob:` URL is scoped to the browser session that created it and cannot be recovered server-side. Such rows are preserved during unrelated saves. Once an original file is recovered, name it `<image-uuid>.jpg` (or `.jpeg`, `.png`, `.webp`) and supply its directory with `--blob-dir <path>`; the same dry-run/apply workflow replaces that exact row.
+
 `useHojaDocumentExports` builds PDF, print-preview, and XLS data from the current document and merges production claims into contacts without duplicating an existing staff/contact identity. Section exports use the same document model but never invoke publication. Only the explicit full-document publish action calls `publish_hoja_de_ruta_document`.
+
+The general PDF and XLS exports exclude DNI. The separate accreditation XLS includes DNI, is labeled as internal personal data, and requires an explicit confirmation before local download. It is never uploaded or published by the Hoja workflow.
+
+## Editor Safety And Validation
+
+- The editor validates required event/venue fields, contact formats, DNI/NIE formats, non-negative quantities, and travel/accommodation chronology before save, status changes, preview, publication, or export.
+- Validation moves the editor to the first affected section and exposes field-level errors for required event data.
+- Browser refresh, SPA navigation, job switching, dialog close, Escape, and overlay dismissal all guard unsaved changes.
+- Staff rows persist their department, render in deterministic department groups, and mask DNI until the user explicitly reveals it.
+- Realtime version drift and stale saves surface the same conflict recovery controls.
 
 ## Integration Points
 
@@ -96,6 +109,7 @@ For changes to this feature, run the focused client contracts and database autho
 
 ```bash
 npm run test:critical
+npm run test:e2e:hoja
 npx supabase db reset --local --no-seed
 npx supabase db lint --local --fail-on error --schema public,auth
 npx supabase test db supabase/tests/database/hoja_de_ruta_hardening.sql

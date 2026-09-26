@@ -9,6 +9,7 @@ import type { EventData } from "@/types/hoja-de-ruta";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 import { formatInTimeZone } from "date-fns-tz";
+import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
 
 interface ModernWeatherSectionProps {
   eventData: EventData;
@@ -69,18 +70,11 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
       return;
     }
 
-    console.log('WeatherSection: Fetching weather for:', {
-      eventDates: eventData.eventDates,
-      venue: eventData.venue
-    });
-
     setIsLoading(true);
     setError(null);
 
     try {
       const weatherData = await getWeatherForJob(eventData.venue, eventData.eventDates);
-      
-      console.log('WeatherSection: Received weather data:', weatherData);
       
       const fetchedAt = new Date();
       setEventData(prev => ({
@@ -95,7 +89,7 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
         setError("No se pudieron obtener datos meteorológicos para esta ubicación y fecha");
       }
     } catch (err) {
-      console.error('Weather fetch error:', err);
+      reportHojaError("weather.fetch", err);
       setError("Error al obtener datos meteorológicos. Verifique la conexión a internet.");
     } finally {
       setIsLoading(false);
@@ -144,10 +138,10 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
       transition={{ duration: 0.3 }}
       className="space-y-4"
     >
-      <Card className="border-2 border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50">
+      <Card className="border-2 border-info/30 bg-gradient-to-br from-info/10 to-info/5">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2 text-sky-700">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2 text-info">
               <CloudSun className="w-5 h-5" />
               Previsión Meteorológica
             </CardTitle>
@@ -172,7 +166,7 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
                 }
                 variant="outline"
                 size="sm"
-                className="text-sky-600 border-sky-300 hover:bg-sky-50"
+                className="text-info border-info/40 hover:bg-info/10"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -188,16 +182,16 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
           {isLoading && (
             <div className="flex items-center justify-center py-8">
               <div className="text-center space-y-2">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto text-sky-600" />
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-info" />
                 <p className="text-sm text-muted-foreground">Obteniendo datos meteorológicos...</p>
               </div>
             </div>
           )}
 
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <p className="text-sm text-amber-700">{error}</p>
+            <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-warning" />
+              <p className="text-sm text-warning">{error}</p>
             </div>
           )}
 
@@ -218,26 +212,26 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-sky-100 shadow-sm"
+                      className="flex items-center justify-between p-3 bg-card rounded-lg border border-info/20 shadow-sm"
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{day.icon}</span>
                         <div>
-                          <p className="font-medium text-gray-900 capitalize">{formattedDate}</p>
-                          <p className="text-sm text-gray-600">{day.condition}</p>
+                          <p className="font-medium text-foreground capitalize">{formattedDate}</p>
+                          <p className="text-sm text-muted-foreground">{day.condition}</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-lg text-gray-900">
+                          <span className="font-semibold text-lg text-foreground">
                             {day.maxTemp}°C
                           </span>
-                          <span className="text-gray-500">
+                          <span className="text-muted-foreground">
                             / {day.minTemp}°C
                           </span>
                         </div>
                         {day.precipitationProbability > 0 && (
-                          <p className="text-xs text-blue-600">
+                          <p className="text-xs text-info">
                             🌧️ {day.precipitationProbability}%
                           </p>
                         )}
@@ -247,8 +241,8 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
                 })}
               </div>
 
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs text-blue-700">
+              <div className="p-3 bg-info/10 border border-info/30 rounded-lg">
+                <p className="text-xs text-info">
                   💡 <strong>Tip:</strong> Los datos meteorológicos se actualizan automáticamente y se incluirán en el PDF generado.
                   Fuente: Open-Meteo API
                 </p>
@@ -257,7 +251,7 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
           )}
 
           {!hasWeatherData && !isLoading && !error && (
-            <div className="text-center py-6 text-gray-500">
+            <div className="text-center py-6 text-muted-foreground">
               <CloudSun className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p className="text-sm">
                 {!eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)

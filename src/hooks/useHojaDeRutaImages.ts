@@ -34,9 +34,11 @@ const blobFromPreview = async (previewUrl: string): Promise<Blob> => {
 export const useHojaDeRutaImages = () => {
   const [managedImages, setManagedImages] = useState<ManagedImage[]>([]);
   const [removedStoragePaths, setRemovedStoragePaths] = useState<string[]>([]);
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [savedFingerprint, setSavedFingerprint] = useState("[]");
   const hydratedKeyRef = useRef<string | null>(null);
   const preparedFingerprintRef = useRef<string | null>(null);
+  const pendingUploadPathsRef = useRef(new Set<string>());
   const hydrationRunRef = useRef(0);
 
   const fingerprintFor = useCallback((items: ManagedImage[]) => JSON.stringify(
@@ -79,6 +81,9 @@ export const useHojaDeRutaImages = () => {
           Array.from(new Set([...paths, existing.cleanupStoragePath!]))
         );
       }
+      if (existing && existing.id !== next?.id) {
+        setRemovedImageIds((ids) => Array.from(new Set([...ids, existing.id])));
+      }
       if (existing?.previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(existing.previewUrl);
       }
@@ -111,6 +116,7 @@ export const useHojaDeRutaImages = () => {
           Array.from(new Set([...paths, target.cleanupStoragePath!]))
         );
       }
+      setRemovedImageIds((ids) => Array.from(new Set([...ids, target.id])));
       if (target.previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(target.previewUrl);
       }
@@ -164,10 +170,22 @@ export const useHojaDeRutaImages = () => {
   const hydratePersistedImages = useCallback(async (
     jobId: string,
     rows: HojaDeRutaImageRecord[] | null | undefined,
+    options: { force?: boolean } = {},
   ) => {
     const signature = `${jobId}:${(rows || []).map((row) => `${row.id}:${row.image_path}`).join("|")}`;
-    if (hydratedKeyRef.current === signature) return;
+    if (!options.force && hydratedKeyRef.current === signature) return;
     const runId = ++hydrationRunRef.current;
+    let failedPendingCleanup: string[] = [];
+
+    if (options.force && pendingUploadPathsRef.current.size > 0) {
+      const pendingPaths = Array.from(pendingUploadPathsRef.current);
+      const { error } = await supabase.storage.from(IMAGE_BUCKET).remove(pendingPaths);
+      if (error) {
+        failedPendingCleanup = pendingPaths;
+      } else {
+        pendingPaths.forEach((path) => pendingUploadPathsRef.current.delete(path));
+      }
+    }
 
     const hydrated = await Promise.all((rows || []).map(async (row): Promise<ManagedImage | null> => {
       if (!row.image_path || row.image_path.startsWith("blob:")) return null;
@@ -212,7 +230,8 @@ export const useHojaDeRutaImages = () => {
       });
       return hydrated.filter((item): item is ManagedImage => Boolean(item));
     });
-    setRemovedStoragePaths([]);
+    setRemovedStoragePaths(failedPendingCleanup);
+    setRemovedImageIds([]);
     const clean = hydrated.filter((item): item is ManagedImage => Boolean(item));
     setSavedFingerprint(fingerprintFor(clean));
     hydratedKeyRef.current = signature;
@@ -238,6 +257,7 @@ export const useHojaDeRutaImages = () => {
         });
 
       if (error) throw error;
+      pendingUploadPathsRef.current.add(storagePath);
       next[index] = { ...item, storagePath, cleanupStoragePath: storagePath };
     }
 
@@ -254,10 +274,13 @@ export const useHojaDeRutaImages = () => {
   }, [fingerprintFor, managedImages]);
 
   const commitImageSave = useCallback(async () => {
+    pendingUploadPathsRef.current.clear();
     if (preparedFingerprintRef.current) {
       setSavedFingerprint(preparedFingerprintRef.current);
       preparedFingerprintRef.current = null;
     }
+
+    setRemovedImageIds([]);
 
     if (removedStoragePaths.length === 0) return;
     const paths = [...removedStoragePaths];
@@ -273,6 +296,7 @@ export const useHojaDeRutaImages = () => {
 
   const imageFingerprint = useMemo(() => fingerprintFor(managedImages), [fingerprintFor, managedImages]);
   const isImageDirty = imageFingerprint !== savedFingerprint;
+  const getRemovedImageIds = useCallback(() => [...removedImageIds], [removedImageIds]);
 
   return {
     images,
@@ -289,6 +313,7 @@ export const useHojaDeRutaImages = () => {
     hydratePersistedImages,
     prepareImagesForSave,
     commitImageSave,
+    getRemovedImageIds,
     imageFingerprint,
     isImageDirty,
   };

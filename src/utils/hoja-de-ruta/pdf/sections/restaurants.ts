@@ -2,6 +2,7 @@ import { PDFDocument } from '../core/pdf-document';
 import { QRService } from '../services/qr-service';
 import { MapService } from '../services/map-service';
 import type { Restaurant } from '@/types/hoja-de-ruta';
+import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
 export class RestaurantsSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -87,7 +88,7 @@ export class RestaurantsSection {
         mapDataUrl = await MapService.getMapImageForAddress(restaurant.address, mapW, mapH, 15);
       }
     } catch (e) {
-      console.warn('Restaurant map fetch failed:', e);
+      reportHojaError('pdf.restaurant.map.fetch', e);
     }
 
     if (mapDataUrl) {
