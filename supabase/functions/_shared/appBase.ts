@@ -9,6 +9,12 @@
  * silently keep pointing outbound links at a domain that no longer serves
  * the app, so any candidate resolving to a known-deprecated host is
  * rejected here rather than trusted.
+ *
+ * A second, distinct failure mode: PUBLIC_APP_URL/SITE_URL/etc. accidentally
+ * set to the Supabase *project* URL (SUPABASE_URL) instead of the frontend's
+ * own domain — the backend API was never meant to serve `/conductor` or any
+ * other SPA route, so that candidate is rejected too, whether or not it
+ * happens to match a known-deprecated suffix.
  */
 
 /** Canonical production app origin — the safe default when nothing else applies. */
@@ -19,14 +25,36 @@ export const CANONICAL_APP_BASE = "https://sector-pro.work";
 // as they're retired.
 const DEPRECATED_HOST_SUFFIXES = [".lovable.app"];
 
+// The Supabase backend is never a valid app origin: it serves the REST/Auth/
+// Storage/Functions API, not the frontend SPA, so a candidate landing here
+// (e.g. a SITE_URL secret set to the project URL by mistake) is rejected
+// even though it's a live, correctly-spelled domain.
+const SUPABASE_API_HOST_SUFFIXES = [".supabase.co", ".supabase.in", ".supabase.net", ".supabase.red"];
+
 function isDeprecatedHost(host: string): boolean {
   const lower = host.toLowerCase();
   return DEPRECATED_HOST_SUFFIXES.some((suffix) => lower.endsWith(suffix));
 }
 
+function isSupabaseApiHost(host: string): boolean {
+  const lower = host.toLowerCase();
+  if (SUPABASE_API_HOST_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return true;
+
+  // Covers self-hosted/custom-domain Supabase deployments too: reject an
+  // exact match against this project's own configured SUPABASE_URL host.
+  const configuredApiUrl = Deno.env.get("SUPABASE_URL");
+  if (!configuredApiUrl) return false;
+  try {
+    return lower === new URL(configuredApiUrl).host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Normalizes an arbitrary URL/host string to `protocol//host`, returning
- * `null` if it's empty, unparsable, or resolves to a deprecated domain.
+ * `null` if it's empty, unparsable, or resolves to a deprecated or
+ * Supabase-API host.
  */
 export function toSafeOrigin(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -34,7 +62,7 @@ export function toSafeOrigin(value: string | null | undefined): string | null {
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
     const url = new URL(withProtocol);
-    if (isDeprecatedHost(url.host)) return null;
+    if (isDeprecatedHost(url.host) || isSupabaseApiHost(url.host)) return null;
     return `${url.protocol}//${url.host}`;
   } catch {
     return null;
