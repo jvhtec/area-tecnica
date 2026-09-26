@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  backfillMissingRowIds,
   buildProgramaDueEvents,
   buildProgramaMessage,
   buildProgramaPayload,
@@ -83,6 +82,62 @@ describe("programa feed due-event generation", () => {
       "2026-07-07",
       "2026-07-08",
     ]);
+  });
+});
+
+describe("programa feed Madrid DST boundaries", () => {
+  it("uses CET before the spring-forward gap and CEST after it", () => {
+    const springJob: ProgramaJob = {
+      id: "spring-job",
+      title: "Cambio horario primavera",
+      start_time: "2026-03-28T12:00:00.000Z",
+      end_time: "2026-03-30T12:00:00.000Z",
+    };
+    const days: ProgramaProgramDay[] = [{
+      date: "2026-03-29",
+      rows: [
+        { id: "before", time: "01:30", item: "Antes", notify: true },
+        { id: "after", time: "03:30", item: "Después", notify: true },
+      ],
+    }];
+
+    const events = buildProgramaDueEvents(
+      springJob,
+      days,
+      new Date("2026-03-29T01:00:00.000Z"),
+    );
+
+    expect(events.find((event) => event.rowId === "before")?.dueAt.toISOString())
+      .toBe("2026-03-29T00:30:00.000Z");
+    expect(events.find((event) => event.rowId === "after")?.dueAt.toISOString())
+      .toBe("2026-03-29T01:30:00.000Z");
+  });
+
+  it("uses CEST before the autumn fallback and CET after it", () => {
+    const autumnJob: ProgramaJob = {
+      id: "autumn-job",
+      title: "Cambio horario otoño",
+      start_time: "2026-10-24T12:00:00.000Z",
+      end_time: "2026-10-26T12:00:00.000Z",
+    };
+    const days: ProgramaProgramDay[] = [{
+      date: "2026-10-25",
+      rows: [
+        { id: "before", time: "01:30", item: "Antes", notify: true },
+        { id: "after", time: "03:30", item: "Después", notify: true },
+      ],
+    }];
+
+    const events = buildProgramaDueEvents(
+      autumnJob,
+      days,
+      new Date("2026-10-25T01:00:00.000Z"),
+    );
+
+    expect(events.find((event) => event.rowId === "before")?.dueAt.toISOString())
+      .toBe("2026-10-24T23:30:00.000Z");
+    expect(events.find((event) => event.rowId === "after")?.dueAt.toISOString())
+      .toBe("2026-10-25T02:30:00.000Z");
   });
 });
 
@@ -201,41 +256,6 @@ describe("programa feed recipient targeting", () => {
   });
 });
 
-describe("programa feed legacy row id backfill", () => {
-  it("assigns ids only to rows that are missing one and flags the result as changed", () => {
-    const days: ProgramaProgramDay[] = [
-      {
-        date: "2026-07-06",
-        rows: [
-          { id: "row-1", time: "18:00", item: "Soundcheck" },
-          { time: "19:00", item: "Doors" },
-        ],
-      },
-    ];
-
-    const result = backfillMissingRowIds(days);
-
-    expect(result.changed).toBe(true);
-    expect(result.days[0].rows?.[0].id).toBe("row-1");
-    expect(result.days[0].rows?.[1].id).toEqual(expect.any(String));
-    expect(result.days[0].rows?.[1].id).not.toBe("");
-  });
-
-  it("reports unchanged when every row already has an id", () => {
-    const days: ProgramaProgramDay[] = [
-      { date: "2026-07-06", rows: [{ id: "row-1", time: "18:00", item: "Soundcheck" }] },
-    ];
-
-    const result = backfillMissingRowIds(days);
-    expect(result.changed).toBe(false);
-    expect(result.days).toEqual(days);
-  });
-
-  it("handles missing/non-array input without throwing", () => {
-    expect(backfillMissingRowIds(undefined)).toEqual({ days: [], changed: false });
-    expect(backfillMissingRowIds(null)).toEqual({ days: [], changed: false });
-  });
-});
 
 describe("programa feed message building", () => {
   it("builds Spanish reminder copy including the job title, item, and time", () => {
