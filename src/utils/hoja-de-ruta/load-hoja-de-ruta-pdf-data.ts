@@ -6,6 +6,10 @@ import {
   normalizeVenueCoordinates,
   resolveHojaVenue,
 } from '@/utils/hoja-de-ruta/venue-resolution';
+import {
+  fetchJobProducerContacts,
+  mergeProducerClaimsIntoContacts,
+} from '@/features/jobs/producer-claims/producerClaims';
 
 const MADRID_TIMEZONE = 'Europe/Madrid';
 
@@ -54,7 +58,7 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
     { data: images, error: imagesError },
     { data: jobRow, error: jobError },
   ] = await Promise.all([
-    supabase.from('hoja_de_ruta_contacts').select('name,role,phone').eq('hoja_de_ruta_id', mainData.id),
+    supabase.from('hoja_de_ruta_contacts').select('name,role,phone,email').eq('hoja_de_ruta_id', mainData.id),
     supabase
       .from('hoja_de_ruta_transport')
       .select('id,transport_type,driver_name,driver_phone,license_plate,company,date_time,has_return,return_date_time,source_logistics_event_id,is_hoja_relevant,logistics_categories')
@@ -114,7 +118,10 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
     name: contact.name || '',
     role: contact.role || '',
     phone: contact.phone || '',
+    email: contact.email || '',
   }));
+  const producerClaims = await fetchJobProducerContacts([jobId]);
+  const mergedContacts = mergeProducerClaimsIntoContacts(mappedContacts, producerClaims);
 
   const mappedTransport: Transport[] = (transportRows || []).map((row) => ({
     id: row.id,
@@ -131,15 +138,25 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
     logistics_categories: Array.isArray(row.logistics_categories) ? row.logistics_categories : [],
   }));
 
-  const venueMapPreview =
-    (images || []).find((image) => image.image_type === 'venue_map' && typeof image.image_path === 'string' && image.image_path.startsWith('data:image/'))?.image_path || null;
+  const venueMapImage = (images || []).find(
+    (image) => image.image_type === 'venue_map' && typeof image.image_path === 'string',
+  );
+  let venueMapPreview: string | null = null;
+  if (venueMapImage?.image_path?.startsWith('data:image/')) {
+    venueMapPreview = venueMapImage.image_path;
+  } else if (venueMapImage?.image_path && !venueMapImage.image_path.startsWith('blob:')) {
+    const { data: signedMap } = await supabase.storage
+      .from('job-documents')
+      .createSignedUrl(venueMapImage.image_path, 60 * 60);
+    venueMapPreview = signedMap?.signedUrl || null;
+  }
 
   return {
     eventData: {
       eventName: mainData.event_name || '',
       eventDates: mainData.event_dates || '',
       venue: mappedVenue,
-      contacts: mappedContacts,
+      contacts: mergedContacts,
       // The Hoja de Transportes PDF only renders venue/contacts/transport.
       staff: [],
       logistics: {
