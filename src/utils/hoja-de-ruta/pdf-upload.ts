@@ -39,18 +39,20 @@ export const uploadPdfToJob = async (
   const { data: authData } = await supabase.auth.getUser();
   const userId = authData.user?.id || null;
 
-  // Snapshot the previous documents of this exact kind. Legacy generated rows
-  // are also caught by the canonical folder while they are being migrated.
-  const { data: existingDocs, error: snapshotError } = await supabase
-    .from("job_documents")
-    .select("id,file_path,document_kind")
-    .eq("job_id", jobId)
-    .like("file_path", `${folderPath}/%`)
-    .order("uploaded_at", { ascending: false });
+  // Non-published document kinds can use ordinary replacement cleanup. The
+  // canonical Hoja path is finalized by one database transaction below.
+  let previousDocs: Array<{ id: string; file_path: string }> = [];
+  if (kind !== "hoja_de_ruta") {
+    const { data: existingDocs, error: snapshotError } = await supabase
+      .from("job_documents")
+      .select("id,file_path")
+      .eq("job_id", jobId)
+      .like("file_path", `${folderPath}/%`)
+      .order("uploaded_at", { ascending: false });
 
-  if (snapshotError) throw snapshotError;
-
-  const previousDocs = (existingDocs || []).filter((doc) => doc.file_path !== filePath);
+    if (snapshotError) throw snapshotError;
+    previousDocs = (existingDocs || []).filter((doc) => doc.file_path !== filePath);
+  }
 
   const { error: uploadError } = await supabase.storage
     .from("job-documents")
@@ -83,40 +85,41 @@ export const uploadPdfToJob = async (
     throw insertError || new Error("No se pudo registrar el documento publicado");
   }
 
+  let previousPaths: string[] = [];
+
   if (kind === "hoja_de_ruta") {
-    const { data: publishedHoja, error: publishError } = await supabase
-      .from("hoja_de_ruta")
-      .update({ published_document_id: inserted.id })
-      .eq("job_id", jobId)
-      .select("id")
-      .maybeSingle();
+    const { data: retiredPaths, error: publishError } = await supabase.rpc(
+      "publish_hoja_de_ruta_document",
+      { p_job_id: jobId, p_document_id: inserted.id },
+    );
 
-    if (publishError || !publishedHoja) {
-      // Keep the new document intact for diagnosis/retry, but never notify the
-      // crew when the canonical pointer was not committed.
-      throw publishError || new Error("No se pudo marcar la Hoja de Ruta como publicada");
+    if (publishError) {
+      await supabase.from("job_documents").delete().eq("id", inserted.id);
+      await supabase.storage.from("job-documents").remove([filePath]);
+      throw publishError;
     }
-  }
-
-  // Cleanup only after the new row and, for Hoja, the canonical pointer exist.
-  if (previousDocs.length) {
+    previousPaths = Array.isArray(retiredPaths) ? retiredPaths : [];
+  } else if (previousDocs.length) {
     const previousIds = previousDocs.map((doc) => doc.id);
-    const previousPaths = previousDocs.map((doc) => doc.file_path);
+    previousPaths = previousDocs.map((doc) => doc.file_path);
 
     const { error: dbDeleteError } = await supabase
       .from("job_documents")
       .delete()
       .in("id", previousIds);
 
-    if (!dbDeleteError && previousPaths.length) {
-      const { error: removeError } = await supabase.storage
-        .from("job-documents")
-        .remove(previousPaths);
-      if (removeError) {
-        console.warn("No se pudieron limpiar PDFs antiguos de Hoja de Ruta:", removeError);
-      }
-    } else if (dbDeleteError) {
-      console.warn("No se pudieron limpiar referencias antiguas de Hoja de Ruta:", dbDeleteError);
+    if (dbDeleteError) {
+      console.warn("No se pudieron limpiar referencias antiguas del documento:", dbDeleteError);
+      previousPaths = [];
+    }
+  }
+
+  if (previousPaths.length) {
+    const { error: removeError } = await supabase.storage
+      .from("job-documents")
+      .remove(previousPaths);
+    if (removeError) {
+      console.warn("No se pudieron limpiar objetos de documentos antiguos:", removeError);
     }
   }
 
