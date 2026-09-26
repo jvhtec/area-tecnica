@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 // Import the working hooks
-import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
+import { useHojaDocument } from "@/features/hoja-de-ruta/model/useHojaDocument";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
@@ -122,7 +122,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     addTransport,
     removeTransport,
     importTransports
-  } = useHojaDeRutaForm({
+  } = useHojaDocument({
     prepareImagesForSave,
     commitImageSave,
     isImageDirty,
