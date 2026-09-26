@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { resolveConfiguredAppBase, toSafeOrigin } from "../_shared/appBase.ts";
 import { joinedSingle } from "../_shared/joins.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { broadcastPush } from "../_shared/pushBroadcast.ts";
@@ -81,30 +82,6 @@ type VacationRequestRow = {
   tech?: ProfileLite | null;
   approver?: ProfileLite | null;
 };
-
-function pickEnvBase(): string | undefined {
-  const candidates = [
-    Deno.env.get("PUBLIC_APP_URL"),
-    Deno.env.get("PUBLIC_SITE_URL"),
-    Deno.env.get("NEXT_PUBLIC_SITE_URL"),
-    Deno.env.get("SITE_URL"),
-    Deno.env.get("PUBLIC_CONFIRM_BASE"),
-  ];
-  for (const val of candidates) {
-    if (val && val.trim()) return val.trim();
-  }
-  return undefined;
-}
-
-function toOrigin(input?: string): string | undefined {
-  if (!input) return undefined;
-  try {
-    const u = new URL(input);
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    return input.replace(/\/$/, "");
-  }
-}
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
@@ -376,10 +353,9 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Missing request_id(s)" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    const envBaseRaw = pickEnvBase();
-    const envBase = toOrigin(envBaseRaw);
+    const envBase = resolveConfiguredAppBase();
     const rawOrigin = req.headers.get('origin') || req.headers.get('referer');
-    const originBase = rawOrigin ? toOrigin(rawOrigin.split('?')[0]) : undefined;
+    const originBase = rawOrigin ? toSafeOrigin(rawOrigin.split('?')[0]) : undefined;
     const baseUrl = envBase || originBase || 'http://localhost:3000';
 
 
