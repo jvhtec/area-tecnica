@@ -3,61 +3,42 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
-  Calendar,
-  MapPin,
-  Users,
   Sparkles,
   CheckCircle2,
   Clock,
   Eye,
-  Building2,
-  Phone,
-  Car,
-  Bed,
-  Activity,
   Database,
-  UtensilsCrossed,
   AlertCircle,
   FileDown,
-  CloudSun
 } from "lucide-react";
 
 // Import the working hooks
 import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 
-// Import new modern sections
-import { ModernEventSection } from "./sections/ModernEventSection";
-import { ModernVenueSection } from "./sections/ModernVenueSection";
-import { ModernContactsSection } from "./sections/ModernContactsSection";
-import { ModernStaffSection } from "./sections/ModernStaffSection";
-import { ModernTravelSection } from "./sections/ModernTravelSection";
-import { ModernAccommodationSection } from "./sections/ModernAccommodationSection";
-import { ModernLogisticsSection } from "./sections/ModernLogisticsSection";
-import { ModernScheduleSection } from "./sections/ModernScheduleSection";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { HojaDeRutaHeaderActions } from "@/components/hoja-de-ruta/components/HojaDeRutaHeaderActions";
 import { MobileSectionSwitcher } from "@/components/hoja-de-ruta/components/MobileSectionSwitcher";
 import { MobileSaveBar } from "@/components/hoja-de-ruta/components/MobileSaveBar";
 import { QuickNavigationSidebar } from "@/components/hoja-de-ruta/components/QuickNavigationSidebar";
-import { ModernWeatherSection } from "./sections/ModernWeatherSection";
-import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
 import { HojaDeRutaPdfPreviewDialog } from "./HojaDeRutaPdfPreviewDialog";
 import {
-  getHojaDeRutaPdfSectionLabel,
-  type HojaDeRutaPdfSectionId,
   type HojaDeRutaPrintSectionId,
   normalizeHojaDeRutaPrintSections,
 } from "@/utils/hoja-de-ruta/pdf";
-import type { LucideIcon } from "lucide-react";
+import {
+  HOJA_SECTION_REGISTRY,
+  type HojaSectionCompletionContext,
+  type HojaSectionRenderContext,
+} from "@/features/hoja-de-ruta/sections/sectionRegistry";
 import type { HojaDeRutaTabOption } from "@/components/hoja-de-ruta/types";
 import { useHojaDeRutaExports } from "@/components/hoja-de-ruta/useHojaDeRutaExports";
 
@@ -154,21 +135,20 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     }
   }, [routedJobId, selectedJobId, setSelectedJobId]);
 
-  const completionProgress = useMemo(() => {
-    const checks = [
-      Boolean(eventData.eventName && eventData.eventDates),
-      Boolean(eventData.venue.name && eventData.venue.address),
-      Boolean(eventData.weather?.length),
-      eventData.contacts.some((contact) => Boolean(contact.name && (contact.phone || contact.email))),
-      eventData.staff.some((staff) => Boolean(staff.name && staff.position)),
-      travelArrangements.some((travel) => Boolean(travel.transportation_type)),
-      accommodations.some((acc) => Boolean(acc.hotel_name || acc.rooms.some((room) => room.room_type))),
-      Boolean(eventData.logistics.transport.length || eventData.logistics.loadingDetails),
-      Boolean(eventData.schedule || eventData.programScheduleDays?.some((day) => day.rows.length)),
-      Boolean(eventData.restaurants?.some((restaurant) => restaurant.isSelected)),
-    ];
-    return (checks.filter(Boolean).length / checks.length) * 100;
-  }, [accommodations, eventData, travelArrangements]);
+  const sectionCompletionContext: HojaSectionCompletionContext = {
+    eventData,
+    travelArrangements,
+    accommodations,
+  };
+  const completionProgress = useMemo(
+    () => (
+      HOJA_SECTION_REGISTRY.filter((section) =>
+        section.isComplete({ eventData, travelArrangements, accommodations })
+      ).length
+      / HOJA_SECTION_REGISTRY.length
+    ) * 100,
+    [accommodations, eventData, travelArrangements],
+  );
 
   useEffect(() => {
     if (!selectedJobId || isLoadingHojaDeRuta) return;
@@ -288,28 +268,118 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     }
   };
 
-  const tabPresentationConfig: Array<{ id: HojaDeRutaPdfSectionId; icon: LucideIcon; color: string }> = [
-    { id: "event", icon: Calendar, color: "text-blue-600" },
-    { id: "venue", icon: MapPin, color: "text-green-600" },
-    { id: "weather", icon: CloudSun, color: "text-sky-600" },
-    { id: "contacts", icon: Phone, color: "text-purple-600" },
-    { id: "staff", icon: Users, color: "text-orange-600" },
-    { id: "travel", icon: Car, color: "text-cyan-600" },
-    { id: "accommodation", icon: Bed, color: "text-pink-600" },
-    { id: "logistics", icon: Building2, color: "text-indigo-600" },
-    { id: "schedule", icon: Activity, color: "text-red-600" },
-    { id: "restaurants", icon: UtensilsCrossed, color: "text-emerald-600" },
-  ];
-
-  const tabConfig: HojaDeRutaTabOption[] = tabPresentationConfig.map((section) => ({
-    ...section,
-    label: getHojaDeRutaPdfSectionLabel(section.id),
+  const tabConfig: HojaDeRutaTabOption[] = HOJA_SECTION_REGISTRY.map((section) => ({
+    id: section.id,
+    label: section.label,
+    icon: section.icon,
+    color: section.color,
   }));
 
   const excludedPrintSections = normalizeHojaDeRutaPrintSections(eventData.printExcludedSections);
   const excludedPrintSectionSet = new Set<HojaDeRutaPrintSectionId>(excludedPrintSections);
   const isPrintSectionExcluded = (sectionId: HojaDeRutaPrintSectionId) =>
     excludedPrintSectionSet.has(sectionId);
+
+  const sectionRenderContext: HojaSectionRenderContext = {
+    event: {
+      eventData,
+      setEventData,
+      selectedJobId,
+      setSelectedJobId,
+      jobs,
+      isLoadingJobs,
+      jobDetails: null,
+      onAutoPopulate: handleLoadJobData,
+      hideJobSelection: Boolean(routedJobId),
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    venue: {
+      eventData,
+      setEventData,
+      images,
+      imagePreviews,
+      onImageUpload: handleImageUpload,
+      onRemoveImage: removeImage,
+      onVenueMapUpload: handleVenueMapUpload,
+      handleVenueMapUrl,
+      appendVenuePreviews,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    weather: {
+      eventData,
+      setEventData,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    contacts: {
+      eventData,
+      onContactChange: handleContactChange,
+      onAddContact: addContact,
+      onRemoveContact: removeContact,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    staff: {
+      eventData,
+      onStaffChange: handleStaffChange,
+      onAddStaff: addStaffMember,
+      onRemoveStaff: removeStaffMember,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    travel: {
+      travelArrangements,
+      onUpdate: updateTravelArrangement,
+      onAdd: addTravelArrangement,
+      onRemove: removeTravelArrangement,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    accommodation: {
+      accommodations,
+      eventData,
+      onUpdateAccommodation: (index, data) => {
+        setAccommodations((previous) =>
+          previous.map((accommodation, currentIndex) =>
+            currentIndex === index ? { ...accommodation, ...data } : accommodation
+          )
+        );
+      },
+      onUpdateRoom: updateRoom,
+      onAddAccommodation: addAccommodation,
+      onRemoveAccommodation: removeAccommodation,
+      onAddRoom: addRoom,
+      onRemoveRoom: removeRoom,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    logistics: {
+      eventData,
+      setEventData,
+      onUpdateTransport: updateTransport,
+      onAddTransport: addTransport,
+      onRemoveTransport: removeTransport,
+      onImportTransports: importTransports,
+      jobId: jobId || selectedJobId,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    schedule: {
+      eventData,
+      setEventData,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+    restaurants: {
+      eventData,
+      onUpdateEventData: setEventData,
+      accommodations,
+      isPrintSectionExcluded,
+      onPrintSectionExcludedChange: handlePrintExclusionChange,
+    },
+  };
 
   if (isLoadingHojaDeRuta) {
     return (
@@ -529,133 +599,9 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <TabsContent value="event" className="mt-0" id="panel-event" role="tabpanel">
-                      <ModernEventSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        selectedJobId={selectedJobId}
-                        setSelectedJobId={setSelectedJobId}
-                        jobs={jobs}
-                        isLoadingJobs={isLoadingJobs}
-                        jobDetails={null}
-                        onAutoPopulate={handleLoadJobData}
-                        hideJobSelection={Boolean(routedJobId)}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="venue" className="mt-0" id="panel-venue" role="tabpanel">
-                      <ModernVenueSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        images={images}
-                        imagePreviews={imagePreviews}
-                        onImageUpload={handleImageUpload}
-                        onRemoveImage={removeImage}
-                        onVenueMapUpload={handleVenueMapUpload}
-                        handleVenueMapUrl={handleVenueMapUrl}
-                        appendVenuePreviews={appendVenuePreviews}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="weather" className="mt-0" id="panel-weather" role="tabpanel">
-                      <ModernWeatherSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="contacts" className="mt-0" id="panel-contacts" role="tabpanel">
-                      <ModernContactsSection
-                        eventData={eventData}
-                        onContactChange={handleContactChange}
-                        onAddContact={addContact}
-                        onRemoveContact={removeContact}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="staff" className="mt-0" id="panel-staff" role="tabpanel">
-                      <ModernStaffSection
-                        eventData={eventData}
-                        onStaffChange={handleStaffChange}
-                        onAddStaff={addStaffMember}
-                        onRemoveStaff={removeStaffMember}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="travel" className="mt-0" id="panel-travel" role="tabpanel">
-                      <ModernTravelSection
-                        travelArrangements={travelArrangements}
-                        onUpdate={updateTravelArrangement}
-                        onAdd={addTravelArrangement}
-                        onRemove={removeTravelArrangement}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="accommodation" className="mt-0" id="panel-accommodation" role="tabpanel">
-                       <ModernAccommodationSection
-                         accommodations={accommodations}
-                         eventData={eventData}
-                         onUpdateAccommodation={(index, data) => {
-                           setAccommodations(prev => 
-                             prev.map((acc, i) => 
-                               i === index ? { ...acc, ...data } : acc
-                             )
-                           );
-                         }}
-                         onUpdateRoom={updateRoom}
-                         onAddAccommodation={addAccommodation}
-                         onRemoveAccommodation={removeAccommodation}
-                         onAddRoom={addRoom}
-                         onRemoveRoom={removeRoom}
-                         isPrintSectionExcluded={isPrintSectionExcluded}
-                         onPrintSectionExcludedChange={handlePrintExclusionChange}
-                       />
-                    </TabsContent>
-
-                     <TabsContent value="logistics" className="mt-0" id="panel-logistics" role="tabpanel">
-                       <ModernLogisticsSection
-                         eventData={eventData}
-                         setEventData={setEventData}
-                         onUpdateTransport={updateTransport}
-                         onAddTransport={addTransport}
-                         onRemoveTransport={removeTransport}
-                         onImportTransports={importTransports}
-                         jobId={jobId || selectedJobId}
-                         isPrintSectionExcluded={isPrintSectionExcluded}
-                         onPrintSectionExcludedChange={handlePrintExclusionChange}
-                       />
-                     </TabsContent>
-
-                    <TabsContent value="schedule" className="mt-0" id="panel-schedule" role="tabpanel">
-                      <ModernScheduleSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="restaurants" className="mt-0" id="panel-restaurants" role="tabpanel">
-                      <ModernRestaurantSection
-                        eventData={eventData}
-                        onUpdateEventData={setEventData}
-                        accommodations={accommodations}
-                        isPrintSectionExcluded={isPrintSectionExcluded}
-                        onPrintSectionExcludedChange={handlePrintExclusionChange}
-                      />
-                    </TabsContent>
+                    {HOJA_SECTION_REGISTRY.map((section) =>
+                      section.render(sectionRenderContext)
+                    )}
                   </motion.div>
                   </fieldset>
                 </AnimatePresence>
@@ -669,7 +615,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
       {isMobile && (
         <MobileSaveBar
           onSave={handleSave}
-          disabled={!selectedJobId || !isInitialized || isSaving}
+          disabled={isFinal || !selectedJobId || !isInitialized || isSaving}
           isSaving={isSaving}
         />
       )}
