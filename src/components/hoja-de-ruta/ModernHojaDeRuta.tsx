@@ -180,6 +180,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
     handleDownloadPdfPreview,
     handleGenerateDriverCertificatePDF,
     handleGeneratePDF,
+    handlePublishPDF,
     handleGenerateSectionPDF,
     handleGenerateXLS,
     handleOpenPdfPreviewInNewTab,
@@ -677,6 +678,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false }: ModernHojaDeRutaPr
         showDialog={showPrintDialog}
         setShowDialog={setShowPrintDialog}
         onGeneratePDF={handleGeneratePDF}
+        onPublishPDF={handlePublishPDF}
+        canPublish={documentStatus === "approved" || documentStatus === "final"}
         onGenerateDriverCertificatePDF={handleGenerateDriverCertificatePDF}
         onGenerateSectionPDF={handleGenerateSectionPDF}
         onPreviewPDF={() => { void handlePreviewPDF(); }}
