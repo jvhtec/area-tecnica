@@ -1093,7 +1093,7 @@ returns text[]
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $publish$
 declare
   v_target_uploaded_at timestamptz;
   v_current_document_id uuid;
@@ -1112,38 +1112,7 @@ begin
     and jd.document_kind = 'hoja_de_ruta'
     and (
       lower(split_part(coalesce(jd.file_type, ''), ';', 1)) = 'application/pdf'
-      or jd.file_path ~* '\\.pdf
-create or replace function public.replace_hoja_de_ruta_all(
-  p_hoja_de_ruta_id uuid,
-  p_transport_rows jsonb,
-  p_contact_rows jsonb,
-  p_staff_rows jsonb
-)
-returns void
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_job_id uuid;
-begin
-  select job_id into v_job_id
-  from public.hoja_de_ruta
-  where id = p_hoja_de_ruta_id;
-
-  if v_job_id is null or not public.can_manage_hoja(v_job_id) then
-    raise exception 'permission denied' using errcode = '42501';
-  end if;
-
-  perform public.replace_hoja_de_ruta_transport(p_hoja_de_ruta_id, p_transport_rows);
-  perform public.replace_hoja_de_ruta_contacts(p_hoja_de_ruta_id, p_contact_rows);
-  perform public.replace_hoja_de_ruta_staff(p_hoja_de_ruta_id, p_staff_rows);
-end;
-$$;
-
-revoke execute on function public.replace_hoja_de_ruta_all(uuid, jsonb, jsonb, jsonb) from public, anon;
-grant execute on function public.replace_hoja_de_ruta_all(uuid, jsonb, jsonb, jsonb) to authenticated, service_role;
-
+      or jd.file_path ~* '\\.pdf$'
     )
   for update;
 
@@ -1203,7 +1172,7 @@ grant execute on function public.replace_hoja_de_ruta_all(uuid, jsonb, jsonb, js
 
   return coalesce(v_deleted_paths, array[]::text[]);
 end;
-$;
+$publish$;
 
 revoke all on function public.publish_hoja_de_ruta_document(uuid, uuid) from public, anon;
 grant execute on function public.publish_hoja_de_ruta_document(uuid, uuid) to authenticated, service_role;
