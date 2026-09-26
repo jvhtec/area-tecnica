@@ -33,7 +33,7 @@ const createPDFEngine = (
   jobDate?: string,
   toast?: PDFGenerationOptions['toast'],
   accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections' | 'publish'>
 ) => new PDFEngine({
   eventData,
   travelArrangements,
@@ -61,7 +61,7 @@ export const generatePDF = async (
   jobDate?: string,
   toast?: PDFGenerationOptions['toast'],
   accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections' | 'publish'>
 ): Promise<void> => {
   const engine = createPDFEngine(
     eventData,
@@ -91,7 +91,7 @@ export const generatePDFPreview = async (
   jobDate?: string,
   toast?: PDFGenerationOptions['toast'],
   accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections' | 'publish'>
 ): Promise<GeneratedHojaDeRutaPdf> => {
   const engine = createPDFEngine(
     eventData,
