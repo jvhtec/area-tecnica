@@ -35,7 +35,18 @@ const isDurableStoragePath = (value?: string | null) =>
 export const useHojaDeRutaImages = () => {
   const [managedImages, setManagedImages] = useState<ManagedImage[]>([]);
   const [removedStoragePaths, setRemovedStoragePaths] = useState<string[]>([]);
+  const [savedFingerprint, setSavedFingerprint] = useState("[]");
   const hydratedKeyRef = useRef<string | null>(null);
+  const preparedFingerprintRef = useRef<string | null>(null);
+
+  const fingerprintFor = useCallback((items: ManagedImage[]) => JSON.stringify(
+    items.map((item) => ({
+      id: item.id,
+      imageType: item.imageType,
+      storagePath: item.storagePath || null,
+      localPreview: item.storagePath ? null : item.previewUrl,
+    })),
+  ), []);
 
   const venueItems = useMemo(
     () => managedImages.filter((item) => item.imageType === "venue"),
@@ -182,8 +193,10 @@ export const useHojaDeRutaImages = () => {
       return hydrated.filter((item): item is ManagedImage => Boolean(item));
     });
     setRemovedStoragePaths([]);
+    const clean = hydrated.filter((item): item is ManagedImage => Boolean(item));
+    setSavedFingerprint(fingerprintFor(clean));
     hydratedKeyRef.current = signature;
-  }, []);
+  }, [fingerprintFor]);
 
   const prepareImagesForSave = useCallback(async (jobId: string): Promise<HojaDeRutaImageRecord[]> => {
     const next = [...managedImages];
@@ -209,6 +222,7 @@ export const useHojaDeRutaImages = () => {
     }
 
     setManagedImages(next);
+    preparedFingerprintRef.current = fingerprintFor(next);
 
     let venueOrder = 0;
     return next.map((item) => ({
@@ -217,9 +231,14 @@ export const useHojaDeRutaImages = () => {
       image_type: item.imageType,
       sort_order: item.imageType === "venue" ? venueOrder++ : 0,
     }));
-  }, [managedImages]);
+  }, [fingerprintFor, managedImages]);
 
   const commitImageSave = useCallback(async () => {
+    if (preparedFingerprintRef.current) {
+      setSavedFingerprint(preparedFingerprintRef.current);
+      preparedFingerprintRef.current = null;
+    }
+
     if (removedStoragePaths.length === 0) return;
     const paths = [...removedStoragePaths];
     setRemovedStoragePaths([]);
@@ -232,15 +251,8 @@ export const useHojaDeRutaImages = () => {
 
   const clearVenueMap = useCallback(() => replaceVenueMap(null), [replaceVenueMap]);
 
-  const imageFingerprint = useMemo(
-    () => managedImages.map((item) => ({
-      id: item.id,
-      imageType: item.imageType,
-      storagePath: item.storagePath || null,
-      local: !item.storagePath,
-    })),
-    [managedImages],
-  );
+  const imageFingerprint = useMemo(() => fingerprintFor(managedImages), [fingerprintFor, managedImages]);
+  const isImageDirty = imageFingerprint !== savedFingerprint;
 
   return {
     images,
@@ -258,5 +270,6 @@ export const useHojaDeRutaImages = () => {
     prepareImagesForSave,
     commitImageSave,
     imageFingerprint,
+    isImageDirty,
   };
 };
