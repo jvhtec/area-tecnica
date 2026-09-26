@@ -9,6 +9,7 @@ type HojaDocumentRow = {
   file_path?: string | null;
   file_type?: string | null;
   uploaded_at?: string | null;
+  document_kind?: string | null;
 };
 
 export type HojaAttachment = {
@@ -92,17 +93,47 @@ async function findLatestJobHojaAttachment(
   supabaseAdmin: SupabaseAdminClient,
   jobId: string,
 ): Promise<HojaAttachment | null> {
+  const { data: hoja, error: hojaError } = await supabaseAdmin
+    .from("hoja_de_ruta")
+    .select("published_document_id")
+    .eq("job_id", jobId)
+    .maybeSingle();
+
+  if (hojaError) throw hojaError;
+  const publishedId = (hoja as { published_document_id?: string | null } | null)?.published_document_id;
+
+  if (publishedId) {
+    const { data: published, error: publishedError } = await supabaseAdmin
+      .from("job_documents")
+      .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
+      .eq("id", publishedId)
+      .eq("job_id", jobId)
+      .maybeSingle();
+
+    if (publishedError) throw publishedError;
+    if (published?.file_path) {
+      return toHojaAttachment(
+        "job_documents",
+        published as HojaDocumentRow,
+        resolveJobDocumentBucket(published.file_path),
+      );
+    }
+  }
+
   const { data, error } = await supabaseAdmin
     .from("job_documents")
-    .select("id, file_name, file_path, file_type, uploaded_at")
+    .select("id, file_name, file_path, file_type, uploaded_at, document_kind")
     .eq("job_id", jobId)
     .order("uploaded_at", { ascending: false });
 
   if (error) throw error;
 
-  const doc = ((data || []) as HojaDocumentRow[])
+  const rows = (data || []) as HojaDocumentRow[];
+  const typed = rows.find((row) => row.document_kind === "hoja_de_ruta" && isPdfDocument(row));
+  const doc = typed || rows
     .filter((row) => isJobHojaDeRutaDocument(row, jobId))
     .sort(byNewestUpload)[0];
+
   if (!doc?.file_path) return null;
   return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
 }
@@ -115,7 +146,7 @@ async function findLatestLinkedJobHojaAttachment(
 
   const { data, error } = await supabaseAdmin
     .from("job_documents")
-    .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+    .select("id, job_id, file_name, file_path, file_type, uploaded_at, document_kind")
     .in("job_id", linkedJobIds)
     .order("uploaded_at", { ascending: false });
 
@@ -125,7 +156,11 @@ async function findLatestLinkedJobHojaAttachment(
   const doc = ((data || []) as HojaDocumentRow[])
     .filter((row) => {
       const rowJobId = row.job_id || null;
-      return Boolean(rowJobId && linkedJobIdSet.has(rowJobId) && isJobHojaDeRutaDocument(row, rowJobId));
+      return Boolean(
+        rowJobId &&
+        linkedJobIdSet.has(rowJobId) &&
+        (row.document_kind === "hoja_de_ruta" || isJobHojaDeRutaDocument(row, rowJobId))
+      );
     })
     .sort(byNewestUpload)[0];
 
