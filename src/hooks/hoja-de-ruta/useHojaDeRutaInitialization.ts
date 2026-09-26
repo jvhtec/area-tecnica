@@ -99,11 +99,13 @@ export const useHojaDeRutaInitialization = (
     staffFromAssignments,
     tourContacts,
     powerRequirementsText,
+    powerRequirementsSourceUpdatedAt,
   }: {
     jobData: any;
     staffFromAssignments: NonNullable<EventData['staff']>;
     tourContacts: Array<{ id?: string; name: string; role: string; phone: string; email?: string }>;
     powerRequirementsText: string;
+    powerRequirementsSourceUpdatedAt?: string;
   }): EventData => {
     const { startDate, eventStartDate, eventEndDate, eventDates } = formatJobEventDates(jobData);
 
@@ -138,6 +140,7 @@ export const useHojaDeRutaInitialization = (
         ? `Inicio del evento: ${formatInTimeZone(startDate, "Europe/Madrid", "HH:mm")}`
         : "",
       powerRequirements: powerRequirementsText || "",
+      powerRequirementsSourceUpdatedAt,
       auxiliaryNeeds: "",
       auxiliaryStaffSetupQty: 0,
       auxiliaryStaffDismantleQty: 0,
@@ -147,11 +150,11 @@ export const useHojaDeRutaInitialization = (
     };
   };
 
-  // Fetch power requirements for a job
-  const fetchPowerRequirements = useCallback(async (jobId: string): Promise<string> => {
-    if (!jobId) return "";
-
-    console.log("⚡ INITIALIZATION: Fetching power requirements for:", jobId);
+  // Fetch current Consumos-derived power requirements and its source revision.
+  const fetchPowerRequirements = useCallback(async (
+    jobId: string,
+  ): Promise<{ text: string; sourceUpdatedAt?: string }> => {
+    if (!jobId) return { text: "" };
 
     try {
       const { data: powerRequirements, error } = await supabase
@@ -160,23 +163,26 @@ export const useHojaDeRutaInitialization = (
         .eq("job_id", jobId)
         .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error("❌ INITIALIZATION: Error fetching power requirements:", error);
-        return "";
+      if (error || !powerRequirements?.length) {
+        if (error) {
+          console.warn("No se pudieron cargar los requisitos de potencia:", error);
+        }
+        return { text: "" };
       }
 
-      if (!powerRequirements || powerRequirements.length === 0) {
-        console.log("ℹ️ INITIALIZATION: No power requirements found for this job");
-        return "";
-      }
+      const sourceUpdatedAt = powerRequirements
+        .map((row) => row.updated_at || row.created_at)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1);
 
-      const powerText = formatPowerRequirementsText(powerRequirements);
-
-      console.log("✅ INITIALIZATION: Power requirements fetched successfully");
-      return powerText;
+      return {
+        text: formatPowerRequirementsText(powerRequirements),
+        sourceUpdatedAt,
+      };
     } catch (error) {
-      console.error("❌ INITIALIZATION: Error fetching power requirements:", error);
-      return "";
+      console.warn("No se pudieron cargar los requisitos de potencia:", error);
+      return { text: "" };
     }
   }, []);
 
@@ -257,10 +263,11 @@ export const useHojaDeRutaInitialization = (
     console.log("🔄 INITIALIZATION: Auto-populating basic job data with assignments for:", jobId);
 
     try {
-      const [assignmentData, powerRequirementsText] = await Promise.all([
+      const [assignmentData, powerRequirements] = await Promise.all([
         loadCurrentJobAssignments(jobId),
         fetchPowerRequirements(jobId)
       ]);
+      const powerRequirementsText = powerRequirements.text;
 
       if (!assignmentData) return;
 
@@ -271,6 +278,7 @@ export const useHojaDeRutaInitialization = (
         staffFromAssignments,
         tourContacts,
         powerRequirementsText,
+        powerRequirementsSourceUpdatedAt: powerRequirements.sourceUpdatedAt,
       });
 
       console.log("✅ INITIALIZATION: Setting basic job data with assignments:", {
@@ -324,10 +332,11 @@ export const useHojaDeRutaInitialization = (
 
     const initializeFormData = async () => {
       // Always load current job assignments and power requirements first
-      const [assignmentData, powerRequirementsText] = await Promise.all([
+      const [assignmentData, powerRequirements] = await Promise.all([
         loadCurrentJobAssignments(selectedJobId),
         fetchPowerRequirements(selectedJobId)
       ]);
+      const powerRequirementsText = powerRequirements.text;
 
       // Everything below is synchronous, so this single check after the only
       // await guards every state mutation in this run.
@@ -405,6 +414,10 @@ export const useHojaDeRutaInitialization = (
             savedPowerRequirements: savedEventData?.powerRequirements,
             generatedPowerRequirements: powerRequirementsText,
           }),
+          powerRequirementsSourceUpdatedAt:
+            savedEventData?.powerRequirements?.trim()
+              ? savedEventData?.powerRequirementsSourceUpdatedAt
+              : powerRequirements.sourceUpdatedAt,
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
           auxiliaryStaffSetupQty: savedEventData?.auxiliaryStaffSetupQty ?? 0,
           auxiliaryStaffDismantleQty: savedEventData?.auxiliaryStaffDismantleQty ?? 0,
@@ -447,6 +460,7 @@ export const useHojaDeRutaInitialization = (
           staffFromAssignments,
           tourContacts,
           powerRequirementsText,
+          powerRequirementsSourceUpdatedAt: powerRequirements.sourceUpdatedAt,
         }));
         setTravelArrangements([]);
         setAccommodations([]);
@@ -476,6 +490,7 @@ export const useHojaDeRutaInitialization = (
 
   return {
     autoPopulateBasicJobData,
-    loadCurrentJobAssignments
+    loadCurrentJobAssignments,
+    fetchPowerRequirements,
   };
 };
