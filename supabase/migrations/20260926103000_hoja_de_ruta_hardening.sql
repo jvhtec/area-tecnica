@@ -426,8 +426,14 @@ begin
     last_modified = excluded.last_modified,
     last_modified_by = excluded.last_modified_by,
     updated_at = excluded.updated_at
+  where coalesce(hoja_de_ruta.document_version, 0) = coalesce(p_expected_version, 0)
   returning hoja_de_ruta.id, hoja_de_ruta.document_version
     into v_id, v_version;
+
+  if v_id is null then
+    raise exception 'Otra persona ha guardado cambios en esta Hoja de Ruta'
+      using errcode = '40001';
+  end if;
 
   insert into public.hoja_de_ruta_logistics (
     hoja_de_ruta_id,
@@ -447,7 +453,16 @@ begin
     unloading_details = excluded.unloading_details,
     equipment_logistics = excluded.equipment_logistics;
 
-  -- Contacts.
+  -- Contacts. Supplied IDs may only address rows already owned by this Hoja.
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(v_event->'contacts', '[]'::jsonb)) as r(id uuid)
+    join public.hoja_de_ruta_contacts c on c.id = r.id
+    where c.hoja_de_ruta_id is distinct from v_id
+  ) then
+    raise exception 'Un contacto pertenece a otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
   delete from public.hoja_de_ruta_contacts t
   where t.hoja_de_ruta_id = v_id
     and not exists (
@@ -490,6 +505,15 @@ begin
     sort_order = excluded.sort_order;
 
   -- Staff.
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(v_event->'staff', '[]'::jsonb)) as r(id uuid)
+    join public.hoja_de_ruta_staff staff on staff.id = r.id
+    where staff.hoja_de_ruta_id is distinct from v_id
+  ) then
+    raise exception 'Un miembro de personal pertenece a otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
   delete from public.hoja_de_ruta_staff t
   where t.hoja_de_ruta_id = v_id
     and not exists (
@@ -538,6 +562,27 @@ begin
     sort_order = excluded.sort_order;
 
   -- Hoja transport rows.
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(v_logistics->'transport', '[]'::jsonb)) as r(id uuid)
+    join public.hoja_de_ruta_transport t on t.id = r.id
+    where t.hoja_de_ruta_id is distinct from v_id
+  ) then
+    raise exception 'Un transporte pertenece a otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(v_logistics->'transport', '[]'::jsonb))
+      as r(source_logistics_event_id uuid)
+    left join public.logistics_events le on le.id = r.source_logistics_event_id
+    where r.source_logistics_event_id is not null
+      and (le.id is null or le.job_id is distinct from p_job_id)
+  ) then
+    raise exception 'El evento logístico no pertenece al trabajo de esta Hoja de Ruta'
+      using errcode = '22023';
+  end if;
+
   delete from public.hoja_de_ruta_transport t
   where t.hoja_de_ruta_id = v_id
     and not exists (
@@ -625,6 +670,15 @@ begin
     );
 
   -- Travel.
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(p_payload->'travelArrangements', '[]'::jsonb)) as r(id uuid)
+    join public.hoja_de_ruta_travel_arrangements t on t.id = r.id
+    where t.hoja_de_ruta_id is distinct from v_id
+  ) then
+    raise exception 'Un viaje pertenece a otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
   delete from public.hoja_de_ruta_travel_arrangements t
   where t.hoja_de_ruta_id = v_id
     and not exists (
@@ -701,6 +755,15 @@ begin
     sort_order = excluded.sort_order;
 
   -- Accommodations.
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(p_payload->'accommodations', '[]'::jsonb)) as r(id uuid)
+    join public.hoja_de_ruta_accommodations a on a.id = r.id
+    where a.hoja_de_ruta_id is distinct from v_id
+  ) then
+    raise exception 'Un alojamiento pertenece a otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
   delete from public.hoja_de_ruta_accommodations a
   where a.hoja_de_ruta_id = v_id
     and not exists (
@@ -754,7 +817,38 @@ begin
     longitude = excluded.longitude,
     sort_order = excluded.sort_order;
 
-  -- Rooms. Delete only rows under accommodations belonging to this Hoja.
+  -- Rooms. Existing IDs and staff references must stay inside this Hoja.
+  if exists (
+    select 1
+    from jsonb_array_elements(coalesce(p_payload->'accommodations', '[]'::jsonb)) acc_json
+    cross join lateral jsonb_to_recordset(coalesce(acc_json->'rooms', '[]'::jsonb)) as r(id uuid)
+    join public.hoja_de_ruta_room_assignments room on room.id = r.id
+    join public.hoja_de_ruta_accommodations owner_acc on owner_acc.id = room.accommodation_id
+    where owner_acc.hoja_de_ruta_id is distinct from v_id
+  ) then
+    raise exception 'Una habitación pertenece a otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(coalesce(p_payload->'accommodations', '[]'::jsonb)) acc_json
+    cross join lateral jsonb_to_recordset(coalesce(acc_json->'rooms', '[]'::jsonb)) as r(
+      staff_member1_hoja_staff_id uuid,
+      staff_member2_hoja_staff_id uuid
+    )
+    left join public.hoja_de_ruta_staff s1 on s1.id = r.staff_member1_hoja_staff_id
+    left join public.hoja_de_ruta_staff s2 on s2.id = r.staff_member2_hoja_staff_id
+    where (
+      r.staff_member1_hoja_staff_id is not null
+      and (s1.id is null or s1.hoja_de_ruta_id is distinct from v_id)
+    ) or (
+      r.staff_member2_hoja_staff_id is not null
+      and (s2.id is null or s2.hoja_de_ruta_id is distinct from v_id)
+    )
+  ) then
+    raise exception 'Una habitación referencia personal de otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
   delete from public.hoja_de_ruta_room_assignments room
   using public.hoja_de_ruta_accommodations acc
   where room.accommodation_id = acc.id
@@ -818,6 +912,15 @@ begin
 
   -- Image metadata. Binary objects are uploaded before this RPC. The DB stores
   -- only durable storage paths, never blob:/data: URLs.
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(p_payload->'images', '[]'::jsonb)) as r(id uuid)
+    join public.hoja_de_ruta_images img on img.id = r.id
+    where img.hoja_de_ruta_id is distinct from v_id
+  ) then
+    raise exception 'Una imagen pertenece a otra Hoja de Ruta' using errcode = '22023';
+  end if;
+
   delete from public.hoja_de_ruta_images img
   where img.hoja_de_ruta_id = v_id
     and not exists (
@@ -953,8 +1056,36 @@ $$;
 revoke all on function public.get_hoja_de_ruta(uuid) from public, anon;
 grant execute on function public.get_hoja_de_ruta(uuid) to authenticated, service_role;
 
--- Retire the stale "oscar" bypass from the old replacement RPC while keeping
--- the RPC for old clients until all deployed frontends have moved to save_hoja_de_ruta.
+-- Atomically make one generated Hoja PDF canonical and retire older rows.
+-- Storage object deletion remains client-side using the returned paths.
+create or replace function public.publish_hoja_de_ruta_document(
+  p_job_id uuid,
+  p_document_id uuid
+)
+returns text[]
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_target_uploaded_at timestamptz;
+  v_current_document_id uuid;
+  v_current_uploaded_at timestamptz;
+  v_deleted_paths text[];
+begin
+  if not public.can_manage_hoja(p_job_id) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+
+  select jd.uploaded_at
+    into v_target_uploaded_at
+  from public.job_documents jd
+  where jd.id = p_document_id
+    and jd.job_id = p_job_id
+    and jd.document_kind = 'hoja_de_ruta'
+    and (
+      lower(split_part(coalesce(jd.file_type, ''), ';', 1)) = 'application/pdf'
+      or jd.file_path ~* '\\.pdf
 create or replace function public.replace_hoja_de_ruta_all(
   p_hoja_de_ruta_id uuid,
   p_transport_rows jsonb,
@@ -976,6 +1107,112 @@ begin
   if v_job_id is null or not public.can_manage_hoja(v_job_id) then
     raise exception 'permission denied' using errcode = '42501';
   end if;
+
+  perform public.replace_hoja_de_ruta_transport(p_hoja_de_ruta_id, p_transport_rows);
+  perform public.replace_hoja_de_ruta_contacts(p_hoja_de_ruta_id, p_contact_rows);
+  perform public.replace_hoja_de_ruta_staff(p_hoja_de_ruta_id, p_staff_rows);
+end;
+$$;
+
+revoke execute on function public.replace_hoja_de_ruta_all(uuid, jsonb, jsonb, jsonb) from public, anon;
+grant execute on function public.replace_hoja_de_ruta_all(uuid, jsonb, jsonb, jsonb) to authenticated, service_role;
+
+    )
+  for update;
+
+  if not found then
+    raise exception 'El documento no es una Hoja de Ruta PDF válida para este trabajo'
+      using errcode = '22023';
+  end if;
+
+  select h.published_document_id
+    into v_current_document_id
+  from public.hoja_de_ruta h
+  where h.job_id = p_job_id
+  for update;
+
+  if not found then
+    raise exception 'No existe una Hoja de Ruta para este trabajo' using errcode = '22023';
+  end if;
+
+  if v_current_document_id is not null and v_current_document_id <> p_document_id then
+    select jd.uploaded_at
+      into v_current_uploaded_at
+    from public.job_documents jd
+    where jd.id = v_current_document_id
+      and jd.job_id = p_job_id
+      and jd.document_kind = 'hoja_de_ruta';
+
+    if v_current_uploaded_at is not null
+       and v_target_uploaded_at is not null
+       and v_current_uploaded_at > v_target_uploaded_at then
+      raise exception 'Existe una Hoja de Ruta publicada más reciente'
+        using errcode = '40001';
+    end if;
+  end if;
+
+  update public.hoja_de_ruta
+  set published_document_id = p_document_id
+  where job_id = p_job_id;
+
+  with deleted as (
+    delete from public.job_documents jd
+    where jd.job_id = p_job_id
+      and jd.id <> p_document_id
+      and (
+        jd.document_kind = 'hoja_de_ruta'
+        or (
+          jd.document_kind is null
+          and jd.file_path like ('hojas-de-ruta/' || p_job_id::text || '/%')
+        )
+      )
+      and coalesce(jd.uploaded_at, '-infinity'::timestamptz)
+          <= coalesce(v_target_uploaded_at, now())
+    returning jd.file_path
+  )
+  select coalesce(array_agg(file_path), array[]::text[])
+    into v_deleted_paths
+  from deleted;
+
+  return coalesce(v_deleted_paths, array[]::text[]);
+end;
+$;
+
+revoke all on function public.publish_hoja_de_ruta_document(uuid, uuid) from public, anon;
+grant execute on function public.publish_hoja_de_ruta_document(uuid, uuid) to authenticated, service_role;
+
+-- Retire the stale "oscar" bypass from the old replacement RPC while keeping
+-- the RPC for old clients until all deployed frontends have moved to save_hoja_de_ruta.
+create or replace function public.replace_hoja_de_ruta_all(
+  p_hoja_de_ruta_id uuid,
+  p_transport_rows jsonb,
+  p_contact_rows jsonb,
+  p_staff_rows jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_job_id uuid;
+begin
+  select job_id into v_job_id
+  from public.hoja_de_ruta
+  where id = p_hoja_de_ruta_id
+  for update;
+
+  if v_job_id is null or not public.can_manage_hoja(v_job_id) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+
+  update public.hoja_de_ruta
+  set
+    document_version = coalesce(document_version, 0) + 1,
+    last_modified = now(),
+    last_modified_by = auth.uid(),
+    updated_at = now()
+  where id = p_hoja_de_ruta_id;
 
   perform public.replace_hoja_de_ruta_transport(p_hoja_de_ruta_id, p_transport_rows);
   perform public.replace_hoja_de_ruta_contacts(p_hoja_de_ruta_id, p_contact_rows);
