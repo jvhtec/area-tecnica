@@ -20,34 +20,42 @@ export interface JobSelection {
   end_time: string;
 }
 
+type TourRow = { id: string; name: string };
+type TourDateRow = { id: string; tour?: TourRow | TourRow[] | null };
+
 type JobSelectionRow = {
   id: string;
   title: string;
   start_time: string;
   end_time: string;
   tour_date_id: string | null;
-  tour_date?: Array<{
-    id: string;
-    tour?: Array<{ id: string; name: string }>;
-  }> | null;
+  tour_date?: TourDateRow | TourDateRow[] | null;
 };
 
-const mapJob = (job: JobSelectionRow): JobSelection => ({
-  id: job.id,
-  title: job.title,
-  start_time: job.start_time,
-  end_time: job.end_time,
-  tour_date_id: job.tour_date_id,
-  tour_date: job.tour_date?.[0]
-    ? {
-        id: job.tour_date[0].id,
-        tour: {
-          id: job.tour_date[0].tour?.[0]?.id || "",
-          name: job.tour_date[0].tour?.[0]?.name || "",
-        },
-      }
-    : null,
-});
+const firstEmbed = <T,>(value: T | T[] | null | undefined): T | undefined =>
+  Array.isArray(value) ? value[0] : value ?? undefined;
+
+const mapJob = (job: JobSelectionRow): JobSelection => {
+  const tourDate = firstEmbed(job.tour_date);
+  const tour = firstEmbed(tourDate?.tour);
+
+  return {
+    id: job.id,
+    title: job.title,
+    start_time: job.start_time,
+    end_time: job.end_time,
+    tour_date_id: job.tour_date_id,
+    tour_date: tourDate
+      ? {
+          id: tourDate.id,
+          tour: {
+            id: tour?.id || "",
+            name: tour?.name || "",
+          },
+        }
+      : null,
+  };
+};
 
 const JOB_SELECTION_COLUMNS = `
   id,
