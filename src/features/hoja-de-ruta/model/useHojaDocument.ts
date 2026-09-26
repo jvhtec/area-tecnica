@@ -29,11 +29,14 @@ export type UseHojaDocumentOptions = {
   isImageDirty: boolean;
 };
 
-export const useHojaDocument = ({
-  prepareImagesForSave,
-  commitImageSave,
-  isImageDirty,
-}: UseHojaDocumentOptions) => {
+export const useHojaDocument = (
+  jobId: string | undefined,
+  {
+    prepareImagesForSave,
+    commitImageSave,
+    isImageDirty,
+  }: UseHojaDocumentOptions,
+) => {
   const { toast } = useToast();
   const {
     eventData,
@@ -49,6 +52,12 @@ export const useHojaDocument = ({
   } = useHojaDocumentState();
 
   const { data: jobs, isLoading: isLoadingJobs } = useJobSelection(selectedJobId);
+
+  useEffect(() => {
+    if (jobId && selectedJobId !== jobId) {
+      setSelectedJobId(jobId);
+    }
+  }, [jobId, selectedJobId, setSelectedJobId]);
 
   const [hasSavedData, setHasSavedData] = useState(false);
   const [hasBasicJobData, setHasBasicJobData] = useState(false);
