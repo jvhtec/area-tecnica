@@ -85,11 +85,13 @@ export const useHojaDeRutaForm = ({
   );
   const savedSnapshotRef = useRef<string | null>(null);
   const baselineJobRef = useRef("");
+  const awaitingInitRef = useRef(false);
 
   useEffect(() => {
     if (baselineJobRef.current === selectedJobId) return;
     baselineJobRef.current = selectedJobId;
     savedSnapshotRef.current = null;
+    awaitingInitRef.current = Boolean(selectedJobId);
     setDocumentVersion(0);
     setHasExternalConflict(false);
     setHasSavedData(false);
@@ -100,7 +102,11 @@ export const useHojaDeRutaForm = ({
   }, [forceRefetch, selectedJobId]);
 
   useEffect(() => {
-    if (!isInitialized || savedSnapshotRef.current !== null) return;
+    if (!isInitialized) {
+      awaitingInitRef.current = false;
+      return;
+    }
+    if (awaitingInitRef.current || savedSnapshotRef.current !== null) return;
     savedSnapshotRef.current = snapshot;
     setDocumentVersion(Number(hojaDeRuta?.document_version || 0));
   }, [hojaDeRuta?.document_version, isInitialized, snapshot]);
