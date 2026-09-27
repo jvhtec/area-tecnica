@@ -71,7 +71,10 @@ VALUES
   ('assignment.removed', 'Assignment removed', 'management', 'info', false),
   ('document.uploaded', 'Document uploaded', 'management', 'info', false),
   ('document.deleted', 'Document deleted', 'management', 'info', false),
-  ('hoja.updated', 'Hoja updated', 'management', 'info', false)
+  ('hoja.updated', 'Hoja updated', 'management', 'info', false),
+  ('tourdate.created', 'Tour date created', 'management', 'info', false),
+  ('tourdate.updated', 'Tour date updated', 'management', 'info', false),
+  ('tourdate.deleted', 'Tour date deleted', 'management', 'info', false)
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO auth.users (
