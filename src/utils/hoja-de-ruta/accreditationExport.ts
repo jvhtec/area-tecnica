@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 
+import { staffDepartmentLabel } from "@/features/hoja-de-ruta/model/groupStaffByDepartment";
 import type { EventData } from "@/types/hoja-de-ruta";
 import { applyStyle, populateSheet, saveWorkbook } from "@/utils/excelExport";
 import { loadExceljs } from "@/utils/lazyExceljs";
@@ -21,7 +22,7 @@ export const buildAccreditationRows = (staff: EventData["staff"]) => [
       [member.surname1, member.surname2].filter(Boolean).join(" "),
       member.dni || "",
       member.position || "",
-      member.department || "",
+      staffDepartmentLabel(member.department),
     ]),
 ];
 

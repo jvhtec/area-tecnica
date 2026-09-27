@@ -265,14 +265,14 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
     try {
       const { data, error } = await dataLayerClient
         .from("logistics_events")
-        .select("*")
+        .select("id, event_date, event_time, end_date, transport_type, license_plate, transport_provider, is_hoja_relevant, hoja_categories, updated_at")
         .eq("job_id", jobId)
         .eq("is_hoja_relevant", true)
         .order("event_date", { ascending: true })
         .order("event_time", { ascending: true });
 
       if (error) throw error;
-      const logisticsEvents = (data || []) as unknown as LogisticsEventSnapshot[];
+      const logisticsEvents: LogisticsEventSnapshot[] = data ?? [];
 
       if (!logisticsEvents.length) {
         onImportTransports([]);

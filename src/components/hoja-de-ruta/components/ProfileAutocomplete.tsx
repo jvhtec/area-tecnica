@@ -7,6 +7,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { maskDni } from "@/utils/hoja-de-ruta/maskDni";
 import { reportHojaError } from "@/features/hoja-de-ruta/lib/hojaLogger";
+import { staffDepartmentLabel } from "@/features/hoja-de-ruta/model/groupStaffByDepartment";
+
+const PROFILE_ROLE_LABELS: Record<string, string> = {
+  admin: "Administración",
+  management: "Gestión",
+  logistics: "Logística",
+  house_tech: "Plantilla",
+  technician: "Técnico",
+  conductor: "Conductor",
+};
 
 export interface Profile {
   id: string;
@@ -169,12 +179,12 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
                           )}
                           {profile.department && (
                             <span className="text-xs text-warning bg-warning/15 px-2 py-1 rounded">
-                              {profile.department}
+                              {staffDepartmentLabel(profile.department)}
                             </span>
                           )}
                           {profile.role && (
                             <span className="text-xs text-info bg-info/15 px-2 py-1 rounded">
-                              {profile.role}
+                              {PROFILE_ROLE_LABELS[profile.role] ?? profile.role}
                             </span>
                           )}
                         </div>

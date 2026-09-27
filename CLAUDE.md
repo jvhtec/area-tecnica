@@ -715,8 +715,9 @@ Versioned document builder for event logistics and controlled publication:
 - **Feature module**: `src/features/hoja-de-ruta/` (canonical model, aggregate API, mapper, section registry, exports)
 - **Image handling**: `src/hooks/useHojaDeRutaImages.ts`
 - **Utils**: `src/utils/hoja-de-ruta/`, `src/utils/hojaDeRutaExport.ts`
-- **Database boundary**: `get_hoja_de_ruta`, `save_hoja_de_ruta`, `set_hoja_de_ruta_status`, `publish_hoja_de_ruta_document`
-- **Workflow**: Load/edit one aggregate document → optimistic versioned save → review/approve/finalize → download or explicitly publish
+- **Database boundary**: `get_hoja_de_ruta`, `save_hoja_de_ruta`, `set_hoja_de_ruta_status`, `reopen_hoja_de_ruta`, `publish_hoja_de_ruta_document`
+- **Workflow**: Load/edit one aggregate document → optimistic versioned save → review/approve (by someone else) /finalize → download or explicitly publish. Editing approved content returns it to review; only admin/management can reopen a final Hoja, with a logged reason.
+- **Integrity triggers**: the `final` lock and the `document_version` bump are enforced by triggers on `hoja_de_ruta` and every child table, not only by the RPCs. A direct write (Tour Ops, a new SECURITY DEFINER function, a script) automatically bumps the version, and fails on a final Hoja. Only the Hoja RPCs set the transaction-local `app.hoja_trusted_write` flag; never set it from new code to dodge the lock.
 - **Docs**: `docs/workflows/hoja-de-ruta.md`
 
 ### SoundVision File Library
@@ -1089,4 +1090,5 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **170+ SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
 - **Validate types with `npm run typecheck`, not bare `npx tsc --noEmit`** — CI gates on `tsc -p tsconfig.app.json`; a plain tsc run picks a different config and can pass while CI fails
 - **`strict` is on — don't cast around it.** New strict errors on DB-backed code almost always mean a hand-written interface says `foo: string` where the column is `foo: string | null`. Widen the type to match the column rather than adding `as string` or `!`. Supabase's generated RPC `Args` types do *not* model argument nullability: for a `DEFAULT NULL` argument pass `undefined` (identical at runtime), and only cast when the argument has no default and must be sent as null.
+- **Never write Hoja de Ruta tables expecting the old "RPC-only" rules** — any direct write to `hoja_de_ruta*` bumps `document_version` and is rejected on a `final` Hoja (triggers from `20260927150000_hoja_de_ruta_integrity.sql`). Workflow columns (`status`, `approved_*`, `document_version`, `published_document_id`) change only through the Hoja RPCs.
 - **Don't manually edit archive/ or src/legacy/** — these are retained for reference only, no new runtime imports

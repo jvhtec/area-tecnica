@@ -19,7 +19,7 @@ interface ModernStaffSectionProps {
   onStaffChange: (index: number, field: string, value: string) => void;
   onAddStaff: () => void;
   onRemoveStaff: (index: number) => void;
-  onProfileSelect?: (index: number, profileData: any) => void;
+  onProfileSelect?: (index: number, profileData: Partial<Profile>) => void;
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
   onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }

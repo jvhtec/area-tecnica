@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getHojaAggregate,
   hojaDocumentQueryKey,
+  reopenHoja,
   saveHojaAggregate,
   setHojaStatus,
 } from "@/features/hoja-de-ruta/api/hojaDocumentApi";
@@ -15,6 +16,7 @@ import type {
   HojaDocumentSaveInput,
   HojaStatus,
 } from "@/features/hoja-de-ruta/model/HojaDocument";
+import { toJsonValue } from "@/utils/json";
 
 export type SaveHojaPayload = HojaDocumentSaveInput;
 
@@ -56,7 +58,8 @@ export const useHojaDocumentPersistence = (
       return saveHojaAggregate({
         jobId,
         expectedVersion: input.expectedVersion,
-        payload: buildHojaSavePayload(input),
+        payload: toJsonValue(buildHojaSavePayload(input)),
+        removedImageIds: input.removedImageIds ?? [],
       });
     },
     onSuccess: (saved) => {
@@ -95,6 +98,31 @@ export const useHojaDocumentPersistence = (
     },
   });
 
+  const reopenMutation = useMutation({
+    mutationFn: async ({
+      reason,
+      expectedVersion,
+    }: {
+      reason: string;
+      expectedVersion: number;
+    }) => {
+      if (!jobId) throw new Error("No hay un trabajo seleccionado");
+      return reopenHoja(jobId, expectedVersion, reason);
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKey, (current: typeof hojaDeRuta) => current
+        ? {
+            ...current,
+            status: updated.status,
+            approved_by: undefined,
+            approved_at: undefined,
+            document_version: updated.document_version,
+          }
+        : current);
+      void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   const forceRefetch = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey });
     return refetch();
@@ -108,7 +136,8 @@ export const useHojaDocumentPersistence = (
     saveAll: saveAll.mutateAsync,
     isSaving: saveAll.isPending,
     setStatus: statusMutation.mutateAsync,
-    isChangingStatus: statusMutation.isPending,
+    isChangingStatus: statusMutation.isPending || reopenMutation.isPending,
+    reopen: reopenMutation.mutateAsync,
     forceRefetch,
   };
 };

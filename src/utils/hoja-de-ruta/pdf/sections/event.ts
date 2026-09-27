@@ -22,7 +22,9 @@ export class EventSection {
       ['Hora Fin', eventData.eventEndTime],
       ['Asistentes Estimados', eventData.estimatedAttendees?.toString()],
       ['Estado', eventData.eventStatus]
-    ].filter(([, value]) => DataValidators.hasData(value));
+    ]
+      .map(([label, value]) => [label ?? '', value ?? ''])
+      .filter(([, value]) => DataValidators.hasData(value));
 
     if (details.length > 0) {
       this.pdfDoc.addTable({

@@ -18,7 +18,8 @@ export const sanitizeHojaPdfFileName = (fileName: string): string => {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/_/g, " ")
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/[<>:"/\\|?*]/g, " ")
+    .replace(/[\p{Cc}]/gu, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+\./g, ".")
     .trim();
@@ -77,7 +78,9 @@ export const uploadPdfToJob = async (
       uploaded_by: userId,
       original_type: "pdf",
       document_kind: kind,
-      visible_to_tech: kind === "hoja_de_ruta",
+      // A canonical Hoja PDF becomes crew-visible only inside the publish RPC,
+      // so an interrupted publication never leaves a visible stray document.
+      visible_to_tech: false,
     })
     .select("id,file_path")
     .single();

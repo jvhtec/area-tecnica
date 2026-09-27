@@ -3427,6 +3427,7 @@ export type Database = {
           print_excluded_sections: Json
           program_schedule_json: Json | null
           restaurants_info: Json | null
+          review_requested_by: string | null
           schedule: string | null
           status: string | null
           tour_date_id: string | null
@@ -3468,6 +3469,7 @@ export type Database = {
           print_excluded_sections?: Json
           program_schedule_json?: Json | null
           restaurants_info?: Json | null
+          review_requested_by?: string | null
           schedule?: string | null
           status?: string | null
           tour_date_id?: string | null
@@ -3509,6 +3511,7 @@ export type Database = {
           print_excluded_sections?: Json
           program_schedule_json?: Json | null
           restaurants_info?: Json | null
+          review_requested_by?: string | null
           schedule?: string | null
           status?: string | null
           tour_date_id?: string | null
@@ -5888,8 +5891,11 @@ export type Database = {
       }
       logistics_events: {
         Row: {
+          berth_count: number | null
           color: string | null
           created_at: string | null
+          end_date: string | null
+          end_time: string | null
           event_date: string
           event_time: string
           event_type: Database["public"]["Enums"]["logistics_event_type"]
@@ -5900,7 +5906,10 @@ export type Database = {
           license_plate: string | null
           loading_bay: string | null
           location_id: string | null
+          movement_type: string | null
           notes: string | null
+          origin_location_id: string | null
+          passenger_count: number | null
           timezone: string | null
           title: string | null
           transport_provider:
@@ -5911,8 +5920,11 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          berth_count?: number | null
           color?: string | null
           created_at?: string | null
+          end_date?: string | null
+          end_time?: string | null
           event_date: string
           event_time: string
           event_type: Database["public"]["Enums"]["logistics_event_type"]
@@ -5923,7 +5935,10 @@ export type Database = {
           license_plate?: string | null
           loading_bay?: string | null
           location_id?: string | null
+          movement_type?: string | null
           notes?: string | null
+          origin_location_id?: string | null
+          passenger_count?: number | null
           timezone?: string | null
           title?: string | null
           transport_provider?:
@@ -5934,8 +5949,11 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          berth_count?: number | null
           color?: string | null
           created_at?: string | null
+          end_date?: string | null
+          end_time?: string | null
           event_date?: string
           event_time?: string
           event_type?: Database["public"]["Enums"]["logistics_event_type"]
@@ -5946,7 +5964,10 @@ export type Database = {
           license_plate?: string | null
           loading_bay?: string | null
           location_id?: string | null
+          movement_type?: string | null
           notes?: string | null
+          origin_location_id?: string | null
+          passenger_count?: number | null
           timezone?: string | null
           title?: string | null
           transport_provider?:
@@ -13284,6 +13305,17 @@ export type Database = {
         }
         Returns: string[]
       }
+      purge_expired_hoja_dni: {
+        Args: { p_retention?: unknown }
+        Returns: number
+      }
+      reopen_hoja_de_ruta: {
+        Args: { p_expected_version: number; p_job_id: string; p_reason: string }
+        Returns: {
+          document_version: number
+          status: string
+        }[]
+      }
       set_hoja_de_ruta_status: {
         Args: {
           p_expected_version: number
@@ -13296,27 +13328,6 @@ export type Database = {
           document_version: number
           status: string
         }[]
-      }
-      replace_hoja_de_ruta_all: {
-        Args: {
-          p_contact_rows: Json
-          p_hoja_de_ruta_id: string
-          p_staff_rows: Json
-          p_transport_rows: Json
-        }
-        Returns: undefined
-      }
-      replace_hoja_de_ruta_contacts: {
-        Args: { p_contact_rows: Json; p_hoja_de_ruta_id: string }
-        Returns: undefined
-      }
-      replace_hoja_de_ruta_staff: {
-        Args: { p_hoja_de_ruta_id: string; p_staff_rows: Json }
-        Returns: undefined
-      }
-      replace_hoja_de_ruta_transport: {
-        Args: { p_hoja_de_ruta_id: string; p_transport_rows: Json }
-        Returns: undefined
       }
       replace_job_expense_receipt: {
         Args: {

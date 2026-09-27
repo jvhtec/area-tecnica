@@ -31,6 +31,8 @@ type UseHojaDeRutaSaveOptions = {
   onSavedVersion: (version: number) => void;
   onConflict: () => void;
   validateBeforeSave: () => Promise<boolean>;
+  /** Saving approved content sends it back to review on the server. */
+  isApproved: boolean;
 };
 
 const errorCode = (error: unknown): string | undefined => {
@@ -54,6 +56,7 @@ export const useHojaDocumentSave = ({
   onSavedVersion,
   onConflict,
   validateBeforeSave,
+  isApproved,
 }: UseHojaDeRutaSaveOptions) => {
   const { toast } = useToast();
   const saveInProgressRef = useRef(false);
@@ -90,7 +93,9 @@ export const useHojaDocumentSave = ({
 
       toast({
         title: "Guardado",
-        description: "La Hoja de Ruta se ha guardado correctamente.",
+        description: isApproved
+          ? "La Hoja de Ruta se ha guardado y vuelve a revisión porque cambió tras su aprobación."
+          : "La Hoja de Ruta se ha guardado correctamente.",
       });
       return saved;
     } catch (error: unknown) {
@@ -123,6 +128,7 @@ export const useHojaDocumentSave = ({
     eventData,
     expectedVersion,
     getRemovedImageIds,
+    isApproved,
     markSaved,
     onSavedVersion,
     onConflict,
@@ -135,8 +141,5 @@ export const useHojaDocumentSave = ({
     validateBeforeSave,
   ]);
 
-  return {
-    handleSaveAll,
-    saveInProgress: saveInProgressRef.current,
-  };
+  return { handleSaveAll };
 };

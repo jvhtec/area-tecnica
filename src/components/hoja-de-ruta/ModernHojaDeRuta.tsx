@@ -32,6 +32,7 @@ import { MobileSectionSwitcher } from "@/components/hoja-de-ruta/components/Mobi
 import { MobileSaveBar } from "@/components/hoja-de-ruta/components/MobileSaveBar";
 import { QuickNavigationSidebar } from "@/components/hoja-de-ruta/components/QuickNavigationSidebar";
 import { HojaConflictBanner } from "@/components/hoja-de-ruta/components/HojaConflictBanner";
+import { HojaStatusControls } from "@/components/hoja-de-ruta/components/HojaStatusControls";
 import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
 import { HojaDeRutaPdfPreviewDialog } from "./HojaDeRutaPdfPreviewDialog";
 import {
@@ -79,6 +80,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false, onDirtyChange }: Mod
     commitImageSave,
     getRemovedImageIds,
     isImageDirty,
+    unavailableImageCount,
+    removeUnavailableImages,
   } = useHojaDeRutaImages();
 
   const document = useHojaDocument(routedJobId, {
@@ -112,6 +115,7 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false, onDirtyChange }: Mod
     documentStatus,
     isFinal,
     handleStatusTransition,
+    handleReopen,
     staffingDiff,
     applyStaffingChanges,
     hasPowerDrift,
@@ -322,6 +326,8 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false, onDirtyChange }: Mod
       onVenueMapUpload: handleVenueMapUpload,
       handleVenueMapUrl,
       appendVenuePreviews,
+      unavailableImageCount,
+      onRemoveUnavailableImages: removeUnavailableImages,
     },
   };
 
@@ -349,14 +355,6 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false, onDirtyChange }: Mod
   const dataSourceInfo = getDataSourceInfo();
   const StatusIcon = statusInfo.icon;
   const DataSourceIcon = dataSourceInfo.icon;
-  const nextStatusAction = documentStatus === "draft"
-    ? { label: "Enviar a revisión", next: "review" as const }
-    : documentStatus === "review"
-      ? { label: "Aprobar", next: "approved" as const }
-      : documentStatus === "approved"
-        ? { label: "Finalizar", next: "final" as const }
-        : null;
-
   return (
     <HojaDocumentProvider value={guardedDocument}>
     <MotionConfig reducedMotion="user">
@@ -410,22 +408,15 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false, onDirtyChange }: Mod
                     {statusInfo.text}
                   </Badge>
                 )}
-                {selectedJobId && nextStatusAction && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    disabled={
-                      !isInitialized
-                      || hasExternalConflict
-                      || isSaving
-                      || isChangingStatus
-                    }
-                    onClick={() => { void handleStatusTransition(nextStatusAction.next); }}
-                  >
-                    {isChangingStatus ? "Actualizando…" : nextStatusAction.label}
-                  </Button>
+                {selectedJobId && hojaDeRuta && (
+                  <HojaStatusControls
+                    className="flex items-center gap-1"
+                    status={documentStatus}
+                    disabled={!isInitialized || hasExternalConflict || isSaving}
+                    isChangingStatus={isChangingStatus}
+                    onTransition={(next) => { void handleStatusTransition(next); }}
+                    onReopen={handleReopen}
+                  />
                 )}
                 <Badge variant="outline" className={dataSourceInfo.color}>
                   <DataSourceIcon className="w-3 h-3 mr-1" />
@@ -459,6 +450,23 @@ export const ModernHojaDeRuta = ({ jobId, embedded = false, onDirtyChange }: Mod
               />
             </div>
           </div>
+
+          {selectedJobId && hojaDeRuta && (
+            <div className="mt-2 flex items-center gap-2 sm:hidden">
+              <Badge variant="outline" className="flex items-center gap-1 border-2">
+                <StatusIcon className="w-3 h-3" />
+                {statusInfo.text}
+              </Badge>
+              <HojaStatusControls
+                className="flex items-center gap-1"
+                status={documentStatus}
+                disabled={!isInitialized || hasExternalConflict || isSaving}
+                isChangingStatus={isChangingStatus}
+                onTransition={(next) => { void handleStatusTransition(next); }}
+                onReopen={handleReopen}
+              />
+            </div>
+          )}
 
           {/* Enhanced Status Messages */}
           <div className="mt-2 md:mt-3 text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

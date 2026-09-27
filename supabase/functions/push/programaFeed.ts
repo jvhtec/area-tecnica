@@ -91,6 +91,9 @@ const loadEligibleJobsWithProgramas = async (
     .select("job_id, program_schedule_json")
     .in("job_id", jobIds)
     .not("program_schedule_json", "is", null)
+    // A previously published PDF may remain visible while a newer live Hoja is
+    // being edited, but reminders must only use currently approved content.
+    .in("status", ["approved", "final"])
     .returns<HojaDeRutaRow[]>();
 
   if (hojasError) {

@@ -12,7 +12,7 @@ import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 interface ModernLogisticsSectionProps {
   eventData: EventData;
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
-  onUpdateTransport: (index: number, field: keyof Transport, value: any) => void;
+  onUpdateTransport: (index: number, field: keyof Transport, value: unknown) => void;
   onAddTransport: () => void;
   onRemoveTransport: (index: number) => void;
   onImportTransports: (transports: Transport[]) => void;

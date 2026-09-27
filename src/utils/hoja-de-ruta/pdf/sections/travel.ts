@@ -42,7 +42,9 @@ export class TravelSection {
         ['Teléfono', Formatters.formatPhone(arrangement.driver_phone || '')],
         ['Matrícula', arrangement.plate_number],
         ['Notas', arrangement.notes]
-      ].filter(([, value]) => DataValidators.hasData(value));
+      ]
+      .map(([label, value]) => [label ?? '', value ?? ''])
+      .filter(([, value]) => DataValidators.hasData(value));
 
       if (travelData.length > 0) {
         this.pdfDoc.addTable({

@@ -31,6 +31,8 @@ export type HojaSectionRuntime = {
     | "onVenueMapUpload"
     | "handleVenueMapUrl"
     | "appendVenuePreviews"
+    | "unavailableImageCount"
+    | "onRemoveUnavailableImages"
   >;
 };
 

@@ -2,6 +2,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { requireServiceRoleRequest } from "../_shared/auth.ts";
+import {
+  groupPathsByJobDocumentBucket,
+  listObjectsUnder,
+} from "../_shared/jobDocumentStorage.ts";
 
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
@@ -140,7 +144,7 @@ async function cleanupStorageForJob(supabase: any, jobId: string) {
 
     const artistIds = festivalArtists?.map((artist: any) => artist.id) || [];
 
-    let artistFiles: any[] = [];
+    let artistFiles: Array<{ file_path: string | null }> = [];
     if (artistIds.length > 0) {
       const { data: files } = await supabase
         .from('festival_artist_files')
@@ -155,25 +159,30 @@ async function cleanupStorageForJob(supabase: any, jobId: string) {
       .select('file_path')
       .eq('job_id', jobId);
 
-    // Collect all file paths
-    const filePaths = [
-      ...(jobDocs || []).map((doc: any) => doc.file_path),
-      ...artistFiles.map((file: any) => file.file_path),
-      ...(festivalLogos || []).map((logo: any) => logo.file_path)
-    ].filter(Boolean);
+    // Hoja de Ruta PDFs and images live under hojas-de-ruta/<jobId>/; images
+    // have no job_documents row, so walk the folder.
+    const hojaObjects = await listObjectsUnder(supabase, 'job-documents', `hojas-de-ruta/${jobId}`);
 
-    console.log(`Found ${filePaths.length} files to delete from storage`);
+    // Each file family has its own bucket, and job documents are split across
+    // two buckets by path.
+    const removals: Array<[string, string[]]> = [
+      ...groupPathsByJobDocumentBucket([
+        ...(jobDocs || []).map((doc: { file_path: string | null }) => doc.file_path),
+        ...hojaObjects,
+      ]).entries(),
+      ['festival_artist_files', artistFiles.flatMap((file) => file.file_path ? [file.file_path] : [])],
+      [
+        'festival-logos',
+        (festivalLogos || []).flatMap((logo: { file_path: string | null }) => logo.file_path ? [logo.file_path] : []),
+      ],
+    ];
 
-    // Delete files from storage
-    if (filePaths.length > 0) {
-      const { error: storageError } = await supabase.storage
-        .from('job_documents')
-        .remove(filePaths);
-      
+    for (const [bucket, paths] of removals) {
+      const unique = Array.from(new Set(paths));
+      if (unique.length === 0) continue;
+      const { error: storageError } = await supabase.storage.from(bucket).remove(unique);
       if (storageError) {
-        console.warn('Storage cleanup warning:', storageError);
-      } else {
-        console.log('Storage cleanup completed successfully');
+        console.warn(`Storage cleanup warning (${bucket}):`, storageError);
       }
     }
   } catch (error) {
@@ -312,34 +321,14 @@ async function deleteJobSpecificData(supabase: any, jobId: string) {
 }
 
 async function deleteHojaDeRutaData(supabase: any, jobId: string) {
-  try {
-    console.log(`Deleting hoja de ruta data for job: ${jobId}`);
-    
-    // Get hoja de ruta ID first
-    const { data: hojaData } = await supabase
-      .from('hoja_de_ruta')
-      .select('id')
-      .eq('job_id', jobId)
-      .single();
+  // Every Hoja child table cascades from hoja_de_ruta, and the service role may
+  // delete a final Hoja. Storage objects were removed in cleanupStorageForJob.
+  const { error } = await supabase
+    .from('hoja_de_ruta')
+    .delete()
+    .eq('job_id', jobId);
 
-    if (hojaData) {
-      const hojaId = hojaData.id;
-      
-      // Delete related hoja de ruta data
-      await Promise.all([
-        supabase.from('hoja_de_ruta_contacts').delete().eq('hoja_de_ruta_id', hojaId),
-        supabase.from('hoja_de_ruta_images').delete().eq('hoja_de_ruta_id', hojaId),
-        supabase.from('hoja_de_ruta_logistics').delete().eq('hoja_de_ruta_id', hojaId),
-        supabase.from('hoja_de_ruta_rooms').delete().eq('hoja_de_ruta_id', hojaId),
-        supabase.from('hoja_de_ruta_staff').delete().eq('hoja_de_ruta_id', hojaId),
-        supabase.from('hoja_de_ruta_travel').delete().eq('hoja_de_ruta_id', hojaId)
-      ]);
-      
-      // Delete the main hoja de ruta record
-      await supabase.from('hoja_de_ruta').delete().eq('id', hojaId);
-      console.log('Hoja de ruta data deleted successfully');
-    }
-  } catch (error) {
+  if (error) {
     console.warn('Hoja de ruta deletion failed:', error);
   }
 }

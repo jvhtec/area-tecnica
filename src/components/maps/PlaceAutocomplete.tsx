@@ -11,7 +11,7 @@ import {
   searchBoxSuggest,
 } from '@/lib/mapbox/mapboxClient';
 
-interface PlaceAutocompleteResult {
+export interface PlaceAutocompleteResult {
   name: string;
   address: string;
   coordinates?: { lat: number; lng: number };

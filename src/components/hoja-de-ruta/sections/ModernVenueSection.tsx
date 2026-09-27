@@ -25,6 +25,9 @@ interface ModernVenueSectionProps {
   onVenueMapUpload: (file: File) => void;
   handleVenueMapUrl: (url: string) => void;
   appendVenuePreviews: (dataUrls: string[]) => void;
+  /** Legacy images whose browser-only `blob:` source can no longer be read. */
+  unavailableImageCount: number;
+  onRemoveUnavailableImages: () => void;
   isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
   onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
@@ -39,6 +42,8 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
   onVenueMapUpload,
   handleVenueMapUrl,
   appendVenuePreviews,
+  unavailableImageCount,
+  onRemoveUnavailableImages,
   isPrintSectionExcluded,
   onPrintSectionExcludedChange,
 }) => {
@@ -182,6 +187,27 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
               </label>
             </div>
 
+            {unavailableImageCount > 0 && (
+              <div
+                role="status"
+                className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span>
+                  {unavailableImageCount === 1
+                    ? "Hay 1 imagen antigua que no se puede recuperar y no aparece en los documentos."
+                    : `Hay ${unavailableImageCount} imágenes antiguas que no se pueden recuperar y no aparecen en los documentos.`}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onRemoveUnavailableImages}
+                >
+                  Quitarlas al guardar
+                </Button>
+              </div>
+            )}
+
             {/* Image Gallery */}
             {imagePreviews.venue.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -196,17 +222,18 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                     >
                       <img
                         src={preview}
-                        alt={`Venue ${index + 1}`}
+                        alt={`Imagen del recinto ${index + 1}`}
                         width={500}
                         height={300}
                         loading="lazy"
                         decoding="async"
                         className="w-full h-32 object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center">
                         <Button
                           size="sm"
                           variant="destructive"
+                          aria-label={`Quitar imagen del recinto ${index + 1}`}
                           onClick={() => onRemoveImage('venue', index)}
                           className="rounded-full w-8 h-8 p-0"
                         >

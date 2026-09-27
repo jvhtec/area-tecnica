@@ -1,12 +1,7 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
 
 import type { HojaSectionId } from "@/features/hoja-de-ruta/model/sectionDefinitions";
-import {
-  hojaDocumentSchema,
-  type HojaDocumentValidationValues,
-} from "@/features/hoja-de-ruta/model/hojaDocumentSchema";
+import { hojaDocumentSchema } from "@/features/hoja-de-ruta/model/hojaDocumentSchema";
 import type { Accommodation, EventData, TravelArrangement } from "@/types/hoja-de-ruta";
 
 export type HojaValidationIssue = {
@@ -45,27 +40,19 @@ export const useHojaValidation = (
   travelArrangements: TravelArrangement[],
   accommodations: Accommodation[],
 ) => {
-  const values = useMemo<HojaDocumentValidationValues>(() => ({
-    eventData: eventData as unknown as HojaDocumentValidationValues["eventData"],
-    travelArrangements: travelArrangements as unknown as HojaDocumentValidationValues["travelArrangements"],
-    accommodations: accommodations as unknown as HojaDocumentValidationValues["accommodations"],
-  }), [accommodations, eventData, travelArrangements]);
-  const form = useForm<HojaDocumentValidationValues>({
-    resolver: zodResolver(hojaDocumentSchema),
-    values,
-    mode: "onBlur",
-  });
   const [showAllErrors, setShowAllErrors] = useState(false);
 
+  // The schema validates the live document directly; `safeParse` accepts any
+  // input, so the editor state needs no conversion.
   const issues = useMemo<HojaValidationIssue[]>(() => {
-    const result = hojaDocumentSchema.safeParse(values);
+    const result = hojaDocumentSchema.safeParse({ eventData, travelArrangements, accommodations });
     if (result.success) return [];
     return result.error.issues.map((issue) => ({
       path: issue.path.join("."),
       message: issue.message,
       section: sectionForPath(issue.path),
     }));
-  }, [values]);
+  }, [accommodations, eventData, travelArrangements]);
 
   const issuesBySection = useMemo(() => {
     const grouped = {} as Partial<Record<HojaSectionId, HojaValidationIssue[]>>;
@@ -77,12 +64,11 @@ export const useHojaValidation = (
 
   const validateDocument = useCallback(async () => {
     setShowAllErrors(true);
-    await form.trigger(undefined, { shouldFocus: false });
     if (issues.length) {
       throw new HojaDocumentValidationError(issues[0].section, issues);
     }
     return true;
-  }, [form, issues]);
+  }, [issues]);
 
   const errorFor = useCallback((path: string) => {
     if (!showAllErrors) return undefined;
@@ -90,7 +76,6 @@ export const useHojaValidation = (
   }, [issues, showAllErrors]);
 
   return {
-    form,
     issues,
     issuesBySection,
     showAllErrors,
