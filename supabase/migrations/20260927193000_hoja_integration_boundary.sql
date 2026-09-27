@@ -1182,7 +1182,7 @@ begin
           and lower(btrim(coalesce(c.name, ''))) = lower(btrim(coalesce(v_contact->>'name', '')))
           and lower(btrim(coalesce(c.role, ''))) = lower(btrim(coalesce(v_contact->>'role', '')))
           and btrim(coalesce(c.phone, '')) = btrim(coalesce(v_contact->>'phone', ''))
-        order by c.created_at, c.id
+        order by c.id
         limit 1;
       end if;
 
