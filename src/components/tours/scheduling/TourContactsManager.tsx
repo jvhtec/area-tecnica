@@ -29,7 +29,7 @@ import {
 interface TourContactsManagerProps {
   tourId: string;
   tourData: { tour_contacts?: TourContact[] | null } | null;
-  tourUpdatedAt: string | null;
+  tourUpdatedAt: string;
   hojaVersions: Record<string, number>;
   canEdit: boolean;
   onSave: () => void;
@@ -57,7 +57,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const syncTourContactsToHojas = async (
   tourId: string,
-  tourUpdatedAt: string | null,
+  tourUpdatedAt: string,
   contacts: TourContact[],
   hojaVersions: Record<string, number>,
 ): Promise<ContactSyncResult> => {

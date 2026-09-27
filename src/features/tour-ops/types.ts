@@ -213,7 +213,7 @@ export interface TourOpsModel {
     description: string | null;
     color: string | null;
     status: string | null;
-    updatedAt: string | null;
+    updatedAt: string;
     startDate: string | null;
     endDate: string | null;
     defaultTimezone: string | null;

@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(107);
+SELECT plan(111);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -814,6 +814,21 @@ SELECT ok(
   'publication marks the canonical Hoja PDF read-only'
 );
 
+INSERT INTO public.job_documents (
+  id, job_id, file_name, file_path, file_type, file_size, uploaded_by,
+  original_type, visible_to_tech
+) VALUES (
+  'dc800000-0000-0000-0000-000000000003'::uuid,
+  'dc200000-0000-0000-0000-000000000001'::uuid,
+  'Documento oculto.pdf',
+  'private/dc200000-0000-0000-0000-000000000001/hidden.pdf',
+  'application/pdf',
+  1,
+  'dc100000-0000-0000-0000-000000000001'::uuid,
+  'pdf',
+  false
+);
+
 SELECT throws_ok(
   $$ UPDATE public.job_documents
      SET job_id = 'dc200000-0000-0000-0000-000000000002'::uuid
@@ -838,6 +853,11 @@ SELECT set_config(
 );
 SET ROLE authenticated;
 
+SELECT lives_ok(
+  $$ SELECT count(*) FROM storage.objects WHERE bucket_id = 'job-documents' $$,
+  'authenticated users can evaluate the job-documents Storage SELECT policy without private-helper permission errors'
+);
+
 SELECT is(
   public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid) #>> '{main,event_name}',
   'Integridad',
@@ -856,6 +876,38 @@ SELECT ok(
     'incident-reports/dc200000-0000-0000-0000-000000000001/incidente.pdf'
   ),
   'an assigned technician can upload an incident report for their job'
+);
+
+SELECT ok(
+  NOT public.can_read_job_document_storage(
+    'private/dc200000-0000-0000-0000-000000000001/hidden.pdf'
+  ),
+  'an assigned technician cannot read a hidden generic job document'
+);
+
+SELECT lives_ok(
+  $$ INSERT INTO public.job_documents (
+       id, job_id, file_name, file_path, file_type, file_size, uploaded_by,
+       original_type, visible_to_tech
+     ) VALUES (
+       'dc800000-0000-0000-0000-000000000004'::uuid,
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'Spoof same-job metadata.pdf',
+       'private/dc200000-0000-0000-0000-000000000001/hidden.pdf',
+       'application/pdf',
+       1,
+       'dc100000-0000-0000-0000-000000000003'::uuid,
+       'pdf',
+       true
+     ) $$,
+  'an assigned technician can still exercise the broad metadata insert policy'
+);
+
+SELECT ok(
+  NOT public.can_read_job_document_storage(
+    'private/dc200000-0000-0000-0000-000000000001/hidden.pdf'
+  ),
+  'technician-created visible metadata cannot promote a hidden object in the same job'
 );
 
 SELECT is(

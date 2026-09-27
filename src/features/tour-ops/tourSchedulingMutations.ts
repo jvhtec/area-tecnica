@@ -32,6 +32,13 @@ const toJson = (value: unknown): Json => {
   return null;
 };
 
+// PostgreSQL function arguments accept NULL unless a function is STRICT, but
+// generated Supabase RPC Args do not encode argument nullability unless a
+// parameter has a default. Keep that mismatch at this boundary rather than
+// widening the generated database declarations by hand.
+const nullableRpcString = (value: string | null | undefined): string =>
+  value as string;
+
 export type TourOpsHojaMutationResult = {
   id?: string | null;
   opsId?: string | null;
@@ -184,12 +191,14 @@ export async function saveTravelSegment(input: Partial<TourOpsTravelSegment> & {
   const { data, error } = await client.rpc("save_tour_ops_travel", {
     p_tour_id: input.tourId,
     p_source: source,
-    p_segment_id: source === "normalized" ? input.id || null : null,
-    p_hoja_id: input.hojaDeRutaId || null,
-    p_hoja_row_id: source === "hoja" ? input.id || null : null,
+    p_segment_id: nullableRpcString(source === "normalized" ? input.id || null : null),
+    p_hoja_id: nullableRpcString(input.hojaDeRutaId || null),
+    p_hoja_row_id: nullableRpcString(source === "hoja" ? input.id || null : null),
     p_hoja_source_table: input.sourceTable || "hoja_de_ruta_travel_arrangements",
     p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
-    p_expected_ops_updated_at: source === "normalized" ? input.updatedAt || null : null,
+    p_expected_ops_updated_at: nullableRpcString(
+      source === "normalized" ? input.updatedAt || null : null,
+    ),
     p_ops_payload: toJson(opsPayload),
     p_hoja_payload: toJson(hojaPayload),
   });
@@ -205,7 +214,7 @@ export async function deleteTravelSegment(input: {
   const { data, error } = await client.rpc("delete_tour_ops_travel", {
     p_segment_id: input.id,
     p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
-    p_expected_ops_updated_at: input.updatedAt || null,
+    p_expected_ops_updated_at: nullableRpcString(input.updatedAt || null),
   });
   if (error) throw error;
   return parseHojaMutationResult(data);
@@ -330,11 +339,13 @@ export async function saveAccommodation(input: Partial<TourOpsAccommodation> & {
   const { data, error } = await client.rpc("save_tour_ops_accommodation", {
     p_tour_id: input.tourId,
     p_source: source,
-    p_accommodation_id: source === "normalized" ? input.id || null : null,
-    p_hoja_id: input.hojaDeRutaId || null,
-    p_hoja_row_id: source === "hoja" ? input.id || null : null,
+    p_accommodation_id: nullableRpcString(source === "normalized" ? input.id || null : null),
+    p_hoja_id: nullableRpcString(input.hojaDeRutaId || null),
+    p_hoja_row_id: nullableRpcString(source === "hoja" ? input.id || null : null),
     p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
-    p_expected_ops_updated_at: source === "normalized" ? input.updatedAt || null : null,
+    p_expected_ops_updated_at: nullableRpcString(
+      source === "normalized" ? input.updatedAt || null : null,
+    ),
     p_ops_payload: toJson(payload),
     p_hoja_payload: toJson(hojaAccommodationPayloadFromHotel(input)),
     p_rooms: toJson(rooms),
@@ -353,9 +364,11 @@ export async function deleteAccommodation(input: {
   const { data, error } = await client.rpc("delete_tour_ops_accommodation", {
     p_source: input.source === "hoja" ? "hoja" : "normalized",
     p_accommodation_id: input.id,
-    p_hoja_id: input.hojaDeRutaId || null,
+    p_hoja_id: nullableRpcString(input.hojaDeRutaId || null),
     p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
-    p_expected_ops_updated_at: input.source === "hoja" ? null : input.updatedAt || null,
+    p_expected_ops_updated_at: nullableRpcString(
+      input.source === "hoja" ? null : input.updatedAt || null,
+    ),
   });
   if (error) throw error;
   return parseHojaMutationResult(data);

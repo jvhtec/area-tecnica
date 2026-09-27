@@ -28,7 +28,7 @@ export const buildPowerTableData = (
   table: PowerTable,
   settings: PowerElectricalSettings & { powerFactor?: number },
   options: { generationTimestamp?: string } = {},
-) => {
+): NonNullable<Json> => {
   const payload = {
     rows: table.rows,
     ...(table.id !== undefined ? { sourceTableId: String(table.id) } : {}),
@@ -44,7 +44,7 @@ export const buildPowerTableData = (
     ...(settings.powerFactor !== undefined ? { pf: settings.powerFactor } : {}),
   };
 
-  return payload as unknown as Json;
+  return payload as unknown as NonNullable<Json>;
 };
 
 export const buildPowerTableMetadata = (
@@ -124,7 +124,7 @@ export const buildPowerRequirementInsert = ({
       rows: table.rows,
       ...(resolvedGenerationTimestamp ? { generationTimestamp: resolvedGenerationTimestamp } : {}),
       ...(tableStage ? { stageNumber: tableStage.number, stageName: tableStage.name } : {}),
-    } as unknown as Json)),
+    } as unknown as NonNullable<Json>)),
     includes_hoist: table.includesHoist || false,
   };
 };

@@ -1518,15 +1518,29 @@ begin
   if auth.uid() is null or v_job_id is null then return false; end if;
   if v_role in ('admin', 'management', 'logistics', 'house_tech') then return true; end if;
 
+  if p_path like ('incident-reports/' || v_job_id::text || '/%')
+     and exists (
+       select 1
+       from public.job_assignments ja
+       where ja.job_id = v_job_id
+         and ja.technician_id = auth.uid()
+         and ja.status = 'confirmed'
+     ) then return true; end if;
+
   if exists (
     select 1
     from public.job_documents jd
     join public.job_assignments ja on ja.job_id = jd.job_id
+    left join public.profiles uploader on uploader.id = jd.uploaded_by
     where jd.job_id = v_job_id
       and jd.file_path = p_path
       and jd.visible_to_tech = true
       and ja.technician_id = auth.uid()
       and ja.status = 'confirmed'
+      and (
+        jd.uploaded_by is null
+        or uploader.role in ('admin', 'management', 'logistics', 'house_tech')
+      )
   ) then return true; end if;
 
   if p_path like ('hojas-de-ruta/' || v_job_id::text || '/images/%')
@@ -1581,11 +1595,57 @@ begin
 end;
 $$;
 
+create or replace function public.can_delete_job_document_storage(p_path text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_job_id uuid := public.job_document_storage_job_id(p_path);
+  v_role text := coalesce(public.get_current_user_role(), '');
+begin
+  if coalesce(auth.jwt()->>'role', '') = 'service_role' then return true; end if;
+  if auth.uid() is null or v_job_id is null then return false; end if;
+
+  if exists (
+    select 1
+    from public.job_documents jd
+    join public.hoja_de_ruta h on h.published_document_id = jd.id
+    where jd.file_path = p_path
+  ) then return false; end if;
+
+  if v_role in ('admin', 'management', 'logistics', 'house_tech') then return true; end if;
+
+  -- A technician may clean up an incident-report object only before its
+  -- metadata row exists. Once metadata exists, document lifecycle controls own
+  -- deletion rather than raw Storage access.
+  if p_path like ('incident-reports/' || v_job_id::text || '/%')
+     and exists (
+       select 1
+       from public.job_assignments ja
+       where ja.job_id = v_job_id
+         and ja.technician_id = auth.uid()
+         and ja.status = 'confirmed'
+     )
+     and not exists (
+       select 1
+       from public.job_documents jd
+       where jd.file_path = p_path
+     ) then return true; end if;
+
+  return false;
+end;
+$$;
+
 revoke all on function public.job_document_storage_job_id(text) from public, anon, authenticated;
 revoke all on function public.can_read_job_document_storage(text) from public, anon;
 revoke all on function public.can_write_job_document_storage(text) from public, anon;
+revoke all on function public.can_delete_job_document_storage(text) from public, anon;
 grant execute on function public.can_read_job_document_storage(text) to authenticated, service_role;
 grant execute on function public.can_write_job_document_storage(text) to authenticated, service_role;
+grant execute on function public.can_delete_job_document_storage(text) to authenticated, service_role;
 
 drop policy if exists "Authenticated users can view job documents" on storage.objects;
 drop policy if exists "Users can view job documents" on storage.objects;
@@ -1604,14 +1664,6 @@ on storage.objects for select to authenticated
 using (
   bucket_id = 'job-documents'
   and public.can_read_job_document_storage(name)
-  and exists (
-    select 1 from public.jobs j
-    where j.id = public.job_document_storage_job_id(storage.objects.name)
-  )
-  and (
-    public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
-    or public.can_read_job_document_storage(name)
-  )
 );
 
 create policy "p_storage_job_documents_authorized_insert"
@@ -1619,14 +1671,6 @@ on storage.objects for insert to authenticated
 with check (
   bucket_id = 'job-documents'
   and public.can_write_job_document_storage(name)
-  and exists (
-    select 1 from public.jobs j
-    where j.id = public.job_document_storage_job_id(storage.objects.name)
-  )
-  and (
-    public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
-    or public.can_write_job_document_storage(name)
-  )
 );
 
 create policy "p_storage_job_documents_authorized_update"
@@ -1635,34 +1679,16 @@ using (
   bucket_id = 'job-documents'
   and public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
   and public.can_write_job_document_storage(name)
-  and exists (
-    select 1 from public.jobs j
-    where j.id = public.job_document_storage_job_id(storage.objects.name)
-  )
 )
 with check (
   bucket_id = 'job-documents'
   and public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
   and public.can_write_job_document_storage(name)
-  and exists (
-    select 1 from public.jobs j
-    where j.id = public.job_document_storage_job_id(storage.objects.name)
-  )
 );
 
 create policy "p_storage_job_documents_authorized_delete"
 on storage.objects for delete to authenticated
 using (
   bucket_id = 'job-documents'
-  and public.can_write_job_document_storage(name)
-  and exists (
-    select 1 from public.jobs j
-    where j.id = public.job_document_storage_job_id(storage.objects.name)
-  )
-  and (
-    public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
-    or not exists (
-      select 1 from public.job_documents jd where jd.file_path = storage.objects.name
-    )
-  )
+  and public.can_delete_job_document_storage(name)
 );

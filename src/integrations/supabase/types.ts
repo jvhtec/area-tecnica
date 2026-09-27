@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
-  }
   public: {
     Tables: {
       achievement_progress: {
@@ -458,7 +453,7 @@ export type Database = {
           created_at: string
           id: string
           ip_address: string | null
-          metadata: Json
+          metadata: NonNullable<Json>
           resource: string
           severity: string
           user_agent: string | null
@@ -468,7 +463,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: string | null
-          metadata?: Json
+          metadata?: NonNullable<Json>
           resource: string
           severity: string
           user_agent?: string | null
@@ -478,7 +473,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: string | null
-          metadata?: Json
+          metadata?: NonNullable<Json>
           resource?: string
           severity?: string
           user_agent?: string | null
@@ -1862,7 +1857,7 @@ export type Database = {
         Row: {
           artist_id: string | null
           created_at: string | null
-          form_data: Json
+          form_data: NonNullable<Json>
           form_id: string | null
           id: string
           notes: string | null
@@ -1873,7 +1868,7 @@ export type Database = {
         Insert: {
           artist_id?: string | null
           created_at?: string | null
-          form_data: Json
+          form_data: NonNullable<Json>
           form_id?: string | null
           id?: string
           notes?: string | null
@@ -1884,7 +1879,7 @@ export type Database = {
         Update: {
           artist_id?: string | null
           created_at?: string | null
-          form_data?: Json
+          form_data?: NonNullable<Json>
           form_id?: string | null
           id?: string
           notes?: string | null
@@ -1961,13 +1956,12 @@ export type Database = {
           extras_wired: string | null
           foh_console: string | null
           foh_console_provided_by:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           foh_drive: string | null
           foh_drive_position: string | null
           foh_outboard: string | null
           foh_tech: boolean | null
-          foh_waves_models: Json
+          foh_waves_models: NonNullable<Json>
           foh_waves_provided_by: Database["public"]["Enums"]["provider_type"]
           form_language: string
           id: string
@@ -1983,8 +1977,7 @@ export type Database = {
           infra_opticalcon_duo: boolean | null
           infra_opticalcon_duo_quantity: number | null
           infrastructure_provided_by:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           isaftermidnight: boolean | null
           job_id: string | null
           line_check: boolean
@@ -1995,12 +1988,11 @@ export type Database = {
           mic_pack: string | null
           mon_console: string | null
           mon_console_provided_by:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           mon_outboard: string | null
           mon_position: string | null
           mon_tech: boolean | null
-          mon_waves_models: Json
+          mon_waves_models: NonNullable<Json>
           mon_waves_provided_by: Database["public"]["Enums"]["provider_type"]
           monitors_enabled: boolean | null
           monitors_from_foh: boolean
@@ -2030,8 +2022,7 @@ export type Database = {
           updated_at: string | null
           wired_mics: Json | null
           wireless_provided_by:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           wireless_quantity: number | null
           wireless_systems: Json | null
         }
@@ -2045,13 +2036,12 @@ export type Database = {
           extras_wired?: string | null
           foh_console?: string | null
           foh_console_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           foh_drive?: string | null
           foh_drive_position?: string | null
           foh_outboard?: string | null
           foh_tech?: boolean | null
-          foh_waves_models?: Json
+          foh_waves_models?: NonNullable<Json>
           foh_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           form_language?: string
           id?: string
@@ -2067,8 +2057,7 @@ export type Database = {
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
           infrastructure_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           isaftermidnight?: boolean | null
           job_id?: string | null
           line_check?: boolean
@@ -2079,12 +2068,11 @@ export type Database = {
           mic_pack?: string | null
           mon_console?: string | null
           mon_console_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           mon_outboard?: string | null
           mon_position?: string | null
           mon_tech?: boolean | null
-          mon_waves_models?: Json
+          mon_waves_models?: NonNullable<Json>
           mon_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           monitors_enabled?: boolean | null
           monitors_from_foh?: boolean
@@ -2114,8 +2102,7 @@ export type Database = {
           updated_at?: string | null
           wired_mics?: Json | null
           wireless_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           wireless_quantity?: number | null
           wireless_systems?: Json | null
         }
@@ -2129,13 +2116,12 @@ export type Database = {
           extras_wired?: string | null
           foh_console?: string | null
           foh_console_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           foh_drive?: string | null
           foh_drive_position?: string | null
           foh_outboard?: string | null
           foh_tech?: boolean | null
-          foh_waves_models?: Json
+          foh_waves_models?: NonNullable<Json>
           foh_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           form_language?: string
           id?: string
@@ -2151,8 +2137,7 @@ export type Database = {
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
           infrastructure_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           isaftermidnight?: boolean | null
           job_id?: string | null
           line_check?: boolean
@@ -2163,12 +2148,11 @@ export type Database = {
           mic_pack?: string | null
           mon_console?: string | null
           mon_console_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           mon_outboard?: string | null
           mon_position?: string | null
           mon_tech?: boolean | null
-          mon_waves_models?: Json
+          mon_waves_models?: NonNullable<Json>
           mon_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           monitors_enabled?: boolean | null
           monitors_from_foh?: boolean
@@ -2198,8 +2182,7 @@ export type Database = {
           updated_at?: string | null
           wired_mics?: Json | null
           wireless_provided_by?:
-            | Database["public"]["Enums"]["provider_type"]
-            | null
+            Database["public"]["Enums"]["provider_type"] | null
           wireless_quantity?: number | null
           wireless_systems?: Json | null
         }
@@ -2234,7 +2217,7 @@ export type Database = {
           foh_drive_options: string[]
           foh_drive_positions: string[]
           foh_outboard: string | null
-          foh_waves_models: Json
+          foh_waves_models: NonNullable<Json>
           has_dj_booths: boolean | null
           has_drum_fills: boolean | null
           has_side_fills: boolean | null
@@ -2245,7 +2228,7 @@ export type Database = {
           mon_consoles: Json | null
           mon_outboard: string | null
           mon_positions: string[]
-          mon_waves_models: Json
+          mon_waves_models: NonNullable<Json>
           notes: string | null
           other_infrastructure: string | null
           updated_at: string | null
@@ -2265,7 +2248,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: Json
+          foh_waves_models?: NonNullable<Json>
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
           has_side_fills?: boolean | null
@@ -2276,7 +2259,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: Json
+          mon_waves_models?: NonNullable<Json>
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
@@ -2296,7 +2279,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: Json
+          foh_waves_models?: NonNullable<Json>
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
           has_side_fills?: boolean | null
@@ -2307,7 +2290,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: Json
+          mon_waves_models?: NonNullable<Json>
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
@@ -2387,7 +2370,7 @@ export type Database = {
           event_kind: string
           id: string
           job_id: string
-          payload: Json
+          payload: NonNullable<Json>
           sent_at: string
           user_id: string
         }
@@ -2398,7 +2381,7 @@ export type Database = {
           event_kind: string
           id?: string
           job_id: string
-          payload?: Json
+          payload?: NonNullable<Json>
           sent_at?: string
           user_id: string
         }
@@ -2409,7 +2392,7 @@ export type Database = {
           event_kind?: string
           id?: string
           job_id?: string
-          payload?: Json
+          payload?: NonNullable<Json>
           sent_at?: string
           user_id?: string
         }
@@ -2645,7 +2628,7 @@ export type Database = {
           foh_drive_options: string[]
           foh_drive_positions: string[]
           foh_outboard: string | null
-          foh_waves_models: Json
+          foh_waves_models: NonNullable<Json>
           gear_setup_id: string
           id: string
           iem_systems: Json | null
@@ -2661,7 +2644,7 @@ export type Database = {
           mon_consoles: Json | null
           mon_outboard: string | null
           mon_positions: string[]
-          mon_waves_models: Json
+          mon_waves_models: NonNullable<Json>
           monitors_enabled: boolean | null
           monitors_quantity: number | null
           notes: string | null
@@ -2681,7 +2664,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: Json
+          foh_waves_models?: NonNullable<Json>
           gear_setup_id: string
           id?: string
           iem_systems?: Json | null
@@ -2697,7 +2680,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: Json
+          mon_waves_models?: NonNullable<Json>
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           notes?: string | null
@@ -2717,7 +2700,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: Json
+          foh_waves_models?: NonNullable<Json>
           gear_setup_id?: string
           id?: string
           iem_systems?: Json | null
@@ -2733,7 +2716,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: Json
+          mon_waves_models?: NonNullable<Json>
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           notes?: string | null
@@ -2797,6 +2780,7 @@ export type Database = {
       }
       fleet_vehicles: {
         Row: {
+          berth_layouts: number[]
           brand: string | null
           cargo_length_m: number | null
           created_at: string
@@ -2810,12 +2794,14 @@ export type Database = {
           model: string | null
           name: string
           notes: string | null
+          passenger_seats: number | null
           payload_kg: number | null
           required_license: string
           updated_at: string
           vehicle_type: Database["public"]["Enums"]["transport_type"]
         }
         Insert: {
+          berth_layouts?: number[]
           brand?: string | null
           cargo_length_m?: number | null
           created_at?: string
@@ -2829,12 +2815,14 @@ export type Database = {
           model?: string | null
           name: string
           notes?: string | null
+          passenger_seats?: number | null
           payload_kg?: number | null
           required_license?: string
           updated_at?: string
           vehicle_type: Database["public"]["Enums"]["transport_type"]
         }
         Update: {
+          berth_layouts?: number[]
           brand?: string | null
           cargo_length_m?: number | null
           created_at?: string
@@ -2848,6 +2836,7 @@ export type Database = {
           model?: string | null
           name?: string
           notes?: string | null
+          passenger_seats?: number | null
           payload_kg?: number | null
           required_license?: string
           updated_at?: string
@@ -3026,7 +3015,7 @@ export type Database = {
           id: string
           operation_id: string
           parent_key: string | null
-          payload: Json
+          payload: NonNullable<Json>
           safe_error: Json | null
           semantic_key: string
           state: string
@@ -3039,7 +3028,7 @@ export type Database = {
           id?: string
           operation_id: string
           parent_key?: string | null
-          payload?: Json
+          payload?: NonNullable<Json>
           safe_error?: Json | null
           semantic_key: string
           state?: string
@@ -3052,7 +3041,7 @@ export type Database = {
           id?: string
           operation_id?: string
           parent_key?: string | null
-          payload?: Json
+          payload?: NonNullable<Json>
           safe_error?: Json | null
           semantic_key?: string
           state?: string
@@ -3197,7 +3186,7 @@ export type Database = {
           id: string
           job_assignment_id: string | null
           job_role: string | null
-          metadata: Json
+          metadata: NonNullable<Json>
           quantity: number | null
           role_department: string | null
           source_type: Database["public"]["Enums"]["flex_work_order_item_source"]
@@ -3212,7 +3201,7 @@ export type Database = {
           id?: string
           job_assignment_id?: string | null
           job_role?: string | null
-          metadata?: Json
+          metadata?: NonNullable<Json>
           quantity?: number | null
           role_department?: string | null
           source_type: Database["public"]["Enums"]["flex_work_order_item_source"]
@@ -3227,7 +3216,7 @@ export type Database = {
           id?: string
           job_assignment_id?: string | null
           job_role?: string | null
-          metadata?: Json
+          metadata?: NonNullable<Json>
           quantity?: number | null
           role_department?: string | null
           source_type?: Database["public"]["Enums"]["flex_work_order_item_source"]
@@ -3402,7 +3391,7 @@ export type Database = {
           alerts: Json | null
           approved_at: string | null
           approved_by: string | null
-          aux_machinery_requirements: Json
+          aux_machinery_requirements: NonNullable<Json>
           aux_staff_dismantle_qty: number
           aux_staff_setup_qty: number
           auxiliary_needs: string | null
@@ -3423,9 +3412,9 @@ export type Database = {
           logistics_info: Json | null
           power_requirements: string | null
           power_requirements_source_updated_at: string | null
-          published_document_id: string | null
-          print_excluded_sections: Json
+          print_excluded_sections: NonNullable<Json>
           program_schedule_json: Json | null
+          published_document_id: string | null
           restaurants_info: Json | null
           review_requested_by: string | null
           schedule: string | null
@@ -3444,7 +3433,7 @@ export type Database = {
           alerts?: Json | null
           approved_at?: string | null
           approved_by?: string | null
-          aux_machinery_requirements?: Json
+          aux_machinery_requirements?: NonNullable<Json>
           aux_staff_dismantle_qty?: number
           aux_staff_setup_qty?: number
           auxiliary_needs?: string | null
@@ -3465,9 +3454,9 @@ export type Database = {
           logistics_info?: Json | null
           power_requirements?: string | null
           power_requirements_source_updated_at?: string | null
-          published_document_id?: string | null
-          print_excluded_sections?: Json
+          print_excluded_sections?: NonNullable<Json>
           program_schedule_json?: Json | null
+          published_document_id?: string | null
           restaurants_info?: Json | null
           review_requested_by?: string | null
           schedule?: string | null
@@ -3486,7 +3475,7 @@ export type Database = {
           alerts?: Json | null
           approved_at?: string | null
           approved_by?: string | null
-          aux_machinery_requirements?: Json
+          aux_machinery_requirements?: NonNullable<Json>
           aux_staff_dismantle_qty?: number
           aux_staff_setup_qty?: number
           auxiliary_needs?: string | null
@@ -3507,9 +3496,9 @@ export type Database = {
           logistics_info?: Json | null
           power_requirements?: string | null
           power_requirements_source_updated_at?: string | null
-          published_document_id?: string | null
-          print_excluded_sections?: Json
+          print_excluded_sections?: NonNullable<Json>
           program_schedule_json?: Json | null
+          published_document_id?: string | null
           restaurants_info?: Json | null
           review_requested_by?: string | null
           schedule?: string | null
@@ -3554,6 +3543,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "hoja_de_ruta_published_document_id_fkey"
+            columns: ["published_document_id"]
+            isOneToOne: false
+            referencedRelation: "job_documents"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hoja_de_ruta_tour_date_id_fkey"
             columns: ["tour_date_id"]
             isOneToOne: false
@@ -3573,8 +3569,8 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
-          source_tour_accommodation_id: string | null
           sort_order: number
+          source_tour_accommodation_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -3587,8 +3583,8 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
-          source_tour_accommodation_id?: string | null
           sort_order?: number
+          source_tour_accommodation_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -3601,8 +3597,8 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
-          source_tour_accommodation_id?: string | null
           sort_order?: number
+          source_tour_accommodation_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3611,6 +3607,13 @@ export type Database = {
             columns: ["hoja_de_ruta_id"]
             isOneToOne: false
             referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_de_ruta_accommodations_source_tour_accommodation_id_fkey"
+            columns: ["source_tour_accommodation_id"]
+            isOneToOne: false
+            referencedRelation: "tour_accommodations"
             referencedColumns: ["id"]
           },
         ]
@@ -3925,6 +3928,20 @@ export type Database = {
             referencedRelation: "hoja_de_ruta_accommodations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "hoja_room_staff1_hoja_staff_fkey"
+            columns: ["staff_member1_hoja_staff_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta_staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_room_staff2_hoja_staff_fkey"
+            columns: ["staff_member2_hoja_staff_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta_staff"
+            referencedColumns: ["id"]
+          },
         ]
       }
       hoja_de_ruta_rooms: {
@@ -4074,7 +4091,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
-          template_data: Json
+          template_data: NonNullable<Json>
           updated_at: string | null
         }
         Insert: {
@@ -4085,7 +4102,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
-          template_data: Json
+          template_data: NonNullable<Json>
           updated_at?: string | null
         }
         Update: {
@@ -4096,7 +4113,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
-          template_data?: Json
+          template_data?: NonNullable<Json>
           updated_at?: string | null
         }
         Relationships: []
@@ -4106,6 +4123,7 @@ export type Database = {
           company: string | null
           created_at: string | null
           date_time: string | null
+          destination: string | null
           driver_name: string | null
           driver_phone: string | null
           has_return: boolean | null
@@ -4114,12 +4132,11 @@ export type Database = {
           is_hoja_relevant: boolean
           license_plate: string | null
           logistics_categories: Database["public"]["Enums"]["logistics_transport_category"][]
+          origin: string | null
           return_date_time: string | null
           sort_order: number
           source_logistics_event_id: string | null
           source_logistics_updated_at: string | null
-          origin: string | null
-          destination: string | null
           transport_type: string
           updated_at: string | null
         }
@@ -4127,6 +4144,7 @@ export type Database = {
           company?: string | null
           created_at?: string | null
           date_time?: string | null
+          destination?: string | null
           driver_name?: string | null
           driver_phone?: string | null
           has_return?: boolean | null
@@ -4135,12 +4153,11 @@ export type Database = {
           is_hoja_relevant?: boolean
           license_plate?: string | null
           logistics_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
+          origin?: string | null
           return_date_time?: string | null
           sort_order?: number
           source_logistics_event_id?: string | null
           source_logistics_updated_at?: string | null
-          origin?: string | null
-          destination?: string | null
           transport_type: string
           updated_at?: string | null
         }
@@ -4148,6 +4165,7 @@ export type Database = {
           company?: string | null
           created_at?: string | null
           date_time?: string | null
+          destination?: string | null
           driver_name?: string | null
           driver_phone?: string | null
           has_return?: boolean | null
@@ -4156,12 +4174,11 @@ export type Database = {
           is_hoja_relevant?: boolean
           license_plate?: string | null
           logistics_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
+          origin?: string | null
           return_date_time?: string | null
           sort_order?: number
           source_logistics_event_id?: string | null
           source_logistics_updated_at?: string | null
-          origin?: string | null
-          destination?: string | null
           transport_type?: string
           updated_at?: string | null
         }
@@ -4247,8 +4264,8 @@ export type Database = {
           pickup_address: string | null
           pickup_time: string | null
           plate_number: string | null
-          source_tour_travel_segment_id: string | null
           sort_order: number
+          source_tour_travel_segment_id: string | null
           transportation_type: string
           updated_at: string | null
         }
@@ -4265,8 +4282,8 @@ export type Database = {
           pickup_address?: string | null
           pickup_time?: string | null
           plate_number?: string | null
-          source_tour_travel_segment_id?: string | null
           sort_order?: number
+          source_tour_travel_segment_id?: string | null
           transportation_type: string
           updated_at?: string | null
         }
@@ -4283,12 +4300,19 @@ export type Database = {
           pickup_address?: string | null
           pickup_time?: string | null
           plate_number?: string | null
-          source_tour_travel_segment_id?: string | null
           sort_order?: number
+          source_tour_travel_segment_id?: string | null
           transportation_type?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hoja_de_ruta_travel_arrangeme_source_tour_travel_segment_i_fkey"
+            columns: ["source_tour_travel_segment_id"]
+            isOneToOne: false
+            referencedRelation: "tour_travel_segments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hoja_de_ruta_travel_arrangements_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
@@ -4464,11 +4488,11 @@ export type Database = {
       }
       job_documents: {
         Row: {
+          document_kind: string | null
           file_name: string
           file_path: string
           file_size: number | null
           file_type: string | null
-          document_kind: string | null
           has_preview: boolean
           id: string
           job_id: string
@@ -4482,11 +4506,11 @@ export type Database = {
           visible_to_tech: boolean
         }
         Insert: {
+          document_kind?: string | null
           file_name: string
           file_path: string
           file_size?: number | null
           file_type?: string | null
-          document_kind?: string | null
           has_preview?: boolean
           id?: string
           job_id: string
@@ -4500,11 +4524,11 @@ export type Database = {
           visible_to_tech?: boolean
         }
         Update: {
+          document_kind?: string | null
           file_name?: string
           file_path?: string
           file_size?: number | null
           file_type?: string | null
-          document_kind?: string | null
           has_preview?: boolean
           id?: string
           job_id?: string
@@ -4555,7 +4579,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: Json
+          status_history: NonNullable<Json>
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -4582,7 +4606,7 @@ export type Database = {
           rejected_by?: string | null
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["expense_status"]
-          status_history?: Json
+          status_history?: NonNullable<Json>
           submitted_at?: string | null
           submitted_by?: string | null
           technician_id: string
@@ -4609,7 +4633,7 @@ export type Database = {
           rejected_by?: string | null
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["expense_status"]
-          status_history?: Json
+          status_history?: NonNullable<Json>
           submitted_at?: string | null
           submitted_by?: string | null
           technician_id?: string
@@ -5183,7 +5207,7 @@ export type Database = {
           created_by: string | null
           id: string
           job_id: string
-          plot_data: Json
+          plot_data: NonNullable<Json>
           updated_at: string | null
         }
         Insert: {
@@ -5191,7 +5215,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           job_id: string
-          plot_data: Json
+          plot_data: NonNullable<Json>
           updated_at?: string | null
         }
         Update: {
@@ -5199,7 +5223,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           job_id?: string
-          plot_data?: Json
+          plot_data?: NonNullable<Json>
           updated_at?: string | null
         }
         Relationships: [
@@ -5427,6 +5451,7 @@ export type Database = {
       job_whatsapp_groups: {
         Row: {
           created_at: string
+          created_by: string | null
           department: string
           id: string
           job_id: string
@@ -5435,6 +5460,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           department: string
           id?: string
           job_id: string
@@ -5443,6 +5469,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           department?: string
           id?: string
           job_id?: string
@@ -5450,6 +5477,20 @@ export type Database = {
           wa_group_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "job_whatsapp_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_whatsapp_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "job_whatsapp_groups_job_id_fkey"
             columns: ["job_id"]
@@ -5476,8 +5517,7 @@ export type Database = {
           flex_folders_created: boolean | null
           id: string
           invoicing_company:
-            | Database["public"]["Enums"]["invoicing_company"]
-            | null
+            Database["public"]["Enums"]["invoicing_company"] | null
           job_type: Database["public"]["Enums"]["job_type"]
           location_id: string | null
           preventive_resource_assigned_at: string | null
@@ -5503,8 +5543,7 @@ export type Database = {
           flex_folders_created?: boolean | null
           id?: string
           invoicing_company?:
-            | Database["public"]["Enums"]["invoicing_company"]
-            | null
+            Database["public"]["Enums"]["invoicing_company"] | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
           preventive_resource_assigned_at?: string | null
@@ -5515,7 +5554,7 @@ export type Database = {
           rates_approved_by?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["job_status"] | null
-          time_range?: unknown
+          time_range?: never
           timezone?: string | null
           title: string
           tour_date_id?: string | null
@@ -5530,8 +5569,7 @@ export type Database = {
           flex_folders_created?: boolean | null
           id?: string
           invoicing_company?:
-            | Database["public"]["Enums"]["invoicing_company"]
-            | null
+            Database["public"]["Enums"]["invoicing_company"] | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
           preventive_resource_assigned_at?: string | null
@@ -5542,7 +5580,7 @@ export type Database = {
           rates_approved_by?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["job_status"] | null
-          time_range?: unknown
+          time_range?: never
           timezone?: string | null
           title?: string
           tour_date_id?: string | null
@@ -5922,8 +5960,7 @@ export type Database = {
           timezone: string | null
           title: string | null
           transport_provider:
-            | Database["public"]["Enums"]["transport_provider_enum"]
-            | null
+            Database["public"]["Enums"]["transport_provider_enum"] | null
           transport_request_id: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at: string | null
@@ -5951,8 +5988,7 @@ export type Database = {
           timezone?: string | null
           title?: string | null
           transport_provider?:
-            | Database["public"]["Enums"]["transport_provider_enum"]
-            | null
+            Database["public"]["Enums"]["transport_provider_enum"] | null
           transport_request_id?: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
@@ -5980,8 +6016,7 @@ export type Database = {
           timezone?: string | null
           title?: string | null
           transport_provider?:
-            | Database["public"]["Enums"]["transport_provider_enum"]
-            | null
+            Database["public"]["Enums"]["transport_provider_enum"] | null
           transport_request_id?: string | null
           transport_type?: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
@@ -6004,6 +6039,13 @@ export type Database = {
           {
             foreignKeyName: "logistics_events_location_id_fkey"
             columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_events_origin_location_id_fkey"
+            columns: ["origin_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
@@ -6247,7 +6289,7 @@ export type Database = {
           expires_at: string | null
           failed_count: number
           id: string
-          meta: Json
+          meta: NonNullable<Json>
           provider_status: string
           read_at: string | null
           title: string
@@ -6266,7 +6308,7 @@ export type Database = {
           expires_at?: string | null
           failed_count?: number
           id?: string
-          meta?: Json
+          meta?: NonNullable<Json>
           provider_status?: string
           read_at?: string | null
           title: string
@@ -6285,7 +6327,7 @@ export type Database = {
           expires_at?: string | null
           failed_count?: number
           id?: string
-          meta?: Json
+          meta?: NonNullable<Json>
           provider_status?: string
           read_at?: string | null
           title?: string
@@ -6300,20 +6342,19 @@ export type Database = {
         Row: {
           account_enabled: boolean
           assignments: boolean | null
-          category_preferences: Json
+          category_preferences: NonNullable<Json>
           created_at: string | null
           form_submissions: boolean | null
           gear_movements: boolean | null
           id: string
           messages: boolean | null
-          muted_entities: Json
+          muted_entities: NonNullable<Json>
           quiet_hours_enabled: boolean
           quiet_hours_end: string
           quiet_hours_start: string
           quiet_hours_timezone: string
           staffing_scope:
-            | Database["public"]["Enums"]["staffing_notification_scope"]
-            | null
+            Database["public"]["Enums"]["staffing_notification_scope"] | null
           updated_at: string | null
           urgent_bypass: boolean
           user_id: string
@@ -6321,20 +6362,19 @@ export type Database = {
         Insert: {
           account_enabled?: boolean
           assignments?: boolean | null
-          category_preferences?: Json
+          category_preferences?: NonNullable<Json>
           created_at?: string | null
           form_submissions?: boolean | null
           gear_movements?: boolean | null
           id?: string
           messages?: boolean | null
-          muted_entities?: Json
+          muted_entities?: NonNullable<Json>
           quiet_hours_enabled?: boolean
           quiet_hours_end?: string
           quiet_hours_start?: string
           quiet_hours_timezone?: string
           staffing_scope?:
-            | Database["public"]["Enums"]["staffing_notification_scope"]
-            | null
+            Database["public"]["Enums"]["staffing_notification_scope"] | null
           updated_at?: string | null
           urgent_bypass?: boolean
           user_id: string
@@ -6342,20 +6382,19 @@ export type Database = {
         Update: {
           account_enabled?: boolean
           assignments?: boolean | null
-          category_preferences?: Json
+          category_preferences?: NonNullable<Json>
           created_at?: string | null
           form_submissions?: boolean | null
           gear_movements?: boolean | null
           id?: string
           messages?: boolean | null
-          muted_entities?: Json
+          muted_entities?: NonNullable<Json>
           quiet_hours_enabled?: boolean
           quiet_hours_end?: string
           quiet_hours_start?: string
           quiet_hours_timezone?: string
           staffing_scope?:
-            | Database["public"]["Enums"]["staffing_notification_scope"]
-            | null
+            Database["public"]["Enums"]["staffing_notification_scope"] | null
           updated_at?: string | null
           urgent_bypass?: boolean
           user_id?: string
@@ -6428,21 +6467,21 @@ export type Database = {
           created_at: string
           expires_at: string | null
           kind: string
-          payload: Json
+          payload: NonNullable<Json>
         }
         Insert: {
           cache_key: string
           created_at?: string
           expires_at?: string | null
           kind: string
-          payload: Json
+          payload: NonNullable<Json>
         }
         Update: {
           cache_key?: string
           created_at?: string
           expires_at?: string | null
           kind?: string
-          payload?: Json
+          payload?: NonNullable<Json>
         }
         Relationships: []
       }
@@ -6460,7 +6499,7 @@ export type Database = {
           position: string | null
           stage_name: string | null
           stage_number: number | null
-          table_data: Json
+          table_data: NonNullable<Json>
           table_name: string
           total_watts: number
           updated_at: string
@@ -6478,7 +6517,7 @@ export type Database = {
           position?: string | null
           stage_name?: string | null
           stage_number?: number | null
-          table_data?: Json
+          table_data?: NonNullable<Json>
           table_name: string
           total_watts: number
           updated_at?: string
@@ -6496,7 +6535,7 @@ export type Database = {
           position?: string | null
           stage_name?: string | null
           stage_number?: number | null
-          table_data?: Json
+          table_data?: NonNullable<Json>
           table_name?: string
           total_watts?: number
           updated_at?: string
@@ -6990,7 +7029,7 @@ export type Database = {
           event_kind: string
           id: string
           job_id: string
-          payload: Json
+          payload: NonNullable<Json>
           sent_at: string
           user_id: string
         }
@@ -7001,7 +7040,7 @@ export type Database = {
           event_kind?: string
           id?: string
           job_id: string
-          payload?: Json
+          payload?: NonNullable<Json>
           sent_at?: string
           user_id: string
         }
@@ -7012,7 +7051,7 @@ export type Database = {
           event_kind?: string
           id?: string
           job_id?: string
-          payload?: Json
+          payload?: NonNullable<Json>
           sent_at?: string
           user_id?: string
         }
@@ -7666,7 +7705,7 @@ export type Database = {
       }
       rack_builder_panel_layout_rows: {
         Row: {
-          active_column_map: Json
+          active_column_map: NonNullable<Json>
           created_at: string
           hole_count: number
           id: string
@@ -7675,7 +7714,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          active_column_map?: Json
+          active_column_map?: NonNullable<Json>
           created_at?: string
           hole_count: number
           id?: string
@@ -7684,7 +7723,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          active_column_map?: Json
+          active_column_map?: NonNullable<Json>
           created_at?: string
           hole_count?: number
           id?: string
@@ -7956,7 +7995,7 @@ export type Database = {
           created_at: string
           id: string
           ip_address: unknown
-          metadata: Json
+          metadata: NonNullable<Json>
           resource: string
           severity: string
           user_agent: string | null
@@ -7967,7 +8006,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: unknown
-          metadata?: Json
+          metadata?: NonNullable<Json>
           resource: string
           severity: string
           user_agent?: string | null
@@ -7978,7 +8017,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: unknown
-          metadata?: Json
+          metadata?: NonNullable<Json>
           resource?: string
           severity?: string
           user_agent?: string | null
@@ -7995,7 +8034,7 @@ export type Database = {
           created_at: string
           id: string
           label: string
-          metadata: Json
+          metadata: NonNullable<Json>
           required: boolean
           responsible_role: string
           status: string
@@ -8011,7 +8050,7 @@ export type Database = {
           created_at?: string
           id?: string
           label: string
-          metadata?: Json
+          metadata?: NonNullable<Json>
           required?: boolean
           responsible_role: string
           status?: string
@@ -8027,7 +8066,7 @@ export type Database = {
           created_at?: string
           id?: string
           label?: string
-          metadata?: Json
+          metadata?: NonNullable<Json>
           required?: boolean
           responsible_role?: string
           status?: string
@@ -8069,7 +8108,7 @@ export type Database = {
           entity_id: string
           id: string
           job_id: string | null
-          state: Json
+          state: NonNullable<Json>
           status: string
           tour_date_id: string | null
           tour_id: string | null
@@ -8084,11 +8123,11 @@ export type Database = {
           current_step: string
           entity_id: string
           id?: string
-          job_id?: string | null
-          state?: Json
+          job_id?: never
+          state?: NonNullable<Json>
           status?: string
-          tour_date_id?: string | null
-          tour_id?: string | null
+          tour_date_id?: never
+          tour_id?: never
           type: string
           updated_at?: string
         }
@@ -8100,11 +8139,11 @@ export type Database = {
           current_step?: string
           entity_id?: string
           id?: string
-          job_id?: string | null
-          state?: Json
+          job_id?: never
+          state?: NonNullable<Json>
           status?: string
-          tour_date_id?: string | null
-          tour_id?: string | null
+          tour_date_id?: never
+          tour_id?: never
           type?: string
           updated_at?: string
         }
@@ -8602,7 +8641,7 @@ export type Database = {
           mode: string
           next_run_at: string | null
           offer_message: string | null
-          policy: Json
+          policy: NonNullable<Json>
           run_lock: string | null
           status: string
           updated_at: string | null
@@ -8618,7 +8657,7 @@ export type Database = {
           mode: string
           next_run_at?: string | null
           offer_message?: string | null
-          policy: Json
+          policy: NonNullable<Json>
           run_lock?: string | null
           status?: string
           updated_at?: string | null
@@ -8634,7 +8673,7 @@ export type Database = {
           mode?: string
           next_run_at?: string | null
           offer_message?: string | null
-          policy?: Json
+          policy?: NonNullable<Json>
           run_lock?: string | null
           status?: string
           updated_at?: string | null
@@ -9062,7 +9101,7 @@ export type Database = {
           department: Database["public"]["Enums"]["department"]
           id: string
           name: string
-          tables: Json
+          tables: NonNullable<Json>
           tool: string
           updated_at: string
         }
@@ -9072,7 +9111,7 @@ export type Database = {
           department: Database["public"]["Enums"]["department"]
           id?: string
           name: string
-          tables: Json
+          tables: NonNullable<Json>
           tool: string
           updated_at?: string
         }
@@ -9082,7 +9121,7 @@ export type Database = {
           department?: Database["public"]["Enums"]["department"]
           id?: string
           name?: string
-          tables?: Json
+          tables?: NonNullable<Json>
           tool?: string
           updated_at?: string
         }
@@ -9552,8 +9591,8 @@ export type Database = {
           room_allocation: Json | null
           room_type: string | null
           rooms_booked: number | null
-          special_requests: string | null
           source_hoja_accommodation_id: string | null
+          special_requests: string | null
           status: string | null
           total_cost_eur: number | null
           tour_date_id: string | null
@@ -9583,8 +9622,8 @@ export type Database = {
           room_allocation?: Json | null
           room_type?: string | null
           rooms_booked?: number | null
-          special_requests?: string | null
           source_hoja_accommodation_id?: string | null
+          special_requests?: string | null
           status?: string | null
           total_cost_eur?: number | null
           tour_date_id?: string | null
@@ -9614,8 +9653,8 @@ export type Database = {
           room_allocation?: Json | null
           room_type?: string | null
           rooms_booked?: number | null
-          special_requests?: string | null
           source_hoja_accommodation_id?: string | null
+          special_requests?: string | null
           status?: string | null
           total_cost_eur?: number | null
           tour_date_id?: string | null
@@ -9643,6 +9682,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_accommodations_source_hoja_accommodation_id_fkey"
+            columns: ["source_hoja_accommodation_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta_accommodations"
             referencedColumns: ["id"]
           },
           {
@@ -10008,7 +10054,7 @@ export type Database = {
           id: string
           metadata: Json | null
           set_id: string
-          table_data: Json
+          table_data: NonNullable<Json>
           table_name: string
           table_type: string
           total_value: number
@@ -10019,7 +10065,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           set_id: string
-          table_data: Json
+          table_data: NonNullable<Json>
           table_name: string
           table_type: string
           total_value?: number
@@ -10030,7 +10076,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           set_id?: string
-          table_data?: Json
+          table_data?: NonNullable<Json>
           table_name?: string
           table_type?: string
           total_value?: number
@@ -10096,7 +10142,7 @@ export type Database = {
       tour_guest_links: {
         Row: {
           access_level: string
-          allowed_sections: Json
+          allowed_sections: NonNullable<Json>
           created_at: string
           created_by: string | null
           expires_at: string | null
@@ -10110,7 +10156,7 @@ export type Database = {
         }
         Insert: {
           access_level?: string
-          allowed_sections?: Json
+          allowed_sections?: NonNullable<Json>
           created_at?: string
           created_by?: string | null
           expires_at?: string | null
@@ -10124,7 +10170,7 @@ export type Database = {
         }
         Update: {
           access_level?: string
-          allowed_sections?: Json
+          allowed_sections?: NonNullable<Json>
           created_at?: string
           created_by?: string | null
           expires_at?: string | null
@@ -10262,7 +10308,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           default_crew_calls: Json | null
-          default_schedule: Json
+          default_schedule: NonNullable<Json>
           default_timing: Json | null
           description: string | null
           id: string
@@ -10276,7 +10322,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           default_crew_calls?: Json | null
-          default_schedule: Json
+          default_schedule: NonNullable<Json>
           default_timing?: Json | null
           description?: string | null
           id?: string
@@ -10290,7 +10336,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           default_crew_calls?: Json | null
-          default_schedule?: Json
+          default_schedule?: NonNullable<Json>
           default_timing?: Json | null
           description?: string | null
           id?: string
@@ -10522,6 +10568,13 @@ export type Database = {
             columns: ["from_tour_date_id"]
             isOneToOne: false
             referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_travel_segments_source_hoja_travel_arrangement_id_fkey"
+            columns: ["source_hoja_travel_arrangement_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta_travel_arrangements"
             referencedColumns: ["id"]
           },
           {
@@ -11308,10 +11361,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          instances_json: Json
+          instances_json: NonNullable<Json>
           job_plan_id: string
-          label_notes_json: Json
-          metrics_json: Json
+          label_notes_json: NonNullable<Json>
+          metrics_json: NonNullable<Json>
           published_at: string | null
           published_by: string | null
           status: string
@@ -11324,10 +11377,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          instances_json?: Json
+          instances_json?: NonNullable<Json>
           job_plan_id: string
-          label_notes_json?: Json
-          metrics_json?: Json
+          label_notes_json?: NonNullable<Json>
+          metrics_json?: NonNullable<Json>
           published_at?: string | null
           published_by?: string | null
           status?: string
@@ -11340,10 +11393,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          instances_json?: Json
+          instances_json?: NonNullable<Json>
           job_plan_id?: string
-          label_notes_json?: Json
-          metrics_json?: Json
+          label_notes_json?: NonNullable<Json>
+          metrics_json?: NonNullable<Json>
           published_at?: string | null
           published_by?: string | null
           status?: string
@@ -11836,7 +11889,7 @@ export type Database = {
           highlight_ttl_seconds: number
           id: string
           name: string
-          panel_durations: Json
+          panel_durations: NonNullable<Json>
           panel_order: string[]
           rotation_fallback_seconds: number
           slug: string
@@ -11850,7 +11903,7 @@ export type Database = {
           highlight_ttl_seconds?: number
           id?: string
           name: string
-          panel_durations: Json
+          panel_durations: NonNullable<Json>
           panel_order: string[]
           rotation_fallback_seconds?: number
           slug: string
@@ -11864,7 +11917,7 @@ export type Database = {
           highlight_ttl_seconds?: number
           id?: string
           name?: string
-          panel_durations?: Json
+          panel_durations?: NonNullable<Json>
           panel_order?: string[]
           rotation_fallback_seconds?: number
           slug?: string
@@ -12356,6 +12409,45 @@ export type Database = {
       }
     }
     Functions: {
+      _hoja_assert_tour_membership: {
+        Args: { p_hoja_id: string; p_tour_id: string }
+        Returns: undefined
+      }
+      _hoja_guard_child_hoja: {
+        Args: { p_hoja_id: string }
+        Returns: undefined
+      }
+      _hoja_is_service_role: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      _hoja_lock_external_edit: {
+        Args: { p_expected_version: number; p_hoja_id: string }
+        Returns: {
+          job_id: string
+          previous_status: string
+        }[]
+      }
+      _hoja_lock_external_edits: {
+        Args: { p_expected_versions: Json; p_hoja_ids: string[] }
+        Returns: Json
+      }
+      _hoja_log_status_change: {
+        Args: {
+          p_code: string
+          p_extra?: Json
+          p_from: string
+          p_hoja_id: string
+          p_job_id: string
+          p_to: string
+        }
+        Returns: undefined
+      }
+      _hoja_touch: { Args: { p_hoja_id: string }; Returns: undefined }
+      _hoja_trusted_write: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       acquire_assignment_lock: {
         Args: { p_date: string; p_technician_id: string }
         Returns: boolean
@@ -12410,7 +12502,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: Json
+          status_history: NonNullable<Json>
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -12424,7 +12516,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      assert_soundvision_access: { Args: never; Returns: boolean }
+      assert_soundvision_access: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       assign_transport_driver: {
         Args: {
           p_assignment_id?: string
@@ -12452,9 +12547,16 @@ export type Database = {
           used_today: number
         }[]
       }
-      auto_complete_past_jobs: { Args: never; Returns: number }
+      auto_complete_past_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       can_access_department_task: {
         Args: { task_assigned_department: string }
+        Returns: boolean
+      }
+      can_delete_job_document_storage: {
+        Args: { p_path: string }
         Returns: boolean
       }
       can_manage_festival_push_subscription: {
@@ -12464,6 +12566,15 @@ export type Database = {
           p_stages: number[]
           p_user_id: string
         }
+        Returns: boolean
+      }
+      can_manage_hoja: { Args: { p_job_id?: string }; Returns: boolean }
+      can_manage_hoja_accommodation: {
+        Args: { p_accommodation_id: string }
+        Returns: boolean
+      }
+      can_manage_hoja_record: {
+        Args: { p_hoja_de_ruta_id: string }
         Returns: boolean
       }
       can_manage_role_skill_mapping: {
@@ -12478,7 +12589,11 @@ export type Database = {
         Args: { p_technician_id: string }
         Returns: boolean
       }
-      can_manage_users: { Args: never; Returns: boolean }
+      can_manage_users: { Args: Record<PropertyKey, never>; Returns: boolean }
+      can_read_job_document_storage: {
+        Args: { p_path: string }
+        Returns: boolean
+      }
       can_submit_job_expense: {
         Args: {
           p_amount_original: number
@@ -12495,6 +12610,10 @@ export type Database = {
           reason: string
           remaining: number
         }[]
+      }
+      can_write_job_document_storage: {
+        Args: { p_path: string }
+        Returns: boolean
       }
       check_technician_conflicts: {
         Args: {
@@ -12514,8 +12633,14 @@ export type Database = {
         Args: { p_event_type: string; p_max_attempts?: number }
         Returns: string
       }
-      cleanup_anonymous_security_audit_log: { Args: never; Returns: number }
-      cleanup_driver_locations: { Args: never; Returns: number }
+      cleanup_anonymous_security_audit_log: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      cleanup_driver_locations: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       clear_tour_preset_assignments: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
@@ -12599,8 +12724,11 @@ export type Database = {
           tour_id: string
         }[]
       }
-      current_user_department: { Args: never; Returns: string }
-      current_user_role: { Args: never; Returns: string }
+      current_user_department: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_user_role: { Args: Record<PropertyKey, never>; Returns: string }
       deactivate_unassigned_prep_day_timesheet: {
         Args: { _date: string; _job_id: string; _technician_id: string }
         Returns: number
@@ -12614,6 +12742,24 @@ export type Database = {
         }[]
       }
       delete_logistics_event: { Args: { p_event_id: string }; Returns: Json }
+      delete_tour_ops_accommodation: {
+        Args: {
+          p_accommodation_id: string
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string
+          p_hoja_id: string
+          p_source: string
+        }
+        Returns: Json
+      }
+      delete_tour_ops_travel: {
+        Args: {
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string
+          p_segment_id: string
+        }
+        Returns: Json
+      }
       department_for_role_prefix: {
         Args: { p_role_prefix: string }
         Returns: string
@@ -12631,7 +12777,7 @@ export type Database = {
         Returns: number
       }
       evaluate_daily_achievements: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           new_unlocks: number
           user_id: string
@@ -12646,7 +12792,7 @@ export type Database = {
         Returns: Json
       }
       find_declined_with_active_timesheets: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           active_timesheet_count: number
           assignment_status: string
@@ -12655,7 +12801,7 @@ export type Database = {
         }[]
       }
       find_double_bookings: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           date: string
           job_count: number
@@ -12664,7 +12810,7 @@ export type Database = {
         }[]
       }
       find_orphaned_timesheets: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           date: string
           job_id: string
@@ -12674,7 +12820,7 @@ export type Database = {
         }[]
       }
       find_policies_to_optimize: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           policy_name: string
           table_name: string
@@ -12707,7 +12853,7 @@ export type Database = {
         }[]
       }
       get_assignment_matrix_staffing: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           availability_status: string
           availability_updated_at: string
@@ -12746,23 +12892,11 @@ export type Database = {
           status: string
         }[]
       }
-      can_manage_hoja: {
-        Args: { p_job_id?: string | null }
-        Returns: boolean
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
-      get_current_user_role: { Args: never; Returns: string }
-      get_hoja_de_ruta: {
-        Args: { p_job_id: string }
-        Returns: Json
-      }
-      get_published_hoja_documents_for_production: {
-        Args: { p_job_id: string; p_tour_date_id?: string | null }
-        Returns: {
-          job_id: string
-          published_document_id: string
-        }[]
-      }
-      get_driver_locations: { Args: never; Returns: Json }
+      get_driver_locations: { Args: Record<PropertyKey, never>; Returns: Json }
       get_event_driver_assignment_ids: {
         Args: { p_event_id: string }
         Returns: string[]
@@ -12771,6 +12905,7 @@ export type Database = {
         Args: { p_job_id: string; p_user_id: string }
         Returns: number[]
       }
+      get_hoja_de_ruta: { Args: { p_job_id: string }; Returns: Json }
       get_hourly_rate_mode_dates_for_timesheets: {
         Args: { _job_ids?: string[] }
         Returns: {
@@ -12834,7 +12969,10 @@ export type Database = {
           year: number
         }[]
       }
-      get_my_calendar_ics_token: { Args: never; Returns: string }
+      get_my_calendar_ics_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_my_transport_assignments: {
         Args: { p_from?: string; p_to?: string }
         Returns: Json
@@ -12854,7 +12992,7 @@ export type Database = {
         }[]
       }
       get_profiles_with_skills: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           assignable_as_tech: boolean
           bg_color: string
@@ -12878,6 +13016,13 @@ export type Database = {
         Args: { p_token: string }
         Returns: Json
       }
+      get_published_hoja_documents_for_production: {
+        Args: { p_job_id: string; p_tour_date_id?: string }
+        Returns: {
+          job_id: string
+          published_document_id: string
+        }[]
+      }
       get_rate_for_evento_job: {
         Args: { p_category: string; p_job_id: string }
         Returns: number
@@ -12898,7 +13043,7 @@ export type Database = {
         }[]
       }
       get_timesheet_amounts_visible: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           amount_breakdown: Json
           amount_breakdown_visible: Json
@@ -13038,14 +13183,23 @@ export type Database = {
           target_stage: number
         }[]
       }
-      invoke_auto_timesheet_reminders: { Args: never; Returns: undefined }
+      invoke_auto_timesheet_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       invoke_scheduled_push_notification: {
         Args: { event_type: string }
         Returns: undefined
       }
-      invoke_staffing_sweeper: { Args: never; Returns: undefined }
-      is_admin: { Args: never; Returns: boolean }
-      is_admin_or_management: { Args: never; Returns: boolean }
+      invoke_staffing_sweeper: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_admin_or_management: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_house_tech: { Args: { _profile_id: string }; Returns: boolean }
       is_madrid_working_day: { Args: { check_date: string }; Returns: boolean }
       is_management_or_admin: { Args: { p_user_id: string }; Returns: boolean }
@@ -13056,6 +13210,7 @@ export type Database = {
           iso_year: number
         }[]
       }
+      job_document_storage_job_id: { Args: { p_path: string }; Returns: string }
       json_diff_public: {
         Args: { _new: Json; _old: Json; allowed: string[] }
         Returns: Json
@@ -13091,8 +13246,14 @@ export type Database = {
         }
         Returns: string
       }
-      logistics_matrix_can_manage: { Args: never; Returns: boolean }
-      logistics_matrix_can_view: { Args: never; Returns: boolean }
+      logistics_matrix_can_manage: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      logistics_matrix_can_view: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       manage_assignment_lifecycle: {
         Args: {
           p_action: string
@@ -13108,6 +13269,14 @@ export type Database = {
         Args: { row_id: string; sent_at: string }
         Returns: boolean
       }
+      migrate_hoja_legacy_image_path: {
+        Args: {
+          p_expected_path: string
+          p_image_id: string
+          p_storage_path: string
+        }
+        Returns: boolean
+      }
       minutes_to_hours_round_30: { Args: { mins: number }; Returns: number }
       mutate_setup_workflow: {
         Args: { p_action: string; p_payload: Json; p_workflow_id?: string }
@@ -13120,7 +13289,7 @@ export type Database = {
           entity_id: string
           id: string
           job_id: string | null
-          state: Json
+          state: NonNullable<Json>
           status: string
           tour_date_id: string | null
           tour_id: string | null
@@ -13139,7 +13308,27 @@ export type Database = {
         Returns: boolean
       }
       normalize_text_for_match: { Args: { input: string }; Returns: string }
-      prune_place_api_cache: { Args: never; Returns: undefined }
+      prune_place_api_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      publish_hoja_de_ruta_document:
+        | {
+            Args: { p_document_id: string; p_job_id: string }
+            Returns: string[]
+          }
+        | {
+            Args: {
+              p_document_id: string
+              p_expected_version: number
+              p_job_id: string
+            }
+            Returns: string[]
+          }
+      purge_expired_hoja_dni: {
+        Args: { p_retention?: string }
+        Returns: number
+      }
       purge_push_history: {
         Args: {
           p_attempt_retention?: string
@@ -13168,7 +13357,10 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: boolean
       }
-      rack_builder_can_use_tool: { Args: never; Returns: boolean }
+      rack_builder_can_use_tool: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       rack_builder_layout_item_slot: {
         Args: {
           p_force_full_width: boolean
@@ -13279,7 +13471,10 @@ export type Database = {
         Args: { _date: string; _job_id: string }
         Returns: undefined
       }
-      refresh_v_job_staffing_summary: { Args: never; Returns: undefined }
+      refresh_v_job_staffing_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       remove_assignment_with_timesheets: {
         Args: { p_job_id: string; p_technician_id: string }
         Returns: {
@@ -13295,119 +13490,9 @@ export type Database = {
         Args: { p_assignment_id: string }
         Returns: Json
       }
-      save_hoja_de_ruta: {
-        Args: {
-          p_expected_version: number | null
-          p_job_id: string
-          p_payload: Json
-          p_removed_image_ids: string[]
-        }
-        Returns: {
-          document_version: number
-          id: string
-        }[]
-      }
-      save_tour_ops_hoja_program: {
-        Args: {
-          p_expected_version: number
-          p_hoja_id: string
-          p_program: Json
-        }
-        Returns: Json
-      }
-      save_tour_ops_travel: {
-        Args: {
-          p_expected_hoja_versions: Json
-          p_expected_ops_updated_at: string | null
-          p_hoja_id: string | null
-          p_hoja_payload: Json
-          p_hoja_row_id: string | null
-          p_hoja_source_table: string | null
-          p_ops_payload: Json
-          p_segment_id: string | null
-          p_source: string
-          p_tour_id: string
-        }
-        Returns: Json
-      }
-      delete_tour_ops_travel: {
-        Args: {
-          p_expected_hoja_versions: Json
-          p_expected_ops_updated_at: string | null
-          p_segment_id: string
-        }
-        Returns: Json
-      }
-      save_tour_ops_accommodation: {
-        Args: {
-          p_accommodation_id: string | null
-          p_expected_hoja_versions: Json
-          p_expected_ops_updated_at: string | null
-          p_hoja_id: string | null
-          p_hoja_payload: Json
-          p_hoja_row_id: string | null
-          p_ops_payload: Json
-          p_rooms: Json
-          p_source: string
-          p_tour_id: string
-        }
-        Returns: Json
-      }
-      delete_tour_ops_accommodation: {
-        Args: {
-          p_accommodation_id: string
-          p_expected_hoja_versions: Json
-          p_expected_ops_updated_at: string | null
-          p_hoja_id: string | null
-          p_source: string
-        }
-        Returns: Json
-      }
-      save_tour_contacts_and_sync_hojas: {
-        Args: {
-          p_contacts: Json
-          p_expected_hoja_versions: Json
-          p_expected_tour_updated_at: string | null
-          p_tour_id: string
-        }
-        Returns: Json
-      }
-      migrate_hoja_legacy_image_path: {
-        Args: {
-          p_expected_path: string
-          p_image_id: string
-          p_storage_path: string
-        }
-        Returns: boolean
-      }
-      publish_hoja_de_ruta_document: {
-        Args: {
-          p_document_id: string
-          p_expected_version: number
-          p_job_id: string
-        }
-        Returns: string[]
-      }
-      purge_expired_hoja_dni: {
-        Args: { p_retention?: unknown }
-        Returns: number
-      }
       reopen_hoja_de_ruta: {
         Args: { p_expected_version: number; p_job_id: string; p_reason: string }
         Returns: {
-          document_version: number
-          status: string
-        }[]
-      }
-      set_hoja_de_ruta_status: {
-        Args: {
-          p_expected_version: number
-          p_job_id: string
-          p_status: string
-        }
-        Returns: {
-          approved_at: string | null
-          approved_by: string | null
           document_version: number
           status: string
         }[]
@@ -13438,7 +13523,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: Json
+          status_history: NonNullable<Json>
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -13495,7 +13580,86 @@ export type Database = {
         Args: { p_link_id: string }
         Returns: undefined
       }
-      rotate_my_calendar_ics_token: { Args: never; Returns: string }
+      rotate_my_calendar_ics_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      save_hoja_de_ruta:
+        | {
+            Args: {
+              p_expected_version: number
+              p_job_id: string
+              p_payload: Json
+            }
+            Returns: {
+              document_version: number
+              id: string
+            }[]
+          }
+        | {
+            Args: {
+              p_expected_version: number
+              p_job_id: string
+              p_payload: Json
+              p_removed_image_ids: string[]
+            }
+            Returns: {
+              document_version: number
+              id: string
+            }[]
+          }
+      save_logistics_event_plan: {
+        Args: {
+          p_departments: string[]
+          p_event: Json
+          p_event_id?: string
+          p_paired_event?: Json
+        }
+        Returns: Json
+      }
+      save_tour_contacts_and_sync_hojas: {
+        Args: {
+          p_contacts: Json
+          p_expected_hoja_versions: Json
+          p_expected_tour_updated_at: string
+          p_tour_id: string
+        }
+        Returns: Json
+      }
+      save_tour_ops_accommodation: {
+        Args: {
+          p_accommodation_id: string
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string
+          p_hoja_id: string
+          p_hoja_payload: Json
+          p_hoja_row_id: string
+          p_ops_payload: Json
+          p_rooms: Json
+          p_source: string
+          p_tour_id: string
+        }
+        Returns: Json
+      }
+      save_tour_ops_hoja_program: {
+        Args: { p_expected_version: number; p_hoja_id: string; p_program: Json }
+        Returns: Json
+      }
+      save_tour_ops_travel: {
+        Args: {
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string
+          p_hoja_id: string
+          p_hoja_payload: Json
+          p_hoja_row_id: string
+          p_hoja_source_table: string
+          p_ops_payload: Json
+          p_segment_id: string
+          p_source: string
+          p_tour_id: string
+        }
+        Returns: Json
+      }
       save_transport_request: {
         Args: {
           p_department: string
@@ -13562,6 +13726,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_hoja_de_ruta_status:
+        | {
+            Args: { p_job_id: string; p_status: string }
+            Returns: {
+              approved_at: string
+              approved_by: string
+              document_version: number
+              status: string
+            }[]
+          }
+        | {
+            Args: {
+              p_expected_version: number
+              p_job_id: string
+              p_status: string
+            }
+            Returns: {
+              approved_at: string
+              approved_by: string
+              document_version: number
+              status: string
+            }[]
+          }
       set_technician_payout_override: {
         Args: { _amount_eur: number; _job_id: string; _technician_id: string }
         Returns: Json
@@ -13575,7 +13762,10 @@ export type Database = {
         Returns: undefined
       }
       staffing_role_prefix: { Args: { p_role_code: string }; Returns: string }
-      stop_sharing_driver_location: { Args: never; Returns: Json }
+      stop_sharing_driver_location: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       submit_job_expense: {
         Args: {
           p_amount_original: number
@@ -13608,7 +13798,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: Json
+          status_history: NonNullable<Json>
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -13657,7 +13847,7 @@ export type Database = {
         Returns: boolean
       }
       tp_get_technician_published_plans: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           case_counts_json: Json
           department: string
@@ -13678,7 +13868,7 @@ export type Database = {
         Args: { p_department: string; p_job_id: string }
         Returns: boolean
       }
-      tp_is_office_role: { Args: never; Returns: boolean }
+      tp_is_office_role: { Args: Record<PropertyKey, never>; Returns: boolean }
       tp_next_plan_version_number: {
         Args: { p_job_plan_id: string }
         Returns: number
@@ -13694,13 +13884,22 @@ export type Database = {
         }
         Returns: string
       }
-      transport_request_is_privileged: { Args: never; Returns: boolean }
+      transport_request_is_privileged: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       transport_stage_transition_allowed: {
         Args: { p_from: string; p_to: string }
         Returns: boolean
       }
-      transport_write_actor_is_trusted: { Args: never; Returns: boolean }
-      update_tour_dates: { Args: never; Returns: undefined }
+      transport_write_actor_is_trusted: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      update_tour_dates: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       upsert_job_prep_days: {
         Args: { p_dates: string[]; p_job_id: string }
         Returns: undefined
@@ -13730,10 +13929,7 @@ export type Database = {
     }
     Enums: {
       activity_visibility:
-        | "management"
-        | "house_plus_job"
-        | "job_participants"
-        | "actor_only"
+        "management" | "house_plus_job" | "job_participants" | "actor_only"
       assignment_status: "invited" | "confirmed" | "declined"
       bug_severity: "low" | "medium" | "high" | "critical"
       bug_status: "open" | "in_progress" | "resolved"
@@ -13772,11 +13968,7 @@ export type Database = {
         | "pa_amp"
       expense_status: "draft" | "submitted" | "approved" | "rejected"
       feature_status:
-        | "pending"
-        | "under_review"
-        | "accepted"
-        | "rejected"
-        | "completed"
+        "pending" | "under_review" | "accepted" | "rejected" | "completed"
       flex_work_order_item_source: "role" | "extra"
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
@@ -13800,7 +13992,7 @@ export type Database = {
         | "tourdate"
         | "evento"
         | "ciclo"
-      logistics_event_type: "load" | "unload"
+      logistics_event_type: "load" | "unload" | "crew_transfer"
       logistics_transport_category:
         | "sonido_madera"
         | "sonido_escenario"
@@ -13810,17 +14002,10 @@ export type Database = {
         | "rigging_motores"
       message_status: "unread" | "read"
       milestone_category:
-        | "planning"
-        | "technical"
-        | "logistics"
-        | "administrative"
-        | "production"
+        "planning" | "technical" | "logistics" | "administrative" | "production"
       movement_type: "addition" | "subtraction"
       notification_channel:
-        | "messages"
-        | "assignments"
-        | "form_submissions"
-        | "gear_movements"
+        "messages" | "assignments" | "form_submissions" | "gear_movements"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
       provider_type: "festival" | "band" | "mixed"
       push_notification_recipient_type:
@@ -13837,12 +14022,7 @@ export type Database = {
       task_status: "not_started" | "in_progress" | "completed"
       timesheet_status: "draft" | "submitted" | "approved" | "rejected"
       tour_date_type:
-        | "show"
-        | "rehearsal"
-        | "travel"
-        | "setup"
-        | "off"
-        | "rigging"
+        "show" | "rehearsal" | "travel" | "setup" | "off" | "rigging"
       transport_provider_enum:
         | "camionaje"
         | "transluminaria"
@@ -13854,6 +14034,7 @@ export type Database = {
         | "nacex"
         | "sector_pro"
         | "recogida_cliente"
+        | "montoya"
       transport_type:
         | "trailer"
         | "9m"
@@ -13864,12 +14045,7 @@ export type Database = {
         | "rv"
         | "sleeper_bus"
       transportation_type:
-        | "van"
-        | "sleeper_bus"
-        | "train"
-        | "plane"
-        | "rv"
-        | "autobus"
+        "van" | "sleeper_bus" | "train" | "plane" | "rv" | "autobus"
       user_role:
         | "admin"
         | "user"
@@ -13926,8 +14102,7 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -13951,8 +14126,7 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -13976,8 +14150,7 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -14088,7 +14261,7 @@ export const Constants = {
         "evento",
         "ciclo",
       ],
-      logistics_event_type: ["load", "unload"],
+      logistics_event_type: ["load", "unload", "crew_transfer"],
       logistics_transport_category: [
         "sonido_madera",
         "sonido_escenario",
@@ -14147,6 +14320,7 @@ export const Constants = {
         "nacex",
         "sector_pro",
         "recogida_cliente",
+        "montoya",
       ],
       transport_type: [
         "trailer",

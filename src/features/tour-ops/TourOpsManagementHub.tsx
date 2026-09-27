@@ -199,11 +199,17 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   };
 
   const removeTravel = async (segment: TourOpsTravelSegment) => {
-    const result = await mutations.removeTravel.mutateAsync({
-      id: segment.id,
-      expectedHojaVersions: hojaVersions,
-      updatedAt: segment.updatedAt,
-    });
+    let result;
+    try {
+      result = await mutations.removeTravel.mutateAsync({
+        id: segment.id,
+        expectedHojaVersions: hojaVersions,
+        updatedAt: segment.updatedAt,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el viaje");
+      return;
+    }
     if (result.approvalInvalidated) {
       toast.warning("Viaje eliminado. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
     } else {
@@ -214,13 +220,19 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const removeHotel = async (hotel: TourOpsAccommodation) => {
     const targetDate = hotel.tourDateId ? model.dates.find((date) => date.id === hotel.tourDateId) : null;
     const hojaDeRutaId = hotel.hojaDeRutaId || targetDate?.hojaDeRutaId || null;
-    const result = await mutations.removeHotel.mutateAsync({
-      id: hotel.id,
-      source: hotel.source,
-      hojaDeRutaId,
-      expectedHojaVersions: hojaVersions,
-      updatedAt: hotel.updatedAt,
-    });
+    let result;
+    try {
+      result = await mutations.removeHotel.mutateAsync({
+        id: hotel.id,
+        source: hotel.source,
+        hojaDeRutaId,
+        expectedHojaVersions: hojaVersions,
+        updatedAt: hotel.updatedAt,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el hotel");
+      return;
+    }
     if (result.approvalInvalidated) {
       toast.warning("Hotel eliminado. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
     } else {

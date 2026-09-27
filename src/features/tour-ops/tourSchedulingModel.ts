@@ -237,7 +237,7 @@ export function normalizeTourOpsModel(
       description: textOrNull(tour.description),
       color: textOrNull(tour.color),
       status: textOrNull(tour.status),
-      updatedAt: textOrNull(tour.updated_at),
+      updatedAt: String(tour.updated_at),
       startDate: textOrNull(tour.start_date),
       endDate: textOrNull(tour.end_date),
       defaultTimezone: textOrNull(tour.default_timezone),
