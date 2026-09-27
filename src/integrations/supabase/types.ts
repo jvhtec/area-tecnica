@@ -3573,6 +3573,7 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
+          source_tour_accommodation_id: string | null
           sort_order: number
           updated_at: string | null
         }
@@ -3586,6 +3587,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          source_tour_accommodation_id?: string | null
           sort_order?: number
           updated_at?: string | null
         }
@@ -3599,6 +3601,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          source_tour_accommodation_id?: string | null
           sort_order?: number
           updated_at?: string | null
         }
@@ -3621,6 +3624,7 @@ export type Database = {
           phone: string | null
           role: string | null
           sort_order: number
+          source_tour_contact_id: string | null
           technician_id: string | null
         }
         Insert: {
@@ -3631,6 +3635,7 @@ export type Database = {
           phone?: string | null
           role?: string | null
           sort_order?: number
+          source_tour_contact_id?: string | null
           technician_id?: string | null
         }
         Update: {
@@ -3641,6 +3646,7 @@ export type Database = {
           phone?: string | null
           role?: string | null
           sort_order?: number
+          source_tour_contact_id?: string | null
           technician_id?: string | null
         }
         Relationships: [
@@ -4241,6 +4247,7 @@ export type Database = {
           pickup_address: string | null
           pickup_time: string | null
           plate_number: string | null
+          source_tour_travel_segment_id: string | null
           sort_order: number
           transportation_type: string
           updated_at: string | null
@@ -4258,6 +4265,7 @@ export type Database = {
           pickup_address?: string | null
           pickup_time?: string | null
           plate_number?: string | null
+          source_tour_travel_segment_id?: string | null
           sort_order?: number
           transportation_type: string
           updated_at?: string | null
@@ -4275,6 +4283,7 @@ export type Database = {
           pickup_address?: string | null
           pickup_time?: string | null
           plate_number?: string | null
+          source_tour_travel_segment_id?: string | null
           sort_order?: number
           transportation_type?: string
           updated_at?: string | null
@@ -9544,6 +9553,7 @@ export type Database = {
           room_type: string | null
           rooms_booked: number | null
           special_requests: string | null
+          source_hoja_accommodation_id: string | null
           status: string | null
           total_cost_eur: number | null
           tour_date_id: string | null
@@ -9574,6 +9584,7 @@ export type Database = {
           room_type?: string | null
           rooms_booked?: number | null
           special_requests?: string | null
+          source_hoja_accommodation_id?: string | null
           status?: string | null
           total_cost_eur?: number | null
           tour_date_id?: string | null
@@ -9604,6 +9615,7 @@ export type Database = {
           room_type?: string | null
           rooms_booked?: number | null
           special_requests?: string | null
+          source_hoja_accommodation_id?: string | null
           status?: string | null
           total_cost_eur?: number | null
           tour_date_id?: string | null
@@ -10421,6 +10433,7 @@ export type Database = {
           id: string
           luggage_truck: boolean | null
           route_notes: string | null
+          source_hoja_travel_arrangement_id: string | null
           status: string | null
           stops: Json | null
           to_location_id: string | null
@@ -10446,6 +10459,7 @@ export type Database = {
           id?: string
           luggage_truck?: boolean | null
           route_notes?: string | null
+          source_hoja_travel_arrangement_id?: string | null
           status?: string | null
           stops?: Json | null
           to_location_id?: string | null
@@ -10471,6 +10485,7 @@ export type Database = {
           id?: string
           luggage_truck?: boolean | null
           route_notes?: string | null
+          source_hoja_travel_arrangement_id?: string | null
           status?: string | null
           stops?: Json | null
           to_location_id?: string | null
@@ -10631,6 +10646,7 @@ export type Database = {
           tour_contacts: Json | null
           tour_settings: Json | null
           travel_plan: Json | null
+          updated_at: string
         }
         Insert: {
           color?: string | null
@@ -10668,6 +10684,7 @@ export type Database = {
           tour_contacts?: Json | null
           tour_settings?: Json | null
           travel_plan?: Json | null
+          updated_at?: string
         }
         Update: {
           color?: string | null
@@ -10705,6 +10722,7 @@ export type Database = {
           tour_contacts?: Json | null
           tour_settings?: Json | null
           travel_plan?: Json | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -13288,6 +13306,71 @@ export type Database = {
           document_version: number
           id: string
         }[]
+      }
+      save_tour_ops_hoja_program: {
+        Args: {
+          p_expected_version: number
+          p_hoja_id: string
+          p_program: Json
+        }
+        Returns: Json
+      }
+      save_tour_ops_travel: {
+        Args: {
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string | null
+          p_hoja_id: string | null
+          p_hoja_payload: Json
+          p_hoja_row_id: string | null
+          p_hoja_source_table: string | null
+          p_ops_payload: Json
+          p_segment_id: string | null
+          p_source: string
+          p_tour_id: string
+        }
+        Returns: Json
+      }
+      delete_tour_ops_travel: {
+        Args: {
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string | null
+          p_segment_id: string
+        }
+        Returns: Json
+      }
+      save_tour_ops_accommodation: {
+        Args: {
+          p_accommodation_id: string | null
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string | null
+          p_hoja_id: string | null
+          p_hoja_payload: Json
+          p_hoja_row_id: string | null
+          p_ops_payload: Json
+          p_rooms: Json
+          p_source: string
+          p_tour_id: string
+        }
+        Returns: Json
+      }
+      delete_tour_ops_accommodation: {
+        Args: {
+          p_accommodation_id: string
+          p_expected_hoja_versions: Json
+          p_expected_ops_updated_at: string | null
+          p_hoja_id: string | null
+          p_source: string
+        }
+        Returns: Json
+      }
+      save_tour_contacts_and_sync_hojas: {
+        Args: {
+          p_contacts: Json
+          p_expected_hoja_versions: Json
+          p_expected_tour_updated_at: string | null
+          p_tour_id: string
+        }
+        Returns: Json
       }
       migrate_hoja_legacy_image_path: {
         Args: {

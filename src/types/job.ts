@@ -6,6 +6,7 @@ export interface JobDocument {
   visible_to_tech?: boolean;
   read_only?: boolean;
   template_type?: string | null;
+  document_kind?: string | null;
 }
 
 export type JobType = "single" | "tour" | "tourdate" | "festival" | "ciclo" | "dryhire" | "evento";

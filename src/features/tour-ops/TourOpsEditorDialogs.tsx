@@ -205,6 +205,7 @@ export const TravelDialog = ({
     const toDate = model.dates.find((date) => date.id === form.toTourDateId);
     await onSave({
       id: editingSegment?.id,
+      updatedAt: editingSegment?.updatedAt,
       source: editingSegment?.source,
       sourceTable: editingSegment?.sourceTable,
       hojaDeRutaId: editingSegment?.hojaDeRutaId,
@@ -379,6 +380,7 @@ export const HotelDialog = ({
 
     await onSave({
       id: editingHotel?.id,
+      updatedAt: editingHotel?.updatedAt,
       source: editingHotel?.source,
       tourId: model.tour.id,
       tourDateId: form.tourDateId || null,

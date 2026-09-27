@@ -14,8 +14,7 @@ export {
   saveAccommodation,
   saveProgramSchedule,
   saveTimelineEvent,
-  saveTravelSegment,
-  syncHojaRutaOpsData
+  saveTravelSegment
 } from "@/features/tour-ops/tourSchedulingMutations";
 export {
   normalizeProgramDays,

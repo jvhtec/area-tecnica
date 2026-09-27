@@ -169,6 +169,13 @@ export function normalizeTourOpsModel(
         isTourPackOnly: Boolean(date.is_tour_pack_only),
         location: date.location,
         hojaDeRutaId: textOrNull(hoja?.id),
+        hojaDocumentVersion: hoja?.document_version == null ? null : Number(hoja.document_version),
+        hojaStatus:
+          hoja?.status === "review" || hoja?.status === "approved" || hoja?.status === "final"
+            ? hoja.status
+            : hoja
+              ? "draft"
+              : null,
         jobId: textOrNull(job?.id),
         jobTitle: textOrNull(job?.title),
         jobStatus: textOrNull(job?.status),
@@ -228,6 +235,7 @@ export function normalizeTourOpsModel(
       description: textOrNull(tour.description),
       color: textOrNull(tour.color),
       status: textOrNull(tour.status),
+      updatedAt: textOrNull(tour.updated_at),
       startDate: textOrNull(tour.start_date),
       endDate: textOrNull(tour.end_date),
       defaultTimezone: textOrNull(tour.default_timezone),

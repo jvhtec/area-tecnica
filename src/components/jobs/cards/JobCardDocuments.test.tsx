@@ -50,4 +50,27 @@ describe("JobCardDocuments", () => {
     expect(downloadButton).toHaveClass("h-11", "w-11", "shrink-0");
     expect(deleteButton).toHaveClass("h-11", "w-11", "shrink-0");
   });
+
+  it("treats a published Hoja PDF as an issued read-only artifact", () => {
+    const fileName = "Hoja de Ruta.pdf";
+    render(
+      <JobCardDocuments
+        documents={[{
+          id: "hoja-published",
+          file_name: fileName,
+          file_path: "hojas-de-ruta/job-1/hoja.pdf",
+          uploaded_at: "2026-09-27T12:00:00Z",
+          visible_to_tech: true,
+          document_kind: "hoja_de_ruta",
+        }]}
+        userRole="management"
+        onDeleteDocument={vi.fn()}
+        showTitle={false}
+      />,
+    );
+
+    expect(screen.getByText("Hoja publicada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Eliminar ${fileName}` })).not.toBeInTheDocument();
+    expect(screen.getByRole("switch")).toBeDisabled();
+  });
 });

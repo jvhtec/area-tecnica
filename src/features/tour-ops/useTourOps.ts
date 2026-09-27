@@ -15,7 +15,6 @@ import {
   saveTimelineEvent,
   setTourGuestLinkAccess,
   saveTravelSegment,
-  syncHojaRutaOpsData,
   updateTourDocumentGuestVisibility,
 } from "@/features/tour-ops/tourSchedulingService";
 import type {
@@ -69,32 +68,39 @@ export function useTourOpsMutations(tourId: string) {
   });
 
   const saveTravel = useMutation({
-    mutationFn: (input: Partial<TourOpsTravelSegment> & { tourId: string }) => saveTravelSegment(input),
+    mutationFn: (input: Partial<TourOpsTravelSegment> & { tourId: string; expectedHojaVersions?: Record<string, number> }) =>
+      saveTravelSegment(input),
     onSuccess: invalidate,
   });
 
   const removeTravel = useMutation({
-    mutationFn: deleteTravelSegment,
+    mutationFn: (input: {
+      id: string;
+      expectedHojaVersions?: Record<string, number>;
+      updatedAt?: string | null;
+    }) => deleteTravelSegment(input),
     onSuccess: invalidate,
   });
 
   const saveHotel = useMutation({
-    mutationFn: (input: Partial<TourOpsAccommodation> & { tourId: string }) => saveAccommodation(input),
+    mutationFn: (input: Partial<TourOpsAccommodation> & { tourId: string; expectedHojaVersions?: Record<string, number> }) =>
+      saveAccommodation(input),
     onSuccess: invalidate,
   });
 
   const removeHotel = useMutation({
-    mutationFn: (input: { id: string; source?: TourOpsAccommodation["source"] }) => deleteAccommodation(input),
+    mutationFn: (input: {
+      id: string;
+      source?: TourOpsAccommodation["source"];
+      hojaDeRutaId?: string | null;
+      expectedHojaVersions?: Record<string, number>;
+      updatedAt?: string | null;
+    }) => deleteAccommodation(input),
     onSuccess: invalidate,
   });
 
   const migrateTravel = useMutation({
     mutationFn: (model: TourOpsModel) => migrateLegacyTravelPlan(model),
-    onSuccess: invalidate,
-  });
-
-  const syncHojaOps = useMutation({
-    mutationFn: (model: TourOpsModel) => syncHojaRutaOpsData(model),
     onSuccess: invalidate,
   });
 
@@ -116,7 +122,6 @@ export function useTourOpsMutations(tourId: string) {
     saveHotel,
     removeHotel,
     migrateTravel,
-    syncHojaOps,
     setGuestDocumentVisibility,
   };
 }

@@ -26,6 +26,7 @@ Hoja de Ruta is modeled as one versioned document. The React feature owns a cano
 | **Database hardening** | `supabase/migrations/20260926103000_hoja_de_ruta_hardening.sql` |
 | **Roadmap completion migration** | `supabase/migrations/20260926144902_complete_hoja_roadmap.sql` |
 | **Integrity migration** | `supabase/migrations/20260927150000_hoja_de_ruta_integrity.sql` |
+| **Integration-boundary migration** | `supabase/migrations/20260927193000_hoja_integration_boundary.sql` |
 | **Database tests** | `supabase/tests/database/hoja_de_ruta_hardening.sql`, `hoja_de_ruta_integrity.sql` |
 
 ## Document Boundary
@@ -73,6 +74,7 @@ The section registry is the source of truth for tabs, completion checks, export 
 - `reopen_hoja_de_ruta` is the only way back: admin/management, required reason, logged as `hoja.status.reopened`.
 - PDF download and preview are local export actions. They do not publish a file.
 - Publication is a separate explicit action and is accepted only for `approved` or `final` documents.
+- A canonical published Hoja PDF is an issued artifact: publication marks it read-only and generic document CRUD cannot hide, mutate, or delete it. Replacement stays inside `publish_hoja_de_ruta_document`.
 
 ## Authorization
 
@@ -81,6 +83,7 @@ The section registry is the source of truth for tabs, completion checks, export 
 - The restricted projection omits staff rows and sensitive identity data. Room assignments retain only the operationally necessary occupant name.
 - Unassigned technicians cannot read the document.
 - Anonymous callers cannot execute the aggregate, status, or publication RPCs.
+- The private `job-documents` bucket follows the same job boundary. Assigned technicians can read visible documents and approved/final Hoja images for their jobs; incident-report uploads are the only technician write exception.
 
 Keep authorization in the RPCs and database policies. Do not replace aggregate reads with direct client table queries, which can change the projection and expose child-table details.
 
@@ -107,6 +110,8 @@ The general PDF and XLS exports exclude DNI, and the Hoja keeps its DNI copies o
 ## Integration Points
 
 - **Jobs**: initialization can populate dates, location, assignments, power, and producer contacts.
+- **Tour Ops**: Programa, travel, accommodation/rooming, and tour contacts use version-aware transactional bridge RPCs. Travel/accommodation pairs use stable reciprocal source IDs; cross-date moves validate every affected Hoja snapshot before mutating either side. Hoja transport remains logistics-owned and is edited in place rather than mirrored into a second Tour Ops identity.
+- **Programa reminders**: Tour Ops preserves row `id`, `notify`, and department scope so scheduled-push dedupe stays stable across edits.
 - **Mapbox**: venue autocomplete, geocoding, maps, and coordinates.
 - **Google Places**: restaurant search and details through the cached Edge Function.
 - **Wikimedia**: venue/accommodation image suggestions through the cached Edge Function.

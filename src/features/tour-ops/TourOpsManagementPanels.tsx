@@ -51,10 +51,13 @@ const toHojaProgramDays = (
       label: day.label || `Dia ${index + 1}`,
       date: day.date || undefined,
       rows: day.rows.map((row) => ({
+        id: row.id,
         time: row.time || "",
         item: row.item || "",
         dept: row.dept || "",
         notes: row.notes || "",
+        notify: row.notify,
+        departments: row.departments,
       })),
     }));
   }
@@ -73,10 +76,13 @@ const cleanProgramDays = (program: HojaProgramDay[]): TourOpsProgramDay[] =>
       date: day.date || null,
       rows: (day.rows || [])
         .map((row) => ({
+          id: row.id || crypto.randomUUID(),
           time: row.time?.trim() || null,
           item: row.item?.trim() || null,
           dept: row.dept?.trim() || null,
           notes: row.notes?.trim() || null,
+          notify: Boolean(row.notify),
+          departments: row.departments || [],
         }))
         .filter((row) => row.time || row.item || row.dept || row.notes),
     }))

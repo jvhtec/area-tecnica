@@ -4,4 +4,8 @@ export const shouldStopTransitionAfterSave = (
   currentStatus: HojaStatus,
   nextStatus: "review" | "approved" | "final",
   wasDirty: boolean,
-) => currentStatus === "approved" && nextStatus === "final" && wasDirty;
+  isAdmin = false,
+) => wasDirty && (
+  (currentStatus === "approved" && nextStatus === "final")
+  || (!isAdmin && currentStatus === "review" && nextStatus === "approved")
+);

@@ -496,7 +496,7 @@ export const useOptimizedJobCard = <TJob extends OptimizedJobCardJob>(
   }, [job.id, department, queryClient, toast]);
 
   const handleDeleteDocument = useCallback(async (doc: JobDocumentRow) => {
-    if (doc?.read_only) {
+    if (doc?.read_only || doc?.document_kind === 'hoja_de_ruta') {
       console.error('Attempted to delete read-only document', doc);
       return;
     }

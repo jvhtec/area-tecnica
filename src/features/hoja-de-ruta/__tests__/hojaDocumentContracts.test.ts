@@ -198,6 +198,44 @@ describe("Hoja document contracts", () => {
     expect(document.accommodations[0]?.rooms[0]).toMatchObject({
       staff_member1_id: "",
       staff_member2_id: "",
+      staff_member1_free_text: "legacy-index-0",
+      staff_member2_free_text: "legacy-index-1",
+    });
+  });
+
+  it("round-trips current free-text room occupants without turning them into staff ids", () => {
+    const document = mapHojaAggregateToDocument(JOB_ID, {
+      ...aggregateFixture,
+      accommodations: [{
+        ...aggregateFixture.accommodations![0],
+        rooms: [{
+          id: ROOM_ID,
+          room_type: "single",
+          room_number: "205",
+          staff_member1_id: "Invitado externo",
+          staff_member1_hoja_staff_id: null,
+        }],
+      }],
+    });
+
+    expect(document.accommodations[0]?.rooms[0]).toMatchObject({
+      staff_member1_id: "",
+      staff_member1_free_text: "Invitado externo",
+    });
+
+    const payload = buildHojaSavePayload({
+      eventData: document.eventData,
+      travelArrangements: document.travelArrangements,
+      accommodations: document.accommodations,
+      images: document.images,
+      expectedVersion: document.document_version || 0,
+    });
+    const accommodations = payload.accommodations as Array<Record<string, unknown>>;
+    const rooms = accommodations[0]?.rooms as Array<Record<string, unknown>>;
+    expect(rooms[0]).toMatchObject({
+      id: ROOM_ID,
+      staff_member1_hoja_staff_id: null,
+      staff_member1_free_text: "Invitado externo",
     });
   });
 
