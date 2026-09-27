@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(63);
+SELECT plan(62);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -309,6 +309,11 @@ UPDATE public.hoja_de_ruta
 SET review_requested_by = 'dc100000-0000-0000-0000-000000000006'::uuid
 WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid;
 
+-- The API service_role DB role cannot delete auth.users. Execute the FK action
+-- as the test session owner while keeping the service-role JWT claim so nested
+-- Hoja guards still see a trusted caller.
+RESET ROLE;
+
 SELECT lives_ok(
   $$ DELETE FROM auth.users
      WHERE id = 'dc100000-0000-0000-0000-000000000006'::uuid $$,
@@ -322,7 +327,6 @@ SELECT is(
   'the review requester foreign key clears through ON DELETE SET NULL'
 );
 
-RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
 SELECT set_config(
@@ -483,24 +487,6 @@ SELECT throws_ok(
   'the aggregate editor cannot approve their own changes'
 );
 
-RESET ROLE;
-SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
-SELECT set_config(
-  'request.jwt.claims',
-  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
-  false
-);
-SET ROLE authenticated;
-
-SELECT lives_ok(
-  $$ SELECT * FROM public.set_hoja_de_ruta_status(
-       'dc200000-0000-0000-0000-000000000001'::uuid,
-       'approved',
-       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
-     ) $$,
-  'a different manager re-approves the aggregate edit'
-);
-
 SELECT ok(
   EXISTS (
     SELECT 1 FROM public.activity_log
@@ -545,7 +531,7 @@ SELECT lives_ok(
        'approved',
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
-  'the reviewer approves again'
+  'a different manager approves the aggregate edit'
 );
 
 INSERT INTO public.job_documents (
