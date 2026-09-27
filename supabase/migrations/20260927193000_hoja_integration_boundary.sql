@@ -1410,6 +1410,7 @@ begin
   if new.visible_to_tech is distinct from old.visible_to_tech
      or new.read_only is distinct from old.read_only
      or new.file_path is distinct from old.file_path
+     or new.job_id is distinct from old.job_id
      or new.document_kind is distinct from old.document_kind then
     raise exception 'La Hoja de Ruta publicada solo se reemplaza desde su flujo de publicación'
       using errcode = '42501';
@@ -1487,14 +1488,10 @@ declare
   v_job_id uuid;
   v_part text;
 begin
-  select jd.job_id into v_job_id
-  from public.job_documents jd
-  where jd.file_path = p_path
-    and jd.job_id is not null
-  order by jd.uploaded_at desc nulls last
-  limit 1;
-  if v_job_id is not null then return v_job_id; end if;
-
+  -- Storage ownership is encoded in the object namespace. Do not consult
+  -- mutable job_documents metadata here: file_path is not unique and an
+  -- authenticated user can create metadata rows they own, so metadata-derived
+  -- ownership would let a duplicate row reassign an existing object's job.
   foreach v_part in array string_to_array(coalesce(p_path, ''), '/')
   loop
     if v_part ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then

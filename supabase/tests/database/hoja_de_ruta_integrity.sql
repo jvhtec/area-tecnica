@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(103);
+SELECT plan(107);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -814,6 +814,21 @@ SELECT ok(
   'publication marks the canonical Hoja PDF read-only'
 );
 
+SELECT throws_ok(
+  $$ UPDATE public.job_documents
+     SET job_id = 'dc200000-0000-0000-0000-000000000002'::uuid
+     WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid $$,
+  '42501',
+  'La Hoja de Ruta publicada solo se reemplaza desde su flujo de publicación',
+  'generic document updates cannot reassign the canonical published PDF to another job'
+);
+
+SELECT is(
+  (SELECT job_id FROM public.job_documents WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid),
+  'dc200000-0000-0000-0000-000000000001'::uuid,
+  'the canonical published PDF keeps the Hoja job identity'
+);
+
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000003', false);
 SELECT set_config(
@@ -978,6 +993,57 @@ SELECT throws_ok(
   'permission denied',
   'the publication wrapper authorizes before revealing the document version'
 );
+
+RESET ROLE;
+INSERT INTO public.job_assignments (job_id, technician_id, status, sound_role)
+VALUES (
+  'dc200000-0000-0000-0000-000000000002'::uuid,
+  'dc100000-0000-0000-0000-000000000004'::uuid,
+  'confirmed',
+  'SND-PA'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000004', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000004"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ INSERT INTO public.job_documents (
+       id, job_id, file_name, file_path, file_type, file_size, uploaded_by,
+       original_type, visible_to_tech
+     ) VALUES (
+       'dc800000-0000-0000-0000-000000000002'::uuid,
+       'dc200000-0000-0000-0000-000000000002'::uuid,
+       'Spoof metadata.pdf',
+       'hojas-de-ruta/dc200000-0000-0000-0000-000000000001/integridad.pdf',
+       'application/pdf',
+       1,
+       'dc100000-0000-0000-0000-000000000004'::uuid,
+       'pdf',
+       true
+     ) $$,
+  'an authenticated technician can create duplicate metadata for a known path'
+);
+
+SELECT ok(
+  NOT public.can_read_job_document_storage(
+    'hojas-de-ruta/dc200000-0000-0000-0000-000000000001/integridad.pdf'
+  ),
+  'duplicate metadata cannot redefine storage ownership away from the job UUID embedded in the path'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
+  false
+);
+SET ROLE authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Final lock on every writer
