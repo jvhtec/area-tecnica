@@ -517,7 +517,7 @@ SELECT is(
    FROM pg_policies
    WHERE schemaname = 'storage'
      AND tablename = 'objects'
-     AND policyname LIKE 'p_storage_job_documents_scoped_%'),
+     AND policyname LIKE 'p_storage_job_documents_authorized_%'),
   4,
   'job-documents storage has one scoped policy per CRUD class'
 );

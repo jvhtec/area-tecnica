@@ -1114,8 +1114,9 @@ begin
     select h.id, h.job_id, coalesce(h.status, 'draft') as status,
            coalesce(h.document_version, 0) as document_version
     from public.hoja_de_ruta h
-    where h.tour_id = p_tour_id
-       or h.tour_date_id in (select td.id from public.tour_dates td where td.tour_id = p_tour_id)
+    where h.tour_date_id in (
+      select td.id from public.tour_dates td where td.tour_id = p_tour_id
+    )
     order by h.id
     for update
   loop
@@ -1139,8 +1140,9 @@ begin
   for v_hoja in
     select h.id, h.job_id, coalesce(h.status, 'draft') as status
     from public.hoja_de_ruta h
-    where (h.tour_id = p_tour_id
-       or h.tour_date_id in (select td.id from public.tour_dates td where td.tour_id = p_tour_id))
+    where h.tour_date_id in (
+        select td.id from public.tour_dates td where td.tour_id = p_tour_id
+      )
       and coalesce(h.status, 'draft') <> 'final'
     order by h.id
   loop
@@ -1568,7 +1570,7 @@ begin
     where jd.file_path = p_path
   ) then return false; end if;
 
-  if v_role in ('admin', 'management', 'logistics') then return true; end if;
+  if v_role in ('admin', 'management', 'logistics', 'house_tech') then return true; end if;
 
   if p_path like 'incident-reports/%'
      and exists (
@@ -1600,40 +1602,68 @@ drop policy if exists "p_storage_job_documents_authorized_insert" on storage.obj
 drop policy if exists "p_storage_job_documents_authorized_update" on storage.objects;
 drop policy if exists "p_storage_job_documents_authorized_delete" on storage.objects;
 
-create policy "p_storage_job_documents_scoped_select"
+create policy "p_storage_job_documents_authorized_select"
 on storage.objects for select to authenticated
 using (
   bucket_id = 'job-documents'
   and public.can_read_job_document_storage(name)
+  and exists (
+    select 1 from public.jobs j
+    where j.id = public.job_document_storage_job_id(storage.objects.name)
+  )
+  and (
+    public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
+    or public.can_read_job_document_storage(name)
+  )
 );
 
-create policy "p_storage_job_documents_scoped_insert"
+create policy "p_storage_job_documents_authorized_insert"
 on storage.objects for insert to authenticated
 with check (
   bucket_id = 'job-documents'
   and public.can_write_job_document_storage(name)
+  and exists (
+    select 1 from public.jobs j
+    where j.id = public.job_document_storage_job_id(storage.objects.name)
+  )
+  and (
+    public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
+    or public.can_write_job_document_storage(name)
+  )
 );
 
-create policy "p_storage_job_documents_scoped_update"
+create policy "p_storage_job_documents_authorized_update"
 on storage.objects for update to authenticated
 using (
   bucket_id = 'job-documents'
-  and coalesce(public.get_current_user_role(), '') in ('admin', 'management', 'logistics')
+  and public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
   and public.can_write_job_document_storage(name)
+  and exists (
+    select 1 from public.jobs j
+    where j.id = public.job_document_storage_job_id(storage.objects.name)
+  )
 )
 with check (
   bucket_id = 'job-documents'
-  and coalesce(public.get_current_user_role(), '') in ('admin', 'management', 'logistics')
+  and public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
   and public.can_write_job_document_storage(name)
+  and exists (
+    select 1 from public.jobs j
+    where j.id = public.job_document_storage_job_id(storage.objects.name)
+  )
 );
 
-create policy "p_storage_job_documents_scoped_delete"
+create policy "p_storage_job_documents_authorized_delete"
 on storage.objects for delete to authenticated
 using (
   bucket_id = 'job-documents'
   and public.can_write_job_document_storage(name)
+  and exists (
+    select 1 from public.jobs j
+    where j.id = public.job_document_storage_job_id(storage.objects.name)
+  )
   and (
-    coalesce(public.get_current_user_role(), '') in ('admin', 'management', 'logistics')
+    public.get_current_user_role() in ('admin', 'management', 'logistics', 'house_tech')
     or not exists (
       select 1 from public.job_documents jd where jd.file_path = storage.objects.name
     )
