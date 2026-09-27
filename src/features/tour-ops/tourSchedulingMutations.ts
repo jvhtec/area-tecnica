@@ -298,20 +298,45 @@ export const hojaAccommodationPayloadFromHotel = (input: Partial<TourOpsAccommod
 export const hojaStaffStorageLookup = async (hojaId: string) => {
   const { data, error } = await client
     .from("hoja_de_ruta_staff")
-    .select("id, name, surname1, surname2, position")
+    .select("id, technician_id, name, surname1, surname2, position")
     .eq("hoja_de_ruta_id", hojaId);
   if (error) throw error;
 
   const byValue = new Map<string, string>();
-  asArray<UnknownRecord>(data).forEach((member, index) => {
-    const indexValue = String(index);
+  asArray<UnknownRecord>(data).forEach((member) => {
+    const canonicalId = textOrNull(member.id);
+    if (!canonicalId) return;
     [textOrNull(member.id), textOrNull(member.technician_id)]
       .filter(Boolean)
-      .forEach((key) => byValue.set(key as string, indexValue));
+      .forEach((key) => byValue.set(key as string, canonicalId));
     const name = displayName(member.name, member.surname1, member.surname2);
-    if (name) byValue.set(name, indexValue);
+    if (name) byValue.set(name, canonicalId);
   });
   return byValue;
+};
+
+export const buildHojaRoomAssignmentRows = (
+  accommodationId: string,
+  rooms: TourOpsRoomAssignment[] | undefined | null,
+  staffValueLookup: Map<string, string>,
+) => {
+  const staffValue = (value: unknown, rawValue: unknown) => {
+    const normalizedValue = textOrNull(value);
+    const raw = textOrNull(rawValue);
+    if (normalizedValue && staffValueLookup.has(normalizedValue)) return staffValueLookup.get(normalizedValue);
+    if (raw && staffValueLookup.has(raw)) return staffValueLookup.get(raw);
+    return null;
+  };
+
+  return asArray<TourOpsRoomAssignment>(rooms)
+    .filter((room) => room.roomType || room.roomNumber || room.staffMember1Id || room.staffMember2Id)
+    .map((room) => ({
+      accommodation_id: accommodationId,
+      room_type: room.roomType || "single",
+      room_number: room.roomNumber || "",
+      staff_member1_hoja_staff_id: staffValue(room.staffMember1Id, room.rawStaffMember1Id),
+      staff_member2_hoja_staff_id: staffValue(room.staffMember2Id, room.rawStaffMember2Id),
+    }));
 };
 
 export const replaceHojaRoomAssignments = async (
@@ -328,23 +353,7 @@ export const replaceHojaRoomAssignments = async (
   if (serializedRooms.length === 0) return;
 
   const staffValueLookup = hojaId ? await hojaStaffStorageLookup(hojaId) : new Map<string, string>();
-  const staffValue = (value: unknown, rawValue: unknown) => {
-    const normalizedValue = textOrNull(value);
-    const raw = textOrNull(rawValue);
-    if (normalizedValue && staffValueLookup.has(normalizedValue)) return staffValueLookup.get(normalizedValue);
-    if (raw && staffValueLookup.has(raw)) return staffValueLookup.get(raw);
-    return normalizedValue ?? raw;
-  };
-
-  const rows = asArray<TourOpsRoomAssignment>(rooms)
-    .filter((room) => room.roomType || room.roomNumber || room.staffMember1Id || room.staffMember2Id)
-    .map((room) => ({
-      accommodation_id: accommodationId,
-      room_type: room.roomType || "single",
-      room_number: room.roomNumber || "",
-      staff_member1_id: staffValue(room.staffMember1Id, room.rawStaffMember1Id) ?? null,
-      staff_member2_id: staffValue(room.staffMember2Id, room.rawStaffMember2Id) ?? null,
-    }));
+  const rows = buildHojaRoomAssignmentRows(accommodationId, rooms, staffValueLookup);
   if (rows.length === 0) return;
 
   const { error } = await client.from("hoja_de_ruta_room_assignments").insert(rows);

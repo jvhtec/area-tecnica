@@ -319,8 +319,20 @@ export const normalizeRoomAssignment = (
   row: UnknownRecord,
   staffLookup?: Map<string, HojaStaffReference>,
 ): TourOpsRoomAssignment => {
-  const rawStaffMember1Id = textOrNull(row.staff_member1_id ?? row.staffMember1Id ?? row.rawStaffMember1Id);
-  const rawStaffMember2Id = textOrNull(row.staff_member2_id ?? row.staffMember2Id ?? row.rawStaffMember2Id);
+  const rawStaffMember1Id = textOrNull(
+    row.staff_member1_hoja_staff_id ??
+    row.staffMember1HojaStaffId ??
+    row.staff_member1_id ??
+    row.staffMember1Id ??
+    row.rawStaffMember1Id
+  );
+  const rawStaffMember2Id = textOrNull(
+    row.staff_member2_hoja_staff_id ??
+    row.staffMember2HojaStaffId ??
+    row.staff_member2_id ??
+    row.staffMember2Id ??
+    row.rawStaffMember2Id
+  );
   const staff1 = rawStaffMember1Id ? staffLookup?.get(rawStaffMember1Id) : null;
   const staff2 = rawStaffMember2Id ? staffLookup?.get(rawStaffMember2Id) : null;
 

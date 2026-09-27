@@ -64,7 +64,17 @@ export const useHojaDocumentPersistence = (
     },
     onSuccess: (saved) => {
       queryClient.setQueryData(queryKey, (current: typeof hojaDeRuta) => current
-        ? { ...current, document_version: saved.document_version }
+        ? {
+            ...current,
+            document_version: saved.document_version,
+            ...(current.status === "approved"
+              ? {
+                  status: "review" as const,
+                  approved_by: undefined,
+                  approved_at: undefined,
+                }
+              : {}),
+          }
         : current);
       void queryClient.invalidateQueries({ queryKey });
       onSuccess?.();

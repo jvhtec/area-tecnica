@@ -54,6 +54,11 @@ export const getHojaPublishBlockReason = (
   return status === "approved" || status === "final" ? null : "status";
 };
 
+export const shouldStopPublicationAfterSave = (
+  status: HojaDeRutaMetadata["status"],
+  wasDirty: boolean,
+) => status === "approved" && wasDirty;
+
 export const useHojaDocumentExports = ({
   accommodations,
   documentVersion,
@@ -249,7 +254,17 @@ export const useHojaDocumentExports = ({
     setGeneratingSectionId(null);
     setIsGenerating(true);
     try {
+      const wasDirty = Boolean(isDirty);
       const expectedDocumentVersion = await saveBeforePdfGeneration();
+
+      if (publish && shouldStopPublicationAfterSave(status, wasDirty)) {
+        toast({
+          title: "Cambios guardados",
+          description:
+            "La Hoja de Ruta ha vuelto a revisión. Debe aprobarse de nuevo antes de publicarla.",
+        });
+        return;
+      }
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
       const jobDetails = await getSelectedJobDetails(currentJobId);

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { normalizeComparison } from "@/features/tour-ops/tourSchedulingNormalizers";
+import {
+  buildHojaStaffLookup,
+  normalizeComparison,
+  normalizeRoomAssignment,
+} from "@/features/tour-ops/tourSchedulingNormalizers";
+import { buildHojaRoomAssignmentRows } from "@/features/tour-ops/tourSchedulingMutations";
 import { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingService";
 
 const rawTour: Record<string, unknown> = {
@@ -121,6 +126,51 @@ const rawPayload: Record<string, unknown> = {
 describe("tour ops normalization", () => {
   it("ignores surrounding whitespace in sync comparisons", () => {
     expect(normalizeComparison("  BCN Airport  ")).toBe("bcn airport");
+  });
+
+  it("prefers canonical Hoja staff UUIDs when normalizing room occupants", () => {
+    const staffLookup = buildHojaStaffLookup([
+      {
+        id: "staff-row-1",
+        hoja_de_ruta_id: "hdr-1",
+        technician_id: "tech-1",
+        name: "Ada",
+        surname1: "Lovelace",
+      },
+    ]).get("hdr-1");
+
+    expect(normalizeRoomAssignment({
+      id: "room-1",
+      room_type: "single",
+      staff_member1_hoja_staff_id: "staff-row-1",
+      staff_member1_id: "legacy-index-that-must-not-win",
+    }, staffLookup)).toEqual(expect.objectContaining({
+      staffMember1Id: "tech-1",
+      rawStaffMember1Id: "staff-row-1",
+      staffMember1Name: "Ada Lovelace",
+    }));
+  });
+
+  it("writes Tour Ops room occupants through the canonical Hoja staff FK columns", () => {
+    expect(buildHojaRoomAssignmentRows(
+      "hotel-1",
+      [{
+        roomType: "double",
+        roomNumber: "204",
+        staffMember1Id: "tech-1",
+        staffMember2Id: "tech-2",
+      }],
+      new Map([
+        ["tech-1", "hoja-staff-1"],
+        ["tech-2", "hoja-staff-2"],
+      ]),
+    )).toEqual([{
+      accommodation_id: "hotel-1",
+      room_type: "double",
+      room_number: "204",
+      staff_member1_hoja_staff_id: "hoja-staff-1",
+      staff_member2_hoja_staff_id: "hoja-staff-2",
+    }]);
   });
 
   it("merges tour dates, jobs, aggregate hoja data, and legacy tour travel", () => {

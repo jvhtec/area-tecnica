@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(63);
+SELECT plan(69);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -403,13 +403,57 @@ SELECT set_config(
 SET ROLE authenticated;
 
 SELECT lives_ok(
+  $$ INSERT INTO public.hoja_de_ruta_contacts (hoja_de_ruta_id, name, role, sort_order)
+     SELECT id, 'Editado durante review', 'Promotor', 0
+     FROM public.hoja_de_ruta
+     WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid $$,
+  'a second manager can edit content while the Hoja is already in review'
+);
+
+SELECT is(
+  (SELECT review_requested_by FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'dc100000-0000-0000-0000-000000000002'::uuid,
+  'editing content during review transfers review ownership to that editor'
+);
+
+SELECT throws_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'dc200000-0000-0000-0000-000000000001'::uuid,
        'approved',
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
-  'a second manager approves'
+  '42501',
+  'Otra persona debe aprobar la Hoja de Ruta que enviaste a revisión',
+  'an editor cannot approve content they changed while it was already in review'
 );
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  'the original manager can approve after the second manager edits the review'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  false
+);
+SET ROLE authenticated;
 
 INSERT INTO public.hoja_de_ruta_contacts (hoja_de_ruta_id, name, role, sort_order)
 SELECT id, 'Contacto directo', 'Promotor', 0
@@ -493,6 +537,43 @@ SELECT throws_ok(
   'the aggregate editor cannot approve their own changes'
 );
 
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ SELECT * FROM public.save_hoja_de_ruta(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       (SELECT payload FROM hoja_integrity_payloads WHERE name = 'base'),
+       ARRAY[]::uuid[]
+     ) $$,
+  'a different manager can save aggregate edits while the Hoja is already in review'
+);
+
+SELECT is(
+  (SELECT review_requested_by FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'dc100000-0000-0000-0000-000000000002'::uuid,
+  'aggregate edits during review transfer review ownership to the latest editor'
+);
+
+SELECT throws_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  '42501',
+  'Otra persona debe aprobar la Hoja de Ruta que enviaste a revisión',
+  'the latest aggregate editor cannot approve their own review changes'
+);
+
 SELECT ok(
   EXISTS (
     SELECT 1 FROM public.activity_log
@@ -523,10 +604,10 @@ SELECT is(
 );
 
 RESET ROLE;
-SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
 SELECT set_config(
   'request.jwt.claims',
-  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
   false
 );
 SET ROLE authenticated;
@@ -537,7 +618,7 @@ SELECT lives_ok(
        'approved',
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
-  'a different manager approves the aggregate edit'
+  'a different manager approves the latest aggregate review edit'
 );
 
 INSERT INTO public.job_documents (
