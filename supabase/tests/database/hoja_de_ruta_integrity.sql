@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(62);
+SELECT plan(63);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -40,6 +40,12 @@ SELECT set_eq(
        AND tablename IN ('hoja_de_ruta', 'power_requirement_tables') $$,
   ARRAY['hoja_de_ruta', 'power_requirement_tables'],
   'the editor realtime listeners have tables to listen to'
+);
+
+SELECT ok(
+  pg_get_functiondef('public._hoja_guard_child_hoja(uuid)'::regprocedure)
+    ~* 'where h\.id = p_hoja_id\s+for update',
+  'child writes lock the parent row before checking whether it is final'
 );
 
 -- ---------------------------------------------------------------------------

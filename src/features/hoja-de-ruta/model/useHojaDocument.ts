@@ -19,6 +19,7 @@ import { useHojaCollectionEditors } from "@/features/hoja-de-ruta/model/useHojaC
 import { useHojaDocumentInitialization } from "@/features/hoja-de-ruta/model/useHojaDocumentInitialization";
 import { useHojaDocumentRealtime } from "@/features/hoja-de-ruta/model/useHojaDocumentRealtime";
 import { useHojaDocumentSave } from "@/features/hoja-de-ruta/model/useHojaDocumentSave";
+import { shouldStopTransitionAfterSave } from "@/features/hoja-de-ruta/model/hojaStatusWorkflow";
 import { toHojaStatus } from "@/features/hoja-de-ruta/api/hojaDocumentApi";
 import { useHojaDocumentPersistence } from "@/features/hoja-de-ruta/api/useHojaDocumentPersistence";
 import { useHojaDocumentState } from "@/features/hoja-de-ruta/model/useHojaDocumentState";
@@ -210,11 +211,15 @@ export const useHojaDocument = (
     }
 
     let expectedStatusVersion = documentVersionRef.current;
+    const stopAfterSave = shouldStopTransitionAfterSave(documentStatus, nextStatus, isDirty);
     if (isDirty || !hojaDeRuta?.id) {
       try {
         const saved = await handleSaveAll();
         if (!saved) return;
         expectedStatusVersion = saved.document_version;
+        if (stopAfterSave) {
+          return;
+        }
       } catch {
         return;
       }
@@ -258,6 +263,7 @@ export const useHojaDocument = (
     handleSaveAll,
     hasExternalConflict,
     hojaDeRuta?.id,
+    documentStatus,
     isDirty,
     selectedJobId,
     setStatus,

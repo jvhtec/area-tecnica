@@ -343,13 +343,17 @@ begin
 
   select coalesce(h.status, 'draft') into v_status
   from public.hoja_de_ruta h
-  where h.id = p_hoja_id;
+  where h.id = p_hoja_id
+  for update;
 
   -- The parent is being deleted (cascade) or never existed.
   if not found then
     return;
   end if;
 
+  -- The row lock above serializes child edits with status transitions. Without
+  -- it, a child write could observe approved, wait behind finalization, then
+  -- continue against a parent that had become final.
   -- Enforce on top-level statements only: referential actions (a deleted
   -- profile or tour date) and cleanup triggers run nested and are not edits.
   if v_status = 'final'
