@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(69);
+SELECT plan(70);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -574,6 +574,29 @@ SELECT throws_ok(
   'the latest aggregate editor cannot approve their own review changes'
 );
 
+INSERT INTO public.hoja_de_ruta_accommodations (
+  id, hoja_de_ruta_id, hotel_name, address, sort_order
+)
+SELECT
+  'dc700000-0000-0000-0000-000000000001'::uuid,
+  id,
+  'Hotel Integridad',
+  'Calle Integridad 1',
+  0
+FROM public.hoja_de_ruta
+WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid;
+
+INSERT INTO public.hoja_de_ruta_room_assignments (
+  id, accommodation_id, room_type, room_number, staff_member1_id, sort_order
+) VALUES (
+  'dc710000-0000-0000-0000-000000000001'::uuid,
+  'dc700000-0000-0000-0000-000000000001'::uuid,
+  'single',
+  '205',
+  'Invitado externo',
+  0
+);
+
 SELECT ok(
   EXISTS (
     SELECT 1 FROM public.activity_log
@@ -664,6 +687,13 @@ SELECT is(
   public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid) #>> '{main,event_name}',
   'Integridad',
   'the assigned technician reads the approved Hoja'
+);
+
+SELECT is(
+  public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid)
+    #>> '{accommodations,0,rooms,0,staff_member1_name}',
+  'Invitado externo',
+  'crew projection preserves a current free-text room occupant when no canonical staff row exists'
 );
 
 RESET ROLE;

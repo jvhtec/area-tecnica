@@ -320,23 +320,44 @@ export const buildHojaRoomAssignmentRows = (
   rooms: TourOpsRoomAssignment[] | undefined | null,
   staffValueLookup: Map<string, string>,
 ) => {
-  const staffValue = (value: unknown, rawValue: unknown) => {
+  const resolveStaffId = (value: unknown, rawValue: unknown, name: unknown) => {
     const normalizedValue = textOrNull(value);
     const raw = textOrNull(rawValue);
+    const normalizedName = textOrNull(name);
     if (normalizedValue && staffValueLookup.has(normalizedValue)) return staffValueLookup.get(normalizedValue);
     if (raw && staffValueLookup.has(raw)) return staffValueLookup.get(raw);
+    if (normalizedName && staffValueLookup.has(normalizedName)) return staffValueLookup.get(normalizedName);
     return null;
   };
 
   return asArray<TourOpsRoomAssignment>(rooms)
-    .filter((room) => room.roomType || room.roomNumber || room.staffMember1Id || room.staffMember2Id)
-    .map((room) => ({
-      accommodation_id: accommodationId,
-      room_type: room.roomType || "single",
-      room_number: room.roomNumber || "",
-      staff_member1_hoja_staff_id: staffValue(room.staffMember1Id, room.rawStaffMember1Id),
-      staff_member2_hoja_staff_id: staffValue(room.staffMember2Id, room.rawStaffMember2Id),
-    }));
+    .filter((room) =>
+      room.roomType ||
+      room.roomNumber ||
+      room.staffMember1Id ||
+      room.staffMember2Id ||
+      room.staffMember1Name ||
+      room.staffMember2Name
+    )
+    .map((room) => {
+      const staff1Id = resolveStaffId(room.staffMember1Id, room.rawStaffMember1Id, room.staffMember1Name);
+      const staff2Id = resolveStaffId(room.staffMember2Id, room.rawStaffMember2Id, room.staffMember2Name);
+      return {
+        accommodation_id: accommodationId,
+        room_type: room.roomType || "single",
+        room_number: room.roomNumber || "",
+        staff_member1_hoja_staff_id: staff1Id,
+        staff_member2_hoja_staff_id: staff2Id,
+        // These text columns are no longer identity fields. They only retain a
+        // current free-text occupant when no canonical Hoja staff row exists.
+        staff_member1_id: staff1Id
+          ? null
+          : textOrNull(room.staffMember1Name) ?? textOrNull(room.staffMember1Id) ?? textOrNull(room.rawStaffMember1Id),
+        staff_member2_id: staff2Id
+          ? null
+          : textOrNull(room.staffMember2Name) ?? textOrNull(room.staffMember2Id) ?? textOrNull(room.rawStaffMember2Id),
+      };
+    });
 };
 
 export const replaceHojaRoomAssignments = async (
@@ -345,17 +366,22 @@ export const replaceHojaRoomAssignments = async (
   rooms: TourOpsRoomAssignment[] | undefined | null,
 ) => {
   const serializedRooms = serializeRoomAllocation(rooms);
+  const rows = serializedRooms.length > 0
+    ? buildHojaRoomAssignmentRows(
+        accommodationId,
+        rooms,
+        hojaId ? await hojaStaffStorageLookup(hojaId) : new Map<string, string>(),
+      )
+    : [];
+
+  // Resolve/validate the replacement set before deleting the currently stored
+  // rooms. Network/lookup failures must not erase rooming as a side effect.
   const { error: deleteError } = await client
     .from("hoja_de_ruta_room_assignments")
     .delete()
     .eq("accommodation_id", accommodationId);
   if (deleteError) throw deleteError;
-  if (serializedRooms.length === 0) return;
-
-  const staffValueLookup = hojaId ? await hojaStaffStorageLookup(hojaId) : new Map<string, string>();
-  const rows = buildHojaRoomAssignmentRows(accommodationId, rooms, staffValueLookup);
   if (rows.length === 0) return;
-
   const { error } = await client.from("hoja_de_ruta_room_assignments").insert(rows);
   if (error) throw error;
 };

@@ -170,6 +170,29 @@ describe("tour ops normalization", () => {
       room_number: "204",
       staff_member1_hoja_staff_id: "hoja-staff-1",
       staff_member2_hoja_staff_id: "hoja-staff-2",
+      staff_member1_id: null,
+      staff_member2_id: null,
+    }]);
+  });
+
+  it("keeps current free-text room occupants when no Hoja staff row matches", () => {
+    expect(buildHojaRoomAssignmentRows(
+      "hotel-1",
+      [{
+        roomType: "single",
+        roomNumber: "205",
+        staffMember1Id: "Invitado externo",
+        staffMember1Name: "Invitado externo",
+      }],
+      new Map(),
+    )).toEqual([{
+      accommodation_id: "hotel-1",
+      room_type: "single",
+      room_number: "205",
+      staff_member1_hoja_staff_id: null,
+      staff_member2_hoja_staff_id: null,
+      staff_member1_id: "Invitado externo",
+      staff_member2_id: null,
     }]);
   });
 

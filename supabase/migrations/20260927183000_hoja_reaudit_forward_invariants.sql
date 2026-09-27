@@ -62,6 +62,141 @@ begin
 end;
 $$;
 
+-- Crew rooming still needs to display intentional free-text occupants (guest,
+-- driver, external crew, etc.) when there is no canonical Hoja staff row.
+-- Canonical staff identities remain preferred whenever the FK is populated.
+create or replace function public.get_hoja_de_ruta(p_job_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_hoja_id uuid;
+  v_full_access boolean;
+  v_crew_visible boolean;
+  v_role text := coalesce(public.get_current_user_role(), '');
+  v_result jsonb;
+begin
+  v_full_access := coalesce(auth.jwt() ->> 'role', '') = 'service_role'
+    or v_role in ('admin', 'management', 'logistics');
+
+  if not v_full_access then
+    if v_role not in ('technician', 'house_tech')
+       or not exists (
+         select 1 from public.job_assignments ja
+         where ja.job_id = p_job_id
+           and ja.technician_id = auth.uid()
+           and ja.status = 'confirmed'
+       ) then
+      raise exception 'permission denied' using errcode = '42501';
+    end if;
+  end if;
+
+  select h.id,
+         coalesce(h.status, 'draft') in ('approved', 'final')
+    into v_hoja_id, v_crew_visible
+  from public.hoja_de_ruta h
+  where h.job_id = p_job_id;
+
+  if v_hoja_id is null then
+    return null;
+  end if;
+
+  if not v_full_access and not v_crew_visible then
+    return null;
+  end if;
+
+  select jsonb_build_object(
+    'main', to_jsonb(h),
+    'logistics', coalesce((
+      select to_jsonb(l)
+      from public.hoja_de_ruta_logistics l
+      where l.hoja_de_ruta_id = h.id
+    ), '{}'::jsonb),
+    'contacts', coalesce((
+      select jsonb_agg(to_jsonb(c) order by c.sort_order, c.id)
+      from public.hoja_de_ruta_contacts c
+      where c.hoja_de_ruta_id = h.id
+    ), '[]'::jsonb),
+    'staff', case when v_full_access then coalesce((
+      select jsonb_agg(to_jsonb(s) order by s.sort_order, s.id)
+      from public.hoja_de_ruta_staff s
+      where s.hoja_de_ruta_id = h.id
+    ), '[]'::jsonb) else '[]'::jsonb end,
+    'transport', coalesce((
+      select jsonb_agg(to_jsonb(t) order by t.sort_order, t.id)
+      from public.hoja_de_ruta_transport t
+      where t.hoja_de_ruta_id = h.id
+    ), '[]'::jsonb),
+    'travelArrangements', coalesce((
+      select jsonb_agg(to_jsonb(t) order by t.sort_order, t.id)
+      from public.hoja_de_ruta_travel_arrangements t
+      where t.hoja_de_ruta_id = h.id
+    ), '[]'::jsonb),
+    'accommodations', coalesce((
+      select jsonb_agg(
+        to_jsonb(a) || jsonb_build_object(
+          'rooms', coalesce((
+            select jsonb_agg(
+              case
+                when v_full_access then to_jsonb(r)
+                else jsonb_build_object(
+                  'id', r.id,
+                  'room_type', r.room_type,
+                  'room_number', r.room_number,
+                  'staff_member1_id', coalesce((
+                    select s1.technician_id::text
+                    from public.hoja_de_ruta_staff s1
+                    where s1.id = r.staff_member1_hoja_staff_id
+                      and s1.hoja_de_ruta_id = h.id
+                  ), nullif(btrim(r.staff_member1_id), '')),
+                  'staff_member1_name', coalesce((
+                    select nullif(btrim(concat_ws(' ', s1.name, s1.surname1, s1.surname2)), '')
+                    from public.hoja_de_ruta_staff s1
+                    where s1.id = r.staff_member1_hoja_staff_id
+                      and s1.hoja_de_ruta_id = h.id
+                  ), nullif(btrim(r.staff_member1_id), '')),
+                  'staff_member2_id', coalesce((
+                    select s2.technician_id::text
+                    from public.hoja_de_ruta_staff s2
+                    where s2.id = r.staff_member2_hoja_staff_id
+                      and s2.hoja_de_ruta_id = h.id
+                  ), nullif(btrim(r.staff_member2_id), '')),
+                  'staff_member2_name', coalesce((
+                    select nullif(btrim(concat_ws(' ', s2.name, s2.surname1, s2.surname2)), '')
+                    from public.hoja_de_ruta_staff s2
+                    where s2.id = r.staff_member2_hoja_staff_id
+                      and s2.hoja_de_ruta_id = h.id
+                  ), nullif(btrim(r.staff_member2_id), ''))
+                )
+              end
+              order by r.sort_order, r.id
+            )
+            from public.hoja_de_ruta_room_assignments r
+            where r.accommodation_id = a.id
+          ), '[]'::jsonb)
+        )
+        order by a.sort_order, a.id
+      )
+      from public.hoja_de_ruta_accommodations a
+      where a.hoja_de_ruta_id = h.id
+    ), '[]'::jsonb),
+    'images', coalesce((
+      select jsonb_agg(to_jsonb(i) order by i.image_type, i.sort_order, i.id)
+      from public.hoja_de_ruta_images i
+      where i.hoja_de_ruta_id = h.id
+    ), '[]'::jsonb)
+  )
+  into v_result
+  from public.hoja_de_ruta h
+  where h.id = v_hoja_id;
+
+  return v_result;
+end;
+$$;
+
 create or replace function public.hoja_de_ruta_guard()
 returns trigger
 language plpgsql
@@ -284,4 +419,3 @@ begin
   return query select v_saved.id, v_saved.document_version;
 end;
 $$;
-
