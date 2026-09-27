@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(101);
+SELECT plan(103);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -445,6 +445,34 @@ SELECT has_function(
   'public', 'save_tour_contacts_and_sync_hojas',
   ARRAY['uuid', 'timestamp with time zone', 'jsonb', 'jsonb'],
   'tour contacts sync through one optimistic transaction'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'authenticated',
+    'public._hoja_assert_tour_membership(uuid, uuid)',
+    'EXECUTE'
+  ),
+  'the Tour Ops tour-membership guard is not a PostgREST entry point'
+);
+
+SELECT throws_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000099'::uuid,
+       'normalized',
+       NULL::uuid,
+       (SELECT id FROM public.hoja_de_ruta
+        WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       NULL::uuid,
+       'hoja_de_ruta_travel_arrangements',
+       '{}'::jsonb,
+       NULL::timestamptz,
+       '{"transportation_type":"bus"}'::jsonb,
+       '{"transportation_type":"van"}'::jsonb
+     ) $$,
+  '22023',
+  'La Hoja de Ruta no pertenece a esta gira',
+  'Tour Ops cannot attach a Hoja from another tour'
 );
 
 SELECT set_eq(

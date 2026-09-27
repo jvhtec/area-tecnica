@@ -1,15 +1,11 @@
 import type { UnknownRecord } from "@/features/tour-ops/tourSchedulingNormalizers";
 import {
-  annotateAccommodationSyncStatus,
-  annotateTravelSyncStatus,
   asArray,
   buildDateHealth,
   buildHojaStaffLookup,
   dedupeCrew,
   hasHomeBase,
   isRecord,
-  mergeAccommodations,
-  mergeTravelSegments,
   normalizeAccommodation,
   normalizeContacts,
   normalizeDocument,
@@ -28,6 +24,12 @@ import {
   textOrNull,
   toNumber,
 } from "@/features/tour-ops/tourSchedulingNormalizers";
+import {
+  annotateAccommodationSyncStatus,
+  annotateTravelSyncStatus,
+  mergeAccommodations,
+  mergeTravelSegments,
+} from "@/features/tour-ops/tourSchedulingSync";
 import type {
   TourOpsAllowedSections,
   TourOpsCrewMember,

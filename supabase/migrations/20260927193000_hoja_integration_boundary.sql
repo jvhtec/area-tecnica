@@ -185,6 +185,46 @@ $$;
 revoke all on function public._hoja_lock_external_edits(uuid[], jsonb)
   from public, anon, authenticated;
 
+-- Tour Ops bridge RPCs must never attach a Hoja from another tour. The
+-- management/logistics roles intentionally span tours, so this is an aggregate
+-- integrity check rather than an authorization shortcut.
+create or replace function public._hoja_assert_tour_membership(
+  p_hoja_id uuid,
+  p_tour_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if p_hoja_id is null then
+    return;
+  end if;
+
+  if not exists (
+    select 1
+    from public.hoja_de_ruta h
+    where h.id = p_hoja_id
+      and (
+        h.tour_id = p_tour_id
+        or exists (
+          select 1
+          from public.tour_dates td
+          where td.id = h.tour_date_id
+            and td.tour_id = p_tour_id
+        )
+      )
+  ) then
+    raise exception 'La Hoja de Ruta no pertenece a esta gira'
+      using errcode = '22023';
+  end if;
+end;
+$$;
+
+revoke all on function public._hoja_assert_tour_membership(uuid, uuid)
+  from public, anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Programa: one version-aware Hoja mutation
 -- ---------------------------------------------------------------------------
@@ -275,6 +315,8 @@ begin
      and not public._hoja_is_service_role() then
     raise exception 'permission denied' using errcode = '42501';
   end if;
+
+  perform public._hoja_assert_tour_membership(p_hoja_id, p_tour_id);
 
   v_ops := jsonb_populate_record(null::public.tour_travel_segments, coalesce(p_ops_payload, '{}'::jsonb));
   v_hoja_travel := jsonb_populate_record(null::public.hoja_de_ruta_travel_arrangements, coalesce(p_hoja_payload, '{}'::jsonb));
@@ -670,6 +712,8 @@ begin
      and not public._hoja_is_service_role() then
     raise exception 'permission denied' using errcode = '42501';
   end if;
+
+  perform public._hoja_assert_tour_membership(p_hoja_id, p_tour_id);
 
   v_ops := jsonb_populate_record(null::public.tour_accommodations, coalesce(p_ops_payload, '{}'::jsonb));
   v_hoja := jsonb_populate_record(null::public.hoja_de_ruta_accommodations, coalesce(p_hoja_payload, '{}'::jsonb));
