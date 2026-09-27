@@ -68,7 +68,7 @@ The section registry is the source of truth for tabs, completion checks, export 
 - `status`, `approved_*`, `review_requested_by`, `document_version` and `published_document_id` only change through the workflow RPCs; a direct update is rejected with `42501`.
 - A stale `expected_version` is rejected with SQLSTATE `40001`. The conflict banner offers either a confirmed reload or a deliberate retry against the latest version; the retry never bypasses optimistic concurrency.
 - Status transitions are forward only: `draft -> review -> approved -> final`. The person who sent a document to review cannot approve it (admins exempt).
-- Any content change to an `approved` document (aggregate save or direct write) sends it back to `review` and clears the approval; the reset is logged.
+- Any content change to an `approved` document (aggregate save or direct write) sends it back to `review`, clears the approval and records the editor as the new review requester; that editor cannot approve their own changes (admins exempt). The reset is logged.
 - A final document is immutable for every writer, enforced by the table triggers rather than only the RPCs. Crew removal leaves a final document's staff list as issued. Referential actions (a deleted PDF or user, a deleted tour date) and the service role are not blocked.
 - `reopen_hoja_de_ruta` is the only way back: admin/management, required reason, logged as `hoja.status.reopened`.
 - PDF download and preview are local export actions. They do not publish a file.
@@ -77,7 +77,7 @@ The section registry is the source of truth for tabs, completion checks, export 
 ## Authorization
 
 - `admin`, `management`, and `logistics` can read and manage the full aggregate.
-- An assigned `technician` or `house_tech` can read the job document through a restricted projection once it is `approved`/`final` or has a published PDF; drafts and documents in review return `null`. Programa push reminders follow the same rule.
+- An assigned `technician` or `house_tech` can read the live job document through a restricted projection only while it is `approved` or `final`; drafts and documents in review return `null`. A previously published PDF can remain visible as the last issued document while newer edits are reviewed. Programa push reminders use only the currently approved/final live document.
 - The restricted projection omits staff rows and sensitive identity data. Room assignments retain only the operationally necessary occupant name.
 - Unassigned technicians cannot read the document.
 - Anonymous callers cannot execute the aggregate, status, or publication RPCs.

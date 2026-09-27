@@ -11,8 +11,8 @@
 -- * Staff departments and technician links are backfilled (H3).
 -- * DNI copies are purged after the event (M4).
 -- * Compatibility RPCs are retired and wrappers authorize first (M5, M6).
--- * Technicians only see approved/final/published content; publication makes
---   the PDF visible to crew atomically; dry-hire jobs cannot get a Hoja (L2).
+-- * Technicians only see currently approved/final live content; publication
+--   makes the issued PDF visible to crew atomically; dry-hire jobs cannot get a Hoja (L2).
 
 -- ---------------------------------------------------------------------------
 -- Trusted-write marker
@@ -178,6 +178,7 @@ begin
     status = case when h.status = 'approved' then 'review' else h.status end,
     approved_by = case when h.status = 'approved' then null else h.approved_by end,
     approved_at = case when h.status = 'approved' then null else h.approved_at end,
+    review_requested_by = case when h.status = 'approved' then auth.uid() else h.review_requested_by end,
     last_modified = now(),
     last_modified_by = coalesce(auth.uid(), h.last_modified_by),
     updated_at = now()
@@ -210,7 +211,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_ignored constant text[] := array[
-    'published_document_id', 'approved_by', 'created_by',
+    'published_document_id', 'approved_by', 'review_requested_by', 'created_by',
     'last_modified', 'last_modified_by', 'updated_at'
   ];
   v_old_content jsonb;
@@ -263,6 +264,7 @@ begin
        or (
          new.published_document_id is not distinct from old.published_document_id
          and new.approved_by is not distinct from old.approved_by
+         and new.review_requested_by is not distinct from old.review_requested_by
        )
      ) then
     return new;
@@ -291,6 +293,7 @@ begin
       new.status := 'review';
       new.approved_by := null;
       new.approved_at := null;
+      new.review_requested_by := auth.uid();
     end if;
   end if;
   new.last_modified := now();
@@ -588,7 +591,8 @@ begin
     update public.hoja_de_ruta h
     set status = 'review',
         approved_by = null,
-        approved_at = null
+        approved_at = null,
+        review_requested_by = auth.uid()
     where h.id = v_saved.id
       and h.status = 'approved';
 
@@ -828,7 +832,7 @@ grant execute on function public.publish_hoja_de_ruta_document(uuid, uuid, integ
   to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
--- Aggregate read: signed JWT role, crew sees only approved/published content
+-- Aggregate read: signed JWT role, crew sees only currently approved content
 -- ---------------------------------------------------------------------------
 
 create or replace function public.get_hoja_de_ruta(p_job_id uuid)
@@ -862,7 +866,6 @@ begin
 
   select h.id,
          coalesce(h.status, 'draft') in ('approved', 'final')
-           or h.published_document_id is not null
     into v_hoja_id, v_crew_visible
   from public.hoja_de_ruta h
   where h.job_id = p_job_id;

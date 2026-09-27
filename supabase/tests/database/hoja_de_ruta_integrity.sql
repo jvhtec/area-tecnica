@@ -1,13 +1,13 @@
 -- Hoja de Ruta integrity invariants (20260927150000_hoja_de_ruta_integrity.sql):
 -- every writer respects the final lock and moves document_version, workflow
 -- columns change only through the workflow RPCs, approval needs a second
--- person, reopen is management-only and logged, crew only reads approved or
--- published content, and retired compatibility RPCs are gone.
+-- person after every edit, reopen is management-only and logged, crew only
+-- reads currently approved content, and retired compatibility RPCs are gone.
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(51);
+SELECT plan(63);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -83,7 +83,8 @@ FROM (VALUES
   ('dc100000-0000-0000-0000-000000000002'::uuid, 'hoja-int-reviewer@test.local'),
   ('dc100000-0000-0000-0000-000000000003'::uuid, 'hoja-int-tech@test.local'),
   ('dc100000-0000-0000-0000-000000000004'::uuid, 'hoja-int-namesake@test.local'),
-  ('dc100000-0000-0000-0000-000000000005'::uuid, 'hoja-int-logistics@test.local')
+  ('dc100000-0000-0000-0000-000000000005'::uuid, 'hoja-int-logistics@test.local'),
+  ('dc100000-0000-0000-0000-000000000006'::uuid, 'hoja-int-disposable@test.local')
 ) AS fixture(id, email)
 ON CONFLICT (id) DO NOTHING;
 
@@ -289,6 +290,48 @@ SELECT throws_ok(
   'document_version cannot be set directly'
 );
 
+SELECT throws_ok(
+  $$ UPDATE public.hoja_de_ruta
+     SET review_requested_by = 'dc100000-0000-0000-0000-000000000002'::uuid
+     WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid $$,
+  '42501',
+  NULL,
+  'review_requested_by cannot be changed directly'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+SET ROLE service_role;
+
+UPDATE public.hoja_de_ruta
+SET review_requested_by = 'dc100000-0000-0000-0000-000000000006'::uuid
+WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid;
+
+SELECT lives_ok(
+  $$ DELETE FROM auth.users
+     WHERE id = 'dc100000-0000-0000-0000-000000000006'::uuid $$,
+  'deleting a review requester is not blocked by the Hoja guard'
+);
+
+SELECT is(
+  (SELECT review_requested_by FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  NULL::uuid,
+  'the review requester foreign key clears through ON DELETE SET NULL'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
+  false
+);
+SET ROLE authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Crew removal: technician_id only, never by name
 -- ---------------------------------------------------------------------------
@@ -369,13 +412,40 @@ SELECT is(
   'a direct child edit sends an approved Hoja back to review'
 );
 
+SELECT is(
+  (SELECT review_requested_by FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'dc100000-0000-0000-0000-000000000002'::uuid,
+  'the editor becomes the requester when approved content changes'
+);
+
+SELECT throws_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  '42501',
+  'Otra persona debe aprobar la Hoja de Ruta que enviaste a revisión',
+  'the editor cannot re-approve their own direct edit'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
+  false
+);
+SET ROLE authenticated;
+
 SELECT lives_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'dc200000-0000-0000-0000-000000000001'::uuid,
        'approved',
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
-  'the reviewer re-approves the edited Hoja'
+  'a different manager approves the directly edited Hoja'
 );
 
 SELECT lives_ok(
@@ -393,6 +463,42 @@ SELECT is(
    FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
   'review:null',
   'an aggregate save of approved content sends it back to review'
+);
+
+SELECT is(
+  (SELECT review_requested_by FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'dc100000-0000-0000-0000-000000000001'::uuid,
+  'the aggregate editor becomes the requester after approval is invalidated'
+);
+
+SELECT throws_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  '42501',
+  'Otra persona debe aprobar la Hoja de Ruta que enviaste a revisión',
+  'the aggregate editor cannot approve their own changes'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  'a different manager re-approves the aggregate edit'
 );
 
 SELECT ok(
@@ -485,6 +591,66 @@ SELECT is(
   public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid) #>> '{main,event_name}',
   'Integridad',
   'the assigned technician reads the approved Hoja'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  false
+);
+SET ROLE authenticated;
+
+UPDATE public.hoja_de_ruta
+SET program_schedule_json = '[{"date":"2032-03-01","rows":[]}]'::jsonb
+WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid;
+
+SELECT is(
+  (SELECT status FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'review',
+  'editing a published approved Hoja sends the live aggregate back to review'
+);
+
+SELECT ok(
+  (SELECT published_document_id = 'dc800000-0000-0000-0000-000000000001'::uuid
+     FROM public.hoja_de_ruta
+    WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'the last issued PDF remains the canonical published document during review'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000003', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000003"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT is(
+  public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid),
+  NULL::jsonb,
+  'a published pointer never exposes newer in-review aggregate content to crew'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  'a different manager re-approves the published Hoja after the edit'
 );
 
 RESET ROLE;
