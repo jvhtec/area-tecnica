@@ -126,6 +126,21 @@ VALUES (
   'dc100000-0000-0000-0000-000000000001'::uuid
 );
 
+INSERT INTO public.tour_dates (id, tour_id, date, start_date, end_date)
+VALUES (
+  'dc910000-0000-0000-0000-000000000001'::uuid,
+  'dc900000-0000-0000-0000-000000000001'::uuid,
+  '2032-03-01'::date,
+  '2032-03-01'::date,
+  '2032-03-01'::date
+);
+
+UPDATE public.jobs
+SET tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid,
+    tour_date_id = 'dc910000-0000-0000-0000-000000000001'::uuid,
+    job_type = 'tourdate'
+WHERE id = 'dc200000-0000-0000-0000-000000000001'::uuid;
+
 INSERT INTO public.job_assignments (job_id, technician_id, status, sound_role)
 VALUES (
   'dc200000-0000-0000-0000-000000000001'::uuid,
@@ -1399,6 +1414,7 @@ WHERE id IN (
   'dc200000-0000-0000-0000-000000000002'::uuid,
   'dc200000-0000-0000-0000-000000000003'::uuid
 );
+DELETE FROM public.tour_dates WHERE id = 'dc910000-0000-0000-0000-000000000001'::uuid;
 DELETE FROM public.tours WHERE id = 'dc900000-0000-0000-0000-000000000001'::uuid;
 
 SELECT * FROM finish();
