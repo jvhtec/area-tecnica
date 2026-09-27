@@ -30,7 +30,9 @@ export class VenueSection {
       ['Dirección', eventData.venue?.address],
       ['Tipo', eventData.venueType],
       ['Capacidad', eventData.venueCapacity?.toString()]
-    ].filter(([, value]) => DataValidators.hasData(value));
+    ]
+      .map(([label, value]) => [label ?? '', value ?? ''])
+      .filter(([, value]) => DataValidators.hasData(value));
 
     if (venueDetails.length > 0) {
       this.pdfDoc.addTable({

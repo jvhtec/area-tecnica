@@ -1,7 +1,7 @@
 import { TravelArrangement, RoomAssignment } from '../core/pdf-types';
 
 export class DataValidators {
-  static hasData(value: any): boolean {
+  static hasData(value: unknown): boolean {
     if (typeof value === 'string') return value.trim() !== '';
     if (Array.isArray(value)) return value.length > 0 && value.some(item => this.hasData(item));
     if (typeof value === 'object' && value !== null) {

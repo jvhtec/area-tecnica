@@ -2,25 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useJobSelection } from "@/hooks/useJobSelection";
-import { supabase } from "@/lib/supabase";
 import type {
   Accommodation,
   EventData,
   HojaDeRutaImageRecord,
-  Transport,
   TravelArrangement,
 } from "@/types/hoja-de-ruta";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { createHojaDocumentSnapshot } from "@/utils/hoja-de-ruta/documentSnapshot";
 import {
-  adjustAccommodationsForStaffRemoval,
   mergeStaffWithAssignments,
   remapAccommodationStaffReferences,
-  syncTransportsWithLogistics,
 } from "@/utils/hoja-de-ruta/staffSync";
 
+import { useHojaCollectionEditors } from "@/features/hoja-de-ruta/model/useHojaCollectionEditors";
 import { useHojaDocumentInitialization } from "@/features/hoja-de-ruta/model/useHojaDocumentInitialization";
+import { useHojaDocumentRealtime } from "@/features/hoja-de-ruta/model/useHojaDocumentRealtime";
 import { useHojaDocumentSave } from "@/features/hoja-de-ruta/model/useHojaDocumentSave";
+import { toHojaStatus } from "@/features/hoja-de-ruta/api/hojaDocumentApi";
 import { useHojaDocumentPersistence } from "@/features/hoja-de-ruta/api/useHojaDocumentPersistence";
 import { useHojaDocumentState } from "@/features/hoja-de-ruta/model/useHojaDocumentState";
 import { useHojaValidation } from "@/features/hoja-de-ruta/model/useHojaValidation";
@@ -86,6 +85,7 @@ export const useHojaDocument = (
     saveAll,
     isSaving,
     setStatus,
+    reopen,
     isChangingStatus,
     forceRefetch,
   } = useHojaDocumentPersistence(selectedJobId);
@@ -164,6 +164,9 @@ export const useHojaDocument = (
 
   const validation = useHojaValidation(eventData, travelArrangements, accommodations);
 
+  const documentStatus = toHojaStatus(hojaDeRuta?.status);
+  const isFinal = documentStatus === "final";
+
   const { handleSaveAll } = useHojaDocumentSave({
     selectedJobId,
     eventData,
@@ -179,15 +182,8 @@ export const useHojaDocument = (
     onSavedVersion: setDocumentVersion,
     onConflict: () => setHasExternalConflict(true),
     validateBeforeSave: validation.validateDocument,
+    isApproved: documentStatus === "approved",
   });
-
-  const documentStatus =
-    hojaDeRuta?.status === "review"
-    || hojaDeRuta?.status === "approved"
-    || hojaDeRuta?.status === "final"
-      ? hojaDeRuta.status
-      : "draft";
-  const isFinal = documentStatus === "final";
 
   const handleStatusTransition = useCallback(async (
     nextStatus: "review" | "approved" | "final",
@@ -269,6 +265,42 @@ export const useHojaDocument = (
     validation,
   ]);
 
+  const handleReopen = useCallback(async (reason: string) => {
+    if (!selectedJobId) return false;
+    if (hasExternalConflict) {
+      toast({
+        title: "Conflicto de edición",
+        description: "Recarga la versión más reciente antes de reabrir la Hoja de Ruta.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      const updated = await reopen({
+        reason,
+        expectedVersion: documentVersionRef.current,
+      });
+      setDocumentVersion(updated.document_version);
+      setHasExternalConflict(false);
+      toast({
+        title: "Hoja de Ruta reabierta",
+        description: "Vuelve a estar en borrador. El cambio queda registrado con su motivo.",
+      });
+      return true;
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "40001") {
+        setHasExternalConflict(true);
+      }
+      toast({
+        title: "No se pudo reabrir",
+        description: getErrorMessage(error, "Inténtalo de nuevo."),
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [hasExternalConflict, reopen, selectedJobId, toast]);
+
   useEffect(() => {
     if (!fetchError) return;
     toast({
@@ -337,31 +369,6 @@ export const useHojaDocument = (
     toast,
   ]);
 
-  useEffect(() => {
-    if (!selectedJobId || !isInitialized) return;
-
-    void checkStaffingDiff();
-    const channel = supabase
-      .channel(`hoja-staffing:${selectedJobId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "job_assignments",
-          filter: `job_id=eq.${selectedJobId}`,
-        },
-        () => {
-          void checkStaffingDiff();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [checkStaffingDiff, isInitialized, selectedJobId]);
-
   const checkPowerDrift = useCallback(async () => {
     if (!selectedJobId || !isInitialized) return;
     const current = await fetchPowerRequirements(selectedJobId);
@@ -399,31 +406,6 @@ export const useHojaDocument = (
   }, [fetchPowerRequirements, selectedJobId, setEventData]);
 
   useEffect(() => {
-    if (!selectedJobId || !isInitialized) return;
-
-    void checkPowerDrift();
-    const channel = supabase
-      .channel(`hoja-power:${selectedJobId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "power_requirement_tables",
-          filter: `job_id=eq.${selectedJobId}`,
-        },
-        () => {
-          void checkPowerDrift();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [checkPowerDrift, isInitialized, selectedJobId]);
-
-  useEffect(() => {
     if (!isDirty) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -433,279 +415,39 @@ export const useHojaDocument = (
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty]);
 
-  // Detect a newer document version saved by another editor. The RPC remains
-  // the final authority and rejects stale writes with SQLSTATE 40001.
-  useEffect(() => {
-    if (!selectedJobId || !isInitialized) return;
-
-    const channel = supabase
-      .channel(`hoja-editor:${selectedJobId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "hoja_de_ruta",
-          filter: `job_id=eq.${selectedJobId}`,
-        },
-        (payload) => {
-          const nextVersion = Number((payload.new as { document_version?: unknown }).document_version || 0);
-          if (
-            !isSavingRef.current
-            && !isChangingStatusRef.current
-            && nextVersion > documentVersionRef.current
-          ) {
-            setHasExternalConflict(true);
-            toast({
-              title: "Cambios externos",
-              description: "Otra persona ha guardado una versión más reciente de esta Hoja de Ruta.",
-              variant: "destructive",
-            });
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [isInitialized, selectedJobId, toast]);
-
-  const handleContactChange = useCallback((index: number, field: string, value: string) => {
-    setEventData((prev) => ({
-      ...prev,
-      contacts: (prev.contacts || []).map((contact, i) =>
-        i === index ? { ...contact, [field]: value } : contact
-      ),
-    }));
-  }, [setEventData]);
-
-  const addContact = useCallback(() => {
-    setEventData((prev) => ({
-      ...prev,
-      contacts: [
-        ...(prev.contacts || []),
-        { id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" },
-      ],
-    }));
-  }, [setEventData]);
-
-  const removeContact = useCallback((index: number) => {
-    setEventData((prev) => {
-      const next = (prev.contacts || []).filter((_, i) => i !== index);
-      return {
-        ...prev,
-        contacts: next.length
-          ? next
-          : [{ id: crypto.randomUUID(), name: "", role: "", phone: "", email: "" }],
-      };
+  // Detect a newer document version written by another editor, Tour Ops or a
+  // crew change. The RPC remains the final authority and rejects stale writes
+  // with SQLSTATE 40001.
+  const handleRemoteVersion = useCallback((nextVersion: number) => {
+    if (
+      isSavingRef.current
+      || isChangingStatusRef.current
+      || nextVersion <= documentVersionRef.current
+    ) {
+      return;
+    }
+    setHasExternalConflict(true);
+    toast({
+      title: "Cambios externos",
+      description: "Otra persona ha guardado una versión más reciente de esta Hoja de Ruta.",
+      variant: "destructive",
     });
-  }, [setEventData]);
+  }, [toast]);
 
-  const handleStaffChange = useCallback((index: number, field: string, value: string) => {
-    setEventData((prev) => ({
-      ...prev,
-      staff: (prev.staff || []).map((staff, i) =>
-        i === index ? { ...staff, [field]: value } : staff
-      ),
-    }));
-  }, [setEventData]);
+  useHojaDocumentRealtime({
+    jobId: selectedJobId,
+    enabled: isInitialized,
+    onStaffingChange: () => { void checkStaffingDiff(); },
+    onPowerChange: () => { void checkPowerDrift(); },
+    onRemoteVersion: handleRemoteVersion,
+  });
 
-  const addStaffMember = useCallback(() => {
-    setEventData((prev) => ({
-      ...prev,
-      staff: [
-        ...(prev.staff || []),
-        {
-          id: crypto.randomUUID(),
-          name: "",
-          surname1: "",
-          surname2: "",
-          position: "",
-          dni: "",
-        },
-      ],
-    }));
-  }, [setEventData]);
-
-  const removeStaffMember = useCallback((index: number) => {
-    const removedEntry = eventData.staff?.[index];
-    setEventData((prev) => {
-      const next = (prev.staff || []).filter((_, i) => i !== index);
-      return {
-        ...prev,
-        staff: next.length
-          ? next
-          : [{
-              id: crypto.randomUUID(),
-              name: "",
-              surname1: "",
-              surname2: "",
-              position: "",
-              dni: "",
-            }],
-      };
-    });
-    setAccommodations((prev) => adjustAccommodationsForStaffRemoval(prev, index, removedEntry));
-  }, [eventData.staff, setAccommodations, setEventData]);
-
-  const updateTravelArrangement = useCallback((
-    index: number,
-    field: string,
-    value: string | undefined,
-  ) => {
-    setTravelArrangements((prev) =>
-      prev.map((arrangement, i) =>
-        i === index ? { ...arrangement, [field]: value } : arrangement
-      )
-    );
-  }, [setTravelArrangements]);
-
-  const addTravelArrangement = useCallback(() => {
-    setTravelArrangements((prev) => [...prev, {
-      id: crypto.randomUUID(),
-      transportation_type: "van",
-      pickup_address: "",
-      pickup_time: "",
-      departure_time: "",
-      arrival_time: "",
-      flight_train_number: "",
-      driver_name: "",
-      driver_phone: "",
-      plate_number: "",
-      notes: "",
-    }]);
-  }, [setTravelArrangements]);
-
-  const removeTravelArrangement = useCallback((index: number) => {
-    setTravelArrangements((prev) => prev.filter((_, i) => i !== index));
-  }, [setTravelArrangements]);
-
-  const updateAccommodation = useCallback((index: number, field: string, value: unknown) => {
-    setAccommodations((prev) =>
-      prev.map((accommodation, i) =>
-        i === index ? { ...accommodation, [field]: value } : accommodation
-      )
-    );
-  }, [setAccommodations]);
-
-  const addAccommodation = useCallback(() => {
-    setAccommodations((prev) => [...prev, {
-      id: crypto.randomUUID(),
-      hotel_name: "",
-      address: "",
-      check_in: "",
-      check_out: "",
-      rooms: [],
-    }]);
-  }, [setAccommodations]);
-
-  const removeAccommodation = useCallback((index: number) => {
-    setAccommodations((prev) => prev.filter((_, i) => i !== index));
-  }, [setAccommodations]);
-
-  const updateRoom = useCallback((
-    accommodationIndex: number,
-    roomIndex: number,
-    field: string,
-    value: string,
-  ) => {
-    setAccommodations((prev) =>
-      prev.map((accommodation, i) =>
-        i === accommodationIndex
-          ? {
-              ...accommodation,
-              rooms: accommodation.rooms.map((room, j) =>
-                j === roomIndex ? { ...room, [field]: value } : room
-              ),
-            }
-          : accommodation
-      )
-    );
-  }, [setAccommodations]);
-
-  const addRoom = useCallback((accommodationIndex: number) => {
-    setAccommodations((prev) =>
-      prev.map((accommodation, i) =>
-        i === accommodationIndex
-          ? {
-              ...accommodation,
-              rooms: [...accommodation.rooms, {
-                id: crypto.randomUUID(),
-                room_type: "single",
-                room_number: "",
-                staff_member1_id: "",
-                staff_member2_id: "",
-              }],
-            }
-          : accommodation
-      )
-    );
-  }, [setAccommodations]);
-
-  const removeRoom = useCallback((accommodationIndex: number, roomIndex: number) => {
-    setAccommodations((prev) =>
-      prev.map((accommodation, i) =>
-        i === accommodationIndex
-          ? { ...accommodation, rooms: accommodation.rooms.filter((_, j) => j !== roomIndex) }
-          : accommodation
-      )
-    );
-  }, [setAccommodations]);
-
-  const updateTransport = useCallback((index: number, field: string, value: unknown) => {
-    setEventData((prev) => ({
-      ...prev,
-      logistics: {
-        ...prev.logistics,
-        transport: prev.logistics.transport.map((transport, i) =>
-          i === index ? { ...transport, [field]: value } : transport
-        ),
-      },
-    }));
-  }, [setEventData]);
-
-  const addTransport = useCallback(() => {
-    setEventData((prev) => ({
-      ...prev,
-      logistics: {
-        ...prev.logistics,
-        transport: [...prev.logistics.transport, {
-          id: crypto.randomUUID(),
-          transport_type: "trailer",
-          driver_name: "",
-          driver_phone: "",
-          license_plate: "",
-          has_return: false,
-          is_hoja_relevant: true,
-          logistics_categories: [],
-        }],
-      },
-    }));
-  }, [setEventData]);
-
-  const removeTransport = useCallback((index: number) => {
-    setEventData((prev) => ({
-      ...prev,
-      logistics: {
-        ...prev.logistics,
-        transport: prev.logistics.transport.filter((_, i) => i !== index),
-      },
-    }));
-  }, [setEventData]);
-
-  const importTransports = useCallback((transports: Transport[]) => {
-    setEventData((prev) => ({
-      ...prev,
-      logistics: {
-        ...prev.logistics,
-        transport: syncTransportsWithLogistics(
-          Array.isArray(prev.logistics.transport) ? prev.logistics.transport : [],
-          transports,
-        ),
-      },
-    }));
-  }, [setEventData]);
+  const editors = useHojaCollectionEditors({
+    staff: eventData.staff,
+    setEventData,
+    setTravelArrangements,
+    setAccommodations,
+  });
 
   const reloadLatest = useCallback(async () => {
     savedSnapshotRef.current = null;
@@ -754,31 +496,14 @@ export const useHojaDocument = (
     documentStatus,
     isFinal,
     handleStatusTransition,
+    handleReopen,
     staffingDiff,
     applyStaffingChanges,
     hasPowerDrift,
     applyPowerRequirementsChanges,
     documentVersion,
     validation,
-    handleContactChange,
-    addContact,
-    removeContact,
-    handleStaffChange,
-    addStaffMember,
-    removeStaffMember,
-    updateTravelArrangement,
-    addTravelArrangement,
-    removeTravelArrangement,
-    updateAccommodation,
-    addAccommodation,
-    removeAccommodation,
-    updateRoom,
-    addRoom,
-    removeRoom,
-    updateTransport,
-    addTransport,
-    removeTransport,
-    importTransports,
+    ...editors,
     fetchError,
     lastSaveTime,
   };

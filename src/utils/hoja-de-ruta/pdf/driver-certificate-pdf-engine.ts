@@ -470,7 +470,7 @@ export class DriverCertificatePDFEngine {
 
       if (error) throw error;
 
-      const jobData = data as unknown as DeliveryCertificateJobRow | null;
+      const jobData: DeliveryCertificateJobRow | null = data;
       const rawLocation = jobData?.location;
       const location = Array.isArray(rawLocation) ? rawLocation[0] : rawLocation;
       const jobLocation = (location?.formatted_address || location?.name || null) as string | null;

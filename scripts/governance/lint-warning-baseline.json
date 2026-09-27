@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-09-05T20:33:33.201Z",
+  "generatedAt": "2026-09-27T14:44:24.185Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1122,
+  "total": 1038,
   "domains": {
     "app": {
-      "total": 804,
+      "total": 734,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
-        "@typescript-eslint/no-explicit-any": 665,
-        "react-hooks/exhaustive-deps": 74,
+        "@typescript-eslint/no-explicit-any": 602,
+        "react-hooks/exhaustive-deps": 68,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
         "@typescript-eslint/no-empty-object-type": 4,
-        "no-control-regex": 5,
+        "no-control-regex": 4,
         "no-useless-escape": 4,
         "no-case-declarations": 1,
         "@typescript-eslint/no-unsafe-function-type": 3,
@@ -20,9 +20,9 @@
       }
     },
     "functions": {
-      "total": 318,
+      "total": 304,
       "rules": {
-        "@typescript-eslint/no-explicit-any": 283,
+        "@typescript-eslint/no-explicit-any": 269,
         "no-empty": 13,
         "no-control-regex": 2,
         "no-useless-escape": 18,
@@ -34,16 +34,16 @@
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 948,
+    "@typescript-eslint/no-explicit-any": 871,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
     "no-case-declarations": 1,
-    "no-control-regex": 7,
+    "no-control-regex": 6,
     "no-empty": 13,
     "no-useless-escape": 22,
     "prefer-const": 1,
-    "react-hooks/exhaustive-deps": 74,
+    "react-hooks/exhaustive-deps": 68,
     "react-refresh/only-export-components": 43
   },
   "files": {
@@ -126,24 +126,6 @@
     "src/components/flex/FlexFolderPicker.tsx": {
       "react-refresh/only-export-components": 1
     },
-    "src/components/hoja-de-ruta/sections/ModernEventSection.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/hoja-de-ruta/sections/ModernLogisticsSection.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/hoja-de-ruta/sections/ModernStaffSection.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/components/hoja-de-ruta/sections/ModernTransportSection.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/components/hoja-de-ruta/sections/ModernVenueSection.tsx": {
-      "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/hoja-de-ruta/sections/ModernWeatherSection.tsx": {
-      "react-hooks/exhaustive-deps": 1
-    },
     "src/components/jobs/__tests__/JobDetailsDialog.timesheet-pdf.test.ts": {
       "@typescript-eslint/no-explicit-any": 8
     },
@@ -220,14 +202,8 @@
     "src/components/layout/SidebarNavigation.tsx": {
       "react-refresh/only-export-components": 1
     },
-    "src/components/logistics/LogisticsEventCard.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/components/logistics/LogisticsEventDialog.tsx": {
       "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/logistics/TransportRequestDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
     },
     "src/components/maps/GoogleMap.tsx": {
       "@typescript-eslint/no-explicit-any": 4
@@ -506,13 +482,6 @@
     "src/hooks/__tests__/useOptimizedMatrixData.test.ts": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/hooks/hoja-de-ruta/useHojaDeRutaInitialization.ts": {
-      "@typescript-eslint/no-explicit-any": 8,
-      "react-hooks/exhaustive-deps": 2
-    },
-    "src/hooks/tours/useTourCreationMutation.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/hooks/use-mobile.tsx": {
       "react-refresh/only-export-components": 3
     },
@@ -526,12 +495,6 @@
       "react-hooks/exhaustive-deps": 4
     },
     "src/hooks/useGlobalTasks.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/hooks/useHojaDeRutaForm.ts": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/hooks/useHojaDeRutaPersistence.ts": {
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/hooks/useJobActions.ts": {
@@ -573,9 +536,6 @@
     },
     "src/hooks/usePushDebug.ts": {
       "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/hooks/usePushNotifications.ts": {
-      "react-hooks/exhaustive-deps": 1
     },
     "src/hooks/usePushNotificationSchedule.ts": {
       "@typescript-eslint/no-explicit-any": 2
@@ -719,10 +679,6 @@
     "src/pages/RatesCenterPage.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
-    "src/pages/Settings.tsx": {
-      "@typescript-eslint/no-explicit-any": 1,
-      "react-hooks/exhaustive-deps": 1
-    },
     "src/pages/StagePlot.tsx": {
       "react-hooks/exhaustive-deps": 1
     },
@@ -800,14 +756,8 @@
     "src/utils/fileName.ts": {
       "no-control-regex": 1
     },
-    "src/utils/flex-folders/__tests__/folders.dryhire-document-number.test.ts": {
-      "@typescript-eslint/no-explicit-any": 6
-    },
     "src/utils/flex-folders/__tests__/folders.selection.test.ts": {
       "@typescript-eslint/no-explicit-any": 7
-    },
-    "src/utils/flex-folders/__tests__/folders.tourdate-location.test.ts": {
-      "@typescript-eslint/no-explicit-any": 10
     },
     "src/utils/flex-folders/__tests__/openFlexElement.test.ts": {
       "@typescript-eslint/no-explicit-any": 6
@@ -827,32 +777,8 @@
     "src/utils/gearSetupPdfExport.ts": {
       "@typescript-eslint/no-explicit-any": 5
     },
-    "src/utils/hoja-de-ruta/pdf-upload.ts": {
-      "no-control-regex": 1
-    },
-    "src/utils/hoja-de-ruta/pdf/core/pdf-document.ts": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/utils/hoja-de-ruta/pdf/sections/content-sections.ts": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/utils/hoja-de-ruta/pdf/sections/program.ts": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/utils/hoja-de-ruta/pdf/utils/formatters.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/utils/hoja-de-ruta/pdf/utils/validators.ts": {
-      "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/utils/hoja-de-ruta/services/places-restaurant-service.ts": {
-      "@typescript-eslint/no-explicit-any": 5
-    },
     "src/utils/memoriaTecnicaDocuments.ts": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/utils/tourFolders.ts": {
-      "@typescript-eslint/no-explicit-any": 3
     },
     "src/utils/wiredMicrophoneNeedsPdfExport.ts": {
       "@typescript-eslint/no-explicit-any": 5
@@ -872,13 +798,10 @@
       "no-empty": 2
     },
     "supabase/functions/background-job-deletion/index.ts": {
-      "@typescript-eslint/no-explicit-any": 24
-    },
-    "supabase/functions/create-flex-folders/index.ts": {
-      "@typescript-eslint/no-explicit-any": 8
+      "@typescript-eslint/no-explicit-any": 20
     },
     "supabase/functions/create-whatsapp-group/index.ts": {
-      "@typescript-eslint/no-explicit-any": 12
+      "@typescript-eslint/no-explicit-any": 10
     },
     "supabase/functions/create-whatsapp-group/recipientUtils.ts": {
       "@typescript-eslint/no-explicit-any": 1

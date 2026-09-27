@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
+import { autoTable, type UserOptions } from 'jspdf-autotable';
 import { reportGeometry } from '@/utils/pdf/report-system';
 import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
@@ -69,14 +69,15 @@ export class PDFDocument {
     this.doc.setTextColor(color[0], color[1], color[2]);
   }
 
-  addText(text: string, x: number, y: number, options?: any): void {
+  addText(text: string, x: number, y: number, options?: PdfTextOptions): void {
     this.doc.text(text, x, y, options);
   }
 
   // Split a long text into multiple lines that fit within maxWidth
   splitText(text: string, maxWidth: number): string[] {
     try {
-      return this.doc.splitTextToSize(text, maxWidth) as unknown as string[];
+      const lines: unknown = this.doc.splitTextToSize(text, maxWidth);
+      return Array.isArray(lines) ? lines.map((line) => String(line)) : [text];
     } catch {
       return [text];
     }
@@ -124,8 +125,10 @@ export class PDFDocument {
     return yPosition;
   }
 
-  addTable(options: any): void {
-    const currentMargin = options?.margin ?? {};
+  addTable(options: UserOptions): void {
+    const currentMargin = typeof options.margin === 'object' && !Array.isArray(options.margin)
+      ? options.margin
+      : {};
     autoTable(this.doc, {
       ...options,
       margin: {
@@ -133,10 +136,10 @@ export class PDFDocument {
         right: 20,
         top: 20,
         ...currentMargin,
-        bottom: Math.max(currentMargin?.bottom ?? 0, this.footerSpace),
+        bottom: Math.max(currentMargin.bottom ?? 0, this.footerSpace),
       },
-      pageBreak: options?.pageBreak ?? 'auto',
-      rowPageBreak: options?.rowPageBreak ?? 'auto',
+      pageBreak: options.pageBreak ?? 'auto',
+      rowPageBreak: options.rowPageBreak ?? 'auto',
     });
   }
 
@@ -152,12 +155,8 @@ export class PDFDocument {
     this.doc.save(filename);
   }
 
-  output(type: 'dataurl' | 'datauri'): any {
-    return this.doc.output(type);
-  }
-
   outputBlob(): Blob {
-    return this.doc.output('blob') as Blob;
+    return this.doc.output('blob');
   }
 
   getLastAutoTableY(): number {

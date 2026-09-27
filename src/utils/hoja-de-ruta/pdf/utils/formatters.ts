@@ -1,6 +1,37 @@
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
+type IdFields = {
+  id?: string | number | null;
+  user_id?: string | number | null;
+  technician_id?: string | number | null;
+  staff_id?: string | number | null;
+};
+
+/** Any staff-like row the Hoja PDFs resolve room occupants against. */
+export type StaffNameSource = IdFields & {
+  name?: string | null;
+  surname1?: string | null;
+  surname2?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  profiles?: { first_name?: string | null; last_name?: string | null } | null;
+};
+
+const staffNameOf = (staff: StaffNameSource | undefined): string => {
+  if (!staff) return '';
+  if (staff.profiles) {
+    return `${staff.profiles.first_name || ''} ${staff.profiles.last_name || ''}`.trim();
+  }
+  if (staff.name || staff.surname1) {
+    return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
+  }
+  if (staff.first_name || staff.last_name) {
+    return `${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+  }
+  return '';
+};
+
 export class Formatters {
   static formatCurrency(amount: number, currency: string = 'EUR'): string {
     return new Intl.NumberFormat('es-ES', {
@@ -92,58 +123,31 @@ export class Formatters {
     }
   }
 
-  static getStaffName(staffId: string, staffData?: any[]): string {
+  static getStaffName(staffId: string, staffData?: StaffNameSource[]): string {
     if (!staffId || !staffData) return 'Por asignar';
-    
-    // Check if staffId is a numeric string (array index)
+
+    // Legacy rooms may store the staff array index instead of an ID.
     const numericIndex = parseInt(staffId);
     if (!isNaN(numericIndex) && numericIndex >= 0 && numericIndex < staffData.length) {
-      const staff = staffData[numericIndex];
-      if (staff) {
-        if (staff.profiles) {
-          return `${staff.profiles.first_name || ''} ${staff.profiles.last_name || ''}`.trim();
-        }
-        if (staff.name || staff.surname1) {
-          return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
-        }
-        if (staff.first_name || staff.last_name) {
-          return `${staff.first_name || ''} ${staff.last_name || ''}`.trim();
-        }
-      }
+      const indexed = staffNameOf(staffData[numericIndex]);
+      if (indexed) return indexed;
     }
-    
-    // Try to find by exact ID match
-    let staff = staffData.find(s => s.id === staffId || s.id?.toString() === staffId);
-    
-    // If not found, try different ID fields
-    if (!staff) {
-      staff = staffData.find(s => 
-        s.user_id === staffId || 
-        s.technician_id === staffId ||
-        s.staff_id === staffId ||
-        s.user_id?.toString() === staffId ||
-        s.technician_id?.toString() === staffId ||
-        s.staff_id?.toString() === staffId
+
+    const matches = (value: StaffNameSource[keyof IdFields]) =>
+      value !== null && value !== undefined && String(value) === staffId;
+    const staff = staffData.find((entry) => matches(entry.id))
+      ?? staffData.find((entry) =>
+        matches(entry.user_id) || matches(entry.technician_id) || matches(entry.staff_id)
       );
-    }
-    
-    if (staff) {
-      if (staff.profiles) {
-        return `${staff.profiles.first_name || ''} ${staff.profiles.last_name || ''}`.trim();
-      }
-      if (staff.name || staff.surname1) {
-        return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
-      }
-      if (staff.first_name || staff.last_name) {
-        return `${staff.first_name || ''} ${staff.last_name || ''}`.trim();
-      }
-    }
-    
+
+    const found = staffNameOf(staff);
+    if (found) return found;
+
     // If staffId looks like a name, return it as is
-    if (typeof staffId === 'string' && /[a-zA-Z]/.test(staffId)) {
+    if (/[a-zA-Z]/.test(staffId)) {
       return staffId;
     }
-    
+
     return 'Por asignar';
   }
 }

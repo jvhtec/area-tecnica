@@ -16,6 +16,11 @@ import type {
   WeatherData,
 } from "@/types/hoja-de-ruta";
 import { normalizeHojaDeRutaPrintSections } from "@/utils/hoja-de-ruta/pdf/section-options";
+import {
+  parseProgramDays,
+  parseRestaurants,
+  parseWeatherData,
+} from "@/features/hoja-de-ruta/mappers/hojaJsonParsers";
 
 const MADRID_TIMEZONE = "Europe/Madrid";
 const PARTIAL_ISO_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
@@ -82,9 +87,7 @@ const parseRestaurantInfo = (value: unknown): {
 } => {
   if (!isRecord(value)) return {};
   return {
-    restaurants: Array.isArray(value.restaurants)
-      ? value.restaurants as unknown as Restaurant[]
-      : undefined,
+    restaurants: parseRestaurants(value.restaurants),
     selectedRestaurants: Array.isArray(value.selectedRestaurants)
       ? value.selectedRestaurants.filter((item): item is string => typeof item === "string")
       : undefined,
@@ -161,9 +164,7 @@ export function mapHojaAggregateToDocument(
       technician_id: typeof staff.technician_id === "string" ? staff.technician_id : undefined,
     })),
     schedule: String(main.schedule || ""),
-    programScheduleDays: Array.isArray(main.program_schedule_json)
-      ? main.program_schedule_json as unknown as EventData["programScheduleDays"]
-      : undefined,
+    programScheduleDays: parseProgramDays(main.program_schedule_json),
     powerRequirements: String(main.power_requirements || ""),
     powerRequirementsSourceUpdatedAt:
       typeof main.power_requirements_source_updated_at === "string"
@@ -173,9 +174,7 @@ export function mapHojaAggregateToDocument(
     auxiliaryStaffSetupQty: toSafeNonNegativeInt(main.aux_staff_setup_qty),
     auxiliaryStaffDismantleQty: toSafeNonNegativeInt(main.aux_staff_dismantle_qty),
     auxiliaryMachinery: normalizeAuxiliaryMachinery(main.aux_machinery_requirements),
-    weather: Array.isArray(main.weather_data)
-      ? main.weather_data as unknown as WeatherData[]
-      : undefined,
+    weather: parseWeatherData(main.weather_data),
     weatherFetchedAt:
       typeof main.weather_fetched_at === "string" ? main.weather_fetched_at : undefined,
     restaurants: restaurants.restaurants,

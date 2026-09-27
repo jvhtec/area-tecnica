@@ -21,16 +21,16 @@ export class ProgramSection {
     let renderedStructured = false;
 
     // If multi-day structured program exists
-    const anyEvent = eventData as any;
-    if (includeStructured && Array.isArray(anyEvent.programScheduleDays) && anyEvent.programScheduleDays.some((d: any) => d?.rows?.length > 0)) {
-      for (const [idx, day] of anyEvent.programScheduleDays.entries()) {
+    const programDays = eventData.programScheduleDays ?? [];
+    if (includeStructured && programDays.some((day) => day?.rows?.length > 0)) {
+      for (const [idx, day] of programDays.entries()) {
         const title = `${day?.label || `Día ${idx + 1}`}${day?.date ? ` (${day.date})` : ''}`;
         this.pdfDoc.setText(12, HOJA_HEADING);
         this.pdfDoc.addText(title, HOJA_LEFT, yPosition);
         yPosition += 10;
 
         if (Array.isArray(day.rows) && day.rows.length > 0) {
-          const body = day.rows.map((r: any) => [
+          const body = day.rows.map((r) => [
             r.time || '',
             r.item || '',
             r.dept || '',

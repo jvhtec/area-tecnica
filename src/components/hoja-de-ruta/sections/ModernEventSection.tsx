@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { Plus, Sparkles, Trash2, Zap, Building2 } from "lucide-react";
 import type { AuxiliaryMachineryType, EventData } from "@/types/hoja-de-ruta";
-import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { PlaceAutocomplete, type PlaceAutocompleteResult } from "@/components/maps/PlaceAutocomplete";
 import { AUXILIARY_MACHINERY_OPTIONS } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
 import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
@@ -44,7 +44,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   onPrintSectionExcludedChange,
   validationErrorFor = () => undefined,
 }) => {
-  const handleVenueSelect = (place: any) => {
+  const handleVenueSelect = (place: PlaceAutocompleteResult) => {
     setEventData(prev => ({
       ...prev,
       venue: {

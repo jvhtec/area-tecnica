@@ -1,5 +1,11 @@
 # Hoja de Ruta — Post-Roadmap Audit (2026-09-27)
 
+> **Status: resolved in code.** Every finding below is fixed by
+> `supabase/migrations/20260927150000_hoja_de_ruta_integrity.sql` and the
+> accompanying client/edge changes; see [Resolution](#resolution). Two items
+> need a human in production after merge: applying the migration and running
+> the `data:` image migration script.
+
 Re-audit of the Hoja de Ruta module after the roadmap closed with PRs #955, #957 and #958
 (`docs/release/hoja-de-ruta-roadmap-completion.md`). Each claim in that completion report was
 re-verified against the code at `main@5eaf466` and, read-only, against the production database.
@@ -229,3 +235,26 @@ QLT-02 strict ratchet was meant to stop.
   `20260926103000` and `20260926144902`.
 - Production checks were read-only `SELECT` queries and the security and performance advisors.
   No data or schema was changed.
+
+## Resolution
+
+| Finding | Fix | Evidence |
+|---|---|---|
+| H1 | Parent and child guard triggers: the `final` lock applies to every top-level writer except the service role, and non-RPC writes bump `document_version` once per statement. Workflow columns can only change through the RPCs. `remove_assignment_with_timesheets` skips final Hojas and matches by `technician_id` only; the backfill links 160 legacy staff rows whose name matches exactly one assigned technician. | `hoja_de_ruta_integrity.sql` pgTAP (stale-editor conflict, Tour Ops multi-row bump, direct status/version update rejected, final lock on insert/update/delete, crew removal keeps namesakes and final lists) |
+| H2 | `hoja_de_ruta` and `power_requirement_tables` added to `supabase_realtime`; the listeners moved to `useHojaDocumentRealtime` on the unified subscription manager. | publication assertion in pgTAP |
+| H3 | Staff `technician_id`/`department` backfill in the migration (about 1,538 of 1,950 production rows get a department; the rest are manually typed names). The `data:` image migration stays an operator step (`npm run hoja:migrate-images`, see the completion report); the editor also re-uploads a `data:` image whenever that Hoja is saved. | migration backfill block |
+| M1 | Legacy `blob:` rows are counted in the venue section with a "Quitarlas al guardar" action that sends their IDs as explicit removals. | `useHojaDeRutaImages.unavailableImageCount` |
+| M2 | Saving approved content sends it back to `review` (logged as `edited_after_approval`). Approval needs a second person (`review_requested_by`, admins exempt). `reopen_hoja_de_ruta` offers an admin/management reopen with a required, logged reason; the UI is `HojaStatusControls`, now also on mobile. | pgTAP four-eyes, review reset and reopen tests |
+| M3 | `background-job-deletion` resolves each path's bucket (`job-documents`, `job_documents`, `festival_artist_files`, `festival-logos`), removes the `hojas-de-ruta/<jobId>/` tree, and deletes only the Hoja parent (children cascade). | `_shared/jobDocumentStorage.ts` |
+| M4 | `purge_expired_hoja_dni()` clears DNI copies 30 days after the job ends, scheduled daily by pg_cron. | pgTAP retention tests |
+| M5 | `replace_hoja_de_ruta_all` and its three helpers are dropped; clients can no longer execute the three-argument save. | `hasnt_function` / privilege assertions |
+| M6 | Status, publish and save wrappers, and `get_hoja_de_ruta`, authorize before locking or revealing anything. | pgTAP "authorizes before revealing" tests |
+| L1 | The typed Supabase client is used at the Hoja API boundary with runtime guards (`isHojaAggregate`, `toHojaStatus`, `hojaJsonParsers`) and `toJsonValue`. The Hoja module has no `as unknown as` casts left. `logistics_events` generated types gained the six columns they were missing. | `hojaJsonParsers.test.ts`, `json.test.ts` |
+| L2 | `saveInProgress` removed. Orphan uploads are cleaned on unmount. The publish upload is hidden until the RPC makes it crew-visible. `hasStaffData` ignores DNI-only rows. `get_hoja_de_ruta` reads the signed JWT role. The crew projection and Programa pushes require approved/final/published. Dry-hire jobs cannot get a Hoja (the one existing row is left untouched). There are 0 lint warnings on Hoja paths, and `useHojaDocument.ts` is down from 785 to about 510 lines. | lint baseline, unit tests |
+| Extra | Department grouping and exports mixed English enum keys (`sound`) with Spanish canonical keys, so ordering never matched and raw English labels were shown. Both now normalize to one key with a Spanish label. PDF tables no longer pass `undefined` cells. | `groupStaffByDepartment.test.ts` |
+
+### Behaviour changes to announce
+
+- Editing an approved Hoja returns it to review, and a different manager must approve it again.
+- Assigned technicians no longer see draft or in-review Hojas that were never published, and Programa push reminders are no longer sent for them.
+- DNI in Hoja staff rows is cleared 30 days after the job ends. Export accreditation lists before that.

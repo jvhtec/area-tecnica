@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type {
   HojaDeRutaImageRecord,
@@ -36,6 +36,10 @@ export const useHojaDeRutaImages = () => {
   const [removedStoragePaths, setRemovedStoragePaths] = useState<string[]>([]);
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [savedFingerprint, setSavedFingerprint] = useState("[]");
+  // Legacy rows whose `blob:` URL only ever existed in the browser that created
+  // it. They cannot be previewed or exported; the editor can only drop them.
+  const [unavailableImageIds, setUnavailableImageIds] = useState<string[]>([]);
+  const [savedUnavailableKey, setSavedUnavailableKey] = useState("");
   const hydratedKeyRef = useRef<string | null>(null);
   const preparedFingerprintRef = useRef<string | null>(null);
   const pendingUploadPathsRef = useRef(new Set<string>());
@@ -187,6 +191,10 @@ export const useHojaDeRutaImages = () => {
       }
     }
 
+    const unavailable = (rows || [])
+      .filter((row) => row.id && row.image_path?.startsWith("blob:"))
+      .map((row) => String(row.id));
+
     const hydrated = await Promise.all((rows || []).map(async (row): Promise<ManagedImage | null> => {
       if (!row.image_path || row.image_path.startsWith("blob:")) return null;
 
@@ -232,6 +240,8 @@ export const useHojaDeRutaImages = () => {
     });
     setRemovedStoragePaths(failedPendingCleanup);
     setRemovedImageIds([]);
+    setUnavailableImageIds(unavailable);
+    setSavedUnavailableKey(unavailable.join("|"));
     const clean = hydrated.filter((item): item is ManagedImage => Boolean(item));
     setSavedFingerprint(fingerprintFor(clean));
     hydratedKeyRef.current = signature;
@@ -281,6 +291,7 @@ export const useHojaDeRutaImages = () => {
     }
 
     setRemovedImageIds([]);
+    setSavedUnavailableKey(unavailableImageIds.join("|"));
 
     if (removedStoragePaths.length === 0) return;
     const paths = [...removedStoragePaths];
@@ -290,12 +301,30 @@ export const useHojaDeRutaImages = () => {
       // DB is already correct. Keep cleanup failure non-fatal and retry next edit session.
       setRemovedStoragePaths((current) => Array.from(new Set([...current, ...paths])));
     }
-  }, [removedStoragePaths]);
+  }, [removedStoragePaths, unavailableImageIds]);
+
+  const removeUnavailableImages = useCallback(() => {
+    setRemovedImageIds((ids) => Array.from(new Set([...ids, ...unavailableImageIds])));
+    setUnavailableImageIds([]);
+  }, [unavailableImageIds]);
+
+  // Uploads made for a save that never committed (failed save, then the editor
+  // closed) would otherwise stay in storage with no row pointing at them.
+  useEffect(() => {
+    const pendingPaths = pendingUploadPathsRef.current;
+    return () => {
+      if (pendingPaths.size === 0) return;
+      const paths = Array.from(pendingPaths);
+      pendingPaths.clear();
+      void supabase.storage.from(IMAGE_BUCKET).remove(paths);
+    };
+  }, []);
 
   const clearVenueMap = useCallback(() => replaceVenueMap(null), [replaceVenueMap]);
 
   const imageFingerprint = useMemo(() => fingerprintFor(managedImages), [fingerprintFor, managedImages]);
-  const isImageDirty = imageFingerprint !== savedFingerprint;
+  const isImageDirty = imageFingerprint !== savedFingerprint
+    || unavailableImageIds.join("|") !== savedUnavailableKey;
   const getRemovedImageIds = useCallback(() => [...removedImageIds], [removedImageIds]);
 
   return {
@@ -314,6 +343,8 @@ export const useHojaDeRutaImages = () => {
     prepareImagesForSave,
     commitImageSave,
     getRemovedImageIds,
+    unavailableImageCount: unavailableImageIds.length,
+    removeUnavailableImages,
     imageFingerprint,
     isImageDirty,
   };

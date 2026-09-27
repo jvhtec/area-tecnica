@@ -2,6 +2,37 @@ import { supabase } from '@/lib/supabase';
 import type { Restaurant } from '@/types/hoja-de-ruta';
 import { reportHojaError } from '@/features/hoja-de-ruta/lib/hojaLogger';
 
+const GENERIC_PLACE_TYPES = ['establishment', 'point_of_interest', 'food', 'restaurant'];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const text = (value: unknown): string | undefined =>
+  typeof value === 'string' && value ? value : undefined;
+
+const finite = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+const positive = (value: unknown): number | undefined => {
+  const number = finite(value);
+  return number ? number : undefined;
+};
+
+const stringList = (value: unknown): string[] | undefined =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : undefined;
+
+const latLng = (value: unknown): { lat: number; lng: number } | undefined => {
+  if (!isRecord(value)) return undefined;
+  const lat = finite(value.lat) ?? finite(value.latitude);
+  const lng = finite(value.lng) ?? finite(value.longitude);
+  return lat !== undefined && lng !== undefined ? { lat, lng } : undefined;
+};
+
+const coordinatesOf = (raw: Record<string, unknown>) =>
+  (isRecord(raw.geometry) ? latLng(raw.geometry.location) : undefined) ?? latLng(raw.location);
+
 /**
  * Service for fetching restaurant data using Google Places API
  */
@@ -38,27 +69,13 @@ export class PlacesRestaurantService {
             coordinates,
           },
         });
-        if (!error && data?.restaurants) {
-          const restaurants: Restaurant[] = (data.restaurants as any[]).map((r: any) => this.formatRestaurantData({
-            id: r.id || r.place_id,
-            name: r.name || r.displayName?.text,
-            displayName: r.displayName,
-            formattedAddress: r.formatted_address || r.formattedAddress,
-            rating: r.rating,
-            price_level: r.price_level,
-            priceLevel: r.priceLevel,
-            types: r.types,
-            formatted_phone_number: r.formatted_phone_number,
-            internationalPhoneNumber: r.internationalPhoneNumber,
-            website: r.website || r.websiteUri,
-            websiteUri: r.websiteUri,
-            geometry: r.geometry,
-            location: r.location || (r.geometry?.location ? { latitude: r.geometry.location.lat, longitude: r.geometry.location.lng } : undefined),
-            photos: r.photos,
-            distance: r.distance,
-          }));
+        const rows: unknown = data?.restaurants;
+        if (!error && Array.isArray(rows)) {
+          const restaurants = rows
+            .map((row) => this.formatRestaurantData(row))
+            .filter((restaurant): restaurant is Restaurant => restaurant !== null)
+            .sort((left, right) => (left.distance || 0) - (right.distance || 0));
 
-          restaurants.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
           this.restaurantCache.set(cacheKey, restaurants);
           return restaurants;
         } else if (error) {
@@ -124,25 +141,37 @@ export class PlacesRestaurantService {
   }
 
   /**
-   * Format raw Google Places API data to Restaurant interface
+   * Normalize a restaurant from the edge function, which may use either the
+   * legacy Places fields (place_id, formatted_address, geometry) or the Places
+   * API (New) fields (id, displayName, formattedAddress, location).
    */
-  private static formatRestaurantData(rawData: any): Restaurant {
+  private static formatRestaurantData(rawData: unknown): Restaurant | null {
+    if (!isRecord(rawData)) return null;
+    const id = text(rawData.place_id) ?? text(rawData.id);
+    if (!id) return null;
+
+    const displayName = isRecord(rawData.displayName) ? text(rawData.displayName.text) : undefined;
+    const types = Array.isArray(rawData.types)
+      ? rawData.types.filter((type): type is string => typeof type === 'string')
+      : undefined;
+    const cuisine = types
+      ? types.filter((type) => !GENERIC_PLACE_TYPES.includes(type))
+      : stringList(rawData.cuisine) ?? [];
+
     return {
-      id: rawData.place_id || rawData.id,
-      name: rawData.name || rawData.displayName?.text || '',
-      address: rawData.formatted_address || rawData.formattedAddress || '',
-      rating: rawData.rating || undefined,
-      priceLevel: rawData.price_level ?? rawData.priceLevel ?? undefined,
-      photos: rawData.photos || [],
-      cuisine: rawData.types?.filter((type: string) => 
-        !['establishment', 'point_of_interest', 'food', 'restaurant'].includes(type)
-      ) || rawData.cuisine || [],
-      phone: rawData.formatted_phone_number || rawData.internationalPhoneNumber || undefined,
-      website: rawData.website || rawData.websiteUri || undefined,
-      coordinates: rawData.geometry?.location || (rawData.location ? { lat: rawData.location.latitude, lng: rawData.location.longitude } : undefined) || rawData.location || undefined,
-      distance: rawData.distance || undefined,
-      googlePlaceId: rawData.place_id || rawData.id,
-      isSelected: false
+      id,
+      name: text(rawData.name) ?? displayName ?? '',
+      address: text(rawData.formatted_address) ?? text(rawData.formattedAddress) ?? '',
+      rating: positive(rawData.rating),
+      priceLevel: finite(rawData.price_level) ?? finite(rawData.priceLevel),
+      photos: stringList(rawData.photos) ?? [],
+      cuisine,
+      phone: text(rawData.formatted_phone_number) ?? text(rawData.internationalPhoneNumber),
+      website: text(rawData.website) ?? text(rawData.websiteUri),
+      coordinates: coordinatesOf(rawData),
+      distance: positive(rawData.distance),
+      googlePlaceId: id,
+      isSelected: false,
     };
   }
 

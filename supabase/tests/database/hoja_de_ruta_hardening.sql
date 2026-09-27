@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(48);
+SELECT plan(51);
 
 SELECT has_column(
   'public',
@@ -16,8 +16,8 @@ SELECT function_privs_are(
   'save_hoja_de_ruta',
   ARRAY['uuid', 'integer', 'jsonb'],
   'authenticated',
-  ARRAY['EXECUTE'],
-  'authenticated users can call the guarded aggregate save RPC'
+  ARRAY[]::text[],
+  'the three-argument save core is no longer a client entry point'
 );
 
 SELECT function_privs_are(
@@ -128,14 +128,16 @@ WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
   'db100000-0000-0000-0000-000000000003'::uuid,
-  'db100000-0000-0000-0000-000000000004'::uuid
+  'db100000-0000-0000-0000-000000000004'::uuid,
+  'db100000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM auth.users
 WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
   'db100000-0000-0000-0000-000000000003'::uuid,
-  'db100000-0000-0000-0000-000000000004'::uuid
+  'db100000-0000-0000-0000-000000000004'::uuid,
+  'db100000-0000-0000-0000-000000000005'::uuid
 );
 
 INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
@@ -171,7 +173,8 @@ FROM (VALUES
   ('db100000-0000-0000-0000-000000000001'::uuid, 'hoja-manager@test.local'),
   ('db100000-0000-0000-0000-000000000002'::uuid, 'hoja-tech@test.local'),
   ('db100000-0000-0000-0000-000000000003'::uuid, 'hoja-outsider@test.local'),
-  ('db100000-0000-0000-0000-000000000004'::uuid, 'hoja-production@test.local')
+  ('db100000-0000-0000-0000-000000000004'::uuid, 'hoja-production@test.local'),
+  ('db100000-0000-0000-0000-000000000005'::uuid, 'hoja-reviewer@test.local')
 ) AS fixture(id, email)
 ON CONFLICT (id) DO NOTHING;
 
@@ -180,7 +183,8 @@ VALUES
   ('db100000-0000-0000-0000-000000000001'::uuid, 'hoja-manager@test.local', 'Hoja', 'Manager', 'management', 'production'),
   ('db100000-0000-0000-0000-000000000002'::uuid, 'hoja-tech@test.local', 'Tech', 'Assigned', 'technician', 'sound'),
   ('db100000-0000-0000-0000-000000000003'::uuid, 'hoja-outsider@test.local', 'Tech', 'Outside', 'technician', 'lights'),
-  ('db100000-0000-0000-0000-000000000004'::uuid, 'hoja-production@test.local', 'Prod', 'Crew', 'technician', 'produccion')
+  ('db100000-0000-0000-0000-000000000004'::uuid, 'hoja-production@test.local', 'Prod', 'Crew', 'technician', 'produccion'),
+  ('db100000-0000-0000-0000-000000000005'::uuid, 'hoja-reviewer@test.local', 'Hoja', 'Reviewer', 'management', 'production')
 ON CONFLICT (id) DO UPDATE
 SET role = excluded.role,
     department = excluded.department;
@@ -371,7 +375,8 @@ SELECT lives_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000001'::uuid,
        0,
-       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_initial')
+       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_initial'),
+       ARRAY[]::uuid[]
      ) $$,
   'management can create a Hoja through the aggregate save RPC'
 );
@@ -401,7 +406,7 @@ WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid;
 SELECT lives_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000001'::uuid,
-       1,
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid),
        (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update'),
        ARRAY[NULL]::uuid[]
      ) $$,
@@ -428,13 +433,15 @@ SELECT is(
   'an omitted legacy transient image survives an unrelated save even with a null removal entry'
 );
 
-SELECT lives_ok(
+SELECT throws_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000001'::uuid,
        2,
        (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update')
      ) $$,
-  'a cached client can still save through the three-argument RPC'
+  '42501',
+  NULL,
+  'a retired three-argument client can no longer save'
 );
 
 SELECT is(
@@ -501,7 +508,8 @@ SELECT throws_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000001'::uuid,
        1,
-       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update')
+       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update'),
+       ARRAY[]::uuid[]
      ) $$,
   '40001',
   NULL,
@@ -512,7 +520,8 @@ SELECT lives_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000002'::uuid,
        0,
-       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_two')
+       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_two'),
+       ARRAY[]::uuid[]
      ) $$,
   'management can create a second independent Hoja'
 );
@@ -520,8 +529,9 @@ SELECT lives_ok(
 SELECT throws_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000001'::uuid,
-       3,
-       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'foreign_contact')
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid),
+       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'foreign_contact'),
+       ARRAY[]::uuid[]
      ) $$,
   '22023',
   'Un contacto pertenece a otra Hoja de Ruta',
@@ -562,7 +572,8 @@ SELECT throws_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000001'::uuid,
        2,
-       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update')
+       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update'),
+       ARRAY[]::uuid[]
      ) $$,
   '42501',
   'permission denied',
@@ -570,24 +581,9 @@ SELECT throws_ok(
 );
 
 SELECT is(
-  public.get_hoja_de_ruta('db200000-0000-0000-0000-000000000001'::uuid)->'staff',
-  '[]'::jsonb,
-  'the technician aggregate projection hides Hoja staff rows and DNI'
-);
-
-SELECT is(
-  public.get_hoja_de_ruta('db200000-0000-0000-0000-000000000001'::uuid)
-    #>> '{accommodations,0,rooms,0,staff_member1_name}',
-  'Tech Assigned',
-  'the technician projection keeps a safe room occupant name'
-);
-
-SELECT ok(
-  NOT (
-    public.get_hoja_de_ruta('db200000-0000-0000-0000-000000000001'::uuid)
-      #> '{accommodations,0,rooms,0}'
-  ) ? 'dni',
-  'the technician room projection does not expose DNI'
+  public.get_hoja_de_ruta('db200000-0000-0000-0000-000000000001'::uuid),
+  NULL::jsonb,
+  'an assigned technician does not read a draft Hoja'
 );
 
 RESET ROLE;
@@ -612,22 +608,6 @@ SELECT throws_ok(
 );
 
 RESET ROLE;
-SELECT set_config('request.jwt.claim.role', 'service_role', false);
-SELECT set_config('request.jwt.claim.sub', '', false);
-
-DELETE FROM public.hoja_de_ruta_staff
-WHERE id = 'db400000-0000-0000-0000-000000000001'::uuid;
-
-SELECT is(
-  (
-    SELECT staff_member1_hoja_staff_id
-    FROM public.hoja_de_ruta_room_assignments
-    WHERE id = 'db600000-0000-0000-0000-000000000001'::uuid
-  ),
-  NULL::uuid,
-  'deleting Hoja staff clears room UUID references through ON DELETE SET NULL'
-);
-
 SELECT set_config('request.jwt.claim.role', 'authenticated', false);
 SELECT set_config('request.jwt.claim.sub', 'db100000-0000-0000-0000-000000000001', false);
 SET ROLE authenticated;
@@ -636,7 +616,7 @@ SELECT throws_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'approved',
-       3
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
   '22023',
   NULL,
@@ -647,7 +627,7 @@ SELECT throws_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'review',
-       2
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid) - 1
      ) $$,
   '40001',
   'La Hoja de Ruta ha cambiado desde la última carga',
@@ -658,18 +638,22 @@ SELECT lives_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'review',
-       3
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
   'a draft Hoja can move to review'
 );
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'db100000-0000-0000-0000-000000000005', false);
+SET ROLE authenticated;
 
 SELECT lives_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'approved',
-       4
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
-  'a reviewed Hoja can be approved'
+  'a second manager can approve a reviewed Hoja'
 );
 
 INSERT INTO public.job_documents (
@@ -700,7 +684,7 @@ SELECT throws_ok(
   $$ SELECT public.publish_hoja_de_ruta_document(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'db800000-0000-0000-0000-000000000001'::uuid,
-       4
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid) - 1
      ) $$,
   '40001',
   'La Hoja de Ruta ha cambiado desde la última carga',
@@ -711,9 +695,70 @@ SELECT lives_ok(
   $$ SELECT public.publish_hoja_de_ruta_document(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'db800000-0000-0000-0000-000000000001'::uuid,
-       5
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
   'a current editor can publish the canonical PDF'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'db100000-0000-0000-0000-000000000002', false);
+SET ROLE authenticated;
+
+SELECT is(
+  public.get_hoja_de_ruta('db200000-0000-0000-0000-000000000001'::uuid)->'staff',
+  '[]'::jsonb,
+  'the technician aggregate projection hides Hoja staff rows and DNI'
+);
+
+SELECT is(
+  public.get_hoja_de_ruta('db200000-0000-0000-0000-000000000001'::uuid)
+    #>> '{accommodations,0,rooms,0,staff_member1_name}',
+  'Tech Assigned',
+  'the technician projection keeps a safe room occupant name'
+);
+
+SELECT ok(
+  NOT (
+    public.get_hoja_de_ruta('db200000-0000-0000-0000-000000000001'::uuid)
+      #> '{accommodations,0,rooms,0}'
+  ) ? 'dni',
+  'the technician room projection does not expose DNI'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+SELECT set_config('request.jwt.claim.sub', '', false);
+
+DELETE FROM public.hoja_de_ruta_staff
+WHERE id = 'db400000-0000-0000-0000-000000000001'::uuid;
+
+SELECT is(
+  (
+    SELECT staff_member1_hoja_staff_id
+    FROM public.hoja_de_ruta_room_assignments
+    WHERE id = 'db600000-0000-0000-0000-000000000001'::uuid
+  ),
+  NULL::uuid,
+  'deleting Hoja staff clears room UUID references through ON DELETE SET NULL'
+);
+
+SELECT is(
+  (SELECT status FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid),
+  'review',
+  'a staff change outside the editor sends the approved Hoja back to review'
+);
+
+SELECT set_config('request.jwt.claim.role', 'authenticated', false);
+SELECT set_config('request.jwt.claim.sub', 'db100000-0000-0000-0000-000000000005', false);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'db200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  'the reviewer re-approves the changed Hoja'
 );
 
 RESET ROLE;
@@ -753,7 +798,7 @@ SELECT lives_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'db200000-0000-0000-0000-000000000001'::uuid,
        'final',
-       5
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
   'an approved Hoja can be finalized'
 );
@@ -761,29 +806,25 @@ SELECT lives_ok(
 SELECT throws_ok(
   $$ SELECT * FROM public.save_hoja_de_ruta(
        'db200000-0000-0000-0000-000000000001'::uuid,
-       6,
-       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update')
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid),
+       (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update'),
+       ARRAY[]::uuid[]
      ) $$,
   '22023',
   'La Hoja de Ruta está finalizada y no admite edición',
   'a final Hoja cannot be edited'
 );
 
-SELECT throws_ok(
-  $$ SELECT public.replace_hoja_de_ruta_all(
-       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid),
-       '[]'::jsonb,
-       '[]'::jsonb,
-       '[]'::jsonb
-     ) $$,
-  '22023',
-  'La Hoja de Ruta está finalizada y no admite edición',
-  'the compatibility replacement RPC cannot edit a final Hoja'
+SELECT hasnt_function(
+  'public',
+  'replace_hoja_de_ruta_all',
+  'the unversioned compatibility replacement RPC is retired'
 );
 
 RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
 
 INSERT INTO public.hoja_de_ruta_images (
   id,
@@ -834,14 +875,16 @@ WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
   'db100000-0000-0000-0000-000000000003'::uuid,
-  'db100000-0000-0000-0000-000000000004'::uuid
+  'db100000-0000-0000-0000-000000000004'::uuid,
+  'db100000-0000-0000-0000-000000000005'::uuid
 );
 DELETE FROM auth.users
 WHERE id IN (
   'db100000-0000-0000-0000-000000000001'::uuid,
   'db100000-0000-0000-0000-000000000002'::uuid,
   'db100000-0000-0000-0000-000000000003'::uuid,
-  'db100000-0000-0000-0000-000000000004'::uuid
+  'db100000-0000-0000-0000-000000000004'::uuid,
+  'db100000-0000-0000-0000-000000000005'::uuid
 );
 
 SELECT * FROM finish();

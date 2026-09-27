@@ -1,5 +1,11 @@
 import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
+import {
+  normalizeObjectPath,
+  resolveJobDocumentBucket,
+  type JobDocumentBucket,
+} from "./jobDocumentStorage.ts";
+
 type SupabaseAdminClient = SupabaseClient;
 
 type HojaDocumentRow = {
@@ -18,35 +24,16 @@ type PublishedHojaRow = {
 
 export type HojaAttachment = {
   source: "job_documents";
-  bucket: "job-documents" | "job_documents";
+  bucket: JobDocumentBucket;
   path: string;
   filename: string;
 };
-
-const DEPT_PREFIXES = new Set([
-  "sound",
-  "lights",
-  "video",
-  "production",
-  "logistics",
-  "administrative",
-]);
-
-const normalizeObjectPath = (value: string | null | undefined) =>
-  (value || "").replace(/^\/+/, "");
 
 const isPdfDocument = (doc: HojaDocumentRow): boolean => {
   const mimeType = (doc.file_type || "").split(";")[0].trim().toLowerCase();
   return mimeType === "application/pdf"
     || /\.pdf$/i.test(normalizeObjectPath(doc.file_path));
 };
-
-function resolveJobDocumentBucket(
-  filePath: string,
-): "job-documents" | "job_documents" {
-  const first = normalizeObjectPath(filePath).split("/")[0] || "";
-  return DEPT_PREFIXES.has(first) ? "job_documents" : "job-documents";
-}
 
 async function fetchPublishedDocument(
   supabaseAdmin: SupabaseAdminClient,

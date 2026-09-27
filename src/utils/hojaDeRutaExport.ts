@@ -9,6 +9,7 @@ import {
   HOJA_SECTION_DEFINITIONS,
   type HojaSectionId,
 } from "@/features/hoja-de-ruta/model/sectionDefinitions";
+import { staffDepartmentLabel } from "@/features/hoja-de-ruta/model/groupStaffByDepartment";
 
 interface ExportData {
   eventData: EventData;
@@ -174,7 +175,7 @@ const createStaffSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
         member.name || "",
         fullSurname,
         member.position || "",
-        member.department || "",
+        staffDepartmentLabel(member.department),
         member.role || "",
       ]);
     });

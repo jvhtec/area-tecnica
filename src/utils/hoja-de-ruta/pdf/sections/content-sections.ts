@@ -161,7 +161,7 @@ export class ContentSections {
 
   hasStaffData(eventData: EventData): boolean {
     return eventData.staff && eventData.staff.some(staff => 
-      staff.name || staff.role || staff.dni
+      staff.name || staff.role
     );
   }
 
@@ -240,8 +240,8 @@ export class ContentSections {
 
   hasStructuredProgramData(eventData: EventData): boolean {
     const hasStructured = Array.isArray(eventData.programSchedule) && eventData.programSchedule.length > 0;
-    const hasMulti = Array.isArray((eventData as any).programScheduleDays) &&
-      (eventData as any).programScheduleDays.some((d: any) => Array.isArray(d.rows) && d.rows.length > 0);
+    const hasMulti = Array.isArray(eventData.programScheduleDays)
+      && eventData.programScheduleDays.some((day) => Array.isArray(day.rows) && day.rows.length > 0);
     return hasMulti || hasStructured;
   }
 

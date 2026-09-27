@@ -16,7 +16,7 @@ describe("accreditation export", () => {
     }]);
 
     expect(rows[3]).toEqual(["Nombre", "Apellidos", "DNI", "Posición", "Departamento"]);
-    expect(rows[4]).toEqual(["Ana", "Técnica Prueba", "12345678Z", "SND-PA", "sound"]);
+    expect(rows[4]).toEqual(["Ana", "Técnica Prueba", "12345678Z", "SND-PA", "Sonido"]);
     expect(JSON.stringify(rows)).not.toContain("+34123456789");
   });
 });

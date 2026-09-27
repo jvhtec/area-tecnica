@@ -229,10 +229,10 @@ test("saves restaurant edits with stable persisted images and explicit removals"
   await expect(restaurantCheckbox).toBeChecked();
 
   await selectSection(page, "Lugar");
-  const firstVenueImage = page.getByRole("img", { name: "Venue 1" });
-  await expect(page.locator('img[alt^="Venue "]')).toHaveCount(3);
+  const firstVenueImage = page.getByRole("img", { name: "Imagen del recinto 1" });
+  await expect(page.locator('img[alt^="Imagen del recinto "]')).toHaveCount(3);
   await firstVenueImage.locator("..").locator("button").click({ force: true });
-  await expect(page.locator('img[alt^="Venue "]')).toHaveCount(2);
+  await expect(page.locator('img[alt^="Imagen del recinto "]')).toHaveCount(2);
 
   await page.getByRole("button", { name: /Guardar(?: hoja de ruta)?$/ }).click();
   await expect.poll(
