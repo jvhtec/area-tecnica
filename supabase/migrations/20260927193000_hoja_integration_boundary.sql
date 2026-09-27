@@ -206,14 +206,11 @@ begin
     select 1
     from public.hoja_de_ruta h
     where h.id = p_hoja_id
-      and (
-        h.tour_id = p_tour_id
-        or exists (
-          select 1
-          from public.tour_dates td
-          where td.id = h.tour_date_id
-            and td.tour_id = p_tour_id
-        )
+      and exists (
+        select 1
+        from public.tour_dates td
+        where td.id = h.tour_date_id
+          and td.tour_id = p_tour_id
       )
   ) then
     raise exception 'La Hoja de Ruta no pertenece a esta gira'
