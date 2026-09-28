@@ -4,7 +4,7 @@ SET search_path TO public, extensions;
 
 BEGIN;
 
-SELECT plan(55);
+SELECT plan(56);
 
 -- ---------------------------------------------------------------------------
 -- Structural assertions
@@ -183,7 +183,8 @@ FROM (VALUES
   ('fa100000-0000-0000-0000-000000000005'::uuid, 'fest-scope-declined@test.local'),
   ('fa100000-0000-0000-0000-000000000006'::uuid, 'fest-scope-house@test.local'),
   ('fa100000-0000-0000-0000-000000000007'::uuid, 'fest-scope-logistics@test.local'),
-  ('fa100000-0000-0000-0000-000000000008'::uuid, 'fest-scope-no-role@test.local')
+  ('fa100000-0000-0000-0000-000000000008'::uuid, 'fest-scope-no-role@test.local'),
+  ('fa100000-0000-0000-0000-000000000009'::uuid, 'fest-scope-cross-dept@test.local')
 ) AS u(id, email)
 ON CONFLICT (id) DO NOTHING;
 
@@ -196,7 +197,8 @@ VALUES
   ('fa100000-0000-0000-0000-000000000005'::uuid, 'fest-scope-declined@test.local', 'Diego', 'Declina', 'technician', 'sound'),
   ('fa100000-0000-0000-0000-000000000006'::uuid, 'fest-scope-house@test.local', 'Hugo', 'Casa', 'house_tech', 'sound'),
   ('fa100000-0000-0000-0000-000000000007'::uuid, 'fest-scope-logistics@test.local', 'Lola', 'Logística', 'logistics', 'logistics'),
-  ('fa100000-0000-0000-0000-000000000008'::uuid, 'fest-scope-no-role@test.local', 'Rita', 'Rol', 'technician', 'lights')
+  ('fa100000-0000-0000-0000-000000000008'::uuid, 'fest-scope-no-role@test.local', 'Rita', 'Rol', 'technician', 'lights'),
+  ('fa100000-0000-0000-0000-000000000009'::uuid, 'fest-scope-cross-dept@test.local', 'Cruz', 'Cruzado', 'technician', 'sound')
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
     role = excluded.role,
@@ -229,7 +231,10 @@ INSERT INTO public.job_assignments (
   ('fa300000-0000-0000-0000-000000000005'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
    'fa100000-0000-0000-0000-000000000005'::uuid, 'declined', 'FOH-A', NULL, false, 'direct'),
   ('fa300000-0000-0000-0000-000000000008'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
-   'fa100000-0000-0000-0000-000000000008'::uuid, 'confirmed', NULL, NULL, false, 'direct');
+   'fa100000-0000-0000-0000-000000000008'::uuid, 'confirmed', NULL, NULL, false, 'direct'),
+  -- Sound-profile technician working this job only as lights crew.
+  ('fa300000-0000-0000-0000-000000000009'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
+   'fa100000-0000-0000-0000-000000000009'::uuid, 'confirmed', NULL, 'OP-L', false, 'direct');
 
 INSERT INTO public.festival_shifts (id, job_id, date, start_time, end_time, name, stage, department)
 VALUES
@@ -354,6 +359,17 @@ SELECT results_eq(
   $$SELECT name FROM public.festival_shifts WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid ORDER BY name$$,
   $$VALUES ('Briefing general'::text), ('Luces tarde'::text)$$,
   'assignment without a role falls back to the profile department'
+);
+
+-- ---------------------------------------------------------------------------
+-- Sound-profile technician with only a lights role on this job
+-- ---------------------------------------------------------------------------
+SELECT set_config('request.jwt.claim.sub', 'fa100000-0000-0000-0000-000000000009', true);
+
+SELECT results_eq(
+  $$SELECT name FROM public.festival_shifts WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid ORDER BY name$$,
+  $$VALUES ('Briefing general'::text), ('Luces tarde'::text)$$,
+  'the role held on the job decides the department, not the profile department'
 );
 
 -- ---------------------------------------------------------------------------

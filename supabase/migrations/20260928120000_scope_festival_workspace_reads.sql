@@ -20,8 +20,8 @@
 --     (some shift crew have no job_assignments row).
 --   * Technicians read a shift only when they are on it, it has no department,
 --     or it belongs to their department on that job: the matching
---     sound/lights/video/production role on their assignment, or their
---     profile department.
+--     sound/lights/video/production role on their assignment, or, only when
+--     that assignment has no role at all, their profile department.
 --   * Public form tokens are readable only by the roles that may create them
 --     (admin, management, logistics). Public forms keep using their
 --     token-validated SECURITY DEFINER RPCs and service-role Edge Functions,
@@ -115,7 +115,15 @@ AS $$
                 OR (public.festival_department_matches(fs.department, 'lights') AND ja.lights_role IS NOT NULL)
                 OR (public.festival_department_matches(fs.department, 'video') AND ja.video_role IS NOT NULL)
                 OR (public.festival_department_matches(fs.department, 'production') AND ja.production_role IS NOT NULL)
-                OR public.festival_department_matches(fs.department, p.department)
+                -- Profile department only when the assignment carries no role at all;
+                -- a role on this job always decides the department.
+                OR (
+                  ja.sound_role IS NULL
+                  AND ja.lights_role IS NULL
+                  AND ja.video_role IS NULL
+                  AND ja.production_role IS NULL
+                  AND public.festival_department_matches(fs.department, p.department)
+                )
               )
           )
         )
@@ -239,4 +247,4 @@ REVOKE ALL ON TABLE public.festival_shift_assignments FROM anon;
 COMMENT ON FUNCTION public.can_read_festival_job(uuid) IS
   'RLS helper: office roles and house techs read every festival job; technicians only jobs they are assigned to (non-declined) or have a festival shift on.';
 COMMENT ON FUNCTION public.can_read_festival_shift(uuid) IS
-  'RLS helper: technicians read a festival shift only when they are on it, it has no department, or it matches their department on that job (assignment role or profile department).';
+  'RLS helper: technicians read a festival shift only when they are on it, it has no department, or it matches their department on that job (assignment role; profile department only for role-less assignments).';
