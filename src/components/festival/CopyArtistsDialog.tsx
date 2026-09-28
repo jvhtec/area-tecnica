@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarIcon, Users, Clock, Search, Loader2 } from "lucide-react";
-import { format, parseISO } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
+import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { rebaseSoundcheckDate } from "@/utils/artistScheduleDates";
 import { queryKeys } from "@/lib/react-query";
@@ -53,9 +53,7 @@ const SEARCH_LIMIT = 50;
 
 const formatShowDate = (date: string | null | undefined) => {
   if (!date) return "";
-  // parseISO keeps a date-only "YYYY-MM-DD" on its calendar day (no UTC shift).
-  const parsed = parseISO(date);
-  return Number.isNaN(parsed.getTime()) ? date : format(parsed, "d MMM yyyy");
+  return formatFestivalDayKey(date, "d MMM yyyy", date);
 };
 
 export const CopyArtistsDialog = ({
@@ -517,7 +515,7 @@ export const CopyArtistsDialog = ({
                         <CalendarIcon className="h-4 w-4" />
                         <span>{festival.title}</span>
                         <Badge variant="outline" className="text-xs">
-                          {format(new Date(festival.start_time), "MMM yyyy")}
+                          {formatFestivalInstant(festival.start_time, "MMM yyyy")}
                         </Badge>
                       </div>
                     </SelectItem>
@@ -536,7 +534,7 @@ export const CopyArtistsDialog = ({
                   <SelectContent>
                     {availableDates.map(date => (
                       <SelectItem key={date} value={date}>
-                        {format(new Date(date), "EEEE, MMMM d, yyyy")}
+                        {formatFestivalDayKey(date, "EEEE, d 'de' MMMM 'de' yyyy", date)}
                       </SelectItem>
                     ))}
                   </SelectContent>

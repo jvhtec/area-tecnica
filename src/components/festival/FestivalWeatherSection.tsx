@@ -6,6 +6,7 @@ import { useWeatherData } from '@/hooks/useWeatherData';
 import { WeatherData } from '@/types/hoja-de-ruta';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { formatFestivalDayKey, formatFestivalInstant } from '@/features/festival-management/dateFormatting';
 
 interface FestivalWeatherSectionProps {
   jobId: string;
@@ -28,8 +29,8 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
   
   const eventDatesString = jobDates.length > 0 
     ? jobDates.length === 1
-      ? jobDates[0].toISOString().split('T')[0].split('-').reverse().join('/')
-      : `${jobDates[0].toISOString().split('T')[0].split('-').reverse().join('/')} - ${jobDates[jobDates.length - 1].toISOString().split('T')[0].split('-').reverse().join('/')}`
+      ? formatFestivalInstant(jobDates[0], "dd/MM/yyyy")
+      : `${formatFestivalInstant(jobDates[0], "dd/MM/yyyy")} - ${formatFestivalInstant(jobDates[jobDates.length - 1], "dd/MM/yyyy")}`
     : '';
 
   const { isLoading, error, lastFetch, fetchWeather } = useWeatherData({
@@ -39,15 +40,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
   });
 
   const formatDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { 
-        month: 'long', 
-        day: 'numeric' 
-      });
-    } catch {
-      return dateStr;
-    }
+    return formatFestivalDayKey(dateStr, "d 'de' MMMM", dateStr);
   };
 
   const getWeatherIcon = (condition: string) => {
@@ -135,7 +128,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
                   <strong>Consejo:</strong> Los datos del tiempo se obtienen de Open-Meteo y se actualizan automáticamente.
                 </p>
                 {lastFetch && (
-                  <p>Última actualización: {lastFetch.toLocaleString()}</p>
+                  <p>Última actualización: {formatFestivalInstant(lastFetch, "dd/MM/yyyy HH:mm")}</p>
                 )}
               </div>
             </div>

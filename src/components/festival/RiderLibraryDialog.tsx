@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatInTimeZone } from "date-fns-tz";
 import { CalendarDays, FileText, FolderInput, Library, Loader2, Search } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -14,10 +13,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { importArtistRiderToJob, getRiderImportErrorMessage } from "@/features/festival-management/commands";
+import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 import { fetchRiderLibrary } from "@/features/festival-management/queries";
 import type { FestivalStageOption, RiderLibraryEntry } from "@/features/festival-management/types";
 import { useToast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/react-query";
+import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
 type RiderLibraryDialogProps = {
   canImport: boolean;
@@ -37,7 +38,6 @@ type ImportMutationInput = {
 };
 
 const ALL_SOURCE_JOBS_VALUE = "all";
-const FESTIVAL_TIMEZONE = "Europe/Madrid";
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   ciclo: "Ciclo",
@@ -49,25 +49,19 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   tourdate: "Fecha de gira",
 };
 
-const formatDateValue = (date: Date) => formatInTimeZone(date, FESTIVAL_TIMEZONE, "yyyy-MM-dd");
+const formatDateValue = (date: Date) => formatMadridDateKey(date);
 
 const formatDisplayDate = (value?: string | null) => {
   if (!value) return "Sin fecha";
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month, day] = value.split("-");
-    return `${day}/${month}/${year}`;
+    return formatFestivalDayKey(value, "dd/MM/yyyy", "Sin fecha");
   }
 
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "Sin fecha" : formatInTimeZone(parsed, FESTIVAL_TIMEZONE, "dd/MM/yyyy");
+  return formatFestivalInstant(value, "dd/MM/yyyy", "Sin fecha");
 };
 
 const formatUploadDate = (value?: string | null) => {
-  if (!value) return "Sin fecha de subida";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Sin fecha de subida";
-
-  return formatInTimeZone(parsed, FESTIVAL_TIMEZONE, "dd/MM/yy, HH:mm");
+  return formatFestivalInstant(value, "dd/MM/yy, HH:mm", "Sin fecha de subida");
 };
 
 const formatFileSize = (value?: number | null) => {

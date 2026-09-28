@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { Copy, Edit, FileDown, Trash2, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatFestivalDayKey } from "@/features/festival-management/dateFormatting";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -92,7 +91,7 @@ export const ShiftsTable = ({
   const managingShift = shifts.find((shift) => shift.id === managingShiftId) ?? null;
 
   const formattedDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
-    ? format(parseISO(date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })
+    ? formatFestivalDayKey(date, "EEEE, d 'de' MMMM 'de' yyyy", date)
     : date;
 
   const handleDeleteClick = async (shift: ShiftWithAssignments) => {

@@ -5,7 +5,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DateTypeContextMenu } from "@/components/dashboard/DateTypeContextMenu";
 import { ChevronLeft, ChevronRight, Calendar, CalendarCheck2, Filter } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import {
   Popover,
@@ -18,9 +17,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getDateTypeMeta, getEffectiveFestivalDateType, isKeyFestivalDateType } from "@/constants/dateTypes";
 import {
+  formatFestivalDayKey,
+  formatFestivalInstant,
+} from "@/features/festival-management/dateFormatting";
+import {
   addMadridCalendarDays,
   formatMadridDateKey,
   fromMadridDateKey,
+  getMadridTodayKey,
   MADRID_TIMEZONE,
 } from "@/utils/timezoneUtils";
 
@@ -35,13 +39,6 @@ const getFestivalWeekStartKey = (dateKey: string): string => {
 
   return addMadridCalendarDays(safeDateKey, -(isoWeekday - 1));
 };
-
-const formatFestivalDateKey = (dateKey: string, formatPattern: string): string =>
-  formatInTimeZone(
-    fromMadridDateKey(dateKey, "12:00:00"),
-    MADRID_TIMEZONE,
-    formatPattern,
-  );
 
 interface FestivalDateNavigationProps {
   jobDates: Date[];
@@ -77,14 +74,13 @@ export const FestivalDateNavigation = ({
   const [showOnlyShowDates, setShowOnlyShowDates] = useState(true);
   const [showPastDates, setShowPastDates] = useState(false);
   const [viewMode, setViewMode] = useState<'week' | 'all'>('all');
-  const todayDateKey = formatMadridDateKey(new Date());
+  const todayDateKey = getMadridTodayKey();
   const selectedDateLabel = useMemo(() => {
     if (!FESTIVAL_DATE_KEY_PATTERN.test(selectedDate)) return selectedDate;
-    return formatInTimeZone(
-      fromMadridDateKey(selectedDate, "12:00:00"),
-      MADRID_TIMEZONE,
+    return formatFestivalDayKey(
+      selectedDate,
       "EEEE, d 'de' MMMM 'de' yyyy",
-      { locale: es },
+      selectedDate,
     );
   }, [selectedDate]);
 
@@ -191,12 +187,12 @@ export const FestivalDateNavigation = ({
   };
 
   const formatTabDate = (date: Date) => {
-    return formatInTimeZone(date, MADRID_TIMEZONE, 'EEE, MMM d');
+    return formatFestivalInstant(date, "EEE, d MMM");
   };
 
   const getWeekRange = () => {
     const weekEnd = addMadridCalendarDays(currentWeekStart, 6);
-    return `${formatFestivalDateKey(currentWeekStart, 'MMM d')} - ${formatFestivalDateKey(weekEnd, 'MMM d')}`;
+    return `${formatFestivalDayKey(currentWeekStart, "d MMM")} - ${formatFestivalDayKey(weekEnd, "d MMM")}`;
   };
 
   // Show simplified view for long festivals (7+ days)

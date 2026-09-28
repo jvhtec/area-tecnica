@@ -38,9 +38,9 @@ describe("FestivalDateNavigation", () => {
       />,
     );
 
-    expect(screen.getByText("Thu, Jun 4")).toBeInTheDocument();
-    expect(screen.getByText("Fri, Jun 5")).toBeInTheDocument();
-    expect(screen.getByText("Sat, Jun 6")).toBeInTheDocument();
+    expect(screen.getByText("jue, 4 jun")).toBeInTheDocument();
+    expect(screen.getByText("vie, 5 jun")).toBeInTheDocument();
+    expect(screen.getByText("sáb, 6 jun")).toBeInTheDocument();
   });
 
   it("makes the selected date explicit in both the summary and active tab", () => {
@@ -62,7 +62,7 @@ describe("FestivalDateNavigation", () => {
 
     expect(screen.getByText("Fecha seleccionada:")).toBeInTheDocument();
     expect(screen.getByText("miércoles, 5 de agosto de 2026")).toBeInTheDocument();
-    const selectedTab = screen.getByRole("tab", { name: "Wed, Aug 5" });
+    const selectedTab = screen.getByRole("tab", { name: "mié, 5 ago" });
     expect(selectedTab).toHaveAttribute("aria-current", "date");
     expect(selectedTab).toHaveClass(
       "!bg-primary",
@@ -90,8 +90,8 @@ describe("FestivalDateNavigation", () => {
       />,
     );
 
-    expect(screen.queryByRole("tab", { name: "Sun, Aug 2" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Mon, Aug 3" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "dom, 2 ago" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "lun, 3 ago" })).toBeInTheDocument();
 
     const showPastDates = screen.getByRole("switch", {
       name: "Mostrar fechas pasadas",
@@ -101,6 +101,6 @@ describe("FestivalDateNavigation", () => {
     fireEvent.click(showPastDates);
 
     expect(showPastDates).toBeChecked();
-    expect(screen.getByRole("tab", { name: "Sun, Aug 2" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "dom, 2 ago" })).toBeInTheDocument();
   });
 });

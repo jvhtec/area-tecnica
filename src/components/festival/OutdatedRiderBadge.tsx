@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { History, X, Loader2 } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatFestivalDayKey } from "@/features/festival-management/dateFormatting";
 
 interface OutdatedRiderBadgeProps {
   artistId: string;
@@ -19,10 +18,7 @@ interface OutdatedRiderBadgeProps {
 
 const formatSourceDate = (date: string | null | undefined): string => {
   if (!date) return "otra fecha";
-  // Parse as a date-only value (parseISO treats "YYYY-MM-DD" as local midnight)
-  // so a Postgres `date` isn't shifted back a day for users behind UTC.
-  const parsed = parseISO(date);
-  return Number.isNaN(parsed.getTime()) ? date : format(parsed, "d 'de' MMMM 'de' yyyy", { locale: es });
+  return formatFestivalDayKey(date, "d 'de' MMMM 'de' yyyy", date);
 };
 
 // Warns that an artist's rider/specs were imported or copied and may be stale.

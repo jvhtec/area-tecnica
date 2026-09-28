@@ -7,7 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Loader2, Copy, RefreshCcw, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { addDays, format, isAfter } from "date-fns";
+import { addDays, isAfter } from "date-fns";
+import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
@@ -157,7 +158,7 @@ export const ArtistFormLinksDialog = ({
 
   const formatDateLabel = (value?: string | null) => {
     if (!value) return "Sin fecha";
-    return format(new Date(value), "dd/MM/yyyy");
+    return formatFestivalDayKey(value, "dd/MM/yyyy", "Sin fecha");
   };
 
   const availableDates = [...new Set(artistLinks.map((artist) => artist.date).filter(Boolean) as string[])].sort(
@@ -463,7 +464,7 @@ export const ArtistFormLinksDialog = ({
                             )}
                             {artist.expires_at && isAfter(new Date(artist.expires_at), new Date()) && (
                               <Badge variant="secondary">
-                                Expira {format(new Date(artist.expires_at), 'dd/MM/yyyy')}
+                                Expira {formatFestivalInstant(artist.expires_at, "dd/MM/yyyy")}
                               </Badge>
                             )}
                             <Button

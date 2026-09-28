@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { normalizePresetSubsystem, resolveSubsystemForEquipment } from '@/types/equipment';
 import type { EquipmentCategory } from '@/types/equipment';
+import { formatFestivalInstant } from '@/features/festival-management/dateFormatting';
 import {
   ALL_SECTIONS_ENABLED,
   GEAR_SECTIONS,
@@ -651,7 +652,9 @@ export function PushToFlexPullsheetDialog({
                           {' '}
                           <span className="text-xs text-muted-foreground">
                             {ps.source === 'flex_api' && '(from Flex) '}
-                            ({ps.source === 'flex_api' && ps.created_at === '2000-01-01T00:00:00.000Z' ? 'Unknown' : new Date(ps.created_at).toLocaleDateString()})
+                            ({ps.source === 'flex_api' && ps.created_at === '2000-01-01T00:00:00.000Z'
+                              ? 'Desconocida'
+                              : formatFestivalInstant(ps.created_at, 'dd/MM/yyyy')})
                           </span>
                         </SelectItem>
                       ))}

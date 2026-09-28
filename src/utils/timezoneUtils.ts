@@ -125,6 +125,9 @@ export const formatMadridDateKey = (date: Date | string): string => {
   return formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
 };
 
+export const getMadridTodayKey = (reference: Date = new Date()): string =>
+  formatMadridDateKey(reference);
+
 export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): Date =>
   fromZonedTime(`${dateKey}T${time}`, MADRID_TIMEZONE);
 

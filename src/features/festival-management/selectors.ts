@@ -1,6 +1,7 @@
 import { eachDayOfInterval, isValid } from "date-fns";
-import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
+import { formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 import type {
   ArtistRiderFile,
   FestivalFlexStatus,
@@ -16,6 +17,7 @@ import type {
   RiderStatus,
 } from "@/features/festival-management/types";
 import type { Department } from "@/types/department";
+import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 
 type StageRow = {
   name?: string | null;
@@ -25,8 +27,6 @@ type StageRow = {
 export type JobDateTypeRow = {
   date?: string | null;
 };
-
-const FESTIVAL_TIMEZONE = "Europe/Madrid";
 
 export const FESTIVAL_DEPARTMENT_OPTIONS: Department[] = [
   "sound",
@@ -78,7 +78,7 @@ export const buildFestivalStageOptions = (
 
 const parseFestivalDateType = (value: string) => {
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? fromZonedTime(`${value}T00:00:00`, FESTIVAL_TIMEZONE)
+    ? fromZonedTime(`${value}T00:00:00`, MADRID_TIMEZONE)
     : new Date(value);
 
   return isValid(parsed) ? parsed : null;
@@ -89,15 +89,15 @@ export const buildJobDates = (job: Pick<FestivalJob, "start_time" | "end_time">,
   const endDate = new Date(job.end_time);
 
   if (isValid(startDate) && isValid(endDate)) {
-    const zonedStart = toZonedTime(startDate, FESTIVAL_TIMEZONE);
-    const zonedEnd = toZonedTime(endDate, FESTIVAL_TIMEZONE);
+    const zonedStart = toZonedTime(startDate, MADRID_TIMEZONE);
+    const zonedEnd = toZonedTime(endDate, MADRID_TIMEZONE);
 
     if (zonedEnd < zonedStart) {
-      return [fromZonedTime(zonedStart, FESTIVAL_TIMEZONE)];
+      return [fromZonedTime(zonedStart, MADRID_TIMEZONE)];
     }
 
     return eachDayOfInterval({ start: zonedStart, end: zonedEnd }).map((date) =>
-      fromZonedTime(date, FESTIVAL_TIMEZONE),
+      fromZonedTime(date, MADRID_TIMEZONE),
     );
   }
 
@@ -224,9 +224,7 @@ export const buildRiderLibraryEntries = ({
 };
 
 export const formatFestivalDateLabel = (value?: string | null) => {
-  if (!value) return "Unknown date";
-  const parsed = new Date(value);
-  return isValid(parsed) ? formatInTimeZone(parsed, FESTIVAL_TIMEZONE, "MMM d, yyyy") : "Unknown date";
+  return formatFestivalInstant(value, "d MMM yyyy");
 };
 
 export const getFestivalFlexStatus = ({

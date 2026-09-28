@@ -3,15 +3,16 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { getErrorMessage } from '@/utils/errorMessage';
+import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
-// Shift dates are calendar days ("yyyy-MM-dd"); parse them as local dates.
 const formatShiftDate = (value: Date | string) =>
-  format(typeof value === "string" ? parseISO(value) : value, "d MMM yyyy", { locale: es });
+  typeof value === "string"
+    ? formatFestivalDayKey(value, "d MMM yyyy", value)
+    : formatFestivalInstant(value, "d MMM yyyy");
 
 interface CopyShiftsDialogProps {
   open: boolean;
@@ -167,7 +168,7 @@ export const CopyShiftsDialog = ({
               </SelectTrigger>
               <SelectContent>
                 {jobDates.map((date) => {
-                  const formattedDate = format(date, 'yyyy-MM-dd');
+                  const formattedDate = formatMadridDateKey(date);
                   if (formattedDate === sourceDate) return null;
                   return (
                     <SelectItem key={formattedDate} value={formattedDate}>

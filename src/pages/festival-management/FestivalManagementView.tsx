@@ -33,6 +33,7 @@ import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FestivalManagementVm } from "@/features/festival-management/types";
 import type { Department } from "@/types/department";
@@ -150,7 +151,8 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                 <span className="hidden sm:inline">•</span>
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {new Date(job?.start_time || "").toLocaleDateString()} - {new Date(job?.end_time || "").toLocaleDateString()}
+                  {formatFestivalInstant(job?.start_time, "dd/MM/yyyy")} -{" "}
+                  {formatFestivalInstant(job?.end_time, "dd/MM/yyyy")}
                 </span>
                 {venueData.address && (
                   <>
