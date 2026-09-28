@@ -10,7 +10,6 @@ import {
 import {
   DOCUMENT_UPLOAD_EXTENSIONS,
   SHOW_FILE_EXTENSIONS,
-  TECHNICAL_DOCUMENT_EXTENSIONS,
 } from "@/constants/documentUploadTypes";
 import {
   ALLOWED_EXTENSIONS as PUBLIC_FORM_ALLOWED_EXTENSIONS,
@@ -77,11 +76,20 @@ describe("document upload validation", () => {
 
   it("keeps the public artist form's show-file list in sync with the app", () => {
     expect([...PUBLIC_FORM_SHOW_FILE_EXTENSIONS]).toEqual([...SHOW_FILE_EXTENSIONS]);
-    for (const extension of [...TECHNICAL_DOCUMENT_EXTENSIONS, ...SHOW_FILE_EXTENSIONS]) {
+    for (const extension of DOCUMENT_UPLOAD_EXTENSIONS) {
       expect(PUBLIC_FORM_ALLOWED_EXTENSIONS.has(extension)).toBe(true);
     }
     expect(getPublicFormFileExtension("Festival.SHOW.GZ")).toBe("show.gz");
     expect(getPublicFormFileExtension("rider.pdf")).toBe("pdf");
+    expect(getPublicFormFileExtension("stage-plot.gif")).toBe("gif");
+  });
+
+  it("rejects hidden double extensions in the public form like the app validator", () => {
+    expect(getPublicFormFileExtension("rider.pdf.zip")).toBe("");
+    expect(getPublicFormFileExtension("payload.exe.show.gz")).toBe("");
+    expect(getPublicFormFileExtension("rider")).toBe("");
+    expect(getDocumentUploadValidationError([createFile("rider.pdf.zip", "application/zip")]))
+      .toContain("múltiples extensiones");
   });
 
   it("accepts SoundVision and CAD files through the shared document validator", () => {

@@ -24,6 +24,7 @@ export const ALLOWED_EXTENSIONS = new Set([
   "png",
   "jpg",
   "jpeg",
+  "gif",
   "webp",
   "xmlp",
   "xmlc",
@@ -42,6 +43,7 @@ export const ALLOWED_MIME_TYPES = new Set([
   "text/plain",
   "image/png",
   "image/jpeg",
+  "image/gif",
   "image/webp",
   "application/xml",
   "text/xml",
@@ -66,11 +68,16 @@ export const ALLOWED_MIME_TYPES = new Set([
 
 const COMPOUND_EXTENSIONS = [...ALLOWED_EXTENSIONS].filter((extension) => extension.includes("."));
 
-/** Lower-case extension, treating a known compound extension (`show.gz`) as one. */
+/**
+ * Lower-case extension, treating a known compound extension (`show.gz`) as one.
+ * Returns "" when there is no extension or the name hides another one before
+ * it (`rider.pdf.zip`), matching the app's document validator.
+ */
 export const getFileExtension = (fileName: string) => {
   const lowerName = fileName.toLowerCase();
   const compound = COMPOUND_EXTENSIONS.find((extension) => lowerName.endsWith(`.${extension}`));
-  if (compound) return compound;
-  const parts = lowerName.split(".");
-  return parts.length < 2 ? "" : parts[parts.length - 1];
+  const extension = compound ?? (lowerName.includes(".") ? lowerName.slice(lowerName.lastIndexOf(".") + 1) : "");
+  if (!extension) return "";
+  const stem = lowerName.slice(0, -(extension.length + 1));
+  return stem.includes(".") ? "" : extension;
 };
