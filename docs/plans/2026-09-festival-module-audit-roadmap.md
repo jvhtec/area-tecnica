@@ -114,13 +114,83 @@ These go beyond cleanup. Each one names the problem it solves.
 | --- | --- | --- | --- |
 | **ENH-01** | **A job workspace profile.** Rename the concept from "festival management" to "Producción del trabajo" and add `getJobWorkspaceProfile(job_type)`, which returns labels (festival / ciclo / bolo / evento / fecha de gira) and defaults (for example one stage for `single`). **Per §7.1–7.2, every type keeps all modules for now.** The profile still has a `modules` field, but it is all-on, so hiding a module later is a one-line change. The route stays the same. | It fixes FEST-BUG-01 and FEST-ARCH-07 in one place. `single` jobs already use the artist roster more than festivals do, so they deserve their own copy rather than a "Single Job" badge. | M |
 | ENH-02 | **Public artist forms, sent by production and aimed at `ciclo`** (decision §7.4). **Stop minting tokens automatically:** the `trg_ensure_artist_form_for_missing_rider` trigger (`20260218195000`) creates a live bearer token whenever `rider_missing` is true, and two of the three editors default new artists to `rider_missing = true`. That is where the 355 forms and 3 submissions come from. Mint a token only when production presses **Enviar formulario**. Send it from the app (email/WhatsApp through the existing edge functions), and record the sender (a production-department user, a natural fit with `job_producer_claims`). Track sent / opened / submitted, and send a reminder N days before the date. For a ciclo, add a "send to every artist of the next date" bulk action, and pre-fill from the artist's previous ciclo submission. Managers review a "diff vs current config" with accept-per-field. The UI stays visible on all job types. | It removes 350+ unused live-able credentials and puts the effort where the feature is expected to be used. | M |
-| ENH-03 | **Tie shifts to timesheets.** Link `festival_shift_assignments` to `job_assignments`. Detect overlapping shifts for the same tech on the same day and across jobs, reusing matrix conflict detection. Optionally pre-fill timesheet hours from shifts (the server-side `compute_timesheet_hours` stays authoritative). Only 26 jobs use shifts today, possibly because they duplicate work. | Removes double entry and catches double-booking that the matrix currently can't see. | L |
+| ENH-03 | **Tie shifts to timesheets** (delivered as part of SCH-E, §4b). Link `festival_shift_assignments` to `job_assignments`. Detect overlapping shifts for the same tech on the same day and across jobs, reusing matrix conflict detection. Optionally pre-fill timesheet hours from shifts (the server-side `compute_timesheet_hours` stays authoritative). Only 26 jobs use shifts today, possibly because they duplicate work. | Removes double entry and catches double-booking that the matrix currently can't see. | L |
 | ENH-04 | **An artist change log and rider versions.** Record who changed which technical field and when (the activity catalog already exists). Keep previous rider files as versions instead of replacing them, and show "changed since last print" in the PDFs. | Riders change the week of the show, and crews ask what changed. The `rider_outdated` flags only cover copies. | M |
 | ENH-05 | **First-class stages.** Make `festival_stages` authoritative: create N rows when `max_stages` is set, reference stages by id (keeping the number for display), and allow renaming or reordering. Put per-stage gear, crew and schedule on one stage page. | It fixes FEST-ARCH-04 and enables per-stage WhatsApp groups and PDFs without mapping numbers to names. | L (migration + backfill) |
 | ENH-06 | **Automatic gear-mismatch → extras quote.** The mismatch detection and `useCreateExtrasPresupuesto` already exist. Add a festival-wide "requirements vs inventory" summary per day and stage, with one-click grouped extras into Flex. | It turns an existing indicator into a planning tool. | M |
 | ENH-07 | **Mobile field mode for stage managers.** A read-first day view per stage (running order with live "now/next", changeover countdown, contact for the artist's production), which works offline on the existing snapshot. | The offline infrastructure already exists and is used today mainly for documents. | M |
 | ENH-08 | **Templates for recurring events.** Save a festival's stages, gear setup, shift pattern and form settings as a template, and apply it to the next edition or to a `ciclo` date. `CopyArtistsDialog` and `CopyShiftsDialog` already do half of this, per day. | Ciclos and annual festivals reuse the same structure every time. | M |
 | ENH-09 | **Show-day status on the wallboard and push feed.** Publish the running order (on stage / changeover / delayed) from the stage manager view to the wallboard preset and the festival push feed. | It reuses two existing channels. | S–M |
+
+## 4b. Shift scheduling UX (SCH workstream)
+
+The "Planificación" tab (`src/components/festival/scheduling/`, about 2,100 LOC) works, but every task takes too many steps. This section is a UX audit plus a delivery plan. It extends Phase 2.4 and absorbs ENH-03.
+
+### How it is used (production, 2026-09-28, aggregates only)
+
+| Signal | Value | What it tells us |
+| --- | --- | --- |
+| Shifts / festival days / jobs | 159 / 67 / 26 | The feature is used on real festivals and single jobs. |
+| Shifts per day, people per shift | 2.4, 4.4 | A typical day is Mañana / Tarde / Noche with 4–5 people each. It is a small grid, not a big roster. |
+| Shifts that end after midnight | **61 (38%)** | Overnight is the normal case, not an edge case. |
+| External crew in assignments | **133 of 677 (21%)** | Externals are first-class, but they are typed as free text every time. |
+| Shifts edited after creation | **102 of 159** | People create a shift and then fix it. The create flow doesn't capture what they need first time. |
+| Most common names | Mañana, Noche, Turno de Mañana, Montaje, Turno de Tarde, "Turno de Mañana - Stage 1" … | The same few patterns are retyped every day, and the stage is written into the name because the stage picker ignores stage names. |
+
+### Friction and bugs found
+
+| ID | Finding | Evidence |
+| --- | --- | --- |
+| SCH-01 | **Adding people is one at a time and fights you.** Pick a technician, pick a role, press *Asignar*, read the toast, repeat. After each add the role resets to empty, and the default role only applies when the dialog opens, so the second add fails with "completa todos los campos" until the role is picked again. The technician `Select` is uncontrolled, so it keeps showing the previous name while its state is empty. | `ManageAssignmentsDialog.tsx` (`setRole("")` after add; `useEffect([open, department])`; `Select` without `value`) |
+| SCH-02 | **The crew list in the dialog doesn't update.** The dialog receives a snapshot of the shift taken when it opened (`managingShift` / `currentShift` state), so a person just added doesn't appear under "Personal asignado" until the dialog is reopened. It also invalidates a query key (`festivalShifts`) that no query uses. | `ShiftsTable.tsx:48,149,317`, `ShiftsList.tsx`, `ManageAssignmentsDialog.tsx:153,183` |
+| SCH-03 | **One shift is split across two dialogs:** "Editar" for times and details, the people icon for crew. Creating a staffed shift takes two dialogs and at least six clicks per person. | `EditShiftDialog`, `ManageAssignmentsDialog` |
+| SCH-04 | **Stage and department pickers are hardcoded.** "Stage 1–4" regardless of `festival_stages` names or `max_stages`. The department list has no production, and the table shows the raw value (`sound`). | `CreateShiftDialog.tsx`, `EditShiftDialog.tsx:172-195`, `ShiftsTable` |
+| SCH-05 | **The candidate list is wrong for mixed crews.** It lists job crew whose *profile* department equals the shift's department, and defaults to sound when the shift has none. Someone on this job as lights crew with a sound profile shows up in sound shifts and not in lights shifts. People who are only on a shift, and production crew, never appear. | `ManageAssignmentsDialog.tsx` technicians query |
+| SCH-06 | **Crew names can come out blank.** The shifts hook reads `profiles` directly (including `email`, which it doesn't need). Since SEC-13, a house tech or shift-only technician can't read the profiles of people they don't share an assignment with, so the view shows "undefined undefined". | `useFestivalShifts.ts`; `20260904162000_narrow_profile_and_rate_visibility.sql` (use `get_profile_directory`) |
+| SCH-07 | **Overnight shifts are misplaced.** Shifts are sorted by the `start_time` string, so anything starting between 00:00 and the festival day start (07:00) lists first. There is no duration, no "ends next day" marker, and no validation, so `end == start` is accepted. With 38% overnight shifts this is the common case. | `ShiftsTable.tsx` sort; create/edit zod schemas |
+| SCH-08 | **Destructive actions are inconsistent.** Delete in the table uses the native `confirm()`; delete in the list view has **no confirmation at all**. Deletion is two client-side deletes, even though the FK already cascades. | `ShiftsTable.tsx:137`, `ShiftsList.tsx`, `FestivalScheduling.tsx` `handleDeleteShift` |
+| SCH-09 | **The time calculator is a detour.** It computes N optimal shifts from the artist schedule, but it lives inside *Crear turno* and applies one start/end pair to the single shift being created. You have to reopen the dialog N times. | `ShiftTimeCalculator.tsx:182`, `CreateShiftDialog` |
+| SCH-10 | **Copying is all-or-nothing, to one date, and not atomic.** You can't pick which shifts to copy, choose several target dates, or copy without crew. A 500 ms `setTimeout` papers over the refetch. | `CopyShiftsDialog.tsx`, `FestivalScheduling.tsx:handleShiftsCopied` (FEST-DATA-01) |
+| SCH-11 | **Two views, both partial.** The table is six columns wide on a phone. The list view hides stage and crew names. The toggle isn't remembered. There is a manual "Actualizar" button next to a live-subscription indicator. | `FestivalScheduling.tsx`, `ShiftsList.tsx` |
+| SCH-12 | **No person-centred view.** There is no way to see a technician's shifts across the day or festival, how many hours they do, who on the job has no shift, or whether someone is double-booked or lacks rest. Shifts don't feed timesheets (ENH-03). | — |
+| SCH-13 | **Smaller issues.** English "(House Tech)" label; dates in browser locale/timezone; `ShiftsTable` fetches job title and logo on every mount just for the PDF; externals retyped each time with no suggestions. | `ManageAssignmentsDialog.tsx`, `ShiftsTable.tsx` |
+
+### Target experience
+
+1. **One day board instead of a table plus dialogs.**
+   - Pick a day and see it as a timeline from the festival day start to the day start of the next day (for example 07:00→07:00), so overnight shifts read naturally. There is one lane per stage (using stage names) or per department, with a switch.
+   - Each shift is a block showing its name, time range, duration and crew chips. An "ends next day" marker appears when it crosses midnight.
+   - On phones the same data is a vertical agenda per stage, and you swipe to change day. No wide tables.
+2. **A shift sheet instead of two dialogs.** Tapping a shift, or dragging on an empty lane, opens a side sheet (bottom sheet on mobile) with details and crew together:
+   - Times, stage (named) and department.
+   - A **multi-select crew picker** with search. It lists the job's crew grouped by *the role they hold on this job*, then everyone else on the job, then "externos recientes" (names reused on this festival). Each person comes in with a default role, and the role can be changed on the chip.
+   - Changes save as you go, with undo on remove. The crew list is live (no snapshot).
+3. **Patterns instead of retyping.**
+   - **Day templates**: save "Mañana / Tarde / Noche" with times, stage and optional crew per festival, and apply them to one or many dates.
+   - **Copy day**: choose the source shifts, several target dates, and with or without crew, done in one transaction (FEST-DATA-01).
+   - The calculator becomes **"Generar turnos desde el horario de artistas"**. It proposes the N shifts on the board as drafts; you adjust them and create all at once.
+4. **Crew view ("Por persona").**
+   - Rows are the job's crew and columns the festival days, showing each person's shifts and hours.
+   - It highlights people with no shift, overlapping shifts (including other jobs, through the matrix conflict logic), and less than 12 h rest between shifts. The rest threshold is configurable and is a warning only.
+5. **Coverage at a glance (optional).**
+   - A shift can declare how many people it needs per role, and the board shows filled versus needed.
+   - "Shifts without crew" (4 today) become visible instead of silent.
+6. **Out of the planner.**
+   - The existing PDF gets per-day, per-stage and per-person variants.
+   - Crew see their own shifts in the technician app, which already reads `festival_shifts`.
+   - Changes go out through the festival push feed. The "send to the department WhatsApp" action is kept.
+
+### Delivery plan
+
+| Step | Scope | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| **SCH-A. Quick fixes** (one PR) | SCH-01 (keep the role, control the Select, bulk add stays for step B); SCH-02 (dialog reads the live shift from the query by id); SCH-04 (stage names from `buildFestivalStageOptions`, production department, Spanish labels); SCH-05 (candidates by job role, plus shift crew, plus production); SCH-06 (`get_profile_directory`); SCH-07 (sort from festival day start, duration and "+1 día" marker, reject `end == start`); SCH-08 (`useConfirm` everywhere, single delete); SCH-13 labels and locale | S–M | Phase 0 merged | Component tests for each fix; overnight sorting has a unit test; e2e adds "create shift, add two people without re-picking the role" |
+| **SCH-B. Data layer** | `features/festival-scheduling/api.ts` (queries and mutations, `festivalKeys`); `copy_festival_shifts` RPC (FEST-DATA-01); assignment constraints (FEST-DATA-02); remove the refetch timeouts and the manual refresh button | M | = Phase 1.2 + 2.4 | Source-boundary exemptions for `scheduling/*` removed; RPC pgTAP |
+| **SCH-C. Day board + shift sheet** | Timeline board (stage or department lanes, overnight aware), unified shift sheet with the multi-select picker and external suggestions, mobile agenda; retire `ShiftsList`/`ShiftsTable` as primary views (the table stays for print) | L | SCH-B; ENH-05 is *nice to have* (works with the current stage numbers + names) | Usability check with 2–3 real planners; `/ui-check` desktop + mobile; e2e for create, edit, assign and delete on both viewports |
+| **SCH-D. Patterns** | Day templates (small table `festival_shift_templates`), copy day with options, "generate from artist schedule" drafts | M | SCH-C | Creating a typical three-shift day for a new date takes one action |
+| **SCH-E. Crew view + conflicts** | "Por persona" view, hours per person, overlap and rest warnings (reusing the matrix conflict helpers), coverage counts; then ENH-03 (link to `job_assignments`, optional timesheet pre-fill; `compute_timesheet_hours` stays authoritative) | L | SCH-C, 1.2 | Conflicts pinned by tests; timesheet pre-fill behind a flag first |
+
+**What to measure** (same queries as above, re-run after each step): the share of shifts edited after creation (64% today) should fall; average clicks and time to staff a day (measure in the usability check); the share of shift names that embed a stage should reach zero once stage names are shown; shifts without crew; external names reused versus retyped.
 
 ## 5. Roadmap
 
@@ -166,7 +236,7 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
 | 2.1 | **Artist model**: shared zod schema and mapping for all four editors | `ArtistManagementForm`, `MobileArtistFormSheet`, `MobileArtistConfigEditor`, `artistRequirementsFormModel` | FEST-ARCH-01, about 32 `any` warnings |
 | 2.2 | Artists list/table | `FestivalArtistManagement`, `ArtistTable`, `useArtistsQuery`, `useArtistMutations`, `CopyArtistsDialog` (RPC) | ARCH-05, ARCH-06, BUG-07 |
 | 2.3 | Gear and stages | `FestivalGearManagement`, `FestivalGearSetupForm`, `gear-setup/*`, `useCombinedGearSetup` | DATA-03 (gear save RPC) |
-| 2.4 | Scheduling | `FestivalScheduling`, `ShiftsTable`, `Create/Edit/ManageAssignments/CopyShifts` dialogs, `useFestivalShifts` | `confirm()` → `useConfirm` |
+| 2.4 | Scheduling | `FestivalScheduling`, `ShiftsTable`, `Create/Edit/ManageAssignments/CopyShifts` dialogs, `useFestivalShifts` | Delivered as **SCH-A → SCH-B** (see §4b); the UX redesign continues as SCH-C–E |
 | 2.5 | Forms and assets | `ArtistFormLinkDialog`, `ArtistFormLinksDialog`, `FestivalLogoManager`, `ArtistFileDialog` | DATA-03 (bulk links) |
 | 2.6 | Shell and realtime | `useFestivalManagementVm` channel → `useTableSubscription`, `FestivalManagementView` split, `Festivals` page server-side filter and batched logos | ARCH-03, ARCH-06 |
 | 2.7 | Print | `usePrintOptionDownloads`, `PrintOptionsDialog`, `festivalPdfGenerator` split by section | ARCH-05 |
@@ -174,7 +244,7 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
 
 ### Phase 3: enhancements (after Phase 2 lands for the relevant sub-domain)
 
-Suggested order, by value and dependency: **ENH-01** (labels and defaults; module hiding deferred by decision) → **ENH-02** (production send flow, ciclo-first) → **ENH-04** (change log / rider versions) → **ENH-06** (mismatch → quote) → **ENH-05** (first-class stages, needs 2.3) → **ENH-03** (shifts ↔ timesheets, needs 2.4 and 1.2) → ENH-08 / ENH-07 / ENH-09.
+Suggested order, by value and dependency: **ENH-01** (labels and defaults; module hiding deferred by decision) → **ENH-02** (production send flow, ciclo-first) → **ENH-04** (change log / rider versions) → **ENH-06** (mismatch → quote) → **ENH-05** (first-class stages, needs 2.3) → **ENH-03** (shifts ↔ timesheets, now delivered inside SCH-E) → ENH-08 / ENH-07 / ENH-09. The scheduling redesign (§4b SCH-A…E) runs in parallel: SCH-A can start right after Phase 0 because it needs no schema change.
 
 ## 6. Ratchets and exit targets
 
@@ -206,5 +276,6 @@ Consider a module-scoped gate, `governance:festival`, that fails when a new file
 - `pg_class.reltuples` for `festival%` tables (approximate row counts).
 - `festival_artist_forms` status/expiry counts. `festival_artist_form_submissions` row count.
 - Per-`job_type` counts of jobs with artists, shifts and gear setups.
+- Scheduling usage (§4b): shift, day and job counts; overnight shifts; external versus internal assignments; duplicate and overlapping assignments; shifts edited after creation; the most common shift names.
 
 No row contents were read. Before writing each migration, re-run the policy query, because production has drifted from the migration chain (DB-06).
