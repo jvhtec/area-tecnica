@@ -110,10 +110,11 @@ export async function sendTransportRequestEmail(
     const from = normalizeEmail(Deno.env.get("BREVO_FROM"));
     if (!apiKey || !from) return skip("not_configured");
     const recipients = new Set<string>();
-    // Pagination avoids silently dropping logistics profiles beyond the API row cap.
+    // Pagination avoids silently dropping logistics managers beyond the API row cap.
     for (let offset = 0; ; offset += PAGE_SIZE) {
       const { data: profiles, error: profilesError } = await client.from("profiles")
-        .select("email").eq("department", "logistics").order("id", { ascending: true })
+        .select("email").eq("department", "logistics").eq("role", "management")
+        .order("id", { ascending: true })
         .range(offset, offset + PAGE_SIZE - 1);
       if (profilesError || !Array.isArray(profiles)) return skip("data_unavailable");
       for (const profile of profiles) {
