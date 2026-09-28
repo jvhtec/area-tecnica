@@ -453,7 +453,7 @@ export type Database = {
           created_at: string
           id: string
           ip_address: string | null
-          metadata: NonNullable<Json>
+          metadata: Json
           resource: string
           severity: string
           user_agent: string | null
@@ -463,7 +463,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: string | null
-          metadata?: NonNullable<Json>
+          metadata?: Json
           resource: string
           severity: string
           user_agent?: string | null
@@ -473,7 +473,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: string | null
-          metadata?: NonNullable<Json>
+          metadata?: Json
           resource?: string
           severity?: string
           user_agent?: string | null
@@ -1857,7 +1857,7 @@ export type Database = {
         Row: {
           artist_id: string | null
           created_at: string | null
-          form_data: NonNullable<Json>
+          form_data: Json
           form_id: string | null
           id: string
           notes: string | null
@@ -1868,7 +1868,7 @@ export type Database = {
         Insert: {
           artist_id?: string | null
           created_at?: string | null
-          form_data: NonNullable<Json>
+          form_data: Json
           form_id?: string | null
           id?: string
           notes?: string | null
@@ -1879,7 +1879,7 @@ export type Database = {
         Update: {
           artist_id?: string | null
           created_at?: string | null
-          form_data?: NonNullable<Json>
+          form_data?: Json
           form_id?: string | null
           id?: string
           notes?: string | null
@@ -1956,12 +1956,13 @@ export type Database = {
           extras_wired: string | null
           foh_console: string | null
           foh_console_provided_by:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           foh_drive: string | null
           foh_drive_position: string | null
           foh_outboard: string | null
           foh_tech: boolean | null
-          foh_waves_models: NonNullable<Json>
+          foh_waves_models: Json
           foh_waves_provided_by: Database["public"]["Enums"]["provider_type"]
           form_language: string
           id: string
@@ -1977,7 +1978,8 @@ export type Database = {
           infra_opticalcon_duo: boolean | null
           infra_opticalcon_duo_quantity: number | null
           infrastructure_provided_by:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           isaftermidnight: boolean | null
           job_id: string | null
           line_check: boolean
@@ -1988,11 +1990,12 @@ export type Database = {
           mic_pack: string | null
           mon_console: string | null
           mon_console_provided_by:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           mon_outboard: string | null
           mon_position: string | null
           mon_tech: boolean | null
-          mon_waves_models: NonNullable<Json>
+          mon_waves_models: Json
           mon_waves_provided_by: Database["public"]["Enums"]["provider_type"]
           monitors_enabled: boolean | null
           monitors_from_foh: boolean
@@ -2022,7 +2025,8 @@ export type Database = {
           updated_at: string | null
           wired_mics: Json | null
           wireless_provided_by:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           wireless_quantity: number | null
           wireless_systems: Json | null
         }
@@ -2036,12 +2040,13 @@ export type Database = {
           extras_wired?: string | null
           foh_console?: string | null
           foh_console_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           foh_drive?: string | null
           foh_drive_position?: string | null
           foh_outboard?: string | null
           foh_tech?: boolean | null
-          foh_waves_models?: NonNullable<Json>
+          foh_waves_models?: Json
           foh_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           form_language?: string
           id?: string
@@ -2057,7 +2062,8 @@ export type Database = {
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
           infrastructure_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           isaftermidnight?: boolean | null
           job_id?: string | null
           line_check?: boolean
@@ -2068,11 +2074,12 @@ export type Database = {
           mic_pack?: string | null
           mon_console?: string | null
           mon_console_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           mon_outboard?: string | null
           mon_position?: string | null
           mon_tech?: boolean | null
-          mon_waves_models?: NonNullable<Json>
+          mon_waves_models?: Json
           mon_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           monitors_enabled?: boolean | null
           monitors_from_foh?: boolean
@@ -2102,7 +2109,8 @@ export type Database = {
           updated_at?: string | null
           wired_mics?: Json | null
           wireless_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           wireless_quantity?: number | null
           wireless_systems?: Json | null
         }
@@ -2116,12 +2124,13 @@ export type Database = {
           extras_wired?: string | null
           foh_console?: string | null
           foh_console_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           foh_drive?: string | null
           foh_drive_position?: string | null
           foh_outboard?: string | null
           foh_tech?: boolean | null
-          foh_waves_models?: NonNullable<Json>
+          foh_waves_models?: Json
           foh_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           form_language?: string
           id?: string
@@ -2137,7 +2146,8 @@ export type Database = {
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
           infrastructure_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           isaftermidnight?: boolean | null
           job_id?: string | null
           line_check?: boolean
@@ -2148,11 +2158,12 @@ export type Database = {
           mic_pack?: string | null
           mon_console?: string | null
           mon_console_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           mon_outboard?: string | null
           mon_position?: string | null
           mon_tech?: boolean | null
-          mon_waves_models?: NonNullable<Json>
+          mon_waves_models?: Json
           mon_waves_provided_by?: Database["public"]["Enums"]["provider_type"]
           monitors_enabled?: boolean | null
           monitors_from_foh?: boolean
@@ -2182,7 +2193,8 @@ export type Database = {
           updated_at?: string | null
           wired_mics?: Json | null
           wireless_provided_by?:
-            Database["public"]["Enums"]["provider_type"] | null
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           wireless_quantity?: number | null
           wireless_systems?: Json | null
         }
@@ -2217,7 +2229,7 @@ export type Database = {
           foh_drive_options: string[]
           foh_drive_positions: string[]
           foh_outboard: string | null
-          foh_waves_models: NonNullable<Json>
+          foh_waves_models: Json
           has_dj_booths: boolean | null
           has_drum_fills: boolean | null
           has_side_fills: boolean | null
@@ -2228,7 +2240,7 @@ export type Database = {
           mon_consoles: Json | null
           mon_outboard: string | null
           mon_positions: string[]
-          mon_waves_models: NonNullable<Json>
+          mon_waves_models: Json
           notes: string | null
           other_infrastructure: string | null
           updated_at: string | null
@@ -2248,7 +2260,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: NonNullable<Json>
+          foh_waves_models?: Json
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
           has_side_fills?: boolean | null
@@ -2259,7 +2271,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: NonNullable<Json>
+          mon_waves_models?: Json
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
@@ -2279,7 +2291,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: NonNullable<Json>
+          foh_waves_models?: Json
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
           has_side_fills?: boolean | null
@@ -2290,7 +2302,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: NonNullable<Json>
+          mon_waves_models?: Json
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
@@ -2370,7 +2382,7 @@ export type Database = {
           event_kind: string
           id: string
           job_id: string
-          payload: NonNullable<Json>
+          payload: Json
           sent_at: string
           user_id: string
         }
@@ -2381,7 +2393,7 @@ export type Database = {
           event_kind: string
           id?: string
           job_id: string
-          payload?: NonNullable<Json>
+          payload?: Json
           sent_at?: string
           user_id: string
         }
@@ -2392,7 +2404,7 @@ export type Database = {
           event_kind?: string
           id?: string
           job_id?: string
-          payload?: NonNullable<Json>
+          payload?: Json
           sent_at?: string
           user_id?: string
         }
@@ -2628,7 +2640,7 @@ export type Database = {
           foh_drive_options: string[]
           foh_drive_positions: string[]
           foh_outboard: string | null
-          foh_waves_models: NonNullable<Json>
+          foh_waves_models: Json
           gear_setup_id: string
           id: string
           iem_systems: Json | null
@@ -2644,7 +2656,7 @@ export type Database = {
           mon_consoles: Json | null
           mon_outboard: string | null
           mon_positions: string[]
-          mon_waves_models: NonNullable<Json>
+          mon_waves_models: Json
           monitors_enabled: boolean | null
           monitors_quantity: number | null
           notes: string | null
@@ -2664,7 +2676,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: NonNullable<Json>
+          foh_waves_models?: Json
           gear_setup_id: string
           id?: string
           iem_systems?: Json | null
@@ -2680,7 +2692,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: NonNullable<Json>
+          mon_waves_models?: Json
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           notes?: string | null
@@ -2700,7 +2712,7 @@ export type Database = {
           foh_drive_options?: string[]
           foh_drive_positions?: string[]
           foh_outboard?: string | null
-          foh_waves_models?: NonNullable<Json>
+          foh_waves_models?: Json
           gear_setup_id?: string
           id?: string
           iem_systems?: Json | null
@@ -2716,7 +2728,7 @@ export type Database = {
           mon_consoles?: Json | null
           mon_outboard?: string | null
           mon_positions?: string[]
-          mon_waves_models?: NonNullable<Json>
+          mon_waves_models?: Json
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           notes?: string | null
@@ -3015,7 +3027,7 @@ export type Database = {
           id: string
           operation_id: string
           parent_key: string | null
-          payload: NonNullable<Json>
+          payload: Json
           safe_error: Json | null
           semantic_key: string
           state: string
@@ -3028,7 +3040,7 @@ export type Database = {
           id?: string
           operation_id: string
           parent_key?: string | null
-          payload?: NonNullable<Json>
+          payload?: Json
           safe_error?: Json | null
           semantic_key: string
           state?: string
@@ -3041,7 +3053,7 @@ export type Database = {
           id?: string
           operation_id?: string
           parent_key?: string | null
-          payload?: NonNullable<Json>
+          payload?: Json
           safe_error?: Json | null
           semantic_key?: string
           state?: string
@@ -3186,7 +3198,7 @@ export type Database = {
           id: string
           job_assignment_id: string | null
           job_role: string | null
-          metadata: NonNullable<Json>
+          metadata: Json
           quantity: number | null
           role_department: string | null
           source_type: Database["public"]["Enums"]["flex_work_order_item_source"]
@@ -3201,7 +3213,7 @@ export type Database = {
           id?: string
           job_assignment_id?: string | null
           job_role?: string | null
-          metadata?: NonNullable<Json>
+          metadata?: Json
           quantity?: number | null
           role_department?: string | null
           source_type: Database["public"]["Enums"]["flex_work_order_item_source"]
@@ -3216,7 +3228,7 @@ export type Database = {
           id?: string
           job_assignment_id?: string | null
           job_role?: string | null
-          metadata?: NonNullable<Json>
+          metadata?: Json
           quantity?: number | null
           role_department?: string | null
           source_type?: Database["public"]["Enums"]["flex_work_order_item_source"]
@@ -3391,7 +3403,7 @@ export type Database = {
           alerts: Json | null
           approved_at: string | null
           approved_by: string | null
-          aux_machinery_requirements: NonNullable<Json>
+          aux_machinery_requirements: Json
           aux_staff_dismantle_qty: number
           aux_staff_setup_qty: number
           auxiliary_needs: string | null
@@ -3412,7 +3424,7 @@ export type Database = {
           logistics_info: Json | null
           power_requirements: string | null
           power_requirements_source_updated_at: string | null
-          print_excluded_sections: NonNullable<Json>
+          print_excluded_sections: Json
           program_schedule_json: Json | null
           published_document_id: string | null
           restaurants_info: Json | null
@@ -3433,7 +3445,7 @@ export type Database = {
           alerts?: Json | null
           approved_at?: string | null
           approved_by?: string | null
-          aux_machinery_requirements?: NonNullable<Json>
+          aux_machinery_requirements?: Json
           aux_staff_dismantle_qty?: number
           aux_staff_setup_qty?: number
           auxiliary_needs?: string | null
@@ -3454,7 +3466,7 @@ export type Database = {
           logistics_info?: Json | null
           power_requirements?: string | null
           power_requirements_source_updated_at?: string | null
-          print_excluded_sections?: NonNullable<Json>
+          print_excluded_sections?: Json
           program_schedule_json?: Json | null
           published_document_id?: string | null
           restaurants_info?: Json | null
@@ -3475,7 +3487,7 @@ export type Database = {
           alerts?: Json | null
           approved_at?: string | null
           approved_by?: string | null
-          aux_machinery_requirements?: NonNullable<Json>
+          aux_machinery_requirements?: Json
           aux_staff_dismantle_qty?: number
           aux_staff_setup_qty?: number
           auxiliary_needs?: string | null
@@ -3496,7 +3508,7 @@ export type Database = {
           logistics_info?: Json | null
           power_requirements?: string | null
           power_requirements_source_updated_at?: string | null
-          print_excluded_sections?: NonNullable<Json>
+          print_excluded_sections?: Json
           program_schedule_json?: Json | null
           published_document_id?: string | null
           restaurants_info?: Json | null
@@ -4091,7 +4103,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
-          template_data: NonNullable<Json>
+          template_data: Json
           updated_at: string | null
         }
         Insert: {
@@ -4102,7 +4114,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
-          template_data: NonNullable<Json>
+          template_data: Json
           updated_at?: string | null
         }
         Update: {
@@ -4113,7 +4125,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
-          template_data?: NonNullable<Json>
+          template_data?: Json
           updated_at?: string | null
         }
         Relationships: []
@@ -4579,7 +4591,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: NonNullable<Json>
+          status_history: Json
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -4606,7 +4618,7 @@ export type Database = {
           rejected_by?: string | null
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["expense_status"]
-          status_history?: NonNullable<Json>
+          status_history?: Json
           submitted_at?: string | null
           submitted_by?: string | null
           technician_id: string
@@ -4633,7 +4645,7 @@ export type Database = {
           rejected_by?: string | null
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["expense_status"]
-          status_history?: NonNullable<Json>
+          status_history?: Json
           submitted_at?: string | null
           submitted_by?: string | null
           technician_id?: string
@@ -5207,7 +5219,7 @@ export type Database = {
           created_by: string | null
           id: string
           job_id: string
-          plot_data: NonNullable<Json>
+          plot_data: Json
           updated_at: string | null
         }
         Insert: {
@@ -5215,7 +5227,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           job_id: string
-          plot_data: NonNullable<Json>
+          plot_data: Json
           updated_at?: string | null
         }
         Update: {
@@ -5223,7 +5235,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           job_id?: string
-          plot_data?: NonNullable<Json>
+          plot_data?: Json
           updated_at?: string | null
         }
         Relationships: [
@@ -5517,7 +5529,8 @@ export type Database = {
           flex_folders_created: boolean | null
           id: string
           invoicing_company:
-            Database["public"]["Enums"]["invoicing_company"] | null
+            | Database["public"]["Enums"]["invoicing_company"]
+            | null
           job_type: Database["public"]["Enums"]["job_type"]
           location_id: string | null
           preventive_resource_assigned_at: string | null
@@ -5543,7 +5556,8 @@ export type Database = {
           flex_folders_created?: boolean | null
           id?: string
           invoicing_company?:
-            Database["public"]["Enums"]["invoicing_company"] | null
+            | Database["public"]["Enums"]["invoicing_company"]
+            | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
           preventive_resource_assigned_at?: string | null
@@ -5554,7 +5568,7 @@ export type Database = {
           rates_approved_by?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["job_status"] | null
-          time_range?: never
+          time_range?: unknown
           timezone?: string | null
           title: string
           tour_date_id?: string | null
@@ -5569,7 +5583,8 @@ export type Database = {
           flex_folders_created?: boolean | null
           id?: string
           invoicing_company?:
-            Database["public"]["Enums"]["invoicing_company"] | null
+            | Database["public"]["Enums"]["invoicing_company"]
+            | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
           preventive_resource_assigned_at?: string | null
@@ -5580,7 +5595,7 @@ export type Database = {
           rates_approved_by?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["job_status"] | null
-          time_range?: never
+          time_range?: unknown
           timezone?: string | null
           title?: string
           tour_date_id?: string | null
@@ -5960,7 +5975,8 @@ export type Database = {
           timezone: string | null
           title: string | null
           transport_provider:
-            Database["public"]["Enums"]["transport_provider_enum"] | null
+            | Database["public"]["Enums"]["transport_provider_enum"]
+            | null
           transport_request_id: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at: string | null
@@ -5988,7 +6004,8 @@ export type Database = {
           timezone?: string | null
           title?: string | null
           transport_provider?:
-            Database["public"]["Enums"]["transport_provider_enum"] | null
+            | Database["public"]["Enums"]["transport_provider_enum"]
+            | null
           transport_request_id?: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
@@ -6016,7 +6033,8 @@ export type Database = {
           timezone?: string | null
           title?: string | null
           transport_provider?:
-            Database["public"]["Enums"]["transport_provider_enum"] | null
+            | Database["public"]["Enums"]["transport_provider_enum"]
+            | null
           transport_request_id?: string | null
           transport_type?: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
@@ -6289,7 +6307,7 @@ export type Database = {
           expires_at: string | null
           failed_count: number
           id: string
-          meta: NonNullable<Json>
+          meta: Json
           provider_status: string
           read_at: string | null
           title: string
@@ -6308,7 +6326,7 @@ export type Database = {
           expires_at?: string | null
           failed_count?: number
           id?: string
-          meta?: NonNullable<Json>
+          meta?: Json
           provider_status?: string
           read_at?: string | null
           title: string
@@ -6327,7 +6345,7 @@ export type Database = {
           expires_at?: string | null
           failed_count?: number
           id?: string
-          meta?: NonNullable<Json>
+          meta?: Json
           provider_status?: string
           read_at?: string | null
           title?: string
@@ -6342,19 +6360,20 @@ export type Database = {
         Row: {
           account_enabled: boolean
           assignments: boolean | null
-          category_preferences: NonNullable<Json>
+          category_preferences: Json
           created_at: string | null
           form_submissions: boolean | null
           gear_movements: boolean | null
           id: string
           messages: boolean | null
-          muted_entities: NonNullable<Json>
+          muted_entities: Json
           quiet_hours_enabled: boolean
           quiet_hours_end: string
           quiet_hours_start: string
           quiet_hours_timezone: string
           staffing_scope:
-            Database["public"]["Enums"]["staffing_notification_scope"] | null
+            | Database["public"]["Enums"]["staffing_notification_scope"]
+            | null
           updated_at: string | null
           urgent_bypass: boolean
           user_id: string
@@ -6362,19 +6381,20 @@ export type Database = {
         Insert: {
           account_enabled?: boolean
           assignments?: boolean | null
-          category_preferences?: NonNullable<Json>
+          category_preferences?: Json
           created_at?: string | null
           form_submissions?: boolean | null
           gear_movements?: boolean | null
           id?: string
           messages?: boolean | null
-          muted_entities?: NonNullable<Json>
+          muted_entities?: Json
           quiet_hours_enabled?: boolean
           quiet_hours_end?: string
           quiet_hours_start?: string
           quiet_hours_timezone?: string
           staffing_scope?:
-            Database["public"]["Enums"]["staffing_notification_scope"] | null
+            | Database["public"]["Enums"]["staffing_notification_scope"]
+            | null
           updated_at?: string | null
           urgent_bypass?: boolean
           user_id: string
@@ -6382,19 +6402,20 @@ export type Database = {
         Update: {
           account_enabled?: boolean
           assignments?: boolean | null
-          category_preferences?: NonNullable<Json>
+          category_preferences?: Json
           created_at?: string | null
           form_submissions?: boolean | null
           gear_movements?: boolean | null
           id?: string
           messages?: boolean | null
-          muted_entities?: NonNullable<Json>
+          muted_entities?: Json
           quiet_hours_enabled?: boolean
           quiet_hours_end?: string
           quiet_hours_start?: string
           quiet_hours_timezone?: string
           staffing_scope?:
-            Database["public"]["Enums"]["staffing_notification_scope"] | null
+            | Database["public"]["Enums"]["staffing_notification_scope"]
+            | null
           updated_at?: string | null
           urgent_bypass?: boolean
           user_id?: string
@@ -6467,21 +6488,21 @@ export type Database = {
           created_at: string
           expires_at: string | null
           kind: string
-          payload: NonNullable<Json>
+          payload: Json
         }
         Insert: {
           cache_key: string
           created_at?: string
           expires_at?: string | null
           kind: string
-          payload: NonNullable<Json>
+          payload: Json
         }
         Update: {
           cache_key?: string
           created_at?: string
           expires_at?: string | null
           kind?: string
-          payload?: NonNullable<Json>
+          payload?: Json
         }
         Relationships: []
       }
@@ -6499,7 +6520,7 @@ export type Database = {
           position: string | null
           stage_name: string | null
           stage_number: number | null
-          table_data: NonNullable<Json>
+          table_data: Json
           table_name: string
           total_watts: number
           updated_at: string
@@ -6517,7 +6538,7 @@ export type Database = {
           position?: string | null
           stage_name?: string | null
           stage_number?: number | null
-          table_data?: NonNullable<Json>
+          table_data?: Json
           table_name: string
           total_watts: number
           updated_at?: string
@@ -6535,7 +6556,7 @@ export type Database = {
           position?: string | null
           stage_name?: string | null
           stage_number?: number | null
-          table_data?: NonNullable<Json>
+          table_data?: Json
           table_name?: string
           total_watts?: number
           updated_at?: string
@@ -7029,7 +7050,7 @@ export type Database = {
           event_kind: string
           id: string
           job_id: string
-          payload: NonNullable<Json>
+          payload: Json
           sent_at: string
           user_id: string
         }
@@ -7040,7 +7061,7 @@ export type Database = {
           event_kind?: string
           id?: string
           job_id: string
-          payload?: NonNullable<Json>
+          payload?: Json
           sent_at?: string
           user_id: string
         }
@@ -7051,7 +7072,7 @@ export type Database = {
           event_kind?: string
           id?: string
           job_id?: string
-          payload?: NonNullable<Json>
+          payload?: Json
           sent_at?: string
           user_id?: string
         }
@@ -7705,7 +7726,7 @@ export type Database = {
       }
       rack_builder_panel_layout_rows: {
         Row: {
-          active_column_map: NonNullable<Json>
+          active_column_map: Json
           created_at: string
           hole_count: number
           id: string
@@ -7714,7 +7735,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          active_column_map?: NonNullable<Json>
+          active_column_map?: Json
           created_at?: string
           hole_count: number
           id?: string
@@ -7723,7 +7744,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          active_column_map?: NonNullable<Json>
+          active_column_map?: Json
           created_at?: string
           hole_count?: number
           id?: string
@@ -7995,7 +8016,7 @@ export type Database = {
           created_at: string
           id: string
           ip_address: unknown
-          metadata: NonNullable<Json>
+          metadata: Json
           resource: string
           severity: string
           user_agent: string | null
@@ -8006,7 +8027,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: unknown
-          metadata?: NonNullable<Json>
+          metadata?: Json
           resource: string
           severity: string
           user_agent?: string | null
@@ -8017,7 +8038,7 @@ export type Database = {
           created_at?: string
           id?: string
           ip_address?: unknown
-          metadata?: NonNullable<Json>
+          metadata?: Json
           resource?: string
           severity?: string
           user_agent?: string | null
@@ -8034,7 +8055,7 @@ export type Database = {
           created_at: string
           id: string
           label: string
-          metadata: NonNullable<Json>
+          metadata: Json
           required: boolean
           responsible_role: string
           status: string
@@ -8050,7 +8071,7 @@ export type Database = {
           created_at?: string
           id?: string
           label: string
-          metadata?: NonNullable<Json>
+          metadata?: Json
           required?: boolean
           responsible_role: string
           status?: string
@@ -8066,7 +8087,7 @@ export type Database = {
           created_at?: string
           id?: string
           label?: string
-          metadata?: NonNullable<Json>
+          metadata?: Json
           required?: boolean
           responsible_role?: string
           status?: string
@@ -8108,7 +8129,7 @@ export type Database = {
           entity_id: string
           id: string
           job_id: string | null
-          state: NonNullable<Json>
+          state: Json
           status: string
           tour_date_id: string | null
           tour_id: string | null
@@ -8123,11 +8144,11 @@ export type Database = {
           current_step: string
           entity_id: string
           id?: string
-          job_id?: never
-          state?: NonNullable<Json>
+          job_id?: string | null
+          state?: Json
           status?: string
-          tour_date_id?: never
-          tour_id?: never
+          tour_date_id?: string | null
+          tour_id?: string | null
           type: string
           updated_at?: string
         }
@@ -8139,11 +8160,11 @@ export type Database = {
           current_step?: string
           entity_id?: string
           id?: string
-          job_id?: never
-          state?: NonNullable<Json>
+          job_id?: string | null
+          state?: Json
           status?: string
-          tour_date_id?: never
-          tour_id?: never
+          tour_date_id?: string | null
+          tour_id?: string | null
           type?: string
           updated_at?: string
         }
@@ -8641,7 +8662,7 @@ export type Database = {
           mode: string
           next_run_at: string | null
           offer_message: string | null
-          policy: NonNullable<Json>
+          policy: Json
           run_lock: string | null
           status: string
           updated_at: string | null
@@ -8657,7 +8678,7 @@ export type Database = {
           mode: string
           next_run_at?: string | null
           offer_message?: string | null
-          policy: NonNullable<Json>
+          policy: Json
           run_lock?: string | null
           status?: string
           updated_at?: string | null
@@ -8673,7 +8694,7 @@ export type Database = {
           mode?: string
           next_run_at?: string | null
           offer_message?: string | null
-          policy?: NonNullable<Json>
+          policy?: Json
           run_lock?: string | null
           status?: string
           updated_at?: string | null
@@ -9101,7 +9122,7 @@ export type Database = {
           department: Database["public"]["Enums"]["department"]
           id: string
           name: string
-          tables: NonNullable<Json>
+          tables: Json
           tool: string
           updated_at: string
         }
@@ -9111,7 +9132,7 @@ export type Database = {
           department: Database["public"]["Enums"]["department"]
           id?: string
           name: string
-          tables: NonNullable<Json>
+          tables: Json
           tool: string
           updated_at?: string
         }
@@ -9121,7 +9142,7 @@ export type Database = {
           department?: Database["public"]["Enums"]["department"]
           id?: string
           name?: string
-          tables?: NonNullable<Json>
+          tables?: Json
           tool?: string
           updated_at?: string
         }
@@ -10054,7 +10075,7 @@ export type Database = {
           id: string
           metadata: Json | null
           set_id: string
-          table_data: NonNullable<Json>
+          table_data: Json
           table_name: string
           table_type: string
           total_value: number
@@ -10065,7 +10086,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           set_id: string
-          table_data: NonNullable<Json>
+          table_data: Json
           table_name: string
           table_type: string
           total_value?: number
@@ -10076,7 +10097,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           set_id?: string
-          table_data?: NonNullable<Json>
+          table_data?: Json
           table_name?: string
           table_type?: string
           total_value?: number
@@ -10142,7 +10163,7 @@ export type Database = {
       tour_guest_links: {
         Row: {
           access_level: string
-          allowed_sections: NonNullable<Json>
+          allowed_sections: Json
           created_at: string
           created_by: string | null
           expires_at: string | null
@@ -10156,7 +10177,7 @@ export type Database = {
         }
         Insert: {
           access_level?: string
-          allowed_sections?: NonNullable<Json>
+          allowed_sections?: Json
           created_at?: string
           created_by?: string | null
           expires_at?: string | null
@@ -10170,7 +10191,7 @@ export type Database = {
         }
         Update: {
           access_level?: string
-          allowed_sections?: NonNullable<Json>
+          allowed_sections?: Json
           created_at?: string
           created_by?: string | null
           expires_at?: string | null
@@ -10308,7 +10329,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           default_crew_calls: Json | null
-          default_schedule: NonNullable<Json>
+          default_schedule: Json
           default_timing: Json | null
           description: string | null
           id: string
@@ -10322,7 +10343,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           default_crew_calls?: Json | null
-          default_schedule: NonNullable<Json>
+          default_schedule: Json
           default_timing?: Json | null
           description?: string | null
           id?: string
@@ -10336,7 +10357,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           default_crew_calls?: Json | null
-          default_schedule?: NonNullable<Json>
+          default_schedule?: Json
           default_timing?: Json | null
           description?: string | null
           id?: string
@@ -11361,10 +11382,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          instances_json: NonNullable<Json>
+          instances_json: Json
           job_plan_id: string
-          label_notes_json: NonNullable<Json>
-          metrics_json: NonNullable<Json>
+          label_notes_json: Json
+          metrics_json: Json
           published_at: string | null
           published_by: string | null
           status: string
@@ -11377,10 +11398,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          instances_json?: NonNullable<Json>
+          instances_json?: Json
           job_plan_id: string
-          label_notes_json?: NonNullable<Json>
-          metrics_json?: NonNullable<Json>
+          label_notes_json?: Json
+          metrics_json?: Json
           published_at?: string | null
           published_by?: string | null
           status?: string
@@ -11393,10 +11414,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          instances_json?: NonNullable<Json>
+          instances_json?: Json
           job_plan_id?: string
-          label_notes_json?: NonNullable<Json>
-          metrics_json?: NonNullable<Json>
+          label_notes_json?: Json
+          metrics_json?: Json
           published_at?: string | null
           published_by?: string | null
           status?: string
@@ -11889,7 +11910,7 @@ export type Database = {
           highlight_ttl_seconds: number
           id: string
           name: string
-          panel_durations: NonNullable<Json>
+          panel_durations: Json
           panel_order: string[]
           rotation_fallback_seconds: number
           slug: string
@@ -11903,7 +11924,7 @@ export type Database = {
           highlight_ttl_seconds?: number
           id?: string
           name: string
-          panel_durations: NonNullable<Json>
+          panel_durations: Json
           panel_order: string[]
           rotation_fallback_seconds?: number
           slug: string
@@ -11917,7 +11938,7 @@ export type Database = {
           highlight_ttl_seconds?: number
           id?: string
           name?: string
-          panel_durations?: NonNullable<Json>
+          panel_durations?: Json
           panel_order?: string[]
           rotation_fallback_seconds?: number
           slug?: string
@@ -12417,10 +12438,7 @@ export type Database = {
         Args: { p_hoja_id: string }
         Returns: undefined
       }
-      _hoja_is_service_role: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      _hoja_is_service_role: { Args: never; Returns: boolean }
       _hoja_lock_external_edit: {
         Args: { p_expected_version: number; p_hoja_id: string }
         Returns: {
@@ -12444,10 +12462,7 @@ export type Database = {
         Returns: undefined
       }
       _hoja_touch: { Args: { p_hoja_id: string }; Returns: undefined }
-      _hoja_trusted_write: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      _hoja_trusted_write: { Args: never; Returns: boolean }
       acquire_assignment_lock: {
         Args: { p_date: string; p_technician_id: string }
         Returns: boolean
@@ -12502,7 +12517,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: NonNullable<Json>
+          status_history: Json
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -12516,10 +12531,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      assert_soundvision_access: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      assert_soundvision_access: { Args: never; Returns: boolean }
       assign_transport_driver: {
         Args: {
           p_assignment_id?: string
@@ -12547,10 +12559,7 @@ export type Database = {
           used_today: number
         }[]
       }
-      auto_complete_past_jobs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      auto_complete_past_jobs: { Args: never; Returns: number }
       can_access_department_task: {
         Args: { task_assigned_department: string }
         Returns: boolean
@@ -12589,7 +12598,7 @@ export type Database = {
         Args: { p_technician_id: string }
         Returns: boolean
       }
-      can_manage_users: { Args: Record<PropertyKey, never>; Returns: boolean }
+      can_manage_users: { Args: never; Returns: boolean }
       can_read_job_document_storage: {
         Args: { p_path: string }
         Returns: boolean
@@ -12633,14 +12642,8 @@ export type Database = {
         Args: { p_event_type: string; p_max_attempts?: number }
         Returns: string
       }
-      cleanup_anonymous_security_audit_log: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      cleanup_driver_locations: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      cleanup_anonymous_security_audit_log: { Args: never; Returns: number }
+      cleanup_driver_locations: { Args: never; Returns: number }
       clear_tour_preset_assignments: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
@@ -12724,11 +12727,8 @@ export type Database = {
           tour_id: string
         }[]
       }
-      current_user_department: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      current_user_role: { Args: Record<PropertyKey, never>; Returns: string }
+      current_user_department: { Args: never; Returns: string }
+      current_user_role: { Args: never; Returns: string }
       deactivate_unassigned_prep_day_timesheet: {
         Args: { _date: string; _job_id: string; _technician_id: string }
         Returns: number
@@ -12777,7 +12777,7 @@ export type Database = {
         Returns: number
       }
       evaluate_daily_achievements: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           new_unlocks: number
           user_id: string
@@ -12792,7 +12792,7 @@ export type Database = {
         Returns: Json
       }
       find_declined_with_active_timesheets: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           active_timesheet_count: number
           assignment_status: string
@@ -12801,7 +12801,7 @@ export type Database = {
         }[]
       }
       find_double_bookings: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           date: string
           job_count: number
@@ -12810,7 +12810,7 @@ export type Database = {
         }[]
       }
       find_orphaned_timesheets: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           date: string
           job_id: string
@@ -12820,7 +12820,7 @@ export type Database = {
         }[]
       }
       find_policies_to_optimize: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           policy_name: string
           table_name: string
@@ -12853,7 +12853,7 @@ export type Database = {
         }[]
       }
       get_assignment_matrix_staffing: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           availability_status: string
           availability_updated_at: string
@@ -12892,11 +12892,8 @@ export type Database = {
           status: string
         }[]
       }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_driver_locations: { Args: Record<PropertyKey, never>; Returns: Json }
+      get_current_user_role: { Args: never; Returns: string }
+      get_driver_locations: { Args: never; Returns: Json }
       get_event_driver_assignment_ids: {
         Args: { p_event_id: string }
         Returns: string[]
@@ -12969,10 +12966,7 @@ export type Database = {
           year: number
         }[]
       }
-      get_my_calendar_ics_token: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_my_calendar_ics_token: { Args: never; Returns: string }
       get_my_transport_assignments: {
         Args: { p_from?: string; p_to?: string }
         Returns: Json
@@ -12992,7 +12986,7 @@ export type Database = {
         }[]
       }
       get_profiles_with_skills: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           assignable_as_tech: boolean
           bg_color: string
@@ -13043,7 +13037,7 @@ export type Database = {
         }[]
       }
       get_timesheet_amounts_visible: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           amount_breakdown: Json
           amount_breakdown_visible: Json
@@ -13183,23 +13177,14 @@ export type Database = {
           target_stage: number
         }[]
       }
-      invoke_auto_timesheet_reminders: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      invoke_auto_timesheet_reminders: { Args: never; Returns: undefined }
       invoke_scheduled_push_notification: {
         Args: { event_type: string }
         Returns: undefined
       }
-      invoke_staffing_sweeper: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
-      is_admin_or_management: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      invoke_staffing_sweeper: { Args: never; Returns: undefined }
+      is_admin: { Args: never; Returns: boolean }
+      is_admin_or_management: { Args: never; Returns: boolean }
       is_house_tech: { Args: { _profile_id: string }; Returns: boolean }
       is_madrid_working_day: { Args: { check_date: string }; Returns: boolean }
       is_management_or_admin: { Args: { p_user_id: string }; Returns: boolean }
@@ -13246,14 +13231,8 @@ export type Database = {
         }
         Returns: string
       }
-      logistics_matrix_can_manage: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      logistics_matrix_can_view: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      logistics_matrix_can_manage: { Args: never; Returns: boolean }
+      logistics_matrix_can_view: { Args: never; Returns: boolean }
       manage_assignment_lifecycle: {
         Args: {
           p_action: string
@@ -13289,7 +13268,7 @@ export type Database = {
           entity_id: string
           id: string
           job_id: string | null
-          state: NonNullable<Json>
+          state: Json
           status: string
           tour_date_id: string | null
           tour_id: string | null
@@ -13308,10 +13287,7 @@ export type Database = {
         Returns: boolean
       }
       normalize_text_for_match: { Args: { input: string }; Returns: string }
-      prune_place_api_cache: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      prune_place_api_cache: { Args: never; Returns: undefined }
       publish_hoja_de_ruta_document:
         | {
             Args: { p_document_id: string; p_job_id: string }
@@ -13357,10 +13333,7 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: boolean
       }
-      rack_builder_can_use_tool: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      rack_builder_can_use_tool: { Args: never; Returns: boolean }
       rack_builder_layout_item_slot: {
         Args: {
           p_force_full_width: boolean
@@ -13471,10 +13444,7 @@ export type Database = {
         Args: { _date: string; _job_id: string }
         Returns: undefined
       }
-      refresh_v_job_staffing_summary: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      refresh_v_job_staffing_summary: { Args: never; Returns: undefined }
       remove_assignment_with_timesheets: {
         Args: { p_job_id: string; p_technician_id: string }
         Returns: {
@@ -13523,7 +13493,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: NonNullable<Json>
+          status_history: Json
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -13580,10 +13550,7 @@ export type Database = {
         Args: { p_link_id: string }
         Returns: undefined
       }
-      rotate_my_calendar_ics_token: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      rotate_my_calendar_ics_token: { Args: never; Returns: string }
       save_hoja_de_ruta:
         | {
             Args: {
@@ -13762,10 +13729,7 @@ export type Database = {
         Returns: undefined
       }
       staffing_role_prefix: { Args: { p_role_code: string }; Returns: string }
-      stop_sharing_driver_location: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      stop_sharing_driver_location: { Args: never; Returns: Json }
       submit_job_expense: {
         Args: {
           p_amount_original: number
@@ -13798,7 +13762,7 @@ export type Database = {
           rejected_by: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["expense_status"]
-          status_history: NonNullable<Json>
+          status_history: Json
           submitted_at: string | null
           submitted_by: string | null
           technician_id: string
@@ -13847,7 +13811,7 @@ export type Database = {
         Returns: boolean
       }
       tp_get_technician_published_plans: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           case_counts_json: Json
           department: string
@@ -13868,7 +13832,7 @@ export type Database = {
         Args: { p_department: string; p_job_id: string }
         Returns: boolean
       }
-      tp_is_office_role: { Args: Record<PropertyKey, never>; Returns: boolean }
+      tp_is_office_role: { Args: never; Returns: boolean }
       tp_next_plan_version_number: {
         Args: { p_job_plan_id: string }
         Returns: number
@@ -13884,22 +13848,13 @@ export type Database = {
         }
         Returns: string
       }
-      transport_request_is_privileged: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      transport_request_is_privileged: { Args: never; Returns: boolean }
       transport_stage_transition_allowed: {
         Args: { p_from: string; p_to: string }
         Returns: boolean
       }
-      transport_write_actor_is_trusted: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      update_tour_dates: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      transport_write_actor_is_trusted: { Args: never; Returns: boolean }
+      update_tour_dates: { Args: never; Returns: undefined }
       upsert_job_prep_days: {
         Args: { p_dates: string[]; p_job_id: string }
         Returns: undefined
@@ -13929,7 +13884,10 @@ export type Database = {
     }
     Enums: {
       activity_visibility:
-        "management" | "house_plus_job" | "job_participants" | "actor_only"
+        | "management"
+        | "house_plus_job"
+        | "job_participants"
+        | "actor_only"
       assignment_status: "invited" | "confirmed" | "declined"
       bug_severity: "low" | "medium" | "high" | "critical"
       bug_status: "open" | "in_progress" | "resolved"
@@ -13968,7 +13926,11 @@ export type Database = {
         | "pa_amp"
       expense_status: "draft" | "submitted" | "approved" | "rejected"
       feature_status:
-        "pending" | "under_review" | "accepted" | "rejected" | "completed"
+        | "pending"
+        | "under_review"
+        | "accepted"
+        | "rejected"
+        | "completed"
       flex_work_order_item_source: "role" | "extra"
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
@@ -14002,10 +13964,17 @@ export type Database = {
         | "rigging_motores"
       message_status: "unread" | "read"
       milestone_category:
-        "planning" | "technical" | "logistics" | "administrative" | "production"
+        | "planning"
+        | "technical"
+        | "logistics"
+        | "administrative"
+        | "production"
       movement_type: "addition" | "subtraction"
       notification_channel:
-        "messages" | "assignments" | "form_submissions" | "gear_movements"
+        | "messages"
+        | "assignments"
+        | "form_submissions"
+        | "gear_movements"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
       provider_type: "festival" | "band" | "mixed"
       push_notification_recipient_type:
@@ -14022,7 +13991,12 @@ export type Database = {
       task_status: "not_started" | "in_progress" | "completed"
       timesheet_status: "draft" | "submitted" | "approved" | "rejected"
       tour_date_type:
-        "show" | "rehearsal" | "travel" | "setup" | "off" | "rigging"
+        | "show"
+        | "rehearsal"
+        | "travel"
+        | "setup"
+        | "off"
+        | "rigging"
       transport_provider_enum:
         | "camionaje"
         | "transluminaria"
@@ -14045,7 +14019,12 @@ export type Database = {
         | "rv"
         | "sleeper_bus"
       transportation_type:
-        "van" | "sleeper_bus" | "train" | "plane" | "rv" | "autobus"
+        | "van"
+        | "sleeper_bus"
+        | "train"
+        | "plane"
+        | "rv"
+        | "autobus"
       user_role:
         | "admin"
         | "user"
@@ -14102,7 +14081,8 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -14126,7 +14106,8 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -14150,7 +14131,8 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -14354,3 +14336,4 @@ export const Constants = {
     },
   },
 } as const
+
