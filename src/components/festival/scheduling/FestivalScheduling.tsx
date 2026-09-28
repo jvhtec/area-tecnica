@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { CalendarX, Library, MessageCircle, Plus, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
-import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -20,6 +19,7 @@ import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { FestivalStageOption } from "@/features/festival-management/types";
+import { formatMadridDateKey, getMadridTodayKey } from "@/utils/timezoneUtils";
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
@@ -53,7 +53,7 @@ export const FestivalScheduling = ({
   
   const formatDateToString = useCallback((date: Date): string => {
     try {
-      return format(date, 'yyyy-MM-dd');
+      return formatMadridDateKey(date);
     } catch (error) {
       console.error("Error formatting date:", error);
       console.error("Problematic date value:", date);
@@ -134,8 +134,7 @@ export const FestivalScheduling = ({
       } catch (error) {
         console.error("Error setting initial date:", error);
         
-        const today = new Date();
-        setSelectedDate(formatDateToString(today));
+        setSelectedDate(getMadridTodayKey());
       }
     }
   }, [jobDates, selectedDate, formatDateToString]);

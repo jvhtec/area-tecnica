@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import {
   AlertTriangle,
   CloudDownload,
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useOfflineFestival } from "@/hooks/festival/useOfflineFestival";
 import { cn } from "@/lib/utils";
+import { formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 
 interface FestivalOfflineControlsProps {
   jobId?: string;
@@ -86,7 +86,7 @@ export const FestivalOfflineControls = ({ jobId, canEdit, className }: FestivalO
           <div>Modo offline</div>
           {hasSnapshot && snapshotMeta ? (
             <div className="text-xs font-normal text-muted-foreground">
-              Descargado el {format(new Date(snapshotMeta.downloadedAt), "dd/MM/yyyy HH:mm")} ·{" "}
+              Descargado el {formatFestivalInstant(snapshotMeta.downloadedAt, "dd/MM/yyyy HH:mm")} ·{" "}
               {snapshotMeta.artistCount} artistas
             </div>
           ) : (

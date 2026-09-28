@@ -5,8 +5,6 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, ImageOff, ImagePlus, Loader2 } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -33,6 +31,7 @@ import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { buildReadableFilename } from "@/utils/fileName";
 import { MobileArtistList } from "./mobile/MobileArtistList";
+import { formatFestivalDayKey } from "@/features/festival-management/dateFormatting";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 import { ArtistActionButtons } from "./ArtistActionButtons";
 import { ArtistTableHeader } from "./ArtistTableHeader";
@@ -376,7 +375,7 @@ export const ArtistTable = ({
                           <div className="flex flex-wrap gap-1">
                             {crossDateSearch && artist.date && (
                               <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                                {format(parseISO(artist.date), "d MMM", { locale: es })}
+                                {formatFestivalDayKey(artist.date, "d MMM", artist.date)}
                               </Badge>
                             )}
                             <Badge variant="outline" className="text-[10px] px-1 py-0">{getStageDisplayName(artist.stage)}</Badge>

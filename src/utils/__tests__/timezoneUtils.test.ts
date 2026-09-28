@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 import {
   addMadridCalendarDays,
   formatMadridDateKey,
+  getMadridTodayKey,
   fromMadridDateKey,
   getCalendarPeriodDateKeys,
   getMadridMonthGrid,
@@ -19,6 +20,7 @@ describe("timezoneUtils Madrid calendar helpers", () => {
   it("formats UTC instants as Madrid local date keys", () => {
     expect(formatMadridDateKey(new Date("2026-03-28T22:59:59Z"))).toBe("2026-03-28");
     expect(formatMadridDateKey(new Date("2026-03-28T23:00:00Z"))).toBe("2026-03-29");
+    expect(getMadridTodayKey(new Date("2026-06-03T22:30:00Z"))).toBe("2026-06-04");
   });
 
   it("steps calendar days across the spring DST transition", () => {

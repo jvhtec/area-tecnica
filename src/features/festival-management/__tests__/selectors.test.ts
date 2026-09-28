@@ -157,7 +157,7 @@ describe("festival management selectors", () => {
     expect(getFestivalFlexStatus({ flexError: "boom", folderExists: false, isFlexLoading: false }).variant).toBe(
       "destructive",
     );
-    expect(formatFestivalDateLabel("not-a-date")).toBe("Unknown date");
-    expect(formatFestivalDateLabel("2026-06-01T22:30:00.000Z")).toBe("Jun 2, 2026");
+    expect(formatFestivalDateLabel("not-a-date")).toBe("Fecha desconocida");
+    expect(formatFestivalDateLabel("2026-06-01T22:30:00.000Z")).toBe("2 jun 2026");
   });
 });

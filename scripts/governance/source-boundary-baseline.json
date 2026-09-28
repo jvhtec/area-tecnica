@@ -191,10 +191,6 @@
     "scheduling-new-date": {
       "description": "Scheduling domains must route new date construction through approved date utilities.",
       "fingerprints": [
-        "src/components/festival/scheduling/CopyShiftsDialog.tsx :: Fecha de origen: {format(new Date(sourceDate), 'MMM d, yyyy')}",
-        "src/components/festival/scheduling/CopyShiftsDialog.tsx :: toast.success(`Se copiaron exitosamente ${shifts.length} turnos con todas las asignaciones a ${format(new Date(targetDate), 'MMM d, yyyy')}`);",
-        "src/components/festival/scheduling/FestivalScheduling.tsx :: const today = new Date();",
-        "src/components/festival/scheduling/ShiftsTable.tsx :: const formattedDate = new Date(date).toLocaleDateString(undefined, {",
         "src/components/matrix/AssignJobDialog.tsx :: assigned_at: new Date().toISOString(),",
         "src/components/matrix/AssignJobDialog.tsx :: const parsedAssignmentDate = new Date(`${existingAssignment.assignment_date}T00:00:00`);",
         "src/components/matrix/AssignJobDialog.tsx :: response_time: assignAsConfirmed ? new Date().toISOString() : null,",

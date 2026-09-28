@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { eachDayOfInterval, format, isValid } from "date-fns";
+import { isValid } from "date-fns";
 
+import { buildJobDates } from "@/features/festival-management/selectors";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { fetchWithOfflineFallback, getOfflineFestivalContext } from "@/lib/offline";
+import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
 type JobHeaderDetails = {
   title: string;
@@ -30,12 +32,12 @@ export const useFestivalArtistJobDetails = (jobId: string | undefined, routeDate
       const startDate = new Date(startTime);
       const endDate = new Date(endTime);
       if (!isValid(startDate) || !isValid(endDate)) return;
-      const dates = eachDayOfInterval({ start: startDate, end: endDate });
+      const dates = buildJobDates({ start_time: startTime, end_time: endTime });
       setJobDates(dates);
       const routeDateExists = routeDate
-        ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
+        ? dates.some((festivalDate) => formatMadridDateKey(festivalDate) === routeDate)
         : false;
-      setSelectedDate(routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd"));
+      setSelectedDate(routeDateExists ? routeDate : formatMadridDateKey(dates[0]));
     };
 
     const readOfflineJobDetails = async (): Promise<JobHeaderDetails | null> => {
@@ -116,7 +118,7 @@ export const useFestivalArtistJobDetails = (jobId: string | undefined, routeDate
   useEffect(() => {
     if (!routeDate || jobDates.length === 0) return;
     const routeDateExists = jobDates.some(
-      (festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate,
+      (festivalDate) => formatMadridDateKey(festivalDate) === routeDate,
     );
     if (routeDateExists) {
       setSelectedDate((current) => (current === routeDate ? current : routeDate));

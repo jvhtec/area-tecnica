@@ -66,6 +66,7 @@ test.describe("festival management smoke", () => {
     await page.goto("/festival-management/festival-job-1/scheduling");
 
     await expect(page.getByRole("heading", { name: "Festival Smoke" })).toBeVisible();
+    await expect(page.getByText("10/07/2026 - 13/07/2026", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Planificación del festival" })).toBeVisible();
     await page.getByRole("button", { name: "WhatsApp" }).click();
     await expect(page.getByRole("heading", { name: "Crear Grupo de WhatsApp" })).toBeVisible();

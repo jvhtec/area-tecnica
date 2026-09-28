@@ -1,5 +1,3 @@
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +18,7 @@ import {
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 import type { Artist } from "@/components/festival/artistTableTypes";
 import { formatDifferentScheduleDate, getEffectiveSoundcheckDate } from "@/utils/artistScheduleDates";
+import { formatFestivalDayKey } from "@/features/festival-management/dateFormatting";
 
 // --- Summary Formatters ---
 
@@ -242,7 +241,7 @@ export const MobileArtistCard = ({
               )}
               {showDateBadge && artist.date && (
                 <Badge variant="secondary" className="text-[10px]">
-                  {format(parseISO(artist.date), "d MMM", { locale: es })}
+                  {formatFestivalDayKey(artist.date, "d MMM", artist.date)}
                 </Badge>
               )}
               <Badge variant="outline" className="text-[10px]">{stageName}</Badge>
